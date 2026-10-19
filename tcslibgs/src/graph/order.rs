@@ -107,8 +107,7 @@ mod tests {
     fn yaml_sections_are_in_the_order_written() {
         let (_dir, path) = written(
             "v.yaml",
-            "version: \"2.0\"
-payloads:
+            "payloads:
   - { name: p1, type: i2c }
   - { name: p2, type: i2c }
 moc:
@@ -127,7 +126,6 @@ vehicle:
             "v.xml",
             "<?xml version=\"1.0\"?>
 <configuration>
-    <version>2.0</version>
     <payloads><name>p1</name><type>i2c</type></payloads>
     <moc><name>m</name><type>moc</type></moc>
     <payloads><name>p2</name><type>i2c</type></payloads>

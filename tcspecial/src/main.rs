@@ -6,7 +6,7 @@
 use std::env;
 use std::process;
 
-use log::{debug, error, trace, warn};
+use log::{debug, error, trace};
 use tcslibgs::config::{payload_path_from_args, PAYLOAD_CONFIG_PATH_VAR};
 use tcspecial::runtime;
 
@@ -54,26 +54,21 @@ fn main() {
     // happened to meet first. The same lines tcsmoc, tcssim and tcsgui show
     // as they start.
     //
-    // A version 2 configuration is refused on a warning as well: a node whose
-    // attributes are not all in is a node that cannot be opened, so aboard it
-    // is not a question of degree -- see `tcslibgs::graph::check::Severity`.
+    // Refused on a warning as well: a node whose attributes are not all in is
+    // a node that cannot be opened, so aboard it is not a question of degree
+    // -- see `tcslibgs::graph::check::Severity`.
     let report = tcsverify::verify(
         std::path::Path::new(&payload_path),
         None,
         tcsverify::Limits::EVERYTHING,
     );
-    let graph = runtime::start::is_a_graph(&payload_path);
-    for (error, line) in report.lines() {
-        if error || graph {
-            error!("{}", line);
-        } else {
-            warn!("{}", line);
-        }
+    for (_, line) in report.lines() {
+        error!("{}", line);
         // On stderr too, because a vehicle that will not start is read by
         // whoever is standing there and not through RUST_LOG.
         eprintln!("{}", line);
     }
-    if report.found_errors() || (graph && report.found_anything()) {
+    if report.found_anything() {
         error!("{}: not started", payload_path);
         process::exit(1);
     }

@@ -5577,7 +5577,7 @@ mod tests {
         let path = where_.path().join("vehicle.yaml");
         std::fs::write(
             &path,
-            "version: \"2.0\"\nvehicle:\n  - name: odd\n    type: contraption\n",
+            "vehicle:\n  - name: odd\n    type: contraption\n",
         )
         .expect("a configuration naming a type this build has not got");
 
@@ -5619,8 +5619,7 @@ mod tests {
         let path = where_.path().join("vehicle.yaml");
         std::fs::write(
             &path,
-            "version: \"2.0\"\n\
-             payload_groups:\n  - name: idle\n    interval: 3 s\n\
+            "payload_groups:\n  - name: idle\n    interval: 3 s\n\
              payloads:\n  - name: a\n    type: i2c\n    payload-out: moc\n\
              moc:\n  - name: moc\n    type: moc\n",
         )
@@ -7893,7 +7892,7 @@ mod tests {
         let path = where_.path().join("vehicle.yaml");
         std::fs::write(
             &path,
-            "version: \"2.0\"\npayloads:\n  - name: bay\n    type: app_pl\n    \
+            "payloads:\n  - name: bay\n    type: app_pl\n    \
              executable: /bin/true\n    app-payload-arg: \"--bay\"\n",
         )
         .expect("a payload that is a program");
@@ -8440,14 +8439,14 @@ mod tests {
         // And one that could not be read, which is a file to repair rather
         // than a file to write over.
         let damaged = where_.path().join("c.yaml");
-        std::fs::write(&damaged, "version: \"2.0\"\nnodes: [[[\n").expect("a file");
+        std::fs::write(&damaged, "nodes: [[[\n").expect("a file");
         let mut editor = Editor::open(&damaged, dividers());
         assert!(editor.trouble().is_some(), "a damaged file should be reported");
         seed(&mut editor);
         assert!(editor.document().node("moc-1").is_none());
         assert_eq!(
             std::fs::read_to_string(&damaged).unwrap(),
-            "version: \"2.0\"\nnodes: [[[\n",
+            "nodes: [[[\n",
             "a damaged configuration was written over"
         );
     }
@@ -8639,7 +8638,7 @@ mod tests {
         let path = where_.path().join("vehicle.yaml");
         std::fs::write(
             &path,
-            "version: \"2.0\"\npayloads:\n  - name: bay\n    type: app_pl\n    \
+            "payloads:\n  - name: bay\n    type: app_pl\n    \
              executable: /bin/true\n    app-payload-arg: \"1\"\n",
         )
         .expect("a payload that is a program");
@@ -8693,7 +8692,7 @@ mod tests {
         // kept as a value: this is the other road to the same file.
         std::fs::write(
             &path,
-            "version: \"2.0\"\npayloads:\n  - name: bay\n    type: app_pl\n    \
+            "payloads:\n  - name: bay\n    type: app_pl\n    \
              executable: /bin/true\n    app-payload-arg: \"\"\n",
         )
         .expect("a payload whose argument is stated as nothing");
@@ -8756,7 +8755,7 @@ mod tests {
         let path = where_.path().join("vehicle.yaml");
         std::fs::write(
             &path,
-            "version: \"2.0\"\npayload_groups:\n  - name: idle\n    interval: 3 s\n",
+            "payload_groups:\n  - name: idle\n    interval: 3 s\n",
         )
         .expect("a configuration with a group nothing is in");
         let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
@@ -8812,7 +8811,7 @@ mod tests {
             let path = where_.path().join("vehicle.yaml");
             std::fs::write(
                 &path,
-                "version: \"2.0\"\npayload_groups:\n  - name: idle\n    interval: 3 s\n",
+                "payload_groups:\n  - name: idle\n    interval: 3 s\n",
             )
             .expect("a configuration with a group nothing is in");
             let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
@@ -8879,7 +8878,7 @@ mod tests {
         let path = where_.path().join("vehicle.yaml");
         std::fs::write(
             &path,
-            "version: \"2.0\"\npayload_groups:\n  - name: idle\n    interval: 3 s\n",
+            "payload_groups:\n  - name: idle\n    interval: 3 s\n",
         )
         .expect("a configuration with a group nothing is in");
         let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
@@ -8928,7 +8927,7 @@ mod tests {
         let path = where_.path().join("vehicle.yaml");
         std::fs::write(
             &path,
-            "version: \"2.0\"\npayload_groups:\n  - name: idle\n    interval: 3 s\n",
+            "payload_groups:\n  - name: idle\n    interval: 3 s\n",
         )
         .expect("a configuration with a group nothing is in");
         let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));

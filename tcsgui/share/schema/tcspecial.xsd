@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  A version 2 tcspecial configuration, written in XML.
+  A tcspecial configuration, written in XML.
 
   What this checks is the shape of the file: which sections there are, what an
   entry may say, and which words are words. What it cannot check is whether the
@@ -301,12 +301,11 @@
        has entries: that is how XML spells a list. Nothing is required here,
        for the reason the tcspecial section's attributes are not: a file
        somebody is partway through writing must still open. That a
-       configuration says which version it is, and has a tcspecial section, is
-       checked where a complaint can name the file and the line. -->
+       configuration has a tcspecial section is checked where a complaint can
+       name the file and the line. -->
   <xs:element name="configuration">
     <xs:complexType>
       <xs:choice minOccurs="0" maxOccurs="unbounded">
-        <xs:element name="version" type="xs:string"/>
         <xs:element name="description" type="xs:string"/>
         <xs:element name="include" type="xs:string"/>
         <xs:element name="tcspecial" type="tcspecial"/>

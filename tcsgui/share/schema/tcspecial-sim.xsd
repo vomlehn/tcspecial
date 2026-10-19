@@ -6,11 +6,6 @@
   how fast each one sends, and what it does wrong. Nothing here describes a
   payload; the configuration does that, and the two are joined by name.
 
-  There is no version. A configuration states one so that it can be checked
-  against the software that will read it on the vehicle, before anything opens
-  a device. Nothing aboard reads this file, the simulator not being something
-  that flies, and a file that states one is refused saying so.
-
   As with the configuration schema, this checks the shape of the file and not
   whether it can be run: which settings a given kind of payload may state is
   that kind's own rule, and tcsverify is where those live.

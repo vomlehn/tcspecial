@@ -1,6 +1,5 @@
 # yaml-language-server: $schema=tcsgui/share/schema/tcspecial.schema.json
 
-version: "2.0"
 description: "The ground link alone, ready for payloads to be added"
 
 tcspecial:

@@ -53,7 +53,7 @@ use std::path::{Path, PathBuf};
 
 use tcslibgs::graph::check::Severity;
 use tcslibgs::{
-    names_what_is_gone, ConfigFormat, SimConfigFile, TcsError,
+    ConfigFormat, SimConfigFile, TcsError,
 };
 
 pub mod locate;
@@ -293,46 +293,15 @@ impl Report {
 
 /// Check a tcspecial configuration file, and a simulator file if there is one.
 ///
-/// Which checks are run depends on the version the file says it is. The two
-/// versions describe different things -- version 1 a set of payloads with a
-/// simulator file beside it, version 2 a graph of nodes -- so there is nothing
-/// to share between the two paths but this function, which reads the version
-/// and takes one.
+/// A configuration is a graph of nodes, and is checked as one -- with the
+/// rules tcspecial runs again aboard -- and the simulator file against the
+/// graph's payloads by name.
 ///
 /// `limits` are tcsverify's `--error-limit` and `--warnings`, and the report
 /// passes or fails -- [`Report::status`] -- as tcsverify would under them.
 /// [`Limits::EVERYTHING`] looks at everything.
 pub fn verify(payload_path: &Path, sim_path: Option<&Path>, limits: Limits) -> Report {
     let mut report = Report::under(limits);
-
-    // Neither path for a file that says no version: each would read it as its
-    // own and refuse whatever of it the other version has, which says nothing
-    // about the line that is missing. One written to a spelling that is gone
-    // is told what became of it, which is the more useful of the two.
-    if tcslibgs::graph::states_no_version(payload_path) {
-        report.add(payload_path, THE_FILE_ITSELF, no_version(payload_path));
-        return report;
-    }
-
-    // A version this build does not know is told so, which is the other way a
-    // file reaches here: version 1 -- a set of payloads, each paired with a
-    // ground endpoint and commanded by name -- was read until it was deleted,
-    // every one of its capabilities being a node's.
-    //
-    // Only a file that says a version this is not. A file that cannot be read
-    // at all says no version either, and telling such a file about versions
-    // would bury what is actually wrong with it: those go down the path
-    // below, which reports a parse error at the line the parser stopped on.
-    //
-    // Asked of the library rather than worked out here: one place knows how
-    // to read a version.
-    match tcslibgs::graph::version_of(payload_path) {
-        Some(said) if said != tcslibgs::graph::VERSION => {
-            report.add(payload_path, THE_FILE_ITSELF, not_version_2(&said));
-            return report;
-        }
-        _ => {}
-    }
 
     let payloads = check_graph(payload_path, &mut report);
     if let Some(sim_path) = sim_path {
@@ -344,22 +313,6 @@ pub fn verify(payload_path: &Path, sim_path: Option<&Path>, limits: Limits) -> R
     }
 
     report
-}
-
-/// What is said about a configuration whose version this build does not read.
-///
-/// `said` is the version the file states -- a file that states none is told
-/// that first, above, and one that cannot be read at all is told what is
-/// wrong with it rather than about versions. The only other version there has
-/// been is 1, and the message says what became of it rather than leaving a
-/// reader to wonder which of the two their file is.
-fn not_version_2(said: &str) -> String {
-    format!(
-        "this file says it is version {said}, and the only version there is is 2. \
-Version 1 -- a set of payloads, each paired with a ground endpoint and commanded by \
-name -- is gone, and nothing reads such a file any more: every one of its capabilities \
-is a version 2 node's."
-    )
 }
 
 /// Check two spellings of one configuration -- one XML, one YAML -- each
@@ -768,32 +721,6 @@ fn read(path: &Path, report: &mut Report) -> Option<(String, ConfigFormat)> {
     }
 }
 
-/// What is said about a configuration that states no version, in the
-/// spelling of its own format.
-fn no_version(path: &Path) -> String {
-    let text = std::fs::read_to_string(path).unwrap_or_default();
-    if let Some(gone) = ConfigFormat::of_file(path)
-        .ok()
-        .and_then(|format| names_what_is_gone(&text, format))
-    {
-        return gone.to_string();
-    }
-    let say = |version: &str| match ConfigFormat::of_file(path) {
-        Ok(ConfigFormat::Xml) => format!("<version>{version}</version>"),
-        _ => format!("version: \"{version}\""),
-    };
-    // An empty file is told so: that it states no version is true, and is not
-    // the first thing wrong with it.
-    let empty = text.trim().is_empty();
-    format!(
-        "{}, and which version a configuration is decides what it describes: \
-         say {} for a graph of nodes, or {} for a set of payloads",
-        if empty { "is empty" } else { "states no version" },
-        say("2.0"),
-        say("1.0")
-    )
-}
-
 /// The line a message mentions, if it mentions one.
 ///
 /// A parse error carries its location in a field, and `line_of` reads it
@@ -947,7 +874,6 @@ mod tests {
     }
 
     const SOUND_GRAPH: &str = "\
-version: \"2.0\"
 tcspecial:
   tcs_cmd:
     recv: 0.0.0.0:4000
@@ -1007,7 +933,6 @@ moc:
         let (_dir, path) = graph_written(
             ".yaml",
             "\
-version: \"2.0\"
 payload_groups:
   - name: temps
     interval: soon
@@ -1047,14 +972,14 @@ vehicle:
         let top = dir.path().join("vehicle.yaml");
         std::fs::write(
             &top,
-            "version: \"2.0\"\ninclude:\n  - cabin\nmoc:\n  \
+            "include:\n  - cabin\nmoc:\n  \
              - { name: moc, type: moc, moc-out: moc }\n",
         )
         .unwrap();
         // The included file holds a node nothing links to.
         std::fs::write(
             dir.path().join("cabin.yaml"),
-            "version: \"2.0\"\npayloads:\n  - { name: lonely, type: i2c }\n",
+            "payloads:\n  - { name: lonely, type: i2c }\n",
         )
         .unwrap();
 
@@ -1069,7 +994,7 @@ vehicle:
             "it should be reported in the file it is in, not {}",
             lonely.file.display()
         );
-        assert_eq!(lonely.line, 3, "{lonely}");
+        assert_eq!(lonely.line, 2, "{lonely}");
     }
 
     /// A version 2 configuration's simulator file is joined to it by name.
@@ -1130,7 +1055,6 @@ vehicle:
             "\
 <?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <configuration>
-    <version>2.0</version>
     <payloads>
         <name>a</name>
         <type>i2c</type>
@@ -1168,7 +1092,6 @@ vehicle:
     /// tests below are about the reporting rather than about either version,
     /// so what they are given is the simplest thing that reads.
     const GOOD: &str = "\
-version: \"2.0\"
 description: two payloads
 tcspecial:
   beacon:
@@ -1268,7 +1191,7 @@ payloads:
 
         // Each beside the node it is about, in the order the file wrote them.
         let lines: Vec<usize> = report.findings.iter().map(|f| f.line).collect();
-        assert_eq!(lines, vec![21, 26, 31], "{:?}", report.findings);
+        assert_eq!(lines, vec![20, 25, 30], "{:?}", report.findings);
         for (finding, missing) in report
             .findings
             .iter()
@@ -1383,42 +1306,6 @@ payloads:
         }
     }
 
-    /// A configuration that states no version is told so, whichever version it
-    /// was written as and in either format.
-    ///
-    /// It used to be read as version 1, and a graph read so was refused for
-    /// whatever of it version 1 does not know first -- the root's namespace,
-    /// a number written as a string -- which sent a reader to a line that was
-    /// right.
-    #[test]
-    fn a_configuration_that_states_no_version_is_told_so() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        for (file, version) in [
-            ("examples/minimal/minimal.yaml", "version: \"2.0\"\n"),
-            ("examples/minimal/minimal.xml", "<version>2.0</version>"),
-            ("examples/thermostat/thermostat.yaml", "version: \"2.0\"\n"),
-            ("examples/thermostat/thermostat.xml", "<version>2.0</version>"),
-        ] {
-            let text = std::fs::read_to_string(root.join(file)).expect("the file");
-            assert!(text.contains(version), "{file} states {version}");
-            let extension = if file.ends_with(".xml") { ".xml" } else { ".yaml" };
-            let (_dir, path) = graph_written(extension, &text.replacen(version, "", 1));
-
-            let report = verify(&path, None, Limits::EVERYTHING);
-            assert_eq!(report.findings.len(), 1, "{file}: {:?}", report.said());
-            let said = &report.findings[0].message;
-            assert!(said.starts_with("states no version"), "{file}: {said}");
-            // In the file's own spelling.
-            let spelled = if extension == ".xml" { "<version>2.0</version>" } else { "version: \"2.0\"" };
-            assert!(said.contains(spelled), "{file}: {said}");
-            assert_ne!(report.status(), 0, "{file}");
-        }
-
-        let (_dir, path) = graph_written(".yaml", "\n");
-        let report = verify(&path, None, Limits::EVERYTHING);
-        assert!(report.findings[0].message.starts_with("is empty"), "{:?}", report.said());
-    }
-
     /// A file written in the language that is gone is told what became of it.
     #[test]
     fn a_file_in_the_old_language_is_told_so() {
@@ -1435,31 +1322,29 @@ payloads:
         );
     }
 
-    /// A version this build does not read is told what became of it.
-    ///
-    /// The one problem reported from a line that is not a node's: the version
-    /// is the file's, and the line that states it is the one to change. A
-    /// file saying version 1 is the case that matters -- it was a payload set
-    /// until version 1 was deleted -- and the message says so rather than
-    /// leaving a reader to work out which of the two their file is.
+    /// A file that writes a version is refused for a field a configuration
+    /// does not have, beside the line that writes it, in either format.
     #[test]
-    fn a_version_this_build_does_not_read_is_told_what_became_of_it() {
-        for version in ["1.0", "draft"] {
-            let set = written(
-                ".yaml",
-                &GOOD.replace("version: \"2.0\"", &format!("version: \"{version}\"")),
-                GOOD_SIM,
-            );
-            let report = verify(&set.payload, None, Limits::EVERYTHING);
+    fn a_version_is_refused_as_a_field_there_is_not() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/minimal");
+        // Where the line goes: below the YAML schema comment, and below the
+        // XML root's start tag, which runs over the file's second to fourth.
+        for (file, line, at) in [
+            ("minimal.yaml", "version: \"2.0\"\n", 3),
+            ("minimal.xml", "    <version>2.0</version>\n", 5),
+        ] {
+            let good = std::fs::read_to_string(root.join(file)).expect("the example");
+            let extension = if file.ends_with(".xml") { ".xml" } else { ".yaml" };
+            let mut lines: Vec<&str> = good.split_inclusive('\n').collect();
+            lines.insert(at - 1, line);
+            let (_dir, path) = graph_written(extension, &lines.concat());
 
-            assert_eq!(report.findings.len(), 1, "{:?}", report.findings);
-            assert_eq!(
-                report.findings[0].line, THE_FILE_ITSELF,
-                "the version is the file's own"
-            );
+            let report = verify(&path, None, Limits::EVERYTHING);
+            assert_eq!(report.findings.len(), 1, "{file}: {:?}", report.said());
+            assert_eq!(report.findings[0].line, at, "{file}: {:?}", report.said());
             let said = &report.findings[0].message;
-            assert!(said.contains(version), "{said}");
-            assert!(said.contains("Version 1"), "{said}");
+            assert!(said.contains("unknown field `version`"), "{file}: {said}");
+            assert_ne!(report.status(), 0, "{file}");
         }
     }
 

@@ -138,10 +138,10 @@ struct Sections {
 
 /// What a file still written to an older spelling is told, if it is one.
 ///
-/// Asked of a file that says no version as well as of one that says version
-/// 1: the older files said none, so a file saying none is likelier to be one
-/// of them than anything, and it is better told what became of its sections
-/// than told only that a line is missing.
+/// Asked by the graph loader before it reads a file: those older files stated
+/// no version, as a configuration now does not, so nothing else tells them
+/// apart from a graph, and one is better told what became of its sections
+/// than that it names fields a graph does not have.
 pub fn names_what_is_gone(text: &str, format: ConfigFormat) -> Option<TcsError> {
     what_is_gone(&format.parse(text).ok()?)
 }

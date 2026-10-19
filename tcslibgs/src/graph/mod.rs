@@ -36,11 +36,10 @@
 //! extension decides, through [`crate::format::load_config_file`], which is
 //! the one entry point every loader here uses.
 //!
-//! This reads version 2 and nothing else. Version 1 -- the `payloads` and
-//! `payload_groups` of the shipped sets -- describes a different thing, and a
-//! reader that took both would be two sets of rules to keep correct for as
-//! long as the software lives. The two are told apart by the `version` field
-//! and a file of the wrong one is refused saying so.
+//! There is one configuration language, and a file does not say which
+//! version of it it is written in: the software reading it is what says that,
+//! in [`VERSION`]. A file has no `version` field, so one that writes it is
+//! refused as it would be for any field a configuration does not have.
 //!
 //! Reading a file is not accepting it. [`Graph::check`] is what says whether a
 //! configuration can be flown, and `tcsverify` runs it on the ground against
@@ -66,7 +65,12 @@ use crate::endpoint_config::Scalar;
 use crate::error::{TcsError, TcsResult};
 use crate::format::ConfigFormat;
 
-/// The version this module reads.
+/// The version of the configuration language this software reads.
+///
+/// Said by the software and never by a file: tcspecial announces it in every
+/// beacon and answer to CONNECT, and the digest of a configuration is taken
+/// with it, so two builds reading the language differently are told apart.
+/// A file states nothing about it.
 pub const VERSION: &str = "2.0";
 
 /// One file of a configuration, as it is written.
@@ -77,7 +81,6 @@ pub const VERSION: &str = "2.0";
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct GraphFile {
-    pub version: String,
     #[serde(default)]
     pub description: Option<String>,
     /// Which schema describes this file, where the XML spelling says.
@@ -1019,88 +1022,18 @@ impl Graph {
     }
 }
 
-/// Just the version, from a file that may be of any version.
+/// Read one file of a configuration.
 ///
-/// Read first and on its own, which matters. The full structure refuses a
-/// field it does not know -- that is what catches a misspelling -- so reading
-/// a version 1 file as a graph complains about `payloads` being an unknown
-/// field. True, and the wrong thing to say: the useful complaint is that the
-/// file is version 1, and it cannot be made until the version has been read
-/// without the rest getting in the way.
-#[derive(Deserialize)]
-struct JustTheVersion {
-    #[serde(default)]
-    version: Option<String>,
-}
-
-/// What version a file says it is, or nothing if it cannot be asked.
-///
-/// Nothing covers every way the question can fail to have an answer: a name
-/// that is not a configuration file, a file that cannot be read, one that does
-/// not parse, one that says no version at all. A caller choosing which checks
-/// to run wants one answer to all of those -- "not version 2" -- and the
-/// better complaint about an unreadable file belongs to whatever tries to read
-/// it properly.
-pub fn version_of(path: &Path) -> Option<String> {
-    read_version(path).flatten()
-}
-
-/// Whether a file reads and says no version at all.
-///
-/// The one way of not answering [`version_of`] that is the file's own doing
-/// and has a short answer. Taken for "not version 2", such a file was read as
-/// version 1, and a graph read so was refused for whatever of it version 1
-/// does not know first -- a namespace on the root, a number written as a
-/// string -- and never for the line that was missing.
-pub fn states_no_version(path: &Path) -> bool {
-    matches!(read_version(path), Some(None))
-}
-
-/// The version a file says, `None` inside for a file that says none, and
-/// `None` outside for one that cannot be asked.
-fn read_version(path: &Path) -> Option<Option<String>> {
-    let format = ConfigFormat::of_file(path).ok()?;
-    let text = std::fs::read_to_string(path).ok()?;
-    let said: JustTheVersion = format.parse(&text).ok()?;
-    Some(said.version)
-}
-
-/// Whether this file says it is the version this module reads.
-pub fn is_version_2(path: &Path) -> bool {
-    version_of(path).as_deref() == Some(VERSION)
-}
-
-/// Read one file and require it to be version 2.
-///
-/// The version is checked here rather than in the checking, because a version 1
-/// file is not a graph with problems in it -- it is a different language, and
-/// every complaint the checking made about it would be noise.
+/// The sections older than version 1 are named before the file is read as a
+/// graph: a file still written in them is not a graph with problems in it,
+/// and every complaint the graph reader made about it would be noise.
 fn read_one(path: &Path) -> TcsResult<GraphFile> {
     let format = ConfigFormat::of_file(path)?;
     let text = std::fs::read_to_string(path)
         .map_err(|e| TcsError::Config(format!("{}: {e}", path.display())))?;
 
-    let version: JustTheVersion = format
-        .parse(&text)
-        .map_err(|e| TcsError::Config(format!("{}: {e}", path.display())))?;
-    match version.version.as_deref() {
-        Some(VERSION) => {}
-        Some(other) => {
-            return Err(TcsError::Config(format!(
-                "{}: this reads version {VERSION} configurations and that one \
-                 says version {other}. A version 1 file -- one with payloads \
-                 and payload_groups in it -- describes a different thing and \
-                 is not read here",
-                path.display()
-            )))
-        }
-        None => {
-            return Err(TcsError::Config(format!(
-                "{}: a configuration says which version it is, and this one \
-                 says nothing. Version {VERSION} is what this reads",
-                path.display()
-            )))
-        }
+    if let Some(TcsError::Config(gone)) = crate::config::names_what_is_gone(&text, format) {
+        return Err(TcsError::Config(format!("{}: {gone}", path.display())));
     }
 
     let file: GraphFile = format
@@ -1614,8 +1547,7 @@ mod tests {
         // only the top file may: see Graph::tcspecial.
         std::fs::write(
             &top,
-            "version: \"2.0\"
-include:
+            "include:
   - cabin
 tcspecial:
   tcs_cmd:
@@ -1642,7 +1574,7 @@ moc:
         // in.
         std::fs::write(
             where_.path().join("cabin.yaml"),
-            "version: \"2.0\"\npayloads:\n  \
+            "payloads:\n  \
              - { name: cabin_sensor, type: i2c, path: \"/dev/i2c-1\", \
              address: \"0x48\", payload-out: moc }\n",
         )
@@ -1663,24 +1595,27 @@ moc:
         assert_eq!(graph.check(), Vec::new(), "{:?}", graph.check());
     }
 
-    /// A version 1 file is refused, saying what it is.
+    /// A configuration has no version field, so a file that writes one is
+    /// refused as it would be for any field it does not have.
     ///
-    /// Not read and complained about field by field: version 1 is a different
-    /// language, and every complaint the checking made about it would be noise
-    /// hiding the one thing worth saying.
+    /// Nothing reads a version out of a file: the software is what says which
+    /// version of the language it reads. Refused rather than ignored, as every
+    /// unknown field is, because a field that is read and never acted on is
+    /// a field somebody will one day believe in.
     #[test]
-    fn a_version_1_file_is_refused_as_one() {
+    fn a_version_is_a_field_a_configuration_does_not_have() {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("old.yaml");
-        std::fs::write(
-            &path,
-            "version: \"1.0\"\ndescription: an old set\npayloads: []\n",
-        )
-        .unwrap();
 
-        let said = format!("{}", Graph::load(&path).expect_err("version 1 is refused"));
-        assert!(said.contains("version 2"), "{said}");
-        assert!(said.contains("payloads"), "it should say what version 1 is: {said}");
+        for version in ["1.0", "2.0"] {
+            std::fs::write(&path, format!("version: \"{version}\"\npayloads: []\n")).unwrap();
+            let said = format!("{}", Graph::load(&path).expect_err("a version is refused"));
+            assert!(said.contains("unknown field `version`"), "{said}");
+        }
+
+        // And the same file without the line reads.
+        std::fs::write(&path, "payloads: []\n").unwrap();
+        Graph::load(&path).expect("no version, nothing wrong");
     }
 
     /// An include naming the same file twice is refused.
@@ -1690,12 +1625,12 @@ moc:
         let top = where_.path().join("vehicle.yaml");
         std::fs::write(
             &top,
-            "version: \"2.0\"\ninclude:\n  - cabin\n  - cabin\n",
+            "include:\n  - cabin\n  - cabin\n",
         )
         .unwrap();
         std::fs::write(
             where_.path().join("cabin.yaml"),
-            "version: \"2.0\"\npayloads: []\n",
+            "payloads: []\n",
         )
         .unwrap();
 
@@ -1708,10 +1643,10 @@ moc:
     fn an_include_does_not_nest() {
         let where_ = tempfile::tempdir().expect("a directory");
         let top = where_.path().join("vehicle.yaml");
-        std::fs::write(&top, "version: \"2.0\"\ninclude:\n  - cabin\n").unwrap();
+        std::fs::write(&top, "include:\n  - cabin\n").unwrap();
         std::fs::write(
             where_.path().join("cabin.yaml"),
-            "version: \"2.0\"\ninclude:\n  - deeper\n",
+            "include:\n  - deeper\n",
         )
         .unwrap();
 

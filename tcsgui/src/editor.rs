@@ -557,7 +557,7 @@ mod tests {
     fn a_read_only_session_changes_nothing() {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("vehicle.yaml");
-        let by_hand = "version: \"2.0\"\n\npayloads:\n  - name: temp_1\n    type: i2c\n";
+        let by_hand = "\npayloads:\n  - name: temp_1\n    type: i2c\n";
         std::fs::write(&path, by_hand).expect("a file");
         let journal = crate::history::journal_for(&path);
         let journal_before = journal.as_ref().map(|j| std::fs::read(j).ok());
@@ -617,8 +617,6 @@ mod tests {
         // Written by hand, with the payload where a file from before the
         // canvas was divided would have put it.
         let by_hand = "\
-version: \"2.0\"
-
 moc:
   - name: moc
     type: moc
@@ -847,7 +845,7 @@ tcsgui:
         let path = where_.path().join("vehicle.yaml");
         std::fs::write(
             &path,
-            "version: \"2.0\"\npayloads:\n  - name: payload\n    type: network\n",
+            "payloads:\n  - name: payload\n    type: network\n",
         )
         .expect("a configuration");
 
@@ -919,7 +917,7 @@ tcsgui:
         let path = where_.path().join("vehicle.yaml");
         std::fs::write(
             &path,
-            "version: \"2.0\"\npayloads:\n  - name: i2c\n    type: i2c\n  \
+            "payloads:\n  - name: i2c\n    type: i2c\n  \
              - name: i2c\n    type: i2c\n",
         )
         .expect("a configuration naming a node twice");
@@ -955,7 +953,7 @@ tcsgui:
         let sim = where_.path().join("vehiclesim.yaml");
         std::fs::write(
             &path,
-            "version: \"2.0\"\npayloads:\n  - name: payload\n    type: network\n",
+            "payloads:\n  - name: payload\n    type: network\n",
         )
         .expect("a configuration");
 
@@ -996,7 +994,7 @@ tcsgui:
         // nothing standing in for it, so it has no settings to offer.
         std::fs::write(
             &path,
-            "version: \"2.0\"\npayloads:\n  - name: sensor\n    type: i2c\n  \
+            "payloads:\n  - name: sensor\n    type: i2c\n  \
              - name: payload\n    type: network\nvehicle:\n  - name: mean\n    \
              type: compute\n",
         )

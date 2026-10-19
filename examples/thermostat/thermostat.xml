@@ -2,7 +2,6 @@
 <configuration
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="../../tcsgui/share/schema/tcspecial.xsd">
-    <version>2.0</version>
     <tcspecial>
         <beacon>
             <interval>5 s</interval>

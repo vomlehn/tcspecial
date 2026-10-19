@@ -1596,7 +1596,6 @@ impl Document {
         out.push_str(&format!(
             "    xsi:noNamespaceSchemaLocation=\"{schema}\">\n"
         ));
-        out.push_str("    <version>2.0</version>\n");
         if let Some(description) = &self.description {
             out.push_str(&format!(
                 "    <description>{}</description>\n",
@@ -1802,7 +1801,7 @@ impl Document {
             "# yaml-language-server: $schema={}\n\n",
             crate::nodes::schema_reference(path, crate::nodes::CONFIG_JSON_SCHEMA)
         ));
-        out.push_str("version: \"2.0\"\n");
+        // No version: a configuration has no such field.
         if let Some(description) = &self.description {
             out.push_str(&format!("description: {}\n", quoted(description)));
         }
@@ -3881,9 +3880,9 @@ mod tests {
 
         let yaml = document.to_text(Path::new("graph.yaml")).expect("yaml");
         // A YAML configuration opens by naming its schema, which is a
-        // comment, and says its version under that.
+        // comment, and states no version: the loader would refuse one.
         assert!(yaml.starts_with("# yaml-language-server: $schema="), "{yaml}");
-        assert!(yaml.contains("\nversion: \"2.0\"\n"), "{yaml}");
+        assert!(!yaml.contains("version:"), "{yaml}");
         assert_eq!(
             document.to_text(Path::new("graph.yml")).expect("yml"),
             yaml,
@@ -3955,13 +3954,13 @@ mod tests {
                     text.starts_with("# yaml-language-server: $schema="),
                     "{text}"
                 );
-                assert!(text.contains("\nversion: \"2.0\"\n"), "{text}");
+                assert!(!text.contains("version:"), "{text}");
             }
             assert!(text.contains("sensor"), "{text}");
         }
 
         // And the other way about, which is the same rule read backwards.
-        std::fs::write(&yaml, "version: \"2.0\"\n").expect("a sibling");
+        std::fs::write(&yaml, "description: a sibling\n").expect("a sibling");
         let files = document.files(&xml).expect("the files");
         assert_eq!(files.len(), 2, "{files:?}");
     }
@@ -4761,7 +4760,7 @@ mod tests {
         });
 
         let yaml = document.to_yaml();
-        assert!(yaml.contains("version: \"2.0\""), "{yaml}");
+        assert!(!yaml.contains("version:"), "{yaml}");
         assert!(yaml.contains("type: i2c"), "{yaml}");
         // Quoted: a YAML reader would otherwise turn 0x48 into 72. See
         // `quoted`.

@@ -185,8 +185,7 @@ mod tests {
         std::fs::write(
             &path,
             format!(
-                "version: \"2.0\"
-tcspecial:
+                "tcspecial:
   tcs_cmd:
     recv: 0.0.0.0:4000
     send: 127.0.0.1:4100

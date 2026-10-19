@@ -642,8 +642,7 @@ mod tests {
         let path = where_.path().join("two.yaml");
         std::fs::write(
             &path,
-            "version: \"2.0\"\n\
-             payloads:\n\
+            "payloads:\n\
              \x20 - { name: inside, type: i2c, path: /dev/i2c-1, address: \"0x48\", \
              poll_interval: \"1 s\", payload-out: average }\n\
              vehicle:\n\

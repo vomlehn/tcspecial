@@ -583,23 +583,6 @@ fn main() {
     );
     present_and_stop_if_fatal(&startup);
 
-    // The one thing a configuration can be. A version 1 payload set -- a list
-    // of payloads each paired with a ground endpoint, commanded by name --
-    // was the other, and it is gone: every one of its capabilities is a
-    // version 2 node's, and a second way of saying the same thing was a
-    // second thing to keep working.
-    //
-    // Said here rather than left to the loaders, which would complain about
-    // whatever of a graph they met first.
-    if !tcslibgs::graph::is_version_2(Path::new(&payload_path)) {
-        startup.error(format!(
-            "{payload_path} is not a version 2 configuration: it states no \
-             version, or states an older one. Version 1 payload sets are no \
-             longer read by anything -- see the manual on converting one."
-        ));
-        stop(&startup);
-    }
-
     version_2::run(&payload_path, sim_path.as_deref(), startup);
 }
 

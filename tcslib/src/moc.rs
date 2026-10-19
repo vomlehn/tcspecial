@@ -216,8 +216,7 @@ mod tests {
         std::fs::write(
             &path,
             format!(
-                "version: \"2.0\"
-moc:
+                "moc:
   - {{ name: ground, type: moc, ground_base: \"127.0.0.1:{}\" }}
 payloads:
   - {{ name: a, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7001\", payload-out: ground }}

@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/vomlehn/tcspecial/schema/tcspecial.schema.json",
-  "title": "tcspecial configuration, version 2",
-  "description": "The shape of a version 2 configuration: which sections there are, what an entry may say, and which words are words. Not whether it can be flown -- which attributes a node of a given type must state, whether two payloads claim one socket, whether a mean's inputs are the ones its links bind are rules about meaning, tested against real buses, and tcsverify is the one place they live. A file this accepts may still be refused, and the refusal will say why.",
+  "title": "tcspecial configuration",
+  "description": "The shape of a configuration: which sections there are, what an entry may say, and which words are words. Not whether it can be flown -- which attributes a node of a given type must state, whether two payloads claim one socket, whether a mean's inputs are the ones its links bind are rules about meaning, tested against real buses, and tcsverify is the one place they live. A file this accepts may still be refused, and the refusal will say why.",
   "$defs": {
     "linkEntry": {
       "description": "One line out of a node: the node it goes to, and which of that node's inputs it feeds where it feeds a named one. One entry per line, so several lines are several entries and nothing pairs by position.",
@@ -27,10 +27,6 @@
   },
   "type": "object",
   "properties": {
-    "version": {
-      "description": "Which language this file is written in. A configuration that has not said has not said what it is, and the beacon carries it so the ground can check what is flying.",
-      "const": "2.0"
-    },
     "description": {
       "type": "string"
     },

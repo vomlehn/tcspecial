@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/vomlehn/tcspecial/schema/tcspecial-sim.schema.json",
   "title": "tcspecial simulator configuration",
-  "description": "What tcssim needs in order to stand in for the payloads of a tcspecial configuration: how fast each one sends, and what it does wrong. Nothing here describes a payload -- the configuration does that, and the two are joined by name.\n\nThere is no version. A configuration states one so that it can be checked against the software that will read it on the vehicle, before anything opens a device; nothing aboard reads this file, the simulator not being something that flies. A file that states one is refused, saying so.\n\nA setting written with nothing after it is a setting not stated, which is what the editor writes into the form it makes: every payload of the configuration and every setting a payload may state, so that a reader can see what there is to answer.",
+  "description": "What tcssim needs in order to stand in for the payloads of a tcspecial configuration: how fast each one sends, and what it does wrong. Nothing here describes a payload -- the configuration does that, and the two are joined by name.\n\nA setting written with nothing after it is a setting not stated, which is what the editor writes into the form it makes: every payload of the configuration and every setting a payload may state, so that a reader can see what there is to answer.",
   "type": "object",
   "properties": {
     "description": {

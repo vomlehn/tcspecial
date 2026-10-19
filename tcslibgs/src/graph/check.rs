@@ -463,7 +463,34 @@ fn said(names: &[String]) -> String {
     }
 }
 
+/// What is wrong with a `tcspecial` section, if anything.
+///
+/// Two rounds of rules, and both of them somebody else's. What the section may
+/// say and whether it says it is in parameters.rs; what the values have to be
+/// -- an address and a port wherever one is named, two links that are not one
+/// socket -- is in the struct the command interpreter itself reads.
+///
+/// Flat, prefixes and all, which is how the rules and the complaints name an
+/// attribute: the file's shape is the file's business. See
+/// `parameters::flatten`.
+fn section_refusal(
+    said: &BTreeMap<String, crate::graph::parameters::Parameter>,
+) -> Result<(), String> {
+    let flat = crate::graph::parameters::flatten(said);
+    crate::graph::parameters::ci_config_of(&flat)?.to_ci_config()?;
+    Ok(())
+}
+
 impl Graph {
+    /// Whether the `tcspecial` section is there and reads, which is what
+    /// decides whether a refusal that names no node is the section's own
+    /// complaint said a second time.
+    fn tcspecial_reads(&self) -> bool {
+        self.tcspecial
+            .as_ref()
+            .is_some_and(|said| section_refusal(said).is_ok())
+    }
+
     /// Everything wrong with this configuration.
     ///
     /// Empty means it can be flown as far as this can tell. What it cannot
@@ -815,17 +842,17 @@ impl Graph {
         // at 65500 and sixty nodes counted from it is a configuration that
         // reads and sockets that cannot be, and two sources on one port would
         // arrive interleaved. A section that does not read is complained
-        // about where the section is checked, and not again here.
+        // about where the section is checked, and not again here -- asked of
+        // the section itself rather than of what has been complained about so
+        // far, because that check comes later and the two would otherwise both
+        // say it.
         if let Err(refused) = crate::graph::telemetry::of(self) {
             match refused.node {
                 Some(node) => problems.push(Problem::BadNode {
                     node,
                     why: refused.why,
                 }),
-                None if !problems
-                    .iter()
-                    .any(|p| matches!(p, Problem::BadTcspecial { .. })) =>
-                {
+                None if self.tcspecial_reads() => {
                     problems.push(Problem::BadTcspecial { why: refused.why })
                 }
                 None => {}
@@ -1012,23 +1039,8 @@ impl Graph {
         match &self.tcspecial {
             None => problems.push(Problem::NoTcspecial),
             Some(said) => {
-                // Two rounds of rules, and both of them somebody else's. What
-                // the section may say and whether it says it is in
-                // parameters.rs; what the values have to be -- an address
-                // and a port wherever one is named, two links that are not
-                // one socket -- is in the struct the command interpreter
-                // itself reads.
-                // Flat, prefixes and all, which is how the rules and the
-                // complaints name an attribute: the file's shape is the
-                // file's business. See `parameters::flatten`.
-                let flat = crate::graph::parameters::flatten(said);
-                match crate::graph::parameters::ci_config_of(&flat) {
-                    Err(why) => problems.push(Problem::BadTcspecial { why }),
-                    Ok(section) => {
-                        if let Err(why) = section.to_ci_config() {
-                            problems.push(Problem::BadTcspecial { why });
-                        }
-                    }
+                if let Err(why) = section_refusal(said) {
+                    problems.push(Problem::BadTcspecial { why });
                 }
             }
         }
@@ -1548,6 +1560,46 @@ mod tests {
                 said.contains(expected),
                 "{attribute} = {value} was refused as {said:?}"
             );
+            assert_eq!(
+                bad_tcspecial(&problems),
+                1,
+                "{attribute} = {value} was said more than once: {problems:?}"
+            );
+        }
+    }
+
+    /// How many complaints there are about the section.
+    fn bad_tcspecial(problems: &[Problem]) -> usize {
+        problems
+            .iter()
+            .filter(|p| matches!(p, Problem::BadTcspecial { .. }))
+            .count()
+    }
+
+    /// A section with an attribute left out is told so once.
+    ///
+    /// The ground links' ports are worked out from the section too, and that
+    /// check comes before the section's own: it used to refuse the section in
+    /// the same words, and a run limited to a few errors spent one of them on
+    /// the second copy.
+    #[test]
+    fn a_section_left_unfinished_is_told_so_once() {
+        for left_out in [
+            "tcs_cmd.recv",
+            "payload_command.source_base",
+            "payload_telemetry.dest_base",
+            "beacon.send",
+        ] {
+            // A payload nothing touches, so its telemetry is the section's,
+            // and a ground link with nothing on it: both of what the example
+            // had when the section was half written.
+            let mut g = graph(vec![node("a", "i2c"), node("c", "moc")], Vec::new());
+            let mut flat = crate::graph::parameters::flatten(g.tcspecial.as_ref().unwrap());
+            flat.remove(left_out);
+            g.tcspecial = Some(crate::graph::parameters::nest(&flat));
+
+            let problems = g.check();
+            assert_eq!(bad_tcspecial(&problems), 1, "{left_out}: {problems:?}");
         }
     }
 

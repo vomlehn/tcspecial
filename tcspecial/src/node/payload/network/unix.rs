@@ -44,7 +44,7 @@ impl UnixStreamEndpoint {
     ///
     /// A refusal means nothing is listening there yet, which is the ordinary
     /// case when a handler is started before its device; see
-    /// [`connect_retrying`]. A path with no socket at all is a different
+    /// `connect_retrying`. A path with no socket at all is a different
     /// matter and is not waited out: it will not become one by being asked
     /// again.
     pub fn connect_retrying(what: &str, config: &NetworkConfig) -> TcsResult<Self> {

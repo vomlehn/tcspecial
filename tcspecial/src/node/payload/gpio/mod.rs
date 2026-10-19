@@ -590,8 +590,8 @@ impl EndpointWritable for GpioEndpoint {
     /// is which -- they are a set, named by offsets in the order the file gave
     /// them.
     ///
-    /// What arrives is a value as everything on a link is: see [`state_of`]
-    /// for how it is read and [`values_for`] for what the kernel is then
+    /// What arrives is a value as everything on a link is: see `state_of`
+    /// for how it is read and `values_for` for what the kernel is then
     /// asked.
     fn write(&mut self, data: &[u8]) -> TcsResult<usize> {
         if !self.direction.is_output() {

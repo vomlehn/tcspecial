@@ -51,7 +51,7 @@ impl TcpEndpoint {
 
     /// A second endpoint on the same listener or stream.
     ///
-    /// See [`UdpEndpoint::try_clone`]: one bind, two handles.
+    /// See [`super::udp::UdpEndpoint::try_clone`]: one bind, two handles.
     pub fn try_clone(&self) -> TcsResult<Self> {
         Ok(Self {
             stream: match &self.stream {
@@ -83,9 +83,9 @@ impl TcpEndpoint {
 
     /// Connect as a client, retrying while refused.
     ///
-    /// See [`connect_retrying`]. A handler may be started before the device
-    /// it reaches, and a device that is not listening yet refuses rather than
-    /// failing in any way that waiting cannot fix.
+    /// See this module's `connect_retrying`. A node may be started before
+    /// the device it reaches, and a device that is not listening yet refuses
+    /// rather than failing in any way that waiting cannot fix.
     pub fn connect_retrying(what: &str, config: &NetworkConfig) -> TcsResult<Self> {
         let addr = format!("{}:{}", config.address, config.port);
         let stream = connect_retrying(what, &addr, || TcpStream::connect(&addr))?;

@@ -16,7 +16,7 @@
 //! in both directions: some return success and clear the flag, and a line
 //! left in point-to-point mode on a two-wire bus transmits into other
 //! transmitters. A handler whose line will not take what its file asked for
-//! is refused rather than started; see [`apply`].
+//! is refused rather than started; see `apply`.
 //!
 //! The structure and the two ioctls are declared here rather than taken from
 //! `libc`, which has the ioctl numbers and not the structure.

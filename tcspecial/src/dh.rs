@@ -383,47 +383,92 @@ mod tests {
     /// payload at the address the handler learnt from that first packet.
     #[test]
     fn a_payload_that_speaks_first_and_a_handler_waiting_for_it_both_come_up() {
-        use std::net::UdpSocket;
+        use std::net::{SocketAddr, UdpSocket};
         use std::time::{Duration, Instant};
         use tcslibgs::{NetworkConfig, NetworkProtocol};
 
-        // A free address for the handler's payload side, which it binds. Port
-        // 0 and then let go, so this cannot collide with a real one or
-        // another test.
-        let probe = UdpSocket::bind("127.0.0.1:0").expect("a free payload port");
-        let payload_side = probe.local_addr().expect("its address");
-        drop(probe);
-
-        let oc = UdpSocket::bind("127.0.0.1:0").expect("a free OC port");
-        let oc_addr = oc.local_addr().expect("its address");
-        drop(oc);
-
-        let config = DHConfig {
-            name: DHName::new("Net"),
-            endpoint: EndpointConfig::Network(NetworkConfig {
-                protocol: NetworkProtocol::Udp,
-                address: payload_side.ip().to_string(),
-                port: payload_side.port(),
-            }),
-            packet_size: 64,
-            oc: Some(NetworkConfig {
-                protocol: NetworkProtocol::Udp,
-                address: oc_addr.ip().to_string(),
-                port: oc_addr.port(),
-            }),
-            ground: None,
-                    mode: Default::default(),
-                    stale_interval: None,
+        // Two free addresses, which the handler binds: one for its payload
+        // side and one for its OC side. A port is asked for by binding port 0
+        // and letting go, so that this cannot collide with a real one, and
+        // letting go is a race -- between the drop and the handler's bind,
+        // anything else on the machine may take it, and under a parallel test
+        // run the thing that takes it is usually another test doing the same.
+        //
+        // So the pair is asked for again if either bind lost. A port that was
+        // free a moment ago is not a port that is free, and a test that
+        // treated the first answer as final failed about one run in a
+        // hundred with an address in use.
+        let free = || -> SocketAddr {
+            let probe = UdpSocket::bind("127.0.0.1:0").expect("a free port");
+            let at = probe.local_addr().expect("its address");
+            drop(probe);
+            at
         };
 
-        let mut dh = DataHandler::new(config.clone()).unwrap();
-        let (oc_reader, oc_writer) = bind_endpoint_pair(
-            &config.name.0,
-            &EndpointConfig::Network(config.oc.clone().unwrap()),
-        )
-        .unwrap();
-        dh.start(oc_reader, oc_writer)
-            .expect("the handler starts and waits at its payload's address");
+        let mut attempts = 0;
+        let (config, mut dh) = loop {
+            attempts += 1;
+            let payload_side = free();
+            let oc_addr = free();
+
+            let config = DHConfig {
+                name: DHName::new("Net"),
+                endpoint: EndpointConfig::Network(NetworkConfig {
+                    protocol: NetworkProtocol::Udp,
+                    address: payload_side.ip().to_string(),
+                    port: payload_side.port(),
+                }),
+                packet_size: 64,
+                oc: Some(NetworkConfig {
+                    protocol: NetworkProtocol::Udp,
+                    address: oc_addr.ip().to_string(),
+                    port: oc_addr.port(),
+                }),
+                ground: None,
+                mode: Default::default(),
+                stale_interval: None,
+            };
+
+            // The OC side is bound here, as `start_handler` binds it, and it
+            // is the first of the two that can lose the race.
+            let started = bind_endpoint_pair(
+                &config.name.0,
+                &EndpointConfig::Network(config.oc.clone().unwrap()),
+            )
+            .and_then(|(oc_reader, oc_writer)| {
+                let mut dh = DataHandler::new(config.clone())?;
+                dh.start(oc_reader, oc_writer)?;
+                Ok(dh)
+            });
+
+            match started {
+                Ok(dh) => break (config, dh),
+                Err(why) if attempts < 10 => {
+                    // Said in the log rather than swallowed: a run that
+                    // needed several attempts is worth knowing about, and a
+                    // failure that is not a lost port repeats until the
+                    // attempts run out and is then reported in full.
+                    eprintln!("attempt {attempts} did not get its ports: {why}");
+                }
+                Err(why) => panic!(
+                    "the handler did not start and wait at its payload's \
+                     address after {attempts} attempts: {why}"
+                ),
+            }
+        };
+
+        let payload_side: SocketAddr = match &config.endpoint {
+            EndpointConfig::Network(net) => format!("{}:{}", net.address, net.port)
+                .parse()
+                .expect("the address it was given"),
+            _ => unreachable!("a network endpoint was configured"),
+        };
+        let oc_addr: SocketAddr = {
+            let oc = config.oc.clone().expect("an OC side");
+            format!("{}:{}", oc.address, oc.port)
+                .parse()
+                .expect("the address it was given")
+        };
 
         let ground = UdpSocket::bind("127.0.0.1:0").unwrap();
         ground

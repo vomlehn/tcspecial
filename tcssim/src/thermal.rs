@@ -597,7 +597,11 @@ mod tests {
             payloads.push(sensor);
         }
 
-        // And the heaters, which wait to be driven.
+        // And the heaters, which wait to be driven. Their ports are asked for
+        // by binding and letting go, so a port that was free when it was
+        // chosen may have been taken by the time the heater binds it -- which
+        // would leave the loop open at one end, and is checked for below
+        // rather than left to look like a mass that would not warm.
         let heaters: Vec<u16> = (0..2).map(|_| a_free_port()).collect();
         for (n, at) in heaters.iter().enumerate() {
             let mut heater = SimulatedPayload::new(attached(
@@ -612,6 +616,24 @@ mod tests {
             ));
             heater.start().expect("a heater starts");
             payloads.push(heater);
+        }
+
+        // Each heater is waiting where it was told to wait. A bind that lost
+        // its port is reported by the payload's thread and would otherwise
+        // show up here as a mass that never reached the band, which says
+        // nothing about why.
+        for at in &heaters {
+            let bound = (0..100).any(|_| {
+                if std::net::UdpSocket::bind(("127.0.0.1", *at)).is_err() {
+                    return true;
+                }
+                std::thread::sleep(Duration::from_millis(10));
+                false
+            });
+            assert!(
+                bound,
+                "nothing is waiting at the heater's port {at}: it did not bind"
+            );
         }
 
         // The vehicle's end of the heater links: it sends where the file says

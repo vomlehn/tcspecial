@@ -13,10 +13,10 @@ use std::time::Duration;
 
 use serde::Serialize;
 
-use crate::endpoint_config::{parse_flag, parse_timeout, reject_stream};
 use crate::endpoint_config::{
     bad, parse_u32, reject_foreign_fields, EndpointConfigResult, GroupKind, LinkTerms,
 };
+use crate::endpoint_config::{parse_flag, parse_timeout, reject_stream};
 
 /// Attributes of an I2C group.
 ///
@@ -68,14 +68,18 @@ const I2C_RESERVED_HIGH: std::ops::RangeInclusive<u32> = 0x78..=0x7F;
 /// How wide an address may be follows from the group's addressing mode, so
 /// a file that writes a 10-bit address in a 7-bit group is told which of the
 /// two it got wrong.
-pub(crate) fn parse_i2c_address(group: &str, text: &str, ten_bit: bool) -> EndpointConfigResult<u16> {
+pub(crate) fn parse_i2c_address(
+    group: &str,
+    text: &str,
+    ten_bit: bool,
+) -> EndpointConfigResult<u16> {
     let text = text.trim();
     // The one grammar every integer in these files is written in: decimal, or
     // hexadecimal with an `0x` prefix, underscores allowed among the digits.
     // An address is the field that wants the hexadecimal most -- a datasheet
     // says 0x48 and never 72 -- and the same spelling works everywhere else.
-    let value = crate::whole::whole_u32(text)
-        .map_err(|why| bad(group, &format!("address: {why}")))?;
+    let value =
+        crate::whole::whole_u32(text).map_err(|why| bad(group, &format!("address: {why}")))?;
 
     let (limit, width) = if ten_bit { (0x3FF, 10) } else { (0x7F, 7) };
     if value > limit {
@@ -120,17 +124,8 @@ pub(crate) fn parse_i2c_address(group: &str, text: &str, ten_bit: bool) -> Endpo
 /// no packet error check, no retries, and whatever rate the platform has it
 /// at. There is no stream section, because a transfer on a bus is delimited
 /// by the transfer itself rather than by anything in the data.
-pub(crate) fn group_kind_of(
-    name: &str,
-    g: LinkTerms,
-) -> EndpointConfigResult<GroupKind> {
-
-    reject_foreign_fields(
-        name,
-        "i2c",
-        &g,
-        &["ten_bit", "pec", "retries", "timeout"],
-    )?;
+pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<GroupKind> {
+    reject_foreign_fields(name, "i2c", &g, &["ten_bit", "pec", "retries", "timeout"])?;
     reject_stream(name, "i2c", g.stream.is_some())?;
 
     let ten_bit = parse_flag(name, "ten_bit", g.ten_bit.as_ref())?.unwrap_or(false);

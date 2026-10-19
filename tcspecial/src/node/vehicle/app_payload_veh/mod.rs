@@ -57,7 +57,11 @@ impl AppPayloadVeh {
             ));
         }
         Ok(AppPayloadVeh {
-            running: parent::start(&params.executable_path()?, &params.arguments(), Supports::PAYLOAD)?,
+            running: parent::start(
+                &params.executable_path()?,
+                &params.arguments(),
+                Supports::PAYLOAD,
+            )?,
         })
     }
 
@@ -149,16 +153,19 @@ mod tests {
     fn packets_reach_the_program_and_come_back() {
         let where_ = tempfile::tempdir().expect("a directory");
         let program = stands_in(where_.path());
-        let mut node = crate::when_not_busy(|| AppPayloadVeh::of(&says(&program))).expect("it starts");
+        let mut node =
+            crate::when_not_busy(|| AppPayloadVeh::of(&says(&program))).expect("it starts");
 
-        node.give_payload_data(b"293.15").expect("it takes a packet");
+        node.give_payload_data(b"293.15")
+            .expect("it takes a packet");
         assert_eq!(
             node.take_moc_data().expect("an answer"),
             Some(b"293.15".to_vec())
         );
 
         // A packet of no bytes is a packet, and comes back as one.
-        node.give_payload_data(b"").expect("it takes an empty packet");
+        node.give_payload_data(b"")
+            .expect("it takes an empty packet");
         assert_eq!(node.take_moc_data().expect("an answer"), Some(Vec::new()));
 
         // Told that nothing more is coming, it finishes of its own accord.

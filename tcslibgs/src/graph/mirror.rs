@@ -248,10 +248,16 @@ payloads:
     fn a_sink_that_claims_a_line_nothing_sends_is_refused() {
         let said = format!(
             "{}",
-            pair("    payload-in: true", "    moc-in: true\n    payload-in: true")
-                .expect_err("a payload has no payload-in")
+            pair(
+                "    payload-in: true",
+                "    moc-in: true\n    payload-in: true"
+            )
+            .expect_err("a payload has no payload-in")
         );
-        assert!(said.contains("no data sink called \"payload-in\""), "{said}");
+        assert!(
+            said.contains("no data sink called \"payload-in\""),
+            "{said}"
+        );
 
         // And on a node that does have the sink, with nothing arriving at it:
         // a null node carries both streams, and this one is sent neither.
@@ -287,8 +293,7 @@ payloads:
     fn a_sink_that_denies_a_line_nobody_sends_is_read() {
         pair("    payload-in: true", "    moc-in: false")
             .expect_err("the ground sends the payload what it asks with");
-        pair("    payload-in: true", "    moc-in: true")
-            .expect("and says so when it says so");
+        pair("    payload-in: true", "    moc-in: true").expect("and says so when it says so");
     }
 
     /// A word that is neither true nor false is refused, saying what the
@@ -301,8 +306,7 @@ payloads:
     fn a_sink_given_a_name_instead_of_a_flag_is_refused() {
         let said = format!(
             "{}",
-            pair("    payload-in: payload", "    moc-in: true")
-                .expect_err("a name is not a flag")
+            pair("    payload-in: payload", "    moc-in: true").expect_err("a name is not a flag")
         );
         assert!(said.contains("is not true or false"), "{said}");
         assert!(said.contains("written on that node"), "{said}");

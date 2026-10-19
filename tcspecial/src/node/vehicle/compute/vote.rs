@@ -159,7 +159,8 @@ impl Function for Vote {
         // reported is not a fault here, as it was for a mean: this votes over
         // the latest from each, so a sensor reporting twice simply has its
         // later reading used.
-        self.latest.insert(input.to_string(), from_value(data, input)?);
+        self.latest
+            .insert(input.to_string(), from_value(data, input)?);
 
         // Nothing to vote on until every input has reported once: see the
         // module comment.
@@ -189,7 +190,6 @@ mod tests {
     fn kelvin(number: f64) -> Vec<u8> {
         as_value(number).expect("a temperature a value carries")
     }
-
 
     /// A vote over three inputs, by the algorithm named.
     fn vote(algorithm: Algorithm) -> Vote {
@@ -230,7 +230,11 @@ mod tests {
     #[test]
     fn every_arrival_after_the_first_set_produces_a_value() {
         let mut vote = vote(Algorithm::Median);
-        for (input, reading) in [("in0", kelvin(290_f64)), ("in1", kelvin(293_f64)), ("in2", kelvin(296_f64))] {
+        for (input, reading) in [
+            ("in0", kelvin(290_f64)),
+            ("in1", kelvin(293_f64)),
+            ("in2", kelvin(296_f64)),
+        ] {
             vote.give(Some(input), &reading).unwrap();
         }
 
@@ -303,7 +307,9 @@ mod tests {
             .expect_err("an input it does not have");
         assert!(said.contains("in7") && said.contains("in0"), "{said}");
 
-        let said = vote.give(None, &kelvin(290_f64)).expect_err("no input name");
+        let said = vote
+            .give(None, &kelvin(290_f64))
+            .expect_err("no input name");
         assert!(said.contains("named inputs"), "{said}");
     }
 

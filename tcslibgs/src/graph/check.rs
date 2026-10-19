@@ -299,9 +299,7 @@ impl Problem {
             // The section, where there is one to point at. A missing section
             // has no line of its own and is reported on the file, which is
             // where it would have to be written.
-            Problem::NoTcspecial | Problem::BadTcspecial { .. } => {
-                About::Section("tcspecial")
-            }
+            Problem::NoTcspecial | Problem::BadTcspecial { .. } => About::Section("tcspecial"),
             Problem::BadNode { node, .. } => About::Node(node.clone()),
             Problem::BadLog { node, .. } => About::Node(node.clone()),
             Problem::BadCompute { node, .. } => About::Node(node.clone()),
@@ -699,11 +697,7 @@ impl Graph {
                     linked.entry(node.name.as_str()).or_default().1 = true;
                     // Which of its data sources this link leaves by, and what
                     // stream that carries.
-                    match terminals::terminal_at(
-                        &node.node_type,
-                        origin.input.as_deref(),
-                        false,
-                    ) {
+                    match terminals::terminal_at(&node.node_type, origin.input.as_deref(), false) {
                         Ok(terminal) => terminal,
                         Err(why) => {
                             problems.push(Problem::BadTerminal {
@@ -741,19 +735,12 @@ impl Graph {
                     }
                     Some(at) => {
                         linked.entry(at.name.as_str()).or_default().0 = true;
-                        match terminals::terminal_at(
-                            &at.node_type,
-                            input.as_deref(),
-                            true,
-                        ) {
+                        match terminals::terminal_at(&at.node_type, input.as_deref(), true) {
                             // Carried with the terminal: whether this one is
                             // held to a single source, which is the node
                             // type's business and not the link's.
-                            Ok(terminal) => {
-                                terminal.map(|terminal| {
-                                    (terminal, terminals::merges(&at.node_type))
-                                })
-                            }
+                            Ok(terminal) => terminal
+                                .map(|terminal| (terminal, terminals::merges(&at.node_type))),
                             Err(why) => {
                                 problems.push(Problem::BadTerminal {
                                     from: origin.node.clone(),
@@ -771,10 +758,7 @@ impl Graph {
                 // backwards, and it would be found at run time as a payload
                 // that answers nothing.
                 if let (Some(leaves), Some((arrives, _))) = (&leaves, &arrives) {
-                    match (
-                        terminals::stream_of(leaves),
-                        terminals::stream_of(arrives),
-                    ) {
+                    match (terminals::stream_of(leaves), terminals::stream_of(arrives)) {
                         (Some((_, one)), Some((_, two))) if one != two => {
                             problems.push(Problem::CrossedStreams {
                                 from: origin.node.clone(),
@@ -923,10 +907,7 @@ impl Graph {
         // port. One that only sends to its ground_base binds nothing.
         for node in self.nodes.iter().filter(|n| n.node_type == "moc") {
             let commanded = self.commands.iter().any(|b| b.from == node.name);
-            let feeds = self
-                .links
-                .iter()
-                .any(|l| l.origin().node == node.name);
+            let feeds = self.links.iter().any(|l| l.origin().node == node.name);
             if (commanded || feeds) && !crate::graph::reach::binds(node) {
                 problems.push(Problem::BadNode {
                     node: node.name.clone(),
@@ -974,7 +955,8 @@ impl Graph {
         // these rules used to live in the flight software, where this tool
         // could not reach them.
         for node in self.nodes.iter().filter(|n| n.node_type == "compute") {
-            let what = match crate::node::vehicle::compute::params_of(&node.name, &node.attributes) {
+            let what = match crate::node::vehicle::compute::params_of(&node.name, &node.attributes)
+            {
                 Ok(what) => what,
                 Err(why) => {
                     problems.push(Problem::BadCompute {
@@ -1036,11 +1018,9 @@ impl Graph {
             .iter()
             .filter(|n| crate::node::app::Kind::of(&n.node_type).is_some())
         {
-            if let Err(why) = crate::node::app::params_of(
-                &node.name,
-                &node.node_type,
-                &node.attributes,
-            ) {
+            if let Err(why) =
+                crate::node::app::params_of(&node.name, &node.node_type, &node.attributes)
+            {
                 problems.push(Problem::BadNode {
                     node: node.name.clone(),
                     why,
@@ -1186,9 +1166,10 @@ impl Graph {
                 continue;
             };
 
-            let read = self.links.iter().any(|link| {
-                link.from.split('.').next().unwrap_or(&link.from) == node.name
-            });
+            let read = self
+                .links
+                .iter()
+                .any(|link| link.from.split('.').next().unwrap_or(&link.from) == node.name);
             let driven = !self.sources_of(&node.name).is_empty();
 
             if driven && !gpio.direction.is_output() {
@@ -1226,17 +1207,20 @@ impl Graph {
         // ask are the datum itself and there is no trigger to state. An
         // `app_pl` is asked nothing at all and has no sink for a link to
         // arrive at, so nothing reaches this rule by that road either.
-        for node in self.nodes.iter().filter(|n| {
-            n.is_payload() && crate::node::app::Kind::of(&n.node_type).is_none()
-        }) {
+        for node in self
+            .nodes
+            .iter()
+            .filter(|n| n.is_payload() && crate::node::app::Kind::of(&n.node_type).is_none())
+        {
             if node.attributes.contains_key("trigger") {
                 continue;
             }
             // Whatever terminal it leaves by: a payload read through its
             // `payload-out` is a payload that is read.
-            let read = self.links.iter().any(|link| {
-                link.from.split('.').next().unwrap_or(&link.from) == node.name
-            });
+            let read = self
+                .links
+                .iter()
+                .any(|link| link.from.split('.').next().unwrap_or(&link.from) == node.name);
             if !read {
                 continue;
             }
@@ -1287,9 +1271,10 @@ impl Graph {
     fn sources_of(&self, node: &str) -> Vec<&str> {
         let mut sources: Vec<&str> = Vec::new();
         for link in &self.links {
-            let arrives = link.to.each().iter().any(|destination| {
-                destination.split('.').next().unwrap_or(destination) == node
-            });
+            let arrives =
+                link.to.each().iter().any(|destination| {
+                    destination.split('.').next().unwrap_or(destination) == node
+                });
             let from = link.from.split('.').next().unwrap_or(&link.from);
             if arrives && !sources.contains(&from) {
                 sources.push(from);
@@ -1416,7 +1401,6 @@ fn claim_text(claim: &Claim) -> String {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1512,9 +1496,10 @@ mod tests {
             ],
             // An app node is the program it names, and the argument for each
             // stream its kind handles: see `crate::node::app`.
-            "app_payload_veh" | "app_pl" => {
-                &[("executable", "/bin/cat"), ("app-payload-arg", "--readings")]
-            }
+            "app_payload_veh" | "app_pl" => &[
+                ("executable", "/bin/cat"),
+                ("app-payload-arg", "--readings"),
+            ],
             "app_moc_veh" => &[("executable", "/bin/cat"), ("app-moc-arg", "--commands")],
             "app_all_veh" | "app_all_pl" => &[
                 ("executable", "/bin/cat"),
@@ -1586,9 +1571,7 @@ mod tests {
             let said = problems
                 .iter()
                 .find_map(|p| match p {
-                    Problem::BadNode { node: named, why } if named == node => {
-                        Some(why.clone())
-                    }
+                    Problem::BadNode { node: named, why } if named == node => Some(why.clone()),
                     _ => None,
                 })
                 .unwrap_or_else(|| panic!("{node}: {problems:?}"));
@@ -1724,15 +1707,15 @@ mod tests {
     /// asked the question has not answered it.
     #[test]
     fn a_configuration_says_what_tcspecial_is_configured_with() {
-        let mut g = graph(vec![node("a", "i2c"), node("c", "moc")], vec![link("a", &["c"])]);
+        let mut g = graph(
+            vec![node("a", "i2c"), node("c", "moc")],
+            vec![link("a", &["c"])],
+        );
         assert_eq!(g.check(), Vec::new(), "this one is sound");
 
         g.tcspecial = None;
         let problems = g.check();
-        assert!(
-            problems.contains(&Problem::NoTcspecial),
-            "{problems:?}"
-        );
+        assert!(problems.contains(&Problem::NoTcspecial), "{problems:?}");
         let said = problems
             .iter()
             .find(|p| **p == Problem::NoTcspecial)
@@ -1773,7 +1756,10 @@ mod tests {
         ];
 
         for (attribute, value, expected) in wrong {
-            let mut g = graph(vec![node("a", "i2c"), node("c", "moc")], vec![link("a", &["c"])]);
+            let mut g = graph(
+                vec![node("a", "i2c"), node("c", "moc")],
+                vec![link("a", &["c"])],
+            );
             let mut flat = crate::graph::parameters::flatten(g.tcspecial.as_ref().unwrap());
             flat.insert(attribute.to_string(), Scalar::of(value));
             g.tcspecial = Some(crate::graph::parameters::nest(&flat));
@@ -1964,8 +1950,8 @@ mod tests {
         // One device file, which is one stream split between two.
         let first = named("device-file", "a");
         let mut second = named("device-file", "b");
-        let said = wanted(&two(first.clone(), second.clone()))
-            .expect("two nodes on one device file");
+        let said =
+            wanted(&two(first.clone(), second.clone())).expect("two nodes on one device file");
         assert!(said.contains("/dev/urandom"), "{said}");
         assert!(said.contains("\"a\"") && said.contains("\"b\""), "{said}");
 
@@ -2003,8 +1989,7 @@ mod tests {
         driving
             .attributes
             .insert("lines".to_string(), Scalar::of("5,6,7"));
-        let said = wanted(&two(watching.clone(), driving.clone()))
-            .expect("two nodes on one line");
+        let said = wanted(&two(watching.clone(), driving.clone())).expect("two nodes on one line");
         assert!(said.contains("line 5"), "{said}");
         assert!(
             said.contains("/dev/gpiochip0"),
@@ -2026,8 +2011,7 @@ mod tests {
         theirs
             .attributes
             .insert("address".to_string(), Scalar::of("localhost"));
-        let said = wanted(&two(mine.clone(), theirs.clone()))
-            .expect("two nodes at one port");
+        let said = wanted(&two(mine.clone(), theirs.clone())).expect("two nodes at one port");
         assert!(said.contains("5100"), "{said}");
         theirs
             .attributes
@@ -2045,8 +2029,7 @@ mod tests {
                 .insert("protocol".to_string(), Scalar::of("unix_stream"));
             made.attributes
                 .insert("address".to_string(), Scalar::of("/tmp/node.sock"));
-            made.attributes
-                .insert("port".to_string(), Scalar::of(port));
+            made.attributes.insert("port".to_string(), Scalar::of(port));
             made
         };
         let said = wanted(&two(named_socket("a", "5200"), named_socket("b", "5201")))
@@ -2353,14 +2336,20 @@ mod tests {
                 .find(|p| matches!(p, Problem::RateOnASender { .. }))
                 .expect("the refusal")
                 .describe();
-            assert!(said.contains(sender) && said.contains("poll_interval"), "{said}");
+            assert!(
+                said.contains(sender) && said.contains("poll_interval"),
+                "{said}"
+            );
 
             // Asked on a timer of its own, it is not refused for that.
             let found = paced(sender, &[("trigger", "55"), ("trigger_interval", "1 s")]);
             assert!(!refused(&found), "{sender} asked: {found:?}");
         }
         for quiet in ["i2c", "spi", "device-file"] {
-            assert!(!refused(&paced(quiet, &[("poll_interval", "1 s")])), "{quiet}");
+            assert!(
+                !refused(&paced(quiet, &[("poll_interval", "1 s")])),
+                "{quiet}"
+            );
         }
     }
 
@@ -2375,7 +2364,10 @@ mod tests {
     #[test]
     fn a_node_is_asked_or_it_is_polled() {
         let driven = |pairs: &[(&str, &str)]| {
-            let mut g = graph(vec![node("a", "i2c"), node("b", "moc")], vec![link("a", &["b"])]);
+            let mut g = graph(
+                vec![node("a", "i2c"), node("b", "moc")],
+                vec![link("a", &["b"])],
+            );
             for (name, value) in pairs {
                 g.nodes[0].attributes.insert(
                     (*name).to_string(),
@@ -2386,10 +2378,17 @@ mod tests {
         };
 
         // Each of the three on its own, with what it belongs to.
-        assert_eq!(driven(&[("trigger", "55"), ("trigger_interval", "1 s")]), Vec::new());
+        assert_eq!(
+            driven(&[("trigger", "55"), ("trigger_interval", "1 s")]),
+            Vec::new()
+        );
         assert_eq!(driven(&[("poll_interval", "1 s")]), Vec::new());
         assert_eq!(
-            driven(&[("trigger", "55"), ("trigger_interval", "1 s"), ("read_delay", "2 ms")]),
+            driven(&[
+                ("trigger", "55"),
+                ("trigger_interval", "1 s"),
+                ("read_delay", "2 ms")
+            ]),
             Vec::new()
         );
 
@@ -2409,7 +2408,11 @@ mod tests {
                 Problem::PollIntervalWithTrigger { node: "a".into() },
             ),
             (
-                vec![("trigger", "55"), ("trigger_interval", "1 s"), ("poll_interval", "1 s")],
+                vec![
+                    ("trigger", "55"),
+                    ("trigger_interval", "1 s"),
+                    ("poll_interval", "1 s"),
+                ],
                 Problem::TwoRates { node: "a".into() },
             ),
         ] {
@@ -2424,7 +2427,10 @@ mod tests {
     /// A group must exist, must read on a readable interval, and owns it.
     #[test]
     fn a_group_owns_the_interval_of_everything_in_it() {
-        let mut g = graph(vec![node("a", "i2c"), node("b", "moc")], vec![link("a", &["b"])]);
+        let mut g = graph(
+            vec![node("a", "i2c"), node("b", "moc")],
+            vec![link("a", &["b"])],
+        );
         g.nodes[0].group = Some("temps".to_string());
 
         // Named and not declared.
@@ -2442,9 +2448,10 @@ mod tests {
         // A member may not state an interval of its own: two sensors in one
         // group with intervals each is a configuration disagreeing with
         // itself.
-        g.nodes[0]
-            .attributes
-            .insert("interval".to_string(), crate::endpoint_config::Scalar::of("1 s"));
+        g.nodes[0].attributes.insert(
+            "interval".to_string(),
+            crate::endpoint_config::Scalar::of("1 s"),
+        );
         assert!(g
             .check()
             .iter()
@@ -2453,7 +2460,10 @@ mod tests {
         // Nor a rate of either of the other two spellings: a group says
         // when the nodes in it are read, however they are driven.
         for rate in ["trigger_interval", "poll_interval"] {
-            let mut g = graph(vec![node("a", "i2c"), node("b", "moc")], vec![link("a", &["b"])]);
+            let mut g = graph(
+                vec![node("a", "i2c"), node("b", "moc")],
+                vec![link("a", &["b"])],
+            );
             g.nodes[0].group = Some("temps".to_string());
             g.groups.push(Group {
                 name: "temps".to_string(),
@@ -2463,9 +2473,10 @@ mod tests {
                 .attributes
                 .insert(rate.to_string(), crate::endpoint_config::Scalar::of("1 s"));
             if rate == "trigger_interval" {
-                g.nodes[0]
-                    .attributes
-                    .insert("trigger".to_string(), crate::endpoint_config::Scalar::of("55"));
+                g.nodes[0].attributes.insert(
+                    "trigger".to_string(),
+                    crate::endpoint_config::Scalar::of("55"),
+                );
             }
             let found = g.check();
             assert!(
@@ -2492,7 +2503,10 @@ mod tests {
     /// A group nothing is in is refused, as tcsgui has always marked it.
     #[test]
     fn a_group_with_nothing_in_it_is_refused() {
-        let mut g = graph(vec![node("a", "i2c"), node("b", "moc")], vec![link("a", &["b"])]);
+        let mut g = graph(
+            vec![node("a", "i2c"), node("b", "moc")],
+            vec![link("a", &["b"])],
+        );
         g.groups.push(Group {
             name: "temps".to_string(),
             interval: "3 s".to_string(),
@@ -2572,13 +2586,13 @@ mod tests {
         let mut sends = node("moc", "moc");
         sends.attributes.remove("address");
         sends.attributes.remove("port");
-        let g = graph(vec![node("a", "i2c"), sends.clone()], vec![link("a", &["moc"])]);
+        let g = graph(
+            vec![node("a", "i2c"), sends.clone()],
+            vec![link("a", &["moc"])],
+        );
         assert_eq!(g.check(), Vec::new());
 
-        let mut g = graph(
-            vec![sends, node("thermostat", "compute")],
-            Vec::new(),
-        );
+        let mut g = graph(vec![sends, node("thermostat", "compute")], Vec::new());
         g.commands = vec![CommandBinding {
             from: "moc".to_string(),
             sets: "thermostat.setpoint".to_string(),
@@ -2743,18 +2757,18 @@ mod tests {
                 .attributes
                 .insert("inputs".to_string(), Scalar::of(declared));
             let g = graph(
-                vec![node("a", "i2c"), node("b", "i2c"), node("c", "i2c"), average],
+                vec![
+                    node("a", "i2c"),
+                    node("b", "i2c"),
+                    node("c", "i2c"),
+                    average,
+                ],
                 links,
             );
             g.check()
         };
 
-        let two = || {
-            vec![
-                link("a", &["average.in0"]),
-                link("b", &["average.in1"]),
-            ]
-        };
+        let two = || vec![link("a", &["average.in0"]), link("b", &["average.in1"])];
         let three = || {
             let mut links = two();
             links.push(link("c", &["average.in2"]));
@@ -2955,10 +2969,7 @@ mod tests {
         assert_eq!(
             problems
                 .iter()
-                .filter(|p| matches!(
-                    p,
-                    Problem::LogSourceMismatch { produces: None, .. }
-                ))
+                .filter(|p| matches!(p, Problem::LogSourceMismatch { produces: None, .. }))
                 .count(),
             2,
             "{problems:?}"
@@ -3009,7 +3020,10 @@ mod tests {
             })
             .unwrap_or_else(|| panic!("{problems:?}"));
         // Saying what it does have, which is the one thing a reader needs.
-        assert!(why.contains("telemetry") && why.contains("payload-in"), "{why}");
+        assert!(
+            why.contains("telemetry") && why.contains("payload-in"),
+            "{why}"
+        );
         // Reported on the node the link leaves, which is where the link is
         // written: a link is an attribute of that node.
         let said = problems
@@ -3072,11 +3086,7 @@ mod tests {
             .iter()
             .find(|p| matches!(p, Problem::CrossedStreams { .. }))
             .unwrap_or_else(|| panic!("{problems:?}"));
-        assert!(
-            said.describe().contains("backwards"),
-            "{}",
-            said.describe()
-        );
+        assert!(said.describe().contains("backwards"), "{}", said.describe());
     }
 
     /// The null node passes the rest of itself: all four terminals, each used.
@@ -3150,10 +3160,7 @@ mod tests {
         // whatever order they were sent, with nothing to say which was which.
         let g = graph(
             vec![node("a", "i2c"), node("b", "i2c"), node("n", "null")],
-            vec![
-                link("a", &["n.payload-in"]),
-                link("b", &["n.payload-in"]),
-            ],
+            vec![link("a", &["n.payload-in"]), link("b", &["n.payload-in"])],
         );
         let problems = g.check();
         assert!(
@@ -3176,10 +3183,7 @@ mod tests {
         // Reached by a command binding, so the older `Unconnected` rule is
         // satisfied and this one is what is left to catch it: a ground link
         // that commands a computation and carries no telemetry at all.
-        let mut g = graph(
-            vec![node("moc", "moc"), node("t", "compute")],
-            Vec::new(),
-        );
+        let mut g = graph(vec![node("moc", "moc"), node("t", "compute")], Vec::new());
         g.commands.push(CommandBinding {
             from: "moc".to_string(),
             sets: "t.setpoint".to_string(),
@@ -3190,16 +3194,16 @@ mod tests {
             .find(|p| matches!(p, Problem::NodeOnNoLink { node, .. } if node == "moc"))
             .unwrap_or_else(|| panic!("{problems:?}"));
         assert_eq!(said.about(), About::Node("moc".to_string()));
-        assert!(
-            said.describe().contains("data sink"),
-            "{}",
-            said.describe()
-        );
+        assert!(said.describe().contains("data sink"), "{}", said.describe());
 
         // A payload that is only driven has a sink and nothing else, and is
         // allowed: a heater is a configuration somebody means.
         let g = graph(
-            vec![node("t", "compute"), node("heaters", "gpio"), node("moc", "moc")],
+            vec![
+                node("t", "compute"),
+                node("heaters", "gpio"),
+                node("moc", "moc"),
+            ],
             vec![link("t", &["heaters"]), link("t", &["moc"])],
         );
         assert!(

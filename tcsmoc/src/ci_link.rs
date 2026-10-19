@@ -36,7 +36,6 @@ use tcslibgs::{HostPort, TcsResult, Timestamp};
 #[cfg(test)]
 pub const LOCAL_BIND_ANY: &str = "0.0.0.0:0";
 
-
 /// Where every node's commands go, which is the second of the two links.
 ///
 /// Commands go on two links, for the reason they always have: what the ground
@@ -81,7 +80,6 @@ pub struct CiLink {
 }
 
 impl CiLink {
-
     /// And one whose second link is whatever `commanded` says.
     ///
     /// What a configuration's node commands go on: see [`Commanded`].
@@ -98,7 +96,6 @@ impl CiLink {
     pub fn address(&self) -> &str {
         &self.address
     }
-
 
     /// The client to send with, or `None` if the link is down.
     ///
@@ -138,13 +135,9 @@ impl CiLink {
         let connection = UdpConnection::new(&self.from, address)?;
         let Commanded { from, to } = &self.commanded;
         let nodes = UdpConnection::new(&from.to_string(), &to.to_string())?;
-        self.client = Some(TcsClient::of_a_graph(
-            Box::new(connection),
-            Box::new(nodes),
-        ));
+        self.client = Some(TcsClient::of_a_graph(Box::new(connection), Box::new(nodes)));
         Ok(())
     }
-
 
     /// Take the link down.
     ///
@@ -158,8 +151,6 @@ impl CiLink {
             let _ = client.close();
         }
     }
-
-
 }
 
 #[cfg(test)]
@@ -195,7 +186,11 @@ mod tests {
         });
 
         let mut link = CiLink::down_commanding(LOCAL_BIND_ANY, commanding());
-        assert_eq!(link.command_times(), None, "a link that is down has no times");
+        assert_eq!(
+            link.command_times(),
+            None,
+            "a link that is down has no times"
+        );
 
         link.connect(&at).expect("the link comes up");
         assert_eq!(

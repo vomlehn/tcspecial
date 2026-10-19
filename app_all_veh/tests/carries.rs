@@ -46,8 +46,13 @@ fn each_stream_is_carried_to_the_other_interface() {
     );
 
     // An empty packet on each, which is a packet.
-    running.write_payload(b"").expect("it takes an empty packet");
-    assert_eq!(running.read_payload().expect("it is carried"), Some(Vec::new()));
+    running
+        .write_payload(b"")
+        .expect("it takes an empty packet");
+    assert_eq!(
+        running.read_payload().expect("it is carried"),
+        Some(Vec::new())
+    );
     running.write_moc(b"").expect("it takes an empty packet");
     assert_eq!(running.read_moc().expect("it is carried"), Some(Vec::new()));
 

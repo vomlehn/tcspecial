@@ -99,4 +99,3 @@ impl EndpointWritable for DeviceEndpoint {
         }
     }
 }
-

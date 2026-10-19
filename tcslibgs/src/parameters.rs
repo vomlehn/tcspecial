@@ -42,7 +42,10 @@ pub fn payload_parameters(dh: &DHConfig, sim: Option<&ResolvedSim>) -> String {
         // A handler cannot be started without one, so its absence is worth a
         // line of its own rather than two lines missing.
         None => {
-            let _ = writeln!(out, "  oc_address       none stated, so it cannot be started");
+            let _ = writeln!(
+                out,
+                "  oc_address       none stated, so it cannot be started"
+            );
         }
     }
 
@@ -161,7 +164,8 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
                     crate::LineEdge::Rising => "rising",
                     crate::LineEdge::Falling => "falling",
                     crate::LineEdge::Both => "both",
-                    crate::LineEdge::None => "none, so what they are is reported \
+                    crate::LineEdge::None =>
+                        "none, so what they are is reported \
                                               rather than when they change",
                 }
             );
@@ -285,7 +289,11 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
                 "  ten_bit          {}",
                 if i2c.ten_bit { "yes" } else { "no" }
             );
-            let _ = writeln!(out, "  pec              {}", if i2c.pec { "yes" } else { "no" });
+            let _ = writeln!(
+                out,
+                "  pec              {}",
+                if i2c.pec { "yes" } else { "no" }
+            );
         }
         EndpointConfig::Spi(spi) => {
             let _ = writeln!(out, "  path             {}", spi.path);
@@ -389,10 +397,26 @@ fn simulator_parameters(out: &mut String, dh: &DHConfig, sim: &ResolvedSim) {
 
     let _ = writeln!(out, "  faults");
     for (what, value, unit) in [
-        ("drop_percent", u64::from(faults.drop_percent), "% of packets"),
-        ("corrupt_percent", u64::from(faults.corrupt_percent), "% of packets"),
-        ("truncate_percent", u64::from(faults.truncate_percent), "% of packets"),
-        ("jitter", faults.jitter.as_millis() as u64, " ms late at most"),
+        (
+            "drop_percent",
+            u64::from(faults.drop_percent),
+            "% of packets",
+        ),
+        (
+            "corrupt_percent",
+            u64::from(faults.corrupt_percent),
+            "% of packets",
+        ),
+        (
+            "truncate_percent",
+            u64::from(faults.truncate_percent),
+            "% of packets",
+        ),
+        (
+            "jitter",
+            faults.jitter.as_millis() as u64,
+            " ms late at most",
+        ),
         ("silent_after", faults.silent_after, " packets"),
         ("close_after", faults.close_after, " packets"),
         (
@@ -411,12 +435,10 @@ fn simulator_parameters(out: &mut String, dh: &DHConfig, sim: &ResolvedSim) {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
     use super::*;
     use crate::sim_config::SimConfigFile;
-    use crate::{
-        ConfigFormat, DHName, DeviceConfig, I2cConfig, NetworkConfig, SpiConfig,
-    };
+    use crate::{ConfigFormat, DHName, DeviceConfig, I2cConfig, NetworkConfig, SpiConfig};
+    use std::time::Duration;
 
     fn udp(name: &str) -> DHConfig {
         DHConfig {
@@ -543,10 +565,7 @@ mod tests {
         // The bytes, in the notation every trigger can be written in: a
         // trigger whose carriage return was shown as a line break would read
         // as two triggers.
-        assert!(
-            shown.contains("trigger          \"READ\\r\""),
-            "{shown}"
-        );
+        assert!(shown.contains("trigger          \"READ\\r\""), "{shown}");
         // The rate its trigger goes out at, which is this file's to state.
         assert!(
             shown.contains("packet_interval  500 ms, the rate its trigger goes out at"),
@@ -572,8 +591,14 @@ mod tests {
         );
 
         let shown = payload_parameters(&dh, Some(&sim));
-        assert!(shown.contains("drop_percent           10% of packets"), "{shown}");
-        assert!(shown.contains("jitter                 25 ms late at most"), "{shown}");
+        assert!(
+            shown.contains("drop_percent           10% of packets"),
+            "{shown}"
+        );
+        assert!(
+            shown.contains("jitter                 25 ms late at most"),
+            "{shown}"
+        );
         assert!(
             !shown.contains("corrupt_percent") && !shown.contains("silent_after"),
             "a fault nobody asked for is not worth a line of nought:\n{shown}"
@@ -630,7 +655,10 @@ mod tests {
         let shown = payload_parameters(&dh, None);
         assert!(shown.contains("max_speed        500000 Hz"), "{shown}");
         assert!(shown.contains("bits_per_word    8"), "{shown}");
-        assert!(shown.contains("bit_order        most significant first"), "{shown}");
+        assert!(
+            shown.contains("bit_order        most significant first"),
+            "{shown}"
+        );
         assert!(shown.contains("cs_active        low"), "{shown}");
 
         // A socket named by a path shows the path and no port, the port a
@@ -641,7 +669,10 @@ mod tests {
             port: 0,
         });
         let shown = payload_parameters(&dh, None);
-        assert!(shown.contains("address          /tmp/dh.sock (a socket path)"), "{shown}");
+        assert!(
+            shown.contains("address          /tmp/dh.sock (a socket path)"),
+            "{shown}"
+        );
         assert!(!shown.contains("port             0"), "{shown}");
     }
 

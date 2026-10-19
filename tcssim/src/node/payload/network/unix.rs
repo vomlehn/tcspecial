@@ -33,8 +33,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, hangs_up, ignore_this_request, lateness, send_in_segments, wait_out_packet, wait_while_running, Pacing,
-    PayloadConfig, PayloadStats, Produce,
+    a_packet, hangs_up, ignore_this_request, lateness, send_in_segments, wait_out_packet,
+    wait_while_running, Pacing, PayloadConfig, PayloadStats, Produce,
 };
 
 /// What a datagram device's own path is called, given the handler's.
@@ -98,7 +98,8 @@ fn clear_a_dead_socket(path: &Path) -> Result<(), String> {
                  than stopped; replacing it",
                 path.display()
             );
-            std::fs::remove_file(path).map_err(|e| format!("{} cannot be replaced: {e}", path.display()))
+            std::fs::remove_file(path)
+                .map_err(|e| format!("{} cannot be replaced: {e}", path.display()))
         }
     }
 }
@@ -116,20 +117,32 @@ pub fn run_unix_stream_node(
 ) {
     let path = PathBuf::from(&config.address);
     if let Err(e) = clear_a_dead_socket(&path) {
-        eprintln!("{}: failed to stand in for a Unix stream device: {}", config.name, e);
+        eprintln!(
+            "{}: failed to stand in for a Unix stream device: {}",
+            config.name, e
+        );
         return;
     }
 
     let listener = match UnixListener::bind(&path) {
         Ok(listener) => listener,
         Err(e) => {
-            eprintln!("{}: failed to listen at {}: {}", config.name, path.display(), e);
+            eprintln!(
+                "{}: failed to listen at {}: {}",
+                config.name,
+                path.display(),
+                e
+            );
             return;
         }
     };
     let _bound = BoundPath { path: path.clone() };
     listener.set_nonblocking(true).ok();
-    eprintln!("{}: a Unix stream device is listening at {}", config.name, path.display());
+    eprintln!(
+        "{}: a Unix stream device is listening at {}",
+        config.name,
+        path.display()
+    );
 
     let mut connection: Option<UnixStream> = None;
     let mut rng = rand::thread_rng();
@@ -242,7 +255,10 @@ pub fn run_unix_dgram_node(
     };
 
     if let Err(e) = clear_a_dead_socket(&mine) {
-        eprintln!("{}: failed to stand in for a Unix datagram device: {}", config.name, e);
+        eprintln!(
+            "{}: failed to stand in for a Unix datagram device: {}",
+            config.name, e
+        );
         return;
     }
 
@@ -287,8 +303,8 @@ pub fn run_unix_dgram_node(
         // handler has bound its path fails, which is counted as nothing sent
         // rather than as a packet: the handler is not there yet.
         if pacing.a_packet_is_due(config.triggered, asked)
-                && !ignore_this_request(&config, &mut rng)
-            {
+            && !ignore_this_request(&config, &mut rng)
+        {
             let late = lateness(&config, &mut rng);
             let packet = match a_packet(&config, &pacing, sent, &mut rng) {
                 Produce::Send(packet) => packet,
@@ -415,7 +431,7 @@ mod tests {
     fn device_at(path: &Path, protocol: PayloadProtocol) -> SimulatedPayload {
         SimulatedPayload::new(PayloadConfig {
             thermal: None,
-                        name: "DH0".to_string(),
+            name: "DH0".to_string(),
             protocol,
             address: path.display().to_string(),
             port: 0,
@@ -430,7 +446,7 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(5)),
             packet_interval_ms: Arc::new(AtomicU32::new(100)),
             segment_interval_ms: Arc::new(AtomicU32::new(20)),
-                    triggered: false,
+            triggered: false,
         })
     }
 
@@ -473,11 +489,7 @@ mod tests {
 
         // The socket file goes with the device, rather than being left for
         // the next run to clear.
-        assert!(
-            !path.exists(),
-            "{} outlived the device",
-            path.display()
-        );
+        assert!(!path.exists(), "{} outlived the device", path.display());
     }
 
     /// A datagram device sends to where the handler waits, unprompted, from a
@@ -593,7 +605,9 @@ mod tests {
         while Instant::now() < deadline && vehicle.send_to(b"1", &path).is_err() {
             std::thread::sleep(Duration::from_millis(10));
         }
-        vehicle.send_to(b"1", &path).expect("the heater is driven on");
+        vehicle
+            .send_to(b"1", &path)
+            .expect("the heater is driven on");
 
         // Warming, which is the whole of what a heater does: three kelvin a
         // second, so a tenth of a second is plenty to tell from nothing.

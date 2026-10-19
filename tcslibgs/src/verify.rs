@@ -66,7 +66,6 @@ impl Problem {
             message: message.into(),
         }
     }
-
 }
 
 impl std::fmt::Display for Problem {

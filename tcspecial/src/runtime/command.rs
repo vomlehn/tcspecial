@@ -466,7 +466,7 @@ impl Serving {
                         tcslibgs::DHSample::new(),
                     ))
                 }
-            }
+            },
 
             // Not answered yet, and refused rather than left unanswered. A
             // command the vehicle does not implement is a thing the ground can
@@ -778,7 +778,11 @@ mod tests {
         let at = commands.node_address();
         let handed_over = || done.lock().expect("the record").clone();
 
-        match ask(&ground, at, &Command::StopNode(NodeCommand::stop(1, inside))) {
+        match ask(
+            &ground,
+            at,
+            &Command::StopNode(NodeCommand::stop(1, inside)),
+        ) {
             Some(Telemetry::StopNode(tm)) => {
                 assert_eq!(tm.header.status, CommandStatus::Success);
                 assert_eq!(tm.node, inside, "the answer says which node");
@@ -797,14 +801,22 @@ mod tests {
         );
 
         // Twice is a state and not an action.
-        match ask(&ground, at, &Command::StopNode(NodeCommand::stop(2, inside))) {
+        match ask(
+            &ground,
+            at,
+            &Command::StopNode(NodeCommand::stop(2, inside)),
+        ) {
             Some(Telemetry::StopNode(tm)) => {
                 assert_eq!(tm.header.status, CommandStatus::Success, "asked twice")
             }
             other => panic!("expected a stop answer, got {other:?}"),
         }
 
-        match ask(&ground, at, &Command::StartNode(NodeCommand::start(3, inside))) {
+        match ask(
+            &ground,
+            at,
+            &Command::StartNode(NodeCommand::start(3, inside)),
+        ) {
             Some(Telemetry::StartNode(tm)) => {
                 assert_eq!(tm.header.status, CommandStatus::Success);
                 assert_eq!(tm.node, inside);
@@ -844,7 +856,9 @@ mod tests {
         // attribute no binding mentions.
         let (bench, done) = a_pass_answering(|work| match work {
             Work::Set { attribute, .. } if attribute == "setpoint" => Ok(()),
-            Work::Set { node, attribute, .. } => Err(format!(
+            Work::Set {
+                node, attribute, ..
+            } => Err(format!(
                 "no command binding says the ground may set \"{node}.{attribute}\""
             )),
             _ => Ok(()),
@@ -928,10 +942,18 @@ mod tests {
         let at = commands.node_address();
 
         // Stopped first, so that starting it is a real opening.
-        ask(&ground, at, &Command::StopNode(NodeCommand::stop(1, inside)));
+        ask(
+            &ground,
+            at,
+            &Command::StopNode(NodeCommand::stop(1, inside)),
+        );
         assert!(!states.is_enabled("inside"));
 
-        match ask(&ground, at, &Command::StartNode(NodeCommand::start(2, inside))) {
+        match ask(
+            &ground,
+            at,
+            &Command::StartNode(NodeCommand::start(2, inside)),
+        ) {
             Some(Telemetry::StartNode(tm)) => {
                 assert_eq!(tm.header.status, CommandStatus::Failure);
                 assert_eq!(tm.node, inside);
@@ -958,7 +980,11 @@ mod tests {
         let at = commands.node_address();
 
         let nowhere = NodeId::of(99);
-        match ask(&ground, at, &Command::StopNode(NodeCommand::stop(4, nowhere))) {
+        match ask(
+            &ground,
+            at,
+            &Command::StopNode(NodeCommand::stop(4, nowhere)),
+        ) {
             Some(Telemetry::StopNode(tm)) => {
                 assert_eq!(tm.header.status, CommandStatus::NotFound);
                 assert_eq!(tm.node, nowhere, "the id the command carried");

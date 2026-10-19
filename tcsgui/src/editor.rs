@@ -157,8 +157,7 @@ impl Editor {
                 editor.document = document;
             }
             Err(why) => {
-                editor.trouble =
-                    Some(format!("{} cannot be read: {why}", path.display()));
+                editor.trouble = Some(format!("{} cannot be read: {why}", path.display()));
                 // No history either: a journal belongs to the document it
                 // describes, and the document is not the one that was meant.
                 return editor;
@@ -213,9 +212,7 @@ impl Editor {
                     .nodes
                     .iter()
                     .filter(|node| crate::pane::is_payload(&node.node_type))
-                    .map(|node| {
-                        crate::Qualified::of(&node.name, &node.home).absolute()
-                    })
+                    .map(|node| crate::Qualified::of(&node.name, &node.home).absolute())
                     .collect();
                 let stray: Vec<&String> = simulator
                     .payloads
@@ -788,8 +785,7 @@ tcsgui:
 
         // And read back: a second session on the same pair finds what the
         // first left.
-        let mut reopened =
-            Editor::open(&path, crate::pane::default_dividers());
+        let mut reopened = Editor::open(&path, crate::pane::default_dividers());
         reopened.open_simulator(&sim);
         assert_eq!(
             reopened
@@ -843,11 +839,8 @@ tcsgui:
     fn a_simulator_file_that_does_not_join_up_is_refused() {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("vehicle.yaml");
-        std::fs::write(
-            &path,
-            "payloads:\n  - name: payload\n    type: network\n",
-        )
-        .expect("a configuration");
+        std::fs::write(&path, "payloads:\n  - name: payload\n    type: network\n")
+            .expect("a configuration");
 
         // Two entries of one name.
         let twice = where_.path().join("twicesim.yaml");
@@ -951,16 +944,10 @@ tcsgui:
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("vehicle.yaml");
         let sim = where_.path().join("vehiclesim.yaml");
-        std::fs::write(
-            &path,
-            "payloads:\n  - name: payload\n    type: network\n",
-        )
-        .expect("a configuration");
+        std::fs::write(&path, "payloads:\n  - name: payload\n    type: network\n")
+            .expect("a configuration");
 
-        let mut editor = Editor::open(
-            &path,
-            crate::pane::default_dividers(),
-        );
+        let mut editor = Editor::open(&path, crate::pane::default_dividers());
         editor.open_simulator(&sim);
         assert!(editor.document().simulator.is_some(), "the session has one");
 
@@ -1000,10 +987,7 @@ tcsgui:
         )
         .expect("a configuration");
 
-        let mut editor = Editor::open(
-            &path,
-            crate::pane::default_dividers(),
-        );
+        let mut editor = Editor::open(&path, crate::pane::default_dividers());
         editor.open_simulator(&sim);
         // One edit, so that the files are written: the editor writes on every
         // edit, and this one is about the configuration rather than the
@@ -1016,7 +1000,10 @@ tcsgui:
 
         let written = std::fs::read_to_string(&sim).expect("the simulator file");
         for payload in ["sensor", "payload"] {
-            assert!(written.contains(&format!("name: \"{payload}\"")), "{written}");
+            assert!(
+                written.contains(&format!("name: \"{payload}\"")),
+                "{written}"
+            );
         }
         assert!(
             !written.contains("mean"),
@@ -1060,8 +1047,12 @@ tcsgui:
             let sim = where_.path().join(name);
             // Written, so that what refuses it is the name and not the
             // reading.
-            std::fs::write(&sim, "simulated_payloads: []
-").expect("a file");
+            std::fs::write(
+                &sim,
+                "simulated_payloads: []
+",
+            )
+            .expect("a file");
 
             let mut editor = Editor::open(
                 &where_.path().join("vehicle.yaml"),
@@ -1070,7 +1061,10 @@ tcsgui:
             editor.open_simulator(&sim);
 
             let said = editor.trouble().expect("this should be reported");
-            assert!(said.contains(name) && said.contains(".yaml"), "{name}: {said}");
+            assert!(
+                said.contains(name) && said.contains(".yaml"),
+                "{name}: {said}"
+            );
             assert!(
                 editor.document().simulator.is_none(),
                 "{name}: nothing should be opened for a name that cannot be written"
@@ -1109,7 +1103,11 @@ tcsgui:
             interval: "3 s".into(),
         });
         editor.edit(add("temp_1", "i2c"));
-        for (attribute, value) in [("group", "cabin_temps"), ("path", "/dev/i2c-1"), ("address", "0x48")] {
+        for (attribute, value) in [
+            ("group", "cabin_temps"),
+            ("path", "/dev/i2c-1"),
+            ("address", "0x48"),
+        ] {
             editor.edit(Edit::SetAttribute {
                 node: "temp_1".into(),
                 attribute: attribute.into(),
@@ -1125,7 +1123,11 @@ tcsgui:
 
         let reopened = Editor::open(&path, crate::pane::default_dividers());
         assert_eq!(
-            reopened.document().groups.get("cabin_temps").map(String::as_str),
+            reopened
+                .document()
+                .groups
+                .get("cabin_temps")
+                .map(String::as_str),
             Some("3 s"),
             "the group did not survive a round trip"
         );
@@ -1436,4 +1438,3 @@ tcsgui:
         );
     }
 }
-

@@ -23,10 +23,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::journal::{Edit, Link};
 use crate::pane::{confine, is_payload, size_of};
-use tcslibgs::endpoint_config::Scalar;
-use tcslibgs::graph::{section_of, Section};
 use crate::style::NodeType;
 use crate::subdiagram::{file_for, Home, Qualified};
+use tcslibgs::endpoint_config::Scalar;
+use tcslibgs::graph::{section_of, Section};
 
 /// One node as the editor holds it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -272,12 +272,8 @@ fn reach_of_node(node: &Node) -> Result<(), String> {
     // same rule tcspecial reads it by, so what this says is what is missing
     // rather than that an app has no address, which no app has.
     if tcslibgs::node::app::Kind::of(&theirs.node_type).is_some() {
-        return tcslibgs::node::app::params_of(
-            &theirs.name,
-            &theirs.node_type,
-            &theirs.attributes,
-        )
-        .map(|_| ());
+        return tcslibgs::node::app::params_of(&theirs.name, &theirs.node_type, &theirs.attributes)
+            .map(|_| ());
     }
 
     // Only the nodes that are opened. A computation and a log have rules of
@@ -489,9 +485,7 @@ impl Document {
                 None => (String::new(), attribute.clone()),
             };
             match out.last_mut() {
-                Some((had, under)) if *had == parent => {
-                    under.push((name, value.clone()))
-                }
+                Some((had, under)) if *had == parent => under.push((name, value.clone())),
                 _ => out.push((parent, vec![(name, value.clone())])),
             }
         }
@@ -782,10 +776,18 @@ impl Document {
         // Whatever it is called, without a number on the end: a file with
         // `i2c-1` twice should offer `i2c-2`, not `i2c-1-1`.
         let stem = match node.name.rsplit_once('-') {
-            Some((stem, number)) if !number.is_empty() && number.bytes().all(|b| b.is_ascii_digit()) => stem,
+            Some((stem, number))
+                if !number.is_empty() && number.bytes().all(|b| b.is_ascii_digit()) =>
+            {
+                stem
+            }
             _ => node.name.as_str(),
         };
-        let stem = if stem.is_empty() { node.node_type.as_str() } else { stem };
+        let stem = if stem.is_empty() {
+            node.node_type.as_str()
+        } else {
+            stem
+        };
         let taken = |name: &str| {
             let whole = Qualified::of(name, &home).absolute();
             self.nodes
@@ -849,10 +851,7 @@ impl Document {
     /// whole sheet from the top, because arranging is what a person does to
     /// bring everything into view rather than to fit it around what they are
     /// looking at now.
-    pub fn arranged(
-        &self,
-        dividers: crate::pane::Dividers,
-    ) -> Vec<(String, (i32, i32))> {
+    pub fn arranged(&self, dividers: crate::pane::Dividers) -> Vec<(String, (i32, i32))> {
         let mut taken: Vec<(i32, i32, u32, u32)> = Vec::new();
         let mut moved = Vec::new();
 
@@ -877,9 +876,7 @@ impl Document {
     pub fn where_each_is(&self, named: &[(String, (i32, i32))]) -> Vec<(String, (i32, i32))> {
         named
             .iter()
-            .filter_map(|(name, _)| {
-                self.node(name).map(|node| (name.clone(), node.at))
-            })
+            .filter_map(|(name, _)| self.node(name).map(|node| (name.clone(), node.at)))
             .collect()
     }
 
@@ -897,10 +894,7 @@ impl Document {
     }
 
     /// The same, to be changed.
-    fn payloads_of_mut<'a>(
-        &'a mut self,
-        group: &'a str,
-    ) -> impl Iterator<Item = &'a mut Node> {
+    fn payloads_of_mut<'a>(&'a mut self, group: &'a str) -> impl Iterator<Item = &'a mut Node> {
         self.nodes
             .iter_mut()
             .filter(move |node| in_group(node, group) && is_payload(&node.node_type))
@@ -1134,9 +1128,7 @@ impl Document {
                     self.apply(edit);
                 }
             }
-            Edit::SetTcspecial {
-                attribute, now, ..
-            } => match now {
+            Edit::SetTcspecial { attribute, now, .. } => match now {
                 Some(value) => {
                     self.tcspecial.insert(attribute.clone(), value.clone());
                 }
@@ -1228,8 +1220,7 @@ impl Document {
                 // rename that silently unscheduled a dozen sensors.
                 for node in &mut self.nodes {
                     if node.attributes.get("group").map(|g| g.trim()) == Some(was.as_str()) {
-                        node.attributes
-                            .insert("group".to_string(), now.clone());
+                        node.attributes.insert("group".to_string(), now.clone());
                     }
                 }
             }
@@ -1253,9 +1244,7 @@ impl Document {
                     }
                 }
             }
-            Edit::RestoreGroupAttribute {
-                attribute, now, ..
-            } => {
+            Edit::RestoreGroupAttribute { attribute, now, .. } => {
                 // Each node's own value, by name: the group may have changed
                 // since, and what is being put back is what these nodes had.
                 for (name, value) in now {
@@ -1278,9 +1267,7 @@ impl Document {
                 }
             }
             Edit::SetLinkComment { link, now, .. } => {
-                if let Some(existing) =
-                    self.links.iter_mut().find(|l| l.same_connection(link))
-                {
+                if let Some(existing) = self.links.iter_mut().find(|l| l.same_connection(link)) {
                     existing.comment = now.clone();
                 }
             }
@@ -1405,9 +1392,7 @@ impl Document {
                 .tcspecial
                 .iter()
                 .filter(|(_, value)| !value.trim().is_empty())
-                .map(|(attribute, value)| {
-                    (attribute.clone(), Scalar::of(value.as_str()))
-                })
+                .map(|(attribute, value)| (attribute.clone(), Scalar::of(value.as_str())))
                 .collect();
             let outcome = tcslibgs::graph::parameters::ci_config_of(&said)
                 .and_then(|section| section.to_ci_config().map(|_| ()));
@@ -1464,9 +1449,7 @@ impl Document {
                 continue;
             }
             if let Some(input) = &link.input {
-                *bound
-                    .entry((link.to.as_str(), input.as_str()))
-                    .or_insert(0) += 1;
+                *bound.entry((link.to.as_str(), input.as_str())).or_insert(0) += 1;
             }
         }
         for ((node, input), count) in bound {
@@ -1661,10 +1644,7 @@ impl Document {
             {
                 if let Some(comment) = &node.comment {
                     for line in comment_lines(comment, 4) {
-                        out.push_str(&format!(
-                            "    <!-- {} -->\n",
-                            escape(&comment_safe(&line))
-                        ));
+                        out.push_str(&format!("    <!-- {} -->\n", escape(&comment_safe(&line))));
                     }
                 }
                 let tag = section.name();
@@ -1705,9 +1685,7 @@ impl Document {
                             ),
                             None => format!("<target>{}</target>", escape(&target)),
                         };
-                        out.push_str(&format!(
-                            "        <{terminal}>{said}</{terminal}>\n"
-                        ));
+                        out.push_str(&format!("        <{terminal}>{said}</{terminal}>\n"));
                     }
                 }
                 for sink in self.arriving(node, home) {
@@ -1724,21 +1702,12 @@ impl Document {
             for command in &self.commands {
                 if let Some(comment) = &command.comment {
                     for line in comment_lines(comment, 4) {
-                        out.push_str(&format!(
-                            "    <!-- {} -->\n",
-                            escape(&comment_safe(&line))
-                        ));
+                        out.push_str(&format!("    <!-- {} -->\n", escape(&comment_safe(&line))));
                     }
                 }
                 out.push_str("    <commands>\n");
-                out.push_str(&format!(
-                    "        <from>{}</from>\n",
-                    escape(&command.from)
-                ));
-                out.push_str(&format!(
-                    "        <sets>{}</sets>\n",
-                    escape(&command.sets)
-                ));
+                out.push_str(&format!("        <from>{}</from>\n", escape(&command.from)));
+                out.push_str(&format!("        <sets>{}</sets>\n", escape(&command.sets)));
                 out.push_str("    </commands>\n");
             }
         }
@@ -2050,11 +2019,7 @@ impl Document {
     /// several entries, so nothing in a file pairs by position: two lists read
     /// against each other, one of them a name short, would be a configuration
     /// that reads as valid and delivers a reading to the wrong input.
-    fn leaving(
-        &self,
-        node: &Node,
-        home: &Home,
-    ) -> Vec<(&'static str, Vec<Bound>, Option<String>)> {
+    fn leaving(&self, node: &Node, home: &Home) -> Vec<(&'static str, Vec<Bound>, Option<String>)> {
         let mut leaving: Vec<(&'static str, Vec<Bound>, Option<String>)> = Vec::new();
         for terminal in ["payload-out", "moc-out"] {
             let mut destinations: Vec<Bound> = Vec::new();
@@ -2068,11 +2033,7 @@ impl Document {
             // is in -- because a node's own name is the one inside its file.
             let ours = Qualified::of(&node.name, home).absolute();
             for link in self.links.iter().filter(|l| l.from == ours) {
-                let by = crate::style::terminal_for(
-                    &node.node_type,
-                    link.origin.as_deref(),
-                    false,
-                );
+                let by = crate::style::terminal_for(&node.node_type, link.origin.as_deref(), false);
                 if by != Some(terminal) {
                     continue;
                 }
@@ -2138,7 +2099,6 @@ impl Document {
         }
         arriving
     }
-
 }
 
 /// Which language a file's name asks for.
@@ -2203,9 +2163,8 @@ fn quoted(value: &str) -> String {
 /// wrong.
 fn plain(value: &str) -> String {
     const RESERVED: &[&str] = &[
-        "null", "Null", "NULL", "~", "true", "True", "TRUE", "false", "False",
-        "FALSE", "yes", "Yes", "YES", "no", "No", "NO", "on", "On", "ON", "off",
-        "Off", "OFF",
+        "null", "Null", "NULL", "~", "true", "True", "TRUE", "false", "False", "FALSE", "yes",
+        "Yes", "YES", "no", "No", "NO", "on", "On", "ON", "off", "Off", "OFF",
     ];
 
     let bare = !value.is_empty()
@@ -2384,7 +2343,9 @@ pub fn thermostat_example() -> Document {
     // The group the three sensors share, which is the point of the example:
     // readings that will be averaged are taken as close to together as the
     // hardware allows.
-    document.groups.insert("cabin_temps".to_string(), "100 ms".to_string());
+    document
+        .groups
+        .insert("cabin_temps".to_string(), "100 ms".to_string());
 
     place(&mut document, "temp_1", "i2c", (34, 34));
     set(&mut document, "temp_1", "path", "/dev/i2c-1");
@@ -2475,7 +2436,12 @@ pub fn thermostat_example() -> Document {
     );
 
     place(&mut document, "housekeeping", "log", (469, 374));
-    set(&mut document, "housekeeping", "directory", "/var/log/tcspecial");
+    set(
+        &mut document,
+        "housekeeping",
+        "directory",
+        "/var/log/tcspecial",
+    );
     set(&mut document, "housekeeping", "format", "variable_ts_rc");
 
     // Every link names the data source it leaves by, which is the attribute
@@ -2495,17 +2461,35 @@ pub fn thermostat_example() -> Document {
     // into the log.
     for (from, input) in [("k_1", "in0"), ("k_2", "in1"), ("k_3", "in2")] {
         link(&mut document, from, "payload-out", "moc", None);
-        link(&mut document, from, "payload-out", "cabin_temp", Some(input));
+        link(
+            &mut document,
+            from,
+            "payload-out",
+            "cabin_temp",
+            Some(input),
+        );
         link(&mut document, from, "payload-out", "housekeeping", None);
     }
 
     link(&mut document, "cabin_temp", "payload-out", "moc", None);
-    link(&mut document, "cabin_temp", "payload-out", "thermostat", None);
+    link(
+        &mut document,
+        "cabin_temp",
+        "payload-out",
+        "thermostat",
+        None,
+    );
     // The heaters are a payload, so what drives them leaves the thermostat by
     // its moc-out: the vehicleward stream, which is what reaches a payload.
     link(&mut document, "thermostat", "moc-out", "heaters_1", None);
     link(&mut document, "thermostat", "moc-out", "heaters_2", None);
-    link(&mut document, "thermostat", "payload-out", "housekeeping", None);
+    link(
+        &mut document,
+        "thermostat",
+        "payload-out",
+        "housekeeping",
+        None,
+    );
     link(&mut document, "thermostat", "payload-out", "moc", None);
     // The comment belongs to the terminal rather than to one link, so both
     // of the heaters carry it: that is what reading the file back gives, a
@@ -2527,9 +2511,7 @@ pub fn thermostat_example() -> Document {
     document.commands.push(Command {
         from: "moc".to_string(),
         sets: "thermostat.setpoint".to_string(),
-        comment: Some(
-            "the cabin temperature the heaters are held at, in kelvin".to_string(),
-        ),
+        comment: Some("the cabin temperature the heaters are held at, in kelvin".to_string()),
     });
 
     document
@@ -2723,7 +2705,11 @@ mod tests {
             was: Some("4000".into()),
             now: None,
         });
-        assert!(!document.to_yaml().contains("port"), "{}", document.to_yaml());
+        assert!(
+            !document.to_yaml().contains("port"),
+            "{}",
+            document.to_yaml()
+        );
         assert!(document.faults().is_empty(), "clearing one is not a fault");
     }
 
@@ -2764,7 +2750,11 @@ mod tests {
         };
 
         // Complete and sound: nothing said.
-        assert!(filled(None).faults().is_empty(), "{:?}", filled(None).faults());
+        assert!(
+            filled(None).faults().is_empty(),
+            "{:?}",
+            filled(None).faults()
+        );
 
         // Complete and wrong, in the words of the rules that know why.
         for (attribute, instead, expected) in [
@@ -2774,7 +2764,11 @@ mod tests {
             // carrying two things goes wrong.
             ("tcs_cmd.recv", "0.0.0.0", "address:port"),
             ("tcs_cmd.recv", "0.0.0.0:4200", "payload_command.dest_base"),
-            ("payload_command.dest_base", "nought", "payload_command.dest_base"),
+            (
+                "payload_command.dest_base",
+                "nought",
+                "payload_command.dest_base",
+            ),
         ] {
             let document = filled(Some((attribute, instead)));
             let said = document
@@ -2784,9 +2778,7 @@ mod tests {
                     Fault::BadTcspecial { why } => Some(why),
                     _ => None,
                 })
-                .unwrap_or_else(|| {
-                    panic!("{attribute} = {instead} should be refused")
-                });
+                .unwrap_or_else(|| panic!("{attribute} = {instead} should be refused"));
             assert!(
                 said.contains(expected),
                 "{attribute} = {instead} was refused as {said:?}"
@@ -2867,7 +2859,11 @@ mod tests {
             ("stray_sensor", "i2c", (divider + 40, on_grid(120))),
             ("stray_compute", "compute", (on_grid(40), on_grid(200))),
             ("good_sensor", "i2c", (on_grid(16), on_grid(320))),
-            ("good_compute", "compute", (on_grid(divider + 240), on_grid(40))),
+            (
+                "good_compute",
+                "compute",
+                (on_grid(divider + 240), on_grid(40)),
+            ),
         ] {
             document.apply(&add(name, node_type));
             document.apply(&Edit::MoveNode {
@@ -2886,9 +2882,15 @@ mod tests {
         // The payload is in its own pane now, at the near edge of it: the
         // smallest move that obeys the rule, which is its own width short of
         // the divider, taken back to the grid.
-        assert_eq!(at("stray_sensor"), (node_floor(divider - width), on_grid(120)));
+        assert_eq!(
+            at("stray_sensor"),
+            (node_floor(divider - width), on_grid(120))
+        );
         // And the computation is out of it, against the divider.
-        assert_eq!(at("stray_compute"), (crate::pane::node_ceil(divider), on_grid(200)));
+        assert_eq!(
+            at("stray_compute"),
+            (crate::pane::node_ceil(divider), on_grid(200))
+        );
         // The two that were already right are untouched, which matters: a
         // reader who arranged a diagram should find it as they left it.
         assert_eq!(at("good_sensor"), (on_grid(16), on_grid(320)));
@@ -3059,14 +3061,7 @@ mod tests {
             now: Some("/dev/i2c-1".into()),
         });
 
-        let path = |name: &str| {
-            document
-                .node(name)
-                .unwrap()
-                .attributes
-                .get("path")
-                .cloned()
-        };
+        let path = |name: &str| document.node(name).unwrap().attributes.get("path").cloned();
         assert_eq!(path("temp_1").as_deref(), Some("/dev/i2c-1"));
         assert_eq!(path("temp_2").as_deref(), Some("/dev/i2c-1"));
         assert_eq!(path("temp_3"), None, "another group was written to");
@@ -3100,7 +3095,10 @@ mod tests {
             now: "cabin".into(),
         });
 
-        assert_eq!(document.groups.get("cabin").map(String::as_str), Some("3 s"));
+        assert_eq!(
+            document.groups.get("cabin").map(String::as_str),
+            Some("3 s")
+        );
         assert!(!document.groups.contains_key("cabin_temps"));
         assert_eq!(
             document
@@ -3183,9 +3181,11 @@ mod tests {
         });
         for (name, address) in [("temp_1", "0x48"), ("temp_2", "0x49")] {
             document.apply(&add(name, "i2c"));
-            for (attribute, value) in
-                [("group", "cabin_temps"), ("address", address), ("path", "/dev/i2c-1")]
-            {
+            for (attribute, value) in [
+                ("group", "cabin_temps"),
+                ("address", address),
+                ("path", "/dev/i2c-1"),
+            ] {
                 document.apply(&Edit::SetAttribute {
                     node: name.into(),
                     attribute: attribute.into(),
@@ -3309,12 +3309,7 @@ mod tests {
             let before = document.clone();
             document.apply(&edit);
             document.apply(&edit.inverse());
-            assert_eq!(
-                document,
-                before,
-                "{} did not undo cleanly",
-                edit.describe()
-            );
+            assert_eq!(document, before, "{} did not undo cleanly", edit.describe());
         }
     }
 
@@ -3333,7 +3328,11 @@ mod tests {
         let removal = Edit::RemoveNode {
             name: node.name.clone(),
             node_type: node.node_type.clone(),
-            attributes: node.attributes.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+            attributes: node
+                .attributes
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect(),
             links: vec![link.clone()],
             home: None,
         };
@@ -3399,7 +3398,10 @@ mod tests {
             link: Link::new("a", "nowhere", None),
         });
         assert!(
-            document.faults().iter().any(|f| matches!(f, Fault::DanglingLink { .. })),
+            document
+                .faults()
+                .iter()
+                .any(|f| matches!(f, Fault::DanglingLink { .. })),
             "{:?}",
             document.faults()
         );
@@ -3496,9 +3498,9 @@ mod tests {
             });
             // A simulator configuration, so that the edits which set one of
             // its settings have somewhere to put them.
-            document.simulator = Some(crate::sim::Simulator::new(
-                std::path::Path::new("vehiclesim.yaml"),
-            ));
+            document.simulator = Some(crate::sim::Simulator::new(std::path::Path::new(
+                "vehiclesim.yaml",
+            )));
             document.apply(&Edit::AddSimGroup {
                 name: "steady_1hz".into(),
             });
@@ -3516,9 +3518,7 @@ mod tests {
             });
             // What tcspecial is configured with, so that the edits which set
             // one of its parameters have something to change.
-            for (attribute, value) in
-                [("port", "4000"), ("log.directory", "/var/log/tcspecial")]
-            {
+            for (attribute, value) in [("port", "4000"), ("log.directory", "/var/log/tcspecial")] {
                 document.apply(&Edit::SetTcspecial {
                     attribute: attribute.into(),
                     was: None,
@@ -3700,12 +3700,7 @@ mod tests {
             let before = document.clone();
             document.apply(edit);
             document.apply(&edit.inverse());
-            assert_eq!(
-                document,
-                before,
-                "{} did not undo cleanly",
-                edit.describe()
-            );
+            assert_eq!(document, before, "{} did not undo cleanly", edit.describe());
 
             // And an undo followed by a redo lands where the edit did, which
             // is the other half of what undo has to mean.
@@ -3754,7 +3749,10 @@ mod tests {
         );
 
         let xml = document.to_xml();
-        assert!(xml.contains("<!-- 0x49 after the rework; see ECR-114 -->"), "{xml}");
+        assert!(
+            xml.contains("<!-- 0x49 after the rework; see ECR-114 -->"),
+            "{xml}"
+        );
         assert!(xml.contains("<!-- raw counts, not kelvin -->"), "{xml}");
     }
 
@@ -3832,8 +3830,10 @@ mod tests {
         document.apply(&Edit::SetNodeComment {
             node: "a".into(),
             was: None,
-            now: Some(format!("{long}\nshort\n  an indented line that goes on \
-                               and on and on well past where a line should stop")),
+            now: Some(format!(
+                "{long}\nshort\n  an indented line that goes on \
+                               and on and on well past where a line should stop"
+            )),
         });
         let mut link = Link::new("a", "b", None);
         link.comment = Some(long.to_string());
@@ -3863,7 +3863,10 @@ mod tests {
             4,
         );
         assert!(indented.len() > 1, "{indented:?}");
-        assert!(indented.iter().all(|line| line.starts_with("  ")), "{indented:?}");
+        assert!(
+            indented.iter().all(|line| line.starts_with("  ")),
+            "{indented:?}"
+        );
 
         // And a word longer than a line is left whole.
         let word = "x".repeat(100);
@@ -3881,7 +3884,10 @@ mod tests {
         let yaml = document.to_text(Path::new("graph.yaml")).expect("yaml");
         // A YAML configuration opens by naming its schema, which is a
         // comment, and states no version: the loader would refuse one.
-        assert!(yaml.starts_with("# yaml-language-server: $schema="), "{yaml}");
+        assert!(
+            yaml.starts_with("# yaml-language-server: $schema="),
+            "{yaml}"
+        );
         assert!(!yaml.contains("version:"), "{yaml}");
         assert_eq!(
             document.to_text(Path::new("graph.yml")).expect("yml"),
@@ -3945,7 +3951,10 @@ mod tests {
         let files = document.files(&yaml).expect("the files");
         assert_eq!(files.len(), 2, "{files:?}");
         let written: Vec<&std::path::PathBuf> = files.iter().map(|(path, _)| path).collect();
-        assert!(written.contains(&&yaml) && written.contains(&&xml), "{written:?}");
+        assert!(
+            written.contains(&&yaml) && written.contains(&&xml),
+            "{written:?}"
+        );
         for (path, text) in &files {
             if path == &xml {
                 assert!(text.starts_with("<?xml"), "{text}");
@@ -3984,7 +3993,10 @@ mod tests {
         });
 
         let yaml = document.to_yaml();
-        assert!(yaml.contains("    payload-out:\n      - target: moc\n"), "{yaml}");
+        assert!(
+            yaml.contains("    payload-out:\n      - target: moc\n"),
+            "{yaml}"
+        );
         assert!(
             yaml.contains("    payload-in: true\n"),
             "the arriving end does not say so: {yaml}"
@@ -4186,7 +4198,10 @@ mod tests {
             link: Link::joining("sensor", Some("payload-out"), "cabin_temp", Some("in0")),
         });
         let said: Vec<String> = document.concerns().iter().map(|c| c.kind()).collect();
-        assert!(!said.contains(&"payload-out-goes-nowhere".to_string()), "{said:?}");
+        assert!(
+            !said.contains(&"payload-out-goes-nowhere".to_string()),
+            "{said:?}"
+        );
         assert!(said.contains(&"nothing-leaves".to_string()), "{said:?}");
 
         // And on to the ground, which is the shape the whole graph is: a
@@ -4271,7 +4286,10 @@ mod tests {
         });
         let (raised, aside) = document.concerns_apart();
         assert!(
-            !raised.iter().chain(aside.iter()).any(|c| c.node() == "sensor"),
+            !raised
+                .iter()
+                .chain(aside.iter())
+                .any(|c| c.node() == "sensor"),
             "{raised:?} {aside:?}"
         );
         // The decision is still in the document, which is what makes it come
@@ -4292,7 +4310,9 @@ mod tests {
 
         let yaml = document.to_yaml();
         assert!(
-            yaml.contains("  set-aside:\n    - { node: sensor, concern: payload-out-goes-nowhere }"),
+            yaml.contains(
+                "  set-aside:\n    - { node: sensor, concern: payload-out-goes-nowhere }"
+            ),
             "{yaml}"
         );
         let xml = document.to_xml();
@@ -4436,7 +4456,10 @@ mod tests {
         let document = thermostat_example();
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
 
-        for name in ["tests/manual/thermostat.yaml", "tests/manual/thermostat.xml"] {
+        for name in [
+            "tests/manual/thermostat.yaml",
+            "tests/manual/thermostat.xml",
+        ] {
             let path = root.join(name);
             // Written for the place it is going, which is what decides how it
             // names its schema: see `nodes::schema_reference`.
@@ -4475,7 +4498,11 @@ mod tests {
         let xml = document.to_xml();
 
         for node in &document.nodes {
-            assert!(yaml.contains(&format!("name: {}", node.name)), "{}", node.name);
+            assert!(
+                yaml.contains(&format!("name: {}", node.name)),
+                "{}",
+                node.name
+            );
             assert!(
                 xml.contains(&format!("<name>{}</name>", node.name)),
                 "{} is missing from the XML",
@@ -4514,18 +4541,25 @@ mod tests {
             let (yaml_said, xml_said) = match &link.input {
                 Some(input) => (
                     format!("- target: {}\n        input: {input}\n", link.to),
-                    format!(
-                        "<target>{}</target><input>{input}</input>",
-                        link.to
-                    ),
+                    format!("<target>{}</target><input>{input}</input>", link.to),
                 ),
                 None => (
                     format!("- target: {}\n", link.to),
                     format!("<target>{}</target>", link.to),
                 ),
             };
-            assert!(yaml.contains(&yaml_said), "{} to {} is missing from the YAML", link.from, link.to);
-            assert!(xml.contains(&xml_said), "{} to {} is missing from the XML", link.from, link.to);
+            assert!(
+                yaml.contains(&yaml_said),
+                "{} to {} is missing from the YAML",
+                link.from,
+                link.to
+            );
+            assert!(
+                xml.contains(&xml_said),
+                "{} to {} is missing from the XML",
+                link.from,
+                link.to
+            );
         }
     }
 
@@ -4633,10 +4667,10 @@ mod tests {
             "only the link leaving the subdiagram crosses it"
         );
         assert!(
-            !document.faults().iter().any(|f| matches!(
-                f,
-                Fault::DanglingLink { .. } | Fault::SelfLink { .. }
-            )),
+            !document
+                .faults()
+                .iter()
+                .any(|f| matches!(f, Fault::DanglingLink { .. } | Fault::SelfLink { .. })),
             "a crossing link was taken for a broken one: {:?}",
             document.faults()
         );
@@ -4670,7 +4704,9 @@ mod tests {
             link: Link::new("cabin/temp_1", "moc", None),
         });
 
-        let files = document.files(Path::new("/tmp/vehicle.yaml")).expect("files");
+        let files = document
+            .files(Path::new("/tmp/vehicle.yaml"))
+            .expect("files");
         assert_eq!(files.len(), 2, "a top diagram and one subdiagram");
 
         let written: usize = files
@@ -4688,7 +4724,10 @@ mod tests {
             .iter()
             .find(|(path, _)| path.ends_with("cabin.yaml"))
             .expect("the subdiagram's file");
-        assert!(inner.contains("payload-out:\n      - target: moc\n"), "{inner}");
+        assert!(
+            inner.contains("payload-out:\n      - target: moc\n"),
+            "{inner}"
+        );
 
         // And the top file says what it includes.
         let (_, top) = &files[0];
@@ -4774,6 +4813,9 @@ mod tests {
             yaml.contains("    payload-out:\n      - target: cabin_temp\n        input: in0\n"),
             "a link into a named input is written as one entry: {yaml}"
         );
-        assert!(!yaml.contains("\nlinks:"), "there is no links section: {yaml}");
+        assert!(
+            !yaml.contains("\nlinks:"),
+            "there is no links section: {yaml}"
+        );
     }
 }

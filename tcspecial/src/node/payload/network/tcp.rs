@@ -18,10 +18,10 @@ use log::info;
 use nix::poll::PollFlags;
 use tcslibgs::{NetworkConfig, TcsError, TcsResult};
 
-use crate::endpoint::bind_failed;
 use crate::config::constants::{
     ENDPOINT_BUFFER_SIZE, ENDPOINT_CONNECT_BUDGET, ENDPOINT_DELAY_INIT, ENDPOINT_DELAY_MAX,
 };
+use crate::endpoint::bind_failed;
 use crate::endpoint::{
     wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable, WaitResult,
 };
@@ -215,7 +215,9 @@ pub(crate) fn connect_retrying<T>(
                 delay = (delay * 2).min(ENDPOINT_DELAY_MAX);
             }
             Err(e) => {
-                return Err(TcsError::Config(format!("{what}: cannot reach {addr}: {e}")))
+                return Err(TcsError::Config(format!(
+                    "{what}: cannot reach {addr}: {e}"
+                )))
             }
         }
     }

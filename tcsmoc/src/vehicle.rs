@@ -56,8 +56,7 @@ use crate::oc_link::{Arrival, Arrivals};
 use crate::{
     ask_for_the_edge, grid_shape, handle_close, handle_quit, present, show_arrivals, stop,
     window_size, DHInfo, Edge, MainWindow, MenuAction, ProcessManager, Sizes, CHILDREN,
-    CONNECTED_STATUS, DISCONNECTED_STATUS, ERROR_STATUS, NO_TRANSFER_TIME,
-    PANEL_REFRESH_INTERVAL,
+    CONNECTED_STATUS, DISCONNECTED_STATUS, ERROR_STATUS, NO_TRANSFER_TIME, PANEL_REFRESH_INTERVAL,
 };
 
 /// What a panel's status says: a source the ground receives from.
@@ -191,10 +190,9 @@ fn command_links_of(graph: &Graph) -> Result<Option<(String, String, Commanded)>
     let Some(section) = graph.tcspecial.as_ref() else {
         return Ok(None);
     };
-    let ci = tcslibgs::graph::parameters::ci_config_of(&tcslibgs::graph::parameters::flatten(
-        section,
-    ))?
-    .to_ci_config()?;
+    let ci =
+        tcslibgs::graph::parameters::ci_config_of(&tcslibgs::graph::parameters::flatten(section))?
+            .to_ci_config()?;
     Ok(Some((
         ci.moc_cmd_send.to_string(),
         format!("{}:{}", ci.address, ci.port),
@@ -424,7 +422,10 @@ fn set_a_nodes_attribute(
              are not reading the same configuration ({status:?})"
         ),
         Ok((status, _)) if status.is_success() => {
-            format!("SET_NODE {node} ({name}).{} = {value}: {status:?}", attribute.trim())
+            format!(
+                "SET_NODE {node} ({name}).{} = {value}: {status:?}",
+                attribute.trim()
+            )
         }
         // What was refused and why are two things, and only the first is on
         // the wire: an attribute no binding mentions and a value the node
@@ -549,9 +550,7 @@ pub(crate) fn command_buttons(
                 }
                 eprintln!("Disconnected from {address}");
                 ui.set_ci_status(SharedString::from(DISCONNECTED_STATUS));
-                ui.set_last_response(SharedString::from(format!(
-                    "Disconnected from {address}"
-                )));
+                ui.set_last_response(SharedString::from(format!("Disconnected from {address}")));
                 return;
             }
 
@@ -571,9 +570,7 @@ pub(crate) fn command_buttons(
             ui.set_ci_status(SharedString::from(CONNECTED_STATUS));
 
             match digest {
-                Some(digest) => {
-                    hear_what_the_vehicle_read(&ui, &link, &agreed, ours, digest)
-                }
+                Some(digest) => hear_what_the_vehicle_read(&ui, &link, &agreed, ours, digest),
                 // Nothing to compare with, so nothing may be commanded by id:
                 // the warning at startup said why.
                 None => ui.set_last_response(SharedString::from(
@@ -855,9 +852,7 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
     let sizes = Sizes::of(&ui);
     let shape = grid_shape(&sizes, count);
     ui.window().set_size(window_size(&sizes, &shape, count));
-    eprintln!(
-        "{payload_path}: {count} source(s) sending to the ground"
-    );
+    eprintln!("{payload_path}: {count} source(s) sending to the ground");
 
     // The two command links, both ends of each from the file. A configuration
     // with no `tcspecial` section states no ports, so there is nothing to
@@ -866,7 +861,9 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
         Ok(Some((from, to, commanded))) => {
             eprintln!("Commands from {from} to {to}, nodes on {}", commanded.to);
             (
-                Some(Arc::new(Mutex::new(CiLink::down_commanding(&from, commanded)))),
+                Some(Arc::new(Mutex::new(CiLink::down_commanding(
+                    &from, commanded,
+                )))),
                 to,
             )
         }
@@ -908,9 +905,9 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
             Some(path) => {
                 eprintln!("{path}: nothing to simulate, so tcssim is not started")
             }
-            None => eprintln!(
-                "{payload_path}: no simulator file beside it, so tcssim is not started"
-            ),
+            None => {
+                eprintln!("{payload_path}: no simulator file beside it, so tcssim is not started")
+            }
         }
     }
 
@@ -1010,25 +1007,29 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
         let stopping = (pm_tcssim.clone(), Some(pm_tcspecial.clone()));
         let times = link.clone();
         let ui_weak = ui.as_weak();
-        timer.start(slint::TimerMode::Repeated, PANEL_REFRESH_INTERVAL, move || {
-            crate::stop_if_asked(&stopping.0, stopping.1.as_ref());
-            show_arrivals(&model, &arrivals);
+        timer.start(
+            slint::TimerMode::Repeated,
+            PANEL_REFRESH_INTERVAL,
+            move || {
+                crate::stop_if_asked(&stopping.0, stopping.1.as_ref());
+                show_arrivals(&model, &arrivals);
 
-            // When the last command went out and when its answer came back,
-            // which the window shows under the link's own status.
-            //
-            // try_lock rather than lock: the link belongs to the buttons, and
-            // a window that waited for it here would stop repainting exactly
-            // while a command was in flight -- which is when an operator is
-            // watching it. A pass that cannot have it leaves the times as
-            // they are, and the next one is a second away.
-            let Some(times) = times.as_ref() else { return };
-            if let (Some(ui), Ok(link)) = (ui_weak.upgrade(), times.try_lock()) {
-                let (sent, received) = link.command_times().unwrap_or((None, None));
-                ui.set_cmd_sent_time(SharedString::from(crate::shown_time(sent)));
-                ui.set_cmd_recv_time(SharedString::from(crate::shown_time(received)));
-            }
-        });
+                // When the last command went out and when its answer came back,
+                // which the window shows under the link's own status.
+                //
+                // try_lock rather than lock: the link belongs to the buttons, and
+                // a window that waited for it here would stop repainting exactly
+                // while a command was in flight -- which is when an operator is
+                // watching it. A pass that cannot have it leaves the times as
+                // they are, and the next one is a second away.
+                let Some(times) = times.as_ref() else { return };
+                if let (Some(ui), Ok(link)) = (ui_weak.upgrade(), times.try_lock()) {
+                    let (sent, received) = link.command_times().unwrap_or((None, None));
+                    ui.set_cmd_sent_time(SharedString::from(crate::shown_time(sent)));
+                    ui.set_cmd_recv_time(SharedString::from(crate::shown_time(received)));
+                }
+            },
+        );
     }
 
     // The buttons. A configuration with no command link gets handlers that
@@ -1103,7 +1104,11 @@ pub(crate) mod tests {
         let panels = panels(&links, &settable_of(&graph));
         assert_eq!(panels.len(), 1);
         assert_eq!(panels[0].name.as_str(), "sensor");
-        assert!(panels[0].config.contains("payload_telemetry"), "{}", panels[0].config);
+        assert!(
+            panels[0].config.contains("payload_telemetry"),
+            "{}",
+            panels[0].config
+        );
     }
 
     /// The two command links come from the file, both ends of each.
@@ -1248,8 +1253,7 @@ pub(crate) mod tests {
                     Ok(got) => got,
                     Err(_) => return seen,
                 };
-                let command: Command =
-                    serde_json::from_slice(&buffer[..size]).expect("a command");
+                let command: Command = serde_json::from_slice(&buffer[..size]).expect("a command");
                 let seq = command.sequence();
                 seen.push(command.cmd_type());
                 let answer = match &command {
@@ -1310,8 +1314,7 @@ pub(crate) mod tests {
         let links = telemetry::of(&graph).expect("its links");
         let mut settable = settable_of(&graph);
         settable.insert(links[0].source.clone(), vec!["setpoint".to_string()]);
-        let model: Rc<VecModel<DHInfo>> =
-            Rc::new(VecModel::from(panels(&links, &settable)));
+        let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(panels(&links, &settable)));
         ui.set_dh_model(ModelRc::from(model.clone()));
         ui.set_ci_status(SharedString::from(DISCONNECTED_STATUS));
         ui.set_ci_address(SharedString::from(at.clone()));
@@ -1323,10 +1326,13 @@ pub(crate) mod tests {
                     address: "127.0.0.1".to_string(),
                     port: 0,
                 },
-                to: at.parse::<std::net::SocketAddr>().map(|a| HostPort {
-                    address: a.ip().to_string(),
-                    port: a.port(),
-                }).expect("an address"),
+                to: at
+                    .parse::<std::net::SocketAddr>()
+                    .map(|a| HostPort {
+                        address: a.ip().to_string(),
+                        port: a.port(),
+                    })
+                    .expect("an address"),
             },
         )));
         let agreed: Agreed = Arc::new(Mutex::new(None));
@@ -1379,14 +1385,13 @@ pub(crate) mod tests {
         // label: a LineEdit carries no accessible label, and these two are
         // told apart by the thing the test is checking -- the attribute comes
         // filled in from the binding and the value does not.
-        let fields: Vec<ElementHandle> =
-            ElementHandle::find_by_element_type_name(&ui, "LineEdit")
-                .filter(|field| {
-                    field
-                        .accessible_value()
-                        .is_some_and(|held| held == "setpoint" || held.is_empty())
-                })
-                .collect();
+        let fields: Vec<ElementHandle> = ElementHandle::find_by_element_type_name(&ui, "LineEdit")
+            .filter(|field| {
+                field
+                    .accessible_value()
+                    .is_some_and(|held| held == "setpoint" || held.is_empty())
+            })
+            .collect();
         assert_eq!(
             fields.len(),
             2,
@@ -1397,9 +1402,9 @@ pub(crate) mod tests {
                 .collect::<Vec<_>>()
         );
         assert!(
-            fields
-                .iter()
-                .any(|field| field.accessible_value().is_some_and(|held| held == "setpoint")),
+            fields.iter().any(|field| field
+                .accessible_value()
+                .is_some_and(|held| held == "setpoint")),
             "one field should start with the attribute the binding names, so that \
              only the value has to be typed"
         );
@@ -1467,7 +1472,10 @@ pub(crate) mod tests {
                 .expect("a path")
                 .to_string()
         };
-        assert!(anything_simulated(&example("minimal"), Some(&sim("minimal"))));
+        assert!(anything_simulated(
+            &example("minimal"),
+            Some(&sim("minimal"))
+        ));
         assert!(!anything_simulated(
             &example("simple-app"),
             Some(&sim("simple-app"))

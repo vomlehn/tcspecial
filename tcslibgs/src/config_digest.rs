@@ -122,8 +122,6 @@ pub fn digest_of_file<P: AsRef<Path>>(path: P) -> TcsResult<ConfigDigest> {
     digest_of_graph(&crate::graph::Graph::load(path.as_ref())?)
 }
 
-
-
 /// The digest of a configuration: everything the vehicle and the
 /// ground act on, across every file it was read from.
 ///
@@ -222,7 +220,6 @@ fn digest_of_value<T: Serialize>(document: &T) -> TcsResult<ConfigDigest> {
     Ok(ConfigDigest(md5::compute(&canonical).0))
 }
 
-
 /// The bytes a value contributes to the digest.
 ///
 /// One rule, which is three rules to read:
@@ -250,7 +247,10 @@ fn write_canonical(value: &serde_json::Value, out: &mut Vec<u8>) {
             // value settles nothing here -- it is in the ordering because a
             // reader of the digest should not have to know that.
             let mut pairs: Vec<(&String, &serde_json::Value)> = map.iter().collect();
-            pairs.sort_by(|a, b| a.0.cmp(b.0).then_with(|| a.1.to_string().cmp(&b.1.to_string())));
+            pairs.sort_by(|a, b| {
+                a.0.cmp(b.0)
+                    .then_with(|| a.1.to_string().cmp(&b.1.to_string()))
+            });
 
             for (name, value) in pairs {
                 out.extend_from_slice(name.as_bytes());
@@ -301,7 +301,16 @@ mod tests {
             );
         }
 
-        for text in ["", "one", "1.0.0.0", "1.x", "-1", "256", "1.0-draft", "v1.0"] {
+        for text in [
+            "",
+            "one",
+            "1.0.0.0",
+            "1.x",
+            "-1",
+            "256",
+            "1.0-draft",
+            "v1.0",
+        ] {
             assert!(
                 ConfigVersion::of_text(text).is_none(),
                 "{text:?} is not a version"
@@ -360,8 +369,6 @@ mod tests {
         assert_ne!(digest_of_graph(&reordered).expect("it digests"), digest);
     }
 
-
-
     /// The version is three bytes, and says what this build is.
     #[test]
     fn the_version_is_three_bytes_of_this_build() {
@@ -387,11 +394,4 @@ mod tests {
         assert_eq!(said.len(), 32, "{said}");
         assert!(said.chars().all(|c| c.is_ascii_hexdigit()), "{said}");
     }
-
-
-
-
-
-
-
 }

@@ -11,7 +11,7 @@ pub mod tcp;
 pub mod udp;
 pub mod unix;
 
-use libc::{IPPROTO_TCP, IPPROTO_UDP, IPPROTO_SCTP, IPPROTO_UDPLITE};
+use libc::{IPPROTO_SCTP, IPPROTO_TCP, IPPROTO_UDP, IPPROTO_UDPLITE};
 use socket2::{Domain, Type};
 use std::collections::BTreeMap;
 use std::sync::LazyLock;
@@ -22,43 +22,39 @@ pub enum LinkType {
 }
 
 pub struct AddressFamily<'a> {
-    pub af:         Domain,
-    pub sock_info:  BTreeMap<&'a str, SockInfo<'a>>,
+    pub af: Domain,
+    pub sock_info: BTreeMap<&'a str, SockInfo<'a>>,
 }
 
 pub struct SockInfo<'a> {
-    pub sock_type:  Type,
-    pub ipproto:   BTreeMap<&'a str, i32>,
-//    link_type:  LinkType,
+    pub sock_type: Type,
+    pub ipproto: BTreeMap<&'a str, i32>,
+    //    link_type:  LinkType,
 }
 
 pub static PROTOCOLS: LazyLock<BTreeMap<&str, AddressFamily>> = LazyLock::new(|| {
-    BTreeMap::from([
-        (
-            "unix", AddressFamily {
-                af: Domain::UNIX, sock_info: BTreeMap::from([
-                    (
-                        "stream", SockInfo {
-                            sock_type: Type::STREAM, ipproto: BTreeMap::from([
-                                ("tcp", IPPROTO_TCP),
-                                ("udp", IPPROTO_UDP),
-                                ("sctp", IPPROTO_SCTP),
-                                ("udplite", IPPROTO_UDPLITE),
-                                // FIXME: handle SOCK_RAW from RFC 1709
-                            ])
-                        }
-                    )
-                ])
-            }
-        )
-    ])
+    BTreeMap::from([(
+        "unix",
+        AddressFamily {
+            af: Domain::UNIX,
+            sock_info: BTreeMap::from([(
+                "stream",
+                SockInfo {
+                    sock_type: Type::STREAM,
+                    ipproto: BTreeMap::from([
+                        ("tcp", IPPROTO_TCP),
+                        ("udp", IPPROTO_UDP),
+                        ("sctp", IPPROTO_SCTP),
+                        ("udplite", IPPROTO_UDPLITE),
+                        // FIXME: handle SOCK_RAW from RFC 1709
+                    ]),
+                },
+            )]),
+        },
+    )])
 });
-        
 
-
-
-
-//                SockInfo{sock_type: Type::STREAM, protocol: &[], 
+//                SockInfo{sock_type: Type::STREAM, protocol: &[],
 //                    link_type: LinkType::Stream},
 //            }])}
 /*
@@ -66,13 +62,13 @@ pub static PROTOCOLS: LazyLock<BTreeMap<&str, AddressFamily>> = LazyLock::new(||
                 "seqpacket", {type: SOCK_seqpacket, protocol: None, link_type: LinkType::Packet},
 */
 /*
-        {"local", AddressFamily(AF_local, 
+        {"local", AddressFamily(AF_local,
                 "stream", SOCK_stream, None, LinkType::Stream,
                 "dgram",  SOCK_dgram, None, LinkType::Packet,
                 "seqpacket", SOCK_seqpacket, None, LinkType::Packet,
             ],
         {"inet", AddressFamily(AF_inet, BTreeMap::from([
-                "stream", SOCK_stream, None, LinkType:::Stream 
+                "stream", SOCK_stream, None, LinkType:::Stream
                 "dgram", SOCK_dgram, None, :datagram
                 "raw", SOCK_raw, None, LinkType::Packet,
             ],
@@ -103,17 +99,14 @@ pub static PROTOCOLS: LazyLock<BTreeMap<&str, AddressFamily>> = LazyLock::new(||
 */
 
 pub struct Protocol<'a> {
-    pub name:   &'a [&'static str],
+    pub name: &'a [&'static str],
 }
 
 impl Protocol<'_> {
-    pub fn new<'a>(name: &'a[&'static str]) -> Protocol<'a>  {
-        Protocol {
-            name,
-        }
+    pub fn new<'a>(name: &'a [&'static str]) -> Protocol<'a> {
+        Protocol { name }
     }
 }
-
 
 /*
 AF_UNIX or AF_LOCAL	SOCK_STREAM	0	stream

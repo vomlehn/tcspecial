@@ -41,8 +41,8 @@
 /// of the five kinds are the vehicle's own and two are payloads: see
 /// `app::Kind::is_payload`, which `crate::graph::section_of` reads.
 pub mod app;
-/// What the vehicle itself runs: a computation, a log.
-pub mod vehicle;
 /// What the vehicle carries: a device on a bus, a line it drives, a link to
 /// something aboard.
 pub mod payload;
+/// What the vehicle itself runs: a computation, a log.
+pub mod vehicle;

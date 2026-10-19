@@ -128,9 +128,10 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
             // How long to wait between asking and reading, which is this
             // one's: it belongs to the part rather than to the schedule.
             "read_delay" => {
-                read_delay = Some(crate::graph::parse_interval(value.as_str()).map_err(
-                    |why| format!("\"{what}\": read_delay: {why}"),
-                )?);
+                read_delay = Some(
+                    crate::graph::parse_interval(value.as_str())
+                        .map_err(|why| format!("\"{what}\": read_delay: {why}"))?,
+                );
             }
             // Where a ground link's data goes, which only a ground link has:
             // read below.
@@ -514,11 +515,7 @@ fn kind_of(node: &Node) -> Result<DHType, String> {
 }
 
 /// Where this node is, by the rules for its type.
-fn location_of(
-    what: &str,
-    node: &Node,
-    kind: DHType,
-) -> Result<EndpointLocation, String> {
+fn location_of(what: &str, node: &Node, kind: DHType) -> Result<EndpointLocation, String> {
     // A CAN controller is a network interface and not a device file, and a
     // payload on it is told apart from the others by the identifier its
     // frames carry -- as a device on a bus is told apart by its address.
@@ -604,9 +601,9 @@ fn required<'a>(
     is: &str,
     wants: &str,
 ) -> Result<&'a Scalar, String> {
-    node.attributes.get(attribute).ok_or_else(|| {
-        format!("\"{what}\" is {is}, so it needs {wants}: say {attribute}")
-    })
+    node.attributes
+        .get(attribute)
+        .ok_or_else(|| format!("\"{what}\" is {is}, so it needs {wants}: say {attribute}"))
 }
 
 /// A whole number an attribute states, in decimal or in hexadecimal.
@@ -753,11 +750,7 @@ mod tests {
     /// A ground link says where the ground is, as one address and port.
     #[test]
     fn a_ground_link_says_where_the_ground_is() {
-        let moc = node(
-            "moc",
-            "moc",
-            &[("ground_base", "127.0.0.1:5100")],
-        );
+        let moc = node("moc", "moc", &[("ground_base", "127.0.0.1:5100")]);
         let reach = reach_of(&moc).expect("it reads");
         let ground = reach.ground.expect("a ground");
         assert_eq!((ground.address.as_str(), ground.port), ("127.0.0.1", 5100));
@@ -836,7 +829,10 @@ mod tests {
         match &fore.endpoint {
             EndpointConfig::I2c(i2c) => {
                 assert_eq!(i2c.bus, "/dev/i2c-1");
-                assert_eq!(i2c.address, 0x48, "0x48 and not the 72 a YAML reader makes of it");
+                assert_eq!(
+                    i2c.address, 0x48,
+                    "0x48 and not the 72 a YAML reader makes of it"
+                );
                 assert!(!i2c.ten_bit);
                 assert!(!i2c.pec);
             }
@@ -897,8 +893,8 @@ mod tests {
             "{said}"
         );
 
-        let said = reach_of(graph.node("housekeeping").expect("the log"))
-            .expect_err("a log opened");
+        let said =
+            reach_of(graph.node("housekeeping").expect("the log")).expect_err("a log opened");
         assert!(said.contains("directory"), "{said}");
 
         let said = reach_of(&node("mystery", "quantum", &[])).expect_err("a type that is not one");
@@ -966,7 +962,11 @@ mod tests {
         let said = reach_of(&node(
             "moc",
             "moc",
-            &[("address", "10.0.0.1"), ("port", "5000"), ("path", "/dev/null")],
+            &[
+                ("address", "10.0.0.1"),
+                ("port", "5000"),
+                ("path", "/dev/null"),
+            ],
         ))
         .expect_err("a path on a socket");
         assert!(said.contains("path does not locate it"), "{said}");
@@ -1148,7 +1148,11 @@ mod tests {
         let said = reach_of(&node(
             "temp_1",
             "i2c",
-            &[("path", "/dev/i2c-1"), ("address", "0x48"), ("read_size", "0")],
+            &[
+                ("path", "/dev/i2c-1"),
+                ("address", "0x48"),
+                ("read_size", "0"),
+            ],
         ))
         .expect_err("a read of no bytes");
         assert!(said.contains("read_size"), "{said}");
@@ -1165,8 +1169,12 @@ mod tests {
         .expect_err("a number that is not a port");
         assert!(said.contains("70000"), "{said}");
 
-        let said = reach_of(&node("link", "moc", &[("address", "10.0.0.1"), ("port", "0")]))
-            .expect_err("port nought");
+        let said = reach_of(&node(
+            "link",
+            "moc",
+            &[("address", "10.0.0.1"), ("port", "0")],
+        ))
+        .expect_err("port nought");
         assert!(said.contains("whichever one is free"), "{said}");
     }
 
@@ -1185,7 +1193,11 @@ mod tests {
         let reach = reach_of(&node(
             "payload",
             "network",
-            &[("address", "127.0.0.1"), ("port", "5000"), ("protocol", "tcp")],
+            &[
+                ("address", "127.0.0.1"),
+                ("port", "5000"),
+                ("protocol", "tcp"),
+            ],
         ))
         .expect("a TCP payload");
         match reach.endpoint {
@@ -1196,7 +1208,11 @@ mod tests {
         let said = reach_of(&node(
             "payload",
             "network",
-            &[("address", "127.0.0.1"), ("port", "5000"), ("protocol", "smoke")],
+            &[
+                ("address", "127.0.0.1"),
+                ("port", "5000"),
+                ("protocol", "smoke"),
+            ],
         ))
         .expect_err("a protocol that is not one");
         assert!(said.contains("smoke"), "{said}");
@@ -1302,7 +1318,11 @@ mod tests {
         let said = reach_of(&node(
             "temp_1",
             "i2c",
-            &[("path", "/dev/i2c-1"), ("address", "0x48"), ("trigger", "zz")],
+            &[
+                ("path", "/dev/i2c-1"),
+                ("address", "0x48"),
+                ("trigger", "zz"),
+            ],
         ))
         .expect_err("a trigger that is not bytes");
         assert!(said.contains("trigger"), "{said}");
@@ -1411,7 +1431,11 @@ mod tests {
             EndpointConfig::Serial(serial) => {
                 let rs485 = serial.rs485.expect("the bus reached the endpoint");
                 assert!(!rs485.rts_on_send, "RTS is low while sending on this board");
-                assert_eq!(rs485.delay_before_send, Duration::ZERO, "nothing was asked for");
+                assert_eq!(
+                    rs485.delay_before_send,
+                    Duration::ZERO,
+                    "nothing was asked for"
+                );
                 assert_eq!(rs485.delay_after_send, Duration::from_millis(2));
             }
             other => panic!("expected a serial endpoint, got {other:?}"),
@@ -1438,7 +1462,10 @@ mod tests {
             ],
         )
         .expect_err("a peripheral is not an RS-485 bus");
-        assert!(said.contains("rs485"), "the error should name the term: {said}");
+        assert!(
+            said.contains("rs485"),
+            "the error should name the term: {said}"
+        );
     }
 
     /// A GPIO node reaches its endpoint with the lines it watches and how.
@@ -1490,7 +1517,10 @@ mod tests {
         // refused: a channel's number is assigned as channels appear.
         let said =
             endpoint("rpmsg", &[("path", "/dev/rpmsg0")]).expect_err("a channel with no service");
-        assert!(said.contains("service"), "the error should name what is missing: {said}");
+        assert!(
+            said.contains("service"),
+            "the error should name what is missing: {said}"
+        );
     }
 
     /// A network node may be asked, whatever its protocol, datagrams
@@ -1513,7 +1543,11 @@ mod tests {
                 ],
             )
             .unwrap_or_else(|e| panic!("{protocol}: {e}"));
-            assert_eq!(reach.trigger.as_deref(), Some(b"READ".as_slice()), "{protocol}");
+            assert_eq!(
+                reach.trigger.as_deref(),
+                Some(b"READ".as_slice()),
+                "{protocol}"
+            );
         }
     }
 
@@ -1539,14 +1573,17 @@ mod tests {
     /// carry is what tells one node on a shared bus from another.
     #[test]
     fn a_can_node_is_an_interface_and_an_identifier() {
-        let opened = endpoint("can", &[("interface", "vcan0"), ("can_id", "0x123")])
-            .expect("it opens");
+        let opened =
+            endpoint("can", &[("interface", "vcan0"), ("can_id", "0x123")]).expect("it opens");
         match &opened {
             EndpointConfig::Can(can) => {
                 assert_eq!(can.interface, "vcan0");
                 assert_eq!(can.can_id, 0x123);
                 assert!(!can.fd, "classic CAN unless the file says otherwise");
-                assert!(can.loopback, "and looped back, which is what the kernel does");
+                assert!(
+                    can.loopback,
+                    "and looped back, which is what the kernel does"
+                );
             }
             other => panic!("expected a CAN endpoint, got {other:?}"),
         }
@@ -1561,7 +1598,10 @@ mod tests {
             ("can_id", ("interface", "vcan0")),
         ] {
             let said = endpoint("can", &[stated]).expect_err("half of where it is");
-            assert!(said.contains(missing), "the error should name what is missing: {said}");
+            assert!(
+                said.contains(missing),
+                "the error should name what is missing: {said}"
+            );
         }
     }
 
@@ -1601,7 +1641,10 @@ mod tests {
         reached("serial", &fits).expect("a datum's worth fits");
         let over = line_with(&[("max_length", &one_more), ("read_timeout", "none")]);
         let said = reached("serial", &over).expect_err("more than a datum");
-        assert!(said.contains("max_length") && said.contains(&most), "{said}");
+        assert!(
+            said.contains("max_length") && said.contains(&most),
+            "{said}"
+        );
     }
 
     #[test]
@@ -1612,8 +1655,8 @@ mod tests {
 
     #[test]
     fn a_timeout_alone_ends_a_read() {
-        let stream = line_stream(&[("max_length", "64"), ("read_timeout", "250 ms")])
-            .expect("accepted");
+        let stream =
+            line_stream(&[("max_length", "64"), ("read_timeout", "250 ms")]).expect("accepted");
         assert_eq!(stream.timeout, Some(Duration::from_millis(250)));
         assert!(stream.terminators.is_empty());
         assert!(!stream.is_fixed_length());
@@ -1642,14 +1685,17 @@ mod tests {
     #[test]
     fn a_stream_rule_that_ends_no_read_is_refused() {
         let said = line_stream(&[("max_length", "64")]).expect_err("nothing ends the read");
-        assert!(said.contains("timeout") && said.contains("terminator"), "{said}");
+        assert!(
+            said.contains("timeout") && said.contains("terminator"),
+            "{said}"
+        );
     }
 
     #[test]
     fn timeout_none_is_how_a_fixed_length_read_is_asked_for() {
         // The documented way to say "hand me max_length bytes at a time".
-        let stream = line_stream(&[("max_length", "12"), ("read_timeout", "none")])
-            .expect("accepted");
+        let stream =
+            line_stream(&[("max_length", "12"), ("read_timeout", "none")]).expect("accepted");
         assert_eq!(stream.max_length, 12);
         assert_eq!(stream.timeout, None);
         assert!(stream.terminators.is_empty());
@@ -1685,8 +1731,8 @@ mod tests {
     /// value is not a length of time.
     #[test]
     fn a_timeout_without_a_unit_is_refused() {
-        let said = line_stream(&[("max_length", "8"), ("read_timeout", "250")])
-            .expect_err("250 of what");
+        let said =
+            line_stream(&[("max_length", "8"), ("read_timeout", "250")]).expect_err("250 of what");
         assert!(said.contains("a number, a space, and a unit"), "{said}");
 
         let said = line_stream(&[("max_length", "8"), ("read_timeout", "250ms")])
@@ -1698,7 +1744,10 @@ mod tests {
     fn a_zero_timeout_is_refused_in_favour_of_none() {
         let said = line_stream(&[("max_length", "8"), ("read_timeout", "0 ms")])
             .expect_err("a read that times out at once reads nothing");
-        assert!(said.contains("no interval at all") && said.contains("none"), "{said}");
+        assert!(
+            said.contains("no interval at all") && said.contains("none"),
+            "{said}"
+        );
     }
 
     /// A timeout takes every unit and every number an interval takes.
@@ -1731,8 +1780,8 @@ mod tests {
     /// the bytes, separated by commas.
     #[test]
     fn terminators_are_a_string_of_them() {
-        let stream = line_stream(&[("max_length", "8"), ("terminators", "0x0D, 0x0A")])
-            .expect("a string");
+        let stream =
+            line_stream(&[("max_length", "8"), ("terminators", "0x0D, 0x0A")]).expect("a string");
         assert_eq!(stream.terminators, vec![0x0D, 0x0A]);
     }
 
@@ -1898,8 +1947,8 @@ mod tests {
 
     #[test]
     fn a_device_on_a_bus_carries_the_bus_and_its_place_on_it() {
-        let place = endpoint("i2c", &[("path", "/dev/i2c-2"), ("address", "0x49")])
-            .expect("a place");
+        let place =
+            endpoint("i2c", &[("path", "/dev/i2c-2"), ("address", "0x49")]).expect("a place");
         assert_eq!(
             place,
             EndpointConfig::I2c(crate::types::I2cConfig {
@@ -1920,7 +1969,11 @@ mod tests {
         // ...and the same address is fine once the node says so.
         match endpoint(
             "i2c",
-            &[("path", "/dev/i2c-2"), ("address", "0x90"), ("ten_bit", "true")],
+            &[
+                ("path", "/dev/i2c-2"),
+                ("address", "0x90"),
+                ("ten_bit", "true"),
+            ],
         )
         .expect("ten bits hold it")
         {
@@ -1939,7 +1992,10 @@ mod tests {
         for address in ["0x00", "0x01", "0x07", "0x78", "0x7B", "0x7F"] {
             let said = endpoint("i2c", &[("path", "/dev/i2c-1"), ("address", address)])
                 .expect_err(address);
-            assert!(said.contains("reserved by the I2C specification"), "for {address}: {said}");
+            assert!(
+                said.contains("reserved by the I2C specification"),
+                "for {address}: {said}"
+            );
         }
     }
 
@@ -1962,7 +2018,11 @@ mod tests {
         for address in ["0x00", "0x78", "0x3FF"] {
             endpoint(
                 "i2c",
-                &[("path", "/dev/i2c-1"), ("ten_bit", "true"), ("address", address)],
+                &[
+                    ("path", "/dev/i2c-1"),
+                    ("ten_bit", "true"),
+                    ("address", address),
+                ],
             )
             .unwrap_or_else(|e| panic!("{address} should be usable with ten_bit: {e}"));
         }
@@ -2034,7 +2094,11 @@ mod tests {
             ("i2c", vec![("path", "/dev/i2c-1"), ("address", "0x40")]),
             (
                 "spi",
-                vec![("path", "/dev/spidev0.0"), ("max_speed", "1"), ("spi_mode", "0")],
+                vec![
+                    ("path", "/dev/spidev0.0"),
+                    ("max_speed", "1"),
+                    ("spi_mode", "0"),
+                ],
             ),
         ] {
             let mut stated = rest.clone();
@@ -2049,7 +2113,11 @@ mod tests {
         // The rule that a misplaced term is reported where it was written,
         // checked across the cross-product rather than one way.
         let i2c = vec![("path", "/dev/i2c-1"), ("address", "0x40")];
-        let spi = vec![("path", "/dev/spidev0.0"), ("max_speed", "1"), ("spi_mode", "0")];
+        let spi = vec![
+            ("path", "/dev/spidev0.0"),
+            ("max_speed", "1"),
+            ("spi_mode", "0"),
+        ];
         let serial = vec![
             ("path", "/dev/ttyS0"),
             ("datarate", "9600"),

@@ -179,7 +179,10 @@ fn find_stub(adapters: &Path) -> Result<String, String> {
     let mut found = Vec::new();
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().into_owned();
-        let number = match name.strip_prefix("i2c-").and_then(|n| n.parse::<u32>().ok()) {
+        let number = match name
+            .strip_prefix("i2c-")
+            .and_then(|n| n.parse::<u32>().ok())
+        {
             Some(number) => number,
             None => continue,
         };
@@ -196,10 +199,12 @@ fn find_stub(adapters: &Path) -> Result<String, String> {
     found.sort();
     match found.first() {
         Some((_, adapter)) => Ok(format!("/dev/{adapter}")),
-        None => Err("no I2C stub bus is loaded, so there is nothing to stand in for a device \
+        None => Err(
+            "no I2C stub bus is loaded, so there is nothing to stand in for a device \
              on one: sudo modprobe i2c-stub chip_addr=0x48, with the address the \
              tcspecial configuration gives"
-            .to_string()),
+                .to_string(),
+        ),
     }
 }
 
@@ -236,7 +241,10 @@ pub fn run_i2c_node(
     let bus = match SimulatedBus::open(&config.name, &config.address, config.bus_address) {
         Ok(bus) => bus,
         Err(e) => {
-            eprintln!("{}: failed to stand in for an I2C device: {}", config.name, e);
+            eprintln!(
+                "{}: failed to stand in for an I2C device: {}",
+                config.name, e
+            );
             return;
         }
     };

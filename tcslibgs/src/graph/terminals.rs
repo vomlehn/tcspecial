@@ -217,8 +217,8 @@ pub fn terminals_of(node_type: &str) -> Option<Terminals> {
     };
 
     match node_type {
-        "i2c" | "spi" | "serial" | "hdlc" | "can" | "iio" | "rpmsg" | "network"
-        | "device-file" | "gpio" => Some(PAYLOAD),
+        "i2c" | "spi" | "serial" | "hdlc" | "can" | "iio" | "rpmsg" | "network" | "device-file"
+        | "gpio" => Some(PAYLOAD),
         "moc" => Some(MOC),
         "null" => Some(NULL),
         "app_payload_veh" => Some(APP_PAYLOAD),
@@ -412,7 +412,10 @@ mod tests {
             assert!(null.sinks.contains(&name), "{name} is not a sink of null");
         }
         for name in ["payload-out", "moc-out"] {
-            assert!(null.sources.contains(&name), "{name} is not a source of null");
+            assert!(
+                null.sources.contains(&name),
+                "{name} is not a source of null"
+            );
         }
     }
 
@@ -519,7 +522,10 @@ mod tests {
         // And a node with two of them has to be told which: the null node is
         // both ends of both streams, so an unnamed link to it could be either.
         let said = terminal_at("null", None, true).expect_err("ambiguous");
-        assert!(said.contains("payload-in") && said.contains("moc-in"), "{said}");
+        assert!(
+            said.contains("payload-in") && said.contains("moc-in"),
+            "{said}"
+        );
     }
 
     /// A name the type does not have, and a name at the wrong end.
@@ -530,7 +536,10 @@ mod tests {
     #[test]
     fn a_terminal_is_refused_by_name_and_by_end() {
         let said = terminal_at("i2c", Some("to_ground"), false).expect_err("no such");
-        assert!(said.contains("to_ground") && said.contains("payload-out"), "{said}");
+        assert!(
+            said.contains("to_ground") && said.contains("payload-out"),
+            "{said}"
+        );
 
         let said = terminal_at("moc", Some("moc-out"), true).expect_err("wrong end");
         assert!(
@@ -538,6 +547,9 @@ mod tests {
             "{said}"
         );
         let said = terminal_at("null", Some("moc-in"), false).expect_err("wrong end");
-        assert!(said.contains("moc-in") && said.contains("arrives"), "{said}");
+        assert!(
+            said.contains("moc-in") && said.contains("arrives"),
+            "{said}"
+        );
     }
 }

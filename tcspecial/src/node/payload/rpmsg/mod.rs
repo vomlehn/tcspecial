@@ -290,13 +290,7 @@ mod tests {
 
         // And the remote's answer reaches the handler.
         // SAFETY: writing the slice's own length from the slice.
-        let sent = unsafe {
-            libc::write(
-                master,
-                b"DATA".as_ptr() as *const libc::c_void,
-                4,
-            )
-        };
+        let sent = unsafe { libc::write(master, b"DATA".as_ptr() as *const libc::c_void, 4) };
         assert_eq!(sent, 4);
         let answered = (0..50)
             .find_map(|_| {

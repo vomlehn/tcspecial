@@ -438,7 +438,9 @@ impl NodeState {
     pub fn took(&self, how: Outcome) {
         match how {
             Outcome::Moved(bytes) => {
-                self.counters.taken_bytes.fetch_add(bytes as u64, Ordering::Relaxed);
+                self.counters
+                    .taken_bytes
+                    .fetch_add(bytes as u64, Ordering::Relaxed);
                 self.counters.reads.fetch_add(1, Ordering::Relaxed);
                 self.counters.moved(Timestamp::now());
             }
@@ -452,7 +454,9 @@ impl NodeState {
     pub fn gave(&self, how: Outcome) {
         match how {
             Outcome::Moved(bytes) => {
-                self.counters.given_bytes.fetch_add(bytes as u64, Ordering::Relaxed);
+                self.counters
+                    .given_bytes
+                    .fetch_add(bytes as u64, Ordering::Relaxed);
                 self.counters.writes.fetch_add(1, Ordering::Relaxed);
                 self.counters.moved(Timestamp::now());
             }
@@ -527,10 +531,8 @@ impl NodeStates {
         let ids = tcslibgs::graph::telemetry::ids(graph);
         let mut states = NodeStates::default();
         // In id order, so that `by_id` can be indexed by the id itself.
-        let mut in_order: Vec<(usize, &str)> = ids
-            .iter()
-            .map(|(name, &id)| (id, name.as_str()))
-            .collect();
+        let mut in_order: Vec<(usize, &str)> =
+            ids.iter().map(|(name, &id)| (id, name.as_str())).collect();
         in_order.sort_unstable();
         for (id, name) in in_order {
             let state = Arc::new(NodeState::new(name, NodeId::of(id))?);

@@ -46,10 +46,7 @@
 /// allowed among the digits. Everything else here is this with a range check.
 pub fn whole(text: &str) -> Result<u64, String> {
     let said = text.trim();
-    let (digits, radix, how) = match said
-        .strip_prefix("0x")
-        .or_else(|| said.strip_prefix("0X"))
-    {
+    let (digits, radix, how) = match said.strip_prefix("0x").or_else(|| said.strip_prefix("0X")) {
         Some(digits) => (digits, 16, "hexadecimal"),
         None => (said, 10, "decimal"),
     };
@@ -103,7 +100,9 @@ mod tests {
     /// The three spellings of one number are one number.
     #[test]
     fn decimal_hexadecimal_and_grouped_are_the_same_number() {
-        for said in ["1000", "1_000", "1_0_0_0", "0x3e8", "0X3E8", "0x3_e8", " 1000 "] {
+        for said in [
+            "1000", "1_000", "1_0_0_0", "0x3e8", "0X3E8", "0x3_e8", " 1000 ",
+        ] {
             assert_eq!(whole(said), Ok(1000), "{said}");
         }
         // And nought is a number here: whether it means anything is the
@@ -116,7 +115,9 @@ mod tests {
     /// What is not a whole number is said to be what it is.
     #[test]
     fn what_is_not_a_number_is_refused_in_its_own_words() {
-        for said in ["", " ", "_", "0x", "0x_", "ten", "1.5", "-1", "0b101", "48g"] {
+        for said in [
+            "", " ", "_", "0x", "0x_", "ten", "1.5", "-1", "0b101", "48g",
+        ] {
             let why = whole(said).expect_err(said);
             assert!(
                 why.contains("whole number"),

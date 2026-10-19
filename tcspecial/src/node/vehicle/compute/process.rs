@@ -205,9 +205,8 @@ impl Process {
             // SAFETY: both descriptors are owned by something that outlives
             // the call -- the child's pipe by `running`, the node's wakeup by
             // the Arc inside `abandon` -- and neither is kept.
-            let borrowed = unsafe {
-                std::os::fd::BorrowedFd::borrow_raw(running.stdout.as_raw_fd())
-            };
+            let borrowed =
+                unsafe { std::os::fd::BorrowedFd::borrow_raw(running.stdout.as_raw_fd()) };
             let woken = self
                 .abandon
                 .io_fd()
@@ -474,7 +473,6 @@ mod tests {
         as_value(number).expect("a temperature a value carries")
     }
 
-
     /// A program of these parameters, not started.
     ///
     /// What a file may say about one -- that the program and the deadline are
@@ -680,7 +678,9 @@ mod tests {
             Duration::from_millis(200),
         );
 
-        let said = p.give(None, &kelvin(1_f64)).expect_err("a program that took too long");
+        let said = p
+            .give(None, &kelvin(1_f64))
+            .expect_err("a program that took too long");
         assert!(
             said.contains("did not answer within") && said.contains("rather than waited for"),
             "{said}"
@@ -690,7 +690,9 @@ mod tests {
         // will read: the next datum is refused with the same reason, so a
         // ground station sees a computation that has stopped.
         assert!(!p.is_running());
-        let again = p.give(None, &kelvin(2_f64)).expect_err("a stopped computation");
+        let again = p
+            .give(None, &kelvin(2_f64))
+            .expect_err("a stopped computation");
         assert!(again.contains("is not running"), "{again}");
     }
 
@@ -699,7 +701,9 @@ mod tests {
     fn a_program_that_exits_is_reported() {
         let (_where, mut p) = running("read line\nexit 3\n", Duration::from_secs(2));
 
-        let said = p.give(None, &kelvin(1_f64)).expect_err("a program that exited");
+        let said = p
+            .give(None, &kelvin(1_f64))
+            .expect_err("a program that exited");
         assert!(said.contains("exited with status 3"), "{said}");
         assert!(!p.is_running());
     }
@@ -733,7 +737,9 @@ mod tests {
         // The first datum kills it, and it is started again. The datum is
         // refused all the same: it went into a program that died without
         // answering, and saying otherwise would be inventing a result.
-        let said = p.give(None, &kelvin(1_f64)).expect_err("the program exited");
+        let said = p
+            .give(None, &kelvin(1_f64))
+            .expect_err("the program exited");
         assert!(
             said.contains("started again") && said.contains("this datum is lost"),
             "{said}"
@@ -742,7 +748,9 @@ mod tests {
 
         // And the second the same way: a program told to come back comes back
         // however often it stops, and every datum that died with it is lost.
-        let said = p.give(None, &kelvin(2_f64)).expect_err("the program exited again");
+        let said = p
+            .give(None, &kelvin(2_f64))
+            .expect_err("the program exited again");
         assert!(
             said.contains("started again") && said.contains("this datum is lost"),
             "{said}"

@@ -30,8 +30,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::endpoint_config::{
-    bad, parse_u32, reject_foreign_fields, reject_stream, require, EndpointConfigResult,
-    GroupKind, LinkTerms,
+    bad, parse_u32, reject_foreign_fields, reject_stream, require, EndpointConfigResult, GroupKind,
+    LinkTerms,
 };
 
 /// What an rpmsg payload's channel is.
@@ -169,8 +169,11 @@ mod tests {
             Some(2048)
         );
 
-        let said = group_kind_of("remote", terms(&[("service", "x"), ("max_message_bytes", "0")]))
-            .expect_err("a message of no bytes");
+        let said = group_kind_of(
+            "remote",
+            terms(&[("service", "x"), ("max_message_bytes", "0")]),
+        )
+        .expect_err("a message of no bytes");
         assert!(
             format!("{said}").contains("max_message_bytes"),
             "the error should name the term: {said}"

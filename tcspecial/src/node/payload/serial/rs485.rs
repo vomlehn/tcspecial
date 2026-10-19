@@ -164,7 +164,11 @@ mod tests {
             delay_before_send: Duration::from_millis(0),
             delay_after_send: Duration::from_millis(0),
         });
-        assert_eq!(high & SER_RS485_ENABLED, SER_RS485_ENABLED, "the mode is on");
+        assert_eq!(
+            high & SER_RS485_ENABLED,
+            SER_RS485_ENABLED,
+            "the mode is on"
+        );
         assert_eq!(high & SER_RS485_RTS_ON_SEND, SER_RS485_RTS_ON_SEND);
         assert_eq!(high & SER_RS485_RTS_AFTER_SEND, 0);
 
@@ -189,7 +193,10 @@ mod tests {
         });
         assert_eq!(asked.delay_rts_before_send, 2);
         assert_eq!(asked.delay_rts_after_send, 3);
-        assert_eq!(asked.padding, [0; 5], "the kernel asks for these to be zero");
+        assert_eq!(
+            asked.padding, [0; 5],
+            "the kernel asks for these to be zero"
+        );
     }
 
     /// A port has taken the mode when it holds what it was asked for, and a
@@ -203,14 +210,14 @@ mod tests {
         };
         let asked = asked_for(&terms);
 
-        assert!(took_it(&asked, &asked), "a port that holds what it was told");
+        assert!(
+            took_it(&asked, &asked),
+            "a port that holds what it was told"
+        );
 
         // What a driver that does not support the mode does: returns success
         // and leaves the flag clear.
-        let cleared = SerialRs485 {
-            flags: 0,
-            ..asked
-        };
+        let cleared = SerialRs485 { flags: 0, ..asked };
         assert!(!took_it(&asked, &cleared), "the mode is not on");
 
         // And one that took the mode and rounded a delay away.
@@ -218,7 +225,10 @@ mod tests {
             delay_rts_after_send: 0,
             ..asked
         };
-        assert!(!took_it(&asked, &rounded), "the turnaround is not what was asked");
+        assert!(
+            !took_it(&asked, &rounded),
+            "the turnaround is not what was asked"
+        );
 
         // A port that added a flag of its own has still done what it was
         // told: bus termination and full duplex are the driver's business.
@@ -226,7 +236,10 @@ mod tests {
             flags: asked.flags | (1 << 5),
             ..asked
         };
-        assert!(took_it(&asked, &more), "a flag of the driver's own is not a refusal");
+        assert!(
+            took_it(&asked, &more),
+            "a flag of the driver's own is not a refusal"
+        );
     }
 
     /// A pseudo-terminal will not take the mode, and says so rather than

@@ -138,7 +138,10 @@ mod tests {
         assert_eq!(said[..LENGTH], 6u32.to_ne_bytes());
 
         let mut reading = said.as_slice();
-        assert_eq!(read(&mut reading).expect("it reads"), Some(b"293.15".to_vec()));
+        assert_eq!(
+            read(&mut reading).expect("it reads"),
+            Some(b"293.15".to_vec())
+        );
         // And then the interface has ended, which is not an error.
         assert_eq!(read(&mut reading).expect("the end"), None);
     }
@@ -153,7 +156,10 @@ mod tests {
 
         let mut reading = said.as_slice();
         assert_eq!(read(&mut reading).expect("it reads"), Some(Vec::new()));
-        assert_eq!(read(&mut reading).expect("it reads"), Some(b"after".to_vec()));
+        assert_eq!(
+            read(&mut reading).expect("it reads"),
+            Some(b"after".to_vec())
+        );
         assert_eq!(read(&mut reading).expect("the end"), None);
     }
 
@@ -170,7 +176,10 @@ mod tests {
         while let Some(data) = read(&mut reading).expect("it reads") {
             read_back.push(data);
         }
-        assert_eq!(read_back, vec![b"one".to_vec(), Vec::new(), b"three".to_vec()]);
+        assert_eq!(
+            read_back,
+            vec![b"one".to_vec(), Vec::new(), b"three".to_vec()]
+        );
     }
 
     /// An interface that ends inside a packet's length is an error.

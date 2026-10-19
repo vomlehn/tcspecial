@@ -128,7 +128,9 @@ fn apply_line_terms(what: &str, file: &File, config: &SerialConfig) -> TcsResult
     if unsafe { libc::tcgetattr(fd, &mut terms) } != 0 {
         return Err(not_a_line(
             what,
-            &config.path, "cannot be read as a serial port"));
+            &config.path,
+            "cannot be read as a serial port",
+        ));
     }
 
     unsafe { libc::cfmakeraw(&mut terms) };
@@ -192,7 +194,9 @@ fn apply_line_terms(what: &str, file: &File, config: &SerialConfig) -> TcsResult
     if unsafe { libc::tcgetattr(fd, &mut got) } != 0 {
         return Err(not_a_line(
             what,
-            &config.path, "cannot be read back after setting"));
+            &config.path,
+            "cannot be read back after setting",
+        ));
     }
     if parity_of(got.c_cflag) != wanted {
         return Err(not_a_line(
@@ -371,7 +375,11 @@ mod tests {
         use std::os::unix::io::FromRawFd;
 
         let master_fd = unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY) };
-        assert!(master_fd >= 0, "no pty: {}", std::io::Error::last_os_error());
+        assert!(
+            master_fd >= 0,
+            "no pty: {}",
+            std::io::Error::last_os_error()
+        );
         let _master = unsafe { File::from_raw_fd(master_fd) };
         assert_eq!(unsafe { libc::grantpt(master_fd) }, 0);
         assert_eq!(unsafe { libc::unlockpt(master_fd) }, 0);
@@ -470,7 +478,11 @@ mod tests {
 
         // A pty, as tcssim makes one.
         let master_fd = unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY) };
-        assert!(master_fd >= 0, "no pty: {}", std::io::Error::last_os_error());
+        assert!(
+            master_fd >= 0,
+            "no pty: {}",
+            std::io::Error::last_os_error()
+        );
         let mut master = unsafe { File::from_raw_fd(master_fd) };
         assert_eq!(unsafe { libc::grantpt(master_fd) }, 0);
         assert_eq!(unsafe { libc::unlockpt(master_fd) }, 0);
@@ -500,7 +512,9 @@ mod tests {
         // What the device's end writes, the handler's end reads. Raw terms
         // were applied when the endpoint was opened, so these bytes are not
         // edited, echoed or translated on the way.
-        master.write_all(b"from the device").expect("the far end writes");
+        master
+            .write_all(b"from the device")
+            .expect("the far end writes");
         master.flush().ok();
 
         let mut buffer = [0u8; 64];

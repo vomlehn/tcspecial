@@ -68,13 +68,13 @@ fn the_options_are_taken_as_options() {
     assert_eq!(status, 1);
 
     // Before the file or after it, either way.
-    for args in [
-        ["--error-limit=2", set],
-        [set, "--error-limit=2"],
-    ] {
+    for args in [["--error-limit=2", set], [set, "--error-limit=2"]] {
         let (lines, status) = run(&args);
         assert_eq!(lines.len(), 2, "{args:?}: {lines:?}");
-        assert!(lines.iter().all(|line| line.contains(": error: ")), "{lines:?}");
+        assert!(
+            lines.iter().all(|line| line.contains(": error: ")),
+            "{lines:?}"
+        );
         assert_eq!(status, 1);
     }
 
@@ -138,7 +138,10 @@ fn the_digest_is_printed_for_the_configurations() {
     let (lines, status) = run(&["--digest", &xml, &yaml, &sim]);
     assert_eq!(status, 0, "{lines:?}");
     assert_eq!(lines.len(), 2, "{lines:?}");
-    assert!(lines[0].starts_with(&xml) && lines[1].starts_with(&yaml), "{lines:?}");
+    assert!(
+        lines[0].starts_with(&xml) && lines[1].starts_with(&yaml),
+        "{lines:?}"
+    );
     assert_eq!(
         digest(&lines[0]),
         digest(&lines[1]),
@@ -165,7 +168,10 @@ fn a_digest_that_cannot_be_taken_is_a_failed_run() {
     let (lines, status) = run(&["--digest", set]);
     assert_eq!(status, 1, "{lines:?}");
     assert_eq!(lines.len(), 13, "the digest and the twelve: {lines:?}");
-    assert!(lines[0].contains(": md5 "), "the digest comes first: {lines:?}");
+    assert!(
+        lines[0].contains(": md5 "),
+        "the digest comes first: {lines:?}"
+    );
 
     // And one that does not parse has nothing to digest.
     let unreadable = dir.path().join("unreadable.yaml");
@@ -190,7 +196,12 @@ fn a_bad_option_is_a_command_line_of_none_of_the_shapes() {
     let dir = tempfile::tempdir().expect("a directory");
     let set = with_errors(dir.path(), 1);
     let set = set.to_str().expect("a path");
-    for bad in ["--error-limit=five", "--error-limit=", "--warnings=maybe", "--warnings="] {
+    for bad in [
+        "--error-limit=five",
+        "--error-limit=",
+        "--warnings=maybe",
+        "--warnings=",
+    ] {
         let (lines, status) = run(&[bad, set]);
         assert_eq!(status, 2, "{bad}");
         assert!(lines.is_empty(), "{bad}: nothing is checked: {lines:?}");

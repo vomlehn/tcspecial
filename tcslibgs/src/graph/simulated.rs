@@ -60,7 +60,9 @@ pub fn reading_of(
     for link in graph.links.iter().filter(|l| l.origin().node == payload) {
         for destination in link.to.each() {
             let to = Destination::parse(destination).node;
-            let Some(node) = graph.node(&to) else { continue };
+            let Some(node) = graph.node(&to) else {
+                continue;
+            };
             if node.node_type != "compute" {
                 continue;
             }
@@ -113,7 +115,11 @@ pub fn handlers(graph: &Graph, sim_file: &SimConfigFile) -> Result<Vec<DHConfig>
 
     let named = |name: &str| sim_file.simulated_payloads.iter().any(|e| e.name == name);
     let mut handlers = Vec::new();
-    for node in graph.nodes.iter().filter(|n| n.is_payload() && named(&n.name)) {
+    for node in graph
+        .nodes
+        .iter()
+        .filter(|n| n.is_payload() && named(&n.name))
+    {
         // A payload that is only driven -- a heater, a valve -- is written to
         // and never read, and a stand-in for it would be sending data nothing
         // reads into a device the vehicle is trying to drive.
@@ -166,9 +172,8 @@ pub fn handlers(graph: &Graph, sim_file: &SimConfigFile) -> Result<Vec<DHConfig>
             ));
         }
 
-        let reach = reach_of(node).map_err(|why| {
-            format!("\"{}\" cannot be simulated: {why}", node.name)
-        })?;
+        let reach = reach_of(node)
+            .map_err(|why| format!("\"{}\" cannot be simulated: {why}", node.name))?;
 
         let mode = match reach.trigger {
             None => DHMode::Periodic,

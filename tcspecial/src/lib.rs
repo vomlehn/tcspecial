@@ -15,12 +15,12 @@ pub use config::*;
 pub use endpoint::*;
 pub use node::payload::device_file::*;
 pub use node::payload::i2c::*;
+pub use node::payload::network::tcp::*;
+pub use node::payload::network::udp::*;
+pub use node::payload::network::unix::*;
 pub use node::payload::network::*;
 pub use node::payload::serial::*;
 pub use node::payload::spi::*;
-pub use node::payload::network::tcp::*;
-pub use node::payload::network::unix::*;
-pub use node::payload::network::udp::*;
 pub use telemetry_log::*;
 
 /// Start something, waiting out a program that is still being written.
@@ -38,9 +38,7 @@ pub use telemetry_log::*;
 /// before the vehicle is powered, and `Text file busy` there would be a real
 /// fault worth reporting rather than waiting out.
 #[cfg(test)]
-pub(crate) fn when_not_busy<T>(
-    mut start: impl FnMut() -> Result<T, String>,
-) -> Result<T, String> {
+pub(crate) fn when_not_busy<T>(mut start: impl FnMut() -> Result<T, String>) -> Result<T, String> {
     for _ in 0..200 {
         match start() {
             Err(why) if why.contains("os error 26") => {

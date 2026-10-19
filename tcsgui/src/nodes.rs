@@ -186,13 +186,7 @@ pub const TEXT: &str = "text";
 ///   is written.
 /// * `boolean` -- `true` or `false`, and nothing else.
 pub const KINDS: &[&str] = &[
-    TEXT,
-    "path",
-    "whole",
-    "interval",
-    "timeout",
-    "bytes",
-    "boolean",
+    TEXT, "path", "whole", "interval", "timeout", "bytes", "boolean",
 ];
 
 /// A description as a file writes it.
@@ -323,13 +317,15 @@ fn walk(root: &Path, where_: &Path, found: &mut Vec<PathBuf>, trouble: &mut Vec<
 /// One description, read from `root`-relative `path`.
 fn read_one(root: &Path, path: &Path) -> Result<Described, String> {
     let whole = root.join(path);
-    let said: Said = tcslibgs::load_config_file(&whole)
-        .map_err(|e| format!("{}: {e}", whole.display()))?;
+    let said: Said =
+        tcslibgs::load_config_file(&whole).map_err(|e| format!("{}: {e}", whole.display()))?;
 
     let named = |what: &str| format!("{}: {what}", whole.display());
     let node = said.node.as_str().trim().to_string();
     if node.is_empty() {
-        return Err(named("a description says which node it is about, and this says nothing"));
+        return Err(named(
+            "a description says which node it is about, and this says nothing",
+        ));
     }
     let node_type = said.node_type.as_str().trim().to_string();
     if node_type.is_empty() {
@@ -345,7 +341,11 @@ fn read_one(root: &Path, path: &Path) -> Result<Described, String> {
         if name.is_empty() {
             return Err(named(&format!("\"{node}\" has an attribute with no name")));
         }
-        let required = match attribute.required.as_ref().map(|r| r.as_str().trim().to_string()) {
+        let required = match attribute
+            .required
+            .as_ref()
+            .map(|r| r.as_str().trim().to_string())
+        {
             None => false,
             Some(said) => match said.as_str() {
                 "true" => true,
@@ -362,7 +362,10 @@ fn read_one(root: &Path, path: &Path) -> Result<Described, String> {
         // nothing knows would be a field offered in whatever way the window
         // falls back to, which is the kind of mistake a description is read
         // by a program to catch.
-        let said_kind = attribute.kind.as_ref().map(|k| k.as_str().trim().to_string());
+        let said_kind = attribute
+            .kind
+            .as_ref()
+            .map(|k| k.as_str().trim().to_string());
         let kind = match said_kind {
             None => TEXT.to_string(),
             Some(said) if KINDS.contains(&said.as_str()) => said,
@@ -685,13 +688,19 @@ mod tests {
 
         // A computation is a compute node with its function already answered,
         // which is what `sets` is for.
-        let voter = described.iter().find(|one| one.node == "vote").expect("vote");
+        let voter = described
+            .iter()
+            .find(|one| one.node == "vote")
+            .expect("vote");
         assert_eq!(voter.node_type, "compute");
         assert_eq!(voter.sets.get("function").map(String::as_str), Some("vote"));
         assert_eq!(voter.attributes.len(), 2);
         assert_eq!(voter.attributes[0].name, "inputs");
         assert!(voter.attributes[0].required);
-        assert!(voter.attributes[0].about.contains("comma separated"), "{voter:?}");
+        assert!(
+            voter.attributes[0].about.contains("comma separated"),
+            "{voter:?}"
+        );
         assert_eq!(voter.attributes[1].name, "algorithm");
         // Folded into one line, however the file wrapped it.
         assert!(!voter.attributes[0].about.contains('\n'));
@@ -707,16 +716,15 @@ mod tests {
             process.sets.get("function").map(String::as_str),
             Some("process")
         );
-        let asked: Vec<&str> = process
-            .attributes
-            .iter()
-            .map(|a| a.name.as_str())
-            .collect();
+        let asked: Vec<&str> = process.attributes.iter().map(|a| a.name.as_str()).collect();
         assert_eq!(asked, vec!["executable", "timeout", "restart"]);
         assert!(process.attributes.iter().all(|a| a.required));
 
         // And a node with nothing to be told says nothing.
-        let null = described.iter().find(|one| one.node == "null").expect("null");
+        let null = described
+            .iter()
+            .find(|one| one.node == "null")
+            .expect("null");
         assert_eq!(null.node_type, "null");
         assert!(null.attributes.is_empty());
         assert!(null.sets.is_empty());
@@ -809,13 +817,11 @@ mod tests {
         assert!(!described.is_empty());
 
         for one in &described {
-            let Some(table) = tcslibgs::graph::terminals::terminals_of(&one.node_type)
-            else {
+            let Some(table) = tcslibgs::graph::terminals::terminals_of(&one.node_type) else {
                 continue;
             };
             for (terminal, said) in one.terminals.each() {
-                let known =
-                    table.sinks.contains(&terminal) || table.sources.contains(&terminal);
+                let known = table.sinks.contains(&terminal) || table.sources.contains(&terminal);
                 assert_eq!(
                     said,
                     known,
@@ -956,7 +962,11 @@ mod tests {
                 if path.file_name().and_then(|n| n.to_str()) == Some("mod.rs") {
                     continue;
                 }
-                let stem = path.file_stem().expect("a name").to_string_lossy().to_string();
+                let stem = path
+                    .file_stem()
+                    .expect("a name")
+                    .to_string_lossy()
+                    .to_string();
                 assert!(
                     described
                         .iter()

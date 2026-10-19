@@ -26,8 +26,8 @@ use log::info;
 use nix::poll::PollFlags;
 use tcslibgs::{NetworkConfig, TcsError, TcsResult};
 
-use crate::endpoint::bind_failed;
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
+use crate::endpoint::bind_failed;
 use crate::endpoint::{
     wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable, WaitResult,
 };
@@ -134,10 +134,8 @@ impl UnixDatagramEndpoint {
         let path = config.address.clone();
         clear_a_dead_socket(what, Path::new(&path))?;
 
-        let socket =
-            UnixDatagram::bind(&path).map_err(|e| {
-                bind_failed(&format!("{what} Unix datagram endpoint"), &path, e)
-            })?;
+        let socket = UnixDatagram::bind(&path)
+            .map_err(|e| bind_failed(&format!("{what} Unix datagram endpoint"), &path, e))?;
         socket.set_nonblocking(true)?;
 
         Ok(Self {

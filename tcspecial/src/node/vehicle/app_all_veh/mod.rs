@@ -55,7 +55,11 @@ impl AppAllVeh {
             ));
         }
         Ok(AppAllVeh {
-            running: parent::start(&params.executable_path()?, &params.arguments(), Supports::ALL)?,
+            running: parent::start(
+                &params.executable_path()?,
+                &params.arguments(),
+                Supports::ALL,
+            )?,
         })
     }
 
@@ -132,8 +136,7 @@ mod tests {
     fn stands_in(where_: &std::path::Path) -> PathBuf {
         let path = where_.join("stands_in");
         let mut file = std::fs::File::create(&path).expect("a program");
-        file.write_all(b"#!/bin/sh\nexec cat\n")
-            .expect("a program");
+        file.write_all(b"#!/bin/sh\nexec cat\n").expect("a program");
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
             .expect("a program that can be run");
         path
@@ -162,13 +165,15 @@ mod tests {
         let program = stands_in(where_.path());
         let mut node = crate::when_not_busy(|| AppAllVeh::of(&says(&program))).expect("it starts");
 
-        node.give_payload_data(b"293.15").expect("it takes a packet");
+        node.give_payload_data(b"293.15")
+            .expect("it takes a packet");
         assert_eq!(
             node.take_payload_data().expect("it is carried"),
             Some(b"293.15".to_vec())
         );
 
-        node.give_payload_data(b"").expect("it takes an empty packet");
+        node.give_payload_data(b"")
+            .expect("it takes an empty packet");
         assert_eq!(
             node.take_payload_data().expect("it is carried"),
             Some(Vec::new())

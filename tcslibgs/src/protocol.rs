@@ -242,7 +242,10 @@ mod tests {
     fn test_address_family_conversion() {
         let af = AddressFamily::Inet;
         assert_eq!(af.to_os(), libc::AF_INET);
-        assert_eq!(AddressFamily::from_os(libc::AF_INET), Some(AddressFamily::Inet));
+        assert_eq!(
+            AddressFamily::from_os(libc::AF_INET),
+            Some(AddressFamily::Inet)
+        );
     }
 
     #[test]

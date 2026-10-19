@@ -293,10 +293,12 @@ mod tests {
         fs::write(&blocked, b"a file").expect("a file");
 
         let path = blocked.join("graph.yaml");
-        let why = write_atomically(&path, b"nodes: []\n")
-            .expect_err("a file is not a directory");
+        let why = write_atomically(&path, b"nodes: []\n").expect_err("a file is not a directory");
         let said = format!("{why}");
-        assert!(said.contains("graph.yaml"), "it should name the file: {said}");
+        assert!(
+            said.contains("graph.yaml"),
+            "it should name the file: {said}"
+        );
         assert!(
             said.contains("directory"),
             "and say what could not be made, since that is what to put right: \
@@ -404,6 +406,9 @@ mod tests {
 
         std::env::set_current_dir(was).expect("to move back");
         result.expect("a write with no directory in the path");
-        assert_eq!(fs::read(where_.path().join("graph.yaml")).unwrap(), b"nodes: []\n");
+        assert_eq!(
+            fs::read(where_.path().join("graph.yaml")).unwrap(),
+            b"nodes: []\n"
+        );
     }
 }

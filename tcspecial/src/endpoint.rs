@@ -29,12 +29,12 @@ use crate::node::payload::gpio::GpioEndpoint;
 use crate::node::payload::hdlc::HdlcEndpoint;
 use crate::node::payload::i2c::I2cEndpoint;
 use crate::node::payload::iio::IioEndpoint;
-use crate::node::payload::rpmsg::RpmsgEndpoint;
-use crate::node::payload::serial::SerialEndpoint;
-use crate::node::payload::spi::SpiEndpoint;
 use crate::node::payload::network::tcp::TcpEndpoint;
 use crate::node::payload::network::udp::UdpEndpoint;
 use crate::node::payload::network::unix::{UnixDatagramEndpoint, UnixStreamEndpoint};
+use crate::node::payload::rpmsg::RpmsgEndpoint;
+use crate::node::payload::serial::SerialEndpoint;
+use crate::node::payload::spi::SpiEndpoint;
 
 /// Say what could not be bound, and what that usually means.
 ///
@@ -94,7 +94,12 @@ pub trait EndpointWritable: EndpointWaitable {
 ///
 /// Shared by every kind of endpoint: what differs between them is what
 /// the descriptor refers to, not how it is waited on.
-pub(crate) fn wait_for_fds(io_fd: RawFd, cmd_fd: RawFd, io_events: PollFlags, timeout_ms: i32) -> TcsResult<WaitResult> {
+pub(crate) fn wait_for_fds(
+    io_fd: RawFd,
+    cmd_fd: RawFd,
+    io_events: PollFlags,
+    timeout_ms: i32,
+) -> TcsResult<WaitResult> {
     let io_borrowed = unsafe { BorrowedFd::borrow_raw(io_fd) };
     let cmd_borrowed = unsafe { BorrowedFd::borrow_raw(cmd_fd) };
 
@@ -106,8 +111,12 @@ pub(crate) fn wait_for_fds(io_fd: RawFd, cmd_fd: RawFd, io_events: PollFlags, ti
     match poll(&mut poll_fds, timeout_ms) {
         Ok(0) => Ok(WaitResult::Timeout),
         Ok(_) => {
-            let io_ready = poll_fds[0].revents().is_some_and(|r| r.intersects(io_events));
-            let cmd_ready = poll_fds[1].revents().is_some_and(|r| r.contains(PollFlags::POLLIN));
+            let io_ready = poll_fds[0]
+                .revents()
+                .is_some_and(|r| r.intersects(io_events));
+            let cmd_ready = poll_fds[1]
+                .revents()
+                .is_some_and(|r| r.contains(PollFlags::POLLIN));
 
             match (io_ready, cmd_ready) {
                 (true, true) => Ok(WaitResult::Both),
@@ -119,7 +128,6 @@ pub(crate) fn wait_for_fds(io_fd: RawFd, cmd_fd: RawFd, io_events: PollFlags, ti
         Err(e) => Err(TcsError::Io(io::Error::from_raw_os_error(e as i32))),
     }
 }
-
 
 /// A reader and a writer that wait at one endpoint, opened once.
 ///
@@ -150,7 +158,10 @@ pub fn bind_oc_pair(
     what: &str,
     oc: &NetworkConfig,
     ground: Option<&NetworkConfig>,
-) -> TcsResult<(Box<dyn EndpointReadable + Send>, Box<dyn EndpointWritable + Send>)> {
+) -> TcsResult<(
+    Box<dyn EndpointReadable + Send>,
+    Box<dyn EndpointWritable + Send>,
+)> {
     let reader = match ground {
         Some(ground) => UdpEndpoint::sending_to(what, oc, ground)?,
         None => UdpEndpoint::new(what, oc)?,
@@ -162,7 +173,10 @@ pub fn bind_oc_pair(
 pub fn bind_endpoint_pair(
     what: &str,
     config: &EndpointConfig,
-) -> TcsResult<(Box<dyn EndpointReadable + Send>, Box<dyn EndpointWritable + Send>)> {
+) -> TcsResult<(
+    Box<dyn EndpointReadable + Send>,
+    Box<dyn EndpointWritable + Send>,
+)> {
     match config {
         EndpointConfig::Network(net_config) => match net_config.protocol {
             NetworkProtocol::Udp => {
@@ -270,7 +284,10 @@ pub fn bind_endpoint_pair(
 pub fn driven_endpoint_pair(
     what: &str,
     config: &EndpointConfig,
-) -> TcsResult<(Box<dyn EndpointReadable + Send>, Box<dyn EndpointWritable + Send>)> {
+) -> TcsResult<(
+    Box<dyn EndpointReadable + Send>,
+    Box<dyn EndpointWritable + Send>,
+)> {
     match config {
         EndpointConfig::Network(net_config) if net_config.protocol == NetworkProtocol::Udp => {
             let reader = UdpEndpoint::driving(what, net_config)?;
@@ -311,7 +328,10 @@ pub fn driven_endpoint_pair(
 pub fn connect_endpoint_pair(
     what: &str,
     config: &EndpointConfig,
-) -> TcsResult<(Box<dyn EndpointReadable + Send>, Box<dyn EndpointWritable + Send>)> {
+) -> TcsResult<(
+    Box<dyn EndpointReadable + Send>,
+    Box<dyn EndpointWritable + Send>,
+)> {
     match config {
         EndpointConfig::Network(net_config) => match net_config.protocol {
             // Bound, not connected: the payload is the end that speaks first

@@ -850,8 +850,8 @@ mod tests {
     use super::*;
     use crate::runtime::node_state::Abandon;
 
-    use std::sync::Mutex as TestLock;
     use std::path::Path;
+    use std::sync::Mutex as TestLock;
     use tcslibgs::graph::Graph;
 
     /// What a node was given, and what it will say when read.
@@ -944,8 +944,7 @@ mod tests {
     /// so the decisions these tests look for are written as `b"1"` and
     /// `b"0"`.
     fn kelvin(number: f64) -> Vec<u8> {
-        crate::node::vehicle::compute::as_value(number)
-            .expect("a temperature a value carries")
+        crate::node::vehicle::compute::as_value(number).expect("a temperature a value carries")
     }
 
     /// The example's links, and only its links.
@@ -1122,7 +1121,12 @@ mod tests {
 
         // The log saw the same three and the decision, which is the other
         // leg of each "T".
-        assert_eq!(log.lock().expect("the record").given.len(), 4, "{:?}", log.lock().expect("the record").given);
+        assert_eq!(
+            log.lock().expect("the record").given.len(),
+            4,
+            "{:?}",
+            log.lock().expect("the record").given
+        );
 
         // And both heaters were asserted, from the one pass: one decision
         // reaching each of them, so that one failing leaves the other
@@ -1162,7 +1166,9 @@ mod tests {
             let inputs = routes.inputs_of(name);
             fabric.hold(
                 name,
-                Box::new(ComputePort::make(node, &inputs, &Abandon::nothing()).expect("the computation")),
+                Box::new(
+                    ComputePort::make(node, &inputs, &Abandon::nothing()).expect("the computation"),
+                ),
             );
         }
         let (_, moc_port) = recorder();
@@ -1205,7 +1211,10 @@ mod tests {
         let node = graph.node("k_1").expect("the converter");
         fabric.hold(
             "k_1",
-            Box::new(ComputePort::make(node, &routes.inputs_of("k_1"), &Abandon::nothing()).expect("it builds")),
+            Box::new(
+                ComputePort::make(node, &routes.inputs_of("k_1"), &Abandon::nothing())
+                    .expect("it builds"),
+            ),
         );
         let (moc, moc_port) = recorder();
         fabric.hold("moc", moc_port);
@@ -1543,7 +1552,10 @@ mod tests {
 
         assert_eq!(moved.delivered, 1);
         assert_eq!(moved.refused.len(), 2, "{:?}", moved.refused);
-        assert!(moved.refused.iter().all(|(_, why)| why.contains("no such node")));
+        assert!(moved
+            .refused
+            .iter()
+            .all(|(_, why)| why.contains("no such node")));
         assert_eq!(moc.lock().expect("the record").given.len(), 1);
     }
 
@@ -1599,11 +1611,7 @@ mod tests {
         let mut fabric = Fabric::new(thermostat(), 64);
 
         let mut sensors = Vec::new();
-        for (sensor, converter) in [
-            ("temp_1", "k_1"),
-            ("temp_2", "k_2"),
-            ("temp_3", "k_3"),
-        ] {
+        for (sensor, converter) in [("temp_1", "k_1"), ("temp_2", "k_2"), ("temp_3", "k_3")] {
             let (record, port) = recorder();
             record.lock().expect("the record").to_say = vec![vec![sensors.len() as u8]];
             fabric.hold(sensor, port);

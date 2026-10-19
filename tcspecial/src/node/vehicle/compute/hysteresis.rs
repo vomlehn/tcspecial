@@ -378,7 +378,11 @@ mod tests {
             half_band: 2.0,
         });
 
-        assert_eq!(h.held(), None, "nothing is decided before the first reading");
+        assert_eq!(
+            h.held(),
+            None,
+            "nothing is decided before the first reading"
+        );
 
         // In the band, and still nothing decided: there is nothing to hold
         // them at yet, which is the one sample that drives nothing at all.
@@ -386,7 +390,10 @@ mod tests {
         assert_eq!(h.held(), None);
 
         // Cold: a decision, and from here on that is what they are held at.
-        assert_eq!(h.give(None, &kelvin(290.0_f64)).unwrap(), Some(b"1".to_vec()));
+        assert_eq!(
+            h.give(None, &kelvin(290.0_f64)).unwrap(),
+            Some(b"1".to_vec())
+        );
         assert_eq!(h.held(), Some(b"1".to_vec()));
 
         // Still cold: nothing new to send, and the same thing to hold them
@@ -401,8 +408,10 @@ mod tests {
         assert_eq!(h.held(), Some(b"1".to_vec()));
 
         // And over the top of it: a new decision, held from now on.
-        assert_eq!(h.give(None, &kelvin(296.0_f64)).unwrap(), Some(b"0".to_vec()));
+        assert_eq!(
+            h.give(None, &kelvin(296.0_f64)).unwrap(),
+            Some(b"0".to_vec())
+        );
         assert_eq!(h.held(), Some(b"0".to_vec()));
     }
 }
-

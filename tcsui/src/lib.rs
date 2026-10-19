@@ -135,11 +135,17 @@ mod tests {
         let schedule = Schedule::standard();
 
         // Nothing heard: the colour of knowing nothing, which is not green.
-        assert_eq!(indicator(&schedule.after(None, SystemTime::now())), palette::unknown());
+        assert_eq!(
+            indicator(&schedule.after(None, SystemTime::now())),
+            palette::unknown()
+        );
 
         // Just arrived, and one beacon missed: still well.
         assert_eq!(indicator(&schedule.at(Duration::ZERO)), palette::well());
-        assert_eq!(indicator(&schedule.at(Duration::from_secs(6))), palette::well());
+        assert_eq!(
+            indicator(&schedule.at(Duration::from_secs(6))),
+            palette::well()
+        );
 
         // Late enough to look at, and long enough to be wrong. Both stages
         // blink, so the instants are chosen in the lit half of a blink --

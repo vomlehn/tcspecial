@@ -21,10 +21,10 @@
 //! * [`crate::node::payload::network::unix`] -- a Unix-domain socket of either flavour, which
 //!   the simulator simply is
 
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::Arc;
 use std::os::unix::fs::{symlink, FileTypeExt};
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
@@ -223,40 +223,34 @@ impl SimulatedPayload {
         let config = self.config.clone();
         let stats = self.stats.clone();
 
-        let handle = thread::spawn(move || {
-            match config.protocol {
-                PayloadProtocol::Tcp => crate::node::payload::network::tcp::run_tcp_node(config, running, stats),
-                PayloadProtocol::Udp => crate::node::payload::network::udp::run_udp_node(config, running, stats),
-                PayloadProtocol::Device => {
-                    crate::node::payload::device_file::run_device_file_node(config, running, stats)
-                }
-                PayloadProtocol::Serial => {
-                    crate::node::payload::serial::run_serial_node(config, running, stats)
-                }
-                PayloadProtocol::I2c => {
-                    crate::node::payload::i2c::run_i2c_node(config, running, stats)
-                }
-                PayloadProtocol::Spi => {
-                    crate::node::payload::spi::run_spi_node(config, running, stats)
-                }
-                PayloadProtocol::Can => {
-                    crate::node::payload::can::run_can_node(config, running, stats)
-                }
-                PayloadProtocol::Iio => {
-                    crate::node::payload::iio::run_iio_node(config, running, stats)
-                }
-                PayloadProtocol::Rpmsg => {
-                    crate::node::payload::rpmsg::run_rpmsg_node(config, running, stats)
-                }
-                PayloadProtocol::Gpio => {
-                    crate::node::payload::gpio::run_gpio_node(config, running, stats)
-                }
-                PayloadProtocol::UnixStream => {
-                    crate::node::payload::network::unix::run_unix_stream_node(config, running, stats)
-                }
-                PayloadProtocol::UnixDgram => {
-                    crate::node::payload::network::unix::run_unix_dgram_node(config, running, stats)
-                }
+        let handle = thread::spawn(move || match config.protocol {
+            PayloadProtocol::Tcp => {
+                crate::node::payload::network::tcp::run_tcp_node(config, running, stats)
+            }
+            PayloadProtocol::Udp => {
+                crate::node::payload::network::udp::run_udp_node(config, running, stats)
+            }
+            PayloadProtocol::Device => {
+                crate::node::payload::device_file::run_device_file_node(config, running, stats)
+            }
+            PayloadProtocol::Serial => {
+                crate::node::payload::serial::run_serial_node(config, running, stats)
+            }
+            PayloadProtocol::I2c => crate::node::payload::i2c::run_i2c_node(config, running, stats),
+            PayloadProtocol::Spi => crate::node::payload::spi::run_spi_node(config, running, stats),
+            PayloadProtocol::Can => crate::node::payload::can::run_can_node(config, running, stats),
+            PayloadProtocol::Iio => crate::node::payload::iio::run_iio_node(config, running, stats),
+            PayloadProtocol::Rpmsg => {
+                crate::node::payload::rpmsg::run_rpmsg_node(config, running, stats)
+            }
+            PayloadProtocol::Gpio => {
+                crate::node::payload::gpio::run_gpio_node(config, running, stats)
+            }
+            PayloadProtocol::UnixStream => {
+                crate::node::payload::network::unix::run_unix_stream_node(config, running, stats)
+            }
+            PayloadProtocol::UnixDgram => {
+                crate::node::payload::network::unix::run_unix_dgram_node(config, running, stats)
             }
         });
 
@@ -307,12 +301,16 @@ impl SimulatedPayload {
 
     /// Update packet interval
     pub fn set_packet_interval(&self, interval_ms: u32) {
-        self.config.packet_interval_ms.store(interval_ms, Ordering::SeqCst);
+        self.config
+            .packet_interval_ms
+            .store(interval_ms, Ordering::SeqCst);
     }
 
     /// Update segment interval
     pub fn set_segment_interval(&self, interval_ms: u32) {
-        self.config.segment_interval_ms.store(interval_ms, Ordering::SeqCst);
+        self.config
+            .segment_interval_ms
+            .store(interval_ms, Ordering::SeqCst);
     }
 }
 
@@ -644,7 +642,11 @@ pub(crate) fn wait_out_packet(pacing: &Pacing, since: Instant, running: &AtomicB
         .saturating_sub(since.elapsed())
         // A payload that produces nothing still has to notice Stop, and a
         // loop with no wait in it at all would spin.
-        .max(Duration::from_millis(if pacing.produces() { 0 } else { 10 }));
+        .max(Duration::from_millis(if pacing.produces() {
+            0
+        } else {
+            10
+        }));
 
     wait_while_running(left, running);
 }
@@ -660,7 +662,7 @@ mod tests {
     fn with(faults: Faults) -> PayloadConfig {
         PayloadConfig {
             thermal: None,
-                        name: "DH0".to_string(),
+            name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: "127.0.0.1".to_string(),
             port: 5000,
@@ -876,16 +878,11 @@ mod tests {
         let running = AtomicBool::new(true);
 
         let mut went: Vec<Vec<u8>> = Vec::new();
-        let (bytes, whole) = send_in_segments(
-            &packet,
-            5,
-            Duration::ZERO,
-            &running,
-            &mut |segment| {
+        let (bytes, whole) =
+            send_in_segments(&packet, 5, Duration::ZERO, &running, &mut |segment| {
                 went.push(segment.to_vec());
                 Ok(segment.len())
-            },
-        );
+            });
 
         assert!(whole, "the whole packet went");
         assert_eq!(bytes, 12);
@@ -924,7 +921,11 @@ mod tests {
 
             assert!(whole);
             assert_eq!(bytes, 12);
-            assert_eq!(went.len(), 1, "a segment size of {segment_size} divided the packet");
+            assert_eq!(
+                went.len(),
+                1,
+                "a segment size of {segment_size} divided the packet"
+            );
             assert_eq!(went[0], packet);
         }
     }
@@ -998,7 +999,11 @@ mod tests {
 
         // 80 ms of a 100 ms interval already spent on segments.
         let at = Instant::now();
-        wait_out_packet(&pacing, Instant::now() - Duration::from_millis(80), &running);
+        wait_out_packet(
+            &pacing,
+            Instant::now() - Duration::from_millis(80),
+            &running,
+        );
         let waited = at.elapsed();
         assert!(
             waited >= Duration::from_millis(20) && waited < Duration::from_millis(60),
@@ -1008,7 +1013,11 @@ mod tests {
         // More spent than the interval allows: the packet is late, and no
         // more waiting is added to it.
         let at = Instant::now();
-        wait_out_packet(&pacing, Instant::now() - Duration::from_millis(200), &running);
+        wait_out_packet(
+            &pacing,
+            Instant::now() - Duration::from_millis(200),
+            &running,
+        );
         let waited = at.elapsed();
         assert!(
             waited < Duration::from_millis(20),
@@ -1020,7 +1029,7 @@ mod tests {
     fn test_payload_config() {
         let config = PayloadConfig {
             thermal: None,
-                        name: "DH0".to_string(),
+            name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: "127.0.0.1".to_string(),
             port: 5000,

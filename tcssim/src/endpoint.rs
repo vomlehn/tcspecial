@@ -120,12 +120,7 @@ pub fn payload_config_attached(
         // bank. So the bank is the payload, and the simulator fills it; see
         // node::payload::i2c. The bus the handler was told to open is made to lead to
         // the stub, as a line's path is made to lead to a pty.
-        EndpointConfig::I2c(i2c) => (
-            PayloadProtocol::I2c,
-            i2c.bus.clone(),
-            0,
-            i2c.address,
-        ),
+        EndpointConfig::I2c(i2c) => (PayloadProtocol::I2c, i2c.bus.clone(), 0, i2c.address),
         // A peripheral the simulator can carry the bytes of, though not be:
         // nothing emulates one, a peripheral being a thing a controller
         // clocks, so what stands in is a pty as for a serial line. The bytes
@@ -224,10 +219,10 @@ pub fn endpoint_description(endpoint: &EndpointConfig) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
     use super::*;
-    use tcslibgs::ResolvedSim;
     use std::sync::atomic::Ordering;
+    use std::time::Duration;
+    use tcslibgs::ResolvedSim;
     use tcslibgs::{
         BitOrder, CsActive, DHMode, DHName, DeviceConfig, I2cConfig, NetworkConfig,
         NetworkProtocol, SerialConfig, SpiConfig, SpiMode, StopBits,
@@ -256,8 +251,8 @@ mod tests {
             packet_size: 4,
             oc: None,
             ground: None,
-                    mode: Default::default(),
-                    stale_interval: None,
+            mode: Default::default(),
+            stale_interval: None,
         };
 
         let config = payload_config_from(&dh, &sim(250, 100, 2)).unwrap();
@@ -349,7 +344,10 @@ mod tests {
         };
 
         let config = payload_config_from(&dh, &sim(0, 100, 2)).expect("a stream can be asked");
-        assert!(config.triggered, "the simulator was not told to wait to be asked");
+        assert!(
+            config.triggered,
+            "the simulator was not told to wait to be asked"
+        );
         // What to send and how often are tcspecial's, and do not come this
         // way at all: the simulator only has to answer.
         assert_eq!(config.packet_interval_ms.load(Ordering::SeqCst), 0);
@@ -379,8 +377,8 @@ mod tests {
                 packet_size: 4,
                 oc: None,
                 ground: None,
-                            mode: Default::default(),
-                            stale_interval: None,
+                mode: Default::default(),
+                stale_interval: None,
             };
 
             let config =
@@ -410,8 +408,8 @@ mod tests {
             packet_size: 4,
             oc: None,
             ground: None,
-                    mode: Default::default(),
-                    stale_interval: None,
+            mode: Default::default(),
+            stale_interval: None,
         };
 
         let config = payload_config_from(&dh, &sim(250, 100, 2)).expect("a line is simulable");
@@ -445,8 +443,8 @@ mod tests {
             packet_size: 8,
             oc: None,
             ground: None,
-                    mode: Default::default(),
-                    stale_interval: None,
+            mode: Default::default(),
+            stale_interval: None,
         };
 
         let config = payload_config_from(&dh, &sim(250, 100, 2)).expect("a bus is simulable");

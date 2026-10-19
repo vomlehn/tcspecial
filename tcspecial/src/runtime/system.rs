@@ -40,7 +40,7 @@ use std::sync::Arc;
 use crate::endpoint::bind_oc_pair;
 use crate::node::vehicle::log::LogNode;
 use crate::runtime::fabric::{Fabric, Moved, Port};
-use crate::runtime::node_state::{Abandon, Nudge, NodeStates};
+use crate::runtime::node_state::{Abandon, NodeStates, Nudge};
 use crate::runtime::port::{AppPort, ComputePort, EndpointPort, LogPort, NullPort, Use};
 use crate::runtime::route::Routes;
 use crate::runtime::schedule::Schedule;
@@ -230,8 +230,7 @@ impl System {
         // Before anything opens, because a node's state is what decides
         // whether the pass touches it and every node has one from the start.
         let states = Arc::new(
-            NodeStates::of(graph)
-                .map_err(|e| vec![format!("a node's wakeup descriptor: {e}")])?,
+            NodeStates::of(graph).map_err(|e| vec![format!("a node's wakeup descriptor: {e}")])?,
         );
         let mut fabric = Fabric::new(routes.clone(), DATUM_BYTES);
         fabric.watched_by(states.clone());
@@ -703,7 +702,12 @@ pub fn open_ground_link(link: &Telemetered) -> Result<Box<dyn Port>, String> {
             link.vehicle.address, link.vehicle.port, link.ground.address, link.ground.port
         )
     })?;
-    Ok(Box::new(EndpointPort::of(what, reader, writer, Use::Driven)))
+    Ok(Box::new(EndpointPort::of(
+        what,
+        reader,
+        writer,
+        Use::Driven,
+    )))
 }
 
 /// What a node becomes: a port over whatever it is.
@@ -767,9 +771,7 @@ pub fn described(graph: &Graph) -> BTreeMap<String, String> {
                 // than which of the two streams it is run with, which its type
                 // already says. See `crate::node::vehicle::app_payload_veh`
                 // and its four neighbours.
-                other if tcslibgs::node::app::Kind::of(other).is_some() => {
-                    "a program".to_string()
-                }
+                other if tcslibgs::node::app::Kind::of(other).is_some() => "a program".to_string(),
                 // A ground link, where nothing the vehicle sends passes
                 // through the node itself: each source has a link of its own
                 // to the node's `ground_base`. So one that nothing is read
@@ -827,7 +829,6 @@ mod tests {
     fn tally() -> Tally {
         Arc::new(AtomicUsize::new(0))
     }
-
 
     use tcslibgs::graph::Node;
     use tcslibgs::Scalar;
@@ -970,12 +971,7 @@ payloads:
         let counts: Counts = graph
             .nodes
             .iter()
-            .map(|node| {
-                (
-                    node.name.clone(),
-                    (tally(), tally()),
-                )
-            })
+            .map(|node| (node.name.clone(), (tally(), tally())))
             .collect();
         // Cloned into the opener, which the system keeps so that a node can
         // be opened again: the counters are reference counted, so the test
@@ -1036,12 +1032,22 @@ payloads:
         let (reads, asks) = (&counts["asked"].0, &counts["asked"].1);
 
         system.pass(start);
-        assert_eq!((reads.load(Ordering::Relaxed), asks.load(Ordering::Relaxed)), (1, 1));
+        assert_eq!(
+            (reads.load(Ordering::Relaxed), asks.load(Ordering::Relaxed)),
+            (1, 1)
+        );
         system.pass(start + Duration::from_millis(20));
         system.pass(start + Duration::from_millis(40));
-        assert_eq!((reads.load(Ordering::Relaxed), asks.load(Ordering::Relaxed)), (3, 1), "read every pass, asked once");
+        assert_eq!(
+            (reads.load(Ordering::Relaxed), asks.load(Ordering::Relaxed)),
+            (3, 1),
+            "read every pass, asked once"
+        );
         system.pass(start + Duration::from_millis(100));
-        assert_eq!((reads.load(Ordering::Relaxed), asks.load(Ordering::Relaxed)), (4, 2));
+        assert_eq!(
+            (reads.load(Ordering::Relaxed), asks.load(Ordering::Relaxed)),
+            (4, 2)
+        );
     }
 
     /// A `poll_interval` is a floor: the least time between one read and the
@@ -1205,8 +1211,16 @@ vehicle:
         let moved = system.pass(start + Duration::from_millis(100));
         assert_eq!(moved.delivered, 0, "{moved:?}");
         assert!(moved.all_delivered(), "and nothing is reported: {moved:?}");
-        assert_eq!(asks.load(Ordering::Relaxed), 1, "a stopped node is not asked either");
-        assert_eq!(readings.lock().expect("the record").len(), 1, "the reading was not taken");
+        assert_eq!(
+            asks.load(Ordering::Relaxed),
+            1,
+            "a stopped node is not asked either"
+        );
+        assert_eq!(
+            readings.lock().expect("the record").len(),
+            1,
+            "the reading was not taken"
+        );
         assert_eq!(arrived.lock().expect("the record").len(), 1);
 
         // And with the other end stopped instead, the reading is taken and the
@@ -1224,7 +1238,11 @@ vehicle:
             "dropped is not refused: a node the ground stopped is the \
              configuration working as asked and not a fault: {moved:?}"
         );
-        assert_eq!(arrived.lock().expect("the record").len(), 1, "nothing new arrived");
+        assert_eq!(
+            arrived.lock().expect("the record").len(),
+            1,
+            "nothing new arrived"
+        );
 
         // Started again, it moves what it moves.
         states.named("average").expect("the computation").enable();
@@ -1315,7 +1333,12 @@ vehicle:
         let samples = states.named("asked").expect("the node").samples();
         assert_eq!(samples.taken.data(), b"warm");
         assert_eq!(
-            states.named("average").expect("the node").samples().given.data(),
+            states
+                .named("average")
+                .expect("the node")
+                .samples()
+                .given
+                .data(),
             b"warm"
         );
 
@@ -1387,7 +1410,11 @@ vehicle:
         )
         .expect("it opens");
 
-        assert_eq!(opens.load(Ordering::Relaxed), 2, "both nodes were opened at startup");
+        assert_eq!(
+            opens.load(Ordering::Relaxed),
+            2,
+            "both nodes were opened at startup"
+        );
         let states = system.states();
 
         // Stopped, as the command interpreter stops it, and then released as
@@ -1452,9 +1479,7 @@ vehicle:
         let mut system = System::of_opening(
             &graph,
             start,
-            |_: &Node, _: &Routes, _: &Abandon| {
-                Ok(Box::new(Ground::default()) as Box<dyn Port>)
-            },
+            |_: &Node, _: &Routes, _: &Abandon| Ok(Box::new(Ground::default()) as Box<dyn Port>),
             |_: &Telemetered| Ok(Box::new(Ground::default()) as Box<dyn Port>),
         )
         .expect("it opens");
@@ -1502,7 +1527,8 @@ vehicle:
             self.sensors
                 .get(name)
                 .unwrap_or_else(|| panic!("there is no sensor called \"{name}\" here"))
-                .lock().expect("the record")
+                .lock()
+                .expect("the record")
                 .push(datum.to_vec());
         }
     }
@@ -1551,23 +1577,23 @@ vehicle:
             &graph,
             now,
             move |node: &Node, routes: &Routes, abandon: &Abandon| {
-            match node.node_type.as_str() {
-                // The nodes that would touch hardware.
-                "i2c" | "spi" => Ok(Box::new(Sensor {
-                    readings: opening_sensors
-                        .get(&node.name)
-                        .map_or_else(kept, Arc::clone),
-                }) as Box<dyn Port>),
-                "gpio" => Ok(Box::new(Ground {
-                    got: Arc::clone(&opening_heaters),
-                }) as Box<dyn Port>),
-                "moc" => Ok(Box::new(Ground {
-                    got: Arc::clone(&opening_ground),
-                }) as Box<dyn Port>),
-                // And the ones that need nothing but a configuration, which
-                // are opened for real.
-                _ => open(node, routes, abandon),
-            }
+                match node.node_type.as_str() {
+                    // The nodes that would touch hardware.
+                    "i2c" | "spi" => Ok(Box::new(Sensor {
+                        readings: opening_sensors
+                            .get(&node.name)
+                            .map_or_else(kept, Arc::clone),
+                    }) as Box<dyn Port>),
+                    "gpio" => Ok(Box::new(Ground {
+                        got: Arc::clone(&opening_heaters),
+                    }) as Box<dyn Port>),
+                    "moc" => Ok(Box::new(Ground {
+                        got: Arc::clone(&opening_ground),
+                    }) as Box<dyn Port>),
+                    // And the ones that need nothing but a configuration, which
+                    // are opened for real.
+                    _ => open(node, routes, abandon),
+                }
             },
             // What goes to the ground, watched rather than sent: there is no
             // ground station here to bind the other end. A line drawn into the
@@ -1622,14 +1648,15 @@ vehicle:
         // means rather than as four bytes.
         let to_ground: Vec<String> = vehicle
             .ground
-            .lock().expect("the record")
+            .lock()
+            .expect("the record")
             .iter()
-            .map(|datum| {
-                match crate::node::vehicle::compute::from_value(datum, "the ground") {
+            .map(
+                |datum| match crate::node::vehicle::compute::from_value(datum, "the ground") {
                     Ok(number) => format!("{number}"),
                     Err(_) => String::from_utf8_lossy(datum).to_string(),
-                }
-            })
+                },
+            )
             .collect();
         assert_eq!(
             to_ground,
@@ -1696,7 +1723,10 @@ vehicle:
         assert_eq!(system.polled(), ["sensor"], "it is read, being in no group");
         let moved = system.pass(Instant::now());
         assert!(moved.all_delivered(), "{:?}", moved.refused);
-        assert_eq!(sent.lock().expect("the record").clone(), vec![b"reading 1".to_vec()]);
+        assert_eq!(
+            sent.lock().expect("the record").clone(),
+            vec![b"reading 1".to_vec()]
+        );
     }
 
     /// The group is read on its interval and not before.
@@ -1755,7 +1785,10 @@ vehicle:
         let start = Instant::now();
         let mut vehicle = vehicle(start, &[]);
 
-        assert_eq!(vehicle.system.set("thermostat", "setpoint", b"300.0"), Ok(()));
+        assert_eq!(
+            vehicle.system.set("thermostat", "setpoint", b"300.0"),
+            Ok(())
+        );
         assert!(vehicle
             .system
             .set("thermostat", "above", b"5.0")
@@ -1774,18 +1807,23 @@ vehicle:
         let graph =
             Graph::load(root.join("tests/manual/thermostat.yaml")).expect("the example reads");
 
-        let refused = System::of_opening(&graph, Instant::now(), |node, routes, abandon| {
-            if node.node_type == "i2c" {
-                return Err(format!("{}: /dev/i2c-1 is not there", node.name));
-            }
-            if node.node_type == "log" {
-                return Err(format!("{}: /var/log/tcspecial is not there", node.name));
-            }
-            match node.node_type.as_str() {
-                "spi" | "gpio" | "moc" => Ok(Box::new(Ground::default()) as Box<dyn Port>),
-                _ => open(node, routes, abandon),
-            }
-        }, |_link| Ok(Box::new(Ground::default()) as Box<dyn Port>))
+        let refused = System::of_opening(
+            &graph,
+            Instant::now(),
+            |node, routes, abandon| {
+                if node.node_type == "i2c" {
+                    return Err(format!("{}: /dev/i2c-1 is not there", node.name));
+                }
+                if node.node_type == "log" {
+                    return Err(format!("{}: /var/log/tcspecial is not there", node.name));
+                }
+                match node.node_type.as_str() {
+                    "spi" | "gpio" | "moc" => Ok(Box::new(Ground::default()) as Box<dyn Port>),
+                    _ => open(node, routes, abandon),
+                }
+            },
+            |_link| Ok(Box::new(Ground::default()) as Box<dyn Port>),
+        )
         .expect_err("a vehicle whose bus is missing");
 
         assert_eq!(refused.len(), 3, "{refused:?}");

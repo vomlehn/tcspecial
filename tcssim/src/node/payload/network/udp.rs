@@ -13,8 +13,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, ignore_this_request, lateness, send_in_segments, wait_out_packet, wait_while_running, Pacing,
-    PayloadConfig, PayloadStats, Produce,
+    a_packet, ignore_this_request, lateness, send_in_segments, wait_out_packet, wait_while_running,
+    Pacing, PayloadConfig, PayloadStats, Produce,
 };
 
 /// Run a simulated device reached over UDP.
@@ -35,7 +35,11 @@ use crate::payload::{
 /// is not there is reported: a send to a port nothing is bound to comes back
 /// refused instead of being quietly dropped, and the failed sends are what
 /// the window shows as nothing moving.
-pub fn run_udp_node(config: PayloadConfig, running: Arc<AtomicBool>, stats: Arc<std::sync::Mutex<PayloadStats>>) {
+pub fn run_udp_node(
+    config: PayloadConfig,
+    running: Arc<AtomicBool>,
+    stats: Arc<std::sync::Mutex<PayloadStats>>,
+) {
     let handler = format!("{}:{}", config.address, config.port);
 
     // A heater is the other way round. It sends nothing -- being driven is the
@@ -68,12 +72,18 @@ pub fn run_udp_node(config: PayloadConfig, running: Arc<AtomicBool>, stats: Arc<
     let socket = match UdpSocket::bind(&mine) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("{}: failed to bind the UDP device at {}: {}", config.name, mine, e);
+            eprintln!(
+                "{}: failed to bind the UDP device at {}: {}",
+                config.name, mine, e
+            );
             return;
         }
     };
     if let Err(e) = socket.connect(&handler) {
-        eprintln!("{}: failed to reach the handler at {}: {}", config.name, handler, e);
+        eprintln!(
+            "{}: failed to reach the handler at {}: {}",
+            config.name, handler, e
+        );
         return;
     }
 
@@ -109,8 +119,8 @@ pub fn run_udp_node(config: PayloadConfig, running: Arc<AtomicBool>, stats: Arc<
         // datagram, so a packet in four segments arrives as four reads at the
         // handler.
         if pacing.a_packet_is_due(config.triggered, asked)
-                && !ignore_this_request(&config, &mut rng)
-            {
+            && !ignore_this_request(&config, &mut rng)
+        {
             let late = lateness(&config, &mut rng);
             let packet = match a_packet(&config, &pacing, sent, &mut rng) {
                 Produce::Send(packet) => packet,
@@ -141,7 +151,6 @@ pub fn run_udp_node(config: PayloadConfig, running: Arc<AtomicBool>, stats: Arc<
         wait_out_packet(&pacing, started, &running);
     }
 }
-
 
 /// Stand in for a payload the vehicle drives and never reads.
 ///
@@ -208,10 +217,10 @@ fn run_driven_udp_node(
 mod tests {
     use super::*;
     use crate::payload::{PayloadProtocol, SimulatedPayload};
-    use tcslibgs::Faults;
     use std::sync::atomic::AtomicU32;
-    use tcslibgs::Timestamp;
     use std::time::Duration;
+    use tcslibgs::Faults;
+    use tcslibgs::Timestamp;
 
     /// A UDP device sends because it is running, not because it was asked.
     ///
@@ -236,7 +245,7 @@ mod tests {
 
         let mut device = SimulatedPayload::new(PayloadConfig {
             thermal: None,
-                        name: "DH0".to_string(),
+            name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: at.ip().to_string(),
             port: at.port(),
@@ -251,7 +260,7 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(5)),
             packet_interval_ms: Arc::new(AtomicU32::new(200)),
             segment_interval_ms: Arc::new(AtomicU32::new(40)),
-                    triggered: false,
+            triggered: false,
         });
         device.start().expect("the device starts");
 
@@ -309,7 +318,7 @@ mod tests {
     ) -> SimulatedPayload {
         SimulatedPayload::new(PayloadConfig {
             thermal: None,
-                        name: "DH0".to_string(),
+            name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: at.ip().to_string(),
             port: at.port(),
@@ -332,7 +341,9 @@ mod tests {
     fn handler_end(wait: Duration) -> (UdpSocket, std::net::SocketAddr) {
         let handler = UdpSocket::bind("127.0.0.1:0").expect("a socket for the handler");
         let at = handler.local_addr().expect("its address");
-        handler.set_read_timeout(Some(wait)).expect("a read timeout");
+        handler
+            .set_read_timeout(Some(wait))
+            .expect("a read timeout");
         (handler, at)
     }
 
@@ -410,7 +421,8 @@ mod tests {
         device.stop();
 
         assert_eq!(
-            from.port(), mine,
+            from.port(),
+            mine,
             "the device answered from {} rather than the {mine} it was given",
             from.port()
         );
@@ -439,9 +451,7 @@ mod tests {
             let sample = device.stats().last_sent;
             match sample.time {
                 Some(_) => break sample,
-                None if Instant::now() < deadline => {
-                    std::thread::sleep(Duration::from_millis(10))
-                }
+                None if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(10)),
                 None => panic!("a packet arrived and nothing recorded when"),
             }
         };
@@ -462,7 +472,11 @@ mod tests {
             "a packet of twelve bytes was sampled as {} bytes",
             sent.total
         );
-        assert_eq!(&buf[..sent.data().len()], sent.data(), "the sample is not the bytes that arrived");
+        assert_eq!(
+            &buf[..sent.data().len()],
+            sent.data(),
+            "the sample is not the bytes that arrived"
+        );
         assert!(
             device.stats().last_recv.is_empty(),
             "nothing was sent to this device, so it has no received line"
@@ -492,9 +506,7 @@ mod tests {
             let sample = device.stats().last_recv;
             match sample.time {
                 Some(_) => break sample,
-                None if Instant::now() < deadline => {
-                    std::thread::sleep(Duration::from_millis(10))
-                }
+                None if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(10)),
                 None => panic!("the device was spoken to and recorded no time"),
             }
         };
@@ -643,7 +655,7 @@ mod tests {
 
         let mut device = SimulatedPayload::new(PayloadConfig {
             thermal: None,
-                        name: "DH0".to_string(),
+            name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: at.ip().to_string(),
             port: at.port(),
@@ -658,7 +670,7 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(8)),
             packet_interval_ms: Arc::new(AtomicU32::new(50)),
             segment_interval_ms: Arc::new(AtomicU32::new(50)),
-                    triggered: false,
+            triggered: false,
         });
         device.start().expect("the device starts");
 

@@ -135,7 +135,10 @@ impl Moc {
 
     /// The nodes whose data arrives here, in the order they are drawn.
     pub fn sources(&self) -> Vec<&str> {
-        self.ports.iter().map(|(source, _)| source.as_str()).collect()
+        self.ports
+            .iter()
+            .map(|(source, _)| source.as_str())
+            .collect()
     }
 
     /// The next datum to arrive from any source, and which source it is from.
@@ -158,14 +161,16 @@ impl Moc {
         };
 
         let ready = loop {
-            let ready =
-                unsafe { libc::poll(fds.as_mut_ptr(), fds.len() as libc::nfds_t, timeout) };
+            let ready = unsafe { libc::poll(fds.as_mut_ptr(), fds.len() as libc::nfds_t, timeout) };
             if ready >= 0 {
                 break ready;
             }
             let error = std::io::Error::last_os_error();
             if error.kind() != std::io::ErrorKind::Interrupted {
-                return Err(format!("\"{}\": waiting for data failed: {error}", self.name));
+                return Err(format!(
+                    "\"{}\": waiting for data failed: {error}",
+                    self.name
+                ));
             }
         };
         if ready == 0 {
@@ -182,7 +187,10 @@ impl Moc {
             let (source, socket) = &self.ports[at];
             let mut datum = vec![0u8; DATUM_BYTES];
             let got = socket.recv(&mut datum).map_err(|e| {
-                format!("\"{}\": reading what \"{source}\" sent failed: {e}", self.name)
+                format!(
+                    "\"{}\": reading what \"{source}\" sent failed: {e}",
+                    self.name
+                )
             })?;
             datum.truncate(got);
             self.next = (at + 1) % count;
@@ -292,7 +300,9 @@ payloads:
         assert_eq!(ground.sources(), vec!["sensor"]);
 
         let vehicle = UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
-        vehicle.send_to(b"reading", ("127.0.0.1", port)).expect("sent");
+        vehicle
+            .send_to(b"reading", ("127.0.0.1", port))
+            .expect("sent");
         let received = ground
             .receive(Some(Duration::from_secs(5)))
             .expect("it reads")

@@ -184,7 +184,10 @@ mod tests {
 
         let mut buffer = [0u8; 64];
         let got = endpoint.read(&mut buffer).expect("the samples are read");
-        assert_eq!(&buffer[..got], &[0x01, 0x00, 0x02, 0x00, 0x03, 0x00, 0x04, 0x00]);
+        assert_eq!(
+            &buffer[..got],
+            &[0x01, 0x00, 0x02, 0x00, 0x03, 0x00, 0x04, 0x00]
+        );
     }
 
     /// A write says what an IIO device is rather than failing at a

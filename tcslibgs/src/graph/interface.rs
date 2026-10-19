@@ -40,7 +40,15 @@ mod tests {
             assert!(!sends(quiet), "{quiet}");
         }
         for talking in [
-            "network", "serial", "hdlc", "can", "rpmsg", "iio", "gpio", "app_pl", "app_all_pl",
+            "network",
+            "serial",
+            "hdlc",
+            "can",
+            "rpmsg",
+            "iio",
+            "gpio",
+            "app_pl",
+            "app_all_pl",
         ] {
             assert!(sends(talking), "{talking}");
         }

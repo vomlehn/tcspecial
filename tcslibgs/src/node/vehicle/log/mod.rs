@@ -60,8 +60,7 @@ impl LogFormat {
     pub fn of(text: &str) -> Result<LogFormat, String> {
         if let Some(rest) = text.strip_prefix("fixed") {
             let length = rest.trim_start().strip_prefix(':').ok_or_else(|| {
-                "format: a fixed-length log says how long: fixed:<n>, as in fixed:16"
-                    .to_string()
+                "format: a fixed-length log says how long: fixed:<n>, as in fixed:16".to_string()
             })?;
             let length: u32 = length.trim().parse().map_err(|_| {
                 format!(
@@ -70,9 +69,7 @@ impl LogFormat {
                 )
             })?;
             if length == 0 {
-                return Err(
-                    "format: fixed:0 is a log of records with nothing in them".to_string()
-                );
+                return Err("format: fixed:0 is a log of records with nothing in them".to_string());
             }
             return Ok(LogFormat::Fixed(length));
         }
@@ -116,10 +113,7 @@ pub struct LogParams {
 /// nothing reads is refused rather than ignored, because a log whose `fromat`
 /// was misspelled would be opened in whichever format the default happens to
 /// be and would look exactly like a configured log.
-pub fn params_of(
-    what: &str,
-    attributes: &BTreeMap<String, Scalar>,
-) -> Result<LogParams, String> {
+pub fn params_of(what: &str, attributes: &BTreeMap<String, Scalar>) -> Result<LogParams, String> {
     for attribute in attributes.keys() {
         match attribute.as_str() {
             "directory" | "format" | "segment_bytes" => {}
@@ -198,7 +192,10 @@ mod tests {
     /// The three formats, as a file spells them.
     #[test]
     fn the_formats_are_read_as_a_file_writes_them() {
-        assert_eq!(LogFormat::of("variable_simple"), Ok(LogFormat::VariableSimple));
+        assert_eq!(
+            LogFormat::of("variable_simple"),
+            Ok(LogFormat::VariableSimple)
+        );
         assert_eq!(LogFormat::of("variable_ts_rc"), Ok(LogFormat::VariableTsRc));
         assert_eq!(LogFormat::of("fixed:16"), Ok(LogFormat::Fixed(16)));
         // However much space somebody left around the colon.
@@ -269,7 +266,11 @@ mod tests {
             (vec![("format", "variable_simple")], "directory"),
             (vec![("directory", "/tmp")], "format"),
             (
-                vec![("directory", "/tmp"), ("format", "variable_simple"), ("fromat", "x")],
+                vec![
+                    ("directory", "/tmp"),
+                    ("format", "variable_simple"),
+                    ("fromat", "x"),
+                ],
                 "fromat",
             ),
             (
@@ -289,8 +290,8 @@ mod tests {
                 "segment_bytes",
             ),
         ] {
-            let said = params_of("housekeeping", &attributes(&stated))
-                .expect_err("a log that is wrong");
+            let said =
+                params_of("housekeeping", &attributes(&stated)).expect_err("a log that is wrong");
             assert!(
                 said.contains(wanted),
                 "the complaint should say {wanted}: {said}"

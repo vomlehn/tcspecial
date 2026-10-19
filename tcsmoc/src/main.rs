@@ -2,11 +2,10 @@
 //!
 //! A GUI application for testing and visualizing tcspecial operation.
 
-
 use slint::{LogicalSize, Model, ModelRc, SharedString, VecModel};
 use std::env;
 use std::path::Path;
-use std::process::{Child, Command, exit};
+use std::process::{exit, Child, Command};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -26,7 +25,6 @@ mod config;
 mod oc_link;
 mod vehicle;
 
-
 /// What the window's status line says about the link to the command
 /// interpreter.
 ///
@@ -37,9 +35,6 @@ mod vehicle;
 pub(crate) const CONNECTED_STATUS: &str = "Connected";
 pub(crate) const DISCONNECTED_STATUS: &str = "Disconnected";
 pub(crate) const ERROR_STATUS: &str = "Error";
-
-
-
 
 /// The programs the MOC starts.
 ///
@@ -184,9 +179,7 @@ fn rows_of_room(rows: usize, panels: usize) -> usize {
 /// opens with.
 fn height_for_rows(sizes: &Sizes, rows: usize) -> f32 {
     let rows = rows.max(1);
-    rows as f32 * sizes.panel_height
-        + (rows - 1) as f32 * sizes.grid_spacing
-        + sizes.chrome_height
+    rows as f32 * sizes.panel_height + (rows - 1) as f32 * sizes.grid_spacing + sizes.chrome_height
 }
 
 /// The size the window opens at for a grid of `shape` holding `panels`.
@@ -294,12 +287,12 @@ fn grid_shape(sizes: &Sizes, panels: usize) -> GridShape {
         // panel and the next, and a window as wide as its panels alone put the
         // last column's buttons over the edge -- thirty pixels for the padding
         // that was allowed for, and twenty more for two gaps that were not.
-        width: sizes.width_for_columns(columns).max(min_window_width(sizes)),
+        width: sizes
+            .width_for_columns(columns)
+            .max(min_window_width(sizes)),
         height: height_for_rows(sizes, rows),
     }
 }
-
-
 
 /// Which simulator file goes with this payload set, if it has one.
 ///
@@ -384,15 +377,6 @@ fn stop(startup: &Startup) -> ! {
     exit(1);
 }
 
-
-
-
-
-
-
-
-
-
 /// Put what the ground received into the panels.
 ///
 /// What no command asked for: the listeners in [`oc_link`] put it where this
@@ -430,7 +414,6 @@ fn show_arrivals(dh_model: &Rc<VecModel<DHInfo>>, arrivals: &Arrivals) {
         });
     }
 }
-
 
 /// Change one panel's contents, leaving the rest of it alone.
 ///
@@ -603,11 +586,9 @@ fn ask_for_the_edge(ui: &MainWindow, edge: Edge) {
         move || {
             let Some(ui) = ui_weak.upgrade() else { return };
             let window = ui.window();
-            if let Some(y) = tcslibgs::display::top_of(
-                edge,
-                tcslibgs::screen_height(),
-                window.size().height,
-            ) {
+            if let Some(y) =
+                tcslibgs::display::top_of(edge, tcslibgs::screen_height(), window.size().height)
+            {
                 window.set_position(slint::PhysicalPosition::new(0, y));
             }
         },
@@ -617,24 +598,11 @@ fn ask_for_the_edge(ui: &MainWindow, edge: Edge) {
     std::mem::forget(timer);
 }
 
-
-
-
 /// How often the panels are repainted from what has arrived.
 ///
 /// Nothing is sent to the spacecraft on this timer; see [`crate::freshness`]
 /// for what it replaced and why.
 const PANEL_REFRESH_INTERVAL: Duration = Duration::from_millis(1000);
-
-
-
-
-
-
-
-
-
-
 
 /// Which payloads the operator has turned off, one flag per panel.
 ///
@@ -643,9 +611,6 @@ const PANEL_REFRESH_INTERVAL: Duration = Duration::from_millis(1000);
 /// reads it is the asking done when contact returns: a payload somebody
 /// stopped is not a payload to go asking the spacecraft about.
 pub type Declined = Arc<Mutex<Vec<bool>>>;
-
-
-
 
 // Quit button handler
 fn handle_quit(
@@ -658,7 +623,7 @@ fn handle_quit(
     });
 }
 
-    // Window close handler (close box)
+// Window close handler (close box)
 fn handle_close(
     ui: &MainWindow,
     pm_tcssim: Arc<ProcessManager>,
@@ -837,9 +802,6 @@ mod tests {
         all.into_iter()
     }
 
-
-
-
     /// The room the window opens with, which is a rule rather than a floor.
     ///
     /// Three rows are looked ahead for, so a file that grows a row can be
@@ -925,7 +887,12 @@ mod tests {
             let widths: Vec<f32> = ElementHandle::find_by_element_type_name(&ui, "DHPanel")
                 .map(|panel| panel.size().width)
                 .collect();
-            assert_eq!(widths.len(), panels, "{what}: {} panels found", widths.len());
+            assert_eq!(
+                widths.len(),
+                panels,
+                "{what}: {} panels found",
+                widths.len()
+            );
             assert!(
                 widths.iter().all(|w| *w == widths[0]),
                 "{what}: the panels are {widths:?} wide"
@@ -949,9 +916,7 @@ mod tests {
         use i_slint_backend_testing::ElementHandle;
 
         for panels in [2usize, 3, 4, 5] {
-            let rows: Vec<DHInfo> = (0..panels)
-                .map(|i| a_panel(i, &format!("DH{i}")))
-                .collect();
+            let rows: Vec<DHInfo> = (0..panels).map(|i| a_panel(i, &format!("DH{i}"))).collect();
 
             let ui = MainWindow::new().unwrap();
 
@@ -1018,10 +983,7 @@ mod tests {
             // And the first row is filled before there is a second at all.
             assert_eq!(
                 shape.columns.min(panels),
-                placed
-                    .iter()
-                    .filter(|(_, _, y)| *y == placed[0].2)
-                    .count(),
+                placed.iter().filter(|(_, _, y)| *y == placed[0].2).count(),
                 "{panels} panels in a {}x{} grid: the first row is not full",
                 shape.columns,
                 shape.rows
@@ -1109,7 +1071,12 @@ mod tests {
                     .map(|panel| {
                         let left = panel.absolute_position().x;
                         let top = panel.absolute_position().y;
-                        (left, left + panel.size().width, top, top + panel.size().height)
+                        (
+                            left,
+                            left + panel.size().width,
+                            top,
+                            top + panel.size().height,
+                        )
                     })
                     .collect();
             for button in ElementHandle::find_by_element_type_name(&ui, "Button") {
@@ -1119,12 +1086,14 @@ mod tests {
                 // The command interpreter's own buttons, and Quit, are in no
                 // panel.
                 let Some(&(panel_left, panel_right, _, _)) =
-                    panel_rects.iter().find(|(left_edge, right_edge, top_edge, bottom_edge)| {
-                        left >= *left_edge
-                            && left < *right_edge
-                            && top >= *top_edge
-                            && top < *bottom_edge
-                    })
+                    panel_rects
+                        .iter()
+                        .find(|(left_edge, right_edge, top_edge, bottom_edge)| {
+                            left >= *left_edge
+                                && left < *right_edge
+                                && top >= *top_edge
+                                && top < *bottom_edge
+                        })
                 else {
                     continue;
                 };
@@ -1186,9 +1155,7 @@ mod tests {
             // round -- its rows state heights, so the surplus could only
             // gather at the bottom, which showed as a band under the packet
             // count.
-            for (n, panel) in ElementHandle::find_by_element_type_name(&ui, "DHPanel")
-                .enumerate()
-            {
+            for (n, panel) in ElementHandle::find_by_element_type_name(&ui, "DHPanel").enumerate() {
                 assert!(
                     (panel.size().height - sizes.panel_height).abs() <= 1.0,
                     "{what}: panel {n} is {} tall where a panel wants {}",
@@ -1318,9 +1285,6 @@ mod tests {
         crate::vehicle::tests::pressing_connect_and_enable_commands_the_vehicle();
     }
 
-
-
-
     /// The MOC listens where tcspecial sends, by reading the same files.
     ///
     /// Checked against the shipped configurations rather than a contrived
@@ -1354,9 +1318,11 @@ mod tests {
         // And the two ends are two sockets. One address for both would be a
         // sender bound where the listener is, which is the listener's port
         // taken from it at startup.
-        assert_ne!(mine.send, mine.recv, "the two ends of the beacon link are one");
+        assert_ne!(
+            mine.send, mine.recv,
+            "the two ends of the beacon link are one"
+        );
     }
-
 
     /// Every panel shows what arrived from its payload, and nothing the
     /// spacecraft merely claims.
@@ -1504,7 +1470,6 @@ mod tests {
             "what the beacon said is not on screen: {shown:?}"
         );
     }
-
 
     /// The window size the design document states is the one the rule gives.
     ///
@@ -1658,26 +1623,18 @@ mod tests {
         }
     }
 
-
-
-
-
     /// shown as having brought nothing.
     #[test]
     fn a_panel_counts_what_arrived_at_the_ground() {
         use crate::oc_link::Arrival;
         use tcslibgs::{DHSample, Timestamp};
-        let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(vec![
-            a_panel(0, "DH0"),
-            a_panel(1, "DH1"),
-        ]));
+        let model: Rc<VecModel<DHInfo>> =
+            Rc::new(VecModel::from(vec![a_panel(0, "DH0"), a_panel(1, "DH1")]));
 
         let mut data = DHSample::new();
         data.record(&[0xDE, 0xAD]);
         let arrival = Arrival {
-            at: Timestamp::at(
-                std::time::SystemTime::UNIX_EPOCH + Duration::from_secs(3661),
-            ),
+            at: Timestamp::at(std::time::SystemTime::UNIX_EPOCH + Duration::from_secs(3661)),
             data,
             packets: 5,
             sends_values: false,
@@ -1703,7 +1660,6 @@ mod tests {
         assert_eq!(quiet.oc_time, SharedString::from(NO_TRANSFER_TIME));
     }
 
-
     /// A fresh panel says nothing has arrived from its payload yet.
     ///
     /// The placeholder every other time in the window uses, so a panel that
@@ -1714,7 +1670,6 @@ mod tests {
         assert_eq!(info.oc_time, SharedString::from(NO_TRANSFER_TIME));
         assert!(info.oc_data.is_empty());
     }
-
 
     /// Each child is started on the tcspecial configuration the MOC read, and
     /// told so by argument.
@@ -1786,7 +1741,6 @@ mod tests {
     fn the_moc_starts_tcspecial_and_tcssim() {
         assert_eq!(CHILDREN, ["tcspecial", "tcssim"]);
     }
-
 
     /// The panels and the sources line up by index, which is what lets a
     /// panel's row number name the node it is about.
@@ -1907,7 +1861,6 @@ mod tests {
             );
         }
     }
-
 
     /// An unreadable or empty configuration still produces a window.
     #[test]

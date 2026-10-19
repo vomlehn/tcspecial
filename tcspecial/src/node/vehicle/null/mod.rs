@@ -108,7 +108,10 @@ mod tests {
         let said = through
             .take("through", &mut [0u8; 4])
             .expect_err("it does not fit");
-        assert!(said.contains("through") && said.contains("7 bytes"), "{said}");
+        assert!(
+            said.contains("through") && said.contains("7 bytes"),
+            "{said}"
+        );
         assert!(through.waiting(), "the datum is still here");
 
         let mut buffer = [0u8; 64];

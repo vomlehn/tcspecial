@@ -18,8 +18,8 @@ use std::sync::{Arc, Mutex};
 use nix::poll::PollFlags;
 use tcslibgs::{NetworkConfig, TcsError, TcsResult};
 
-use crate::endpoint::bind_failed;
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
+use crate::endpoint::bind_failed;
 use crate::endpoint::{
     wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable, WaitResult,
 };
@@ -98,11 +98,7 @@ impl UdpEndpoint {
     ///
     /// For a link whose far end is written down: a payload's ground link, both
     /// ends of which come out of `payload_telemetry`. `dest` is that far end.
-    pub fn sending_to(
-        what: &str,
-        config: &NetworkConfig,
-        dest: &NetworkConfig,
-    ) -> TcsResult<Self> {
+    pub fn sending_to(what: &str, config: &NetworkConfig, dest: &NetworkConfig) -> TcsResult<Self> {
         let told = format!("{}:{}", dest.address, dest.port)
             .parse::<SocketAddr>()
             .map_err(|e| {
@@ -115,11 +111,7 @@ impl UdpEndpoint {
         Self::bound(what, config, Some(told))
     }
 
-    fn bound(
-        what: &str,
-        config: &NetworkConfig,
-        told: Option<SocketAddr>,
-    ) -> TcsResult<Self> {
+    fn bound(what: &str, config: &NetworkConfig, told: Option<SocketAddr>) -> TcsResult<Self> {
         let addr = format!("{}:{}", config.address, config.port);
         let socket = UdpSocket::bind(&addr)
             .map_err(|e| bind_failed(&format!("{what} UDP endpoint"), &addr, e))?;
@@ -160,7 +152,6 @@ impl UdpEndpoint {
     pub fn peer(&self) -> Option<SocketAddr> {
         self.peer.lock().ok().and_then(|guard| *guard)
     }
-
 }
 
 impl EndpointWaitable for UdpEndpoint {
@@ -275,7 +266,9 @@ mod tests {
         // Read so that the peer is learnt, which is what would have taken the
         // link over before.
         let _ = reading.read(&mut into);
-        writer.write(b"again").expect("it still knows where to send");
+        writer
+            .write(b"again")
+            .expect("it still knows where to send");
         let (size, _) = ground
             .recv_from(&mut buffer)
             .expect("the stranger should not have taken the link");
@@ -414,6 +407,9 @@ mod tests {
             .unwrap();
         let (n, from) = ground.recv_from(&mut buffer).unwrap();
         assert_eq!(&buffer[..n], b"telemetry");
-        assert_eq!(from, addr, "the answer came from the address the ground sent to");
+        assert_eq!(
+            from, addr,
+            "the answer came from the address the ground sent to"
+        );
     }
 }

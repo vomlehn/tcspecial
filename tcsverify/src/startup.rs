@@ -122,7 +122,10 @@ mod tests {
         let mut startup = Startup::default();
         startup.report(&warned, true);
         assert!(!startup.fatal());
-        assert_eq!(startup.lines(), &[(false, "a.yaml:1: warning: wrong".to_string())]);
+        assert_eq!(
+            startup.lines(),
+            &[(false, "a.yaml:1: warning: wrong".to_string())]
+        );
 
         let mut wrong = Report::default();
         wrong.findings.push(finding("a.yaml", Severity::Error));

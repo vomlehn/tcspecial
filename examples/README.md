@@ -12,14 +12,6 @@ ground station. An example may hold a ground program without holding a
 payload: `beacon` does, its ground station watching something tcspecial sends
 on its own account, and so does `ping`, whose ground station is Python 3.
 
-| Directory | Description |
-|---|---|
-| `minimal` | The smallest working configuration: one UDP payload whose telemetry goes straight to the ground (MOC). |
-| `thermostat` | Three temperature sensors (I2C and SPI), converted to kelvin, averaged, and fed to a hysteresis thermostat that drives GPIO heaters. The setpoint is commanded from the ground. |
-| `simple-app` | A payload that is a program rather than a device: an `app_pl` node sending a line of text one word per packet, and a ground station that prints the line. Two programs of its own beside the configuration: the payload in Python 3, the ground station in Rust. |
-| `beacon` | The one thing a ground station knows without asking: a window showing the spacecraft's beacon, built from the two halves any ground station would use -- `tcslib::beacon` to listen and `tcsui`'s panel to show it. |
-| `ping` | The ground pings a `ping` vehicle node and times the answer: the round trip, and the two halves of it. The ground station is Python 3, with the beacon panel and the halves it is built from written again in Python under `python/`, and tests that hold them to the Rust. |
-
 A configuration and its simulator file are matched by payload name. Every
 data handler in the configuration needs an entry in the simulator file, and
 the simulator file can't name a payload the configuration doesn't have.
@@ -27,8 +19,8 @@ the simulator file can't name a payload the configuration doesn't have.
 The YAML and XML files must say the same thing, so change both together.
 
 Two sets of tests find the examples on their own, so adding one means adding
-its directory here, and a row to the table above; there's no list in the
-tests to update:
+its directory here, and a row to the table of its section below; there's no
+list in the tests to update:
 
 - `tcsverify/tests/examples.rs` runs `tcsverify` on each configuration and its
   simulator file (any error or warning fails), and checks that the YAML and
@@ -42,28 +34,19 @@ tests to update:
 at the top of their row, markdown having no way to say so. `make help` lists
 the targets, including the ones that run tcspecial on each example.
 
-## simple-app
+## Simple examples
 
-The one example that runs end to end on one host, and the one to look at to
-see what an app node is. Two programs, both in `examples/simple-app`:
+Each shows one thing at its simplest: a payload's data reaching the ground,
+the vehicle saying it is alive, the vehicle answering a ping. Start with
+`minimal`, the smallest configuration that does anything.
 
-- `lorem_pl.py` is the payload, a Python 3 program that uses nothing outside
-  the standard library. tcspecial starts it from the configuration, as
-  the `executable` of the `app_pl` node named `lorem`, and runs it with the
-  node's name and `app-payload-arg` -- which for this payload is the line of
-  the text to send, counting from one. It sends one word per packet and then a
-  packet holding the line terminator.
-- `lorem_moc` is the ground station, a Rust program in the crate beside the
-  configuration. It gets `lorem`'s words from the configuration's moc node,
-  `moc-1`, with one function call, `tcslib::moc::Moc::receive`, which works out
-  from the configuration which port they arrive at; it writes out each word
-  with one space between them, and stops when the terminator arrives.
+| Directory | Description |
+|---|---|
+| `minimal` | The smallest working configuration: one UDP payload whose telemetry goes straight to the ground (MOC). |
+| `beacon` | The one thing a ground station knows without asking: a window showing the spacecraft's beacon, built from the two halves any ground station would use -- `tcslib::beacon` to listen and `tcsui`'s panel to show it. |
+| `ping` | The ground pings a `ping` vehicle node and times the answer: the round trip, and the two halves of it. The ground station is Python 3, with the beacon panel and the halves it is built from written again in Python under `python/`, and tests that hold them to the Rust. |
 
-```
-make run-simple-app
-```
-
-## beacon
+### beacon
 
 What a ground station can know about a spacecraft without asking it anything.
 tcspecial sends a beacon every `beacon.interval` for as long as it runs, over
@@ -119,7 +102,7 @@ ipsum text as one array per line, each holding that line's words. Nothing
 holds a line terminator; the end of a word array is the end of the line, and
 what stands for it on the wire is the one constant both programs read.
 
-## ping
+### ping
 
 The ground sends a ping up to the `moc` node, which hands it to the `ping`
 node; the `ping` node answers with the vehicle's time on the end, and the
@@ -156,3 +139,34 @@ Its ports are all in the seven thousands, which no other example uses.
 tcsmoc pings it too: `make runmocy TCSPECIAL_CONFIG_FILE=examples/ping/ping`,
 then the `Ping node` button beside `Command`. It is the same panel, kept by
 `tcslib::ping`, which `ping_ground.py` is written after.
+
+## More complex examples
+
+Each puts the vehicle to work on its payloads: what they send, and what is done
+with it aboard and on the ground.
+
+| Directory | Description |
+|---|---|
+| `thermostat` | Three temperature sensors (I2C and SPI), converted to kelvin, averaged, and fed to a hysteresis thermostat that drives GPIO heaters. The setpoint is commanded from the ground. |
+| `simple-app` | A payload that is a program rather than a device: an `app_pl` node sending a line of text one word per packet, and a ground station that prints the line. Two programs of its own beside the configuration: the payload in Python 3, the ground station in Rust. |
+
+### simple-app
+
+The one example that runs end to end on one host, and the one to look at to
+see what an app node is. Two programs, both in `examples/simple-app`:
+
+- `lorem_pl.py` is the payload, a Python 3 program that uses nothing outside
+  the standard library. tcspecial starts it from the configuration, as
+  the `executable` of the `app_pl` node named `lorem`, and runs it with the
+  node's name and `app-payload-arg` -- which for this payload is the line of
+  the text to send, counting from one. It sends one word per packet and then a
+  packet holding the line terminator.
+- `lorem_moc` is the ground station, a Rust program in the crate beside the
+  configuration. It gets `lorem`'s words from the configuration's moc node,
+  `moc-1`, with one function call, `tcslib::moc::Moc::receive`, which works out
+  from the configuration which port they arrive at; it writes out each word
+  with one space between them, and stops when the terminator arrives.
+
+```
+make run-simple-app
+```

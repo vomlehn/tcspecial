@@ -1237,7 +1237,8 @@ pub(crate) mod tests {
         let at = vehicle.local_addr().expect("where it is").to_string();
         // What the stub was asked to set, so the test can say the typed
         // attribute and value are what went out.
-        let was_set: Arc<Mutex<Option<(String, Vec<u8>)>>> = Arc::new(Mutex::new(None));
+        type Setting = (String, Vec<u8>);
+        let was_set: Arc<Mutex<Option<Setting>>> = Arc::new(Mutex::new(None));
         let setting = was_set.clone();
         let answering = std::thread::spawn(move || {
             let mut buffer = [0u8; 65535];

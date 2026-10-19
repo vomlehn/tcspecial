@@ -6308,7 +6308,8 @@ mod tests {
         // Everything on the canvas, each tagged with the panel whose ramp it
         // belongs to -- or none, for the panes and the lines, which belong to
         // no ramp.
-        let mut scheme: Vec<(String, Option<Pane>, (u8, u8, u8))> = Vec::new();
+        type Rgb = (u8, u8, u8);
+        let mut scheme: Vec<(String, Option<Pane>, Rgb)> = Vec::new();
         for pane in [Pane::Moc, Pane::Vehicle, Pane::Payloads] {
             scheme.push((
                 format!("the {} pane", pane.label()),

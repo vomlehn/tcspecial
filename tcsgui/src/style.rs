@@ -1614,7 +1614,8 @@ mod tests {
     /// merely in line with it: a dash is a piece of a side, so both ends of it
     /// have to be between the side's own ends.
     fn on_edge(points: &[(f32, f32)], (x, y): (f32, f32), closes: bool) -> bool {
-        let mut sides: Vec<(&(f32, f32), &(f32, f32))> =
+        type Point = (f32, f32);
+        let mut sides: Vec<(&Point, &Point)> =
             points.windows(2).map(|p| (&p[0], &p[1])).collect();
         if closes {
             sides.push((&points[points.len() - 1], &points[0]));

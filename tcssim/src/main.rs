@@ -296,6 +296,11 @@ fn thermal_masses(
     Ok(attached)
 }
 
+/// What [`load`] reads out of the pair: the handlers the simulator stands in
+/// for, the simulator file, its settings resolved against them, and the
+/// payloads' own configurations.
+type Loaded = (Vec<DHConfig>, SimConfigFile, Vec<ResolvedSim>, Vec<PayloadConfig>);
+
 /// Read the pair, once tcsverify has found nothing wrong with it, and say in
 /// `startup` whatever stops it being simulated.
 ///
@@ -309,7 +314,7 @@ fn load(
     payload_path: &str,
     sim_path: &str,
     startup: &mut Startup,
-) -> Option<(Vec<DHConfig>, SimConfigFile, Vec<ResolvedSim>, Vec<PayloadConfig>)> {
+) -> Option<Loaded> {
     let sim_file = match SimConfigFile::load(sim_path) {
         Ok(sim_file) => sim_file,
         Err(e) => {

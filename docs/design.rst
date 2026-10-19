@@ -3603,8 +3603,8 @@ What node types there are is data rather than code in the editor. A node type
 arrives as two files: Rust in tcspecial, and a description tcsgui reads.
 
 Two trees with one structure, family by family. A description at
-``vehicle/compute/mean.yaml`` has its Rust at
-``tcspecial/src/node/vehicle/compute/mean.rs``; one at ``payload/i2c.yaml``
+``vehicle/compute/vote.yaml`` has its Rust at
+``tcspecial/src/node/vehicle/compute/vote.rs``; one at ``payload/i2c.yaml``
 has ``node/payload/i2c/``, a directory with as many files under it as it takes.
 ``moc.yaml`` sits at the root of the tree because the ground station has no
 Rust of its own: it is the other end of the link rather than part of the
@@ -4712,32 +4712,33 @@ the project does, so either may be written in YAML or XML; see `Configuration
 Files`_. The shipped one is YAML because that is what the rest of the
 project's configuration is written in.
 
-This is the shipped ``tcspecial/src/tcspecial.yaml``:
+This is the ``tcspecial`` section of the shipped ``tests/manual/thermostat.yaml``:
 
 .. code-block:: yaml
 
-   tcs_cmd:
-     recv: "0.0.0.0:4000"
-     send: "127.0.0.1:4100"
-   payload_command:
-     source_base: "127.0.0.1:4300"
-     dest_base: "0.0.0.0:4200"
-   payload_telemetry:
-     source_base: "0.0.0.0:6000"
-     dest_base: "127.0.0.1:6100"
-   beacon:
-     interval: "5 s"
-     send: "0.0.0.0:5550"
-     recv: "127.0.0.1:5650"
-   log:
-     directory: telemetry
-     segment_size: 65536
+   tcspecial:
+     beacon:
+       interval: "5 s"
+       recv: "127.0.0.1:5650"
+       send: "0.0.0.0:5550"
+     log:
+       directory: "/var/log/tcspecial"
+       segment_size: "65536"
+     payload_command:
+       dest_base: "0.0.0.0:4200"
+       source_base: "127.0.0.1:4300"
+     payload_telemetry:
+       dest_base: "127.0.0.1:6100"
+       source_base: "0.0.0.0:6000"
+     tcs_cmd:
+       recv: "0.0.0.0:4000"
+       send: "127.0.0.1:4100"
 
 ``tcs_cmd.recv`` is where the command interpreter binds for commands about the
 spacecraft, which is where the ground sends them; ``payload_command`` is the
-two ends of a payload's own command link, counted on by that payload's id; and
+two ends of the link commands about nodes take, one socket for every node; and
 ``beacon.send`` and ``beacon.recv`` are the two ends of the beacon link.
-Every address tcspecial uses is in this file and nowhere else: see
+Every address tcspecial uses is in this section and nowhere else: see
 `Where the Addresses Are`_. The quotes on the addresses are deliberate:
 unquoted, ``0.0.0.0`` is a string in YAML only because it happens not to be a
 number, which is a thin reason to rely on. ``log.directory`` holds the telemetry log's
@@ -7469,40 +7470,12 @@ Requirement
     names.
 
 Requirement
-    Each payload states how long the ground should wait for its data before
-    saying so: ``stale_interval``, in its own entry or in its group. It is
-    read by the ground and by nothing aboard, which is a shape no other
-    attribute in a payload configuration has; it is there because how often a
-    particular instrument has something to say is a property of the
-    instrument, and the same figure is right for whoever is watching.
-
-Requirement
-    Each panel carries a data indicator, shaped like the beacon's and beside
-    the time its payload's last datagram arrived. Grey where the ground has
-    nothing to judge by -- as far as it knows the payload is not enabled, or
-    the payload states no interval; green where data has arrived within that
-    interval; yellow where the payload is enabled and nothing has arrived for
-    longer than it.
-
-    Staleness is measured from the later of the last arrival and the moment
-    the ground came to believe the payload was running, so a payload just
-    enabled has its interval to produce something rather than being late the
-    moment it is switched on. A last arrival in the future is a clock that
-    moved and reads as stale, which is the conservative of the two.
-
-Requirement
-    No red. A payload whose data has stopped may be a payload with nothing to
-    say, a payload somebody stopped, or a link that has failed, and nothing on
-    the ground can tell those apart. Red is for a condition that is dangerous;
-    this is a condition worth looking at.
-
-What is still to be examined about this is written where the rule is, in
-``tcsmoc/src/freshness.rs``: what interval suits a payload that answers
-requests, since its data arrives only when tcspecial asks it; whether
-*enabled* should mean what the ground last commanded or what the spacecraft
-last said, which is a question about a MOC that has just attached to a running
-tcspecial; and whether a payload that states no interval should really look
-like a payload nobody has enabled, both being grey.
+    A panel says when its source's data last arrived and nothing more about
+    whether that was recent enough. Nothing in a configuration states how
+    often a node's data should arrive -- a thermostat's heaters hear from it
+    when a decision changes, which may be hours apart -- so a light that
+    judged it would be a light whose colour means nothing, and one that never
+    changes is worse than none.
 
 Requirement
     Query all still asks the spacecraft directly, and sets both the status and

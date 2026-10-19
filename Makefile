@@ -33,19 +33,15 @@ TCSGUI_DATA := $(DESTDIR)$(PREFIX)/share/$(GUI_NAME)
 
 # The configuration to run, named without a suffix.
 #
-# One variable rather than two, because the files are named for each other:
-# TCSPECIAL_CONFIG_FILE is the stem, `$(TCSPECIAL_CONFIG_FILE).yaml` the
-# configuration -- in YAML or XML -- and `$(TCSPECIAL_CONFIG_FILE)sim.yaml`
-# the simulator settings beside it. So:
-#   make run     TCSPECIAL_CONFIG_FILE=tests/manual/thermostat
-#   make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/thermostat
-#   make runsim  TCSPECIAL_CONFIG_FILE=tests/manual/thermostat
+# TCSPECIAL_CONFIG_FILE is the stem, and `$(TCSPECIAL_CONFIG_FILE).yaml` or
+# `.xml` the configuration. So:
+#   make run     TCSPECIAL_CONFIG_FILE=examples/minimal/minimal
+#   make runmocy TCSPECIAL_CONFIG_FILE=examples/thermostat/thermostat
+#   make runsim  TCSPECIAL_CONFIG_FILE=examples/minimal/minimal
 #
-# It names a configuration to run and is nothing the programs look for. There
-# was a TCSPECIAL_CONFIG_PATH beside it, naming the command interpreter's own
-# settings: a version 1 payload set did not have to say where commands are
-# taken or where beacons go, so a second file answered for it. A version 2
-# configuration must have a `tcspecial` section, so there is one file.
+# It names a configuration to run and is nothing the programs look for. A
+# configuration states where commands are taken and where beacons go in its
+# own `tcspecial` section, so there is one file.
 #
 # Every program takes the configuration file as a command line argument. The
 # simulator file reaches tcssim through the environment: runmocy passes it
@@ -54,9 +50,23 @@ TCSGUI_DATA := $(DESTDIR)$(PREFIX)/share/$(GUI_NAME)
 # tcssim run on its own needs both, and the two must describe the same set or
 # the names will not match.
 #
-# The fixtures live under tests/manual because running one is something a
-# person does at a terminal: each opens sockets or device nodes.
+# The fixture lives under tests/manual because running it is something a
+# person does at a terminal: it opens sockets and device nodes.
 TCSPECIAL_CONFIG_FILE=tests/manual/thermostat
+
+# The simulator settings for that configuration.
+#
+# The file beside it, `<stem>-sim.yaml`, as every example names its own --
+# except for the thermostat fixture, which has none: it is simulated by the
+# example's, which stands in for the same payloads, as SPELLINGS below says.
+# Named rather than worked out by the programs, because tcssim reads it from
+# the environment and a name nothing has is a run with nothing simulated.
+#   make runsim TCSPECIAL_CONFIG_FILE=mine TCSPECIAL_SIM_FILE=mine-bench.yaml
+ifeq ($(TCSPECIAL_CONFIG_FILE),tests/manual/thermostat)
+TCSPECIAL_SIM_FILE ?= examples/thermostat/thermostat-sim.yaml
+else
+TCSPECIAL_SIM_FILE ?= $(TCSPECIAL_CONFIG_FILE)-sim.yaml
+endif
 
 # What the programs log, which every run target passes on. A variable rather
 # than a word in each recipe, so that it can be overridden the way the payload
@@ -184,7 +194,7 @@ define runmoc_on
 	( \
 		set -eu; \
 		echo "Running $(MOC_NAME) on $(basename $(TCSPECIAL_CONFIG_FILE)).$(1)..."; \
-		cd $(RUST) && RUST_LOG=$(RUST_LOG) PAYLOAD_SIM_YAML=$(TCSPECIAL_CONFIG_FILE)sim.yaml cargo run -q --bin tcsmoc -- $(basename $(TCSPECIAL_CONFIG_FILE).$(1)).$(1) \
+		cd $(RUST) && RUST_LOG=$(RUST_LOG) PAYLOAD_SIM_YAML=$(TCSPECIAL_SIM_FILE) cargo run -q --bin tcsmoc -- $(basename $(TCSPECIAL_CONFIG_FILE).$(1)).$(1) \
 	)
 endef
 
@@ -216,7 +226,7 @@ define runverify_on
 	( \
 		set -eu; \
 		echo "Verifying $(basename $(TCSPECIAL_CONFIG_FILE)).$(1)..."; \
-		cd $(RUST) && cargo run -q --bin tcsverify -- $(basename $(TCSPECIAL_CONFIG_FILE).$(1)).$(1) $(TCSPECIAL_CONFIG_FILE)sim.yaml \
+		cd $(RUST) && cargo run -q --bin tcsverify -- $(basename $(TCSPECIAL_CONFIG_FILE).$(1)).$(1) $(TCSPECIAL_SIM_FILE) \
 	)
 endef
 
@@ -246,7 +256,7 @@ runcomparexy:
 	( \
 		set -eu; \
 		echo "Comparing $(TCSPECIAL_CONFIG_FILE).xml with $(TCSPECIAL_CONFIG_FILE).yaml..."; \
-		cd $(RUST) && cargo run -q --bin tcsverify -- $(TCSPECIAL_CONFIG_FILE).xml $(TCSPECIAL_CONFIG_FILE).yaml $(TCSPECIAL_CONFIG_FILE)sim.yaml \
+		cd $(RUST) && cargo run -q --bin tcsverify -- $(TCSPECIAL_CONFIG_FILE).xml $(TCSPECIAL_CONFIG_FILE).yaml $(TCSPECIAL_SIM_FILE) \
 	)
 
 # Every configuration shipped in both spellings, with the simulator file each
@@ -255,8 +265,6 @@ runcomparexy:
 # has no simulator file of its own: it is checked beside the example's, which
 # simulates the same payloads.
 #
-# The four version 1 payload sets were here, each with its own simulator file,
-# and they are gone with version 1.
 SPELLINGS = \
 	tests/manual/thermostat:examples/thermostat/thermostat-sim.yaml \
 	examples/minimal/minimal:examples/minimal/minimal-sim.yaml \
@@ -293,7 +301,7 @@ runsim:
 	( \
 		set -eu; \
 		echo "Running $(SIM_NAME)..."; \
-		cd $(RUST) && RUST_LOG=$(RUST_LOG) PAYLOAD_SIM_YAML=$(TCSPECIAL_CONFIG_FILE)sim.yaml cargo run -q --bin tcssim -- $(TCSPECIAL_CONFIG_FILE).yaml \
+		cd $(RUST) && RUST_LOG=$(RUST_LOG) PAYLOAD_SIM_YAML=$(TCSPECIAL_SIM_FILE) cargo run -q --bin tcssim -- $(TCSPECIAL_CONFIG_FILE).yaml \
 	)
 
 # Make the virtual CAN bus a CAN payload needs.
@@ -554,8 +562,9 @@ install: install-data
 # Install tcsgui's data: the description tree and the schemas.
 #
 # The whole of tcsgui/share, with its structure: the description tree's shape
-# is part of what it means -- a description at compute/mean.yaml is about the
-# Rust at node/compute/mean.rs -- so a flat copy would lose half of it.
+# is part of what it means -- a description at vehicle/compute/vote.yaml is
+# about the Rust at node/vehicle/compute/vote.rs -- so a flat copy would lose
+# half of it.
 #
 # Mode 644 and directories 755: these are read by everybody and written by
 # whoever installed them. A person's own descriptions belong in

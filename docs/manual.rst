@@ -2072,18 +2072,21 @@ so a program
 reading a different one would serve or simulate payloads the panels do not
 describe.
 
-``TCSPECIAL_CONFIG_FILE`` is the set, named without a suffix:
+``TCSPECIAL_CONFIG_FILE`` is the configuration, named without a suffix:
 ``$(TCSPECIAL_CONFIG_FILE).yaml`` is the tcspecial configuration, which
-reaches every program as a command line argument, and
-``$(TCSPECIAL_CONFIG_FILE)sim.yaml`` the simulator configuration,
-which reaches tcssim through the environment -- and tcsmoc too, which it
-inherits the same way: tcsmoc acts on none of it, and reads it only so a panel
-can show what the tcssim it started is simulating. It defaults to
-``tests/manual/tcspecial2``.
+reaches every program as a command line argument. It defaults to
+``tests/manual/thermostat``. ``TCSPECIAL_SIM_FILE`` is the simulator
+configuration, which reaches tcssim through the environment -- and tcsmoc
+too, which it inherits the same way: tcsmoc acts on none of it, and reads it
+only so a panel can show what the tcssim it started is simulating. It
+defaults to the file beside the configuration, ``$(TCSPECIAL_CONFIG_FILE)-sim.yaml``,
+as the examples name theirs; the thermostat fixture has none of its own and
+is simulated by ``examples/thermostat/thermostat-sim.yaml``, which stands in
+for the same payloads.
 
-The sets live under ``tests/manual`` because running one is something a person
-does at a terminal: each opens sockets or device nodes, so none of them belongs
-in a test that runs on every build.
+The fixture lives under ``tests/manual`` because running it is something a
+person does at a terminal: it opens sockets and device nodes, so it does not
+belong in a test that runs on every build.
 
 The two windows open at opposite edges of the display -- tcsmoc at the top and
 tcssim at the bottom -- because they are read together and would otherwise
@@ -2097,9 +2100,8 @@ Everything at once
 .. code-block:: console
 
    $ make runmocy
-   $ make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/thermostat
-   $ make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial2
-   $ make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial4
+   $ make runmocy TCSPECIAL_CONFIG_FILE=examples/minimal/minimal
+   $ make runmocy TCSPECIAL_CONFIG_FILE=examples/thermostat/thermostat
 
 The last letter is the spelling of the tcspecial configuration it reads:
 ``runmocy`` the YAML and ``runmocx`` the XML. Both take the same
@@ -2165,9 +2167,9 @@ tcspecial configuration first, and ``-h`` or ``--help`` prints how:
 
 .. code-block:: console
 
-   $ cargo run --bin tcsverify -- tests/manual/tcspecial2.yaml
-   $ cargo run --bin tcsverify -- tests/manual/tcspecial2.yaml tests/manual/tcspecial2sim.yaml
-   $ cargo run --bin tcsverify -- tests/manual/tcspecial2.xml tests/manual/tcspecial2sim.yaml
+   $ cargo run --bin tcsverify -- examples/minimal/minimal.yaml
+   $ cargo run --bin tcsverify -- examples/minimal/minimal.yaml examples/minimal/minimal-sim.yaml
+   $ cargo run --bin tcsverify -- examples/minimal/minimal.xml examples/minimal/minimal-sim.yaml
 
 Either spelling of the configuration will do -- the last line reads the XML of
 the same set -- and the simulator configuration is named in full rather than
@@ -2335,8 +2337,9 @@ Two links, because what the ground needs in a hurry must never be queued
 behind what it asked for at leisure: a restart waiting behind a payload's
 statistics is a spacecraft that cannot be rescued while it is busy. ``PING``,
 ``RESTART_ARM``, ``RESTART`` and ``CONFIGURE`` go to ``tcs_cmd.recv``;
-``START_DH``, ``STOP_DH``, ``QUERY_DH``, ``QUERY_DH_SAMPLE`` and
-``CONFIGURE_DH`` go to that payload's own socket under ``payload_command``.
+``START_NODE``, ``STOP_NODE``, ``SET_NODE``, ``QUERY_NODE`` and
+``QUERY_NODE_SAMPLE`` go to ``payload_command.dest_base``, one socket for
+every node, the node's id being in the command.
 ``CONNECT`` goes to ``tcs_cmd.recv`` with the rest of the spacecraft's own:
 it asks whether there is a connection to the vehicle at all, and a ground
 station without one has nothing to ask a payload. One table in the library
@@ -2346,13 +2349,13 @@ Both are required, and they must differ -- one socket cannot be two links.
 Nothing else may bind either of them: a payload given port 4000 is refused
 where its file is read, since it would take the commanding with it.
 
-Each link has a loop and a thread of its own, so a payload command that takes
-its time waits for nothing on the other one. tcspecial says where both are as
-it starts:
+The two links are waited on together, so a node command that takes its time
+holds up nothing on the other one. tcspecial says where both are as it starts,
+as the sockets were bound:
 
 .. code-block:: console
 
-   Commands are taken on 0.0.0.0:4000 and payload commands on 0.0.0.0:4001 as tcspecial/src/tcspecial.yaml asked, and beacons go from 0.0.0.0:5550 to 127.0.0.1:5650
+   commands: spacecraft on 0.0.0.0:4000, nodes on 0.0.0.0:4200
 
 A command sent to the wrong one of the two is refused rather than served: it
 means one end is not reading the configuration the other is, and that is the
@@ -2522,18 +2525,15 @@ configured rather than a thing the network did silently.
 programs being run on one machine; a real ground link names the interface
 facing it on each end.
 
-Tcsmoc reads both addresses from the same two files, the same way, so moving a
-beacon moves both ends of it. The command address is the one
-that can still drift: the two ends agree about it by reading the same default,
-so a file that moves it leaves the MOC sending where nothing is bound, and no
-error on either end reports that.
+Tcsmoc reads both addresses from the configuration tcspecial reads, the same
+way, so moving a beacon moves both ends of it -- and so does moving a command
+link, which both ends read from the same ``tcs_cmd`` and ``payload_command``.
 
-Tcspecial says both as it starts, on the terminal and whatever ``RUST_LOG`` is
-set to:
+Tcspecial says both as it starts, on the terminal:
 
 .. code-block:: console
 
-   Commands are taken on 0.0.0.0:4000 and payload commands on 0.0.0.0:4001 as tcspecial/src/tcspecial.yaml asked, and beacons go from 0.0.0.0:5550 to 127.0.0.1:5650
+   5000 ms beacon: 0.0.0.0:5550 to 127.0.0.1:5650
 
 Every beacon carries a configuration version, 2.0, which goes out as three
 bytes and prints as 2.0.0. It is the software's: it says which build is
@@ -2640,9 +2640,9 @@ for a handler nobody can speak for -- which is what the panels say while no
 beacons are arriving.
 
 ``Last recv``
-  When the MOC last received anything from that payload, on the handler's OC
-  address. The MOC's own clock, and read for whether anything is still
-  coming. Beside it is the **data indicator**, below.
+  When the MOC last received anything from that source, on the port its data
+  arrives at. The MOC's own clock, and read for whether anything is still
+  coming: see `When data last arrived`_.
 
 ``From payload``
   What arrived, as the ground received it.
@@ -2666,67 +2666,20 @@ Each panel has three buttons. ``Enable`` and ``Disable`` are described under
 `Starting and stopping a payload`_; ``Configuration`` shows what the files
 said about that handler: see `Seeing what was read`_.
 
-The data indicator
-^^^^^^^^^^^^^^^^^^
-.. note::
-   **Needs examination.** This is a first statement of the rule rather than a
-   settled one; what is unsettled is at the end of this section.
+When data last arrived
+^^^^^^^^^^^^^^^^^^^^^^
+``Last recv`` on each panel is when that source's data last arrived, and the
+panel says nothing more about whether that was recent enough. Nothing in a
+configuration states how often a node's data should arrive -- a node produces
+when something reaches it, and a thermostat that sends only when its decision
+changes may be silent for hours -- so a light that judged it would mean
+nothing, and one that never changed would be worse than none.
 
-Beside ``Last recv`` on each panel is a dot, shaped like the beacon's, saying
-what the ground can say about that payload's data:
-
-grey
-  Nothing to judge by: as far as the ground knows the payload is not enabled,
-  or the payload states no ``stale_interval``.
-
-green
-  Data has arrived from that payload within its interval.
-
-yellow
-  The payload is enabled and nothing has arrived from it for longer than its
-  interval.
-
-There is no red. A payload whose data has stopped may be a payload with
-nothing to say, a payload somebody stopped, or a link that has failed, and
-nothing on the ground can tell those apart; red is for a condition that is
-dangerous, and this is one worth looking at.
-
-How long to wait is the payload's own to say, in its entry or its group:
-
-.. code-block:: yaml
-
-   payloads:
-     - name: auto-send
-       type: network
-       protocol: udp
-       payload_interface: localhost:5000
-       packet_size: 12
-       stale_interval: "3000 ms"
-
-The figure is read by the ground and by nothing aboard. A payload that states
-none is never judged -- its dot stays grey -- because a figure nobody chose
-would make a payload that speaks once an hour look late every minute of it.
-
-Staleness is counted from the later of the last arrival and the moment the
-ground came to believe the payload was running, so a payload just enabled has
-its whole interval to produce something rather than going yellow the instant it
-is switched on.
-
-The MOC asks nothing to work any of this out. An enabled payload sends on its
-own, and its data arrives on that payload's own telemetry socket where the
-ground times it, so the panels are kept current without a command going out.
-There used to be a poller that asked every payload what it was doing once a
-second; for forty payloads that was eighty datagrams a second of housekeeping,
-and the arrivals had already said most of what it learnt. What only the
-spacecraft can say -- its own counters, and whether it has the handler at all
--- is what ``Query all`` is for.
-
-Three things about this are still to be settled: what interval suits a payload
-that answers requests, since its data arrives only when tcspecial asks it;
-whether *enabled* should mean what the ground last commanded or what the
-spacecraft last said, which matters for a MOC that has just attached to a
-tcspecial already running; and whether a payload that states no interval should
-really look like a payload nobody has enabled, both being grey.
+The MOC asks nothing to keep the panels current. Each source's data arrives on
+a port of its own, where the ground times it, so the panels are repainted from
+what has arrived without a command going out. What only the spacecraft can say
+-- a node's own counters, and whether it is running -- is what ``Query all``
+is for.
 
 A triggered payload on the console
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

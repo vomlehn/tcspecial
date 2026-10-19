@@ -600,8 +600,8 @@ fn ask_for_the_edge(ui: &MainWindow, edge: Edge) {
 
 /// How often the panels are repainted from what has arrived.
 ///
-/// Nothing is sent to the spacecraft on this timer; see [`crate::freshness`]
-/// for what it replaced and why.
+/// Nothing is sent to the spacecraft on this timer: what a panel shows is
+/// what has arrived, which the ground has without asking anybody.
 const PANEL_REFRESH_INTERVAL: Duration = Duration::from_millis(1000);
 
 /// Which payloads the operator has turned off, one flag per panel.

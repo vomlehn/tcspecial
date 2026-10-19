@@ -105,6 +105,12 @@ Languages:
 - Vehicle: Rust -- tcspecial.
 - Payload: Rust -- tcssim stands in for `sensor`, a network payload.
 
+Languages:
+
+- MOC: Rust -- `beacon_watch`, on `tcslib::beacon` and `tcsui`.
+- Vehicle: Rust -- tcspecial.
+- Payload: Rust -- tcssim stands in for `sensor`, a network payload.
+
 ### ping
 
 The ground sends a ping up to the `moc` node, which hands it to the `ping`
@@ -153,6 +159,13 @@ Its ports are all in the seven thousands, which no other example uses.
 tcsmoc pings it too: `make runmocy TCSPECIAL_CONFIG_FILE=examples/ping/ping`,
 then the `Ping node` button beside `Command`. It is the same panel, kept by
 `tcslib::ping`, which `ping_ground.py` is written after.
+
+Languages:
+
+- MOC: Python 3 -- `ping_moc.py`, on `python/`; or Rust, in tcsmoc.
+- Vehicle: Rust -- tcspecial, whose `ping` node answers.
+- Payload: none. The `ping` node is the vehicle's own, and nothing is
+  simulated.
 
 Languages:
 
@@ -213,6 +226,12 @@ The text itself is `simple_app`'s library: the first paragraph of the lorem
 ipsum text as one array per line, each holding that line's words. Nothing
 holds a line terminator; the end of a word array is the end of the line, and
 what stands for it on the wire is the one constant both programs read.
+
+Languages:
+
+- MOC: Rust -- `lorem_moc`, on `tcslib::moc`.
+- Vehicle: Rust -- tcspecial, which runs the payload as its `app_pl` node.
+- Payload: Python 3 -- `lorem_pl.py`.
 
 Languages:
 

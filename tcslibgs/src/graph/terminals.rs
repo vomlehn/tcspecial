@@ -80,7 +80,7 @@ pub fn stream_of(terminal: &str) -> Option<(bool, Stream)> {
 /// `payload-in`, a `payload-in` only to a `payload-out`, a `moc-out` only to
 /// a `moc-in`, and a `moc-in` only to a `moc-out`. Which is one
 /// sentence twice over -- a stream leaves at one terminal and arrives at the
-/// other -- and that is why it is derived from [`KNOWN`] rather than written
+/// other -- and that is why it is derived from `KNOWN` rather than written
 /// out again: the two halves of the table cannot drift apart.
 ///
 /// `None` for a name that is not one of the four, which is a computation's own

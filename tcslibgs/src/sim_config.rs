@@ -32,7 +32,7 @@
 //!
 //! A group carries what several simulated payloads have in common; a payload
 //! overrides any of it for itself. The format is chosen from the file extension
-//! by [`tcslibgs::load_config_file`], so the same configuration can be written
+//! by [`crate::load_config_file`], so the same configuration can be written
 //! in YAML or XML.
 
 use std::collections::{BTreeMap, BTreeSet};

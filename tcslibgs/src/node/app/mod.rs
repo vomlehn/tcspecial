@@ -37,7 +37,8 @@
 //! is a field rather than five structs, so that a rule about app nodes is
 //! written once -- and the module sits beside the two families rather than in
 //! one of them for the same reason. Which family a given kind belongs to is
-//! [`Kind::is_payload`], which `crate::graph::section_of` reads.
+//! [`Kind::is_payload`](crate::node::app::Kind::is_payload), which
+//! `crate::graph::section_of` reads.
 //!
 //! What the interfaces are, what a packet is, and what the program itself
 //! holds is `tcsapp`. None of that is here: this is what a configuration says,

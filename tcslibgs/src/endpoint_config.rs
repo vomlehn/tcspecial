@@ -12,7 +12,7 @@
 //! module parsed it, and the rules were reachable only through it. It is
 //! gone; a payload states what an endpoint and its group stated between them.
 //! What is left here is the part that was never about the file: the terms
-//! ([`LinkTerms`]), what they mean once settled ([`GroupKind`] and the
+//! (`LinkTerms`), what they mean once settled ([`GroupKind`] and the
 //! per-kind parameters), where a payload is reached ([`EndpointLocation`]),
 //! and the scalar spellings a file may use ([`Scalar`], [`ByteList`]).
 //!
@@ -615,7 +615,7 @@ mod a_scalar_of_nothing {
 ///
 /// XML has no sequences in an attribute, so `terminators="0x0D,0x0A"` is the
 /// form there; YAML may use either that or `[0x0D, 0x0A]`. Repeated
-/// `<terminator>` children work too, by way of [`Section`]-like flattening
+/// `<terminator>` children work too, by way of section-like flattening
 /// in the untagged enum below.
 #[derive(Debug, Clone)]
 pub struct ByteList(Vec<String>);

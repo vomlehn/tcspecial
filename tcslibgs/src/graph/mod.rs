@@ -118,10 +118,9 @@ pub struct GraphFile {
     /// What tcspecial itself is configured with: where commands are taken,
     /// where beacons go, where the telemetry log is written.
     ///
-    /// The same section a payload set's file holds, read by the same struct --
-    /// see [`CIConfigJson`]. One statement of what the command interpreter
-    /// needs, so that a graph and a payload set cannot come to describe it
-    /// differently.
+    /// Read by the struct the command interpreter's configuration is -- see
+    /// [`crate::CIConfigJson`]. One statement of what the command interpreter
+    /// needs, so that nothing can come to describe it differently.
     ///
     /// Optional here and required by [`Graph::check`], which is the difference
     /// between a file that cannot be read and a configuration that is

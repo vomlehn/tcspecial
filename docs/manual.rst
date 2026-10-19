@@ -3018,14 +3018,9 @@ that satisfies both.
      - 0.9.42
      - `0.9.42 <https://docs.rs/serde_norway/0.9.42>`__
      - tcsgui, tcslibgs
-     - Reads configuration files written in YAML.
+     - Reads configuration files written in YAML, and the editor's undo
+       history, which it keeps on disk.
      - `repository <https://github.com/cafkafk/serde-yaml>`__
-   * - `serde_yaml <https://crates.io/crates/serde_yaml>`__
-     - 0.9
-     - `0.9.34+deprecated <https://docs.rs/serde_yaml/0.9.34+deprecated>`__
-     - tcsgui
-     - The editor's undo history, kept on disk. Deprecated by its author; ``serde_norway`` is the maintained fork the configuration files are read with.
-     - `repository <https://github.com/dtolnay/serde-yaml>`__
    * - `slint <https://crates.io/crates/slint>`__
      - 1.3, 1.18
      - `1.18.1 <https://docs.rs/slint/1.18.1>`__

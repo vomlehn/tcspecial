@@ -16,7 +16,11 @@ tcsverify = { path = "../tcsverify" }
 # the platform.
 slint = "1.18"
 serde = { version = "1.0", features = ["derive"] }
-serde_yaml = "0.9"
+# The undo history kept on disk, in YAML: the same crate tcslibgs reads the
+# configuration files with. It was serde_yaml, which its author has
+# deprecated; serde_norway is the maintained fork of it, writing the same
+# YAML, so a history written before the change still reads.
+serde_norway = "0.9.42"
 libc = "0.2"
 
 [dev-dependencies]
@@ -29,7 +33,6 @@ tempfile = "3.27.0"
 # For the schema tests, which read share/schema/*.json and hold it against the
 # software's own lists. Only the tests: the editor reads no JSON.
 serde_json = "1.0"
-serde_norway = "0.9.42"
 
 [build-dependencies]
 slint-build = "1.18"

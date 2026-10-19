@@ -4037,74 +4037,102 @@ These are the checks:
 Example: a cabin thermostat
 ---------------------------
 
-Three temperature sensors, two on an I\ :superscript:`2`\ C bus and one on a
-SPI link, each producing a different format. All three are read together every
-three seconds. Each reading is converted to kelvin, and each converted reading
-goes to two places: down to the MOC, and into a mean. The mean goes to the MOC
-as well, and into a comparison against a setpoint the ground sets. More than
-two degrees above it, three heater lines are unasserted; more than two below,
-they are asserted.
+Three temperature sensors of one place, two on an I\ :superscript:`2`\ C bus
+and one on a SPI link, each producing a different format. All three are read
+together ten times a second. Each reading is converted to kelvin, and each
+converted reading goes to two places: down to the MOC, and into a vote. The
+vote takes the middle of the three and goes to the MOC as well, and into a
+comparison against a setpoint the ground sets. More than two degrees above it,
+two sets of heater lines are unasserted; more than two below, they are
+asserted.
+
+The trio is the point of the example. Three sensors of one place, separated
+only because two parts cannot occupy one point, so that the temperature
+survives one of them going wrong: the third is a different part on a different
+bus with a format and a scale of its own, so no one bus and no one part number
+can take the whole trio out, and the vote leaves the odd reading out of the
+answer rather than averaging it in.
+
+This is the shape of the shipped ``examples/thermostat``. Left out for room
+are its ``tcspecial`` section, which every configuration must have and without
+which this would be refused, its log node, and the editor's layout; its
+addresses are its own. What is here is checked as it stands, with a
+``tcspecial`` section added back.
 
 .. code-block:: yaml
 
    version: "2.0"
    description: Cabin thermostat
 
-   groups:
-     - name: cabin_temps
-       interval: 3 s
+   payload_groups:
+     - { name: cabin_temps, interval: "100 ms" }
 
-   nodes:
-     - { name: temp_fore, type: i2c, group: cabin_temps,
-         path: /dev/i2c-1, address: 0x48, read_size: 2 }
-     - { name: temp_aft, type: i2c, group: cabin_temps,
-         path: /dev/i2c-1, address: 0x49, read_size: 2 }
-     - { name: temp_bay, type: spi, group: cabin_temps,
-         path: /dev/spidev0.0, max_speed: 1000000, spi_mode: 0, read_size: 3 }
+   moc:
+     - { name: moc, type: moc, address: "10.0.0.1", port: "5000",
+         ground_base: "10.0.0.2:5100", payload-in: true }
 
-     - { name: k_fore, type: compute, function: to_kelvin,
-         params: { format: i16_be, scale: 0.0625, offset: 273.15 } }
-     - { name: k_aft, type: compute, function: to_kelvin,
-         params: { format: i16_be, scale: 0.0625, offset: 273.15 } }
-     - { name: k_bay, type: compute, function: to_kelvin,
-         params: { format: u24_be, scale: 0.0078, offset: 255.37 } }
+   vehicle:
+     - { name: k_1, type: compute, function: to_kelvin, format: i16_be,
+         scale: "0.0625", offset: "273.15", payload-in: true,
+         payload-out: [{ target: moc }, { target: cabin_temp, input: in0 }] }
+     - { name: k_2, type: compute, function: to_kelvin, format: i16_be,
+         scale: "0.0625", offset: "273.15", payload-in: true,
+         payload-out: [{ target: moc }, { target: cabin_temp, input: in1 }] }
+     - { name: k_3, type: compute, function: to_kelvin, format: u24_be,
+         scale: "0.0078", offset: "255.37", payload-in: true,
+         payload-out: [{ target: moc }, { target: cabin_temp, input: in2 }] }
 
-     - { name: mean_temp, type: compute, function: mean, inputs: [in0, in1, in2] }
+     - { name: cabin_temp, type: compute, function: vote, algorithm: median,
+         inputs: "in0,in1,in2", payload-in: true,
+         payload-out: [{ target: moc }, { target: thermostat }] }
      - { name: thermostat, type: compute, function: hysteresis,
-         params: { setpoint: 293.15, above: 2.0, below: 2.0 } }
+         setpoint: "293.15", half_band: "2.0", payload-in: true,
+         payload-out: [{ target: moc }],
+         moc-out: [{ target: heaters_1 }, { target: heaters_2 }] }
 
-     - { name: moc, type: moc, address: 10.0.0.1, port: 5000,
-         ground_base: 10.0.0.2:5100 }
-     - { name: heaters, type: gpio, direction: output,
-         path: /dev/gpiochip0, lines: [3, 4, 5] }
+   payloads:
+     - { name: temp_1, type: i2c, group: cabin_temps, path: "/dev/i2c-1",
+         address: "0x48", read_size: "2", payload-out: [{ target: k_1 }] }
+     - { name: temp_2, type: i2c, group: cabin_temps, path: "/dev/i2c-1",
+         address: "0x49", read_size: "2", payload-out: [{ target: k_2 }] }
+     - { name: temp_3, type: spi, group: cabin_temps, path: "/dev/spidev0.0",
+         max_speed: "1000000", spi_mode: "0", read_size: "3",
+         payload-out: [{ target: k_3 }] }
 
-   links:
-     - { from: temp_fore, to: k_fore }
-     - { from: temp_aft, to: k_aft }
-     - { from: temp_bay, to: k_bay }
-
-     - { from: k_fore, to: [moc, mean_temp.in0] }
-     - { from: k_aft, to: [moc, mean_temp.in1] }
-     - { from: k_bay, to: [moc, mean_temp.in2] }
-
-     - { from: mean_temp, to: [moc, thermostat] }
-     - { from: thermostat, to: heaters }
+     - { name: heaters_1, type: gpio, direction: output, path: "/dev/gpiochip0",
+         lines: "3,4,5", moc-in: true }
+     - { name: heaters_2, type: gpio, direction: output, path: "/dev/gpiochip0",
+         lines: "6,7,8", moc-in: true }
 
    commands:
      - { from: moc, sets: thermostat.setpoint }
 
-Several things in that file are refusals waiting to happen, which is the point.
-Drop one of the three links into ``mean_temp`` and the configuration is refused
-for an unbound input rather than averaging over a reading that never arrives.
-Give ``temp_aft`` an interval of its own and it is refused for disagreeing with
-its group. Remove ``direction: output`` from ``heaters`` and it is refused for
-being written to as an input. None of those is discovered in flight.
+A line is written once, on the node it leaves, under the terminal it leaves
+by: ``payload-out`` on each sensor names the conversion it feeds, and the
+conversions name the vote's input they bind. The thermostat's decision leaves
+by two terminals, which is the file saying two different things with it -- its
+``payload-out`` sends it to the ground as telemetry, and its ``moc-out`` drives
+the two heaters.
 
-What the cycle costs is also visible in the file rather than in the code. One
-group interval governs the whole loop: the sensors are read, the conversions
-run, the mean is taken and the comparison made once every three seconds,
-because that is what ``cabin_temps`` says and everything downstream of it is
-driven by arrival rather than by a clock of its own.
+Several things in that file are refusals waiting to happen, which is the point.
+Drop ``cabin_temp.in2`` from ``k_3``'s links and the configuration is refused
+for a vote whose declared inputs are not the ones that arrive, rather than
+voting over two readings and calling it a trio. Give ``temp_2`` an interval of
+its own and it is refused for disagreeing with the group that says when it is
+read. Remove ``direction: output`` from ``heaters_1`` and it is refused for
+being driven as an input -- lines with no direction are inputs, a set of
+discretes being more often something read, so the omission reads as though it
+were right and the flight software would refuse every decision for that node
+for as long as it ran. None of those is discovered in flight.
+
+What the cycle costs is also visible in the file rather than in the code. The
+group interval paces the readings and everything downstream of them runs on
+arrival rather than on a clock of its own, so a tenth of a second is a tenth of
+a second of sensing -- and three readings a tenth of a second is three votes
+and three decisions, the vote producing a value on every arrival so that a
+sensor which stops reporting is outvoted rather than waited for. The decision
+is asserted to the heaters each time; what reaches the ground and the log is
+the transitions.
 
 Features
 ========

@@ -46,7 +46,7 @@ pub struct Node {
     ///
     /// The editor holds one assembled document whatever it was read from, and
     /// this is what says which file each node goes back to. It is also what
-    /// lets two subdiagrams each have a `temp_fore`: a node is known by its
+    /// lets two subdiagrams each have a `temp_1`: a node is known by its
     /// name within its own home, and by `home/name` from outside.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub home: Home,
@@ -150,7 +150,7 @@ impl Concern {
 /// Where one line goes, as a file writes it: its entry.
 ///
 /// A link out of a node is written as an entry under the data source it leaves
-/// by -- `- target: mean_temp`, and `input: in0` where it feeds a named input
+/// by -- `- target: cabin_temp`, and `input: in0` where it feeds a named input
 /// -- so what the writers need is the two apart. Not a type the document holds:
 /// the document holds links, and this is one of them on its way into a file.
 ///
@@ -418,8 +418,8 @@ impl Document {
 
     /// The node this absolute name refers to.
     ///
-    /// Absolute: `temp_fore` for a node of the top diagram and
-    /// `cabin/temp_fore` for one inside a subdiagram. That is how the editor
+    /// Absolute: `temp_1` for a node of the top diagram and
+    /// `cabin/temp_1` for one inside a subdiagram. That is how the editor
     /// holds a name everywhere except in a file, where it is written relative
     /// to the file it is in -- see [`Qualified::written_from`].
     pub fn node(&self, name: &str) -> Option<&Node> {
@@ -691,7 +691,7 @@ impl Document {
     /// both names to change.
     ///
     /// By the whole name, which includes the subdiagram a node lives in: two
-    /// pages of one configuration may each have a `temp_fore`, and that is not
+    /// pages of one configuration may each have a `temp_1`, and that is not
     /// a duplicate -- see [`Node::home`].
     pub fn sharing_a_name(&self) -> Vec<usize> {
         let mut count: BTreeMap<&str, usize> = BTreeMap::new();
@@ -1298,8 +1298,8 @@ impl Document {
         let mut faults = Vec::new();
 
         // By the name a link would have to use, not by the bare one: two
-        // subdiagrams may each hold a temp_fore, and they are two nodes
-        // because cabin/temp_fore and bay/temp_fore are two names. Counting
+        // subdiagrams may each hold a temp_1, and they are two nodes
+        // because cabin/temp_1 and bay/temp_1 are two names. Counting
         // bare names here would refuse the reuse a separate file is for.
         let mut seen: BTreeMap<String, usize> = BTreeMap::new();
         for node in &self.nodes {
@@ -2030,7 +2030,7 @@ impl Document {
 
     /// What leaves a node, by the data source it leaves by.
     ///
-    /// A link is an attribute of the node it leaves -- `payload-out: k_fore` -- so
+    /// A link is an attribute of the node it leaves -- `payload-out: k_1` -- so
     /// writing a node means writing the links out of it, named after their
     /// terminal. Which terminal is the editor's own table where the link does
     /// not say: a payload has one data source and the line was drawn from it.
@@ -2065,7 +2065,7 @@ impl Document {
             // somebody wrote -- so in practice they agree or there is one.
             let mut comment: Option<String> = None;
             // The links this node is the source of. Compared as the document
-            // holds them -- `cabin/temp_fore` from outside the subdiagram it
+            // holds them -- `cabin/temp_1` from outside the subdiagram it
             // is in -- because a node's own name is the one inside its file.
             let ours = Qualified::of(&node.name, home).absolute();
             for link in self.links.iter().filter(|l| l.from == ours) {
@@ -2109,7 +2109,7 @@ impl Document {
     ///
     /// Which sink a line arrives at is the stream's own answer: what leaves by
     /// `payload-out` arrives at a `payload-in` and nowhere else, so a destination
-    /// that named an input -- `mean_temp.in0` -- counts at the stream's sink.
+    /// that named an input -- `cabin_temp.in0` -- counts at the stream's sink.
     /// Only the sinks something arrives at are written, as a node with nothing
     /// leaving it writes no `payload-out`.
     fn arriving(&self, node: &Node, home: &Home) -> Vec<&'static str> {
@@ -2189,7 +2189,7 @@ fn quoted(value: &str) -> String {
 
 /// A name or a type, written bare where bare says the same thing.
 ///
-/// Most of them do: `temp_fore` and `i2c` are plain scalars in YAML and read
+/// Most of them do: `temp_1` and `i2c` are plain scalars in YAML and read
 /// back as themselves, and a file where every name is in quotes reads as a
 /// file written by a program. The exceptions are the words YAML gives a
 /// meaning of its own -- `null` is nothing at all, `yes` is true, `0x48` is a
@@ -2385,42 +2385,46 @@ pub fn thermostat_example() -> Document {
     // The group the three sensors share, which is the point of the example:
     // readings that will be averaged are taken as close to together as the
     // hardware allows.
-    document.groups.insert("cabin_temps".to_string(), "3 s".to_string());
+    document.groups.insert("cabin_temps".to_string(), "100 ms".to_string());
 
-    place(&mut document, "temp_fore", "i2c", (34, 34));
-    set(&mut document, "temp_fore", "path", "/dev/i2c-1");
-    set(&mut document, "temp_fore", "address", "0x48");
-    set(&mut document, "temp_fore", "group", "cabin_temps");
-    set(&mut document, "temp_fore", "read_size", "2");
+    place(&mut document, "temp_1", "i2c", (34, 34));
+    set(&mut document, "temp_1", "path", "/dev/i2c-1");
+    set(&mut document, "temp_1", "address", "0x48");
+    set(&mut document, "temp_1", "group", "cabin_temps");
+    set(&mut document, "temp_1", "read_size", "2");
     note(
         &mut document,
-        "temp_fore",
-        "Forward bulkhead. Two bytes, signed, big endian.",
+        "temp_1",
+        "One of three sensors of the same place, a trio, so that the\ntemperature survives one of them going wrong. Two bytes, signed,\nbig endian.",
     );
 
-    place(&mut document, "temp_aft", "i2c", (34, 166));
-    set(&mut document, "temp_aft", "path", "/dev/i2c-1");
-    set(&mut document, "temp_aft", "address", "0x49");
-    set(&mut document, "temp_aft", "group", "cabin_temps");
-    set(&mut document, "temp_aft", "read_size", "2");
-    note(&mut document, "temp_aft", "Aft bulkhead; same part as temp_fore.");
-
-    place(&mut document, "temp_bay", "spi", (34, 280));
-    set(&mut document, "temp_bay", "path", "/dev/spidev0.0");
-    set(&mut document, "temp_bay", "max_speed", "1000000");
-    set(&mut document, "temp_bay", "spi_mode", "0");
-    set(&mut document, "temp_bay", "group", "cabin_temps");
-    set(&mut document, "temp_bay", "read_size", "3");
+    place(&mut document, "temp_2", "i2c", (34, 166));
+    set(&mut document, "temp_2", "path", "/dev/i2c-1");
+    set(&mut document, "temp_2", "address", "0x49");
+    set(&mut document, "temp_2", "group", "cabin_temps");
+    set(&mut document, "temp_2", "read_size", "2");
     note(
         &mut document,
-        "temp_bay",
-        "Equipment bay. Three bytes, unsigned -- a different part, hence its\nown conversion.",
+        "temp_2",
+        "The second of the trio; the same part as temp_1, on the same bus.",
+    );
+
+    place(&mut document, "temp_3", "spi", (34, 280));
+    set(&mut document, "temp_3", "path", "/dev/spidev0.0");
+    set(&mut document, "temp_3", "max_speed", "1000000");
+    set(&mut document, "temp_3", "spi_mode", "0");
+    set(&mut document, "temp_3", "group", "cabin_temps");
+    set(&mut document, "temp_3", "read_size", "3");
+    note(
+        &mut document,
+        "temp_3",
+        "The third. A different part on a different bus: three bytes,\nunsigned, its own scale and so its own conversion, so that no one\nbus and no one part number can take the whole trio out.",
     );
 
     for (name, at, format, scale, offset) in [
-        ("k_fore", (242, 34), "i16_be", "0.0625", "273.15"),
-        ("k_aft", (242, 166), "i16_be", "0.0625", "273.15"),
-        ("k_bay", (242, 280), "u24_be", "0.0078", "255.37"),
+        ("k_1", (242, 34), "i16_be", "0.0625", "273.15"),
+        ("k_2", (242, 166), "i16_be", "0.0625", "273.15"),
+        ("k_3", (242, 280), "u24_be", "0.0078", "255.37"),
     ] {
         place(&mut document, name, "compute", at);
         set(&mut document, name, "function", "to_kelvin");
@@ -2429,19 +2433,24 @@ pub fn thermostat_example() -> Document {
         set(&mut document, name, "offset", offset);
     }
 
-    place(&mut document, "mean_temp", "compute", (469, 166));
-    set(&mut document, "mean_temp", "function", "mean");
-    set(&mut document, "mean_temp", "inputs", "in0,in1,in2");
+    place(&mut document, "cabin_temp", "compute", (469, 166));
+    set(&mut document, "cabin_temp", "function", "vote");
+    set(&mut document, "cabin_temp", "algorithm", "median");
+    set(&mut document, "cabin_temp", "inputs", "in0,in1,in2");
+    note(
+        &mut document,
+        "cabin_temp",
+        "One temperature out of the three, by the algorithm named: median\ntakes the middle reading, closest_mean the mean of the two that\nagree best. Either leaves a sensor that has gone wrong out of the\nanswer, which a mean over all three would not, and it produces a\nvalue on every arrival, so one sensor that stops reporting is\noutvoted rather than stopping the vehicle from deciding anything.",
+    );
 
     place(&mut document, "thermostat", "compute", (601, 242));
     set(&mut document, "thermostat", "function", "hysteresis");
     set(&mut document, "thermostat", "setpoint", "293.15");
-    set(&mut document, "thermostat", "above", "2.0");
-    set(&mut document, "thermostat", "below", "2.0");
+    set(&mut document, "thermostat", "half_band", "2.0");
     note(
         &mut document,
         "thermostat",
-        "setpoint is set from the ground; above and below are the two\ndegrees either side that the heaters are switched at.",
+        "setpoint is set from the ground; half_band is how far either side\nof it the heaters are switched at, the setpoint being in the middle\nof the band.",
     );
 
     place(&mut document, "moc", "moc", (790, 34));
@@ -2451,11 +2460,20 @@ pub fn thermostat_example() -> Document {
     // this port plus its own device id, from the start.
     set(&mut document, "moc", "ground_base", "10.0.0.2:5100");
 
-    place(&mut document, "heaters", "gpio", (34, 393));
-    set(&mut document, "heaters", "path", "/dev/gpiochip0");
-    set(&mut document, "heaters", "direction", "output");
-    set(&mut document, "heaters", "lines", "3,4,5");
-    note(&mut document, "heaters", "Three circuits, driven together.");
+    for (name, at, lines) in [
+        ("heaters_1", (34, 393), "3,4,5"),
+        ("heaters_2", (34, 470), "6,7,8"),
+    ] {
+        place(&mut document, name, "gpio", at);
+        set(&mut document, name, "path", "/dev/gpiochip0");
+        set(&mut document, name, "direction", "output");
+        set(&mut document, name, "lines", lines);
+    }
+    note(
+        &mut document,
+        "heaters_1",
+        "Two heaters, each three circuits driven together, both near the\nsensors on the same thermal mass. Separate nodes rather than six\nlines on one, so that one can be stopped from the ground while the\nother goes on holding the temperature.",
+    );
 
     place(&mut document, "housekeeping", "log", (469, 374));
     set(&mut document, "housekeeping", "directory", "/var/log/tcspecial");
@@ -2470,29 +2488,39 @@ pub fn thermostat_example() -> Document {
         });
     };
 
-    link(&mut document, "temp_fore", "payload-out", "k_fore", None);
-    link(&mut document, "temp_aft", "payload-out", "k_aft", None);
-    link(&mut document, "temp_bay", "payload-out", "k_bay", None);
+    link(&mut document, "temp_1", "payload-out", "k_1", None);
+    link(&mut document, "temp_2", "payload-out", "k_2", None);
+    link(&mut document, "temp_3", "payload-out", "k_3", None);
 
-    // The "T": each converted reading goes to the ground, into the mean, and
+    // The "T": each converted reading goes to the ground, into the vote, and
     // into the log.
-    for (from, input) in [("k_fore", "in0"), ("k_aft", "in1"), ("k_bay", "in2")] {
+    for (from, input) in [("k_1", "in0"), ("k_2", "in1"), ("k_3", "in2")] {
         link(&mut document, from, "payload-out", "moc", None);
-        link(&mut document, from, "payload-out", "mean_temp", Some(input));
+        link(&mut document, from, "payload-out", "cabin_temp", Some(input));
         link(&mut document, from, "payload-out", "housekeeping", None);
     }
 
-    link(&mut document, "mean_temp", "payload-out", "moc", None);
-    link(&mut document, "mean_temp", "payload-out", "thermostat", None);
+    link(&mut document, "cabin_temp", "payload-out", "moc", None);
+    link(&mut document, "cabin_temp", "payload-out", "thermostat", None);
     // The heaters are a payload, so what drives them leaves the thermostat by
     // its moc-out: the vehicleward stream, which is what reaches a payload.
-    link(&mut document, "thermostat", "moc-out", "heaters", None);
+    link(&mut document, "thermostat", "moc-out", "heaters_1", None);
+    link(&mut document, "thermostat", "moc-out", "heaters_2", None);
     link(&mut document, "thermostat", "payload-out", "housekeeping", None);
-    document.apply(&Edit::SetLinkComment {
-        link: Link::joining("thermostat", Some("moc-out"), "heaters", None),
-        was: None,
-        now: Some("asserted below the setpoint, unasserted above it".to_string()),
-    });
+    link(&mut document, "thermostat", "payload-out", "moc", None);
+    // The comment belongs to the terminal rather than to one link, so both
+    // of the heaters carry it: that is what reading the file back gives, a
+    // comment above `moc-out` being about the block and not its first line.
+    for heater in ["heaters_1", "heaters_2"] {
+        document.apply(&Edit::SetLinkComment {
+            link: Link::joining("thermostat", Some("moc-out"), heater, None),
+            was: None,
+            now: Some(
+                "asserted below the setpoint, unasserted above it. Two heaters,\nbecause one failing must not leave the mass with no way to be\nwarmed: either alone holds the band, and both together hold it\ntwice as fast."
+                    .to_string(),
+            ),
+        });
+    }
 
     // What the ground may change in flight, which the worked example calls for
     // and the diagram cannot show: the setpoint is commanded, and the rest of
@@ -2778,14 +2806,14 @@ mod tests {
     #[test]
     fn a_node_is_left_alone_until_it_says_enough_to_be_wrong() {
         let mut document = Document::new();
-        document.apply(&add("temp_fore", "i2c"));
+        document.apply(&add("temp_1", "i2c"));
 
         // Nothing stated: nothing to say.
         assert!(document.faults().is_empty(), "{:?}", document.faults());
 
         // A bus and no address: still unfinished, still nothing to say.
         document.apply(&Edit::SetAttribute {
-            node: "temp_fore".into(),
+            node: "temp_1".into(),
             attribute: "path".into(),
             was: None,
             now: Some("/dev/i2c-1".into()),
@@ -2795,7 +2823,7 @@ mod tests {
         // And an address that is not one, which is wrong rather than
         // unfinished.
         document.apply(&Edit::SetAttribute {
-            node: "temp_fore".into(),
+            node: "temp_1".into(),
             attribute: "address".into(),
             was: None,
             now: Some("0xZZ".into()),
@@ -2804,7 +2832,7 @@ mod tests {
             .faults()
             .into_iter()
             .find_map(|fault| match fault {
-                Fault::BadNode { node, why } if node == "temp_fore" => Some(why),
+                Fault::BadNode { node, why } if node == "temp_1" => Some(why),
                 _ => None,
             })
             .expect("an address that is not one should be refused");
@@ -2812,7 +2840,7 @@ mod tests {
 
         // Put right, and the editor goes quiet again.
         document.apply(&Edit::SetAttribute {
-            node: "temp_fore".into(),
+            node: "temp_1".into(),
             attribute: "address".into(),
             was: Some("0xZZ".into()),
             now: Some("0x48".into()),
@@ -2997,10 +3025,10 @@ mod tests {
             interval: "3 s".into(),
         });
         for (name, node_type, group) in [
-            ("temp_fore", "i2c", Some("cabin_temps")),
-            ("temp_aft", "i2c", Some("cabin_temps")),
+            ("temp_1", "i2c", Some("cabin_temps")),
+            ("temp_2", "i2c", Some("cabin_temps")),
             // In another group, so it is not touched.
-            ("temp_bay", "i2c", Some("bay")),
+            ("temp_3", "i2c", Some("bay")),
             // Not in a group at all.
             ("loose", "i2c", None),
             // In the group and not a payload, which is an oddity the checker
@@ -3040,9 +3068,9 @@ mod tests {
                 .get("path")
                 .cloned()
         };
-        assert_eq!(path("temp_fore").as_deref(), Some("/dev/i2c-1"));
-        assert_eq!(path("temp_aft").as_deref(), Some("/dev/i2c-1"));
-        assert_eq!(path("temp_bay"), None, "another group was written to");
+        assert_eq!(path("temp_1").as_deref(), Some("/dev/i2c-1"));
+        assert_eq!(path("temp_2").as_deref(), Some("/dev/i2c-1"));
+        assert_eq!(path("temp_3"), None, "another group was written to");
         assert_eq!(path("loose"), None, "a node in no group was written to");
         assert_eq!(path("k"), None, "a computation was given a bus path");
     }
@@ -3060,9 +3088,9 @@ mod tests {
             name: "cabin_temps".into(),
             interval: "3 s".into(),
         });
-        document.apply(&add("temp_fore", "i2c"));
+        document.apply(&add("temp_1", "i2c"));
         document.apply(&Edit::SetAttribute {
-            node: "temp_fore".into(),
+            node: "temp_1".into(),
             attribute: "group".into(),
             was: None,
             now: Some("cabin_temps".into()),
@@ -3077,7 +3105,7 @@ mod tests {
         assert!(!document.groups.contains_key("cabin_temps"));
         assert_eq!(
             document
-                .node("temp_fore")
+                .node("temp_1")
                 .unwrap()
                 .attributes
                 .get("group")
@@ -3108,7 +3136,7 @@ mod tests {
             name: "cabin_temps".into(),
             interval: "3 s".into(),
         });
-        for (name, node_type) in [("temp_fore", "i2c"), ("temp_bay", "spi")] {
+        for (name, node_type) in [("temp_1", "i2c"), ("temp_3", "spi")] {
             document.apply(&add(name, node_type));
             document.apply(&Edit::SetAttribute {
                 node: name.into(),
@@ -3154,7 +3182,7 @@ mod tests {
             name: "cabin_temps".into(),
             interval: "3 s".into(),
         });
-        for (name, address) in [("temp_fore", "0x48"), ("temp_aft", "0x49")] {
+        for (name, address) in [("temp_1", "0x48"), ("temp_2", "0x49")] {
             document.apply(&add(name, "i2c"));
             for (attribute, value) in
                 [("group", "cabin_temps"), ("address", address), ("path", "/dev/i2c-1")]
@@ -3195,19 +3223,19 @@ mod tests {
     #[test]
     fn replaying_the_edits_rebuilds_the_same_document() {
         let edits = vec![
-            add("temp_fore", "i2c"),
-            add("k_fore", "compute"),
+            add("temp_1", "i2c"),
+            add("k_1", "compute"),
             Edit::SetAttribute {
-                node: "temp_fore".into(),
+                node: "temp_1".into(),
                 attribute: "address".into(),
                 was: None,
                 now: Some("0x48".into()),
             },
             Edit::AddLink {
-                link: Link::new("temp_fore", "k_fore", None),
+                link: Link::new("temp_1", "k_1", None),
             },
             Edit::MoveNode {
-                node: "k_fore".into(),
+                node: "k_1".into(),
                 was: (0, 0),
                 now: (240, 80),
             },
@@ -3224,9 +3252,9 @@ mod tests {
         }
 
         assert_eq!(live, recovered);
-        assert_eq!(live.node("k_fore").unwrap().at, (240, 80));
+        assert_eq!(live.node("k_1").unwrap().at, (240, 80));
         assert_eq!(
-            live.node("temp_fore").unwrap().attributes.get("address"),
+            live.node("temp_1").unwrap().attributes.get("address"),
             Some(&"0x48".to_string())
         );
     }
@@ -3332,10 +3360,10 @@ mod tests {
 
         document.apply(&Edit::RenameNode {
             was: "a".into(),
-            now: "temp_fore".into(),
+            now: "temp_1".into(),
         });
 
-        assert_eq!(document.links[0].from, "temp_fore");
+        assert_eq!(document.links[0].from, "temp_1");
         // Its own fault and not every fault: these nodes have no attributes
         // filled in, which is a fault of its own and nothing to do with
         // renaming.
@@ -3538,7 +3566,7 @@ mod tests {
             },
             Edit::RenameNode {
                 was: "a".into(),
-                now: "temp_fore".into(),
+                now: "temp_1".into(),
             },
             Edit::AddLink {
                 link: Link::new("b", "a", None),
@@ -3700,18 +3728,18 @@ mod tests {
     #[test]
     fn comments_are_kept_on_nodes_and_on_links() {
         let mut document = Document::new();
-        document.apply(&add("temp_fore", "i2c"));
-        document.apply(&add("k_fore", "compute"));
+        document.apply(&add("temp_1", "i2c"));
+        document.apply(&add("k_1", "compute"));
         document.apply(&Edit::AddLink {
-            link: Link::new("temp_fore", "k_fore", None),
+            link: Link::new("temp_1", "k_1", None),
         });
         document.apply(&Edit::SetNodeComment {
-            node: "temp_fore".into(),
+            node: "temp_1".into(),
             was: None,
             now: Some("0x49 after the rework; see ECR-114".into()),
         });
         document.apply(&Edit::SetLinkComment {
-            link: Link::new("temp_fore", "k_fore", None),
+            link: Link::new("temp_1", "k_1", None),
             was: None,
             now: Some("raw counts, not kelvin".into()),
         });
@@ -3950,10 +3978,10 @@ mod tests {
         use crate::journal::Link;
 
         let mut document = Document::new();
-        document.apply(&add("temp_fore", "i2c"));
+        document.apply(&add("temp_1", "i2c"));
         document.apply(&add("moc", "moc"));
         document.apply(&Edit::AddLink {
-            link: Link::joining("temp_fore", Some("payload-out"), "moc", None),
+            link: Link::joining("temp_1", Some("payload-out"), "moc", None),
         });
 
         let yaml = document.to_yaml();
@@ -3991,7 +4019,7 @@ mod tests {
 
         let mut document = Document::new();
         document.apply(&add("moc", "moc"));
-        for name in ["temp_aft", "temp_fore"] {
+        for name in ["temp_2", "temp_1"] {
             document.apply(&add(name, "i2c"));
             document.apply(&Edit::AddLink {
                 link: Link::joining(name, Some("payload-out"), "moc", None),
@@ -4099,7 +4127,7 @@ mod tests {
         let mut document = Document::new();
         for home in [None, Some("cabin".to_string()), Some("bay".to_string())] {
             document.apply(&Edit::AddNode {
-                name: "temp_fore".to_string(),
+                name: "temp_1".to_string(),
                 node_type: "i2c".to_string(),
                 home,
             });
@@ -4111,12 +4139,12 @@ mod tests {
 
         // And inside one page it is a duplicate like any other.
         document.apply(&Edit::AddNode {
-            name: "temp_fore".to_string(),
+            name: "temp_1".to_string(),
             node_type: "i2c".to_string(),
             home: Some("cabin".to_string()),
         });
         assert_eq!(document.sharing_a_name(), vec![1, 3]);
-        assert_eq!(document.spare_name(3), "temp_fore-1");
+        assert_eq!(document.spare_name(3), "temp_1-1");
     }
 
     /// Three shapes, and which rules apply depends on the pane: a payload is
@@ -4132,7 +4160,7 @@ mod tests {
         for (name, node_type) in [
             ("sensor", "i2c"),
             ("ground", "moc"),
-            ("mean_temp", "compute"),
+            ("cabin_temp", "compute"),
             ("housekeeping", "log"),
         ] {
             document.apply(&add(name, node_type));
@@ -4156,7 +4184,7 @@ mod tests {
         // The readings reach a computation: the payload is answered, and the
         // computation is now one a stream stops at.
         document.apply(&Edit::AddLink {
-            link: Link::joining("sensor", Some("payload-out"), "mean_temp", Some("in0")),
+            link: Link::joining("sensor", Some("payload-out"), "cabin_temp", Some("in0")),
         });
         let said: Vec<String> = document.concerns().iter().map(|c| c.kind()).collect();
         assert!(!said.contains(&"payload-out-goes-nowhere".to_string()), "{said:?}");
@@ -4165,7 +4193,7 @@ mod tests {
         // And on to the ground, which is the shape the whole graph is: a
         // payload, vehicle nodes, a MOC link.
         document.apply(&Edit::AddLink {
-            link: Link::joining("mean_temp", Some("payload-out"), "ground", None),
+            link: Link::joining("cabin_temp", Some("payload-out"), "ground", None),
         });
         let said: Vec<String> = document.concerns().iter().map(|c| c.kind()).collect();
         assert_eq!(
@@ -4178,7 +4206,7 @@ mod tests {
         // A log is where a stream stops on purpose: something arrives and
         // nothing leaves, and that is what a log is for.
         document.apply(&Edit::AddLink {
-            link: Link::joining("mean_temp", Some("payload-out"), "housekeeping", None),
+            link: Link::joining("cabin_temp", Some("payload-out"), "housekeeping", None),
         });
         assert!(
             !document
@@ -4512,7 +4540,7 @@ mod tests {
             home: None,
         });
         document.apply(&Edit::AddNode {
-            name: "temp_fore".into(),
+            name: "temp_1".into(),
             node_type: "i2c".into(),
             home: Some("cabin".into()),
         });
@@ -4527,9 +4555,9 @@ mod tests {
         assert_eq!(document.nodes_in(&Some("cabin".into())).len(), 1);
 
         // Named through its home from outside, plainly from inside.
-        assert!(document.node("cabin/temp_fore").is_some());
+        assert!(document.node("cabin/temp_1").is_some());
         assert!(
-            document.node("temp_fore").is_none(),
+            document.node("temp_1").is_none(),
             "a subdiagram's node answered to a bare name from the top diagram"
         );
     }
@@ -4549,7 +4577,7 @@ mod tests {
                 home: None,
             });
             document.apply(&Edit::AddNode {
-                name: "temp_fore".into(),
+                name: "temp_1".into(),
                 node_type: "i2c".into(),
                 home: Some(home.into()),
             });
@@ -4565,8 +4593,8 @@ mod tests {
             document.faults()
         );
         assert_ne!(
-            document.node("cabin/temp_fore").unwrap().home,
-            document.node("bay/temp_fore").unwrap().home
+            document.node("cabin/temp_1").unwrap().home,
+            document.node("bay/temp_1").unwrap().home
         );
     }
 
@@ -4584,7 +4612,7 @@ mod tests {
             node_type: "moc".into(),
             home: None,
         });
-        for name in ["temp_fore", "k_fore"] {
+        for name in ["temp_1", "k_1"] {
             document.apply(&Edit::AddNode {
                 name: name.into(),
                 node_type: "i2c".into(),
@@ -4594,10 +4622,10 @@ mod tests {
 
         // One link inside, one crossing out.
         document.apply(&Edit::AddLink {
-            link: Link::new("cabin/temp_fore", "cabin/k_fore", None),
+            link: Link::new("cabin/temp_1", "cabin/k_1", None),
         });
         document.apply(&Edit::AddLink {
-            link: Link::new("cabin/k_fore", "moc", None),
+            link: Link::new("cabin/k_1", "moc", None),
         });
 
         assert_eq!(
@@ -4635,12 +4663,12 @@ mod tests {
             home: None,
         });
         document.apply(&Edit::AddNode {
-            name: "temp_fore".into(),
+            name: "temp_1".into(),
             node_type: "i2c".into(),
             home: Some("cabin".into()),
         });
         document.apply(&Edit::AddLink {
-            link: Link::new("cabin/temp_fore", "moc", None),
+            link: Link::new("cabin/temp_1", "moc", None),
         });
 
         let files = document.files(Path::new("/tmp/vehicle.yaml")).expect("files");
@@ -4678,7 +4706,7 @@ mod tests {
             home: None,
         });
         document.apply(&Edit::AddLink {
-            link: Link::new("moc", "cabin/temp_fore", None),
+            link: Link::new("moc", "cabin/temp_1", None),
         });
 
         assert!(
@@ -4720,16 +4748,16 @@ mod tests {
     #[test]
     fn the_file_written_is_the_v2_shape() {
         let mut document = Document::new();
-        document.apply(&add("temp_fore", "i2c"));
+        document.apply(&add("temp_1", "i2c"));
         document.apply(&Edit::SetAttribute {
-            node: "temp_fore".into(),
+            node: "temp_1".into(),
             attribute: "address".into(),
             was: None,
             now: Some("0x48".into()),
         });
-        document.apply(&add("mean_temp", "compute"));
+        document.apply(&add("cabin_temp", "compute"));
         document.apply(&Edit::AddLink {
-            link: Link::new("temp_fore", "mean_temp", Some("in0")),
+            link: Link::new("temp_1", "cabin_temp", Some("in0")),
         });
 
         let yaml = document.to_yaml();
@@ -4744,7 +4772,7 @@ mod tests {
         assert!(yaml.contains("\npayloads:\n"), "{yaml}");
         assert!(yaml.contains("\nvehicle:\n"), "{yaml}");
         assert!(
-            yaml.contains("    payload-out:\n      - target: mean_temp\n        input: in0\n"),
+            yaml.contains("    payload-out:\n      - target: cabin_temp\n        input: in0\n"),
             "a link into a named input is written as one entry: {yaml}"
         );
         assert!(!yaml.contains("\nlinks:"), "there is no links section: {yaml}");

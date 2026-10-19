@@ -731,7 +731,7 @@ mod tests {
 
         // A device on a bus: the bus, and the address that tells it from the
         // other sensor on the same wires.
-        let fore = reach("temp_fore");
+        let fore = reach("temp_1");
         match &fore.endpoint {
             EndpointConfig::I2c(i2c) => {
                 assert_eq!(i2c.bus, "/dev/i2c-1");
@@ -750,7 +750,7 @@ mod tests {
 
         // And the one in the equipment bay, which is a peripheral on a SPI
         // bus and answers in three.
-        let bay = reach("temp_bay");
+        let bay = reach("temp_3");
         match &bay.endpoint {
             EndpointConfig::Spi(spi) => {
                 assert_eq!(spi.path, "/dev/spidev0.0");
@@ -762,7 +762,7 @@ mod tests {
         assert_eq!(bay.read_size, Some(3));
 
         // The heaters: three lines of one chip, driven.
-        match &reach("heaters").endpoint {
+        match &reach("heaters_1").endpoint {
             EndpointConfig::Gpio(gpio) => {
                 assert_eq!(gpio.path, "/dev/gpiochip0");
                 assert_eq!(gpio.lines, vec![3, 4, 5]);
@@ -817,7 +817,7 @@ mod tests {
     #[test]
     fn an_attribute_nothing_reads_is_refused() {
         let said = reach_of(&node(
-            "temp_bay",
+            "temp_3",
             "spi",
             &[("path", "/dev/spidev0.0"), ("max_speeed", "1000000")],
         ))
@@ -832,7 +832,7 @@ mod tests {
     #[test]
     fn a_term_of_another_link_is_refused() {
         let said = reach_of(&node(
-            "temp_fore",
+            "temp_1",
             "i2c",
             &[
                 ("path", "/dev/i2c-1"),
@@ -928,8 +928,8 @@ mod tests {
     #[test]
     fn a_node_that_says_nowhere_is_refused() {
         for (name, node_type, attributes, wanted) in [
-            ("temp_fore", "i2c", vec![("path", "/dev/i2c-1")], "address"),
-            ("temp_fore", "i2c", vec![("address", "0x48")], "path"),
+            ("temp_1", "i2c", vec![("path", "/dev/i2c-1")], "address"),
+            ("temp_1", "i2c", vec![("address", "0x48")], "path"),
             ("link", "moc", vec![("port", "5000")], "address"),
             ("link", "moc", vec![("address", "10.0.0.1")], "port"),
             ("file", "device-file", vec![], "path"),
@@ -949,7 +949,7 @@ mod tests {
     #[test]
     fn a_read_size_of_nothing_is_refused() {
         let said = reach_of(&node(
-            "temp_fore",
+            "temp_1",
             "i2c",
             &[("path", "/dev/i2c-1"), ("address", "0x48"), ("read_size", "0")],
         ))
@@ -1067,7 +1067,7 @@ mod tests {
     #[test]
     fn a_trigger_is_read_as_the_bytes_it_is() {
         let reach = reach_of(&node(
-            "temp_fore",
+            "temp_1",
             "i2c",
             &[
                 ("path", "/dev/i2c-1"),
@@ -1082,7 +1082,7 @@ mod tests {
         // A command and a register, which is what an interface document
         // commonly asks for: two values, the second of them two bytes.
         let reach = reach_of(&node(
-            "temp_fore",
+            "temp_1",
             "i2c",
             &[
                 ("path", "/dev/i2c-1"),
@@ -1104,7 +1104,7 @@ mod tests {
         assert_eq!(reach.trigger, Some(b"READ\r".to_vec()));
 
         let said = reach_of(&node(
-            "temp_fore",
+            "temp_1",
             "i2c",
             &[("path", "/dev/i2c-1"), ("address", "0x48"), ("trigger", "zz")],
         ))
@@ -1117,7 +1117,7 @@ mod tests {
     #[test]
     fn a_group_is_not_an_attribute_of_the_interface() {
         let reach = reach_of(&node(
-            "temp_fore",
+            "temp_1",
             "i2c",
             &[
                 ("path", "/dev/i2c-1"),

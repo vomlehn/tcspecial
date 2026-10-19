@@ -535,14 +535,14 @@ mod tests {
         let path = where_.path().join("graph.yaml");
         let mut editor = Editor::new(&path);
 
-        editor.edit(add("temp_fore", "i2c"));
+        editor.edit(add("temp_1", "i2c"));
         let after_one = std::fs::read_to_string(&path).expect("the file exists already");
-        assert!(after_one.contains("temp_fore"), "{after_one}");
+        assert!(after_one.contains("temp_1"), "{after_one}");
         assert!(editor.trouble().is_none(), "{:?}", editor.trouble());
 
-        editor.edit(add("temp_aft", "i2c"));
+        editor.edit(add("temp_2", "i2c"));
         let after_two = std::fs::read_to_string(&path).unwrap();
-        assert!(after_two.contains("temp_aft"), "{after_two}");
+        assert!(after_two.contains("temp_2"), "{after_two}");
     }
 
     /// A read-only session takes no edit and writes no file, whatever it is
@@ -557,7 +557,7 @@ mod tests {
     fn a_read_only_session_changes_nothing() {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("vehicle.yaml");
-        let by_hand = "version: \"2.0\"\n\npayloads:\n  - name: temp_fore\n    type: i2c\n";
+        let by_hand = "version: \"2.0\"\n\npayloads:\n  - name: temp_1\n    type: i2c\n";
         std::fs::write(&path, by_hand).expect("a file");
         let journal = crate::history::journal_for(&path);
         let journal_before = journal.as_ref().map(|j| std::fs::read(j).ok());
@@ -572,7 +572,7 @@ mod tests {
             home: None,
         });
         editor.edit(Edit::SetNodeComment {
-            node: "temp_fore".into(),
+            node: "temp_1".into(),
             was: None,
             now: Some("a comment".into()),
         });
@@ -624,10 +624,10 @@ moc:
     type: moc
     address: \"10.0.0.1\"
     port: \"5000\"
-    moc-out: temp_fore
+    moc-out: temp_1
 
 payloads:
-  - name: temp_fore
+  - name: temp_1
     type: i2c
     path: \"/dev/i2c-1\"
     address: \"0x48\"
@@ -637,7 +637,7 @@ payloads:
 tcsgui:
   nodes:
     - { name: moc, x: 240, y: 40 }
-    - { name: temp_fore, x: 400, y: 240 }
+    - { name: temp_1, x: 400, y: 240 }
 ";
         std::fs::write(&path, by_hand).expect("a file");
 
@@ -645,7 +645,7 @@ tcsgui:
         assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
 
         // The payload is in the payload working pane.
-        let sensor = editor.document().node("temp_fore").expect("the sensor");
+        let sensor = editor.document().node("temp_1").expect("the sensor");
         assert!(
             sensor.at.0 + crate::style::WIDTH as i32 <= dividers.payloads,
             "the payload opened at {:?}, outside its pane",
@@ -679,7 +679,7 @@ tcsgui:
 
         // The first real edit writes it, as every edit does.
         editor.edit(Edit::SetNodeComment {
-            node: "temp_fore".into(),
+            node: "temp_1".into(),
             was: None,
             now: Some("the fore sensor".into()),
         });
@@ -703,7 +703,7 @@ tcsgui:
         let path = where_.path().join("vehicle.yaml");
         let mut editor = Editor::new(&path);
 
-        editor.edit(add("temp_fore", "i2c"));
+        editor.edit(add("temp_1", "i2c"));
         assert!(!editor.unsaved(), "an edit that was written owes nothing");
 
         // Taken away behind the editor's back, as a half-written set of files
@@ -712,7 +712,7 @@ tcsgui:
         editor.save();
         assert!(path.exists(), "Save did not write the file");
         assert!(editor.trouble().is_none(), "{:?}", editor.trouble());
-        assert!(std::fs::read_to_string(&path).unwrap().contains("temp_fore"));
+        assert!(std::fs::read_to_string(&path).unwrap().contains("temp_1"));
     }
 
     /// A write that failed is owed, and a later save settles it.
@@ -738,7 +738,7 @@ tcsgui:
         };
 
         shut(0o500);
-        editor.edit(add("temp_fore", "i2c"));
+        editor.edit(add("temp_1", "i2c"));
         assert!(editor.trouble().is_some(), "a failed write should be said");
         assert!(
             editor.unsaved(),
@@ -754,7 +754,7 @@ tcsgui:
         editor.save();
         assert!(editor.trouble().is_none(), "{:?}", editor.trouble());
         assert!(!editor.unsaved());
-        assert!(std::fs::read_to_string(&path).unwrap().contains("temp_fore"));
+        assert!(std::fs::read_to_string(&path).unwrap().contains("temp_1"));
     }
 
     /// The simulator's file is written with the configuration's, and read
@@ -1110,10 +1110,10 @@ tcsgui:
             name: "cabin_temps".into(),
             interval: "3 s".into(),
         });
-        editor.edit(add("temp_fore", "i2c"));
+        editor.edit(add("temp_1", "i2c"));
         for (attribute, value) in [("group", "cabin_temps"), ("path", "/dev/i2c-1"), ("address", "0x48")] {
             editor.edit(Edit::SetAttribute {
-                node: "temp_fore".into(),
+                node: "temp_1".into(),
                 attribute: attribute.into(),
                 was: None,
                 now: Some(value.into()),
@@ -1296,7 +1296,7 @@ tcsgui:
             home: None,
         });
         editor.edit(Edit::AddNode {
-            name: "temp_fore".into(),
+            name: "temp_1".into(),
             node_type: "i2c".into(),
             home: Some("cabin".into()),
         });
@@ -1307,7 +1307,7 @@ tcsgui:
         });
         // A link that crosses the boundary, which was asked for.
         editor.edit(Edit::AddLink {
-            link: crate::journal::Link::new("cabin/temp_fore", "moc", None),
+            link: crate::journal::Link::new("cabin/temp_1", "moc", None),
         });
         assert!(editor.trouble().is_none(), "{:?}", editor.trouble());
 
@@ -1319,13 +1319,13 @@ tcsgui:
         assert!(top.contains("include:\n  - cabin"), "{top}");
         assert!(top.contains("name: moc"), "{top}");
         assert!(
-            !top.contains("name: temp_fore"),
+            !top.contains("name: temp_1"),
             "the subdiagram's node is in the top file too: {top}"
         );
 
         // The subdiagram holds its node, and the crossing link is written
         // where its source lives -- qualified at the far end only.
-        assert!(inner.contains("name: temp_fore"), "{inner}");
+        assert!(inner.contains("name: temp_1"), "{inner}");
         // A link is an attribute of the node it leaves, so a link that
         // crosses the boundary is written in the file its *source* is in --
         // once, and with the far end plain, moc having no subdiagram to
@@ -1353,7 +1353,7 @@ tcsgui:
             home: None,
         });
         editor.edit(Edit::AddNode {
-            name: "temp_fore".into(),
+            name: "temp_1".into(),
             node_type: "i2c".into(),
             home: Some("cabin".into()),
         });
@@ -1363,7 +1363,7 @@ tcsgui:
             .expect("the subdiagram, in XML as its parent is");
         assert!(top.contains("<include>cabin</include>"), "{top}");
         assert!(inner.starts_with("<?xml"), "{inner}");
-        assert!(inner.contains("<name>temp_fore</name>"), "{inner}");
+        assert!(inner.contains("<name>temp_1</name>"), "{inner}");
     }
 
     /// An XML name gets an XML file, and the history still works.
@@ -1373,7 +1373,7 @@ tcsgui:
         let path = where_.path().join("graph.xml");
         let mut editor = Editor::new(&path);
 
-        editor.edit(add("temp_fore", "i2c"));
+        editor.edit(add("temp_1", "i2c"));
         let written = std::fs::read_to_string(&path).expect("the file exists");
         assert!(written.starts_with("<?xml"), "{written}");
         assert!(written.contains("<type>i2c</type>"), "{written}");
@@ -1381,7 +1381,7 @@ tcsgui:
 
         // And the history is beside it as it is for YAML, so undo reaches past
         // a crash whichever format the configuration is written in.
-        editor.edit(add("temp_aft", "i2c"));
+        editor.edit(add("temp_2", "i2c"));
         let recovered = Editor::open(&path, crate::pane::default_dividers());
         assert_eq!(recovered.undo_depth(), 2);
         assert_eq!(recovered.document().nodes.len(), 2);

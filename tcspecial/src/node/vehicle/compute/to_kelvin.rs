@@ -162,7 +162,7 @@ mod tests {
 
         let refused = |pairs: &[(&str, &str)]| {
             params_of(
-                "k_fore",
+                "k_1",
                 &pairs
                     .iter()
                     .map(|(k, v)| (k.to_string(), tcslibgs::Scalar::of(*v)))

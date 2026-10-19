@@ -34,14 +34,14 @@
 //! Nothing about order, and nothing about completeness. Arrivals come as the
 //! devices produce them, so a function over several inputs is handed one at a
 //! time and says for itself when it has enough -- which is why [`Function`]
-//! hands back an `Option` rather than a value. A mean over three sensors emits
+//! hands back an `Option` rather than a value. A vote over three sensors emits
 //! once all three have arrived and not before, so a reading is never averaged
 //! against a stale one from the pass before.
 
 pub mod hysteresis;
-pub mod mean;
 pub mod process;
 pub mod to_kelvin;
+pub mod vote;
 
 use tcslibgs::graph::Node;
 use tcslibgs::node::vehicle::compute::{self, Computation};
@@ -64,7 +64,7 @@ pub trait Function: Send {
     /// does.
     ///
     /// A setpoint arrives this way, and the value is text as everything on a
-    /// link is. Most functions take none: a mean has nothing to set, and a
+    /// link is. Most functions take none: a vote has nothing to set, and a
     /// conversion's scale is a property of the part rather than something the
     /// ground changes -- so the default refuses, naming the function, and a
     /// function that does take settings says which.
@@ -88,7 +88,7 @@ pub trait Function: Send {
 /// Build the function a node's configuration asks for.
 ///
 /// `inputs` is what the routing found bound to this node, which a function
-/// over several of them needs: a mean cannot know it is waiting for three
+/// over several of them needs: a vote cannot know it is waiting for three
 /// until something tells it how many links arrive.
 pub fn make(
     node: &Node,
@@ -102,13 +102,14 @@ pub fn make(
 
     match what {
         Computation::ToKelvin(params) => Ok(Box::new(to_kelvin::ToKelvin::of(params))),
-        Computation::Mean(params) => {
+        Computation::Vote(params) => {
             // The declared inputs and the bound ones are checked against each
-            // other by `Graph::check`, so a mean that reaches here is one
+            // other by `Graph::check`, so a vote that reaches here is one
             // whose links are the inputs it says. Checked again all the same,
-            // because what this builds is the thing that waits for them: a
-            // mean waiting for an input nothing delivers would never emit,
-            // and nothing in the telemetry would say why.
+            // because what this builds is the thing that waits for the first
+            // reading from each: a vote waiting on an input nothing delivers
+            // would never produce anything, and nothing in the telemetry
+            // would say why.
             let mut bound: Vec<&str> = inputs.to_vec();
             let mut declared: Vec<&str> =
                 params.inputs.iter().map(String::as_str).collect();
@@ -116,13 +117,13 @@ pub fn make(
             declared.sort();
             if bound != declared {
                 return Err(format!(
-                    "\"{}\" (mean) is over {declared:?} and the links bind \
+                    "\"{}\" (vote) is over {declared:?} and the links bind \
                      {bound:?}",
                     node.name
                 ));
             }
 
-            Ok(Box::new(mean::Mean::of(params)))
+            Ok(Box::new(vote::Vote::of(params)))
         }
         Computation::Hysteresis(params) => Ok(Box::new(hysteresis::Hysteresis::of(params))),
         // Started here, as the configuration is loaded: a program that
@@ -209,8 +210,8 @@ mod tests {
     ///
     /// The three built-ins joined as the shipped example joins them, because
     /// each of them being right is not the same as the three of them agreeing:
-    /// the mean has to accept what to_kelvin produces, and the hysteresis has
-    /// to accept what the mean produces. A representation change in one of
+    /// the vote has to accept what to_kelvin produces, and the hysteresis has
+    /// to accept what the vote produces. A representation change in one of
     /// them would pass that one's own tests and fail here.
     #[test]
     fn the_thermostat_runs_from_counts_to_a_decision() {
@@ -222,6 +223,8 @@ mod tests {
             })
         };
 
+        use tcslibgs::node::vehicle::compute::{Algorithm, VoteParams};
+
         // Three sensors of one make, for simplicity: a sixteenth of a degree
         // a count, above freezing.
         let mut converters = [
@@ -229,21 +232,21 @@ mod tests {
             sensor(0.0625, 273.15),
             sensor(0.0625, 273.15),
         ];
-        let mut mean = mean::Mean::of(tcslibgs::node::vehicle::compute::MeanParams {
+        let mut voted = vote::Vote::of(VoteParams {
             inputs: vec!["in0".to_string(), "in1".to_string(), "in2".to_string()],
+            algorithm: Algorithm::Median,
         });
 
         let mut thermostat =
             hysteresis::Hysteresis::of(tcslibgs::node::vehicle::compute::HysteresisParams {
                 setpoint: 293.15,
-                above: 2.0,
-                below: 2.0,
+                half_band: 2.0,
             });
 
         /// One pass: three readings in, a decision out if there is one.
         fn pass(
             converters: &mut [to_kelvin::ToKelvin; 3],
-            mean: &mut mean::Mean,
+            voted: &mut vote::Vote,
             thermostat: &mut hysteresis::Hysteresis,
             counts: [i16; 3],
         ) -> Option<Vec<u8>> {
@@ -254,7 +257,7 @@ mod tests {
                     .expect("a conversion")
                     .expect("a value");
                 let input = ["in0", "in1", "in2"][n];
-                if let Some(out) = mean.give(Some(input), &kelvin).expect("the mean") {
+                if let Some(out) = voted.give(Some(input), &kelvin).expect("the mean") {
                     averaged = Some(out);
                 }
             }
@@ -263,7 +266,7 @@ mod tests {
         }
 
         // A cold cabin: 280 counts is about 290.6 K, more than two under.
-        let decision = pass(&mut converters, &mut mean, &mut thermostat, [280, 280, 280]);
+        let decision = pass(&mut converters, &mut voted, &mut thermostat, [280, 280, 280]);
         assert_eq!(
             decision,
             Some(b"1".to_vec()),
@@ -271,18 +274,18 @@ mod tests {
         );
 
         // Warming through the band: nothing to say.
-        let decision = pass(&mut converters, &mut mean, &mut thermostat, [320, 320, 320]);
+        let decision = pass(&mut converters, &mut voted, &mut thermostat, [320, 320, 320]);
         assert_eq!(decision, None, "inside the band nothing should change");
 
         // Over the top: the heaters go off, once.
-        let decision = pass(&mut converters, &mut mean, &mut thermostat, [360, 360, 360]);
+        let decision = pass(&mut converters, &mut voted, &mut thermostat, [360, 360, 360]);
         assert_eq!(decision, Some(b"0".to_vec()));
-        let decision = pass(&mut converters, &mut mean, &mut thermostat, [365, 365, 365]);
+        let decision = pass(&mut converters, &mut voted, &mut thermostat, [365, 365, 365]);
         assert_eq!(decision, None, "the same decision should not be repeated");
 
         // And the ground asks for a warmer cabin, which the next pass acts on.
         thermostat.set_setpoint(300.0);
-        let decision = pass(&mut converters, &mut mean, &mut thermostat, [365, 365, 365]);
+        let decision = pass(&mut converters, &mut voted, &mut thermostat, [365, 365, 365]);
         assert_eq!(
             decision,
             Some(b"1".to_vec()),
@@ -296,7 +299,7 @@ mod tests {
     /// another, each with its own conversion, averaged into one number.
     #[test]
     fn three_unlike_sensors_average_to_one_temperature() {
-        use tcslibgs::node::vehicle::compute::{Format, MeanParams, ToKelvinParams};
+        use tcslibgs::node::vehicle::compute::{Algorithm, Format, ToKelvinParams, VoteParams};
 
         let part = |format: Format, scale: f64| {
             to_kelvin::ToKelvin::of(ToKelvinParams {
@@ -310,8 +313,9 @@ mod tests {
         // A different part: three bytes, and a different scale.
         let mut bay = part(Format::U24Be, 0.001);
 
-        let mut mean = mean::Mean::of(MeanParams {
+        let mut voted = vote::Vote::of(VoteParams {
             inputs: vec!["in0".to_string(), "in1".to_string(), "in2".to_string()],
+            algorithm: Algorithm::Median,
         });
 
         // All three sitting at 20 above freezing, in their own units.
@@ -319,9 +323,9 @@ mod tests {
         let b = aft.give(None, &320i16.to_be_bytes()).unwrap().unwrap();
         let c = bay.give(None, &[0x00, 0x4e, 0x20]).unwrap().unwrap();
 
-        assert_eq!(mean.give(Some("in0"), &a).unwrap(), None);
-        assert_eq!(mean.give(Some("in1"), &b).unwrap(), None);
-        let out = mean.give(Some("in2"), &c).unwrap().expect("a mean");
+        assert_eq!(voted.give(Some("in0"), &a).unwrap(), None);
+        assert_eq!(voted.give(Some("in1"), &b).unwrap(), None);
+        let out = voted.give(Some("in2"), &c).unwrap().expect("a vote");
 
         let averaged = from_value(&out, "the mean").unwrap();
         assert!(
@@ -378,7 +382,7 @@ mod tests {
         attributes.insert("format".to_string(), tcslibgs::Scalar::of("i16_be"));
         attributes.insert("offset".to_string(), tcslibgs::Scalar::of("273.15"));
         let node = Node {
-            name: "k_fore".to_string(),
+            name: "k_1".to_string(),
             node_type: "compute".to_string(),
             group: None,
             attributes,
@@ -388,7 +392,7 @@ mod tests {
             Err(said) => said,
             Ok(f) => panic!("a conversion with no scale became {}", f.name()),
         };
-        assert!(said.contains("k_fore") && said.contains("scale"), "{said}");
+        assert!(said.contains("k_1") && said.contains("scale"), "{said}");
     }
 
 }

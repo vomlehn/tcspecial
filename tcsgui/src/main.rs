@@ -4362,7 +4362,7 @@ fn arriving_at(document: &Document, node: &str, terminal: &str) -> Option<String
 /// And about the end it leaves by, which is always the terminal pressed.
 ///
 /// Always, because a link *is* an attribute of the node it leaves, named after
-/// that terminal: `payload-out: k_fore` is where the link is written, so there is no
+/// that terminal: `payload-out: k_1` is where the link is written, so there is no
 /// such thing as a link whose source terminal the file does not say.
 fn leaving_by(from: &Drawing) -> Option<String> {
     Some(from.terminal.clone())
@@ -5877,13 +5877,16 @@ mod tests {
         assert!(named.contains(&"subdiagram".to_string()), "{named:?}");
 
         // What a placed node is given, as the one string a callback carries.
-        let mean = rows
+        let voter = rows
             .iter()
-            .find(|row| row.node.name == "mean")
-            .expect("the mean entry");
-        assert_eq!(mean.node.node_type, "compute");
-        assert_eq!(mean.sets, "function=mean");
-        assert_eq!(stated(&mean.sets), vec![("function".to_string(), "mean".to_string())]);
+            .find(|row| row.node.name == "vote")
+            .expect("the vote entry");
+        assert_eq!(voter.node.node_type, "compute");
+        assert_eq!(voter.sets, "function=vote");
+        assert_eq!(
+            stated(&voter.sets),
+            vec![("function".to_string(), "vote".to_string())]
+        );
 
         // With no tree at all the pane is what it was before there was one:
         // every type offered as itself. An editor whose descriptions are not
@@ -6493,13 +6496,13 @@ mod tests {
         let where_ = tempfile::tempdir().expect("a directory");
         let mut editor = Editor::new(&where_.path().join("v.yaml"));
         editor.edit(Edit::AddNode {
-            name: "temp_fore".into(),
+            name: "temp_1".into(),
             node_type: "i2c".into(),
             home: None,
         });
 
-        let (name, node_type, _, fields) = panel_of(&editor, &None, Some("temp_fore"));
-        assert_eq!(name, "temp_fore");
+        let (name, node_type, _, fields) = panel_of(&editor, &None, Some("temp_1"));
+        assert_eq!(name, "temp_1");
         assert_eq!(node_type, "i2c");
 
         let shown: Vec<String> = fields.iter().map(|f| f.name.to_string()).collect();
@@ -6529,18 +6532,18 @@ mod tests {
         let where_ = tempfile::tempdir().expect("a directory");
         let mut editor = Editor::new(&where_.path().join("v.yaml"));
         editor.edit(Edit::AddNode {
-            name: "temp_fore".into(),
+            name: "temp_1".into(),
             node_type: "i2c".into(),
             home: None,
         });
         editor.edit(Edit::SetAttribute {
-            node: "temp_fore".into(),
+            node: "temp_1".into(),
             attribute: "path".into(),
             was: None,
             now: Some("/dev/i2c-1".into()),
         });
 
-        let (_, _, _, fields) = panel_of(&editor, &None, Some("temp_fore"));
+        let (_, _, _, fields) = panel_of(&editor, &None, Some("temp_1"));
         let path = fields.iter().find(|f| f.name == "path").unwrap();
         assert_eq!(path.value, "/dev/i2c-1");
         assert!(path.required, "the bus is one the configuration must state");
@@ -6560,18 +6563,18 @@ mod tests {
         let where_ = tempfile::tempdir().expect("a directory");
         let mut editor = Editor::new(&where_.path().join("v.yaml"));
         editor.edit(Edit::AddNode {
-            name: "temp_fore".into(),
+            name: "temp_1".into(),
             node_type: "i2c".into(),
             home: None,
         });
         editor.edit(Edit::SetAttribute {
-            node: "temp_fore".into(),
+            node: "temp_1".into(),
             attribute: "future_thing".into(),
             was: None,
             now: Some("7".into()),
         });
 
-        let (_, _, _, fields) = panel_of(&editor, &None, Some("temp_fore"));
+        let (_, _, _, fields) = panel_of(&editor, &None, Some("temp_1"));
         let extra = fields
             .iter()
             .find(|f| f.name == "future_thing")
@@ -6721,7 +6724,7 @@ mod tests {
             home: None,
         });
         editor.edit(Edit::AddNode {
-            name: "temp_fore".into(),
+            name: "temp_1".into(),
             node_type: "i2c".into(),
             home: Some("cabin".into()),
         });
@@ -6732,7 +6735,7 @@ mod tests {
 
         let (inside, _) = views_of(&editor, &Some("cabin".into()), None);
         let names: Vec<String> = inside.iter().map(|n| n.name.to_string()).collect();
-        assert_eq!(names, vec!["temp_fore".to_string()]);
+        assert_eq!(names, vec!["temp_1".to_string()]);
 
         // The closed box says what is in it, rather than drawing it.
         let box_ = top.iter().find(|n| n.name == "cabin").unwrap();
@@ -6764,12 +6767,12 @@ mod tests {
             home: None,
         });
         editor.edit(Edit::AddNode {
-            name: "temp_fore".into(),
+            name: "temp_1".into(),
             node_type: "i2c".into(),
             home: Some("cabin".into()),
         });
         editor.edit(Edit::AddLink {
-            link: Link::new("cabin/temp_fore", "moc", None),
+            link: Link::new("cabin/temp_1", "moc", None),
         });
 
         // Seen from inside the subdiagram: one link, named for where it goes.
@@ -6780,7 +6783,7 @@ mod tests {
         // And seen from the top diagram, where its source is off the page.
         let (_, top) = views_of(&editor, &None, None);
         assert_eq!(top.len(), 1);
-        assert_eq!(top[0].label, "cabin/temp_fore");
+        assert_eq!(top[0].label, "cabin/temp_1");
     }
 
     /// A name is the type, a hyphen and the first free number, and it is
@@ -7578,19 +7581,19 @@ mod tests {
         // A mean is the one destination whose arriving end is named by
         // something that is not a terminal, and it still fills its inputs.
         document.apply(&Edit::AddNode {
-            name: "mean_temp".into(),
+            name: "cabin_temp".into(),
             node_type: "compute".into(),
             home: None,
         });
         document.apply(&Edit::SetAttribute {
-            node: "mean_temp".into(),
+            node: "cabin_temp".into(),
             attribute: "inputs".into(),
             was: None,
             now: Some("in0,in1".into()),
         });
-        assert!(declares_inputs(&document, "mean_temp"));
+        assert!(declares_inputs(&document, "cabin_temp"));
         assert_eq!(
-            arriving_at(&document, "mean_temp", "payload-in").as_deref(),
+            arriving_at(&document, "cabin_temp", "payload-in").as_deref(),
             Some("in0"),
             "a mean is filled by name, not by terminal"
         );
@@ -7800,12 +7803,12 @@ mod tests {
         // And a payload already placed is in the way, so the next one goes
         // beside it or below it rather than on top of it.
         document.apply(&Edit::AddNode {
-            name: "temp_fore".into(),
+            name: "temp_1".into(),
             node_type: "i2c".into(),
             home: None,
         });
         document.apply(&Edit::MoveNode {
-            node: "temp_fore".into(),
+            node: "temp_1".into(),
             was: (0, 0),
             now: first_payload,
         });
@@ -9372,7 +9375,7 @@ mod tests {
         };
         shut(0o500);
         editor.borrow_mut().edit(Edit::AddNode {
-            name: "mean_temp".into(),
+            name: "cabin_temp".into(),
             node_type: "compute".into(),
             home: None,
         });
@@ -9441,9 +9444,9 @@ mod tests {
             dividers(),
         )));
         for (name, node_type) in [
-            ("temp_fore", "i2c"),
-            ("temp_aft", "i2c"),
-            ("mean_temp", "compute"),
+            ("temp_1", "i2c"),
+            ("temp_2", "i2c"),
+            ("cabin_temp", "compute"),
         ] {
             editor.borrow_mut().edit(Edit::AddNode {
                 name: name.to_string(),
@@ -9496,24 +9499,24 @@ mod tests {
 
         // Two lines into one input, which is the fault: a mean over one
         // reading and itself.
-        let twice = |to: &str| journal::Link::joining(to, Some("payload-out"), "mean_temp", Some("in0"));
-        editor.borrow_mut().edit(Edit::AddLink { link: twice("temp_fore") });
+        let twice = |to: &str| journal::Link::joining(to, Some("payload-out"), "cabin_temp", Some("in0"));
+        editor.borrow_mut().edit(Edit::AddLink { link: twice("temp_1") });
         views.borrow().refresh(&editor.borrow());
         assert!(!shown().0, "one line into an input is no fault");
 
-        editor.borrow_mut().edit(Edit::AddLink { link: twice("temp_aft") });
+        editor.borrow_mut().edit(Edit::AddLink { link: twice("temp_2") });
         views.borrow().refresh(&editor.borrow());
         let (visible, heading, said) = shown();
         assert!(visible, "the fault was not shown");
         assert!(heading.contains("configuration"), "{heading}");
         assert!(said.contains("two links arrive"), "{said}");
-        assert!(said.contains("mean_temp.in0"), "{said}");
+        assert!(said.contains("cabin_temp.in0"), "{said}");
 
         // Acknowledged, and the next edit does not bring it back: the red on
         // the node and the sentence in its window are still saying it.
         views.borrow().alert.as_ref().unwrap().invoke_acknowledged();
         editor.borrow_mut().edit(Edit::AddNode {
-            name: "temp_bay".to_string(),
+            name: "temp_3".to_string(),
             node_type: "i2c".to_string(),
             home: None,
         });
@@ -9522,10 +9525,10 @@ mod tests {
 
         // Put right and made again, and it is said again: a fault that is no
         // longer there is forgotten, which is what lets it be said twice.
-        editor.borrow_mut().edit(Edit::RemoveLink { link: twice("temp_aft") });
+        editor.borrow_mut().edit(Edit::RemoveLink { link: twice("temp_2") });
         views.borrow().refresh(&editor.borrow());
         assert!(editor.borrow().faults().is_empty(), "{:?}", editor.borrow().faults());
-        editor.borrow_mut().edit(Edit::AddLink { link: twice("temp_aft") });
+        editor.borrow_mut().edit(Edit::AddLink { link: twice("temp_2") });
         views.borrow().refresh(&editor.borrow());
         assert!(shown().0, "a fault made again should be said again");
     }
@@ -9713,39 +9716,46 @@ mod tests {
         views.borrow().refresh(&editor.borrow());
 
         // The entry the palette offers, pressed.
-        let mean = rows_of(Pane::Vehicle)
+        let voter = rows_of(Pane::Vehicle)
             .into_iter()
-            .find(|row| row.node.name == "mean")
-            .expect("the palette offers a mean");
-        ui.invoke_place_node(mean.node.name.clone(), mean.node.node_type.clone(), mean.sets);
+            .find(|row| row.node.name == "vote")
+            .expect("the palette offers a vote");
+        ui.invoke_place_node(voter.node.name.clone(), voter.node.node_type.clone(), voter.sets);
 
         // Named after the type, numbered from one: see `fresh_name`. The
-        // palette entry is called "mean" and the node it places is "mean-1",
+        // palette entry is called "vote" and the node it places is "vote-1",
         // which is the editor saying "this is the first of them" rather than
-        // "this is the mean".
+        // "this is the vote".
         let placed = editor
             .borrow()
             .document()
-            .node("mean-1")
+            .node("vote-1")
             .cloned()
-            .expect("a node called mean-1");
+            .expect("a node called vote-1");
         assert_eq!(placed.node_type, "compute");
         assert_eq!(
             placed.attributes.get("function").map(String::as_str),
-            Some("mean"),
-            "a mean placed from the palette is a mean"
+            Some("vote"),
+            "a vote placed from the palette is a vote"
         );
 
-        // And the panel asks it for a mean's attributes rather than for every
+        // And the panel asks it for a vote's attributes rather than for every
         // attribute any computation has.
-        chosen.borrow_mut().insert(String::new(), "mean-1".to_string());
-        let (_, _, _, fields) = panel_of(&editor.borrow(), &None, Some("mean-1"));
+        chosen.borrow_mut().insert(String::new(), "vote-1".to_string());
+        let (_, _, _, fields) = panel_of(&editor.borrow(), &None, Some("vote-1"));
         let asked: Vec<String> = fields
             .iter()
             .filter(|field| !field.is_heading)
             .map(|field| field.name.to_string())
             .collect();
-        assert_eq!(asked, vec!["function".to_string(), "inputs".to_string()]);
+        assert_eq!(
+            asked,
+            vec![
+                "function".to_string(),
+                "inputs".to_string(),
+                "algorithm".to_string()
+            ]
+        );
 
         // Placed in one step, so undone in one: the node, the function its
         // entry answered and the place it was put all go with one Undo, and
@@ -9753,21 +9763,21 @@ mod tests {
         let at = placed.at;
         editor.borrow_mut().undo();
         assert!(
-            editor.borrow().document().node("mean-1").is_none(),
+            editor.borrow().document().node("vote-1").is_none(),
             "one undo takes the placed node away"
         );
         editor.borrow_mut().redo();
         let back = editor
             .borrow()
             .document()
-            .node("mean-1")
+            .node("vote-1")
             .cloned()
             .expect("one redo puts it back");
         assert_eq!(back.at, at, "where it was placed, not the corner");
         assert_eq!(
             back.attributes.get("function").map(String::as_str),
-            Some("mean"),
-            "and still a mean"
+            Some("vote"),
+            "and still a vote"
         );
 
         // And so for every entry the palette offers, in every pane: whatever
@@ -10072,7 +10082,7 @@ mod tests {
 
             assert_eq!(
                 ui.get_links().row_count(),
-                16,
+                18,
                 "thermostat.{extension} should draw every line"
             );
             for row in 0..ui.get_links().row_count() {
@@ -10265,14 +10275,14 @@ mod tests {
             dividers(),
         )));
         editor.borrow_mut().edit(Edit::AddNode {
-            name: "temp_fore".to_string(),
+            name: "temp_1".to_string(),
             node_type: "i2c".to_string(),
             home: None,
         });
         // In its own pane, a little in from the divider.
         let was = (24, 88);
         editor.borrow_mut().edit(Edit::MoveNode {
-            node: "temp_fore".to_string(),
+            node: "temp_1".to_string(),
             was: (0, 0),
             now: was,
         });
@@ -10341,7 +10351,7 @@ mod tests {
         let now = editor
             .borrow()
             .document()
-            .node("temp_fore")
+            .node("temp_1")
             .expect("the node")
             .at;
         assert_eq!(
@@ -10648,7 +10658,7 @@ mod tests {
         };
         shut(0o500);
         editor.borrow_mut().edit(Edit::AddNode {
-            name: "mean_temp".into(),
+            name: "cabin_temp".into(),
             node_type: "compute".into(),
             home: None,
         });
@@ -10686,7 +10696,7 @@ mod tests {
         window.invoke_saved();
         assert!(!editor.borrow().unsaved(), "{:?}", editor.borrow().trouble());
         let written = std::fs::read_to_string(&path).expect("the file");
-        assert!(written.contains("mean_temp"), "{written}");
+        assert!(written.contains("cabin_temp"), "{written}");
     }
 
     /// A click on a node opens a window for it, and another node opens
@@ -10725,7 +10735,7 @@ mod tests {
             let left = dividers().payloads;
             for (name, node_type, at) in [
                 ("to_kelvin", "compute", (left + 120, 88)),
-                ("mean_temp", "compute", (left + 120, 240)),
+                ("cabin_temp", "compute", (left + 120, 240)),
                 // And a payload, in its own pane. Of a different type on
                 // purpose: a click has to open the window for whatever was
                 // clicked, and a payload is the one a person reaches for
@@ -10838,7 +10848,7 @@ mod tests {
         // A second node opens a second window, and the first stays: which is
         // the whole point of this not being a panel.
         click((dividers().payloads + 120, 240), "compute");
-        ui.invoke_node_edit("mean_temp".into());
+        ui.invoke_node_edit("cabin_temp".into());
         assert_eq!(
             views.borrow().attributes.len(),
             2,
@@ -10942,7 +10952,7 @@ mod tests {
         window.invoke_closed();
         assert_eq!(
             views.borrow().attributes.keys().collect::<Vec<_>>(),
-            vec!["askew", "mean_temp", "sensor"],
+            vec!["askew", "cabin_temp", "sensor"],
             "Close should shut one window and leave the others"
         );
     }
@@ -10964,7 +10974,7 @@ mod tests {
         )));
         {
             let mut editor = editor.borrow_mut();
-            for (name, node_type) in [("temp_fore", "i2c"), ("k", "compute")] {
+            for (name, node_type) in [("temp_1", "i2c"), ("k", "compute")] {
                 editor.edit(Edit::AddNode {
                     name: name.to_string(),
                     node_type: node_type.to_string(),
@@ -10975,7 +10985,7 @@ mod tests {
 
         // With no simulator file, a payload's panel is its own attributes and
         // nothing else: there is no second file for anything to go in.
-        let (_, _, _, fields) = panel_of(&editor.borrow(), &None, Some("temp_fore"));
+        let (_, _, _, fields) = panel_of(&editor.borrow(), &None, Some("temp_1"));
         assert!(
             fields.iter().all(|f| !f.is_heading && !f.simulated),
             "the panel should carry nothing of a file that was not given"
@@ -10987,7 +10997,7 @@ mod tests {
 
         // Now the payload's panel is its attributes, a rule, and the
         // simulator's settings for it.
-        let (_, _, _, fields) = panel_of(&editor.borrow(), &None, Some("temp_fore"));
+        let (_, _, _, fields) = panel_of(&editor.borrow(), &None, Some("temp_1"));
         let rule = fields
             .iter()
             .position(|f| f.is_heading)
@@ -11042,11 +11052,11 @@ mod tests {
             showing: Rc::new(RefCell::new(String::new())),
         }));
 
-        show_node(&editor, &views, "temp_fore");
+        show_node(&editor, &views, "temp_1");
         let window = views
             .borrow()
             .attributes
-            .get("temp_fore")
+            .get("temp_1")
             .map(|window| window.as_weak())
             .expect("the node's window")
             .upgrade()
@@ -11056,7 +11066,7 @@ mod tests {
         window.invoke_sim_attribute_set("drop_percent".into(), "10".into());
         assert_eq!(
             editor.borrow().document().simulator.as_ref().unwrap().payloads
-                ["temp_fore"]["drop_percent"],
+                ["temp_1"]["drop_percent"],
             "10"
         );
         // One edit, and the node's own attributes are untouched: two files,
@@ -11065,13 +11075,13 @@ mod tests {
         assert!(!editor
             .borrow()
             .document()
-            .node("temp_fore")
+            .node("temp_1")
             .unwrap()
             .attributes
             .contains_key("drop_percent"));
         assert!(editor.borrow_mut().undo());
         assert!(!editor.borrow().document().simulator.as_ref().unwrap().payloads
-            ["temp_fore"]
+            ["temp_1"]
             .contains_key("drop_percent"));
     }
 
@@ -11193,7 +11203,7 @@ mod tests {
                 name: "cabin_temps".to_string(),
                 interval: "3 s".to_string(),
             });
-            for name in ["temp_fore", "temp_aft"] {
+            for name in ["temp_1", "temp_2"] {
                 editor.edit(Edit::AddNode {
                     name: name.to_string(),
                     node_type: "i2c".to_string(),
@@ -11249,13 +11259,13 @@ mod tests {
             .expect("and still be there");
         assert_eq!(window.get_group(), "cabin_temps");
         assert_eq!(window.get_interval(), "3 s");
-        assert_eq!(window.get_members_text(), "temp_fore, temp_aft");
+        assert_eq!(window.get_members_text(), "temp_1, temp_2");
 
         // One of the fields they both have, set once.
         let depth = editor.borrow().undo_depth();
         window.invoke_attribute_set("path".into(), "/dev/i2c-1".into());
 
-        for name in ["temp_fore", "temp_aft"] {
+        for name in ["temp_1", "temp_2"] {
             assert_eq!(
                 editor
                     .borrow()
@@ -11277,7 +11287,7 @@ mod tests {
             "setting one value on a group should be one edit"
         );
         assert!(editor.borrow_mut().undo());
-        for name in ["temp_fore", "temp_aft"] {
+        for name in ["temp_1", "temp_2"] {
             assert_eq!(
                 editor.borrow().document().node(name).unwrap().attributes.get("path"),
                 None,
@@ -11295,7 +11305,7 @@ mod tests {
             editor
                 .borrow()
                 .document()
-                .node("temp_fore")
+                .node("temp_1")
                 .unwrap()
                 .attributes
                 .get("group")
@@ -11425,7 +11435,7 @@ mod tests {
 
         let window = MainWindow::new().expect("a window");
         let at = (120, 90);
-        let node = view_of("temp_fore", "i2c", at, None, false, None);
+        let node = view_of("temp_1", "i2c", at, None, false, None);
         let (width, height) = (node.width, node.height);
         window
             .set_nodes(ModelRc::from(Rc::new(VecModel::from(vec![node]))));

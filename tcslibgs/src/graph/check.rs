@@ -150,11 +150,11 @@ pub enum Problem {
     BadLog { node: String, why: String },
     /// A compute node whose attributes are not its computation's.
     BadCompute { node: String, why: String },
-    /// A mean whose declared inputs are not the ones the links bind.
+    /// A vote whose declared inputs are not the ones the links bind.
     ///
     /// `declared` is what the node says it is over and `bound` what arrives:
     /// the two are listed so that a reader can see which is missing.
-    MeanInputs {
+    VoteInputs {
         node: String,
         declared: Vec<String>,
         bound: Vec<String>,
@@ -265,7 +265,7 @@ impl Problem {
             Problem::BadNode { node, .. } => About::Node(node.clone()),
             Problem::BadLog { node, .. } => About::Node(node.clone()),
             Problem::BadCompute { node, .. } => About::Node(node.clone()),
-            Problem::MeanInputs { node, .. } => About::Node(node.clone()),
+            Problem::VoteInputs { node, .. } => About::Node(node.clone()),
             // Reported on the source and not on the log: the log is right
             // about what it wants, and the source is the thing a reader will
             // have to change or unlink.
@@ -405,13 +405,13 @@ impl Problem {
             // The reason already names the node and the computation: see
             // crate::node::vehicle::compute::params_of.
             Problem::BadCompute { why, .. } => why.clone(),
-            Problem::MeanInputs {
+            Problem::VoteInputs {
                 node,
                 declared,
                 bound,
             } => format!(
-                "\"{node}\" is a mean over {} and the links bind {}: a mean whose \
-                 inputs are not the ones that arrive is a mean over the wrong \
+                "\"{node}\" votes over {} and the links bind {}: a vote whose \
+                 inputs are not the ones that arrive is a vote over the wrong \
                  readings",
                 said(declared),
                 said(bound)
@@ -899,18 +899,19 @@ impl Graph {
                 }
             };
 
-            // A mean says which inputs it is over, and the links say which
-            // arrive. Both are checked, and against each other: a mean over
+            // A vote says which inputs it is over, and the links say which
+            // arrive. Both are checked, and against each other: a vote over
             // three sensors whose third link was deleted has two inputs, each
-            // bound exactly once, and would otherwise quietly become a mean
-            // over two.
-            if let crate::node::vehicle::compute::Computation::Mean(mean) = &what {
+            // bound exactly once, and would otherwise quietly become a vote
+            // over two -- which is no vote at all, two readings that disagree
+            // having no majority between them.
+            if let crate::node::vehicle::compute::Computation::Vote(vote) = &what {
                 let mut bound = self.inputs_bound_at(&node.name);
-                let mut declared = mean.inputs.clone();
+                let mut declared = vote.inputs.clone();
                 bound.sort();
                 declared.sort();
                 if bound != declared {
-                    problems.push(Problem::MeanInputs {
+                    problems.push(Problem::VoteInputs {
                         node: node.name.clone(),
                         declared,
                         bound,
@@ -2140,15 +2141,12 @@ mod tests {
 
         // A thermostat with no band, which used to pass here and be refused
         // when the vehicle started.
-        let problems = computation(&[
-            ("function", "hysteresis"),
-            ("setpoint", "293.15"),
-            ("above", "2.0"),
-        ]);
+        let problems = computation(&[("function", "hysteresis"), ("setpoint", "293.15")]);
         assert!(
             problems.iter().any(|p| matches!(
                 p,
-                Problem::BadCompute { node, why } if node == "thermostat" && why.contains("below")
+                Problem::BadCompute { node, why }
+                    if node == "thermostat" && why.contains("half_band")
             )),
             "{problems:?}"
         );
@@ -2167,8 +2165,7 @@ mod tests {
         let problems = computation(&[
             ("function", "hysteresis"),
             ("setpoint", "293.15"),
-            ("above", "2.0"),
-            ("below", "2.0"),
+            ("half_band", "2.0"),
         ]);
         assert!(
             !problems
@@ -2178,64 +2175,73 @@ mod tests {
         );
     }
 
-    /// A mean is over the inputs the links bind, and says which they are.
+    /// A vote is over the inputs the links bind, and says which they are.
     ///
     /// The fault this catches has no other symptom: a mean over three sensors
     /// whose third link was deleted has two inputs, each bound exactly once,
     /// and would otherwise quietly become a mean over two.
     #[test]
-    fn a_mean_is_over_the_inputs_that_arrive() {
-        let mean = |declared: &str, links: Vec<Link>| {
+    fn a_vote_is_over_the_inputs_that_arrive() {
+        let voting = |declared: &str, links: Vec<Link>| {
             let mut average = node("average", "compute");
             average.attributes.clear();
             average
                 .attributes
-                .insert("function".to_string(), Scalar::of("mean"));
+                .insert("function".to_string(), Scalar::of("vote"));
+            average
+                .attributes
+                .insert("algorithm".to_string(), Scalar::of("median"));
             average
                 .attributes
                 .insert("inputs".to_string(), Scalar::of(declared));
             let g = graph(
-                vec![node("a", "i2c"), node("b", "i2c"), average],
+                vec![node("a", "i2c"), node("b", "i2c"), node("c", "i2c"), average],
                 links,
             );
             g.check()
         };
 
-        let both = || {
+        let two = || {
             vec![
                 link("a", &["average.in0"]),
                 link("b", &["average.in1"]),
             ]
         };
+        let three = || {
+            let mut links = two();
+            links.push(link("c", &["average.in2"]));
+            links
+        };
 
         // Three declared, two bound.
-        let problems = mean("in0,in1,in2", both());
+        let problems = voting("in0,in1,in2", two());
         assert!(
             problems.iter().any(|p| matches!(
                 p,
-                Problem::MeanInputs { node, declared, bound }
+                Problem::VoteInputs { node, declared, bound }
                     if node == "average" && declared.len() == 3 && bound.len() == 2
             )),
             "{problems:?}"
         );
 
-        // Two declared and two bound, under other names: the names have to be
-        // the same ones, not merely the same number -- a mean told in1 and in2
-        // and linked in0 and in1 is waiting for a reading nothing delivers.
-        let problems = mean("in1,in2", both());
+        // Three declared and three bound, under other names: the names have
+        // to be the same ones, not merely the same number -- a vote told in1,
+        // in2 and in3 and linked in0, in1 and in2 is waiting for a reading
+        // nothing delivers.
+        let problems = voting("in1,in2,in3", three());
         assert!(
             problems
                 .iter()
-                .any(|p| matches!(p, Problem::MeanInputs { .. })),
+                .any(|p| matches!(p, Problem::VoteInputs { .. })),
             "{problems:?}"
         );
 
-        // And the two agreeing, which says nothing.
-        let problems = mean("in0,in1", both());
+        // And the three agreeing, which says nothing.
+        let problems = voting("in0,in1,in2", three());
         assert!(
             !problems
                 .iter()
-                .any(|p| matches!(p, Problem::MeanInputs { .. })),
+                .any(|p| matches!(p, Problem::VoteInputs { .. })),
             "{problems:?}"
         );
     }
@@ -2279,7 +2285,7 @@ mod tests {
         assert!(
             !problems
                 .iter()
-                .any(|p| matches!(p, Problem::MeanInputs { .. })),
+                .any(|p| matches!(p, Problem::VoteInputs { .. })),
             "{problems:?}"
         );
     }
@@ -2336,13 +2342,13 @@ mod tests {
         // to say.
         let g = graph(
             vec![
-                sensor("temp_fore", Some("2")),
-                sensor("temp_aft", Some("2")),
+                sensor("temp_1", Some("2")),
+                sensor("temp_2", Some("2")),
                 fixed_log("fixed:2"),
             ],
             vec![
-                link("temp_fore", &["housekeeping"]),
-                link("temp_aft", &["housekeeping"]),
+                link("temp_1", &["housekeeping"]),
+                link("temp_2", &["housekeeping"]),
             ],
         );
         assert!(
@@ -2357,13 +2363,13 @@ mod tests {
         // the source, naming both lengths.
         let g = graph(
             vec![
-                sensor("temp_fore", Some("2")),
-                sensor("temp_bay", Some("3")),
+                sensor("temp_1", Some("2")),
+                sensor("temp_3", Some("3")),
                 fixed_log("fixed:2"),
             ],
             vec![
-                link("temp_fore", &["housekeeping"]),
-                link("temp_bay", &["housekeeping"]),
+                link("temp_1", &["housekeeping"]),
+                link("temp_3", &["housekeeping"]),
             ],
         );
         let problems = g.check();
@@ -2375,7 +2381,7 @@ mod tests {
         assert!(matches!(
             mismatches[0],
             Problem::LogSourceMismatch { source, wanted: 2, produces: Some(3), .. }
-                if source == "temp_bay"
+                if source == "temp_3"
         ));
         assert!(
             mismatches[0].describe().contains("3 bytes")
@@ -2389,12 +2395,12 @@ mod tests {
         let g = graph(
             vec![
                 node("thermostat", "compute"),
-                sensor("temp_fore", None),
+                sensor("temp_1", None),
                 fixed_log("fixed:2"),
             ],
             vec![
                 link("thermostat", &["housekeeping"]),
-                link("temp_fore", &["housekeeping"]),
+                link("temp_1", &["housekeeping"]),
             ],
         );
         let problems = g.check();
@@ -2416,12 +2422,12 @@ mod tests {
             let g = graph(
                 vec![
                     node("thermostat", "compute"),
-                    sensor("temp_bay", Some("3")),
+                    sensor("temp_3", Some("3")),
                     fixed_log(format),
                 ],
                 vec![
                     link("thermostat", &["housekeeping"]),
-                    link("temp_bay", &["housekeeping"]),
+                    link("temp_3", &["housekeeping"]),
                 ],
             );
             assert!(
@@ -2723,12 +2729,12 @@ mod tests {
                 node: "c".into(),
                 why: "\"c\" (mean): inputs is not set".into(),
             },
-            Problem::MeanInputs {
+            Problem::VoteInputs {
                 node: "c".into(),
                 declared: vec!["in0".into(), "in1".into(), "in2".into()],
                 bound: vec!["in0".into()],
             },
-            Problem::MeanInputs {
+            Problem::VoteInputs {
                 node: "c".into(),
                 declared: vec!["in0".into()],
                 bound: vec![],

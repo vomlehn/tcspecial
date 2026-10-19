@@ -166,7 +166,7 @@ mod tests {
             .iter()
             .map(|h| (h.name.0.as_str(), h.packet_size))
             .collect();
-        assert!(sized.contains(&("temp_fore", 2)), "{sized:?}");
-        assert!(sized.contains(&("temp_bay", 3)), "{sized:?}");
+        assert!(sized.contains(&("temp_1", 2)), "{sized:?}");
+        assert!(sized.contains(&("temp_3", 3)), "{sized:?}");
     }
 }

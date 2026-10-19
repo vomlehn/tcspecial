@@ -268,7 +268,7 @@ fn line_opens_an_entry(line: &str) -> bool {
 
 /// Which data source this line writes, if it writes one.
 ///
-/// `payload-out: k_fore` in YAML and `<payload-out>k_fore</payload-out>` in XML -- and the
+/// `payload-out: k_1` in YAML and `<payload-out>k_1</payload-out>` in XML -- and the
 /// list form too, a comment above `payload-out: [a, b]` being about both of them.
 /// The two names are the schema's: see `tcslibgs::graph::terminals`.
 fn source_named(line: &str, xml: bool) -> Option<String> {
@@ -540,8 +540,8 @@ mod tests {
         for extension in ["yaml", "xml"] {
             let path = root.join(format!("tests/manual/thermostat.{extension}"));
             let document = read(&path).expect("the worked example");
-            assert_eq!(document.nodes.len(), 11, "thermostat.{extension}");
-            assert_eq!(document.links.len(), 16, "thermostat.{extension}");
+            assert_eq!(document.nodes.len(), 12, "thermostat.{extension}");
+            assert_eq!(document.links.len(), 18, "thermostat.{extension}");
         }
     }
 
@@ -592,39 +592,54 @@ mod tests {
             let sensor = document
                 .nodes
                 .iter()
-                .find(|n| n.name == "temp_fore")
-                .expect("the forward sensor");
+                .find(|n| n.name == "temp_1")
+                .expect("the first of the trio");
             assert_eq!(
                 sensor.comment.as_deref(),
-                Some("Forward bulkhead. Two bytes, signed, big endian."),
+                Some(
+                    "One of three sensors of the same place, a trio, so that the\n\
+                     temperature survives one of them going wrong. Two bytes, signed,\n\
+                     big endian."
+                ),
                 "{extension}"
             );
 
-            // Two lines, which is how the example writes the bay sensor's.
-            let bay = document
+            // Several lines, which is how the example writes the third
+            // sensor's: a comment that wrapped is read back wrapped.
+            let third = document
                 .nodes
                 .iter()
-                .find(|n| n.name == "temp_bay")
-                .expect("the bay sensor");
+                .find(|n| n.name == "temp_3")
+                .expect("the third of the trio");
             assert!(
-                bay.comment
-                    .as_deref()
-                    .is_some_and(|said| said.contains("Equipment bay") && said.contains("own conversion")),
+                third.comment.as_deref().is_some_and(|said| {
+                    said.contains("different bus") && said.contains("own conversion")
+                }),
                 "{extension}: {:?}",
-                bay.comment
+                third.comment
+            );
+            assert!(
+                third.comment.as_deref().is_some_and(|said| said.contains('\n')),
+                "{extension}: and over more than one line"
             );
 
-            // A link's, and a command binding's.
-            let heaters = document
-                .links
-                .iter()
-                .find(|l| l.from == "thermostat" && l.to == "heaters")
-                .expect("the link to the heaters");
-            assert_eq!(
-                heaters.comment.as_deref(),
-                Some("asserted below the setpoint, unasserted above it"),
-                "{extension}"
-            );
+            // A link's, and a command binding's. The comment is above the
+            // terminal rather than one of its lines, so both heaters carry
+            // it: it is about what leaves there and not about which heater.
+            for heater in ["heaters_1", "heaters_2"] {
+                let link = document
+                    .links
+                    .iter()
+                    .find(|l| l.from == "thermostat" && l.to == heater)
+                    .unwrap_or_else(|| panic!("the link to {heater}"));
+                assert!(
+                    link.comment
+                        .as_deref()
+                        .is_some_and(|said| said.contains("asserted below the setpoint")),
+                    "{extension}: {heater}: {:?}",
+                    link.comment
+                );
+            }
             assert_eq!(
                 document.commands[0].comment.as_deref(),
                 Some("the cabin temperature the heaters are held at, in kelvin"),

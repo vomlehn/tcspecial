@@ -13,10 +13,10 @@
 //! disagree about what a node is are two statements of one fact.
 //!
 //! A link is an attribute of the node it leaves, named after the data source
-//! it leaves by, with one entry per line: `payload-out: [{ target: k_fore }]` is a
-//! link from this node's `payload-out` terminal to `k_fore`, and an entry naming an
+//! it leaves by, with one entry per line: `payload-out: [{ target: k_1 }]` is a
+//! link from this node's `payload-out` terminal to `k_1`, and an entry naming an
 //! `input` as well feeds a named input of the node it reaches. The short
-//! spelling is read too -- `payload-out: k_fore`, `payload-out: [moc, mean_temp.in0]` --
+//! spelling is read too -- `payload-out: k_1`, `payload-out: [moc, cabin_temp.in0]` --
 //! and means the same thing; see [`Destinations`].
 //!
 //! So there is no links section, and a node and the links out of it are read,
@@ -301,7 +301,7 @@ impl NodeFile {
     /// The links this node's sources make.
     ///
     /// One per destination, each `from` naming the node and the data source it
-    /// leaves by -- `k_fore.payload-out` -- which is what every rule about a link
+    /// leaves by -- `k_1.payload-out` -- which is what every rule about a link
     /// already reads: see [`Link::origin`].
     pub fn links(&self) -> Vec<Link> {
         let mut links = Vec::new();
@@ -558,7 +558,7 @@ pub struct Link {
 impl Link {
     /// Which node this link leaves, and by which of its data sources.
     ///
-    /// Written the way a destination is -- `temp_fore.payload-out` -- because the
+    /// Written the way a destination is -- `temp_1.payload-out` -- because the
     /// two ends of a link are the same kind of thing: a node and one of its
     /// terminals. A node with one source needs no name after the dot, so every
     /// file written before there were names for these still says what it said.
@@ -575,7 +575,7 @@ impl Link {
 /// ```yaml
 /// payload-out:
 ///   - target: moc
-///   - target: mean_temp
+///   - target: cabin_temp
 ///     input: in0
 /// ```
 ///
@@ -586,7 +586,7 @@ impl Link {
 /// it.
 ///
 /// The short spellings are still read: `payload-out: moc` and `payload-out: [moc,
-/// mean_temp.in0]`, the node and its input separated by a dot. Every
+/// cabin_temp.in0]`, the node and its input separated by a dot. Every
 /// configuration written before entries existed says what it said, and a link
 /// to one place is a line somebody can still write in a line. All of them read
 /// into the same thing -- a destination as `node` or `node.input` -- because
@@ -720,7 +720,7 @@ fn said_so<'de, A: serde::de::MapAccess<'de>>(
 
 /// The destination a mapping names, however the mapping got there.
 ///
-/// Two shapes arrive here. An entry -- `{ target: mean_temp, input: in0 }` --
+/// Two shapes arrive here. An entry -- `{ target: cabin_temp, input: in0 }` --
 /// which is what the editor writes and what a person writing a link by hand
 /// now has to write for a link to a named input. And an XML element with text
 /// in it, `<payload-out>moc</payload-out>`, which quick-xml hands over as a map of one
@@ -784,7 +784,7 @@ fn written_as<'de, A: serde::de::MapAccess<'de>>(mut map: A) -> Result<String, A
 
 /// Which node and which input a destination names.
 ///
-/// `mean_temp.in0` is the `in0` input of `mean_temp`; `moc` is a node that
+/// `cabin_temp.in0` is the `in0` input of `cabin_temp`; `moc` is a node that
 /// takes one input and does not name it. The separator is a dot because a node
 /// name cannot contain one and an input name cannot either, which is checked.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1105,7 +1105,7 @@ fn read_one(path: &Path) -> TcsResult<GraphFile> {
             "links",
             file.links.is_some(),
             "a link is an attribute of the node it leaves, named after the data \
-             source it leaves by: `payload_out: k_fore`",
+             source it leaves by: `payload_out: k_1`",
         ),
         ("groups", file.groups.is_some(), "groups are now payload_groups"),
     ];
@@ -1501,8 +1501,8 @@ mod tests {
         assert_eq!(plain.node, "moc");
         assert_eq!(plain.input, None);
 
-        let named = Destination::parse("mean_temp.in0");
-        assert_eq!(named.node, "mean_temp");
+        let named = Destination::parse("cabin_temp.in0");
+        assert_eq!(named.node, "cabin_temp");
         assert_eq!(named.input.as_deref(), Some("in0"));
 
         // Total: what is wrong with a destination is the checking's to say,
@@ -1534,20 +1534,23 @@ mod tests {
         assert_eq!(yaml.commands, xml.commands);
         assert_eq!(yaml.groups, xml.groups);
 
-        // And it is the thermostat: three sensors, a mean, a comparison, the
-        // ground, the heaters and a log.
+        // And it is the thermostat: three sensors, a vote over them, a
+        // comparison, the ground, two heaters and a log.
         assert_eq!(
             yaml.nodes.len(),
-            11,
+            12,
             "{:?}",
             yaml.nodes.iter().map(|n| &n.name).collect::<Vec<_>>()
         );
         assert_eq!(yaml.groups.len(), 1, "the three sensors share one group");
         assert_eq!(
             yaml.group("cabin_temps").map(|g| g.interval()),
-            Some(Ok(std::time::Duration::from_secs(3)))
+            // Ten times a second, which is what holds the band: the heaters
+            // move the mass several kelvin a second, so a loop that acted
+            // once a second would overshoot the band every time.
+            Some(Ok(std::time::Duration::from_millis(100)))
         );
-        let sensor = yaml.node("temp_fore").expect("the fore sensor");
+        let sensor = yaml.node("temp_1").expect("the first of the trio");
         assert_eq!(sensor.node_type, "i2c");
         assert_eq!(
             sensor.attributes.get("address").map(Scalar::as_str),
@@ -1557,7 +1560,7 @@ mod tests {
         // of the file rather than a field on the node: a node says what the
         // vehicle carries, and this says where somebody put the box.
         assert_eq!(
-            yaml.placed.get("temp_fore").map(|at| (at.x, at.y)),
+            yaml.placed.get("temp_1").map(|at| (at.x, at.y)),
             Some((34, 34))
         );
     }
@@ -1730,16 +1733,16 @@ moc:
     #[test]
     fn a_link_may_be_written_as_an_entry_naming_its_target() {
         let said: NodeFile = serde_norway::from_str(
-            "name: k_fore
+            "name: k_1
 type: compute
 payload-out:
   - target: moc
-  - target: mean_temp
+  - target: cabin_temp
     input: in0
 ",
         )
         .expect("entries");
-        assert_eq!(said.payload_out, vec!["moc", "mean_temp.in0"]);
+        assert_eq!(said.payload_out, vec!["moc", "cabin_temp.in0"]);
 
         // One entry on its own needs no list, as one destination needs no
         // list.

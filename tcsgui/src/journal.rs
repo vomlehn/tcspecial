@@ -729,7 +729,7 @@ mod tests {
     #[test]
     fn an_inverse_puts_back_what_the_edit_changed() {
         let set = Edit::SetAttribute {
-            node: "temp_fore".into(),
+            node: "temp_1".into(),
             attribute: "address".into(),
             was: Some("0x48".into()),
             now: Some("0x49".into()),
@@ -737,7 +737,7 @@ mod tests {
         assert_eq!(
             set.inverse(),
             Edit::SetAttribute {
-                node: "temp_fore".into(),
+                node: "temp_1".into(),
                 attribute: "address".into(),
                 was: Some("0x49".into()),
                 now: Some("0x48".into()),
@@ -800,12 +800,12 @@ mod tests {
     #[test]
     fn undoing_a_removal_restores_the_links_as_well() {
         let removal = Edit::RemoveNode {
-            name: "k_fore".into(),
+            name: "k_1".into(),
             node_type: "compute".into(),
             attributes: vec![("function".into(), "to_kelvin".into())],
             links: vec![
-                Link::new("temp_fore", "k_fore", None),
-                Link::new("k_fore", "mean_temp", Some("in0")),
+                Link::new("temp_1", "k_1", None),
+                Link::new("k_1", "cabin_temp", Some("in0")),
             ],
             home: None,
         };
@@ -817,7 +817,7 @@ mod tests {
                 links,
                 ..
             } => {
-                assert_eq!(name, "k_fore");
+                assert_eq!(name, "k_1");
                 assert_eq!(attributes.len(), 1);
                 assert_eq!(links.len(), 2, "the node came back without its links");
             }
@@ -869,10 +869,10 @@ mod tests {
         let mut journal = Journal::new();
         assert!(journal.next_undo().is_none());
 
-        journal.record(add("temp_fore"));
+        journal.record(add("temp_1"));
         let said = journal.next_undo().expect("something to undo").describe();
         assert!(
-            said.contains("temp_fore") && said.contains("i2c"),
+            said.contains("temp_1") && said.contains("i2c"),
             "the description should name what will be undone: {said}"
         );
 

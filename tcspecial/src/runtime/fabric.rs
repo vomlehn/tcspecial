@@ -877,10 +877,10 @@ mod tests {
         let (mean, mean_port) = recorder();
         let (log, log_port) = recorder();
         fabric.hold("moc", moc_port);
-        fabric.hold("mean_temp", mean_port);
+        fabric.hold("cabin_temp", mean_port);
         fabric.hold("housekeeping", log_port);
 
-        let moved = fabric.deliver("k_fore", &[1, 2, 3, 4]);
+        let moved = fabric.deliver("k_1", &[1, 2, 3, 4]);
 
         assert!(moved.all_delivered(), "{:?}", moved.refused);
         assert_eq!(moved.delivered, 3);
@@ -909,13 +909,13 @@ mod tests {
         let (mean, mean_port) = recorder();
         let (moc, moc_port) = recorder();
         let (log, log_port) = recorder();
-        fabric.hold("mean_temp", mean_port);
+        fabric.hold("cabin_temp", mean_port);
         fabric.hold("moc", moc_port);
         fabric.hold("housekeeping", log_port);
 
-        fabric.deliver("k_fore", &[1]);
-        fabric.deliver("k_aft", &[2]);
-        fabric.deliver("k_bay", &[3]);
+        fabric.deliver("k_1", &[1]);
+        fabric.deliver("k_2", &[2]);
+        fabric.deliver("k_3", &[3]);
 
         let given = mean.lock().expect("the record");
         assert_eq!(
@@ -953,7 +953,7 @@ mod tests {
         let routes = Routes::of(&graph);
 
         let mut fabric = Fabric::new(routes.clone(), 64);
-        for name in ["k_fore", "k_aft", "k_bay", "mean_temp", "thermostat"] {
+        for name in ["k_1", "k_2", "k_3", "cabin_temp", "thermostat"] {
             let node = graph.node(name).expect("a node of the example");
             let inputs = routes.inputs_of(name);
             let port = ComputePort::make(node, &inputs, &Abandon::nothing())
@@ -963,21 +963,25 @@ mod tests {
 
         let (moc, moc_port) = recorder();
         let (log, log_port) = recorder();
-        let (heaters, heater_port) = recorder();
+        let (first, first_port) = recorder();
+        let (second, second_port) = recorder();
         fabric.hold("moc", moc_port);
         fabric.hold("housekeeping", log_port);
-        fabric.hold("heaters", heater_port);
+        fabric.hold("heaters_1", first_port);
+        fabric.hold("heaters_2", second_port);
 
         // Three raw readings, each in its own part's format, all of them
-        // cold: 289.15, 289.15 and 287.3188 kelvin, whose average is more
-        // than two degrees below the setpoint of 293.15.
+        // cold: 289.15, 289.15 and 287.3188 kelvin. The vote over them is
+        // 289.15, the middle of the three, which is more than two degrees
+        // below the setpoint of 293.15.
         let mut moved = Moved::default();
-        moved.add(fabric.deliver("temp_fore", &[0x01, 0x00]));
-        moved.add(fabric.deliver("temp_aft", &[0x01, 0x00]));
-        moved.add(fabric.deliver("temp_bay", &[0x00, 0x10, 0x00]));
+        moved.add(fabric.deliver("temp_1", &[0x01, 0x00]));
+        moved.add(fabric.deliver("temp_2", &[0x01, 0x00]));
+        moved.add(fabric.deliver("temp_3", &[0x00, 0x10, 0x00]));
         assert!(moved.all_delivered(), "{:?}", moved.refused);
 
-        // What the ground saw: three temperatures and the average.
+        // What the ground saw: three temperatures, the one voted out of them,
+        // and the decision.
         let payload_out: Vec<String> = moc
             .lock().expect("the record")
             .given
@@ -986,26 +990,33 @@ mod tests {
             .collect();
         assert_eq!(
             payload_out,
-            vec!["289.15", "289.15", "287.3188", "288.5396"],
-            "the ground should have the three readings and their mean"
+            // 289.15 and not the mean's 288.5396: the low reading is the
+            // outlier, and the median leaves it out.
+            vec!["289.15", "289.15", "287.3188", "289.15", "1"],
+            "the ground should have the three readings, the vote and the decision"
         );
 
         // The log saw the same three and the decision, which is the other
         // leg of each "T".
         assert_eq!(log.lock().expect("the record").given.len(), 4, "{:?}", log.lock().expect("the record").given);
 
-        // And the heaters were asserted, from the one pass.
-        let to_heaters: Vec<Vec<u8>> = heaters
-            .lock().expect("the record")
-            .given
-            .iter()
-            .map(|(_, _, datum)| datum.clone())
-            .collect();
-        assert_eq!(
-            to_heaters,
-            vec![b"1".to_vec()],
-            "a cabin below the band should have its heaters on"
-        );
+        // And both heaters were asserted, from the one pass: one decision
+        // reaching each of them, so that one failing leaves the other
+        // warming the mass.
+        for (which, heater) in [("heaters_1", &first), ("heaters_2", &second)] {
+            let driven: Vec<Vec<u8>> = heater
+                .lock()
+                .expect("the record")
+                .given
+                .iter()
+                .map(|(_, _, datum)| datum.clone())
+                .collect();
+            assert_eq!(
+                driven,
+                vec![b"1".to_vec()],
+                "{which}: a cabin below the band should have its heaters on"
+            );
+        }
     }
 
     /// A decision that has not changed is not sent again.
@@ -1022,7 +1033,7 @@ mod tests {
         let routes = Routes::of(&graph);
 
         let mut fabric = Fabric::new(routes.clone(), 64);
-        for name in ["k_fore", "k_aft", "k_bay", "mean_temp", "thermostat"] {
+        for name in ["k_1", "k_2", "k_3", "cabin_temp", "thermostat"] {
             let node = graph.node(name).expect("a node of the example");
             let inputs = routes.inputs_of(name);
             fabric.hold(
@@ -1033,16 +1044,18 @@ mod tests {
         let (_, moc_port) = recorder();
         let (_, log_port) = recorder();
         let (heaters, heater_port) = recorder();
+        let (_, second_port) = recorder();
         fabric.hold("moc", moc_port);
         fabric.hold("housekeeping", log_port);
-        fabric.hold("heaters", heater_port);
+        fabric.hold("heaters_1", heater_port);
+        fabric.hold("heaters_2", second_port);
 
         // Two passes of the same cold readings. The first decides, the second
         // decides the same thing.
         for _ in 0..2 {
-            fabric.deliver("temp_fore", &[0x01, 0x00]);
-            fabric.deliver("temp_aft", &[0x01, 0x00]);
-            fabric.deliver("temp_bay", &[0x00, 0x10, 0x00]);
+            fabric.deliver("temp_1", &[0x01, 0x00]);
+            fabric.deliver("temp_2", &[0x01, 0x00]);
+            fabric.deliver("temp_3", &[0x00, 0x10, 0x00]);
         }
 
         assert_eq!(
@@ -1065,20 +1078,20 @@ mod tests {
         let routes = Routes::of(&graph);
 
         let mut fabric = Fabric::new(routes.clone(), 64);
-        let node = graph.node("k_fore").expect("the converter");
+        let node = graph.node("k_1").expect("the converter");
         fabric.hold(
-            "k_fore",
-            Box::new(ComputePort::make(node, &routes.inputs_of("k_fore"), &Abandon::nothing()).expect("it builds")),
+            "k_1",
+            Box::new(ComputePort::make(node, &routes.inputs_of("k_1"), &Abandon::nothing()).expect("it builds")),
         );
         let (moc, moc_port) = recorder();
         fabric.hold("moc", moc_port);
 
         // Three bytes where the part's format is two: a bus that returned
         // something else, or a sensor read wrongly.
-        let moved = fabric.deliver("temp_fore", &[0x01, 0x00, 0x00]);
+        let moved = fabric.deliver("temp_1", &[0x01, 0x00, 0x00]);
 
         assert_eq!(moved.refused.len(), 1, "{:?}", moved.refused);
-        assert_eq!(moved.refused[0].0, "k_fore");
+        assert_eq!(moved.refused[0].0, "k_1");
         assert!(
             moved.refused[0].1.contains("to_kelvin"),
             "the complaint should name the computation: {}",
@@ -1110,15 +1123,17 @@ mod tests {
             Box::new(ComputePort::make(thermostat, &[], &Abandon::nothing()).expect("it builds")),
         );
         let (heaters, heater_port) = recorder();
+        let (_, second_port) = recorder();
         let (_, log_port) = recorder();
         let (_, moc_port) = recorder();
-        fabric.hold("heaters", heater_port);
+        fabric.hold("heaters_1", heater_port);
+        fabric.hold("heaters_2", second_port);
         fabric.hold("housekeeping", log_port);
         fabric.hold("moc", moc_port);
 
         // 294 kelvin against a setpoint of 293.15 with two degrees either
         // side: inside the band, so nothing is decided.
-        let moved = fabric.deliver("mean_temp", b"294.0");
+        let moved = fabric.deliver("cabin_temp", b"294.0");
         assert!(moved.all_delivered(), "{:?}", moved.refused);
         assert!(
             heaters.lock().expect("the record").given.is_empty(),
@@ -1132,7 +1147,7 @@ mod tests {
         assert!(heaters.lock().expect("the record").given.is_empty());
 
         // And the same reading now calls for heat.
-        let moved = fabric.deliver("mean_temp", b"294.0");
+        let moved = fabric.deliver("cabin_temp", b"294.0");
         assert!(moved.all_delivered(), "{:?}", moved.refused);
         assert_eq!(
             heaters.lock().expect("the record").given,
@@ -1279,10 +1294,10 @@ mod tests {
         let (log, log_port) = recorder();
         log.lock().expect("the record").refuse = Some("the device is full".to_string());
         fabric.hold("moc", moc_port);
-        fabric.hold("mean_temp", mean_port);
+        fabric.hold("cabin_temp", mean_port);
         fabric.hold("housekeeping", log_port);
 
-        let moved = fabric.deliver("k_fore", &[9]);
+        let moved = fabric.deliver("k_1", &[9]);
 
         assert_eq!(moved.delivered, 2, "the other two should still have got it");
         assert!(!moved.all_delivered());
@@ -1301,9 +1316,9 @@ mod tests {
         let mut fabric = Fabric::new(thermostat(), 64);
         let (moc, moc_port) = recorder();
         fabric.hold("moc", moc_port);
-        // mean_temp and housekeeping are not held.
+        // cabin_temp and housekeeping are not held.
 
-        let moved = fabric.deliver("k_fore", &[7]);
+        let moved = fabric.deliver("k_1", &[7]);
 
         assert_eq!(moved.delivered, 1);
         assert_eq!(moved.refused.len(), 2, "{:?}", moved.refused);
@@ -1329,10 +1344,10 @@ mod tests {
         let mut fabric = Fabric::new(thermostat(), 64);
         let (_sensor, sensor_port) = recorder();
         let (_k, k_port) = recorder();
-        fabric.hold("temp_fore", sensor_port);
-        fabric.hold("k_fore", k_port);
+        fabric.hold("temp_1", sensor_port);
+        fabric.hold("k_1", k_port);
 
-        let moved = fabric.pump("temp_fore");
+        let moved = fabric.pump("temp_1");
         assert_eq!(moved.delivered, 0);
         assert!(moved.all_delivered(), "{:?}", moved.refused);
     }
@@ -1344,10 +1359,10 @@ mod tests {
         let (sensor, sensor_port) = recorder();
         let (k, k_port) = recorder();
         sensor.lock().expect("the record").to_say = vec![vec![0x01, 0x90]];
-        fabric.hold("temp_fore", sensor_port);
-        fabric.hold("k_fore", k_port);
+        fabric.hold("temp_1", sensor_port);
+        fabric.hold("k_1", k_port);
 
-        let moved = fabric.pump("temp_fore");
+        let moved = fabric.pump("temp_1");
 
         assert_eq!(moved.delivered, 1);
         assert_eq!(moved.bytes, 2);
@@ -1364,9 +1379,9 @@ mod tests {
 
         let mut sensors = Vec::new();
         for (sensor, converter) in [
-            ("temp_fore", "k_fore"),
-            ("temp_aft", "k_aft"),
-            ("temp_bay", "k_bay"),
+            ("temp_1", "k_1"),
+            ("temp_2", "k_2"),
+            ("temp_3", "k_3"),
         ] {
             let (record, port) = recorder();
             record.lock().expect("the record").to_say = vec![vec![sensors.len() as u8]];
@@ -1376,7 +1391,7 @@ mod tests {
             sensors.push(got);
         }
 
-        let members: Vec<String> = ["temp_fore", "temp_aft", "temp_bay"]
+        let members: Vec<String> = ["temp_1", "temp_2", "temp_3"]
             .iter()
             .map(|s| s.to_string())
             .collect();

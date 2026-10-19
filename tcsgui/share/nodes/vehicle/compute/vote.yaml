@@ -1,0 +1,25 @@
+# One value out of several readings of the same thing.
+node: vote
+type: compute
+about: >
+  One value out of a trio of sensors reading the same thing, so that the
+  reading survives one of them going wrong.
+sets:
+  function: vote
+payload-sink: true
+payload-source: true
+moc-sink: true
+moc-source: true
+attributes:
+  - name: inputs
+    required: true
+    about: >
+      Which inputs it votes over, comma separated. The links must bind
+      exactly these: a vote whose third link was deleted would quietly
+      become a vote over two, which has no majority in it.
+  - name: algorithm
+    required: true
+    about: >
+      How the one value is picked: median takes the middle reading, and
+      closest_mean takes the mean of the two that agree best. Both leave an
+      outlier out, which is what makes a trio worth having.

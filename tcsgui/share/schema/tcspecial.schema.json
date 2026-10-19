@@ -676,7 +676,7 @@
               "null"
             ]
           },
-          "above": {
+          "half_band": {
             "type": [
               "string",
               "number",
@@ -684,7 +684,7 @@
               "null"
             ]
           },
-          "below": {
+          "algorithm": {
             "type": [
               "string",
               "number",
@@ -1244,7 +1244,7 @@
               "null"
             ]
           },
-          "above": {
+          "half_band": {
             "type": [
               "string",
               "number",
@@ -1252,7 +1252,7 @@
               "null"
             ]
           },
-          "below": {
+          "algorithm": {
             "type": [
               "string",
               "number",
@@ -1830,7 +1830,7 @@
               "null"
             ]
           },
-          "above": {
+          "half_band": {
             "type": [
               "string",
               "number",
@@ -1838,7 +1838,7 @@
               "null"
             ]
           },
-          "below": {
+          "algorithm": {
             "type": [
               "string",
               "number",

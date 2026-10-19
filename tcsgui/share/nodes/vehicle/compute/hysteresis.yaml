@@ -1,4 +1,4 @@
-# A comparison against a setpoint with a band either side of it.
+# A comparison against a setpoint, with a band around it.
 node: hysteresis
 type: compute
 about: >
@@ -14,9 +14,9 @@ attributes:
   - name: setpoint
     required: true
     about: What the reading is held at.
-  - name: above
+  - name: half_band
     required: true
-    about: How far above the setpoint it switches off.
-  - name: below
-    required: true
-    about: How far below the setpoint it switches on.
+    about: >
+      How far from the setpoint the decision changes, each way: it switches
+      off this far above and on this far below. More than nought, a band of
+      nothing being a bare comparison that cycles a relay on a wobble.

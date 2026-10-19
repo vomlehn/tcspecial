@@ -136,7 +136,7 @@ impl Terminals {
     /// The one terminal of this kind, where there is exactly one.
     ///
     /// What a link end that names no terminal means. A node with one sink and
-    /// one source needs no names in the file -- `{ from: temp_fore, to: moc }`
+    /// one source needs no names in the file -- `{ from: temp_1, to: moc }`
     /// is unambiguous -- and one with two of either has to be told which.
     fn only(of: &'static [&'static str]) -> Option<&'static str> {
         match of {

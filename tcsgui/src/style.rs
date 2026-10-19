@@ -1028,12 +1028,12 @@ impl NodeType {
                 ("format", false),
                 ("scale", false),
                 ("offset", false),
-                // mean
+                // vote
                 ("inputs", false),
+                ("algorithm", false),
                 // hysteresis
                 ("setpoint", false),
-                ("above", false),
-                ("below", false),
+                ("half_band", false),
                 // process
                 ("executable", false),
                 ("timeout", false),
@@ -1083,7 +1083,7 @@ impl NodeType {
     /// * a computation may be on either stream in either direction. The
     ///   readings arrive at it, its result goes to the ground, and the shipped
     ///   thermostat drives a line with it -- so it has all four. Its named
-    ///   inputs, `in0` and the rest, are a mean's own affair and are not
+    ///   inputs, `in0` and the rest, are a vote's own affair and are not
     ///   terminals: a line dragged to a computation that declares inputs fills
     ///   the next free one, and no terminal is written;
     /// * a log is written to and read by nobody aboard, so it has the one
@@ -1095,7 +1095,7 @@ impl NodeType {
     /// What is *drawn* and what is *written* are not the same question. A
     /// terminal is written into the file only where the type has more than one
     /// of that kind -- see [`NodeType::must_name`] -- so the file keeps saying
-    /// `{ from: temp_fore, to: moc }`, which is what the schema reads it as
+    /// `{ from: temp_1, to: moc }`, which is what the schema reads it as
     /// anyway.
     pub fn terminals(self) -> Terminals {
         // What tcslibgs says, where it says anything.

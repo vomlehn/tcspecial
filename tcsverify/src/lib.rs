@@ -894,15 +894,15 @@ mod tests {
     fn a_node_one_spelling_renames_is_missing_from_the_other() {
         // Compared and not verified, so the simulator file is not wanted.
         let (_dir, xml, yaml, _) = thermostat_pair(|xml| {
-            xml.replace("<name>heaters</name>", "<name>heater</name>")
-                .replace("<target>heaters</target>", "<target>heater</target>")
+            xml.replace("<name>heaters_1</name>", "<name>heater</name>")
+                .replace("<target>heaters_1</target>", "<target>heater</target>")
         });
         let mut report = Report::default();
         compare(&yaml, &xml, &mut report);
         let said: Vec<&str> = report.findings.iter().map(|f| f.message.as_str()).collect();
-        assert!(said.iter().any(|m| m.contains("nodes / heaters:") && m.contains("does not")), "{said:?}");
+        assert!(said.iter().any(|m| m.contains("nodes / heaters_1:") && m.contains("does not")), "{said:?}");
         assert!(said.iter().any(|m| m.contains("nodes / heater:")), "{said:?}");
-        assert!(said.iter().any(|m| m.contains("\"heaters\"") && m.contains("\"heater\"")), "{said:?}");
+        assert!(said.iter().any(|m| m.contains("\"heaters_1\"") && m.contains("\"heater\"")), "{said:?}");
         assert!(said.len() <= 4, "{said:?}");
     }
 

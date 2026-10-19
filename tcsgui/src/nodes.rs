@@ -674,9 +674,9 @@ mod tests {
                 "app_moc_veh",
                 "app_payload_veh",
                 "hysteresis",
-                "mean",
                 "process",
                 "to_kelvin",
+                "vote",
                 "log",
                 "null",
             ],
@@ -685,15 +685,16 @@ mod tests {
 
         // A computation is a compute node with its function already answered,
         // which is what `sets` is for.
-        let mean = described.iter().find(|one| one.node == "mean").expect("mean");
-        assert_eq!(mean.node_type, "compute");
-        assert_eq!(mean.sets.get("function").map(String::as_str), Some("mean"));
-        assert_eq!(mean.attributes.len(), 1);
-        assert_eq!(mean.attributes[0].name, "inputs");
-        assert!(mean.attributes[0].required);
-        assert!(mean.attributes[0].about.contains("comma separated"), "{mean:?}");
+        let voter = described.iter().find(|one| one.node == "vote").expect("vote");
+        assert_eq!(voter.node_type, "compute");
+        assert_eq!(voter.sets.get("function").map(String::as_str), Some("vote"));
+        assert_eq!(voter.attributes.len(), 2);
+        assert_eq!(voter.attributes[0].name, "inputs");
+        assert!(voter.attributes[0].required);
+        assert!(voter.attributes[0].about.contains("comma separated"), "{voter:?}");
+        assert_eq!(voter.attributes[1].name, "algorithm");
         // Folded into one line, however the file wrapped it.
-        assert!(!mean.attributes[0].about.contains('\n'));
+        assert!(!voter.attributes[0].about.contains('\n'));
 
         // The one written in XML says the same kind of thing, which is the
         // point of it being written in XML.
@@ -1020,13 +1021,17 @@ mod tests {
                 .collect::<BTreeMap<String, String>>()
         };
 
-        let mean = matching(&described, "compute", &said(&[("function", "mean")]))
+        let voter = matching(&described, "compute", &said(&[("function", "vote")]))
             .expect("a compute node with a function is described");
-        assert_eq!(mean.node, "mean");
-        // What the panel asks: the function it is, and then what a mean says.
+        assert_eq!(voter.node, "vote");
+        // What the panel asks: the function it is, and then what a vote says.
         assert_eq!(
-            mean.asked(),
-            vec![("function".to_string(), true), ("inputs".to_string(), true)]
+            voter.asked(),
+            vec![
+                ("function".to_string(), true),
+                ("inputs".to_string(), true),
+                ("algorithm".to_string(), true)
+            ]
         );
 
         let thermostat = matching(

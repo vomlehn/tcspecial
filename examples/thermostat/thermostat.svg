@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1300" height="790" viewBox="0 0 1300 790" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1300" height="900" viewBox="0 0 1300 900" role="img" aria-labelledby="title desc">
   <title id="title">The thermostat example</title>
-  <desc id="desc">Three temperature sensors, temp_fore and temp_aft on I2C and temp_bay on SPI, read together every three seconds as the group cabin_temps. Each reading is converted to kelvin by k_fore, k_aft and k_bay, and each converted reading goes to the moc node on the ground, to mean_temp as input in0, in1 or in2, and to the log housekeeping. mean_temp goes to the moc node and to thermostat, a hysteresis that drives the GPIO heaters and is logged. tcspecial sends what each of k_fore, k_aft, k_bay and mean_temp produces as UDP datagrams to the moc node's ground_base, 127.0.0.1:5100, plus the source's device id: ports 5101 to 5104. Ground software gets that data from the moc node with a function call, tcslib's Moc::receive. The ground sets the thermostat's setpoint through a command binding on the moc node, sent to 127.0.0.1:5000.</desc>
+  <desc id="desc">Three temperature sensors of one place, temp_1 and temp_2 on I2C and temp_3 on SPI, read together ten times a second as the group cabin_temps. Three of them, and on two different buses, so that the temperature survives one sensor or one bus going wrong. Each reading is converted to kelvin by k_1, k_2 and k_3, and each converted reading goes to the moc node on the ground, to cabin_temp as input in0, in1 or in2, and to the log housekeeping. cabin_temp votes over the three, by the median, and produces one temperature on every arrival: a sensor that has gone wrong is outvoted, and one that stops reporting is outvoted too rather than stopping the vehicle from deciding anything. Its value goes to the moc node and to thermostat, a hysteresis holding 293.15 K within a half-band of 2.0, whose decision drives two GPIO heaters, is logged, and goes to the ground. Two heaters, because one failing must not leave the thermal mass with no way to be warmed. tcspecial sends what each of k_1, k_2, k_3, cabin_temp and thermostat produces as UDP datagrams to the moc node's ground_base, 127.0.0.1:5100, plus the source's device id: ports 5101 to 5105. Ground software gets that data from the moc node with a function call, tcslib's Moc::receive. The ground sets the thermostat's setpoint through a command binding on the moc node, sent to 127.0.0.1:5000.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -52,45 +52,50 @@
 
   <!-- Payloads -->
   <rect class="payload" x="60" y="100" width="170" height="74" rx="10"/>
-  <text class="name" x="74" y="124">temp_fore</text>
+  <text class="name" x="74" y="124">temp_1</text>
   <text class="kind" x="74" y="144">I2C, address 0x48</text>
   <text class="detail" x="74" y="162">/dev/i2c-1</text>
 
   <rect class="payload" x="60" y="220" width="170" height="74" rx="10"/>
-  <text class="name" x="74" y="244">temp_aft</text>
+  <text class="name" x="74" y="244">temp_2</text>
   <text class="kind" x="74" y="264">I2C, address 0x49</text>
   <text class="detail" x="74" y="282">/dev/i2c-1</text>
 
   <rect class="payload" x="60" y="340" width="170" height="74" rx="10"/>
-  <text class="name" x="74" y="364">temp_bay</text>
+  <text class="name" x="74" y="364">temp_3</text>
   <text class="kind" x="74" y="384">SPI</text>
   <text class="detail" x="74" y="402">/dev/spidev0.0</text>
 
   <rect class="payload" x="60" y="500" width="170" height="74" rx="10"/>
-  <text class="name" x="74" y="524">heaters</text>
+  <text class="name" x="74" y="524">heaters_1</text>
   <text class="kind" x="74" y="544">GPIO output</text>
   <text class="detail" x="74" y="562">lines 3,4,5</text>
 
+  <rect class="payload" x="60" y="620" width="170" height="74" rx="10"/>
+  <text class="name" x="74" y="644">heaters_2</text>
+  <text class="kind" x="74" y="664">GPIO output</text>
+  <text class="detail" x="74" y="682">lines 6,7,8</text>
+
   <!-- Conversions -->
   <rect class="vehicle" x="300" y="100" width="170" height="74" rx="10"/>
-  <text class="name" x="314" y="124">k_fore</text>
+  <text class="name" x="314" y="124">k_1</text>
   <text class="kind" x="314" y="144">compute, to_kelvin</text>
   <text class="detail" x="314" y="162">i16_be</text>
 
   <rect class="vehicle" x="300" y="220" width="170" height="74" rx="10"/>
-  <text class="name" x="314" y="244">k_aft</text>
+  <text class="name" x="314" y="244">k_2</text>
   <text class="kind" x="314" y="264">compute, to_kelvin</text>
   <text class="detail" x="314" y="282">i16_be</text>
 
   <rect class="vehicle" x="300" y="340" width="170" height="74" rx="10"/>
-  <text class="name" x="314" y="364">k_bay</text>
+  <text class="name" x="314" y="364">k_3</text>
   <text class="kind" x="314" y="384">compute, to_kelvin</text>
   <text class="detail" x="314" y="402">u24_be</text>
 
-  <!-- The mean, with its three named inputs -->
+  <!-- The vote over the three, with its named inputs -->
   <rect class="vehicle" x="540" y="220" width="170" height="80" rx="10"/>
-  <text class="name" x="574" y="244">mean_temp</text>
-  <text class="kind" x="574" y="264">compute, mean</text>
+  <text class="name" x="574" y="244">cabin_temp</text>
+  <text class="kind" x="574" y="264">compute, vote: median</text>
   <text class="port" x="546" y="236">in0</text>
   <text class="port" x="546" y="261">in1</text>
   <text class="port" x="546" y="286">in2</text>
@@ -106,7 +111,7 @@
   <rect class="vehicle" x="780" y="340" width="170" height="74" rx="10"/>
   <text class="name" x="794" y="364">thermostat</text>
   <text class="kind" x="794" y="384">compute, hysteresis</text>
-  <text class="detail" x="794" y="402">293.15 K, ±2.0</text>
+  <text class="detail" x="794" y="402">293.15 K, half_band 2.0</text>
 
   <!-- The ground -->
   <rect class="groundside" x="1010" y="52" width="270" height="580" rx="16"/>
@@ -123,7 +128,7 @@
   <rect class="ground" x="1030" y="430" width="230" height="80" rx="10"/>
   <text class="name" x="1044" y="456">ground software</text>
   <text class="kind" x="1044" y="477">processing and display</text>
-  <text class="detail" x="1044" y="496">from k_fore ... mean_temp</text>
+  <text class="detail" x="1044" y="496">from k_1 ... cabin_temp</text>
 
 
   <!-- Sensors to their conversions -->
@@ -153,15 +158,18 @@
   <!-- The thermostat's decision, logged -->
   <path class="groundward" d="M780,400 C745,400 745,527 714,527" marker-end="url(#arrow-blue)"/>
 
-  <!-- The thermostat drives the heaters -->
+  <!-- The thermostat drives both heaters: one decision, two circuits -->
   <path class="vehicleward" d="M865,414 L865,586 L145,586 L145,578" marker-end="url(#arrow-orange)"/>
+  <path class="vehicleward" d="M865,586 L865,706 L145,706 L145,698" marker-end="url(#arrow-orange)"/>
   <text class="label" x="672" y="578">moc-out: on below the band</text>
+  <text class="label" x="672" y="698">and to the second heater</text>
 
   <!-- Each source's port on the ground: ground_base plus its device id -->
   <text class="portno" x="985" y="113">5101</text>
   <text class="portno" x="985" y="128">5102</text>
   <text class="portno" x="985" y="143">5103</text>
   <text class="portno" x="985" y="158">5104</text>
+  <text class="portno" x="985" y="173">5105</text>
 
   <!-- The ground sets the setpoint -->
   <path class="command" d="M1030,180 L900,180 L900,336" marker-end="url(#arrow-orange)"/>

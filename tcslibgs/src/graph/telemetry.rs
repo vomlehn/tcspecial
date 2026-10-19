@@ -236,10 +236,11 @@ mod tests {
     fn every_node_has_a_device_id() {
         let ids = ids(&example("thermostat"));
         assert_eq!(ids["moc"], 0);
-        assert_eq!(ids["k_fore"], 1);
-        assert_eq!(ids["mean_temp"], 4);
-        assert_eq!(ids["temp_fore"], 7);
-        assert_eq!(ids["heaters"], 10);
+        assert_eq!(ids["k_1"], 1);
+        assert_eq!(ids["cabin_temp"], 4);
+        assert_eq!(ids["temp_1"], 7);
+        assert_eq!(ids["heaters_1"], 10);
+        assert_eq!(ids["heaters_2"], 11);
     }
 
     /// What is drawn into a moc node goes to its ground_base plus the source's
@@ -250,10 +251,14 @@ mod tests {
         assert_eq!(
             summary(&links),
             vec![
-                ("k_fore", 1, "127.0.0.1", 5101),
-                ("k_aft", 2, "127.0.0.1", 5102),
-                ("k_bay", 3, "127.0.0.1", 5103),
-                ("mean_temp", 4, "127.0.0.1", 5104),
+                ("k_1", 1, "127.0.0.1", 5101),
+                ("k_2", 2, "127.0.0.1", 5102),
+                ("k_3", 3, "127.0.0.1", 5103),
+                ("cabin_temp", 4, "127.0.0.1", 5104),
+                // The decision itself, which the ground sees as well as the
+                // heaters: a reader of the telemetry can then say why the
+                // heaters are on without inferring it from the temperature.
+                ("thermostat", 5, "127.0.0.1", 5105),
             ]
         );
         assert!(links.iter().all(|l| l.via == Via::Moc("moc".to_string())));
@@ -285,17 +290,17 @@ mod tests {
     #[test]
     fn two_sources_on_one_port_are_refused() {
         let mut graph = example("thermostat");
-        // temp_aft, id 8, unlinked: 6100 + 8 = 6108; a moc base of 6104 puts
-        // k_fore's 6105 ... mean_temp's 6108 on the same port.
-        graph.links.retain(|link| link.origin().node != "temp_aft");
+        // temp_2, id 8, unlinked: 6100 + 8 = 6108; a moc base of 6104 puts
+        // k_1's 6105 ... cabin_temp's 6108 on the same port.
+        graph.links.retain(|link| link.origin().node != "temp_2");
         let moc = graph.nodes.iter_mut().find(|n| n.name == "moc").expect("moc");
         moc.attributes.insert(
             "ground_base".to_string(),
             crate::Scalar::of("127.0.0.1:6104"),
         );
         let refused = of(&graph).expect_err("two sources on 6108");
-        assert!(refused.why.contains("mean_temp"), "{}", refused.why);
-        assert!(refused.why.contains("temp_aft"), "{}", refused.why);
+        assert!(refused.why.contains("cabin_temp"), "{}", refused.why);
+        assert!(refused.why.contains("temp_2"), "{}", refused.why);
         assert!(refused.why.contains("6108"), "{}", refused.why);
     }
 

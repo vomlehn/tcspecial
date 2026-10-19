@@ -28,7 +28,7 @@
     </tcspecial>
     <payload_groups>
         <name>cabin_temps</name>
-        <interval>3 s</interval>
+        <interval>100 ms</interval>
     </payload_groups>
     <moc>
         <name>moc</name>
@@ -39,62 +39,74 @@
         <payload-in>true</payload-in>
     </moc>
     <vehicle>
-        <name>k_fore</name>
+        <name>k_1</name>
         <type>compute</type>
         <format>i16_be</format>
         <function>to_kelvin</function>
         <offset>273.15</offset>
         <scale>0.0625</scale>
         <payload-out><target>moc</target></payload-out>
-        <payload-out><target>mean_temp</target><input>in0</input></payload-out>
+        <payload-out><target>cabin_temp</target><input>in0</input></payload-out>
         <payload-out><target>housekeeping</target></payload-out>
         <payload-in>true</payload-in>
     </vehicle>
     <vehicle>
-        <name>k_aft</name>
+        <name>k_2</name>
         <type>compute</type>
         <format>i16_be</format>
         <function>to_kelvin</function>
         <offset>273.15</offset>
         <scale>0.0625</scale>
         <payload-out><target>moc</target></payload-out>
-        <payload-out><target>mean_temp</target><input>in1</input></payload-out>
+        <payload-out><target>cabin_temp</target><input>in1</input></payload-out>
         <payload-out><target>housekeeping</target></payload-out>
         <payload-in>true</payload-in>
     </vehicle>
     <vehicle>
-        <name>k_bay</name>
+        <name>k_3</name>
         <type>compute</type>
         <format>u24_be</format>
         <function>to_kelvin</function>
         <offset>255.37</offset>
         <scale>0.0078</scale>
         <payload-out><target>moc</target></payload-out>
-        <payload-out><target>mean_temp</target><input>in2</input></payload-out>
+        <payload-out><target>cabin_temp</target><input>in2</input></payload-out>
         <payload-out><target>housekeeping</target></payload-out>
         <payload-in>true</payload-in>
     </vehicle>
+    <!-- One temperature out of the three, by the algorithm named: median -->
+    <!-- takes the middle reading, closest_mean the mean of the two that -->
+    <!-- agree best. Either leaves a sensor that has gone wrong out of the -->
+    <!-- answer, which a mean over all three would not, and it produces a -->
+    <!-- value on every arrival, so one sensor that stops reporting is -->
+    <!-- outvoted rather than stopping the vehicle from deciding anything. -->
     <vehicle>
-        <name>mean_temp</name>
+        <name>cabin_temp</name>
         <type>compute</type>
-        <function>mean</function>
+        <algorithm>median</algorithm>
+        <function>vote</function>
         <inputs>in0,in1,in2</inputs>
         <payload-out><target>moc</target></payload-out>
         <payload-out><target>thermostat</target></payload-out>
         <payload-in>true</payload-in>
     </vehicle>
-    <!-- setpoint is set from the ground; above and below are the two -->
-    <!-- degrees either side that the heaters are switched at. -->
+    <!-- setpoint is set from the ground; half_band is how far either side -->
+    <!-- of it the heaters are switched at, the setpoint being in the middle -->
+    <!-- of the band. -->
     <vehicle>
         <name>thermostat</name>
         <type>compute</type>
-        <above>2.0</above>
-        <below>2.0</below>
         <function>hysteresis</function>
+        <half_band>2.0</half_band>
         <setpoint>293.15</setpoint>
         <payload-out><target>housekeeping</target></payload-out>
-        <!-- asserted below the setpoint, unasserted above it -->
-        <moc-out><target>heaters</target></moc-out>
+        <payload-out><target>moc</target></payload-out>
+        <!-- asserted below the setpoint, unasserted above it. Two heaters, -->
+        <!-- because one failing must not leave the mass with no way to be -->
+        <!-- warmed: either alone holds the band, and both together hold it -->
+        <!-- twice as fast. -->
+        <moc-out><target>heaters_1</target></moc-out>
+        <moc-out><target>heaters_2</target></moc-out>
         <payload-in>true</payload-in>
     </vehicle>
     <vehicle>
@@ -104,44 +116,58 @@
         <format>variable_ts_rc</format>
         <payload-in>true</payload-in>
     </vehicle>
-    <!-- Forward bulkhead. Two bytes, signed, big endian. -->
+    <!-- One of three sensors of the same place, a trio, so that the -->
+    <!-- temperature survives one of them going wrong. Two bytes, signed, -->
+    <!-- big endian. -->
     <payloads>
-        <name>temp_fore</name>
+        <name>temp_1</name>
         <type>i2c</type>
         <address>0x48</address>
         <group>cabin_temps</group>
         <path>/dev/i2c-1</path>
         <read_size>2</read_size>
-        <payload-out><target>k_fore</target></payload-out>
+        <payload-out><target>k_1</target></payload-out>
     </payloads>
-    <!-- Aft bulkhead; same part as temp_fore. -->
+    <!-- The second of the trio; the same part as temp_1, on the same bus. -->
     <payloads>
-        <name>temp_aft</name>
+        <name>temp_2</name>
         <type>i2c</type>
         <address>0x49</address>
         <group>cabin_temps</group>
         <path>/dev/i2c-1</path>
         <read_size>2</read_size>
-        <payload-out><target>k_aft</target></payload-out>
+        <payload-out><target>k_2</target></payload-out>
     </payloads>
-    <!-- Equipment bay. Three bytes, unsigned - a different part, hence its -->
-    <!-- own conversion. -->
+    <!-- The third. A different part on a different bus: three bytes, -->
+    <!-- unsigned, its own scale and so its own conversion, so that no one -->
+    <!-- bus and no one part number can take the whole trio out. -->
     <payloads>
-        <name>temp_bay</name>
+        <name>temp_3</name>
         <type>spi</type>
         <group>cabin_temps</group>
         <max_speed>1000000</max_speed>
         <path>/dev/spidev0.0</path>
         <read_size>3</read_size>
         <spi_mode>0</spi_mode>
-        <payload-out><target>k_bay</target></payload-out>
+        <payload-out><target>k_3</target></payload-out>
     </payloads>
-    <!-- Three circuits, driven together. -->
+    <!-- Two heaters, each three circuits driven together, both near the -->
+    <!-- sensors on the same thermal mass. Separate nodes rather than six -->
+    <!-- lines on one, so that one can be stopped from the ground while the -->
+    <!-- other goes on holding the temperature. -->
     <payloads>
-        <name>heaters</name>
+        <name>heaters_1</name>
         <type>gpio</type>
         <direction>output</direction>
         <lines>3,4,5</lines>
+        <path>/dev/gpiochip0</path>
+        <moc-in>true</moc-in>
+    </payloads>
+    <payloads>
+        <name>heaters_2</name>
+        <type>gpio</type>
+        <direction>output</direction>
+        <lines>6,7,8</lines>
         <path>/dev/gpiochip0</path>
         <moc-in>true</moc-in>
     </payloads>
@@ -151,16 +177,17 @@
         <sets>thermostat.setpoint</sets>
     </commands>
     <tcsgui>
-        <nodes><name>temp_fore</name><x>34</x><y>34</y></nodes>
-        <nodes><name>temp_aft</name><x>34</x><y>166</y></nodes>
-        <nodes><name>temp_bay</name><x>34</x><y>280</y></nodes>
-        <nodes><name>k_fore</name><x>242</x><y>34</y></nodes>
-        <nodes><name>k_aft</name><x>242</x><y>166</y></nodes>
-        <nodes><name>k_bay</name><x>242</x><y>280</y></nodes>
-        <nodes><name>mean_temp</name><x>469</x><y>166</y></nodes>
+        <nodes><name>temp_1</name><x>34</x><y>34</y></nodes>
+        <nodes><name>temp_2</name><x>34</x><y>166</y></nodes>
+        <nodes><name>temp_3</name><x>34</x><y>280</y></nodes>
+        <nodes><name>k_1</name><x>242</x><y>34</y></nodes>
+        <nodes><name>k_2</name><x>242</x><y>166</y></nodes>
+        <nodes><name>k_3</name><x>242</x><y>280</y></nodes>
+        <nodes><name>cabin_temp</name><x>469</x><y>166</y></nodes>
         <nodes><name>thermostat</name><x>601</x><y>242</y></nodes>
         <nodes><name>moc</name><x>790</x><y>34</y></nodes>
-        <nodes><name>heaters</name><x>34</x><y>393</y></nodes>
+        <nodes><name>heaters_1</name><x>34</x><y>393</y></nodes>
+        <nodes><name>heaters_2</name><x>34</x><y>470</y></nodes>
         <nodes><name>housekeeping</name><x>469</x><y>374</y></nodes>
     </tcsgui>
 </configuration>

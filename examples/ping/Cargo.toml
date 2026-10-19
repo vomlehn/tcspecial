@@ -1,0 +1,14 @@
+[package]
+name = "ping_example"
+version = "0.1.0"
+edition = "2021"
+description = "The tests of the ping example, whose ground station is Python 3: they hold the Python to the Rust it is written after"
+
+# Nothing is built for the example itself: its ground station is ping_moc.py
+# beside this. What is here is the tests, which need the Rust to hold the
+# Python to -- the configuration's facts, the ping format and the beacon's
+# JSON.
+[dev-dependencies]
+tcslibgs = { path = "../../tcslibgs" }
+serde_json = "1.0"
+tempfile = "3"

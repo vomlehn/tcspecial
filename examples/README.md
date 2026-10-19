@@ -10,7 +10,7 @@ An example whose payload is a program of its own holds that program too,
 beside those files: `simple-app` does, with a Python 3 payload and a Rust
 ground station. An example may hold a ground program without holding a
 payload: `beacon` does, its ground station watching something tcspecial sends
-on its own account.
+on its own account, and so does `ping`, whose ground station is Python 3.
 
 | Directory | Description |
 |---|---|
@@ -18,6 +18,7 @@ on its own account.
 | `thermostat` | Three temperature sensors (I2C and SPI), converted to kelvin, averaged, and fed to a hysteresis thermostat that drives GPIO heaters. The setpoint is commanded from the ground. |
 | `simple-app` | A payload that is a program rather than a device: an `app_pl` node sending a line of text one word per packet, and a ground station that prints the line. Two programs of its own beside the configuration: the payload in Python 3, the ground station in Rust. |
 | `beacon` | The one thing a ground station knows without asking: a window showing the spacecraft's beacon, built from the two halves any ground station would use -- `tcslib::beacon` to listen and `tcsui`'s panel to show it. |
+| `ping` | The ground pings a `ping` vehicle node and times the answer: the round trip, and the two halves of it. The ground station is Python 3, with the beacon panel and the halves it is built from written again in Python under `python/`, and tests that hold them to the Rust. |
 
 A configuration and its simulator file are matched by payload name. Every
 data handler in the configuration needs an entry in the simulator file, and
@@ -117,3 +118,37 @@ The text itself is `simple_app`'s library: the first paragraph of the lorem
 ipsum text as one array per line, each holding that line's words. Nothing
 holds a line terminator; the end of a word array is the end of the line, and
 what stands for it on the wire is the one constant both programs read.
+
+## ping
+
+The ground sends a ping up to the `moc` node, which hands it to the `ping`
+node; the `ping` node answers with the vehicle's time on the end, and the
+answer comes back down. What a ping and its answer say is
+`tcslibgs::node::vehicle::ping`:
+
+```
+ping #<count> <seconds>.<nanoseconds>                    up
+ping #<count> <seconds>.<nanoseconds> <seconds>.<nanoseconds>   down
+```
+
+The ground station, `ping_moc.py`, is Python 3 and uses nothing outside the
+standard library. Its window shows the beacon panel, the last ping sent and
+when, the last answer and when, and three times: the round trip, MOC to
+tcspecial, and tcspecial to MOC. The last two are each read across two clocks,
+so each includes their offset and may be negative; their sum is the round
+trip. Press `Send ping` to send one: it clears the time received until its own
+answer, matched by count, arrives.
+
+It is built the way `beacon_watch` is, from the same two halves written again
+in Python: `python/tcslib/beacon.py` after `tcslib::beacon`,
+`python/tcsui/beacon_panel.py` after `tcsui`, and `python/tcslibgs` for the
+ping format and the configuration. `ping_ground.py` here is the ping's own
+part, with no window. The Rust crate beside them is the tests that hold the
+Python to the Rust; `cargo test` runs them.
+
+```
+make run-ping                                   # the vehicle and the window
+python3 examples/ping/ping_moc.py --pings 3     # no window: three pings, printed
+```
+
+Its ports are all in the seven thousands, which no other example uses.

@@ -1768,6 +1768,69 @@ read the other.
 background and the watcher in front of it, and stops the vehicle when the
 window is closed. The watcher opens a window, so it wants a display.
 
+The ping example
+----------------
+.. figure:: ../examples/ping/ping.svg
+   :alt: The ping example: the ground station ping_moc.py sends a ping up to
+         the moc node, which hands it to the ping node by its moc-out link;
+         the ping node answers with the vehicle's time on the end, and the
+         answer comes back down through the moc node to the ground, beside
+         the beacon panel.
+   :width: 100%
+
+   ``examples/ping``: a ping, answered by the vehicle and timed by the ground.
+
+The one exchange that shows how long the link takes each way, and how far the
+two ends' clocks are apart. The ground station sends ``ping #<count> <time>``
+up to the ``moc`` node, which binds ``address:port`` aboard and hands it by its
+``moc-out`` link to the ``ping`` node. The ``ping`` node answers with the ping,
+a space, and the vehicle's time, and sends that by its ``payload-out`` link
+back to the ``moc`` node and so down to the ground, at ``ground_base`` plus its
+device id. Each time is seconds since the UNIX epoch to the nanosecond:
+``1760900000.000000001``. What a ping and its answer say is
+``tcslibgs::node::vehicle::ping``.
+
+The ground station is a Python 3 program, ``ping_moc.py``, that uses nothing
+outside the standard library -- its window is tkinter. It shows the beacon
+panel, the last ping sent and when, the last answer received and when, and
+three times:
+
+* **Round trip**: the ground sending the ping to the ground receiving the
+  answer, on the ground's clock at both ends.
+* **MOC to tcspecial**: the ground sending it to the vehicle having it.
+* **tcspecial to MOC**: the vehicle having it to the ground receiving the
+  answer.
+
+The last two are each read across two clocks, so each includes how far apart
+those clocks are, and either may come out negative; their sum is the round
+trip whatever the offset, which is how to tell a clock that is out from a link
+that is slow. Pressing ``Send ping`` clears the time received and the three
+times until that ping's own answer arrives -- an answer is matched to its ping
+by the count. An answer to an earlier ping is still shown as the last thing
+received, and changes none of the times.
+
+The ground station is built the way ``beacon_watch`` is, from two halves and a
+little of its own, and the halves are the same ones in Python:
+``python/tcslib/beacon.py`` is ``tcslib::beacon``, ``python/tcsui/beacon_panel.py``
+is ``tcsui``'s panel, and ``python/tcslibgs`` holds the ping format and what a
+ground station reads out of a configuration. It reads the XML spelling, the
+standard library having no YAML, and asks ``tcsverify --digest`` for the
+digest it compares each beacon's with rather than working it out a second
+time. The rules are then written twice, in Rust and in Python, and the
+example's tests hold them to one another: the Python's own tests use the Rust
+tests' examples, one test checks that the Python reads the same ports from
+``ping.xml`` as the Rust does from ``ping.yaml``, and one plays the vehicle with
+the Rust -- the ping answered by the function the ``ping`` node answers with,
+the beacon serialized as tcspecial serializes it -- against the ground station.
+``cargo test`` runs them all.
+
+``make -C examples run-ping`` checks for Python 3 and tkinter, builds the
+vehicle and tcsverify, runs the vehicle in the background and the ground
+station in front of it, and stops the vehicle when the window is closed. With
+no display, ``python3 examples/ping/ping_moc.py --pings 3`` sends three pings,
+prints each answer and its times, and stops. Every port the example uses is in
+the seven thousands, which no other example uses.
+
 The Simulator Configuration
 ===========================
 What simulating a payload takes, which is not a property of the payload: how
@@ -2929,7 +2992,7 @@ both are shown the same way.
 Crates Used
 ===========
 These are the crates the workspace's ``Cargo.toml`` files name directly --
-every one of the seventeen manifests, the root and each crate under it. The
+every one of the eighteen manifests, the root and each crate under it. The
 crates they depend on in turn are not listed: ``cargo tree`` shows the whole
 graph, and ``Cargo.lock`` says which version of each is built.
 
@@ -3011,7 +3074,7 @@ that satisfies both.
    * - `serde_json <https://crates.io/crates/serde_json>`__
      - 1.0
      - `1.0.151 <https://docs.rs/serde_json/1.0.151>`__
-     - tcsgui, tcslib, tcslibgs, tcsmoc, tcspecial, tcssim, tcsverify, examples/beacon
+     - tcsgui, tcslib, tcslibgs, tcsmoc, tcspecial, tcssim, tcsverify, examples/beacon, examples/ping
      - The JSON the command link carries between the ground and the vehicle.
      - `repository <https://github.com/serde-rs/json>`__
    * - `serde_norway <https://crates.io/crates/serde_norway>`__

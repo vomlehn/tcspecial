@@ -26,7 +26,9 @@ help:
 	@echo "  make run-thermostat  - Run tcsmoc on the thermostat example"
 	@echo "  make run-simple-app  - Run the simple-app example, printing its line"
 	@echo "  make run-beacon      - Run the beacon example: a window watching the beacon"
+	@echo "  make run-ping        - Run the ping example: a Python window that pings the vehicle"
 	@echo "  make check-python3   - Check for the Python 3 simple-app's payload needs"
+	@echo "  make check-tkinter   - Check for the tkinter the ping example's window needs"
 
 # Running tcsmoc on one of the examples.
 #
@@ -131,6 +133,47 @@ run-beacon:
 		trap 'exit 130' INT TERM; \
 		target/debug/beacon_watch examples/beacon/beacon.yaml \
 	)
+
+# Run the ping example: tcspecial answering pings, and a window sending them.
+#
+# Both ends, as run-beacon runs them. The vehicle goes in the background and
+# the ground station in the foreground, where it stays until its window is
+# closed, and then the vehicle is stopped. The ground station is Python 3,
+# examples/ping/ping_moc.py, so Python and its tkinter are checked for first;
+# tcsverify is built beside the vehicle because the window asks it for the
+# configuration's digest, which it compares every beacon's with.
+#
+# It opens a window, so it wants a display. Without one,
+#   python3 examples/ping/ping_moc.py --pings 3
+# sends three pings and prints each answer and its times.
+.PHONY: run-ping
+run-ping: check-tkinter
+	cd $(ROOT) && cargo build -q --bin tcspecial --bin tcsverify
+	( \
+		set -eu; \
+		echo "Running $(PROJECT_NAME) on examples/ping/ping.yaml..."; \
+		cd $(ROOT); \
+		rm -rf $(TELEMETRY); \
+		mkdir $(TELEMETRY); \
+		RUST_LOG=$(RUST_LOG) target/debug/tcspecial examples/ping/ping.yaml & \
+		vehicle=$$!; \
+		trap 'kill -INT $$vehicle 2>/dev/null || true; wait $$vehicle || true' EXIT; \
+		trap 'exit 130' INT TERM; \
+		python3 examples/ping/ping_moc.py examples/ping/ping.xml \
+	)
+
+# Whether there is a tkinter for the ping example's window to be drawn with.
+#
+# The window is the one part of the ground station that needs more than the
+# interpreter: tkinter comes with Python but is packaged apart from it on some
+# systems -- python3-tk on Debian and Ubuntu -- so a Python that runs the
+# no-window mode may still have nothing to draw with.
+.PHONY: check-tkinter
+check-tkinter: check-python3
+	@python3 -c 'import tkinter' 2>/dev/null || { \
+		echo "the ping example's window is drawn with tkinter, and this python3 has none: install it (python3-tk on Debian and Ubuntu), or run python3 examples/ping/ping_moc.py --pings 3 for no window" >&2; \
+		exit 1; \
+	}
 
 # Whether there is a Python 3 to run simple-app's payload with.
 #

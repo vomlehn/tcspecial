@@ -24,6 +24,9 @@ members = [
     # The programs of an example: see examples/README.md.
     "examples/simple-app",
     "examples/beacon",
+    # Its ground station is Python: this crate is the tests that hold the
+    # Python to the Rust it is written after.
+    "examples/ping",
 ]
 
 [workspace.package]

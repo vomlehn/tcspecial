@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../tcsgui/share/schema/tcspecial.xsd">
+    <description>A ping, and a ground station that sends one and times the answer</description>
+    <tcspecial>
+        <!-- Every port is in the seven thousands, which no other example
+             uses, so this one can be left running while another is looked
+             at.
+
+             The beacon is here as it is in the beacon example: the ground
+             station shows the same panel, so that it says whether the
+             vehicle is alive before anybody presses Ping. -->
+        <beacon>
+            <interval>5 s</interval>
+            <recv>127.0.0.1:7510</recv>
+            <send>0.0.0.0:7500</send>
+        </beacon>
+        <log>
+            <directory>/tmp/telemetry</directory>
+            <segment_size>65536</segment_size>
+        </log>
+        <payload_command>
+            <dest_base>0.0.0.0:7300</dest_base>
+            <source_base>127.0.0.1:7310</source_base>
+        </payload_command>
+        <payload_telemetry>
+            <dest_base>127.0.0.1:7410</dest_base>
+            <source_base>0.0.0.0:7400</source_base>
+        </payload_telemetry>
+        <tcs_cmd>
+            <recv>0.0.0.0:7200</recv>
+            <send>127.0.0.1:7210</send>
+        </tcs_cmd>
+    </tcspecial>
+    <!-- The ground's end of the link, both ways. A ping goes up to
+         address:port, which this node binds aboard, and leaves it by moc-out
+         for the ping node. The answer comes back to the ground at
+         ground_base plus the ping node's device id: ping is the second node
+         written, device id 1, so 7701. -->
+    <moc>
+        <name>moc</name>
+        <type>moc</type>
+        <address>127.0.0.1</address>
+        <port>7600</port>
+        <ground_base>127.0.0.1:7700</ground_base>
+        <payload-in>true</payload-in>
+        <moc-out><target>ping</target></moc-out>
+    </moc>
+    <!-- Answers each ping with the vehicle's time on the end: see
+         tcslibgs::node::vehicle::ping for what a ping and its answer say. -->
+    <vehicle>
+        <name>ping</name>
+        <type>ping</type>
+        <moc-in>true</moc-in>
+        <payload-out><target>moc</target></payload-out>
+    </vehicle>
+    <tcsgui>
+        <nodes><name>moc</name><x>469</x><y>34</y></nodes>
+        <nodes><name>ping</name><x>34</x><y>34</y></nodes>
+    </tcsgui>
+</configuration>

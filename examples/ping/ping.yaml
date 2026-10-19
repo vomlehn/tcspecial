@@ -1,0 +1,55 @@
+# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial.schema.json
+
+description: "A ping, and a ground station that sends one and times the answer"
+
+tcspecial:
+  # Every port is in the seven thousands, which no other example uses, so this
+  # one can be left running while another is looked at.
+  #
+  # The beacon is here as it is in the beacon example: the ground station
+  # shows the same panel, so that it says whether the vehicle is alive before
+  # anybody presses Ping.
+  beacon:
+    interval: "5 s"
+    recv: "127.0.0.1:7510"
+    send: "0.0.0.0:7500"
+  log:
+    directory: "/tmp/telemetry"
+    segment_size: "65536"
+  payload_command:
+    dest_base: "0.0.0.0:7300"
+    source_base: "127.0.0.1:7310"
+  payload_telemetry:
+    dest_base: "127.0.0.1:7410"
+    source_base: "0.0.0.0:7400"
+  tcs_cmd:
+    recv: "0.0.0.0:7200"
+    send: "127.0.0.1:7210"
+
+moc:
+  # The ground's end of the link, both ways. A ping goes up to address:port,
+  # which this node binds aboard, and leaves it by moc-out for the ping node.
+  # The answer comes back to the ground at ground_base plus the ping node's
+  # device id: ping is the second node written, device id 1, so 7701.
+  - name: moc
+    type: moc
+    address: "127.0.0.1"
+    port: "7600"
+    ground_base: "127.0.0.1:7700"
+    payload-in: true
+    moc-out:
+      - target: ping
+
+vehicle:
+  # Answers each ping with the vehicle's time on the end: see
+  # tcslibgs::node::vehicle::ping for what a ping and its answer say.
+  - name: ping
+    type: ping
+    moc-in: true
+    payload-out:
+      - target: moc
+
+tcsgui:
+  nodes:
+    - { name: moc, x: 469, y: 34 }
+    - { name: ping, x: 34, y: 34 }

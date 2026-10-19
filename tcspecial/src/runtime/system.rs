@@ -158,6 +158,14 @@ impl Workbench {
 }
 
 /// Everything a configuration needs in order to run.
+/// How a node is opened: the same call that opened everything at startup.
+///
+/// A type of its own because it is written down twice -- the field that holds
+/// one and the parameter that supplies it -- and a closure's type spelled
+/// twice is two places to keep in step.
+type Opener =
+    Box<dyn FnMut(&tcslibgs::graph::Node, &Routes, &Abandon) -> Result<Box<dyn Port>, String>>;
+
 pub struct System {
     /// The nodes, and the table saying how they are joined.
     fabric: Fabric,
@@ -190,7 +198,7 @@ pub struct System {
     /// The same function that opened everything at startup, because enabling a
     /// node is the same work as starting it was and must be able to fail the
     /// same ways.
-    opener: Box<dyn FnMut(&tcslibgs::graph::Node, &Routes, &Abandon) -> Result<Box<dyn Port>, String>>,
+    opener: Opener,
     /// Work the command interpreter has handed over, taken between stages.
     jobs: Receiver<Job>,
     /// How the interpreter asks for it, and wakes a pass that is waiting.

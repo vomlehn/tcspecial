@@ -58,8 +58,10 @@ attributes and checks in `tcslibgs::node`, the flight-side node in
 - Configurations are YAML or XML, chosen by the file's extension. The two
   spellings of a configuration must say the same thing, so change both
   together. `tcsverify a.xml a.yaml a-sim.yaml` compares them.
-- A file's `version` decides what it is: `2.0` is a graph of nodes, `1.0` a
-  set of payloads.
+- A configuration states `version: "2.0"`, and that is the only version there
+  is. Version 1 described a set of payloads, each paired with a ground
+  endpoint and commanded by name; it is deleted, and a file saying `1.0` is
+  told what became of it rather than read.
 
 ## Building and testing
 

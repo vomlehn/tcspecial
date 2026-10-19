@@ -49,6 +49,13 @@ use tcslibgs::graph::terminals::Stream;
 use super::node_state::Outcome;
 use super::route::{Delivery, Routes};
 
+/// One datum on its way to the places a node's links lead.
+///
+/// Where it came from, the bytes, how far it has already been passed on --
+/// see the cascade in [`Fabric::deliver_on`] -- which stream it is on, and
+/// whether it is something said again rather than something new.
+type Passing = (String, Vec<u8>, usize, Option<Stream>, bool);
+
 /// What a node handed over.
 ///
 /// The bytes, and which of the two streams they belong to where the node keeps
@@ -585,7 +592,7 @@ impl Fabric {
         // vehicle that stops reading its sensors.
         let most = self.nodes.len().max(1);
 
-        let mut work: VecDeque<(String, Vec<u8>, usize, Option<Stream>, bool)> =
+        let mut work: VecDeque<Passing> =
             VecDeque::from(vec![(from.to_string(), data.to_vec(), 0, stream, again)]);
 
         while let Some((from, data, depth, stream, again)) = work.pop_front() {

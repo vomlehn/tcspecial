@@ -45,13 +45,9 @@ use crate::runtime::port::{AppPort, ComputePort, EndpointPort, LogPort, NullPort
 use crate::runtime::route::Routes;
 use crate::runtime::schedule::Schedule;
 
-/// How large a datum may be.
-///
-/// The buffer every read is given, and the most one delivery can carry. A
-/// sensor's reading is a handful of bytes and a line event is sixteen; this is
-/// room for a whole segment of anything this software moves, and a node that
-/// wants less says so with `read_size`.
-pub const DATUM_BYTES: usize = 4096;
+/// How large a datum may be: see [`tcslibgs::DATUM_BYTES`], which is where the
+/// configuration is held to it.
+pub use tcslibgs::DATUM_BYTES;
 
 /// How long a pass may wait when a node is polled rather than scheduled.
 ///

@@ -26,7 +26,7 @@
 
 use crate::endpoint_config::{
     a_link_term, endpoint_of, parse_u32, ByteList, EndpointLocation, LinkTerms, Scalar,
-    StreamTerms,
+    StreamParams, StreamTerms,
 };
 use crate::graph::Node;
 use crate::types::{host_port_of, DeviceConfig, EndpointConfig, HostPort, NetworkConfig};
@@ -67,6 +67,14 @@ pub struct Reach {
     /// tells the nodes apart by the port their data arrives at, and the
     /// vehicle sends from the first reading without being spoken to.
     pub ground: Option<HostPort>,
+    /// Where one read of a line ends: the most it may hold, and the timeout
+    /// and terminators that may end it sooner.
+    ///
+    /// For a line, and only for one: a stream delivers bytes with no frame
+    /// boundaries of its own, so the vehicle holds what has arrived until one
+    /// of these says a read is done. Every other interface's read is already
+    /// a frame -- a datagram, a bus transfer, a CAN frame, a line event.
+    pub stream: Option<StreamParams>,
 }
 
 /// What this node reaches, or what is wrong with what it says.
@@ -213,6 +221,8 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
         }
     }
 
+    // What the rules settle about where a read ends, for a line.
+    let mut framing = None;
     let endpoint = match kind {
         // A socket: a host and a port, and which protocol is spoken to it.
         // The MOC link is one of these, and a `moc` node needs no protocol --
@@ -286,9 +296,24 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
         // them.
         kind => {
             let on_a_link = crate::types::kind_of_terms(what, kind, terms)?;
+            framing = on_a_link.stream().cloned();
             endpoint_of(what, &location_of(what, node, kind)?, &on_a_link)?
         }
     };
+
+    // A read is delivered as one datum, so one that could hold more than a
+    // datum carries would arrive cut short -- and a line read in pieces is a
+    // line whose pieces nothing knows how to put back together.
+    if let Some(rule) = &framing {
+        if rule.max_length as usize > crate::types::DATUM_BYTES {
+            return Err(format!(
+                "\"{what}\": max_length {} is more than one datum carries: a read \
+                 is delivered whole, and the most a datum holds is {} bytes",
+                rule.max_length,
+                crate::types::DATUM_BYTES
+            ));
+        }
+    }
 
     // What the interface itself will not do, which is the last thing to ask:
     // both of these read what the kind settled above.
@@ -309,6 +334,7 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
         trigger,
         read_delay,
         ground,
+        stream: framing,
     })
 }
 
@@ -1548,6 +1574,34 @@ mod tests {
         let line = line_with(attributes);
         let terms = settled("serial", &line)?;
         Ok(terms.stream().expect("a line has a stream rule").clone())
+    }
+
+    /// A line's reach carries where its reads end, so that the vehicle can
+    /// end them there; nothing else's does.
+    #[test]
+    fn a_line_carries_its_stream_rule_and_nothing_else_does() {
+        let line = line_with(&[("max_length", "80"), ("terminators", "0x0A")]);
+        let reach = reached("serial", &line).expect("a line");
+        let rule = reach.stream.expect("a line's reads end somewhere");
+        assert_eq!(rule.max_length, 80);
+        assert_eq!(rule.terminators, vec![0x0A]);
+
+        let bus = reached("i2c", &[("path", "/dev/i2c-1"), ("address", "0x48")]).expect("a bus");
+        assert_eq!(bus.stream, None, "a bus transfer is already a frame");
+    }
+
+    /// A line whose reads could be longer than a datum is refused: a read is
+    /// delivered whole, and one cut short is a line read in pieces nothing
+    /// knows how to put back together.
+    #[test]
+    fn a_read_longer_than_a_datum_is_refused() {
+        let most = crate::types::DATUM_BYTES.to_string();
+        let one_more = (crate::types::DATUM_BYTES + 1).to_string();
+        let fits = line_with(&[("max_length", &most), ("read_timeout", "none")]);
+        reached("serial", &fits).expect("a datum's worth fits");
+        let over = line_with(&[("max_length", &one_more), ("read_timeout", "none")]);
+        let said = reached("serial", &over).expect_err("more than a datum");
+        assert!(said.contains("max_length") && said.contains(&most), "{said}");
     }
 
     #[test]

@@ -5782,7 +5782,7 @@ Requirement
     ``max_message_bytes``.
 
 Requirement
-    An rpmsg payload has no stream section: a read hands over one whole
+    An rpmsg payload has no stream rule: a read hands over one whole
     message and never part of one.
 
 Requirement
@@ -5822,7 +5822,7 @@ Requirement
     refused and told which word and why.
 
 Requirement
-    An IIO payload has no stream section. A buffer read hands over whole
+    An IIO payload has no stream rule. A buffer read hands over whole
     sample sets and never part of one, so there is nothing for a rule about
     where a read ends to say.
 
@@ -6043,7 +6043,7 @@ Requirement
 +---------------+----------+--------------------------------------------------+
 
 Requirement
-    A serial payload has a stream section, because a serial port is a stream and
+    A serial payload has a stream rule, because a serial port is a stream and
     so there is always a rule deciding where one read ends.
 
 HDLC Payloads: a Synchronous Line
@@ -6126,7 +6126,7 @@ Requirement
     payload and a write puts one payload into one frame, as on a CAN bus.
 
 Requirement
-    An hdlc payload has no stream section. A frame is its own length, so there
+    An hdlc payload has no stream rule. A frame is its own length, so there
     is nothing for a rule about where a read ends to say.
 
 Requirement
@@ -6205,7 +6205,7 @@ Requirement
     protocol fixes the framing of a byte and leaves nothing to configure.
 
 Requirement
-    An I2C payload has no stream section, because the master clocks exactly as
+    An I2C payload has no stream rule, because the master clocks exactly as
     many bytes as it asks for and a transfer is therefore already bounded.
 
 Requirement
@@ -6270,7 +6270,7 @@ Requirement
     mismatched data rate fails on a serial line.
 
 Requirement
-    A SPI payload has no stream section, because the master clocks exactly as
+    A SPI payload has no stream rule, because the master clocks exactly as
     many words as it asks for and a transfer is therefore already bounded.
 
 Requirement
@@ -6280,28 +6280,32 @@ Requirement
 
 Where a Read of a Line Ends
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A stream delivers bytes with no frame boundaries of its own, so a payload
-on one needs to be told where one read ends. Three attributes say so.
+A stream delivers bytes with no frame boundaries of its own, so a node on one
+needs to be told where one read ends. Three attributes say so, written flat
+beside the line's other terms.
 
 **Stream attributes**
 
 +---------------+----------+--------------------------------------------------+
 | Name          | Required | Description                                      |
 +===============+==========+==================================================+
-| max_length    | Yes      | Longest payload one read may deliver, in bytes   |
+| max_length    | Yes      | The most one read may hold, in bytes             |
 +---------------+----------+--------------------------------------------------+
-| timeout       | See      | How long a read waits, or ``none``               |
-|               | below    |                                                  |
+| read_timeout  | See      | How long after its first byte a read ends with   |
+|               | below    | what has arrived, or ``none``                    |
 +---------------+----------+--------------------------------------------------+
 | terminators   | See      | One or more byte values, each of which ends a    |
 |               | below    | read                                             |
 +---------------+----------+--------------------------------------------------+
 
 Requirement
-    A stream section specifies the maximum data length.
+    A line specifies the maximum read length, and it is at most a datum's,
+    ``tcslibgs::DATUM_BYTES``: a read is delivered whole, and one longer than
+    a datum would arrive cut short, as pieces nothing knows how to put back
+    together.
 
 Requirement
-    A stream section specifies the timeout, the terminator list, or both.
+    A line specifies the timeout, the terminator list, or both.
 
 Requirement
     Specifying both a timeout and a terminator list is valid. A read then ends
@@ -6313,15 +6317,37 @@ Requirement
 
 Requirement
     To read a fixed number of bytes at a time, with no timeout and no
-    terminator, a stream section specifies a timeout of ``none``.
+    terminator, a line specifies a timeout of ``none``.
 
-The last requirement deserves a word, because it is the one case where the
-format asks for something to be stated that could have been left implicit.
-A stream section giving only a maximum length would be ambiguous: it reads
+Requirement
+    The vehicle acts on the rule: each read of a line is held until it ends,
+    and is then one datum. A terminator is the read's last byte, and what
+    arrived after it is the start of the next read; ``max_length`` ends a
+    read that has filled; the timeout counts from the read's first byte and
+    ends it with what has arrived. Without this a pass would take whatever
+    bytes happened to be waiting, which is half a sentence as often as a
+    whole one -- and a rule that is checked and then ignored is worse than no
+    rule, because it reads as though it were applied. See
+    ``tcspecial::runtime::frame``.
+
+Requirement
+    No more is held than ``max_length``, and no more is asked of the line than
+    would fill the read under way. A line that sends faster than it is read is
+    held back by its own driver's buffer, not by a queue aboard that grows.
+
+Requirement
+    Holding a read never blocks a pass. A timeout is therefore noticed by the
+    first pass after it, and a read that ends by its timeout is late by as
+    much as its group's interval; a read already ended is handed over before
+    anything more is read.
+
+The fixed-length requirement deserves a word, because it is the one case where
+the format asks for something to be stated that could have been left implicit.
+A line giving only a maximum length would be ambiguous: it reads
 either as "hand me this many bytes at a time", which is a real and useful
 intent, or as a file whose author forgot to say when a read should end. These
 have different consequences on a link that goes quiet, so the format does not
-guess. Writing ``timeout: none`` says the first explicitly, and a section with
+guess. Writing ``read_timeout: none`` says the first explicitly, and a line with
 neither attribute is reported as an error rather than being taken for it.
 
 Value Syntax

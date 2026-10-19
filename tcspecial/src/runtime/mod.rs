@@ -12,6 +12,8 @@
 //! * [`fabric`] holds the nodes and moves the bytes, using the other two.
 //! * [`port`] is the one piece that does open something: it presents an
 //!   opened endpoint as a node the fabric can move bytes to and from.
+//! * [`frame`] is where one read of a line ends, so that a port on a line
+//!   hands over whole reads rather than whatever bytes were waiting.
 //! * [`system`] is the assembly and the loop: a port per node, held in a
 //!   fabric, with the schedule deciding when each group is read.
 //! * [`node_state`] is what each node's state is -- enabled or disabled -- and
@@ -26,6 +28,7 @@
 
 pub mod command;
 pub mod fabric;
+pub mod frame;
 pub mod node_state;
 pub mod port;
 pub mod route;

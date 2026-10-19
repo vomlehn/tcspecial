@@ -46,12 +46,25 @@ pub struct Arrival {
     /// had read from the ground, which is the other direction and reads
     /// nought for a payload nobody sends to.
     pub packets: u64,
+    /// Whether the node this came from sends values, so that a reading is
+    /// shown as the temperature it is and not as four bytes of hexadecimal.
+    ///
+    /// Kept per arrival because it is a property of the node it came from,
+    /// and this is where the node is known: the receiving loop has the name
+    /// the datagram came from and the configuration to ask about it. The
+    /// panel, by then, has a row and a string.
+    ///
+    /// From the configuration and never from the data. Every four bytes are a
+    /// value, so a decision of four characters would be shown as a
+    /// temperature by anything that guessed from the width -- see
+    /// `tcslibgs::node::vehicle::compute::node_sends_a_value`.
+    pub sends_values: bool,
 }
 
 impl Arrival {
     /// The two strings a panel shows: when, and what.
     pub fn panel_lines(&self) -> (String, String) {
-        let (_, data) = self.data.panel_lines();
+        let (_, data) = self.data.panel_lines_of(self.sends_values);
         (self.at.time_of_day(), data)
     }
 }
@@ -64,6 +77,44 @@ pub type Arrivals = Arc<Mutex<Vec<Option<Arrival>>>>;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// What came from a node that sends values is shown as the temperature.
+    ///
+    /// The reason the arrival carries that fact at all. The same four bytes
+    /// are shown as bytes for a node that sends something else, because every
+    /// four bytes are a value: the configuration is the only thing that can
+    /// tell a reading from a four-character decision, and it is asked where
+    /// the datagram is received.
+    #[test]
+    fn a_reading_is_shown_as_a_temperature() {
+        let at = Timestamp::at(
+            std::time::UNIX_EPOCH + std::time::Duration::from_secs(3661),
+        );
+        let mut data = DHSample::new();
+        data.record(
+            &tcslibgs::node::vehicle::compute::as_value(293.15).expect("a temperature"),
+        );
+
+        let arrival = Arrival {
+            at,
+            data: data.clone(),
+            packets: 1,
+            sends_values: true,
+        };
+        assert_eq!(arrival.panel_lines(), (at.time_of_day(), "293.15 K".to_string()));
+
+        // And from a node that does not send values, the bytes.
+        let arrival = Arrival {
+            at,
+            data,
+            packets: 1,
+            sends_values: false,
+        };
+        assert_eq!(
+            arrival.panel_lines(),
+            (at.time_of_day(), "30 1D 79 11".to_string())
+        );
+    }
 
     /// A panel's two lines of an arrival: when it came, and what it was.
     ///
@@ -79,7 +130,12 @@ mod tests {
         );
         let mut data = DHSample::new();
         data.record(b"hello");
-        let arrival = Arrival { at, data, packets: 7 };
+        let arrival = Arrival {
+            at,
+            data,
+            packets: 7,
+            sends_values: false,
+        };
 
         // The time is the ground's clock, as every time in the window is, and
         // the data is the head of what arrived in hex -- the same way a

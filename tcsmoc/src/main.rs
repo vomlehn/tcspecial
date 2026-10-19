@@ -24,7 +24,7 @@ mod beacon_receive;
 mod ci_link;
 mod config;
 mod oc_link;
-mod version_2;
+mod vehicle;
 
 
 /// What the window's status line says about the link to the command
@@ -583,7 +583,7 @@ fn main() {
     );
     present_and_stop_if_fatal(&startup);
 
-    version_2::run(&payload_path, sim_path.as_deref(), startup);
+    vehicle::run(&payload_path, sim_path.as_deref(), startup);
 }
 
 /// Ask for this window to be put against one edge of the display.
@@ -811,7 +811,7 @@ mod tests {
     ///
     /// Made here rather than from a configuration, because these tests are
     /// about the window: where a panel lands, how wide it is, what text it
-    /// shows. What a panel is made *of* is `version_2::panels`' business and
+    /// shows. What a panel is made *of* is `vehicle::panels`' business and
     /// is tested there, against the shipped examples.
     fn a_panel(row: usize, name: &str) -> DHInfo {
         DHInfo {
@@ -819,7 +819,7 @@ mod tests {
             dev_id: i32::try_from(row).unwrap_or(i32::MAX),
             config: SharedString::from(format!("to moc, at 127.0.0.1:{}", 5100 + row)),
             packet_size: 0,
-            status: SharedString::from(crate::version_2::RECEIVING_STATUS),
+            status: SharedString::from(crate::vehicle::RECEIVING_STATUS),
             oc_time: SharedString::from(NO_TRANSFER_TIME),
             oc_data: SharedString::new(),
             packets_recv: 0,
@@ -1041,7 +1041,7 @@ mod tests {
         testing::init_integration_test_with_system_time();
 
         // The shipped fixture, through the builder the window really uses:
-        // see `version_2::panels`. A panel's height is what this measures, so
+        // see `vehicle::panels`. A panel's height is what this measures, so
         // the panels have to be real ones.
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("..")
@@ -1049,7 +1049,7 @@ mod tests {
         let graph = tcslibgs::graph::Graph::load(&path)
             .unwrap_or_else(|e| panic!("{} failed to load: {e}", path.display()));
         let links = tcslibgs::graph::telemetry::of(&graph).expect("its links to the ground");
-        let shipped = crate::version_2::panels(&links, &crate::version_2::settable_of(&graph));
+        let shipped = crate::vehicle::panels(&links, &crate::vehicle::settable_of(&graph));
         assert!(!shipped.is_empty(), "{} has no panels", path.display());
 
         // More handlers than the three-row floor covers, as well as the
@@ -1319,7 +1319,7 @@ mod tests {
         every_panel_shows_what_arrived_from_its_payload();
         panels_fill_left_to_right();
         every_panel_in_a_row_is_the_same_width();
-        crate::version_2::tests::pressing_connect_and_enable_commands_the_vehicle();
+        crate::vehicle::tests::pressing_connect_and_enable_commands_the_vehicle();
     }
 
 
@@ -1691,6 +1691,7 @@ mod tests {
             ),
             data,
             packets: 5,
+            sends_values: false,
         };
         let arrivals: Arrivals = Arc::new(Mutex::new(vec![None, Some(arrival)]));
 
@@ -1811,7 +1812,7 @@ mod tests {
         let graph = tcslibgs::graph::Graph::load(&path)
             .unwrap_or_else(|e| panic!("{} failed to load: {e}", path.display()));
         let links = tcslibgs::graph::telemetry::of(&graph).expect("its links to the ground");
-        let model = crate::version_2::panels(&links, &crate::version_2::settable_of(&graph));
+        let model = crate::vehicle::panels(&links, &crate::vehicle::settable_of(&graph));
 
         assert!(model.len() > 1, "the fixture has {} panels", model.len());
 

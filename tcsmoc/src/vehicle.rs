@@ -37,7 +37,7 @@
 //! What stays the same is everything else the window does: the panels, the
 //! grid they sit in, tcspecial and tcssim started on the same file, and Quit.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -761,7 +761,12 @@ fn no_command_link(ui: &MainWindow) {
 
 /// Keep what arrives at one `moc` node, in the panel of the source it came
 /// from.
-fn serve(mut moc: Moc, rows: Arc<BTreeMap<String, usize>>, arrivals: Arrivals) {
+fn serve(
+    mut moc: Moc,
+    rows: Arc<BTreeMap<String, usize>>,
+    sends_values: Arc<BTreeSet<String>>,
+    arrivals: Arrivals,
+) {
     let mut packets: BTreeMap<String, u64> = BTreeMap::new();
     loop {
         let received = match moc.receive(None) {
@@ -785,6 +790,7 @@ fn serve(mut moc: Moc, rows: Arc<BTreeMap<String, usize>>, arrivals: Arrivals) {
                     at: Timestamp::now(),
                     data,
                     packets: *count,
+                    sends_values: sends_values.contains(&received.source),
                 });
             }
         }
@@ -826,6 +832,24 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
             .map(|(row, info)| (info.name.to_string(), row))
             .collect(),
     );
+    // Which sources send values, asked of the configuration once: a panel
+    // then shows a reading as a temperature and everything else as bytes.
+    // See `tcslibgs::node::vehicle::compute::node_sends_a_value` for why this
+    // is the configuration's answer rather than a guess from the data.
+    let sends_values: Arc<BTreeSet<String>> = Arc::new(
+        graph
+            .nodes
+            .iter()
+            .filter(|node| {
+                tcslibgs::node::vehicle::compute::node_sends_a_value(
+                    &node.node_type,
+                    &node.attributes,
+                )
+            })
+            .map(|node| node.name.clone())
+            .collect(),
+    );
+
     let count = rows_in_order.len();
     let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(rows_in_order));
     ui.set_dh_model(ModelRc::from(model.clone()));
@@ -972,8 +996,9 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
             moc.sources().join(", ")
         );
         let rows = rows.clone();
+        let sends_values = sends_values.clone();
         let arrivals = arrivals.clone();
-        thread::spawn(move || serve(moc, rows, arrivals));
+        thread::spawn(move || serve(moc, rows, sends_values, arrivals));
     }
 
     // The panels, kept current -- and the one thing that keeps running on the

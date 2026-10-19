@@ -955,6 +955,14 @@ three thermal states of a vehicle on the way to the one that was asked for.
 The kernel counts them by their place in the request, so lines ``3,4,5``
 named in that order are the low three bits of the call that drives them.
 
+The same value arrives over and over, and that is deliberate. A thermostat
+asserts its decision on every sample rather than only when it changes, so the
+lines are held at what the vehicle last decided and a decision that went
+missing is corrected on the next sample instead of standing until the
+temperature crosses the other threshold. Only the devices are told again: a
+log and a ground link are sent the transitions, so a reader still sees when
+the heaters actually switched.
+
 A GPIO payload cannot be triggered, and a read and a write are not both open
 to it: an input refuses a write, because driving one would be commanding a
 payload rather than reading it, and an output refuses a read, because
@@ -2165,16 +2173,17 @@ person fixing the file wants: a set with three mistakes in it is three runs of
 tcsmoc, each reporting one of them. This asks the same rules -- the library's,
 the ones those programs use -- for all of their answers at once.
 
-It prints what it finds in the order it finds it, and stops as soon as it has
-printed five errors, the fifth being the last line: a long report is a report scrolled past, and in a
-half-built configuration most of the later errors are one unfinished node said
-another way. Two options change that::
+It prints everything it finds, in the order it finds it. Two options change
+that::
 
    $ cargo run --bin tcsverify -- --error-limit=unlimited example.yaml
    $ cargo run --bin tcsverify -- --warnings=off --error-limit=1 example.yaml
 
-``--error-limit=<n>`` stops after ``n`` instead: any whole number, ``0``
-included, or ``unlimited`` to look at everything.
+``--error-limit=<n>`` stops as soon as ``n`` errors have been printed, the
+``n``\ th being the last line: any whole number, ``0`` included, or
+``unlimited``, the default. In a half-built configuration most of the later
+errors are one unfinished node said another way, and a limit keeps the first of
+them on the screen.
 
 ``--warnings=<what>`` says what is done with warnings. ``on``, the default,
 prints them and does not count them against the limit, so they are printed for

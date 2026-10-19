@@ -46,6 +46,29 @@ the vehicle saying it is alive, the vehicle answering a ping. Start with
 | `beacon` | The one thing a ground station knows without asking: a window showing the spacecraft's beacon, built from the two halves any ground station would use -- `tcslib::beacon` to listen and `tcsui`'s panel to show it. |
 | `ping` | The ground pings a `ping` vehicle node and times the answer: the round trip, and the two halves of it. The ground station is Python 3, with the beacon panel and the halves it is built from written again in Python under `python/`, and tests that hold them to the Rust. |
 
+### minimal
+
+The smallest configuration that does anything: one payload, `sensor`, a
+program on this host at `127.0.0.1:5001` that sends its readings over UDP.
+Nothing is drawn from it, so its readings go to the ground over the
+`tcspecial` section's `payload_telemetry`: tcspecial sends each one to
+`dest_base` plus the payload's device id, `127.0.0.1:6100` for `sensor`, which
+is device 0. tcssim stands in for `sensor`, sending a packet every second.
+
+```
+make run-simple
+```
+
+That runs tcsmoc on the example, which starts tcspecial and tcssim itself and
+shows a panel for `sensor`: when its last packet arrived, what it said, and
+how many there have been.
+
+Languages:
+
+- MOC: Rust -- tcsmoc.
+- Vehicle: Rust -- tcspecial.
+- Payload: Rust -- tcssim stands in for `sensor`, a network payload.
+
 ### beacon
 
 What a ground station can know about a spacecraft without asking it anything.
@@ -181,8 +204,49 @@ with it aboard and on the ground.
 
 | Directory | Description |
 |---|---|
-| `thermostat` | Three temperature sensors (I2C and SPI), converted to kelvin, averaged, and fed to a hysteresis thermostat that drives GPIO heaters. The setpoint is commanded from the ground. |
+| `thermostat` | Three temperature sensors (I2C and SPI), converted to kelvin, voted on, and fed to a hysteresis thermostat that drives GPIO heaters. The setpoint is commanded from the ground. |
 | `simple-app` | A payload that is a program rather than a device: an `app_pl` node sending a line of text one word per packet, and a ground station that prints the line. Two programs of its own beside the configuration: the payload in Python 3, the ground station in Rust. |
+
+### thermostat
+
+A control loop, aboard. Three temperature sensors are read together, every
+100 ms, as the group `cabin_temps`: `temp_1` and `temp_2` on the I2C bus
+`/dev/i2c-1` at `0x48` and `0x49`, and `temp_3` on the SPI peripheral
+`/dev/spidev0.0`. Each reading goes through a conversion of its own to kelvin
+-- `k_1`, `k_2`, `k_3`, the parts differing in format and scale -- and the
+three meet at `cabin_temp`, which takes their median, so that one sensor
+failing cannot take the cabin's temperature with it. `thermostat` holds that
+to a setpoint, 293.15 K with a half band of 2 K, and drives the two sets of
+heater lines, `heaters_1` and `heaters_2`, GPIO lines 3-5 and 6-8 of
+`/dev/gpiochip0`. The ground commands the setpoint, and `housekeeping` logs the
+readings and decisions in `/tmp/telemetry`.
+
+tcssim stands in for the sensors with a thermal mass, `cabin`, that all three
+read, so their readings agree and the vote produces a temperature. The mass
+cools towards 283.15 K, ten kelvin below the setpoint, and what the example
+shows is the vehicle deciding to heat it. The heaters are not attached to the
+mass: they are GPIO lines, and tcssim cannot yet be driven through one, so the
+loop is not closed here. tcssim's own tests close it, with heaters that are
+sockets.
+
+```
+make run-thermostat
+```
+
+That runs tcsmoc on the example, as `run-simple` does. tcspecial opens the
+devices, so they have to be there: `make mkstubs`, in the repository's root,
+makes stand-ins for the I2C bus and the GPIO lines where there is no hardware.
+There is no stand-in for a SPI peripheral -- nothing in the kernel can be one
+-- so `temp_3` needs a real one at `/dev/spidev0.0`.
+
+Languages:
+
+- MOC: Rust -- tcsmoc.
+- Vehicle: Rust -- tcspecial, whose conversions, vote, thermostat and log are
+  its own nodes.
+- Payload: Rust -- tcssim stands in for the three sensors, with the thermal
+  mass they read. The heater lines are the kernel's GPIO stand-in, or real
+  ones.
 
 ### simple-app
 

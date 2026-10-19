@@ -118,9 +118,12 @@ impl LogNode {
     /// either way. Called when a pass is over, and whenever something is about
     /// to happen that the log should be on the far side of.
     pub fn flush(&mut self) -> Result<(), String> {
-        self.log
-            .flush()
-            .map_err(|e| format!("{}: cannot flush the log in {}: {e}", self.what, self.directory))
+        self.log.flush().map_err(|e| {
+            format!(
+                "{}: cannot flush the log in {}: {e}",
+                self.what, self.directory
+            )
+        })
     }
 
     /// What the records of this log look like.
@@ -285,10 +288,7 @@ mod tests {
         );
 
         // What it says about itself, for a log line that has to identify it.
-        assert!(
-            format!("{log:?}").contains("fixed_log"),
-            "{log:?}"
-        );
+        assert!(format!("{log:?}").contains("fixed_log"), "{log:?}");
     }
 
     /// The shipped example's log opens as the file describes it.

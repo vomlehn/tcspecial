@@ -20,7 +20,11 @@ use crate::payload::{
 };
 
 /// Run a simulated device reached over TCP.
-pub fn run_tcp_node(config: PayloadConfig, running: Arc<AtomicBool>, stats: Arc<std::sync::Mutex<PayloadStats>>) {
+pub fn run_tcp_node(
+    config: PayloadConfig,
+    running: Arc<AtomicBool>,
+    stats: Arc<std::sync::Mutex<PayloadStats>>,
+) {
     let addr = format!("{}:{}", config.address, config.port);
 
     // Try to bind as server
@@ -115,10 +119,10 @@ pub fn run_tcp_node(config: PayloadConfig, running: Arc<AtomicBool>, stats: Arc<
 mod tests {
     use super::*;
     use crate::payload::{PayloadProtocol, SimulatedPayload};
-    use tcslibgs::Faults;
     use std::net::TcpStream;
     use std::sync::atomic::AtomicU32;
     use std::time::Duration;
+    use tcslibgs::Faults;
 
     fn device_at(port: u16, triggered: bool, interval_ms: u32) -> SimulatedPayload {
         faulty_device_at(port, triggered, interval_ms, Faults::default())
@@ -132,7 +136,7 @@ mod tests {
     ) -> SimulatedPayload {
         SimulatedPayload::new(PayloadConfig {
             thermal: None,
-                        name: "DH0".to_string(),
+            name: "DH0".to_string(),
             protocol: PayloadProtocol::Tcp,
             address: "127.0.0.1".to_string(),
             port,
@@ -204,7 +208,12 @@ mod tests {
             assert_ne!(n, 0, "the device closed the connection");
             got.extend_from_slice(&buf[..n]);
         }
-        assert_eq!(got.len(), 12, "a request was answered with {} bytes", got.len());
+        assert_eq!(
+            got.len(),
+            12,
+            "a request was answered with {} bytes",
+            got.len()
+        );
 
         // And silence again: one request, one answer.
         handler
@@ -268,7 +277,9 @@ mod tests {
         let mut buf = [0u8; 64];
         let mut bytes = 0;
         loop {
-            let n = handler.read(&mut buf).expect("a packet or the end of the link");
+            let n = handler
+                .read(&mut buf)
+                .expect("a packet or the end of the link");
             if n == 0 {
                 break;
             }

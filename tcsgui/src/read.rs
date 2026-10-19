@@ -389,7 +389,10 @@ mod tests {
 
             let read = read(&path).unwrap_or_else(|e| panic!("{name}: {e}"));
 
-            assert_eq!(read.description, document.description, "{name}: description");
+            assert_eq!(
+                read.description, document.description,
+                "{name}: description"
+            );
             assert_eq!(read.groups, document.groups, "{name}: groups");
             assert_eq!(read.commands, document.commands, "{name}: commands");
             assert_eq!(
@@ -563,7 +566,9 @@ mod tests {
         let path = root.join("example.xml");
         // Written for the place it is going, which is what decides how it
         // names its schema: see `nodes::schema_reference`.
-        let written = document.to_text(&path).expect("XML is a format this writes");
+        let written = document
+            .to_text(&path)
+            .expect("XML is a format this writes");
 
         if std::env::var("TCSGUI_WRITE_EXAMPLE").is_ok() {
             std::fs::write(&path, &written).expect("the example is writable");
@@ -619,7 +624,10 @@ mod tests {
                 third.comment
             );
             assert!(
-                third.comment.as_deref().is_some_and(|said| said.contains('\n')),
+                third
+                    .comment
+                    .as_deref()
+                    .is_some_and(|said| said.contains('\n')),
                 "{extension}: and over more than one line"
             );
 

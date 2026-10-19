@@ -71,14 +71,26 @@ impl CanEndpoint {
         set_filter(what, socket.as_raw_fd(), config.can_id)?;
 
         if config.fd {
-            set_flag(what, socket.as_raw_fd(), libc::CAN_RAW_FD_FRAMES, 1, "CAN FD")?;
+            set_flag(
+                what,
+                socket.as_raw_fd(),
+                libc::CAN_RAW_FD_FRAMES,
+                1,
+                "CAN FD",
+            )?;
         }
 
         // Off is the unusual case and the one worth asking for: a bus with
         // real hardware on it needs no loopback, where two programs on one
         // host do.
         if !config.loopback {
-            set_flag(what, socket.as_raw_fd(), libc::CAN_RAW_LOOPBACK, 0, "loopback")?;
+            set_flag(
+                what,
+                socket.as_raw_fd(),
+                libc::CAN_RAW_LOOPBACK,
+                0,
+                "loopback",
+            )?;
         }
 
         bind_to(what, socket.as_raw_fd(), &config.interface, index)?;
@@ -184,7 +196,13 @@ fn set_filter(what: &str, fd: RawFd, can_id: u32) -> TcsResult<()> {
 }
 
 /// Set one of the raw socket's flags, naming it if the kernel refuses.
-fn set_flag(what: &str, fd: RawFd, option: libc::c_int, to: libc::c_int, name: &str) -> TcsResult<()> {
+fn set_flag(
+    what: &str,
+    fd: RawFd,
+    option: libc::c_int,
+    to: libc::c_int,
+    name: &str,
+) -> TcsResult<()> {
     // SAFETY: an int option of the size the kernel expects, living for the
     // call.
     let set = unsafe {
@@ -261,7 +279,8 @@ fn data_of(frame: &[u8], fd: bool) -> Option<(u32, usize)> {
         }
         // SAFETY: the buffer is at least as long as the structure, which is
         // what the kernel wrote into it.
-        let got: libc::canfd_frame = unsafe { std::ptr::read_unaligned(frame.as_ptr() as *const _) };
+        let got: libc::canfd_frame =
+            unsafe { std::ptr::read_unaligned(frame.as_ptr() as *const _) };
         Some((got.can_id, got.len as usize))
     } else {
         if frame.len() < mem::size_of::<libc::can_frame>() {
@@ -302,7 +321,8 @@ impl EndpointReadable for CanEndpoint {
         };
 
         // SAFETY: reading into a buffer of at least `room` bytes.
-        let got = unsafe { libc::read(self.io_fd(), frame.as_mut_ptr() as *mut libc::c_void, room) };
+        let got =
+            unsafe { libc::read(self.io_fd(), frame.as_mut_ptr() as *mut libc::c_void, room) };
         if got < 0 {
             let e = io::Error::last_os_error();
             return match e.kind() {
@@ -363,7 +383,8 @@ impl EndpointWritable for CanEndpoint {
 
         // SAFETY: writing `length` bytes from a buffer at least that long,
         // laid out as the kernel's frame structure.
-        let sent = unsafe { libc::write(self.io_fd(), frame.as_ptr() as *const libc::c_void, length) };
+        let sent =
+            unsafe { libc::write(self.io_fd(), frame.as_ptr() as *const libc::c_void, length) };
         if sent < 0 {
             let e = io::Error::last_os_error();
             return match e.kind() {
@@ -415,7 +436,11 @@ mod tests {
     #[test]
     fn a_short_read_is_not_a_frame() {
         assert_eq!(data_of(&[0u8; 4], false), None);
-        assert_eq!(data_of(&[0u8; 16], true), None, "a classic frame is not an FD one");
+        assert_eq!(
+            data_of(&[0u8; 16], true),
+            None,
+            "a classic frame is not an FD one"
+        );
     }
 
     /// An interface this host has not got is reported, with the command that
@@ -427,8 +452,7 @@ mod tests {
     /// tells an operator which it is.
     #[test]
     fn an_interface_that_is_not_there_says_how_to_make_one() {
-        let said = interface_index("device", "vcan-nonesuch")
-            .expect_err("no such interface");
+        let said = interface_index("device", "vcan-nonesuch").expect_err("no such interface");
         let said = format!("{said}");
         assert!(
             said.contains("vcan-nonesuch") && said.contains("ip link add"),

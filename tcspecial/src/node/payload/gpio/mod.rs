@@ -373,12 +373,7 @@ fn request_for(what: &str, config: &GpioConfig) -> TcsResult<LineRequest> {
 }
 
 /// Make the request, and hand back the descriptor the events arrive on.
-fn ask_for_lines(
-    what: &str,
-    chip: RawFd,
-    mut request: LineRequest,
-    path: &str,
-) -> TcsResult<File> {
+fn ask_for_lines(what: &str, chip: RawFd, mut request: LineRequest, path: &str) -> TcsResult<File> {
     // SAFETY: the structure is laid out as the kernel's own -- the tests
     // below hold it to the kernel's sizes -- and lives across the call, which
     // writes the descriptor into it.
@@ -470,7 +465,11 @@ fn record_of(event: &LineEvent, now: SystemTime) -> [u8; EVENT_BYTES] {
     // nothing to a ground station: what goes out is a Timestamp, which is
     // what every other time in this project is, so a line's change and a
     // telemetry response can be read against each other.
-    let value: u32 = if event.id == GPIO_V2_LINE_EVENT_RISING_EDGE { 1 } else { 0 };
+    let value: u32 = if event.id == GPIO_V2_LINE_EVENT_RISING_EDGE {
+        1
+    } else {
+        0
+    };
 
     record[..8].copy_from_slice(&Timestamp::at(now).to_le_bytes());
     record[8..12].copy_from_slice(&event.offset.to_le_bytes());
@@ -681,13 +680,17 @@ mod tests {
 
         assert_eq!(
             request.config.flags,
-            GPIO_V2_LINE_FLAG_INPUT | GPIO_V2_LINE_FLAG_EDGE_FALLING
+            GPIO_V2_LINE_FLAG_INPUT
+                | GPIO_V2_LINE_FLAG_EDGE_FALLING
                 | GPIO_V2_LINE_FLAG_BIAS_PULL_UP
         );
 
         // The debounce, applied to every line of the request: a bit per line.
         assert_eq!(request.config.num_attrs, 1);
-        assert_eq!(request.config.attrs[0].attr.id, GPIO_V2_LINE_ATTR_ID_DEBOUNCE);
+        assert_eq!(
+            request.config.attrs[0].attr.id,
+            GPIO_V2_LINE_ATTR_ID_DEBOUNCE
+        );
         assert_eq!(request.config.attrs[0].attr.value, 5_000);
         assert_eq!(request.config.attrs[0].mask, 0b111);
 
@@ -744,7 +747,9 @@ mod tests {
         assert_eq!(record.len(), EVENT_BYTES);
         assert_eq!(
             Timestamp::from_le_bytes(record[..8].try_into().unwrap()),
-            Timestamp { micros: 1_700_000_000_123_000 },
+            Timestamp {
+                micros: 1_700_000_000_123_000
+            },
             "the time is a Timestamp, not the kernel's own clock"
         );
         assert_eq!(u32::from_le_bytes(record[8..12].try_into().unwrap()), 7);
@@ -881,7 +886,11 @@ mod tests {
         assert_eq!(u32::from_le_bytes(buffer[8..12].try_into().unwrap()), 3);
         assert_eq!(u32::from_le_bytes(buffer[12..16].try_into().unwrap()), 1);
         assert_eq!(
-            u32::from_le_bytes(buffer[EVENT_BYTES + 12..EVENT_BYTES + 16].try_into().unwrap()),
+            u32::from_le_bytes(
+                buffer[EVENT_BYTES + 12..EVENT_BYTES + 16]
+                    .try_into()
+                    .unwrap()
+            ),
             0
         );
 

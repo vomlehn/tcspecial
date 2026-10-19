@@ -254,4 +254,3 @@ mod tests {
         assert!(contrast_on_white((0, 0, 0)) > 20.0);
     }
 }
-

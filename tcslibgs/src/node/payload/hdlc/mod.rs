@@ -299,8 +299,8 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
     reject_stream(name, "hdlc", g.stream.is_some())?;
 
     let standard = require(name, "hdlc", "standard", g.standard.as_ref())?;
-    let standard = Standard::from_spelling(&standard.as_str().to_ascii_lowercase())
-        .ok_or_else(|| {
+    let standard =
+        Standard::from_spelling(&standard.as_str().to_ascii_lowercase()).ok_or_else(|| {
             bad(
                 name,
                 &format!(
@@ -366,8 +366,8 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
     let loopback = parse_flag(name, "loopback", g.loopback.as_ref())?.unwrap_or(false);
 
     let encoding = match g.encoding.as_ref() {
-        Some(stated) => Encoding::from_spelling(&stated.as_str().to_ascii_lowercase())
-            .ok_or_else(|| {
+        Some(stated) => {
+            Encoding::from_spelling(&stated.as_str().to_ascii_lowercase()).ok_or_else(|| {
                 bad(
                     name,
                     &format!(
@@ -376,7 +376,8 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
                         stated.as_str()
                     ),
                 )
-            })?,
+            })?
+        }
         None => Encoding::Nrz,
     };
 
@@ -559,7 +560,11 @@ mod tests {
         ] {
             let said = group_kind_of(
                 "link",
-                terms(&[("standard", "v35"), ("clock_type", "external"), (field, value)]),
+                terms(&[
+                    ("standard", "v35"),
+                    ("clock_type", "external"),
+                    (field, value),
+                ]),
             )
             .expect_err("a word that is not a value");
             assert!(

@@ -65,7 +65,11 @@ impl AppPl {
         // on: what a payload sends is what it writes, and this kind writes and
         // nothing else. See `tcsapp::parent::Supports::MOC`.
         Ok(AppPl {
-            running: parent::start(&params.executable_path()?, &params.arguments(), Supports::MOC)?,
+            running: parent::start(
+                &params.executable_path()?,
+                &params.arguments(),
+                Supports::MOC,
+            )?,
         })
     }
 

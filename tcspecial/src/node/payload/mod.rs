@@ -16,16 +16,16 @@
 //! the mission is at the other end of it. That is why there is no `moc`
 //! directory -- see `tcslibgs::node`.
 
-pub mod i2c;
-pub mod spi;
 pub mod can;
+pub mod device_file;
 pub mod gpio;
 pub mod hdlc;
+pub mod i2c;
 pub mod iio;
+pub mod network;
 pub mod rpmsg;
 pub mod serial;
-pub mod network;
-pub mod device_file;
+pub mod spi;
 // A payload that is a program rather than a device: one that is asked for a
 // reading, and one that is never asked.
 pub mod app_all_pl;

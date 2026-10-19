@@ -185,9 +185,7 @@ impl End {
                         };
                     }
                     Ok(some) => self.got.extend_from_slice(&byte[..some]),
-                    Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-                        return Ok(Arrived::Nothing)
-                    }
+                    Err(e) if e.kind() == io::ErrorKind::WouldBlock => return Ok(Arrived::Nothing),
                     // What a signal leaves behind: nothing has been lost, so
                     // the read is made again.
                     Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
@@ -412,7 +410,9 @@ pub fn start(
         payload: payload
             .map(|(mine, _)| end(mine, "the payload interface"))
             .transpose()?,
-        moc: moc.map(|(mine, _)| end(mine, "the MOC interface")).transpose()?,
+        moc: moc
+            .map(|(mine, _)| end(mine, "the MOC interface"))
+            .transpose()?,
         errors: end(errors.0, "the error interface")?,
         waits: Some(WAITS),
     })
@@ -639,7 +639,9 @@ mod tests {
                 Arrived::Nothing
             );
         }
-        theirs.write_all(&whole[packet::LENGTH + 1..]).expect("the rest");
+        theirs
+            .write_all(&whole[packet::LENGTH + 1..])
+            .expect("the rest");
         assert_eq!(
             end.read_now().expect("the whole of it"),
             Arrived::Packet(b"293.15".to_vec())
@@ -667,7 +669,10 @@ mod tests {
             Arrived::Packet(b"one".to_vec())
         );
         // A packet of no bytes is a packet, and does not read as the end.
-        assert_eq!(end.read_now().expect("the second"), Arrived::Packet(Vec::new()));
+        assert_eq!(
+            end.read_now().expect("the second"),
+            Arrived::Packet(Vec::new())
+        );
         assert_eq!(
             end.read_now().expect("the third"),
             Arrived::Packet(b"three".to_vec())

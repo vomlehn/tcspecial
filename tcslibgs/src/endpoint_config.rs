@@ -27,20 +27,20 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::node::payload::can::CanParams;
-use crate::node::payload::iio::IioParams;
 use crate::node::payload::gpio::GpioParams;
-use crate::node::payload::rpmsg::RpmsgParams;
 use crate::node::payload::i2c::I2cParams;
+use crate::node::payload::iio::IioParams;
+use crate::node::payload::rpmsg::RpmsgParams;
 use crate::node::payload::serial::SerialParams;
 use crate::node::payload::spi::SpiParams;
 
 // The per-kind types are named from here as well as from their own files, so
 // that a reader of a configuration document reaches everything it can hold
 // through the module that parses it.
-pub use crate::node::payload::i2c::I2cParams as I2cGroupParams;
 pub use crate::node::payload::can::CanParams as CanGroupParams;
-pub use crate::node::payload::iio::IioParams as IioGroupParams;
 pub use crate::node::payload::gpio::GpioParams as GpioGroupParams;
+pub use crate::node::payload::i2c::I2cParams as I2cGroupParams;
+pub use crate::node::payload::iio::IioParams as IioGroupParams;
 pub use crate::node::payload::rpmsg::RpmsgParams as RpmsgGroupParams;
 pub use crate::node::payload::serial::rs485::Rs485Params;
 pub use crate::node::payload::serial::{ByteLength, StopBits};
@@ -202,9 +202,7 @@ pub(crate) fn endpoint_of(
                 "\"{what}\" names a device alone, but a device on an I2C bus needs the \
                  bus and the address on it"
             )),
-            GroupKind::Iio(_) => Ok(EndpointConfig::Iio(IioConfig {
-                path: path.clone(),
-            })),
+            GroupKind::Iio(_) => Ok(EndpointConfig::Iio(IioConfig { path: path.clone() })),
             GroupKind::Gpio(gpio) => Ok(EndpointConfig::Gpio(GpioConfig {
                 path: path.clone(),
                 lines: gpio.lines.clone(),
@@ -606,8 +604,16 @@ mod a_scalar_of_nothing {
         // payload's settings are read.
         let mut settings: std::collections::BTreeMap<String, Scalar> =
             serde_norway::from_str("drop_percent:\njitter_ms: 20\n").expect("it reads");
-        assert_eq!(settings.remove("drop_percent").map(|s| s.as_str().to_string()), Some(String::new()));
-        assert_eq!(settings.remove("jitter_ms").map(|s| s.as_str().to_string()), Some("20".to_string()));
+        assert_eq!(
+            settings
+                .remove("drop_percent")
+                .map(|s| s.as_str().to_string()),
+            Some(String::new())
+        );
+        assert_eq!(
+            settings.remove("jitter_ms").map(|s| s.as_str().to_string()),
+            Some("20".to_string())
+        );
     }
 }
 
@@ -817,10 +823,7 @@ fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 32] {
             "rs485_delay_before_send",
             g.rs485_delay_before_send.is_some(),
         ),
-        (
-            "rs485_delay_after_send",
-            g.rs485_delay_after_send.is_some(),
-        ),
+        ("rs485_delay_after_send", g.rs485_delay_after_send.is_some()),
         ("stop_bits", g.stop_bits.is_some()),
         ("parity", g.parity.is_some()),
         ("byte_length", g.byte_length.is_some()),

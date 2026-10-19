@@ -573,7 +573,10 @@ mod tests {
         assert!(
             theirs.simulated_payloads[0].unknown.is_empty(),
             "the editor wrote a name the simulator does not know: {:?}",
-            theirs.simulated_payloads[0].unknown.keys().collect::<Vec<_>>()
+            theirs.simulated_payloads[0]
+                .unknown
+                .keys()
+                .collect::<Vec<_>>()
         );
         assert!(theirs.simulated_payload_groups[0].unknown.is_empty());
     }
@@ -604,7 +607,9 @@ mod tests {
 
         let simulator = read(&path).expect("read");
         assert_eq!(
-            simulator.payloads["payload"].get("future_thing").map(String::as_str),
+            simulator.payloads["payload"]
+                .get("future_thing")
+                .map(String::as_str),
             Some("7")
         );
         let payloads = vec!["payload".to_string()];

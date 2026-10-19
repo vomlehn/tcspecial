@@ -40,9 +40,7 @@ use std::io;
 use std::net::UdpSocket;
 use std::time::{Duration, SystemTime};
 
-use tcslibgs::{
-    came_from, ConfigDigest, ConfigVersion, Telemetry, Timestamp, NO_TRANSFER_TIME,
-};
+use tcslibgs::{came_from, ConfigDigest, ConfigVersion, Telemetry, Timestamp, NO_TRANSFER_TIME};
 
 /// Where beacons come from and where they are received.
 ///
@@ -668,8 +666,7 @@ impl Beacons {
                 Arrived::Beacon(heard.message)
             }
             Err(ref e)
-                if e.kind() == io::ErrorKind::WouldBlock
-                    || e.kind() == io::ErrorKind::TimedOut =>
+                if e.kind() == io::ErrorKind::WouldBlock || e.kind() == io::ErrorKind::TimedOut =>
             {
                 Arrived::Nothing
             }
@@ -970,13 +967,20 @@ mod tests {
         // The beacon's own number comes back beside the message, which is
         // what tells a beacon that was missed from one that was never sent.
         assert_eq!(hear(&datagram, None).sequence, Some(3));
-        assert_eq!(hear(b"hello", None).sequence, None, "not a beacon, no number");
+        assert_eq!(
+            hear(b"hello", None).sequence,
+            None,
+            "not a beacon, no number"
+        );
 
         // Something else sending to this address is shown rather than hidden:
         // a green light beside a line that said nothing would be a window
         // reporting a beacon it had not had.
         let shown = message_of(b"hello");
-        assert!(shown.contains("unreadable") && shown.contains("hello"), "{shown}");
+        assert!(
+            shown.contains("unreadable") && shown.contains("hello"),
+            "{shown}"
+        );
 
         // And a long one is cut short rather than filling the window.
         let shown = message_of(&[b'x'; 200]);
@@ -1000,7 +1004,11 @@ mod tests {
     #[test]
     fn a_beacons_number_says_what_happened_before_it() {
         assert_eq!(counted(None, 1), Counted::First);
-        assert_eq!(counted(None, 4096), Counted::First, "a station may start late");
+        assert_eq!(
+            counted(None, 4096),
+            Counted::First,
+            "a station may start late"
+        );
 
         assert_eq!(counted(Some(1), 2), Counted::Next);
         assert_eq!(counted(Some(41), 42), Counted::Next);

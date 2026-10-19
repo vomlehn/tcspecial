@@ -59,7 +59,9 @@ fn a_packet_of_payload_data_comes_back_as_moc_data() {
 fn a_zero_length_packet_comes_back() {
     let mut running = parent::start(&app(), &arguments(), Supports::PAYLOAD).expect("it starts");
 
-    running.write_payload(b"").expect("it takes an empty packet");
+    running
+        .write_payload(b"")
+        .expect("it takes an empty packet");
     assert_eq!(running.read_moc().expect("an answer"), Some(Vec::new()));
 
     running.no_more().expect("the interfaces end");

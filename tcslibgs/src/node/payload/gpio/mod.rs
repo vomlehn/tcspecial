@@ -26,8 +26,8 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::endpoint_config::{
-    bad, parse_u32, reject_foreign_fields, reject_stream, require, EndpointConfigResult,
-    GroupKind, LinkTerms, Scalar,
+    bad, parse_u32, reject_foreign_fields, reject_stream, require, EndpointConfigResult, GroupKind,
+    LinkTerms, Scalar,
 };
 
 /// How many bytes one line event takes as payload data.
@@ -204,7 +204,14 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
         name,
         "gpio",
         &g,
-        &["lines", "edge", "bias", "debounce", "state_interval", "direction"],
+        &[
+            "lines",
+            "edge",
+            "bias",
+            "debounce",
+            "state_interval",
+            "direction",
+        ],
     )?;
 
     // An event is its own length, so there is nothing for a rule about where
@@ -256,8 +263,9 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
     };
 
     let direction = match g.direction.as_ref() {
-        Some(stated) => Direction::of(&stated.as_str().to_ascii_lowercase())
-            .map_err(|why| bad(name, &why))?,
+        Some(stated) => {
+            Direction::of(&stated.as_str().to_ascii_lowercase()).map_err(|why| bad(name, &why))?
+        }
         None => Direction::Input,
     };
 
@@ -382,13 +390,13 @@ mod tests {
         assert_eq!(said.state_interval, Some(Duration::from_secs(1)));
 
         // Neither is refused, and the complaint says both ways out.
-        let why = group_kind_of(
-            "discretes",
-            terms(&[("lines", "0"), ("edge", "none")]),
-        )
-        .expect_err("lines nobody watches");
+        let why = group_kind_of("discretes", terms(&[("lines", "0"), ("edge", "none")]))
+            .expect_err("lines nobody watches");
         let why = format!("{why}");
-        assert!(why.contains("state_interval") && why.contains("edge"), "{why}");
+        assert!(
+            why.contains("state_interval") && why.contains("edge"),
+            "{why}"
+        );
 
         // A report of no time at all is refused by the grammar itself: a
         // length of time is never nought, here or anywhere else.
@@ -527,7 +535,11 @@ mod tests {
     /// they were, and the one that was missed is the one worth naming.
     #[test]
     fn a_driven_line_says_nothing_about_watching() {
-        for (term, value) in [("edge", "rising"), ("bias", "pull_up"), ("debounce", "5 ms")] {
+        for (term, value) in [
+            ("edge", "rising"),
+            ("bias", "pull_up"),
+            ("debounce", "5 ms"),
+        ] {
             let said = group_kind_of(
                 "heaters",
                 terms(&[("lines", "17"), ("direction", "output"), (term, value)]),

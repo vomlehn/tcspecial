@@ -149,4 +149,3 @@ fn set_nonblocking(fd: RawFd) -> Result<(), String> {
     }
     Ok(())
 }
-

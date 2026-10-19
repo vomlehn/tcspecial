@@ -314,12 +314,7 @@ impl Link {
     /// What the canvas makes when the line was dragged from the terminal of a
     /// node that has more than one -- a `null` node, whose links have to say
     /// which stream they carry.
-    pub fn joining(
-        from: &str,
-        origin: Option<&str>,
-        to: &str,
-        input: Option<&str>,
-    ) -> Link {
+    pub fn joining(from: &str, origin: Option<&str>, to: &str, input: Option<&str>) -> Link {
         Link {
             from: from.to_string(),
             origin: origin.map(|t| t.to_string()),
@@ -537,7 +532,9 @@ impl Edit {
             },
             Edit::RemoveNode { name, .. } => format!("remove \"{name}\""),
             Edit::RestoreNode { name, .. } => format!("restore \"{name}\""),
-            Edit::SetAttribute { node, attribute, .. } => {
+            Edit::SetAttribute {
+                node, attribute, ..
+            } => {
                 format!("set {attribute} of \"{node}\"")
             }
             Edit::RenameNode { was, now } => format!("rename \"{was}\" to \"{now}\""),
@@ -545,10 +542,9 @@ impl Edit {
             Edit::RemoveLink { link } => {
                 format!("unlink \"{}\" from \"{}\"", link.from, link.to)
             }
-            Edit::MoveLink { was, now } => format!(
-                "move the link from \"{}\" to \"{}\"",
-                was.to, now.to
-            ),
+            Edit::MoveLink { was, now } => {
+                format!("move the link from \"{}\" to \"{}\"", was.to, now.to)
+            }
             Edit::MoveNode { node, .. } => format!("move \"{node}\""),
             Edit::SetAside { node, aside, .. } => {
                 if *aside {
@@ -607,10 +603,7 @@ impl Edit {
             },
             Edit::SetLinkComment { link, now, .. } => match now {
                 Some(_) => format!("comment on \"{}\" to \"{}\"", link.from, link.to),
-                None => format!(
-                    "remove the comment on \"{}\" to \"{}\"",
-                    link.from, link.to
-                ),
+                None => format!("remove the comment on \"{}\" to \"{}\"", link.from, link.to),
             },
         }
     }
@@ -685,7 +678,6 @@ impl Journal {
     pub fn redoable(&self) -> usize {
         self.done.len() - self.cursor
     }
-
 }
 
 #[cfg(test)]

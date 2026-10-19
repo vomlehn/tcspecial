@@ -14,10 +14,7 @@ fn main() {
     // Default to info so that the startup messages below, which used to
     // be printed unconditionally, still appear. RUST_LOG overrides it;
     // RUST_LOG=trace adds the per-datagram tracing in the main loop.
-    env_logger::Builder::from_env(
-        env_logger::Env::default().default_filter_or("info"),
-    )
-    .init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
     trace!("main: entered");
 

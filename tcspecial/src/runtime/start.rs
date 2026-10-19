@@ -24,8 +24,8 @@ use tcslibgs::graph::Graph;
 use crate::beacon_send::BeaconSend;
 use crate::runtime::command::{Commands, Flying};
 use crate::runtime::fabric::Moved;
-use crate::telemetry_log::TelemetryLog;
 use crate::runtime::system::{described, System};
+use crate::telemetry_log::TelemetryLog;
 
 /// Whether something has asked this process to stop.
 static STOPPING: AtomicBool = AtomicBool::new(false);
@@ -62,8 +62,8 @@ pub fn run_graph(path: &str) -> Result<(), Vec<String>> {
     // is running the configuration it is reading -- the same ports, the same
     // device ids, the same nodes.
     let digest = digest_of_graph(&graph).map_err(|why| vec![format!("{path}: {why}")])?;
-    let config_version = ConfigVersion::of_text(tcslibgs::graph::VERSION)
-        .expect("the language's own version reads");
+    let config_version =
+        ConfigVersion::of_text(tcslibgs::graph::VERSION).expect("the language's own version reads");
     eprintln!(
         "tcspecial v{}, config v{config_version}, md5 {digest}",
         ConfigVersion::of_this_build()
@@ -175,10 +175,9 @@ fn telemetry_log(graph: &Graph) -> Result<TelemetryLog, String> {
     let Some(section) = graph.tcspecial.as_ref() else {
         return Ok(TelemetryLog::disabled());
     };
-    let ci = tcslibgs::graph::parameters::ci_config_of(&tcslibgs::graph::parameters::flatten(
-        section,
-    ))?
-    .to_ci_config()?;
+    let ci =
+        tcslibgs::graph::parameters::ci_config_of(&tcslibgs::graph::parameters::flatten(section))?
+            .to_ci_config()?;
     let log = TelemetryLog::open(&ci).map_err(|e| e.to_string())?;
     if log.is_enabled() {
         eprintln!(
@@ -205,10 +204,9 @@ fn beacons(
     let Some(section) = graph.tcspecial.as_ref() else {
         return Ok(None);
     };
-    let ci = tcslibgs::graph::parameters::ci_config_of(&tcslibgs::graph::parameters::flatten(
-        section,
-    ))?
-    .to_ci_config()?;
+    let ci =
+        tcslibgs::graph::parameters::ci_config_of(&tcslibgs::graph::parameters::flatten(section))?
+            .to_ci_config()?;
     let sending = BeaconSend::new(
         ci.beacon_interval,
         ci.beacon_send.clone(),
@@ -251,10 +249,9 @@ fn command_links(
     let Some(section) = graph.tcspecial.as_ref() else {
         return Ok(None);
     };
-    let ci = tcslibgs::graph::parameters::ci_config_of(&tcslibgs::graph::parameters::flatten(
-        section,
-    ))?
-    .to_ci_config()?;
+    let ci =
+        tcslibgs::graph::parameters::ci_config_of(&tcslibgs::graph::parameters::flatten(section))?
+            .to_ci_config()?;
 
     let commands = Commands::start(&ci, states, bench, flying, beacon, telemetry_log)
         .map_err(|e| e.to_string())?;

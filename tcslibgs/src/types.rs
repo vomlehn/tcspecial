@@ -1,7 +1,5 @@
 //! Type definitions shared between ground and space software
 
-
-
 use serde::{Deserialize, Serialize};
 
 use crate::node::payload::hdlc::{ClockType, Encoding, FrameCheck};
@@ -282,7 +280,6 @@ fn binds_every_interface(address: &str) -> bool {
     address.is_empty() || address == "0.0.0.0" || address == "::" || address == "*"
 }
 
-
 impl DHType {
     /// The word a configuration file uses for this kind.
     ///
@@ -342,8 +339,7 @@ impl DHType {
 
     /// Every kind, as a file would write them, for an error to list.
     pub fn spellings() -> String {
-        "network, device-file, serial, i2c, spi, can, iio, rpmsg, gpio, or hdlc"
-            .to_string()
+        "network, device-file, serial, i2c, spi, can, iio, rpmsg, gpio, or hdlc".to_string()
     }
 
     /// The name this word used to be, for a file that still writes it.
@@ -389,7 +385,6 @@ impl NetworkProtocol {
         "tcp, udp, unix_stream, or unix_dgram".to_string()
     }
 }
-
 
 /// Data handler name
 ///
@@ -1181,7 +1176,6 @@ pub(crate) fn kind_of_terms(
     .map_err(|e| format!("{e}"))
 }
 
-
 /// Payload bytes per telemetry log segment file, when the configuration
 /// does not say. The segment file header is added on top of this.
 /// Payload bytes per segment file, for a configuration that does not say.
@@ -1237,9 +1231,9 @@ impl HostPort {
     /// something no socket can be, and the useful moment to say so is while
     /// somebody is reading the file.
     pub fn at(&self, id: usize) -> Result<NetworkConfig, String> {
-        let port = (self.port as usize).checked_add(id).ok_or_else(|| {
-            format!("{}:{} plus {id} is not a port", self.address, self.port)
-        })?;
+        let port = (self.port as usize)
+            .checked_add(id)
+            .ok_or_else(|| format!("{}:{} plus {id} is not a port", self.address, self.port))?;
         if port > u16::MAX as usize {
             return Err(format!(
                 "{}:{} plus {id} is port {port}, and a port is at most 65535: \
@@ -1534,10 +1528,8 @@ impl CIConfigJson {
             "payload_command.source_base",
             &self.payload_command.source_base,
         )?;
-        let payload_command_dest_base = host_port_of(
-            "payload_command.dest_base",
-            &self.payload_command.dest_base,
-        )?;
+        let payload_command_dest_base =
+            host_port_of("payload_command.dest_base", &self.payload_command.dest_base)?;
         let moc_cmd_send = host_port_of("tcs_cmd.send", &self.tcs_cmd.send)?;
         let payload_source_base = host_port_of(
             "payload_telemetry.source_base",
@@ -1566,9 +1558,11 @@ impl CIConfigJson {
         let beacon_interval = crate::graph::parse_interval(&self.beacon.interval)
             .map_err(|why| format!("beacon.interval: {why}"))?;
         if u32::try_from(beacon_interval.as_millis()).is_err() {
-            return Err("beacon.interval: longer than the protocol can carry, which \
+            return Err(
+                "beacon.interval: longer than the protocol can carry, which \
                         counts milliseconds in four bytes"
-                .to_string());
+                    .to_string(),
+            );
         }
 
         // One socket cannot be two links. A file that gave both the same port
@@ -1585,9 +1579,7 @@ impl CIConfigJson {
         // equal to the spacecraft link is a file that has put two links in one
         // socket. The rest of the sum is checked where the payloads are known
         // and the ids with them -- see `interpreter_collisions`.
-        if payload_command_dest_base.address == address
-            && payload_command_dest_base.port == port
-        {
+        if payload_command_dest_base.address == address && payload_command_dest_base.port == port {
             return Err(format!(
                 "tcs_cmd.recv and payload_command.dest_base are both \
                  {address}:{port}, and the two links cannot be one socket: \
@@ -1636,7 +1628,6 @@ impl CommandStatus {
 mod tests {
     use std::time::Duration;
 
-
     /// A datagram is taken only from the socket the configuration names.
     ///
     /// Four programs ask this of four links -- a beacon, a command, a
@@ -1659,7 +1650,10 @@ mod tests {
         // The plain case: one host, one port, both as written.
         assert!(came_from(&stated("127.0.0.1", 4100), &at("127.0.0.1:4100")));
         // The port is asked about always.
-        assert!(!came_from(&stated("127.0.0.1", 4100), &at("127.0.0.1:4101")));
+        assert!(!came_from(
+            &stated("127.0.0.1", 4100),
+            &at("127.0.0.1:4101")
+        ));
         // And the address, where the configuration names one.
         assert!(!came_from(&stated("127.0.0.1", 4100), &at("10.0.0.1:4100")));
         // The names that mean this host are one host, as they are everywhere
@@ -1673,7 +1667,6 @@ mod tests {
         assert!(came_from(&stated("0.0.0.0", 5550), &at("10.0.0.1:5550")));
         assert!(!came_from(&stated("0.0.0.0", 5550), &at("127.0.0.1:5551")));
     }
-
 
     /// Every kind of endpoint makes its own kind of handler.
     ///
@@ -1731,7 +1724,10 @@ mod tests {
     #[test]
     fn test_timestamp_now() {
         let ts = Timestamp::now();
-        assert!(!ts.clock_failed(), "the clock on the machine running this reads");
+        assert!(
+            !ts.clock_failed(),
+            "the clock on the machine running this reads"
+        );
         assert!(
             ts.micros > 0,
             "microseconds since the epoch, and it is not 1970"
@@ -1745,7 +1741,9 @@ mod tests {
     /// this is the format the ground has to agree with, so the test states it.
     #[test]
     fn a_time_is_eight_little_endian_bytes() {
-        let at = Timestamp { micros: 0x0807_0605_0403_0201 };
+        let at = Timestamp {
+            micros: 0x0807_0605_0403_0201,
+        };
         assert_eq!(
             at.to_le_bytes(),
             [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08],
@@ -1878,9 +1876,7 @@ mod tests {
         // read alike.
         let mut sample = DHSample::new();
         sample.record(&[0xAB; 12]);
-        sample.time = Some(Timestamp {
-            micros: 0,
-        });
+        sample.time = Some(Timestamp { micros: 0 });
         let (_, data) = sample.panel_lines();
         assert_eq!(data, "AB AB AB AB AB AB AB AB...");
     }
@@ -1977,8 +1973,6 @@ mod tests {
         );
     }
 
-
-
     #[test]
     fn a_sample_records_the_head_of_a_transfer() {
         let mut sample = DHSample::new();
@@ -2031,32 +2025,6 @@ mod tests {
         assert!(!sample.is_empty());
         assert_eq!(sample.data(), &[] as &[u8]);
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     /// The four SPI modes carry the clock polarity and phase their numbers
     /// mean.

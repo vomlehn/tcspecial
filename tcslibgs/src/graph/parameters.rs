@@ -258,7 +258,10 @@ pub fn ci_config_of(said: &BTreeMap<String, Scalar>) -> Result<CIConfigJson, Str
     }
 
     let text = |name: &str| -> Result<String, String> {
-        match said.get(name).map(|value| value.as_str().trim().to_string()) {
+        match said
+            .get(name)
+            .map(|value| value.as_str().trim().to_string())
+        {
             Some(value) if !value.is_empty() => Ok(value),
             _ => Err(format!(
                 "{name} is not stated, and it has no default: where commands \
@@ -419,10 +422,8 @@ mod tests {
     #[test]
     fn a_missing_attribute_is_named() {
         for (name, required) in ATTRIBUTES {
-            let left_out: Vec<(&str, &str)> = whole()
-                .into_iter()
-                .filter(|(had, _)| had != name)
-                .collect();
+            let left_out: Vec<(&str, &str)> =
+                whole().into_iter().filter(|(had, _)| had != name).collect();
             let outcome = ci_config_of(&said(&left_out));
             if *required {
                 let why = outcome.expect_err(&format!("{name} is required"));
@@ -443,8 +444,7 @@ mod tests {
         let mut cleared = whole();
         cleared.retain(|(name, _)| *name != "tcs_cmd.recv");
         cleared.push(("tcs_cmd.recv", "   "));
-        let why = ci_config_of(&said(&cleared))
-            .expect_err("an empty command interface is none");
+        let why = ci_config_of(&said(&cleared)).expect_err("an empty command interface is none");
         assert!(why.contains("tcs_cmd.recv"), "{why}");
     }
 
@@ -464,7 +464,10 @@ mod tests {
         assert_eq!((one.address.as_str(), one.port), ("0.0.0.0", 4000));
         // Whatever the host is called, the port is after the last colon.
         let named = said(" vehicle.local:4000 ").expect("a named host");
-        assert_eq!((named.address.as_str(), named.port), ("vehicle.local", 4000));
+        assert_eq!(
+            (named.address.as_str(), named.port),
+            ("vehicle.local", 4000)
+        );
 
         // A base counted on by an id, which is the one arithmetic in the
         // section: a payload's own port is the base plus its position.
@@ -516,12 +519,20 @@ mod tests {
 
         // And the links, each of which is a host and a port.
         for (name, value, expected) in [
-            ("payload_command.dest_base", "0.0.0.0:four thousand", "not a port"),
+            (
+                "payload_command.dest_base",
+                "0.0.0.0:four thousand",
+                "not a port",
+            ),
             ("payload_command.dest_base", "0.0.0.0:0", "port 0"),
             ("payload_command.source_base", "0.0.0.0:70000", "not a port"),
             ("payload_command.source_base", "0.0.0.0", "address:port"),
             ("tcs_cmd.send", "nowhere", "address:port"),
-            ("payload_telemetry.source_base", ":6000", "states no address"),
+            (
+                "payload_telemetry.source_base",
+                ":6000",
+                "states no address",
+            ),
         ] {
             let mut wrong = whole();
             wrong.retain(|(had, _)| *had != name);

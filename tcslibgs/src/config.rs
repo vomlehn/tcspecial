@@ -36,7 +36,6 @@ pub const SIM_PAYLOAD_CONFIG_PATH_VAR: &str = "SIM_PAYLOAD_CONFIG_PATH";
 /// argument, and that is what a real run names.
 pub const DEFAULT_PAYLOAD_CONFIG_PATH: &str = "tests/manual/thermostat.yaml";
 
-
 /// The simulator file beside a configuration and named for it, where there is
 /// one.
 ///
@@ -132,7 +131,6 @@ struct Sections {
     endpoints: Vec<IgnoredAny>,
 }
 
-
 /// What a file still written to an older spelling is told, if it is one.
 ///
 /// Asked by the graph loader before it reads a file: those older files stated
@@ -170,15 +168,9 @@ fn what_is_gone(sections: &Sections) -> Option<TcsError> {
     }
 }
 
-
-
-
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
 
     /// Arguments as a program really receives them, its own name first.
     fn args(rest: &[&str]) -> std::vec::IntoIter<String> {
@@ -233,11 +225,6 @@ mod tests {
         );
     }
 
-
-
-
-
-
     /// A file written in the language that is gone is told what became of it.
     ///
     /// Its files described the same payloads in other words -- a group of
@@ -284,5 +271,4 @@ mod tests {
             );
         }
     }
-
 }

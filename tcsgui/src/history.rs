@@ -90,16 +90,11 @@ pub fn state_dir() -> Option<PathBuf> {
     // would be pointing it there for every other test in the process.
     #[cfg(test)]
     {
-        Some(
-            std::env::temp_dir().join(format!("tcsgui-tests-{}", std::process::id())),
-        )
+        Some(std::env::temp_dir().join(format!("tcsgui-tests-{}", std::process::id())))
     }
 
     #[cfg(not(test))]
-    said_by(
-        std::env::var_os("XDG_STATE_HOME"),
-        std::env::var_os("HOME"),
-    )
+    said_by(std::env::var_os("XDG_STATE_HOME"), std::env::var_os("HOME"))
 }
 
 /// The rule itself, given what the environment says.
@@ -111,10 +106,7 @@ pub fn state_dir() -> Option<PathBuf> {
 ///
 /// An `XDG_STATE_HOME` that is not absolute is ignored rather than resolved,
 /// which is what the specification says to do with a relative one.
-fn said_by(
-    xdg: Option<std::ffi::OsString>,
-    home: Option<std::ffi::OsString>,
-) -> Option<PathBuf> {
+fn said_by(xdg: Option<std::ffi::OsString>, home: Option<std::ffi::OsString>) -> Option<PathBuf> {
     if let Some(said) = xdg {
         let said = PathBuf::from(said);
         if said.is_absolute() {
@@ -148,7 +140,13 @@ pub fn journal_in(directory: &Path, configuration: &Path) -> PathBuf {
         .unwrap_or_else(|| "configuration".to_string());
     let stem: String = stem
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
 
     directory.join(format!("{stem}-{:016x}.yaml", digest(&whole)))
@@ -233,19 +231,17 @@ pub fn read_in(directory: &Path, configuration: &Path) -> Option<Journal> {
 /// it.
 pub fn write(configuration: &Path, journal: &Journal) -> Result<(), String> {
     let Some(directory) = state_dir() else {
-        return Err("there is nowhere to keep a history: neither XDG_STATE_HOME \
+        return Err(
+            "there is nowhere to keep a history: neither XDG_STATE_HOME \
                     nor HOME is set"
-            .to_string());
+                .to_string(),
+        );
     };
     write_in(&directory, configuration, journal)
 }
 
 /// The same, in a directory given rather than found.
-pub fn write_in(
-    directory: &Path,
-    configuration: &Path,
-    journal: &Journal,
-) -> Result<(), String> {
+pub fn write_in(directory: &Path, configuration: &Path, journal: &Journal) -> Result<(), String> {
     let path = journal_in(directory, configuration);
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
@@ -467,7 +463,10 @@ mod tests {
         // A relative one is ignored rather than resolved, which is what the
         // specification says to do with it.
         assert_eq!(
-            said_by(Some(OsString::from("state")), Some(OsString::from("/home/a"))),
+            said_by(
+                Some(OsString::from("state")),
+                Some(OsString::from("/home/a"))
+            ),
             Some(PathBuf::from("/home/a/.local/state/tcsgui"))
         );
         // And neither: nowhere to keep a history. The editor still edits, and

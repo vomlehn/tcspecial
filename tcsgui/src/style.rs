@@ -186,7 +186,6 @@ pub struct Appearance {
     pub label_italic: bool,
 }
 
-
 /// The ground each working pane is painted, by the pane.
 ///
 /// Light and neutral, as asked: the three are 14 CIE units apart under every
@@ -396,12 +395,7 @@ pub fn polygon_of(outline: Outline, (width, height): (u32, u32)) -> Vec<(f32, f3
         }
         Outline::Parallelogram => {
             let slant = (h - top) / 2.0;
-            vec![
-                (left + slant, top),
-                (w, top),
-                (w - slant, h),
-                (left, h),
-            ]
+            vec![(left + slant, top), (w, top), (w - slant, h), (left, h)]
         }
     }
 }
@@ -499,10 +493,8 @@ fn run_of(points: &[(f32, f32)]) -> String {
 /// which is what `route.rs` does for the line being dragged, and for the same
 /// reason.
 fn dashes_of(points: &[(f32, f32)], closes: bool, (dash, gap): (f32, f32)) -> String {
-    let mut sides: Vec<((f32, f32), (f32, f32))> = points
-        .windows(2)
-        .map(|pair| (pair[0], pair[1]))
-        .collect();
+    let mut sides: Vec<((f32, f32), (f32, f32))> =
+        points.windows(2).map(|pair| (pair[0], pair[1])).collect();
     if closes {
         sides.push((points[points.len() - 1], points[0]));
     }
@@ -517,12 +509,7 @@ fn dashes_of(points: &[(f32, f32)], closes: bool, (dash, gap): (f32, f32)) -> St
         if span <= f32::EPSILON {
             continue;
         }
-        let at = |along: f32| {
-            (
-                from.0 + run_x * along / span,
-                from.1 + run_y * along / span,
-            )
-        };
+        let at = |along: f32| (from.0 + run_x * along / span, from.1 + run_y * along / span);
 
         let mut along = -into;
         while along < span {
@@ -702,7 +689,9 @@ pub fn terminal_for(node_type: &str, named: Option<&str>, sink: bool) -> Option<
         [only] => Some(only),
         _ => {
             let groundward = if sink { "payload-in" } else { "payload-out" };
-            ours.iter().find(|terminal| **terminal == groundward).copied()
+            ours.iter()
+                .find(|terminal| **terminal == groundward)
+                .copied()
         }
     }
 }
@@ -717,11 +706,7 @@ pub fn terminal_for(node_type: &str, named: Option<&str>, sink: bool) -> Option<
 ///
 /// `at` is where the node is. `None` for a type this build does not know, or a
 /// name that is not one of the four.
-pub fn attachment(
-    node_type: &str,
-    at: (i32, i32),
-    terminal: &str,
-) -> Option<((f32, f32), bool)> {
+pub fn attachment(node_type: &str, at: (i32, i32), terminal: &str) -> Option<((f32, f32), bool)> {
     let found = NodeType::ALL.iter().find(|t| t.spelling() == node_type)?;
     let corner = corner_of(terminal)?;
     let drawn = found.appearance();
@@ -1057,11 +1042,7 @@ impl NodeType {
             | NodeType::AppPl
             | NodeType::AppAllPl => tcslibgs::node::app::attributes_of(self.spelling())
                 .expect("a type that is one of the app kinds"),
-            NodeType::Moc => &[
-                ("ground_base", true),
-                ("address", false),
-                ("port", false),
-            ],
+            NodeType::Moc => &[("ground_base", true), ("address", false), ("port", false)],
             NodeType::Subdiagram => &[("file", true)],
         }
     }
@@ -1244,8 +1225,8 @@ impl NodeType {
     /// the types differ by the edge, the weight and the way the label is set
     /// -- not the size, every node being one size: see `HEIGHT`.
     pub fn appearance(self) -> Appearance {
-        use Outline::*;
         use Edge::*;
+        use Outline::*;
         use Weight::*;
         match self {
             // Buses and the rest of the payloads: the data symbol, and told
@@ -1590,12 +1571,7 @@ mod tests {
                 let corner = corner_of(terminal).expect("a terminal of a known type");
                 let (x, y) = terminal_at(drawn.outline, corner, drawn.size, (0, 0));
                 let (wide, tall) = (TERMINAL.0 as i32, TERMINAL.1 as i32);
-                for spot in [
-                    (x, y),
-                    (x + wide, y),
-                    (x, y + tall),
-                    (x + wide, y + tall),
-                ] {
+                for spot in [(x, y), (x + wide, y), (x, y + tall), (x + wide, y + tall)] {
                     assert!(
                         within(&points, (spot.0 as f32, spot.1 as f32)),
                         "{}'s {terminal} reaches ({}, {}), outside its own outline: {shape}",
@@ -1615,8 +1591,7 @@ mod tests {
     /// have to be between the side's own ends.
     fn on_edge(points: &[(f32, f32)], (x, y): (f32, f32), closes: bool) -> bool {
         type Point = (f32, f32);
-        let mut sides: Vec<(&Point, &Point)> =
-            points.windows(2).map(|p| (&p[0], &p[1])).collect();
+        let mut sides: Vec<(&Point, &Point)> = points.windows(2).map(|p| (&p[0], &p[1])).collect();
         if closes {
             sides.push((&points[points.len() - 1], &points[0]));
         }
@@ -1688,9 +1663,11 @@ mod tests {
     /// channel to a projector or a printer still leaves a distinction.
     #[test]
     fn every_pair_of_types_differs_in_two_things_that_are_not_colour() {
-        for (a, b) in NodeType::ALL.iter().enumerate().flat_map(|(i, a)| {
-            NodeType::ALL[i + 1..].iter().map(move |b| (*a, *b))
-        }) {
+        for (a, b) in NodeType::ALL
+            .iter()
+            .enumerate()
+            .flat_map(|(i, a)| NodeType::ALL[i + 1..].iter().map(move |b| (*a, *b)))
+        {
             let one = a.appearance();
             let two = b.appearance();
             let differences = [
@@ -1742,7 +1719,7 @@ mod tests {
     /// Every type has its own tint.
     ///
     /// Asked for, and worth a test rather than a glance down the table:
-     /// Every terminal a type has is drawn somewhere, and in the right corner.
+    /// Every terminal a type has is drawn somewhere, and in the right corner.
     ///
     /// The arrangement is the argument: the payload's own data along the top
     /// going right, what the ground sends along the bottom going left, so
@@ -1809,7 +1786,8 @@ mod tests {
                 let at = terminal_at(t.appearance().outline, corner, (width, height), node);
                 // On the lines five millimetres apart, where the node is.
                 assert!(
-                    crate::pane::is_on_line(node.0 + at.0) && crate::pane::is_on_line(node.1 + at.1),
+                    crate::pane::is_on_line(node.0 + at.0)
+                        && crate::pane::is_on_line(node.1 + at.1),
                     "{}: {terminal} at {at:?} in a node at {node:?} is off the lines",
                     t.spelling()
                 );
@@ -2011,10 +1989,7 @@ mod tests {
     #[test]
     fn a_line_is_drawn_to_the_terminal_the_link_means() {
         // Named, and the type has it.
-        assert_eq!(
-            terminal_for("null", Some("moc-in"), true),
-            Some("moc-in")
-        );
+        assert_eq!(terminal_for("null", Some("moc-in"), true), Some("moc-in"));
         // Named, and the type has not: a computation's own input, which is
         // not a terminal. The groundward sink is where readings arrive.
         assert_eq!(
@@ -2052,7 +2027,10 @@ mod tests {
         // left.
         let ((x, y), rightward) = attachment("i2c", at, "payload-out").expect("a payload");
         let room = room_at(drawn.outline, drawn.size, corner_of("payload-out").unwrap());
-        assert!(room > 0, "a payload leans, so its upper right is in from the side");
+        assert!(
+            room > 0,
+            "a payload leans, so its upper right is in from the side"
+        );
         assert_eq!(
             x,
             (at.0 + width as i32) as f32 - room as f32,
@@ -2062,7 +2040,10 @@ mod tests {
         assert!(y < at.1 as f32 + height as f32 / 2.0, "the upper corner");
 
         let ((_, lower), rightward) = attachment("i2c", at, "moc-in").expect("a payload");
-        assert!(!rightward && lower > y, "what asks arrives at the lower corner");
+        assert!(
+            !rightward && lower > y,
+            "what asks arrives at the lower corner"
+        );
 
         // And the ground link's pair, both on its left.
         let ((x, _), _) = attachment("moc", at, "payload-in").expect("the ground");
@@ -2077,7 +2058,7 @@ mod tests {
 
     /// Red is not in the palette at all.    /// Red is not in the palette at all.
     ///
-     /// Every label is set legibly.
+    /// Every label is set legibly.
     ///
     /// Type is a distinguishing channel, which makes it tempting to reach for
     /// a six-pixel italic to tell two things apart. A distinction nobody can
@@ -2157,8 +2138,7 @@ mod tests {
     #[test]
     fn a_payload_is_a_device_or_a_driven_line() {
         for t in NodeType::ALL {
-            let by_family =
-                matches!(t.family(), "Devices" | "Driven" | "Payloads of their own");
+            let by_family = matches!(t.family(), "Devices" | "Driven" | "Payloads of their own");
             assert_eq!(
                 t.is_payload(),
                 by_family,

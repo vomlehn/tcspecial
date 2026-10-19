@@ -293,7 +293,11 @@ mod tests {
         // temp_2, id 8, unlinked: 6100 + 8 = 6108; a moc base of 6104 puts
         // k_1's 6105 ... cabin_temp's 6108 on the same port.
         graph.links.retain(|link| link.origin().node != "temp_2");
-        let moc = graph.nodes.iter_mut().find(|n| n.name == "moc").expect("moc");
+        let moc = graph
+            .nodes
+            .iter_mut()
+            .find(|n| n.name == "moc")
+            .expect("moc");
         moc.attributes.insert(
             "ground_base".to_string(),
             crate::Scalar::of("127.0.0.1:6104"),
@@ -308,7 +312,11 @@ mod tests {
     #[test]
     fn a_base_with_no_room_is_refused() {
         let mut graph = example("thermostat");
-        let moc = graph.nodes.iter_mut().find(|n| n.name == "moc").expect("moc");
+        let moc = graph
+            .nodes
+            .iter_mut()
+            .find(|n| n.name == "moc")
+            .expect("moc");
         moc.attributes.insert(
             "ground_base".to_string(),
             crate::Scalar::of("127.0.0.1:65535"),

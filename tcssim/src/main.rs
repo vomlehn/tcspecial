@@ -24,8 +24,8 @@ use std::collections::BTreeMap;
 
 mod endpoint;
 mod grid;
-mod payload;
 mod node;
+mod payload;
 mod pty;
 mod thermal;
 
@@ -35,7 +35,6 @@ use tcslibgs::{ResolvedSim, SimConfigFile};
 use tcsverify::startup::Startup;
 
 slint::include_modules!();
-
 
 /// What a panel's status says of a payload that is sending, and of one that
 /// is not.
@@ -299,7 +298,12 @@ fn thermal_masses(
 /// What [`load`] reads out of the pair: the handlers the simulator stands in
 /// for, the simulator file, its settings resolved against them, and the
 /// payloads' own configurations.
-type Loaded = (Vec<DHConfig>, SimConfigFile, Vec<ResolvedSim>, Vec<PayloadConfig>);
+type Loaded = (
+    Vec<DHConfig>,
+    SimConfigFile,
+    Vec<ResolvedSim>,
+    Vec<PayloadConfig>,
+);
 
 /// Read the pair, once tcsverify has found nothing wrong with it, and say in
 /// `startup` whatever stops it being simulated.
@@ -310,11 +314,7 @@ type Loaded = (Vec<DHConfig>, SimConfigFile, Vec<ResolvedSim>, Vec<PayloadConfig
 /// asked again rather than assumed: the files can change between the two
 /// reads, and a simulator running on a half-read pair would be worse than one
 /// that says so.
-fn load(
-    payload_path: &str,
-    sim_path: &str,
-    startup: &mut Startup,
-) -> Option<Loaded> {
+fn load(payload_path: &str, sim_path: &str, startup: &mut Startup) -> Option<Loaded> {
     let sim_file = match SimConfigFile::load(sim_path) {
         Ok(sim_file) => sim_file,
         Err(e) => {
@@ -374,14 +374,14 @@ fn load(
     let configs: Vec<PayloadConfig> = match dh_configs
         .iter()
         .zip(&sims)
-        .map(|(dh, sim)| {
-            payload_config_attached(dh, sim, masses.get(&dh.name.0).cloned())
-        })
+        .map(|(dh, sim)| payload_config_attached(dh, sim, masses.get(&dh.name.0).cloned()))
         .collect()
     {
         Ok(configs) => configs,
         Err(e) => {
-            startup.error(format!("Error in payload configuration {payload_path}: {e}"));
+            startup.error(format!(
+                "Error in payload configuration {payload_path}: {e}"
+            ));
             return None;
         }
     };
@@ -459,14 +459,12 @@ fn present(startup: &Startup) {
 }
 
 fn main() {
-//    env_logger::init();
+    //    env_logger::init();
 
     // Read both configuration files before the window exists, so a file that
     // cannot be read is reported plainly rather than as an empty window.
-    let payload_path = match payload_path_from_args(
-        env::args(),
-        Some(SIM_PAYLOAD_CONFIG_PATH_VAR),
-    ) {
+    let payload_path = match payload_path_from_args(env::args(), Some(SIM_PAYLOAD_CONFIG_PATH_VAR))
+    {
         Ok(payload_path) => payload_path,
         Err(e) => {
             eprintln!("{}", e);
@@ -545,7 +543,7 @@ fn main() {
 
     // Create simulated payloads
     let payloads: Arc<Mutex<Vec<SimulatedPayload>>> = Arc::new(Mutex::new(
-        configs.into_iter().map(SimulatedPayload::new).collect()
+        configs.into_iter().map(SimulatedPayload::new).collect(),
     ));
 
     // The one button each panel has, which starts and stops its payload.
@@ -614,13 +612,17 @@ fn main() {
         let payloads = payloads.clone();
         let model = model.clone();
         let timer = slint::Timer::default();
-        timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(500), move || {
-            let guard = payloads.lock().unwrap();
-            for (row, payload) in guard.iter().enumerate() {
-                let stats = payload.stats();
-                update_row(&model, row, |info| show_traffic(info, &stats));
-            }
-        });
+        timer.start(
+            slint::TimerMode::Repeated,
+            std::time::Duration::from_millis(500),
+            move || {
+                let guard = payloads.lock().unwrap();
+                for (row, payload) in guard.iter().enumerate() {
+                    let stats = payload.stats();
+                    update_row(&model, row, |info| show_traffic(info, &stats));
+                }
+            },
+        );
 
         // Keep timer alive
         std::mem::forget(timer);
@@ -649,11 +651,9 @@ fn ask_for_the_edge(ui: &MainWindow, edge: Edge) {
         move || {
             let Some(ui) = ui_weak.upgrade() else { return };
             let window = ui.window();
-            if let Some(y) = tcslibgs::display::top_of(
-                edge,
-                tcslibgs::screen_height(),
-                window.size().height,
-            ) {
+            if let Some(y) =
+                tcslibgs::display::top_of(edge, tcslibgs::screen_height(), window.size().height)
+            {
                 window.set_position(slint::PhysicalPosition::new(0, y));
             }
         },
@@ -665,9 +665,9 @@ fn ask_for_the_edge(ui: &MainWindow, edge: Edge) {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
     use super::*;
     use std::path::Path;
+    use std::time::Duration;
     use tcslibgs::{DHName, EndpointConfig, NetworkConfig, NetworkProtocol};
 
     fn repo_file(name: &str) -> std::path::PathBuf {
@@ -685,8 +685,7 @@ mod tests {
         assert!(sim.ends_with("minimal-sim.yaml"), "{sim}");
 
         let mut startup = Startup::default();
-        let (dh_configs, _, sims, configs) =
-            load(payload, &sim, &mut startup).expect("it loads");
+        let (dh_configs, _, sims, configs) = load(payload, &sim, &mut startup).expect("it loads");
         assert!(startup.is_empty(), "{:?}", startup.lines());
         assert_eq!(dh_configs.len(), 1);
         assert_eq!(dh_configs[0].name.0, "sensor");
@@ -787,11 +786,10 @@ mod tests {
 
         // The handler the running program registers, over the payload the
         // files describe.
-        let payloads: Arc<Mutex<Vec<SimulatedPayload>>> = Arc::new(Mutex::new(vec![
-            SimulatedPayload::new(
+        let payloads: Arc<Mutex<Vec<SimulatedPayload>>> =
+            Arc::new(Mutex::new(vec![SimulatedPayload::new(
                 payload_config_attached(&dh, &settings, None).expect("a payload"),
-            ),
-        ]));
+            )]));
         handle_config_edits(&ui, payloads, model.clone());
         ui.show().unwrap();
 
@@ -817,7 +815,10 @@ mod tests {
         // A packet of twelve bytes in segments of twelve: the ordinary case,
         // and nothing to say about it.
         assert_eq!(button(&ui), Some(true), "the button is not there to press");
-        assert!(said(&ui).is_empty(), "something is said before anything is wrong");
+        assert!(
+            said(&ui).is_empty(),
+            "something is said before anything is wrong"
+        );
 
         // The packet size, down one, which leaves the segment larger than the
         // packet it is a piece of. The first spin box of the panel is the
@@ -836,8 +837,9 @@ mod tests {
         );
         let shown = said(&ui);
         assert!(
-            shown.iter().any(|line| line.contains("segment of 12")
-                && line.contains("packet of 11")),
+            shown
+                .iter()
+                .any(|line| line.contains("segment of 12") && line.contains("packet of 11")),
             "nothing on screen says what is wrong: {shown:?}"
         );
 
@@ -848,7 +850,11 @@ mod tests {
         packet_size.invoke_accessible_increment_action();
         assert_eq!(packet_size.accessible_value().as_deref(), Some("12"));
         assert_eq!(button(&ui), Some(true), "the button did not come back");
-        assert!(said(&ui).is_empty(), "the popup is still saying it: {:?}", said(&ui));
+        assert!(
+            said(&ui).is_empty(),
+            "the popup is still saying it: {:?}",
+            said(&ui)
+        );
     }
 
     /// A payload whose files disagree about the two sizes cannot be started,
@@ -862,7 +868,10 @@ mod tests {
     fn a_payload_whose_files_disagree_starts_out_unsendable() {
         let dh = handler("DH0");
         let info = payload_info_from(0, &dh, &sim(1000, 1000, 20));
-        assert_eq!(dh.packet_size, 12, "the tcspecial configuration says twelve bytes");
+        assert_eq!(
+            dh.packet_size, 12,
+            "the tcspecial configuration says twelve bytes"
+        );
         assert!(
             info.sizes_problem.contains("segment of 20")
                 && info.sizes_problem.contains("packet of 12"),
@@ -960,7 +969,10 @@ mod tests {
         // The status line is coloured and weighted by the same status, so it
         // and the button cannot come to disagree either.
         assert!(
-            source.contains(&format!("payload-status == \"{}\" ? black : red", RUNNING_STATUS)),
+            source.contains(&format!(
+                "payload-status == \"{}\" ? black : red",
+                RUNNING_STATUS
+            )),
             "{} does not colour the status line on {:?}",
             window.display(),
             RUNNING_STATUS
@@ -1134,7 +1146,8 @@ mod tests {
 
             // Opened as main() opens it, floor and all.
             let shape = grid::grid_shape(&sizes, panels);
-            ui.window().set_size(grid::window_size(&sizes, &shape, panels));
+            ui.window()
+                .set_size(grid::window_size(&sizes, &shape, panels));
             ui.show().unwrap();
 
             let window = ui.window().size().to_logical(1.0);
@@ -1149,8 +1162,7 @@ mod tests {
                 .next()
                 .expect("the window has a grid of panels");
             assert!(
-                grid.size().width <= area.size().width
-                    && grid.size().height <= area.size().height,
+                grid.size().width <= area.size().width && grid.size().height <= area.size().height,
                 "{set}: the grid is {}x{} in an area {}x{}",
                 grid.size().width,
                 grid.size().height,
@@ -1178,9 +1190,9 @@ mod tests {
             // keeps a label from running off the side of its panel: a
             // Button reports the width it was given, where a Text that does
             // not fit is clipped and reports the width it had.
-            for button in i_slint_backend_testing::ElementHandle::find_by_element_type_name(
-                &ui, "Button",
-            ) {
+            for button in
+                i_slint_backend_testing::ElementHandle::find_by_element_type_name(&ui, "Button")
+            {
                 let right = button.absolute_position().x + button.size().width;
                 assert!(
                     right <= window.width,
@@ -1309,7 +1321,8 @@ mod tests {
                 // One panel's width narrower than two panels need, so the
                 // count has to come down.
                 let narrow = sizes.panel_width + sizes.chrome_width;
-                ui.window().set_size(slint::LogicalSize::new(narrow, window.height));
+                ui.window()
+                    .set_size(slint::LogicalSize::new(narrow, window.height));
                 assert_eq!(
                     columns_now(&ui),
                     1,
@@ -1318,7 +1331,8 @@ mod tests {
 
                 // And wide enough for every panel in a row, so it goes up.
                 let wide = panels as f32 * sizes.panel_width + sizes.chrome_width;
-                ui.window().set_size(slint::LogicalSize::new(wide, window.height));
+                ui.window()
+                    .set_size(slint::LogicalSize::new(wide, window.height));
                 assert_eq!(
                     columns_now(&ui),
                     panels,
@@ -1482,7 +1496,6 @@ mod tests {
     // for, and that is tested where the rule is:
     // `tcslibgs::sim_config`'s `the_two_files_cannot_disagree_about_the_kind`.
 
-
     /// Every shipped set has to describe payloads the simulator can simulate,
     /// and its two files have to agree with each other.
     ///
@@ -1603,12 +1616,7 @@ mod tests {
                 .map(|(row, (dh, s))| payload_info_from(row, dh, s))
                 .collect();
 
-            assert_eq!(
-                panels.len(),
-                dh_configs.len(),
-                "{}",
-                payload_path.display()
-            );
+            assert_eq!(panels.len(), dh_configs.len(), "{}", payload_path.display());
 
             // The shape rule and not the sizes, so there is no window to
             // ask: a grid that holds its panels does so whatever a panel
@@ -1794,11 +1802,14 @@ mod tests {
         // Nothing of the parameters is on screen until the button is pressed:
         // a panel is a dozen lines tall and the parameters are thirty.
         assert!(
-            !on_screen(&ui).iter().any(|line| line.contains("packet_size")),
+            !on_screen(&ui)
+                .iter()
+                .any(|line| line.contains("packet_size")),
             "the parameters are shown before anyone asked for them"
         );
 
-        let button: Vec<_> = ElementHandle::find_by_accessible_label(&ui, "Configuration").collect();
+        let button: Vec<_> =
+            ElementHandle::find_by_accessible_label(&ui, "Configuration").collect();
         assert_eq!(
             button.len(),
             1,
@@ -1834,11 +1845,11 @@ mod tests {
                 port: 5003,
             }),
             packet_size: 15,
-     oc: None,
-     ground: None,
-      mode: Default::default(),
-      stale_interval: None,
- };
+            oc: None,
+            ground: None,
+            mode: Default::default(),
+            stale_interval: None,
+        };
 
         let info = payload_info_from(0, &dh, &sim(500, 250, 5));
         assert_eq!(info.name, SharedString::from("DH3"));

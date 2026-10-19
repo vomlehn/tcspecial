@@ -37,9 +37,7 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use tcslibgs::graph::check::Severity;
-use tcslibgs::{
-    ConfigFormat, SimConfigFile, TcsError,
-};
+use tcslibgs::{ConfigFormat, SimConfigFile, TcsError};
 
 pub mod locate;
 pub mod startup;
@@ -247,7 +245,11 @@ impl Report {
         });
         // Stopped at once on the last that counts, rather than on the one
         // after it: nothing is looked for that will not be printed.
-        if self.limits.error_limit.is_some_and(|limit| self.counted() >= limit) {
+        if self
+            .limits
+            .error_limit
+            .is_some_and(|limit| self.counted() >= limit)
+        {
             self.halted = true;
         }
     }
@@ -684,8 +686,6 @@ fn check_graph_simulator(path: &Path, payloads: Option<&[String]>, report: &mut 
     }
 }
 
-
-
 /// The text of a file and the format its name says it is written in.
 fn read(path: &Path, report: &mut Report) -> Option<(String, ConfigFormat)> {
     let format = match ConfigFormat::of_file(path) {
@@ -744,7 +744,9 @@ mod tests {
 
     /// The thermostat example's two spellings and its simulator file, copied
     /// to a directory of their own, with `change` made to the XML.
-    fn thermostat_pair(change: impl Fn(String) -> String) -> (tempfile::TempDir, PathBuf, PathBuf, PathBuf) {
+    fn thermostat_pair(
+        change: impl Fn(String) -> String,
+    ) -> (tempfile::TempDir, PathBuf, PathBuf, PathBuf) {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/thermostat");
         let dir = tempfile::tempdir().expect("a directory");
         let at = |name: &str| dir.path().join(name);
@@ -753,7 +755,11 @@ mod tests {
         }
         let xml = std::fs::read_to_string(root.join("thermostat.xml")).expect("the XML");
         std::fs::write(at("thermostat.xml"), change(xml)).expect("written");
-        let (xml, yaml, sim) = (at("thermostat.xml"), at("thermostat.yaml"), at("thermostat-sim.yaml"));
+        let (xml, yaml, sim) = (
+            at("thermostat.xml"),
+            at("thermostat.yaml"),
+            at("thermostat-sim.yaml"),
+        );
         (dir, xml, yaml, sim)
     }
 
@@ -765,7 +771,9 @@ mod tests {
         assert!(report.findings.is_empty(), "{:?}", report.said());
         assert!(report.joined, "both were checked with the simulator file");
         // Either order.
-        assert!(verify_pair(&yaml, &xml, &sim, Limits::EVERYTHING).findings.is_empty());
+        assert!(verify_pair(&yaml, &xml, &sim, Limits::EVERYTHING)
+            .findings
+            .is_empty());
     }
 
     /// A value changed in one spelling is reported: where, and what each
@@ -780,14 +788,20 @@ mod tests {
         let finding = &report.findings[0];
         assert_eq!(finding.file, xml);
         assert!(
-            finding.message.contains("nodes / thermostat / attributes / setpoint")
+            finding
+                .message
+                .contains("nodes / thermostat / attributes / setpoint")
                 && finding.message.contains("says \"293.15\"")
                 && finding.message.contains("says \"290\""),
             "{said:?}"
         );
         let text = std::fs::read_to_string(&xml).expect("the XML");
         let line = text.lines().nth(finding.line - 1).expect("a line");
-        assert!(line.contains("<setpoint>290"), "line {}: {line}", finding.line);
+        assert!(
+            line.contains("<setpoint>290"),
+            "line {}: {line}",
+            finding.line
+        );
         assert_eq!(report.status(), 1);
     }
 
@@ -804,9 +818,20 @@ mod tests {
         let mut report = Report::default();
         compare(&yaml, &xml, &mut report);
         let said: Vec<&str> = report.findings.iter().map(|f| f.message.as_str()).collect();
-        assert!(said.iter().any(|m| m.contains("nodes / heaters_1:") && m.contains("does not")), "{said:?}");
-        assert!(said.iter().any(|m| m.contains("nodes / heater:")), "{said:?}");
-        assert!(said.iter().any(|m| m.contains("\"heaters_1\"") && m.contains("\"heater\"")), "{said:?}");
+        assert!(
+            said.iter()
+                .any(|m| m.contains("nodes / heaters_1:") && m.contains("does not")),
+            "{said:?}"
+        );
+        assert!(
+            said.iter().any(|m| m.contains("nodes / heater:")),
+            "{said:?}"
+        );
+        assert!(
+            said.iter()
+                .any(|m| m.contains("\"heaters_1\"") && m.contains("\"heater\"")),
+            "{said:?}"
+        );
         assert!(said.len() <= 4, "{said:?}");
     }
 
@@ -889,7 +914,11 @@ moc:
         assert!(
             !report.found_errors(),
             "{:?}",
-            report.findings.iter().map(|f| f.to_string()).collect::<Vec<_>>()
+            report
+                .findings
+                .iter()
+                .map(|f| f.to_string())
+                .collect::<Vec<_>>()
         );
         assert_eq!(report.status(), 0);
     }
@@ -1312,7 +1341,11 @@ payloads:
             ("minimal.xml", "    <version>2.0</version>\n", 5),
         ] {
             let good = std::fs::read_to_string(root.join(file)).expect("the example");
-            let extension = if file.ends_with(".xml") { ".xml" } else { ".yaml" };
+            let extension = if file.ends_with(".xml") {
+                ".xml"
+            } else {
+                ".yaml"
+            };
             let mut lines: Vec<&str> = good.split_inclusive('\n').collect();
             lines.insert(at - 1, line);
             let (_dir, path) = graph_written(extension, &lines.concat());
@@ -1449,7 +1482,10 @@ simulated_payloads:
             // an_unfinished_graph_warns_and_passes.
             extra.push_str(&format!("  - {{ name: spare{id}, type: i2c }}\n"));
         }
-        graph_written(".yaml", &SOUND_GRAPH.replace("moc:\n", &format!("{extra}moc:\n")))
+        graph_written(
+            ".yaml",
+            &SOUND_GRAPH.replace("moc:\n", &format!("{extra}moc:\n")),
+        )
     }
 
     fn limited(error_limit: Option<usize>, warnings: Warnings) -> Limits {
@@ -1511,7 +1547,10 @@ simulated_payloads:
 
         let every = printed(&verify(&path, None, Limits::EVERYTHING));
         let every: Vec<&str> = every.lines().collect();
-        let errors = every.iter().filter(|line| line.contains(": error: ")).count();
+        let errors = every
+            .iter()
+            .filter(|line| line.contains(": error: "))
+            .count();
         assert!(errors >= 1, "{every:?}");
         assert!(
             every.iter().any(|line| line.contains(": warning: ")),
@@ -1523,12 +1562,19 @@ simulated_payloads:
             let some = printed(&report);
             let some: Vec<&str> = some.lines().collect();
             assert_eq!(some, every[..some.len()], "under {limit}");
-            assert!(some.last().unwrap().contains(": error: "), "under {limit}: {some:?}");
+            assert!(
+                some.last().unwrap().contains(": error: "),
+                "under {limit}: {some:?}"
+            );
         }
         for limit in 1..=every.len() {
             let report = verify(&path, None, limited(Some(limit), Warnings::Errors));
             let some = printed(&report);
-            assert_eq!(some.lines().collect::<Vec<_>>(), every[..limit], "under {limit}");
+            assert_eq!(
+                some.lines().collect::<Vec<_>>(),
+                every[..limit],
+                "under {limit}"
+            );
         }
     }
 
@@ -1539,9 +1585,16 @@ simulated_payloads:
         let (_dir, path) = with_warnings(4);
         let every = verify(&path, None, Limits::EVERYTHING);
         let warned = every.findings.len();
-        assert!(warned >= 4, "too few warnings to tell apart: {:?}", every.findings);
         assert!(
-            every.findings.iter().all(|f| f.severity == Severity::Warning),
+            warned >= 4,
+            "too few warnings to tell apart: {:?}",
+            every.findings
+        );
+        assert!(
+            every
+                .findings
+                .iter()
+                .all(|f| f.severity == Severity::Warning),
             "{:?}",
             every.findings
         );
@@ -1573,7 +1626,6 @@ simulated_payloads:
             assert_eq!(report.status(), 1, "{warnings:?}");
         }
     }
-
 
     /// Every shipped configuration verifies, in both formats.
     ///
@@ -1663,7 +1715,10 @@ simulated_payloads:
         .unwrap();
 
         let report = verify(&path, None, Limits::EVERYTHING);
-        assert!(report.found_anything(), "the unfinished node was not noticed");
+        assert!(
+            report.found_anything(),
+            "the unfinished node was not noticed"
+        );
         assert!(
             !report.found_errors(),
             "an unfinished node is not an error: {:?}",

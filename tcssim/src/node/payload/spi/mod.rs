@@ -26,8 +26,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, ignore_this_request, lateness, send_in_segments, wait_out_packet, wait_while_running, Pacing,
-    PayloadConfig, PayloadStats, Produce,
+    a_packet, ignore_this_request, lateness, send_in_segments, wait_out_packet, wait_while_running,
+    Pacing, PayloadConfig, PayloadStats, Produce,
 };
 use crate::pty::SimulatedNode;
 
@@ -42,10 +42,16 @@ pub fn run_spi_node(
     running: Arc<AtomicBool>,
     stats: Arc<std::sync::Mutex<PayloadStats>>,
 ) {
-    let mut node = match SimulatedNode::open(&format!("{}: a SPI peripheral", config.name), &config.address) {
+    let mut node = match SimulatedNode::open(
+        &format!("{}: a SPI peripheral", config.name),
+        &config.address,
+    ) {
         Ok(node) => node,
         Err(e) => {
-            eprintln!("{}: failed to stand in for a SPI peripheral: {}", config.name, e);
+            eprintln!(
+                "{}: failed to stand in for a SPI peripheral: {}",
+                config.name, e
+            );
             return;
         }
     };
@@ -72,8 +78,8 @@ pub fn run_spi_node(
         }
 
         if pacing.a_packet_is_due(config.triggered, asked)
-                && !ignore_this_request(&config, &mut rng)
-            {
+            && !ignore_this_request(&config, &mut rng)
+        {
             let late = lateness(&config, &mut rng);
             let packet = match a_packet(&config, &pacing, sent, &mut rng) {
                 Produce::Send(packet) => packet,
@@ -138,7 +144,7 @@ mod tests {
         let path = a_path();
         let mut simulated = SimulatedPayload::new(PayloadConfig {
             thermal: None,
-                        name: "DH0".to_string(),
+            name: "DH0".to_string(),
             protocol: PayloadProtocol::Spi,
             address: path.display().to_string(),
             port: 0,
@@ -153,7 +159,7 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(5)),
             packet_interval_ms: Arc::new(AtomicU32::new(200)),
             segment_interval_ms: Arc::new(AtomicU32::new(40)),
-                    triggered: false,
+            triggered: false,
         });
         simulated.start().expect("the device starts");
 

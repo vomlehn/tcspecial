@@ -13,8 +13,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::endpoint_config::reject_stream;
 use crate::endpoint_config::{
-    bad, parse_u32, reject_foreign_fields, require, EndpointConfigResult, GroupKind,
-    LinkTerms, Scalar,
+    bad, parse_u32, reject_foreign_fields, require, EndpointConfigResult, GroupKind, LinkTerms,
+    Scalar,
 };
 
 /// Attributes of a SPI group.
@@ -164,23 +164,24 @@ fn parse_cs_active(group: &str, s: &Scalar) -> EndpointConfigResult<CsActive> {
     }
 }
 
-
 /// What a SPI group says, and what it must say.
 ///
 /// The clock rate and the mode are required: no controller default is right
 /// for every peripheral, and a mismatched mode fails the way a mismatched
 /// data rate fails on a serial line. The rest have usual values and default
 /// to them. There is no stream section, for the reason an I2C group has none.
-pub(crate) fn group_kind_of(
-    name: &str,
-    g: LinkTerms,
-) -> EndpointConfigResult<GroupKind> {
-
+pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<GroupKind> {
     reject_foreign_fields(
         name,
         "spi",
         &g,
-        &["max_speed", "spi_mode", "bits_per_word", "bit_order", "cs_active"],
+        &[
+            "max_speed",
+            "spi_mode",
+            "bits_per_word",
+            "bit_order",
+            "cs_active",
+        ],
     )?;
     reject_stream(name, "spi", g.stream.is_some())?;
 

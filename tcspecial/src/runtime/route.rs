@@ -91,7 +91,11 @@ fn stream_of(graph: &Graph, link: &Link) -> Option<Stream> {
     let only = |node: &str, sink: bool| {
         let node_type = &graph.node(node)?.node_type;
         let terminals = terminals::terminals_of(node_type)?;
-        match if sink { terminals.sinks } else { terminals.sources } {
+        match if sink {
+            terminals.sinks
+        } else {
+            terminals.sources
+        } {
             [one] => named(Some(one)),
             _ => None,
         }
@@ -181,9 +185,8 @@ impl Routes {
                 // the table is built on it. A terminal is not one of those, so
                 // it is dropped here rather than carried to a port that would
                 // refuse it as an input a device does not have.
-                let input = input.filter(|named| {
-                    tcslibgs::graph::terminals::stream_of(named).is_none()
-                });
+                let input =
+                    input.filter(|named| tcslibgs::graph::terminals::stream_of(named).is_none());
 
                 // A line into a moc node goes to this source's own link to
                 // that node's ground_base.
@@ -300,9 +303,10 @@ impl Routes {
     /// mentions cannot be set from the ground: what is changeable in flight is
     /// written down, which is what makes it checkable before it flies.
     pub fn is_commanded(&self, node: &str, attribute: &str) -> bool {
-        self.commands.values().flatten().any(|commanded| {
-            commanded.node == node && commanded.attribute == attribute
-        })
+        self.commands
+            .values()
+            .flatten()
+            .any(|commanded| commanded.node == node && commanded.attribute == attribute)
     }
 
     /// Every node whose output arrives here, in order and once each.
@@ -519,11 +523,7 @@ mod tests {
             .filter(|l| l.via == Via::PayloadTelemetry)
             .count();
         let expected = drawn + untouched;
-        let held: usize = graph
-            .nodes
-            .iter()
-            .map(|n| routes.from(&n.name).len())
-            .sum();
+        let held: usize = graph.nodes.iter().map(|n| routes.from(&n.name).len()).sum();
         assert_eq!(held, expected, "the table and the file disagree");
     }
 
@@ -536,7 +536,11 @@ mod tests {
         graph.links.retain(|link| link.origin().node != "temp_2");
         let routes = Routes::of(&graph);
 
-        let to: Vec<&str> = routes.from("temp_2").iter().map(|d| d.to.as_str()).collect();
+        let to: Vec<&str> = routes
+            .from("temp_2")
+            .iter()
+            .map(|d| d.to.as_str())
+            .collect();
         assert_eq!(to, vec![telemetry::payload_link_name("temp_2").as_str()]);
         for drawn in ["temp_1", "temp_3", "heaters"] {
             assert!(
@@ -564,7 +568,11 @@ mod tests {
         let routes = Routes::of(&thermostat());
         assert!(routes.arriving_at("moc").is_empty());
 
-        let mean: Vec<&str> = routes.from("cabin_temp").iter().map(|d| d.to.as_str()).collect();
+        let mean: Vec<&str> = routes
+            .from("cabin_temp")
+            .iter()
+            .map(|d| d.to.as_str())
+            .collect();
         assert!(mean.contains(&"cabin_temp to moc"), "{mean:?}");
 
         let link = routes

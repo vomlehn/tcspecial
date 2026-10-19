@@ -376,8 +376,14 @@ mod tests {
     /// string, and the hexadecimal form is the byte on its own.
     #[test]
     fn the_two_notations_meet() {
-        assert_eq!(trigger_bytes("0D").unwrap(), trigger_bytes("\"\\r\"").unwrap());
-        assert_eq!(trigger_bytes("41").unwrap(), trigger_bytes("\"A\"").unwrap());
+        assert_eq!(
+            trigger_bytes("0D").unwrap(),
+            trigger_bytes("\"\\r\"").unwrap()
+        );
+        assert_eq!(
+            trigger_bytes("41").unwrap(),
+            trigger_bytes("\"A\"").unwrap()
+        );
     }
 
     /// Bytes read back as a file could have written them.

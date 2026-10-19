@@ -42,8 +42,8 @@
 
 use std::collections::VecDeque;
 use std::os::fd::BorrowedFd;
-use std::time::{Duration, Instant};
 use std::os::unix::io::RawFd;
+use std::time::{Duration, Instant};
 
 use nix::poll::{poll, PollFd, PollFlags};
 
@@ -263,11 +263,7 @@ impl EndpointPort {
     /// follows from which end exists first: the ground sends to an address it
     /// was told, so the vehicle waits at it, where a device is something the
     /// vehicle opens.
-    pub fn open(
-        node: &Node,
-        routes: &Routes,
-        abandon: &Abandon,
-    ) -> Result<EndpointPort, String> {
+    pub fn open(node: &Node, routes: &Routes, abandon: &Abandon) -> Result<EndpointPort, String> {
         let uses = Use::of(routes, &node.name)?;
         let reach = reach_of(node)?;
 
@@ -553,7 +549,6 @@ impl Port for EndpointPort {
             }
         }
 
-
         let got = self.read_one(buffer, want);
 
         // Asked after being read, and asked whether or not the read found
@@ -687,11 +682,7 @@ impl ComputePort {
     /// `inputs` is what the routing found bound to the node, which a
     /// computation over several of them needs: a mean cannot know it is
     /// waiting for three until something tells it how many links arrive.
-    pub fn make(
-        node: &Node,
-        inputs: &[&str],
-        abandon: &Abandon,
-    ) -> Result<ComputePort, String> {
+    pub fn make(node: &Node, inputs: &[&str], abandon: &Abandon) -> Result<ComputePort, String> {
         Ok(ComputePort::of(
             &node.name,
             compute::make(node, inputs, abandon)?,
@@ -793,7 +784,6 @@ impl LogPort {
     pub fn open(node: &Node) -> Result<LogPort, String> {
         Ok(LogPort(LogNode::of(node)?))
     }
-
 }
 
 impl Port for LogPort {
@@ -1044,9 +1034,7 @@ impl Port for AppPort {
         let given = match (&mut self.program, arriving.stream) {
             // A kind with one interface takes what arrives on it, and a link
             // into it says the same thing its one sink does.
-            (Program::Payload(app), Some(Stream::Groundward) | None) => {
-                app.give_payload_data(data)
-            }
+            (Program::Payload(app), Some(Stream::Groundward) | None) => app.give_payload_data(data),
             (Program::Moc(app), Some(Stream::Vehicleward) | None) => app.give_moc_data(data),
             // What asks a payload that is a program for a reading, which is
             // the datum itself: see `crate::node::payload::app_all_pl`.
@@ -1226,7 +1214,11 @@ mod tests {
         let (_script, port) = port_of_script(
             "gps",
             Use::Read,
-            vec![Ok(b"$GPGGA".to_vec()), Ok(b",1\n$GP".to_vec()), Ok(b"RMC\n".to_vec())],
+            vec![
+                Ok(b"$GPGGA".to_vec()),
+                Ok(b",1\n$GP".to_vec()),
+                Ok(b"RMC\n".to_vec()),
+            ],
         );
         let mut port = port.framed_by(tcslibgs::endpoint_config::StreamParams {
             max_length: 64,
@@ -1343,7 +1335,10 @@ mod tests {
         script.lock().expect("the script").to_read = vec![Ok(b"293.15".to_vec())];
 
         let mut buffer = [0u8; 64];
-        let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("the reading");
+        let got = port
+            .take(&mut buffer)
+            .map(|taken| taken.bytes)
+            .expect("the reading");
         assert_eq!(&buffer[..got], b"293.15");
 
         // And the pass after it, with the device not due.
@@ -1358,8 +1353,9 @@ mod tests {
     #[test]
     fn a_read_that_fails_is_reported() {
         let (script, mut port) = port("temp_1", Use::Read);
-        script.lock().expect("the script").to_read =
-            vec![Err(TcsError::Endpoint("the bus did not answer".to_string()))];
+        script.lock().expect("the script").to_read = vec![Err(TcsError::Endpoint(
+            "the bus did not answer".to_string(),
+        ))];
 
         let said = port
             .take(&mut [0u8; 64])
@@ -1376,7 +1372,10 @@ mod tests {
         let (script, mut port) = port("heaters_1", Use::Driven);
 
         assert_eq!(port.give(Arriving::ANYWHERE, b"1"), Ok(()));
-        assert_eq!(script.lock().expect("the script").written, vec![b"1".to_vec()]);
+        assert_eq!(
+            script.lock().expect("the script").written,
+            vec![b"1".to_vec()]
+        );
     }
 
     /// A write that moved some of the bytes is a failure, and says how many.
@@ -1404,7 +1403,9 @@ mod tests {
         let (script, mut port) = port("moc", Use::Both);
         script.lock().expect("the script").write_answers = vec![Ok(0)];
 
-        let said = port.give(Arriving::ANYWHERE, b"293.15").expect_err("a datum dropped");
+        let said = port
+            .give(Arriving::ANYWHERE, b"293.15")
+            .expect_err("a datum dropped");
         assert!(
             said.contains("moved none of them") && said.contains("dropped"),
             "the complaint should say the datum is gone: {said}"
@@ -1419,7 +1420,9 @@ mod tests {
             "cannot drive the lines of /dev/gpiochip0".to_string(),
         ))];
 
-        let said = port.give(Arriving::ANYWHERE, b"1").expect_err("a chip that refused");
+        let said = port
+            .give(Arriving::ANYWHERE, b"1")
+            .expect_err("a chip that refused");
         assert!(
             said.contains("heaters_1") && said.contains("/dev/gpiochip0"),
             "the complaint should name the node and the chip: {said}"
@@ -1436,7 +1439,9 @@ mod tests {
     #[test]
     fn a_node_refuses_the_direction_it_is_not_used_in() {
         let (_, mut sensor) = port("temp_1", Use::Read);
-        let said = sensor.give(Arriving::ANYWHERE, b"1").expect_err("a write to a sensor");
+        let said = sensor
+            .give(Arriving::ANYWHERE, b"1")
+            .expect_err("a write to a sensor");
         assert!(
             said.contains("read and not written"),
             "the complaint should say which way it is used: {said}"
@@ -1482,7 +1487,10 @@ mod tests {
         // A sensor that answers in two bytes, read into a buffer with room
         // for sixty-four: two is what is asked for.
         let mut buffer = [0u8; 64];
-        let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("a reading");
+        let got = port
+            .take(&mut buffer)
+            .map(|taken| taken.bytes)
+            .expect("a reading");
         assert_eq!(got, 2, "a bus master clocks what it asks for and no more");
 
         // And the buffer is the other bound: a caller with room for one byte
@@ -1554,24 +1562,34 @@ mod tests {
         let path = where_.path().join("pipe");
         let name = CString::new(path.to_str().expect("a path")).expect("a name");
         // SAFETY: a path in a directory this test owns, and a mode.
-        assert_eq!(unsafe { libc::mkfifo(name.as_ptr(), 0o600) }, 0, "a named pipe");
+        assert_eq!(
+            unsafe { libc::mkfifo(name.as_ptr(), 0o600) },
+            0,
+            "a named pipe"
+        );
 
         let config = EndpointConfig::Device(DeviceConfig {
             path: path.to_string_lossy().to_string(),
         });
-        let mut port =
-            EndpointPort::connect("sensor", &config, Use::Read).expect("the pipe opens");
+        let mut port = EndpointPort::connect("sensor", &config, Use::Read).expect("the pipe opens");
 
         // Nothing has been written, and this returns: without the readiness
         // question in take, this test would hang rather than fail.
         let mut buffer = [0u8; 64];
-        assert_eq!(port.take(&mut buffer).map(|taken| taken.bytes), Ok(0), "nothing to say is not a wait");
+        assert_eq!(
+            port.take(&mut buffer).map(|taken| taken.bytes),
+            Ok(0),
+            "nothing to say is not a wait"
+        );
 
         // And when there is something, it is read.
-        let mut writer = EndpointPort::connect("writer", &config, Use::Both)
-            .expect("the other end");
+        let mut writer =
+            EndpointPort::connect("writer", &config, Use::Both).expect("the other end");
         assert_eq!(writer.give(Arriving::ANYWHERE, b"293.15"), Ok(()));
-        let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("the reading");
+        let got = port
+            .take(&mut buffer)
+            .map(|taken| taken.bytes)
+            .expect("the reading");
         assert_eq!(&buffer[..got], b"293.15");
     }
 
@@ -1603,15 +1621,18 @@ mod tests {
         let config = EndpointConfig::Device(DeviceConfig {
             path: path.to_string_lossy().to_string(),
         });
-        let mut port = EndpointPort::connect("loopback", &config, Use::Both)
-            .expect("the pipe opens");
+        let mut port =
+            EndpointPort::connect("loopback", &config, Use::Both).expect("the pipe opens");
 
         // Written and read back through the kernel, which is as much of a
         // device as a pipe can be.
         assert_eq!(port.give(Arriving::ANYWHERE, b"293.15"), Ok(()));
 
         let mut buffer = [0u8; 64];
-        let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("what was written");
+        let got = port
+            .take(&mut buffer)
+            .map(|taken| taken.bytes)
+            .expect("what was written");
         assert_eq!(&buffer[..got], b"293.15");
 
         // And the descriptor a waiting loop would poll.
@@ -1644,8 +1665,14 @@ mod tests {
         assert!(port.ready());
 
         let mut buffer = [0u8; 64];
-        let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("the average");
-        assert_eq!(compute::from_value(&buffer[..got], "the average"), Ok(291.0));
+        let got = port
+            .take(&mut buffer)
+            .map(|taken| taken.bytes)
+            .expect("the average");
+        assert_eq!(
+            compute::from_value(&buffer[..got], "the average"),
+            Ok(291.0)
+        );
 
         // And it is gone once taken, rather than being handed out again.
         assert!(!port.ready());
@@ -1672,9 +1699,15 @@ mod tests {
 
         // In order, and whole.
         let mut buffer = [0u8; 64];
-        let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("the first");
+        let got = port
+            .take(&mut buffer)
+            .map(|taken| taken.bytes)
+            .expect("the first");
         assert_eq!(&buffer[..got], b"290.0");
-        let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("the second");
+        let got = port
+            .take(&mut buffer)
+            .map(|taken| taken.bytes)
+            .expect("the second");
         assert_eq!(&buffer[..got], b"go\n");
 
         // And gone once taken, rather than handed out again.
@@ -1685,9 +1718,15 @@ mod tests {
         // value is not a smaller value.
         assert_eq!(port.give(Arriving::ANYWHERE, b"2901234"), Ok(()));
         let said = port.take(&mut [0u8; 4]).expect_err("it does not fit");
-        assert!(said.contains("through") && said.contains("7 bytes"), "{said}");
+        assert!(
+            said.contains("through") && said.contains("7 bytes"),
+            "{said}"
+        );
         assert!(port.ready(), "the datum is still here");
-        let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("with room");
+        let got = port
+            .take(&mut buffer)
+            .map(|taken| taken.bytes)
+            .expect("with room");
         assert_eq!(&buffer[..got], b"2901234");
     }
 
@@ -1711,11 +1750,12 @@ mod tests {
         // could not sort.
         for (datum, what) in [
             (&b"29x.15"[..], "text where a value was meant"),
-            (&f64::NAN.to_le_bytes()[..], "eight bytes that are not a number"),
+            (
+                &f64::NAN.to_le_bytes()[..],
+                "eight bytes that are not a number",
+            ),
         ] {
-            let said = port
-                .give(Arriving::named("in0"), datum)
-                .unwrap_err();
+            let said = port.give(Arriving::named("in0"), datum).unwrap_err();
             assert!(
                 said.contains("cabin_temp") && said.contains("vote"),
                 "the complaint about {what} should name the node and the \
@@ -1752,8 +1792,14 @@ mod tests {
         // Still there, for a caller with room for it.
         assert!(port.ready(), "the result should not have been thrown away");
         let mut buffer = [0u8; 64];
-        let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("the result");
-        assert_eq!(compute::from_value(&buffer[..got], "the result"), Ok(293.15));
+        let got = port
+            .take(&mut buffer)
+            .map(|taken| taken.bytes)
+            .expect("the result");
+        assert_eq!(
+            compute::from_value(&buffer[..got], "the result"),
+            Ok(293.15)
+        );
     }
 
     /// Every source of a log writes into the one log, in order.
@@ -1852,7 +1898,10 @@ mod tests {
         // A pass takes what is there and then asks. On a real device the
         // first pass takes nothing, the question not having been asked yet;
         // the stand-in answers at once, which is what lets the order be seen.
-        let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("a pass");
+        let got = port
+            .take(&mut buffer)
+            .map(|taken| taken.bytes)
+            .expect("a pass");
         assert_eq!(&buffer[..got], b"42");
         assert_eq!(
             script.lock().expect("the script").written,
@@ -1862,7 +1911,10 @@ mod tests {
 
         // And the pass after it takes the answer to that question and asks
         // again.
-        let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("a pass");
+        let got = port
+            .take(&mut buffer)
+            .map(|taken| taken.bytes)
+            .expect("a pass");
         assert_eq!(&buffer[..got], b"43");
         assert_eq!(script.lock().expect("the script").written.len(), 2);
     }
@@ -1891,7 +1943,10 @@ mod tests {
         );
 
         assert_eq!(asked.ask(), Ok(()));
-        assert_eq!(script.lock().expect("the script").written, vec![b"R".to_vec()]);
+        assert_eq!(
+            script.lock().expect("the script").written,
+            vec![b"R".to_vec()]
+        );
         assert!(
             script.lock().expect("the script").to_read.is_empty(),
             "nothing more was read"
@@ -1919,9 +1974,16 @@ mod tests {
         script.lock().expect("the script").to_read = vec![Ok(b"42".to_vec())];
 
         let mut buffer = [0u8; 64];
-        let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("a pass");
+        let got = port
+            .take(&mut buffer)
+            .map(|taken| taken.bytes)
+            .expect("a pass");
 
-        assert_eq!(&buffer[..got], b"42", "the answer to the question just asked");
+        assert_eq!(
+            &buffer[..got],
+            b"42",
+            "the answer to the question just asked"
+        );
         assert_eq!(
             script.lock().expect("the script").written,
             vec![b"R".to_vec()],
@@ -2189,11 +2251,8 @@ mod tests {
             // nobody: six bytes after a length of six.
             let path = where_.path().join("reports");
             let mut file = std::fs::File::create(&path).expect("a program");
-            write!(
-                file,
-                "#!/bin/sh\nprintf '\\006\\000\\000\\000293.15' >&1\n"
-            )
-            .expect("a program");
+            write!(file, "#!/bin/sh\nprintf '\\006\\000\\000\\000293.15' >&1\n")
+                .expect("a program");
             // Closed before it is run: a program still open for writing is a
             // program the kernel refuses to execute.
             drop(file);

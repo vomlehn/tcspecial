@@ -198,7 +198,11 @@ impl Kind {
                 ("app-payload-arg", true),
                 ("restart", false),
             ],
-            Kind::MocVeh => &[("executable", true), ("app-moc-arg", true), ("restart", false)],
+            Kind::MocVeh => &[
+                ("executable", true),
+                ("app-moc-arg", true),
+                ("restart", false),
+            ],
             Kind::AllVeh | Kind::AllPl => &[
                 ("executable", true),
                 ("app-payload-arg", true),
@@ -406,9 +410,7 @@ pub fn params_of(
         .map(|executable| executable.as_str().trim().to_string())
         .filter(|executable| !executable.is_empty())
         .ok_or_else(|| {
-            named(
-                "executable is not set: an app node is the program it names".to_string(),
-            )
+            named("executable is not set: an app node is the program it names".to_string())
         })?;
 
     // The argument for each stream the kind handles, which is required of the
@@ -576,7 +578,10 @@ mod tests {
             of(
                 "fore",
                 "app_payload_veh",
-                &[("executable", "/bin/true"), ("app-payload-arg", "--readings")]
+                &[
+                    ("executable", "/bin/true"),
+                    ("app-payload-arg", "--readings")
+                ]
             )
             .expect("a node that states its one"),
             vec!["fore", "--readings"]
@@ -621,7 +626,10 @@ mod tests {
         let params = params_of(
             "fore",
             "app_payload_veh",
-            &said(&[("executable", "/bin/true"), ("app-payload-arg", "two words")]),
+            &said(&[
+                ("executable", "/bin/true"),
+                ("app-payload-arg", "two words"),
+            ]),
         )
         .expect("an argument as written");
         assert_eq!(params.arguments(), vec!["fore", "two words"]);
@@ -793,7 +801,10 @@ mod tests {
         .expect_err("an argument this kind is not run with");
         assert!(why.contains("app-moc-arg"), "{why}");
         assert!(why.contains("app_payload_veh"), "{why}");
-        assert!(why.contains("executable, app-payload-arg, restart"), "{why}");
+        assert!(
+            why.contains("executable, app-payload-arg, restart"),
+            "{why}"
+        );
 
         // The mirror of it: the payload argument on the one vehicle kind that
         // handles no payload data.
@@ -911,7 +922,10 @@ mod tests {
         let params = params_of(
             "fore",
             "app_payload_veh",
-            &said(&[("executable", "/bin/true"), ("app-payload-arg", "--readings")]),
+            &said(&[
+                ("executable", "/bin/true"),
+                ("app-payload-arg", "--readings"),
+            ]),
         )
         .expect("a node that says nothing about restarting");
         assert_eq!(params.restart, Restart::Never);
@@ -931,7 +945,10 @@ mod tests {
         )
         .expect_err("a misspelled attribute");
         assert!(why.contains("progam"), "{why}");
-        assert!(why.contains("executable, app-payload-arg, restart"), "{why}");
+        assert!(
+            why.contains("executable, app-payload-arg, restart"),
+            "{why}"
+        );
     }
 
     /// And a type that is not an app's is not read as one.

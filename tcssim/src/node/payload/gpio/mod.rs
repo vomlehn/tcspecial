@@ -32,9 +32,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
-use crate::payload::{
-    wait_out_packet, Pacing, PayloadConfig, PayloadStats,
-};
+use crate::payload::{wait_out_packet, Pacing, PayloadConfig, PayloadStats};
 
 /// Where the kernel puts a simulated chip's lines.
 ///
@@ -157,11 +155,7 @@ pub fn run_gpio_node(
                 match std::fs::write(&line.pull, pull) {
                     Ok(()) => moved += 1,
                     Err(e) => {
-                        eprintln!(
-                            "{}: cannot move {}: {e}",
-                            config.name,
-                            line.pull.display()
-                        );
+                        eprintln!("{}: cannot move {}: {e}", config.name, line.pull.display());
                     }
                 }
             }

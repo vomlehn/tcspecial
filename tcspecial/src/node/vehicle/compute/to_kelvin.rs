@@ -103,7 +103,10 @@ mod tests {
         let mut f = conversion(Format::I16Be, 0.0625, 273.15);
 
         // 320 counts at a sixteenth of a degree each is 20 above freezing.
-        let out = f.give(None, &[0x01, 0x40]).expect("a reading").expect("a value");
+        let out = f
+            .give(None, &[0x01, 0x40])
+            .expect("a reading")
+            .expect("a value");
         let kelvin = from_value(&out, "the result").unwrap();
         assert!((kelvin - 293.15).abs() < 0.001, "{kelvin}");
     }
@@ -204,7 +207,11 @@ mod tests {
                 "every reading the same",
             ),
             (
-                vec![("function", "to_kelvin"), ("format", "i16_be"), ("scale", "1")],
+                vec![
+                    ("function", "to_kelvin"),
+                    ("format", "i16_be"),
+                    ("scale", "1"),
+                ],
                 "offset",
             ),
         ] {
@@ -212,5 +219,4 @@ mod tests {
             assert!(said.contains(wanted), "{pairs:?}: {said}");
         }
     }
-
 }

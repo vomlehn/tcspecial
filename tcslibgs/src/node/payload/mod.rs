@@ -14,11 +14,11 @@
 //! What opens one is `tcspecial::node::payload`, and what stands in for one
 //! when there is no hardware is `tcssim::node::payload`.
 
-pub mod i2c;
-pub mod spi;
 pub mod can;
 pub mod gpio;
 pub mod hdlc;
+pub mod i2c;
 pub mod iio;
 pub mod rpmsg;
 pub mod serial;
+pub mod spi;

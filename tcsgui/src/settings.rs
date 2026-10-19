@@ -278,8 +278,7 @@ pub fn save(settings: Settings) {
         None => return,
     };
     let (moc, vehicle) = shares(settings.moc_percent, settings.vehicle_percent);
-    let (list_moc, list_vehicle) =
-        shares(settings.list_moc_percent, settings.list_vehicle_percent);
+    let (list_moc, list_vehicle) = shares(settings.list_moc_percent, settings.list_vehicle_percent);
     if let Err(why) = crate::save::write_atomically(
         &path,
         written(moc, vehicle, list_moc, list_vehicle).as_bytes(),
@@ -369,16 +368,17 @@ mod tests {
             // the wrong thing.
             let (list_moc, list_vehicle) = (vehicle, moc);
             let text = written(moc, vehicle, list_moc, list_vehicle);
-            let said = |name| {
-                element(&text, name).and_then(|said| said.parse::<i32>().ok())
-            };
+            let said = |name| element(&text, name).and_then(|said| said.parse::<i32>().ok());
             assert_eq!(said("moc_pane_percent"), Some(moc));
             assert_eq!(said("vehicle_pane_percent"), Some(vehicle));
             assert_eq!(said("moc_list_percent"), Some(list_moc));
             assert_eq!(said("vehicle_list_percent"), Some(list_vehicle));
             // And through the reader, which is what the editor would use.
             let settings = settings_in(&text, "a test");
-            assert_eq!((settings.moc_percent, settings.vehicle_percent), (moc, vehicle));
+            assert_eq!(
+                (settings.moc_percent, settings.vehicle_percent),
+                (moc, vehicle)
+            );
             assert_eq!(
                 (settings.list_moc_percent, settings.list_vehicle_percent),
                 (list_moc, list_vehicle)
@@ -388,9 +388,14 @@ mod tests {
         // A file written before the lists could be resized says nothing about
         // them, and that is the defaults rather than nothing: a session that
         // read a nought would open with a list of no height.
-        let older = written(DEFAULT_MOC, DEFAULT_VEHICLE, DEFAULT_LIST_MOC, DEFAULT_LIST_VEHICLE)
-            .replace("<moc_list_percent>", "<was_moc_list_percent>")
-            .replace("<vehicle_list_percent>", "<was_vehicle_list_percent>");
+        let older = written(
+            DEFAULT_MOC,
+            DEFAULT_VEHICLE,
+            DEFAULT_LIST_MOC,
+            DEFAULT_LIST_VEHICLE,
+        )
+        .replace("<moc_list_percent>", "<was_moc_list_percent>")
+        .replace("<vehicle_list_percent>", "<was_vehicle_list_percent>");
         let settings = settings_in(&older, "a file from before");
         assert_eq!(
             (settings.list_moc_percent, settings.list_vehicle_percent),
@@ -444,7 +449,10 @@ mod tests {
     /// An element that is not there is not an error.
     #[test]
     fn a_missing_element_is_simply_absent() {
-        assert_eq!(element("<settings></settings>", "vehicle_pane_percent"), None);
+        assert_eq!(
+            element("<settings></settings>", "vehicle_pane_percent"),
+            None
+        );
         assert_eq!(element("", "vehicle_pane_percent"), None);
         // An opening with no closing is not half a value.
         assert_eq!(element("<a>7", "a"), None);
@@ -541,13 +549,19 @@ mod tests {
         )
         .expect("a file");
         assert_eq!(load().vehicle_percent, 30 - DEFAULT_MOC);
-        assert!(path.exists(), "the value should be carried into the new name");
+        assert!(
+            path.exists(),
+            "the value should be carried into the new name"
+        );
         assert_eq!(
             load().vehicle_percent,
             30 - DEFAULT_MOC,
             "and read from it afterwards"
         );
-        assert!(older.exists(), "the old file is left for its owner to delete");
+        assert!(
+            older.exists(),
+            "the old file is left for its owner to delete"
+        );
 
         // The current name wins where both are there, it being the one that
         // is written.

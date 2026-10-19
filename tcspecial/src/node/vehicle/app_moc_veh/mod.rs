@@ -54,7 +54,11 @@ impl AppMocVeh {
             ));
         }
         Ok(AppMocVeh {
-            running: parent::start(&params.executable_path()?, &params.arguments(), Supports::MOC)?,
+            running: parent::start(
+                &params.executable_path()?,
+                &params.arguments(),
+                Supports::MOC,
+            )?,
         })
     }
 
@@ -151,7 +155,10 @@ mod tests {
         );
 
         node.give_moc_data(b"").expect("it takes an empty packet");
-        assert_eq!(node.take_payload_data().expect("an answer"), Some(Vec::new()));
+        assert_eq!(
+            node.take_payload_data().expect("an answer"),
+            Some(Vec::new())
+        );
 
         // Told that nothing more is coming, it finishes of its own accord.
         node.no_more().expect("the interfaces end");

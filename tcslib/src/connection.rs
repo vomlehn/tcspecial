@@ -86,8 +86,7 @@ impl UdpConnection {
                 port: self.remote_addr.port(),
             };
             if came_from(&expected, &from) {
-                let telemetry: Telemetry =
-                    serde_json::from_slice(&self.recv_buffer[..size])?;
+                let telemetry: Telemetry = serde_json::from_slice(&self.recv_buffer[..size])?;
                 return Ok(telemetry);
             }
 
@@ -157,7 +156,8 @@ mod tests {
     #[test]
     fn test_udp_connection_creation() {
         // This test requires network access, so we just verify the types compile
-        let _: fn() -> TcsResult<UdpConnection> = || UdpConnection::new("127.0.0.1:0", "127.0.0.1:4000");
+        let _: fn() -> TcsResult<UdpConnection> =
+            || UdpConnection::new("127.0.0.1:0", "127.0.0.1:4000");
     }
 
     /// Only what comes from where the command went is an answer.
@@ -172,8 +172,7 @@ mod tests {
 
         let spacecraft = UdpSocket::bind("127.0.0.1:0").expect("the far end");
         let at = spacecraft.local_addr().expect("where it is");
-        let mut link =
-            UdpConnection::new("127.0.0.1:0", &at.to_string()).expect("a connection");
+        let mut link = UdpConnection::new("127.0.0.1:0", &at.to_string()).expect("a connection");
         let mine = link.socket.local_addr().expect("where this end is");
 
         let answer = |sequence: u32| {

@@ -392,12 +392,8 @@ mod tests {
                 // Read back the way the vehicle reads it: counts times the
                 // scale, plus the offset.
                 let counts = match reading.format {
-                    Format::I16Be => {
-                        i16::from_be_bytes([bytes[0], bytes[1]]) as f64
-                    }
-                    Format::U24Be => {
-                        u32::from_be_bytes([0, bytes[0], bytes[1], bytes[2]]) as f64
-                    }
+                    Format::I16Be => i16::from_be_bytes([bytes[0], bytes[1]]) as f64,
+                    Format::U24Be => u32::from_be_bytes([0, bytes[0], bytes[1], bytes[2]]) as f64,
                     _ => unreachable!("the parts above"),
                 };
                 let back = counts * reading.scale + reading.offset;
@@ -455,13 +451,7 @@ mod tests {
     /// `every` is the packet interval: for a sensor how often it reports, and
     /// for a heater -- which sends nothing -- how often it looks for what the
     /// vehicle decided.
-    fn attached(
-        name: &str,
-        at: u16,
-        bytes: u32,
-        every: u32,
-        thermal: Thermal,
-    ) -> PayloadConfig {
+    fn attached(name: &str, at: u16, bytes: u32, every: u32, thermal: Thermal) -> PayloadConfig {
         PayloadConfig {
             thermal: Some(thermal),
             name: name.to_string(),
@@ -491,9 +481,7 @@ mod tests {
     /// `a_temperature_encodes_as_the_bytes_the_vehicle_reads_back` holds.
     fn kelvin_of(reading: &ToKelvinParams, bytes: &[u8]) -> Option<f64> {
         let counts = match reading.format {
-            Format::I16Be if bytes.len() >= 2 => {
-                i16::from_be_bytes([bytes[0], bytes[1]]) as f64
-            }
+            Format::I16Be if bytes.len() >= 2 => i16::from_be_bytes([bytes[0], bytes[1]]) as f64,
             Format::U24Be if bytes.len() >= 3 => {
                 u32::from_be_bytes([0, bytes[0], bytes[1], bytes[2]]) as f64
             }
@@ -582,7 +570,11 @@ mod tests {
         let mut payloads: Vec<SimulatedPayload> = Vec::new();
         for (n, (socket, reading)) in waiting.iter().zip(readings).enumerate() {
             let at = socket.local_addr().expect("its address").port();
-            let bytes = if reading.format == Format::U24Be { 3 } else { 2 };
+            let bytes = if reading.format == Format::U24Be {
+                3
+            } else {
+                2
+            };
             let mut sensor = SimulatedPayload::new(attached(
                 &format!("temp_{}", n + 1),
                 at,
@@ -658,10 +650,7 @@ mod tests {
         let driving = std::net::UdpSocket::bind("127.0.0.1:0").expect("a socket for the vehicle");
         let drive = |on: bool| {
             for at in &heaters {
-                let _ = driving.send_to(
-                    if on { b"1" } else { b"0" },
-                    ("127.0.0.1", *at),
-                );
+                let _ = driving.send_to(if on { b"1" } else { b"0" }, ("127.0.0.1", *at));
             }
         };
 
@@ -791,4 +780,3 @@ mod tests {
         );
     }
 }
-

@@ -401,10 +401,7 @@ pub fn attributes_of(function: &str) -> Option<&'static [&'static str]> {
 }
 
 /// What this compute node computes, or what is wrong with what it says.
-pub fn params_of(
-    what: &str,
-    attributes: &BTreeMap<String, Scalar>,
-) -> Result<Computation, String> {
+pub fn params_of(what: &str, attributes: &BTreeMap<String, Scalar>) -> Result<Computation, String> {
     let function = attributes
         .get("function")
         .map(|f| f.as_str().to_string())
@@ -583,7 +580,9 @@ pub fn params_of(
         }
         // Covered by the match above, which refuses a function this does not
         // know before any of its attributes are read.
-        other => Err(format!("\"{what}\": there is no computation called \"{other}\"")),
+        other => Err(format!(
+            "\"{what}\": there is no computation called \"{other}\""
+        )),
     }
 }
 
@@ -668,8 +667,8 @@ mod tests {
 
         // And what is finer than the unit is rounded to it, rather than
         // truncated: a third of a kelvin is 333_333 micro-kelvin and a hair.
-        let third = from_value(&as_value(1.0 / 3.0).expect("a third"), "a third")
-            .expect("it reads back");
+        let third =
+            from_value(&as_value(1.0 / 3.0).expect("a third"), "a third").expect("it reads back");
         assert_eq!(third, 0.333_333);
     }
 
@@ -713,7 +712,10 @@ mod tests {
         // Four bytes are a value whatever they hold, there being no bit
         // pattern of a 32-bit integer that is not a number of micro-kelvin.
         // What a sensor cannot produce is refused where a value is made.
-        assert_eq!(from_value(&[0xFF, 0xFF, 0xFF, 0x7F], "the top"), Ok(2147.483647));
+        assert_eq!(
+            from_value(&[0xFF, 0xFF, 0xFF, 0x7F], "the top"),
+            Ok(2147.483647)
+        );
     }
 
     /// Which nodes send values, and which send something else.
@@ -726,7 +728,10 @@ mod tests {
         assert!(result_is_a_value("to_kelvin"));
         assert!(result_is_a_value("vote"));
         assert!(result_is_a_value("process"));
-        assert!(!result_is_a_value("hysteresis"), "a decision is not a value");
+        assert!(
+            !result_is_a_value("hysteresis"),
+            "a decision is not a value"
+        );
         assert!(!result_is_a_value("to_kelvan"), "nor is a misspelling");
 
         let node = |pairs: &[(&str, &str)]| attributes(pairs);
@@ -947,13 +952,24 @@ mod tests {
     #[test]
     fn a_computation_that_says_too_little_is_refused() {
         for (pairs, wanted) in [
-            (vec![("function", "to_kelvin"), ("scale", "1"), ("offset", "0")], "format"),
             (
-                vec![("function", "to_kelvin"), ("format", "i16_be"), ("offset", "0")],
+                vec![("function", "to_kelvin"), ("scale", "1"), ("offset", "0")],
+                "format",
+            ),
+            (
+                vec![
+                    ("function", "to_kelvin"),
+                    ("format", "i16_be"),
+                    ("offset", "0"),
+                ],
                 "scale",
             ),
             (
-                vec![("function", "to_kelvin"), ("format", "i16_be"), ("scale", "1")],
+                vec![
+                    ("function", "to_kelvin"),
+                    ("format", "i16_be"),
+                    ("scale", "1"),
+                ],
                 "offset",
             ),
             (vec![("function", "vote")], "inputs is not set"),
@@ -973,7 +989,10 @@ mod tests {
         ] {
             let said = refused(&pairs);
             assert!(said.contains(wanted), "{pairs:?}: {said}");
-            assert!(said.contains("node"), "every complaint names the node: {said}");
+            assert!(
+                said.contains("node"),
+                "every complaint names the node: {said}"
+            );
         }
     }
 
@@ -1111,7 +1130,6 @@ mod tests {
         ]);
         assert!(said.contains("setpoint"), "{said}");
     }
-
 
     /// Restarting is never, unless the configuration says `true`.
     #[test]

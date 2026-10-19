@@ -103,9 +103,15 @@ fn xml_position(
     };
     let bytes = text.as_bytes();
     let before = &bytes[..usize::try_from(offset).map_or(bytes.len(), |at| at.min(bytes.len()))];
-    let line_start = before.iter().rposition(|b| *b == b'\n').map_or(0, |at| at + 1);
+    let line_start = before
+        .iter()
+        .rposition(|b| *b == b'\n')
+        .map_or(0, |at| at + 1);
     let line = before.iter().filter(|b| **b == b'\n').count() + 1;
-    let column = String::from_utf8_lossy(&before[line_start..]).chars().count() + 1;
+    let column = String::from_utf8_lossy(&before[line_start..])
+        .chars()
+        .count()
+        + 1;
     (line, column)
 }
 
@@ -143,9 +149,7 @@ mod tests {
         for name in ["a.json", "a.conf", "a.yam", "tcspecial", "a.xm"] {
             assert_eq!(ConfigFormat::from_path(name), None, "{name}");
 
-            let said = ConfigFormat::of_file(name)
-                .expect_err(name)
-                .to_string();
+            let said = ConfigFormat::of_file(name).expect_err(name).to_string();
             assert!(said.contains(name), "{name}: {said}");
             assert!(
                 said.contains(".yaml") && said.contains(".xml"),
@@ -181,10 +185,7 @@ mod tests {
         // A closing tag that is not the open element's: where it starts.
         assert_eq!(at("<doc>\n  <a>x</b>\n</doc>\n"), (2, 7));
         // A root over several lines does not throw the count off.
-        assert_eq!(
-            at("<doc\n    x=\"1\">\n  <a>x</a>\n  <c/>\n</doc>\n").0,
-            4
-        );
+        assert_eq!(at("<doc\n    x=\"1\">\n  <a>x</a>\n  <c/>\n</doc>\n").0, 4);
 
         // And the message says so, in the words YAML's does.
         let said = ConfigFormat::Xml

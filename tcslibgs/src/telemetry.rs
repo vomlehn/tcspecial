@@ -5,9 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::config_digest::{ConfigDigest, ConfigVersion};
-use crate::types::{
-    CommandStatus, DHSample, NodeCounts, NodeId, Timestamp,
-};
+use crate::types::{CommandStatus, DHSample, NodeCounts, NodeId, Timestamp};
 
 /// Telemetry message header
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -166,11 +164,7 @@ impl ConnectTelemetry {
         digest: ConfigDigest,
     ) -> Self {
         Self {
-            header: TelemetryHeader::new(
-                sequence,
-                TelemetryType::Connect,
-                CommandStatus::Success,
-            ),
+            header: TelemetryHeader::new(sequence, TelemetryType::Connect, CommandStatus::Success),
             version,
             config_version,
             digest,
@@ -239,12 +233,7 @@ impl NodeTelemetry {
         Self::of(sequence, TelemetryType::SetNode, status, node)
     }
 
-    fn of(
-        sequence: u32,
-        tm_type: TelemetryType,
-        status: CommandStatus,
-        node: NodeId,
-    ) -> Self {
+    fn of(sequence: u32, tm_type: TelemetryType, status: CommandStatus, node: NodeId) -> Self {
         Self {
             header: TelemetryHeader::new(sequence, tm_type, status),
             node,
@@ -374,11 +363,7 @@ impl BeaconTelemetry {
         digest: ConfigDigest,
     ) -> Self {
         Self {
-            header: TelemetryHeader::new(
-                sequence,
-                TelemetryType::Beacon,
-                CommandStatus::Success,
-            ),
+            header: TelemetryHeader::new(sequence, TelemetryType::Beacon, CommandStatus::Success),
             version,
             config_version,
             digest,
@@ -415,9 +400,7 @@ pub fn answer_to(command: &crate::commands::Command, status: CommandStatus) -> T
             )
             .refused(status),
         ),
-        Command::RestartArm(_) => {
-            Telemetry::RestartArm(RestartArmTelemetry::new(sequence, status))
-        }
+        Command::RestartArm(_) => Telemetry::RestartArm(RestartArmTelemetry::new(sequence, status)),
         Command::Restart(_) => Telemetry::Restart(RestartTelemetry::new(sequence, status)),
         Command::Config(_) => Telemetry::Config(ConfigTelemetry::new(sequence, status)),
         // The id the command carried, refused or not: an answer about a node
@@ -429,23 +412,19 @@ pub fn answer_to(command: &crate::commands::Command, status: CommandStatus) -> T
         Command::StopNode(cmd) => {
             Telemetry::StopNode(NodeTelemetry::stopped(sequence, status, cmd.node))
         }
-        Command::SetNode(cmd) => {
-            Telemetry::SetNode(NodeTelemetry::set(sequence, status, cmd.node))
-        }
+        Command::SetNode(cmd) => Telemetry::SetNode(NodeTelemetry::set(sequence, status, cmd.node)),
         // A refused query measured nothing, so it carries no counts and no
         // samples: the status is the whole of what it says.
-        Command::QueryNode(cmd) => Telemetry::QueryNode(QueryNodeTelemetry::refused(
-            sequence, status, cmd.node,
-        )),
-        Command::QueryNodeSample(cmd) => {
-            Telemetry::QueryNodeSample(QueryNodeSampleTelemetry::new(
-                sequence,
-                status,
-                cmd.node,
-                DHSample::new(),
-                DHSample::new(),
-            ))
+        Command::QueryNode(cmd) => {
+            Telemetry::QueryNode(QueryNodeTelemetry::refused(sequence, status, cmd.node))
         }
+        Command::QueryNodeSample(cmd) => Telemetry::QueryNodeSample(QueryNodeSampleTelemetry::new(
+            sequence,
+            status,
+            cmd.node,
+            DHSample::new(),
+            DHSample::new(),
+        )),
     }
 }
 

@@ -300,10 +300,7 @@ impl TcsClient {
     /// that is running. A disabled node answers with its counters all the
     /// same -- they say what it has done since the vehicle started, not since
     /// it was last enabled.
-    pub fn query_node(
-        &mut self,
-        node: NodeId,
-    ) -> TcsResult<(CommandStatus, bool, NodeCounts)> {
+    pub fn query_node(&mut self, node: NodeId) -> TcsResult<(CommandStatus, bool, NodeCounts)> {
         let seq = self.next_sequence();
         let cmd = Command::QueryNode(NodeCommand::query(seq, node));
         match self.send_command(cmd)? {
@@ -392,11 +389,7 @@ impl TcsClientBuilder {
         self
     }
 
-    pub fn build(
-        self,
-        connection: Box<dyn Connection>,
-        nodes: Box<dyn Connection>,
-    ) -> TcsClient {
+    pub fn build(self, connection: Box<dyn Connection>, nodes: Box<dyn Connection>) -> TcsClient {
         let mut client = TcsClient::of_a_graph(connection, nodes);
         client.set_timeout(self.timeout);
         client
@@ -415,8 +408,7 @@ mod tests {
 
     #[test]
     fn test_client_builder() {
-        let builder = TcsClientBuilder::new()
-            .timeout(Duration::from_secs(10));
+        let builder = TcsClientBuilder::new().timeout(Duration::from_secs(10));
         assert_eq!(builder.timeout, Duration::from_secs(10));
     }
 
@@ -501,7 +493,10 @@ mod tests {
         let sent = client.last_sent().expect("the command was timed");
         let received = client.last_received().expect("so was the answer");
         assert!(sent >= before && sent <= after, "sent at {sent}");
-        assert!(received >= sent && received <= after, "answered at {received}");
+        assert!(
+            received >= sent && received <= after,
+            "answered at {received}"
+        );
     }
 
     /// A CONNECT is asked of the spacecraft's link and of no node's.

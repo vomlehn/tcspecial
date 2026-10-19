@@ -76,7 +76,11 @@ impl Framer {
         let length = ends.min(out.len());
         out[..length].copy_from_slice(&self.held[..length]);
         self.held.drain(..ends);
-        self.began = if self.held.is_empty() { None } else { Some(now) };
+        self.began = if self.held.is_empty() {
+            None
+        } else {
+            Some(now)
+        };
         Some(length)
     }
 
@@ -93,9 +97,7 @@ impl Framer {
             return Some(self.held.len());
         }
         match (self.rule.timeout, self.began) {
-            (Some(timeout), Some(began)) if timed_out(began, now, timeout) => {
-                Some(self.held.len())
-            }
+            (Some(timeout), Some(began)) if timed_out(began, now, timeout) => Some(self.held.len()),
             _ => None,
         }
     }
@@ -131,8 +133,14 @@ mod tests {
         let now = Instant::now();
         let mut framer = Framer::new(rule(64, None, b"\n"));
         assert_eq!(after(&mut framer, b"$GPGGA", now), None, "no end yet");
-        assert_eq!(after(&mut framer, b",1\n$GP", now), Some(b"$GPGGA,1\n".to_vec()));
-        assert_eq!(after(&mut framer, b"RMC\n", now), Some(b"$GPRMC\n".to_vec()));
+        assert_eq!(
+            after(&mut framer, b",1\n$GP", now),
+            Some(b"$GPGGA,1\n".to_vec())
+        );
+        assert_eq!(
+            after(&mut framer, b"RMC\n", now),
+            Some(b"$GPRMC\n".to_vec())
+        );
     }
 
     /// Two reads that arrived together come out one at a time, the second
@@ -154,8 +162,15 @@ mod tests {
         let mut framer = Framer::new(rule(4, None, &[]));
         assert_eq!(after(&mut framer, b"ab", start), None);
         let much_later = start + Duration::from_secs(3_600);
-        assert_eq!(after(&mut framer, b"", much_later), None, "no timeout ends it");
-        assert_eq!(after(&mut framer, b"cdef", much_later), Some(b"abcd".to_vec()));
+        assert_eq!(
+            after(&mut framer, b"", much_later),
+            None,
+            "no timeout ends it"
+        );
+        assert_eq!(
+            after(&mut framer, b"cdef", much_later),
+            Some(b"abcd".to_vec())
+        );
         // What did not fit was never taken: the line still has it.
         assert_eq!(framer.room(), 4);
     }
@@ -166,10 +181,18 @@ mod tests {
     fn a_timeout_ends_a_read_with_what_has_arrived() {
         let start = Instant::now();
         let mut framer = Framer::new(rule(64, Some(Duration::from_millis(250)), &[]));
-        assert_eq!(after(&mut framer, b"", start), None, "nothing held, nothing ends");
+        assert_eq!(
+            after(&mut framer, b"", start),
+            None,
+            "nothing held, nothing ends"
+        );
         assert_eq!(after(&mut framer, b"ab", start), None);
         let early = start + Duration::from_millis(249);
-        assert_eq!(after(&mut framer, b"c", early), None, "the clock is the first byte's");
+        assert_eq!(
+            after(&mut framer, b"c", early),
+            None,
+            "the clock is the first byte's"
+        );
         let late = start + Duration::from_millis(250);
         assert_eq!(after(&mut framer, b"", late), Some(b"abc".to_vec()));
         // And the next read's clock has not started.

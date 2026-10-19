@@ -349,7 +349,10 @@ mod tests {
         // Half of block is not block: a bus that can be read and not written
         // carries device data in one direction only, which a conduit pair
         // cannot use.
-        for half in [I2C_FUNC_SMBUS_READ_I2C_BLOCK, I2C_FUNC_SMBUS_WRITE_I2C_BLOCK] {
+        for half in [
+            I2C_FUNC_SMBUS_READ_I2C_BLOCK,
+            I2C_FUNC_SMBUS_WRITE_I2C_BLOCK,
+        ] {
             let e = match Transfers::of(half, "/dev/i2c-1") {
                 Ok(t) => panic!("half a block transfer became {t:?}"),
                 Err(e) => format!("{e}"),

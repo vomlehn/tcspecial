@@ -90,10 +90,7 @@ pub(crate) fn rs485_of(
             "rs485_delay_before_send",
             g.rs485_delay_before_send.is_some(),
         ),
-        (
-            "rs485_delay_after_send",
-            g.rs485_delay_after_send.is_some(),
-        ),
+        ("rs485_delay_after_send", g.rs485_delay_after_send.is_some()),
     ];
 
     // A synchronous line is driven through generic HDLC rather than through a
@@ -133,8 +130,9 @@ pub(crate) fn rs485_of(
     // Which level drives the transceiver, and no default for it: see
     // Rs485Params::rts_on_send.
     let rts_on_send = match g.rs485_rts_on_send.as_ref() {
-        Some(stated) => parse_flag(name, "rs485_rts_on_send", Some(stated))?
-            .expect("a value was given"),
+        Some(stated) => {
+            parse_flag(name, "rs485_rts_on_send", Some(stated))?.expect("a value was given")
+        }
         None => {
             return Err(bad(
                 name,
@@ -146,26 +144,24 @@ pub(crate) fn rs485_of(
         }
     };
 
-    let delay = |field: &str, stated: Option<&crate::endpoint_config::Scalar>| {
-        match stated {
-            Some(s) => {
-                let held = crate::graph::parse_interval(s.as_str())
-                    .map_err(|why| bad(name, &format!("{field}: {why}")))?;
-                if held > LONGEST_DELAY {
-                    return Err(bad(
-                        name,
-                        &format!(
-                            "{field} is longer than {} ms: a turnaround is a few bit \
+    let delay = |field: &str, stated: Option<&crate::endpoint_config::Scalar>| match stated {
+        Some(s) => {
+            let held = crate::graph::parse_interval(s.as_str())
+                .map_err(|why| bad(name, &format!("{field}: {why}")))?;
+            if held > LONGEST_DELAY {
+                return Err(bad(
+                    name,
+                    &format!(
+                        "{field} is longer than {} ms: a turnaround is a few bit \
                              times, and a line that held the bus for this long would \
                              look like one that had failed",
-                            LONGEST_DELAY.as_millis()
-                        ),
-                    ));
-                }
-                Ok(held)
+                        LONGEST_DELAY.as_millis()
+                    ),
+                ));
             }
-            None => Ok(Duration::ZERO),
+            Ok(held)
         }
+        None => Ok(Duration::ZERO),
     };
 
     Ok(Some(Rs485Params {
@@ -174,10 +170,7 @@ pub(crate) fn rs485_of(
             "rs485_delay_before_send",
             g.rs485_delay_before_send.as_ref(),
         )?,
-        delay_after_send: delay(
-            "rs485_delay_after_send",
-            g.rs485_delay_after_send.as_ref(),
-        )?,
+        delay_after_send: delay("rs485_delay_after_send", g.rs485_delay_after_send.as_ref())?,
     }))
 }
 
@@ -209,7 +202,10 @@ mod tests {
     /// was.
     #[test]
     fn a_line_that_says_nothing_is_not_an_rs485_bus() {
-        assert_eq!(rs485_of("line", &terms(&[]), true).expect("a plain line"), None);
+        assert_eq!(
+            rs485_of("line", &terms(&[]), true).expect("a plain line"),
+            None
+        );
         assert_eq!(
             rs485_of("line", &terms(&[("rs485", "false")]), true).expect("a plain line"),
             None

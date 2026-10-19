@@ -1,6 +1,5 @@
 //! Configuration loading for TCSpecial
 
-
 /// The two ends of the beacon link: `tcslibgs::BeaconLink`, under the name
 /// this module has always called it.
 ///

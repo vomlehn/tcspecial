@@ -14,13 +14,12 @@ use std::net::UdpSocket;
 use std::thread;
 use std::time::Duration;
 
+use tcslib::{TcsClient, UdpConnection};
 use tcslibgs::{
     ArmKey, BeaconInterval, Command, CommandStatus, ConfigDigest, ConfigTelemetry, ConfigVersion,
     ConnectTelemetry, DHSample, NodeCounts, NodeId, NodeTelemetry, PingTelemetry,
     QueryNodeSampleTelemetry, QueryNodeTelemetry, RestartArmTelemetry, RestartTelemetry, Telemetry,
 };
-use tcslib::{TcsClient, UdpConnection};
-
 
 fn stub_sample(first: u8) -> DHSample {
     let mut sample = DHSample::new();
@@ -98,11 +97,9 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
                     CommandStatus::Success,
                     cmd.node,
                 )),
-                Command::SetNode(cmd) => Telemetry::SetNode(NodeTelemetry::set(
-                    seq,
-                    CommandStatus::Success,
-                    cmd.node,
-                )),
+                Command::SetNode(cmd) => {
+                    Telemetry::SetNode(NodeTelemetry::set(seq, CommandStatus::Success, cmd.node))
+                }
                 Command::QueryNode(cmd) => Telemetry::QueryNode(QueryNodeTelemetry::new(
                     seq,
                     CommandStatus::Success,
@@ -157,7 +154,9 @@ fn stub_counts() -> NodeCounts {
         dropped: 2,
         asks: 40,
         asks_failed: 3,
-        last_moved: Some(tcslibgs::Timestamp { micros: 1_700_000_000_000_000 }),
+        last_moved: Some(tcslibgs::Timestamp {
+            micros: 1_700_000_000_000_000,
+        }),
     }
 }
 
@@ -169,14 +168,15 @@ fn what_a_node_has_moved_comes_back() {
 
     let (status, enabled, counts) = client.query_node(NodeId::of(2)).expect("an answer");
     assert!(status.is_success());
-    assert!(enabled, "and whether it is running, which is read with them");
+    assert!(
+        enabled,
+        "and whether it is running, which is read with them"
+    );
     assert_eq!(counts, stub_counts(), "every count, not some of them");
 
     // And the bytes, which are a separate command: asking for them every
     // poll would spend downlink on data nobody reads.
-    let (status, taken, given) = client
-        .query_node_sample(NodeId::of(2))
-        .expect("an answer");
+    let (status, taken, given) = client.query_node_sample(NodeId::of(2)).expect("an answer");
     assert!(status.is_success());
     assert_eq!(taken.data(), stub_sample(0x30).data());
     assert_eq!(given.data(), stub_sample(0x40).data());

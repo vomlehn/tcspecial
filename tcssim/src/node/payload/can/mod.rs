@@ -33,8 +33,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, ignore_this_request, lateness, send_in_segments, wait_out_packet,
-    wait_while_running, Pacing, PayloadConfig, PayloadStats, Produce,
+    a_packet, ignore_this_request, lateness, send_in_segments, wait_out_packet, wait_while_running,
+    Pacing, PayloadConfig, PayloadStats, Produce,
 };
 
 /// Where a frame's data begins in both of the kernel's frame structures: the
@@ -84,7 +84,11 @@ impl BusMember {
         let can_id = config.can_id;
         let extended = can_id > 0x7FF;
         let filter = libc::can_filter {
-            can_id: if extended { can_id | libc::CAN_EFF_FLAG } else { can_id },
+            can_id: if extended {
+                can_id | libc::CAN_EFF_FLAG
+            } else {
+                can_id
+            },
             can_mask: libc::CAN_EFF_MASK | libc::CAN_EFF_FLAG,
         };
         // SAFETY: one can_filter, which is what CAN_RAW_FILTER reads, living
@@ -387,7 +391,7 @@ mod tests {
     fn device_on(interface: &str, can_id: u32, triggered: bool) -> PayloadConfig {
         PayloadConfig {
             thermal: None,
-                        name: "can-device".to_string(),
+            name: "can-device".to_string(),
             protocol: PayloadProtocol::Can,
             address: interface.to_string(),
             port: 0,
@@ -460,7 +464,6 @@ mod tests {
             })
             .expect("the frame arrived at the other member");
         assert_eq!(&buf[..got], &[9, 8, 7]);
-
     }
 
     /// A member of the bus whose socket is not a bus at all.

@@ -43,9 +43,9 @@ pub mod process;
 pub mod to_kelvin;
 pub mod vote;
 
+use crate::runtime::node_state::Abandon;
 use tcslibgs::graph::Node;
 use tcslibgs::node::vehicle::compute::{self, Computation};
-use crate::runtime::node_state::Abandon;
 
 /// Something a compute node runs.
 ///
@@ -111,11 +111,7 @@ pub trait Function: Send {
 /// `inputs` is what the routing found bound to this node, which a function
 /// over several of them needs: a vote cannot know it is waiting for three
 /// until something tells it how many links arrive.
-pub fn make(
-    node: &Node,
-    inputs: &[&str],
-    abandon: &Abandon,
-) -> Result<Box<dyn Function>, String> {
+pub fn make(node: &Node, inputs: &[&str], abandon: &Abandon) -> Result<Box<dyn Function>, String> {
     // What the node says, by the rules the ground tool checks it against: see
     // tcslibgs::node::vehicle::compute. Every complaint from there already names the
     // node and the computation.
@@ -132,8 +128,7 @@ pub fn make(
             // would never produce anything, and nothing in the telemetry
             // would say why.
             let mut bound: Vec<&str> = inputs.to_vec();
-            let mut declared: Vec<&str> =
-                params.inputs.iter().map(String::as_str).collect();
+            let mut declared: Vec<&str> = params.inputs.iter().map(String::as_str).collect();
             bound.sort();
             declared.sort();
             if bound != declared {
@@ -236,7 +231,12 @@ mod tests {
         }
 
         // A cold cabin: 280 counts is about 290.6 K, more than two under.
-        let decision = pass(&mut converters, &mut voted, &mut thermostat, [280, 280, 280]);
+        let decision = pass(
+            &mut converters,
+            &mut voted,
+            &mut thermostat,
+            [280, 280, 280],
+        );
         assert_eq!(
             decision,
             Some(b"1".to_vec()),
@@ -244,18 +244,38 @@ mod tests {
         );
 
         // Warming through the band: nothing to say.
-        let decision = pass(&mut converters, &mut voted, &mut thermostat, [320, 320, 320]);
+        let decision = pass(
+            &mut converters,
+            &mut voted,
+            &mut thermostat,
+            [320, 320, 320],
+        );
         assert_eq!(decision, None, "inside the band nothing should change");
 
         // Over the top: the heaters go off, once.
-        let decision = pass(&mut converters, &mut voted, &mut thermostat, [360, 360, 360]);
+        let decision = pass(
+            &mut converters,
+            &mut voted,
+            &mut thermostat,
+            [360, 360, 360],
+        );
         assert_eq!(decision, Some(b"0".to_vec()));
-        let decision = pass(&mut converters, &mut voted, &mut thermostat, [365, 365, 365]);
+        let decision = pass(
+            &mut converters,
+            &mut voted,
+            &mut thermostat,
+            [365, 365, 365],
+        );
         assert_eq!(decision, None, "the same decision should not be repeated");
 
         // And the ground asks for a warmer cabin, which the next pass acts on.
         thermostat.set_setpoint(300.0);
-        let decision = pass(&mut converters, &mut voted, &mut thermostat, [365, 365, 365]);
+        let decision = pass(
+            &mut converters,
+            &mut voted,
+            &mut thermostat,
+            [365, 365, 365],
+        );
         assert_eq!(
             decision,
             Some(b"1".to_vec()),
@@ -318,7 +338,10 @@ mod tests {
             Ok(f) => panic!("a node with no function became {}", f.name()),
         };
         assert!(said.contains("mystery"), "{said}");
-        assert!(said.contains("to_kelvin"), "it should say what there is: {said}");
+        assert!(
+            said.contains("to_kelvin"),
+            "it should say what there is: {said}"
+        );
     }
 
     /// A function nobody has written is refused by name.
@@ -364,5 +387,4 @@ mod tests {
         };
         assert!(said.contains("k_1") && said.contains("scale"), "{said}");
     }
-
 }

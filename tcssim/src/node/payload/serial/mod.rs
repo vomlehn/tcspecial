@@ -28,8 +28,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, ignore_this_request, lateness, send_in_segments, wait_out_packet, wait_while_running, Pacing,
-    PayloadConfig, PayloadStats, Produce,
+    a_packet, ignore_this_request, lateness, send_in_segments, wait_out_packet, wait_while_running,
+    Pacing, PayloadConfig, PayloadStats, Produce,
 };
 use crate::pty::SimulatedNode;
 
@@ -44,13 +44,17 @@ pub fn run_serial_node(
     running: Arc<AtomicBool>,
     stats: Arc<std::sync::Mutex<PayloadStats>>,
 ) {
-    let mut line = match SimulatedNode::open(&format!("{}: a serial line", config.name), &config.address) {
-        Ok(line) => line,
-        Err(e) => {
-            eprintln!("{}: failed to stand in for a serial line: {}", config.name, e);
-            return;
-        }
-    };
+    let mut line =
+        match SimulatedNode::open(&format!("{}: a serial line", config.name), &config.address) {
+            Ok(line) => line,
+            Err(e) => {
+                eprintln!(
+                    "{}: failed to stand in for a serial line: {}",
+                    config.name, e
+                );
+                return;
+            }
+        };
 
     let mut rng = rand::thread_rng();
     // Packets that have gone, which the faults that are counted rather than
@@ -78,8 +82,8 @@ pub fn run_serial_node(
         // a handler reading one is when the bytes arrive, which is what the
         // segment interval decides.
         if pacing.a_packet_is_due(config.triggered, asked)
-                && !ignore_this_request(&config, &mut rng)
-            {
+            && !ignore_this_request(&config, &mut rng)
+        {
             let late = lateness(&config, &mut rng);
             let packet = match a_packet(&config, &pacing, sent, &mut rng) {
                 Produce::Send(packet) => packet,
@@ -118,12 +122,12 @@ pub fn run_serial_node(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::payload::{PayloadProtocol, SimulatedPayload};
     use crate::pty::make_raw;
     use std::fs::File;
     use std::os::unix::fs::symlink;
     use std::os::unix::io::AsRawFd;
     use std::path::{Path, PathBuf};
-    use crate::payload::{PayloadProtocol, SimulatedPayload};
     use std::sync::atomic::AtomicU32;
     use std::time::Duration;
 
@@ -138,7 +142,7 @@ mod tests {
     fn device_at(path: &Path, packet: u32, segment: u32) -> SimulatedPayload {
         SimulatedPayload::new(PayloadConfig {
             thermal: None,
-                        name: "DH0".to_string(),
+            name: "DH0".to_string(),
             protocol: PayloadProtocol::Serial,
             address: path.display().to_string(),
             port: 0,
@@ -153,7 +157,7 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(segment)),
             packet_interval_ms: Arc::new(AtomicU32::new(200)),
             segment_interval_ms: Arc::new(AtomicU32::new(40)),
-                    triggered: false,
+            triggered: false,
         })
     }
 

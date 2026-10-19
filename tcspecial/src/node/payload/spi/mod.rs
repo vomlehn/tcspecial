@@ -219,11 +219,23 @@ fn mode_bits(config: &SpiConfig) -> u8 {
 }
 
 fn set_u8(fd: RawFd, request: libc::c_ulong, value: u8, on: &str, wanted: &str) -> TcsResult<()> {
-    set(fd, request, &value as *const u8 as *const libc::c_void, on, wanted)
+    set(
+        fd,
+        request,
+        &value as *const u8 as *const libc::c_void,
+        on,
+        wanted,
+    )
 }
 
 fn set_u32(fd: RawFd, request: libc::c_ulong, value: u32, on: &str, wanted: &str) -> TcsResult<()> {
-    set(fd, request, &value as *const u32 as *const libc::c_void, on, wanted)
+    set(
+        fd,
+        request,
+        &value as *const u32 as *const libc::c_void,
+        on,
+        wanted,
+    )
 }
 
 /// Make one request of the open device, saying what was being set if it fails.
@@ -315,7 +327,11 @@ mod tests {
         use std::os::unix::io::FromRawFd;
 
         let master_fd = unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY) };
-        assert!(master_fd >= 0, "no pty: {}", std::io::Error::last_os_error());
+        assert!(
+            master_fd >= 0,
+            "no pty: {}",
+            std::io::Error::last_os_error()
+        );
         let mut master = unsafe { File::from_raw_fd(master_fd) };
         assert_eq!(unsafe { libc::grantpt(master_fd) }, 0);
         assert_eq!(unsafe { libc::unlockpt(master_fd) }, 0);
@@ -352,9 +368,7 @@ mod tests {
         let mut buffer = [0u8; 64];
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
         let mut got = Vec::new();
-        while got.len() < b"from the peripheral".len()
-            && std::time::Instant::now() < deadline
-        {
+        while got.len() < b"from the peripheral".len() && std::time::Instant::now() < deadline {
             match endpoint.read(&mut buffer) {
                 Ok(n) if n > 0 => got.extend_from_slice(&buffer[..n]),
                 _ => std::thread::sleep(std::time::Duration::from_millis(10)),

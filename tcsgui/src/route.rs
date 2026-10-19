@@ -195,12 +195,7 @@ impl Ends {
     }
 
     /// Both ends as the terminals put them.
-    pub fn new(
-        from: (f32, f32),
-        to: (f32, f32),
-        leaves_right: bool,
-        arrives_right: bool,
-    ) -> Ends {
+    pub fn new(from: (f32, f32), to: (f32, f32), leaves_right: bool, arrives_right: bool) -> Ends {
         Ends {
             from,
             to,
@@ -348,12 +343,7 @@ pub fn marker_on(points: &[(f32, f32)]) -> String {
     } else {
         Way::Up
     };
-    triangle(
-        (from.0 + to.0) / 2.0,
-        (from.1 + to.1) / 2.0,
-        way_,
-        MARKER,
-    )
+    triangle((from.0 + to.0) / 2.0, (from.1 + to.1) / 2.0, way_, MARKER)
 }
 
 /// Where a link's label goes: the middle of its longest run.
@@ -503,7 +493,11 @@ fn shapes(ends: Ends, around: &[Obstacle]) -> Vec<Vec<(f32, f32)>> {
     // straight run or a Z possible at all: a line that left rightward and has
     // to arrive somewhere on its left has to go around, whichever way it is
     // pointing when it gets there.
-    let ahead = if ends.leaves_right { in_ > out } else { in_ < out };
+    let ahead = if ends.leaves_right {
+        in_ > out
+    } else {
+        in_ < out
+    };
     let mut tries: Vec<Vec<(f32, f32)>> = Vec::new();
 
     // Straight through: the two ends level, pointing the same way, and the
@@ -541,7 +535,9 @@ fn shapes(ends: Ends, around: &[Obstacle]) -> Vec<Vec<(f32, f32)>> {
         // outward to the next one so it is still a stub's length from its
         // node.
         let stub = mm_out(v, sign);
-        (0..4).map(|n| on_mm(stub + sign * n as f32 * LANE)).collect()
+        (0..4)
+            .map(|n| on_mm(stub + sign * n as f32 * LANE))
+            .collect()
     };
     for band in rows(y1, y2, around) {
         for left in lanes(out, outward) {
@@ -685,22 +681,14 @@ fn blocking(around: &[Obstacle], from: (f32, f32), to: (f32, f32)) -> Vec<Box> {
         .map(|b| {
             let joined = holds(b, from) || holds(b, to);
             let by = if joined { 0.0 } else { CLEAR };
-            (
-                b.x - by,
-                b.y - by,
-                b.x + b.width + by,
-                b.y + b.height + by,
-            )
+            (b.x - by, b.y - by, b.x + b.width + by, b.y + b.height + by)
         })
         .collect()
 }
 
 /// Whether a point is on or inside a node.
 fn holds(b: &Obstacle, (x, y): (f32, f32)) -> bool {
-    x >= b.x - 0.5
-        && x <= b.x + b.width + 0.5
-        && y >= b.y - 0.5
-        && y <= b.y + b.height + 0.5
+    x >= b.x - 0.5 && x <= b.x + b.width + 0.5 && y >= b.y - 0.5 && y <= b.y + b.height + 0.5
 }
 
 /// The same tracks, and then a lane either side of each, and a second beyond
@@ -730,7 +718,6 @@ fn laned(tracks: Vec<f32>) -> Vec<f32> {
     }
     out
 }
-
 
 /// How far this route runs along a route already drawn, in lane-widths.
 ///
@@ -1007,12 +994,20 @@ mod tests {
         // One across, one down, meeting in the middle: a crossing.
         let across = vec![(100.0, 200.0), (400.0, 200.0)];
         let down = vec![(250.0, 100.0), (250.0, 300.0)];
-        assert_eq!(shared(&down, std::slice::from_ref(&across)), 0, "a crossing is free");
+        assert_eq!(
+            shared(&down, std::slice::from_ref(&across)),
+            0,
+            "a crossing is free"
+        );
 
         // Two runs on the same line, overlapping by less than a line's own
         // width and a little: what a crossing looks like from close up.
         let brief = vec![(100.0, 200.0), (108.0, 200.0)];
-        assert_eq!(shared(&brief, std::slice::from_ref(&across)), 0, "a touch is free");
+        assert_eq!(
+            shared(&brief, std::slice::from_ref(&across)),
+            0,
+            "a touch is free"
+        );
 
         // And a real shared run, which is not.
         let along = vec![(150.0, 203.0), (350.0, 203.0)];
@@ -1081,7 +1076,13 @@ mod tests {
         for (x1, y1, x2, y2, around) in [
             (0.0, 0.0, 240.0, 120.0, &[][..]),
             (0.0, 0.0, 600.0, 120.0, &[node(280.0, 0.0)][..]),
-            (600.0, 40.0, 40.0, 240.0, &[node(40.0, 212.0), node(600.0, 12.0)][..]),
+            (
+                600.0,
+                40.0,
+                40.0,
+                240.0,
+                &[node(40.0, 212.0), node(600.0, 12.0)][..],
+            ),
         ] {
             let route_ = way(Ends::forward(x1, y1, x2, y2), around, &[]);
             for pair in route_.windows(2) {
@@ -1266,7 +1267,8 @@ mod tests {
                 if (x1 - x2).abs() < 0.5 && !at_an_end(pair[0]) && !at_an_end(pair[1]) {
                     assert!(on_grid(x1), "a vertical run at {x1}: {route_:?}");
                 }
-                let level_with_an_end = (y1 - ends.from.1).abs() < 0.5 || (y1 - ends.to.1).abs() < 0.5;
+                let level_with_an_end =
+                    (y1 - ends.from.1).abs() < 0.5 || (y1 - ends.to.1).abs() < 0.5;
                 if (y1 - y2).abs() < 0.5 && !level_with_an_end {
                     assert!(on_grid(y1), "a horizontal run at {y1}: {route_:?}");
                 }
@@ -1291,7 +1293,11 @@ mod tests {
         // in nine pixels of the line's own grey, against a node's edge.
         let (length, half) = HEAD;
         assert!(length >= 12.0 && half >= 5.0, "{HEAD:?} is a small arrow");
-        assert_eq!(240.0 - visited[1].0, length, "the head is as long as it says");
+        assert_eq!(
+            240.0 - visited[1].0,
+            length,
+            "the head is as long as it says"
+        );
         assert_eq!(visited[2].1 - visited[1].1, half * 2.0, "and as wide");
     }
 
@@ -1304,9 +1310,8 @@ mod tests {
     /// it: the stub, the straight run, the arrowhead.
     #[test]
     fn a_leftward_link_runs_leftward() {
-        let leftward = |x1: f32, y1: f32, x2: f32, y2: f32| {
-            Ends::new((x1, y1), (x2, y2), false, false)
-        };
+        let leftward =
+            |x1: f32, y1: f32, x2: f32, y2: f32| Ends::new((x1, y1), (x2, y2), false, false);
 
         // Level and clear: one straight line, as the forward case is.
         assert_eq!(
@@ -1527,4 +1532,3 @@ mod tests {
         assert_eq!(drawing((20.0, 20.0), (20.0, 20.5)), "");
     }
 }
-

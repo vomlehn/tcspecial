@@ -307,9 +307,10 @@ impl NodeFile {
     /// already reads: see [`Link::origin`].
     pub fn links(&self) -> Vec<Link> {
         let mut links = Vec::new();
-        for (terminal, destinations) in
-            [("payload-out", &self.payload_out), ("moc-out", &self.moc_out)]
-        {
+        for (terminal, destinations) in [
+            ("payload-out", &self.payload_out),
+            ("moc-out", &self.moc_out),
+        ] {
             if destinations.is_empty() {
                 continue;
             }
@@ -328,10 +329,7 @@ impl NodeFile {
     /// a record of links written elsewhere, and a record read as a link would
     /// be the same connection in the graph twice.
     pub fn arriving(&self) -> Vec<(&'static str, Option<bool>)> {
-        vec![
-            ("payload-in", self.payload_in),
-            ("moc-in", self.moc_in),
-        ]
+        vec![("payload-in", self.payload_in), ("moc-in", self.moc_in)]
     }
 }
 
@@ -374,9 +372,7 @@ impl<'de> Deserialize<'de> for NodeFile {
                         "type" => {
                             node_type = Some(map.next_value::<Scalar>()?.as_str().to_string())
                         }
-                        "group" => {
-                            group = Some(map.next_value::<Scalar>()?.as_str().to_string())
-                        }
+                        "group" => group = Some(map.next_value::<Scalar>()?.as_str().to_string()),
                         // Where this used to be, and said so rather than
                         // read as an attribute nothing knows: a position is
                         // the editor's own and lives in the `tcsgui` section
@@ -409,9 +405,7 @@ impl<'de> Deserialize<'de> for NodeFile {
                         // there -- a record of links written on the nodes they
                         // leave, and not a link. Checked against those links
                         // as the configuration is read: see `mirror`.
-                        "payload-in" => {
-                            payload_in = Some(said_so("payload-in", &mut map)?)
-                        }
+                        "payload-in" => payload_in = Some(said_so("payload-in", &mut map)?),
                         "moc-in" => moc_in = Some(said_so("moc-in", &mut map)?),
                         // Everything else is an attribute of the node, which
                         // is where a word nothing reads ends up -- and is
@@ -432,8 +426,7 @@ impl<'de> Deserialize<'de> for NodeFile {
                 Ok(NodeFile {
                     node: Node {
                         name: name.ok_or_else(|| de::Error::missing_field("name"))?,
-                        node_type: node_type
-                            .ok_or_else(|| de::Error::missing_field("type"))?,
+                        node_type: node_type.ok_or_else(|| de::Error::missing_field("type"))?,
                         group,
                         attributes,
                     },
@@ -537,8 +530,7 @@ impl Node {
                 | "network"
                 | "device-file"
                 | "gpio"
-        ) || crate::node::app::Kind::of(node_type)
-            .is_some_and(|kind| kind.is_payload())
+        ) || crate::node::app::Kind::of(node_type).is_some_and(|kind| kind.is_payload())
     }
 }
 
@@ -701,10 +693,7 @@ impl<'de> Deserialize<'de> for Bound {
 /// data came from for a while, which read as "and nothing else" the moment a
 /// second line arrived -- so a file written against that is refused rather
 /// than half understood.
-fn said_so<'de, A: serde::de::MapAccess<'de>>(
-    sink: &str,
-    map: &mut A,
-) -> Result<bool, A::Error> {
+fn said_so<'de, A: serde::de::MapAccess<'de>>(sink: &str, map: &mut A) -> Result<bool, A::Error> {
     use serde::de::Error;
 
     let said = map.next_value::<Scalar>()?;
@@ -987,7 +976,12 @@ impl Graph {
         // not keep: a node's device id is its position, and that is the order
         // somebody reading the file sees. See `order`.
         let declared = order::declared(from)?;
-        let at = |name: &str| declared.iter().position(|n| n == name).unwrap_or(usize::MAX);
+        let at = |name: &str| {
+            declared
+                .iter()
+                .position(|n| n == name)
+                .unwrap_or(usize::MAX)
+        };
         self.nodes[first..].sort_by_key(|node| at(&node.name));
 
         self.groups.extend(file.payload_groups.iter().cloned());
@@ -1055,7 +1049,11 @@ fn read_one(path: &Path) -> TcsResult<GraphFile> {
             "a link is an attribute of the node it leaves, named after the data \
              source it leaves by: `payload_out: k_1`",
         ),
-        ("groups", file.groups.is_some(), "groups are now payload_groups"),
+        (
+            "groups",
+            file.groups.is_some(),
+            "groups are now payload_groups",
+        ),
     ];
     for (section, there, where_) in moved {
         if *there {
@@ -1173,14 +1171,26 @@ pub fn parse_interval(text: &str) -> Result<Duration, String> {
     // all" sends somebody looking for a typing mistake they did not make.
     const REFUSED: [(&str, &str); 8] = [
         ("m", "say min for minutes or ms for milliseconds"),
-        ("mon", "a month is not a length of time: say 30 d, or a number of days"),
-        ("mo", "a month is not a length of time: say 30 d, or a number of days"),
+        (
+            "mon",
+            "a month is not a length of time: say 30 d, or a number of days",
+        ),
+        (
+            "mo",
+            "a month is not a length of time: say 30 d, or a number of days",
+        ),
         (
             "month",
             "a month is not a length of time: say 30 d, or a number of days",
         ),
-        ("y", "a year is not a length of time: say 365 d, or a number of days"),
-        ("yr", "a year is not a length of time: say 365 d, or a number of days"),
+        (
+            "y",
+            "a year is not a length of time: say 365 d, or a number of days",
+        ),
+        (
+            "yr",
+            "a year is not a length of time: say 365 d, or a number of days",
+        ),
         (
             "year",
             "a year is not a length of time: say 365 d, or a number of days",
@@ -1324,8 +1334,14 @@ mod tests {
     #[test]
     fn an_interval_is_a_number_and_a_unit() {
         assert_eq!(parse_interval("3 s").unwrap(), Duration::from_secs(3));
-        assert_eq!(parse_interval("500 ms").unwrap(), Duration::from_millis(500));
-        assert_eq!(parse_interval("250 us").unwrap(), Duration::from_micros(250));
+        assert_eq!(
+            parse_interval("500 ms").unwrap(),
+            Duration::from_millis(500)
+        );
+        assert_eq!(
+            parse_interval("250 us").unwrap(),
+            Duration::from_micros(250)
+        );
         assert_eq!(parse_interval(" 3 s ").unwrap(), Duration::from_secs(3));
 
         // The seven units, the long ones in the terms somebody would check
@@ -1336,7 +1352,10 @@ mod tests {
         assert_eq!(parse_interval("1 h").unwrap(), Duration::from_secs(3_600));
         assert_eq!(parse_interval("6 h").unwrap(), Duration::from_secs(21_600));
         assert_eq!(parse_interval("1 d").unwrap(), Duration::from_secs(86_400));
-        assert_eq!(parse_interval("2 w").unwrap(), Duration::from_secs(14 * 86_400));
+        assert_eq!(
+            parse_interval("2 w").unwrap(),
+            Duration::from_secs(14 * 86_400)
+        );
         for (long, short) in [
             ("1 h", "60 min"),
             ("1 d", "24 h"),
@@ -1354,9 +1373,18 @@ mod tests {
         // A number or a decimal fraction, and the two ways of writing one
         // interval are one interval. Rounded to the nearest microsecond,
         // which is the smallest thing this counts in.
-        assert_eq!(parse_interval("1.5 s").unwrap(), Duration::from_millis(1_500));
-        assert_eq!(parse_interval("0.5 d").unwrap(), Duration::from_secs(12 * 3_600));
-        assert_eq!(parse_interval("1.5 ms").unwrap(), Duration::from_micros(1_500));
+        assert_eq!(
+            parse_interval("1.5 s").unwrap(),
+            Duration::from_millis(1_500)
+        );
+        assert_eq!(
+            parse_interval("0.5 d").unwrap(),
+            Duration::from_secs(12 * 3_600)
+        );
+        assert_eq!(
+            parse_interval("1.5 ms").unwrap(),
+            Duration::from_micros(1_500)
+        );
         assert_eq!(
             parse_interval("1.0000004 s").unwrap(),
             Duration::from_micros(1_000_000),
@@ -1395,8 +1423,21 @@ mod tests {
         // No hexadecimal and none planned, no sign, no exponent, and
         // nothing after the unit.
         for bad in [
-            "3", "fast", "", "s", "3 seconds", "-1 s", "0b11 s", "0x3e8 ms",
-            "1e3 s", "1.2.3 s", ". s", "1..5 s", "+1 s", "1,5 s", "1 s please",
+            "3",
+            "fast",
+            "",
+            "s",
+            "3 seconds",
+            "-1 s",
+            "0b11 s",
+            "0x3e8 ms",
+            "1e3 s",
+            "1.2.3 s",
+            ". s",
+            "1..5 s",
+            "+1 s",
+            "1,5 s",
+            "1 s please",
         ] {
             assert!(parse_interval(bad).is_err(), "{bad:?} was accepted");
         }
@@ -1430,7 +1471,9 @@ mod tests {
 
         // Nought is refused rather than taken for "as fast as possible", and
         // so is a fraction that rounds to it.
-        for zero in ["0 s", "0 ms", "0 us", "0 min", "0 h", "0 d", "0 w", "0.0 s", "0.4 us"] {
+        for zero in [
+            "0 s", "0 ms", "0 us", "0 min", "0 h", "0 d", "0 w", "0.0 s", "0.4 us",
+        ] {
             let said = parse_interval(zero).expect_err("nought should be refused");
             assert!(said.contains("no interval at all"), "{zero}: {said}");
         }
@@ -1472,13 +1515,19 @@ mod tests {
     fn the_shipped_example_reads_the_same_in_both_formats() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
 
-        let yaml = Graph::load(root.join("tests/manual/thermostat.yaml"))
-            .expect("the YAML example reads");
-        let xml = Graph::load(root.join("tests/manual/thermostat.xml"))
-            .expect("the XML example reads");
+        let yaml =
+            Graph::load(root.join("tests/manual/thermostat.yaml")).expect("the YAML example reads");
+        let xml =
+            Graph::load(root.join("tests/manual/thermostat.xml")).expect("the XML example reads");
 
-        assert_eq!(yaml.nodes, xml.nodes, "the two formats describe different nodes");
-        assert_eq!(yaml.links, xml.links, "the two formats describe different links");
+        assert_eq!(
+            yaml.nodes, xml.nodes,
+            "the two formats describe different nodes"
+        );
+        assert_eq!(
+            yaml.links, xml.links,
+            "the two formats describe different links"
+        );
         assert_eq!(yaml.commands, xml.commands);
         assert_eq!(yaml.groups, xml.groups);
 
@@ -1580,7 +1629,10 @@ moc:
 
         let graph = Graph::load(&top).expect("the pair reads as one");
         assert_eq!(graph.nodes.len(), 2);
-        assert!(graph.node("cabin_sensor").is_some(), "the include was not read");
+        assert!(
+            graph.node("cabin_sensor").is_some(),
+            "the include was not read"
+        );
         assert_eq!(graph.files.len(), 2, "both files should be recorded");
 
         // Which file each node came from, so the digest can cover the set and
@@ -1621,16 +1673,8 @@ moc:
     fn a_file_is_not_included_twice() {
         let where_ = tempfile::tempdir().expect("a directory");
         let top = where_.path().join("vehicle.yaml");
-        std::fs::write(
-            &top,
-            "include:\n  - cabin\n  - cabin\n",
-        )
-        .unwrap();
-        std::fs::write(
-            where_.path().join("cabin.yaml"),
-            "payloads: []\n",
-        )
-        .unwrap();
+        std::fs::write(&top, "include:\n  - cabin\n  - cabin\n").unwrap();
+        std::fs::write(where_.path().join("cabin.yaml"), "payloads: []\n").unwrap();
 
         let said = format!("{}", Graph::load(&top).expect_err("twice is refused"));
         assert!(said.contains("included twice"), "{said}");
@@ -1642,11 +1686,7 @@ moc:
         let where_ = tempfile::tempdir().expect("a directory");
         let top = where_.path().join("vehicle.yaml");
         std::fs::write(&top, "include:\n  - cabin\n").unwrap();
-        std::fs::write(
-            where_.path().join("cabin.yaml"),
-            "include:\n  - deeper\n",
-        )
-        .unwrap();
+        std::fs::write(where_.path().join("cabin.yaml"), "include:\n  - deeper\n").unwrap();
 
         let said = format!("{}", Graph::load(&top).expect_err("nesting is refused"));
         assert!(said.contains("may not include others"), "{said}");
@@ -1729,4 +1769,3 @@ payload-out:
         assert!(said.contains("which node"), "{said}");
     }
 }
-

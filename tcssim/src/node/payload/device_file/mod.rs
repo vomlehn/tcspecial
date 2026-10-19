@@ -17,7 +17,11 @@ use crate::payload::{
 };
 
 /// Run device payload simulation (simulates /dev/urandom-like behavior)
-pub fn run_device_file_node(config: PayloadConfig, running: Arc<AtomicBool>, stats: Arc<std::sync::Mutex<PayloadStats>>) {
+pub fn run_device_file_node(
+    config: PayloadConfig,
+    running: Arc<AtomicBool>,
+    stats: Arc<std::sync::Mutex<PayloadStats>>,
+) {
     let mut rng = rand::thread_rng();
     // Packets that have gone, which the faults that are counted rather than
     // random ask about.
@@ -65,4 +69,3 @@ pub fn run_device_file_node(config: PayloadConfig, running: Arc<AtomicBool>, sta
         wait_out_packet(&pacing, started, &running);
     }
 }
-

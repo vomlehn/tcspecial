@@ -24,10 +24,10 @@
 //!
 //! See `tcslibgs::node` for why there are three trees rather than one.
 
-/// What the vehicle itself runs: a computation, a log, a pass-through, a
-/// program of its own.
-pub mod vehicle;
 /// What the vehicle carries, and the ground link with it: a device on a bus, a
 /// line the vehicle drives, a socket to something aboard or on the ground, a
 /// program standing where a device would.
 pub mod payload;
+/// What the vehicle itself runs: a computation, a log, a pass-through, a
+/// program of its own.
+pub mod vehicle;

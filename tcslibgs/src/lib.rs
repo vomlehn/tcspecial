@@ -16,10 +16,10 @@ pub mod config;
 pub mod config_digest;
 pub mod display;
 pub mod endpoint_config;
-pub mod node;
 pub mod error;
 pub mod format;
 pub mod graph;
+pub mod node;
 pub mod parameters;
 pub mod protocol;
 /// The simulator's own configuration language.
@@ -40,24 +40,24 @@ pub use commands::*;
 // with the kind of group that states them and named from here as well, since
 // by the time a handler holds one it is no longer a matter of configuration
 // files.
+pub use config::*;
+pub use config_digest::*;
+pub use display::{screen_height, Edge};
 pub use endpoint_config::Scalar;
-pub use node::payload::serial::{ByteLength, Parity, StopBits};
-pub use node::payload::hdlc::{ClockType, Encoding, FrameCheck, HdlcParams, Standard};
+pub use error::*;
+pub use format::*;
 pub use node::payload::can::CanParams;
 pub use node::payload::gpio::{Bias, Edge as LineEdge, GpioParams};
+pub use node::payload::hdlc::{ClockType, Encoding, FrameCheck, HdlcParams, Standard};
 pub use node::payload::iio::IioParams;
 pub use node::payload::rpmsg::RpmsgParams;
 pub use node::payload::serial::rs485::Rs485Params;
+pub use node::payload::serial::{ByteLength, Parity, StopBits};
 pub use node::payload::spi::{BitOrder, BitsPerWord, CsActive, SpiMode};
-pub use config::*;
-pub use display::{screen_height, Edge};
-pub use error::*;
-pub use format::*;
 pub use parameters::*;
 pub use protocol::*;
 pub use sim_config::*;
 pub use telemetry::*;
-pub use config_digest::*;
 pub use trigger::*;
 pub use types::*;
 pub use verify::*;

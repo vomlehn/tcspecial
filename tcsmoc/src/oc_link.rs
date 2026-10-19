@@ -72,8 +72,6 @@ impl Arrival {
 /// What every payload last sent to the ground, one slot per panel row.
 pub type Arrivals = Arc<Mutex<Vec<Option<Arrival>>>>;
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -87,13 +85,9 @@ mod tests {
     /// the datagram is received.
     #[test]
     fn a_reading_is_shown_as_a_temperature() {
-        let at = Timestamp::at(
-            std::time::UNIX_EPOCH + std::time::Duration::from_secs(3661),
-        );
+        let at = Timestamp::at(std::time::UNIX_EPOCH + std::time::Duration::from_secs(3661));
         let mut data = DHSample::new();
-        data.record(
-            &tcslibgs::node::vehicle::compute::as_value(293.15).expect("a temperature"),
-        );
+        data.record(&tcslibgs::node::vehicle::compute::as_value(293.15).expect("a temperature"));
 
         let arrival = Arrival {
             at,
@@ -101,7 +95,10 @@ mod tests {
             packets: 1,
             sends_values: true,
         };
-        assert_eq!(arrival.panel_lines(), (at.time_of_day(), "293.15 K".to_string()));
+        assert_eq!(
+            arrival.panel_lines(),
+            (at.time_of_day(), "293.15 K".to_string())
+        );
 
         // And from a node that does not send values, the bytes.
         let arrival = Arrival {
@@ -123,9 +120,7 @@ mod tests {
     /// where the receiving is tested.
     #[test]
     fn an_arrival_says_when_it_came_and_what_it_was() {
-        let at = Timestamp::at(
-            std::time::UNIX_EPOCH + std::time::Duration::from_secs(3661),
-        );
+        let at = Timestamp::at(std::time::UNIX_EPOCH + std::time::Duration::from_secs(3661));
         let mut data = DHSample::new();
         data.record(b"hello");
         let arrival = Arrival {

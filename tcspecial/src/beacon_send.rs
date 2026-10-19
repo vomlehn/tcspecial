@@ -22,11 +22,11 @@ use crate::telemetry_log::TelemetryLog;
 
 #[derive(Clone)]
 pub struct BeaconSend {
-    pair:       ArcCondPair<SystemTime>,
-    interval:   Arc<Mutex<Duration>>,
+    pair: ArcCondPair<SystemTime>,
+    interval: Arc<Mutex<Duration>>,
     /// Where beacons go: `beacon_recv`, which is what tcsmoc makes its
     /// receiving socket out of.
-    dest_addr:  tcslibgs::HostPort,
+    dest_addr: tcslibgs::HostPort,
     /// Where they come from: `beacon_send`, which is what the socket below is
     /// bound to, so every beacon this sends leaves from there.
     ///
@@ -37,16 +37,16 @@ pub struct BeaconSend {
     /// a local interface to join it on -- which bought any number of ground
     /// stations and cost an attribute whose being wrong lost every beacon in
     /// silence.
-    from_addr:  tcslibgs::HostPort,
+    from_addr: tcslibgs::HostPort,
     /// The telemetry log every beacon is recorded in, shared with the
     /// command interpreter so that one log holds all of the telemetry.
-    log:        TelemetryLog,
+    log: TelemetryLog,
     /// How many beacons this process has sent.
     ///
     /// Shared with every duplicate of this sender, because the thread that
     /// sends them holds one: two counters would both say "the third beacon"
     /// about different beacons.
-    sent:       Arc<AtomicU32>,
+    sent: Arc<AtomicU32>,
     /// What this build is, what the configuration says it is, and what it
     /// read, carried in every beacon.
     ///
@@ -54,9 +54,9 @@ pub struct BeaconSend {
     /// digest is of the file this process read, and a file edited since would
     /// otherwise have the beacons claiming a configuration nothing is
     /// serving.
-    version:    ConfigVersion,
+    version: ConfigVersion,
     config_version: ConfigVersion,
-    digest:     ConfigDigest,
+    digest: ConfigDigest,
 }
 
 impl BeaconSend {
@@ -93,7 +93,7 @@ impl BeaconSend {
 
         let b_clone = b.clone();
         thread::spawn(move || {
-// FIXME: add check for error
+            // FIXME: add check for error
             let _ = b_clone.beacon_send();
         });
 
@@ -109,7 +109,7 @@ impl BeaconSend {
         // or firewalled by a rule somebody could write down beforehand.
         let socket = UdpSocket::bind(self.from_addr.to_string())?;
 
-// FIXME: add check for error
+        // FIXME: add check for error
         let _ = self.send_beacon(&socket, &self.dest_addr.to_string());
 
         loop {
@@ -130,7 +130,7 @@ impl BeaconSend {
             }
 
             // Send the beacon
-// FIXME: add check for error
+            // FIXME: add check for error
             let _ = self.send_beacon(&socket, &self.dest_addr.to_string());
 
             // Calculate next expiration time1G

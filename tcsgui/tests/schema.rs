@@ -69,8 +69,7 @@ fn example_configurations() -> Vec<String> {
 /// One schema, read.
 fn read(name: &str) -> serde_json::Value {
     let path = schema().join(name);
-    let text = std::fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
     serde_json::from_str(&text).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
 }
 
@@ -215,7 +214,11 @@ fn every_shipped_xml_file_is_valid_against_its_schema() {
         ("tcspecial.xsd", "example.xml".to_string()),
         ("tcspecial.xsd", "tests/manual/thermostat.xml".to_string()),
     ];
-    files.extend(examples(".xml").into_iter().map(|file| ("tcspecial.xsd", file)));
+    files.extend(
+        examples(".xml")
+            .into_iter()
+            .map(|file| ("tcspecial.xsd", file)),
+    );
     for (schema_name, file) in &files {
         let output = Command::new("xmllint")
             .arg("--noout")
@@ -248,12 +251,9 @@ fn every_shipped_xml_file_is_well_formed() {
         return;
     }
 
-    let mut files: Vec<String> = [
-        "example.xml",
-        "tests/manual/thermostat.xml",
-    ]
-    .map(str::to_string)
-    .to_vec();
+    let mut files: Vec<String> = ["example.xml", "tests/manual/thermostat.xml"]
+        .map(str::to_string)
+        .to_vec();
     files.extend(examples(".xml"));
     for file in &files {
         let path = root().join(file);
@@ -334,10 +334,7 @@ fn every_shipped_configuration_says_which_schema_describes_it() {
         // And the schema it names is where it says it is, which is the half
         // of a reference that rots.
         let named = path.parent().expect("a directory").join(said);
-        assert!(
-            named.is_file(),
-            "{file} names {said}, which is not there"
-        );
+        assert!(named.is_file(), "{file} names {said}, which is not there");
     }
 }
 
@@ -368,7 +365,10 @@ fn every_key_of_a_shipped_configuration_is_in_the_schema() {
         let mapping = said.as_mapping().expect("a configuration is a mapping");
         for (key, value) in mapping {
             let key = key.as_str().expect("a section is named").to_string();
-            assert!(sections.contains(&key), "{file}: {key} is not in the schema");
+            assert!(
+                sections.contains(&key),
+                "{file}: {key} is not in the schema"
+            );
 
             // The node sections, whose entries are what a schema has most to
             // say about.
@@ -411,7 +411,11 @@ fn described() -> Vec<PathBuf> {
                 path.extension().and_then(|e| e.to_str()),
                 Some("yaml") | Some("yml") | Some("xml")
             ) {
-                found.push(path.strip_prefix(root).expect("under the root").to_path_buf());
+                found.push(
+                    path.strip_prefix(root)
+                        .expect("under the root")
+                        .to_path_buf(),
+                );
             }
         }
     }
@@ -462,8 +466,8 @@ fn every_node_description_is_valid_against_its_schema() {
         }
 
         let text = std::fs::read_to_string(&path).expect("a description");
-        let said: serde_norway::Value = serde_norway::from_str(&text)
-            .unwrap_or_else(|e| panic!("{}: {e}", name.display()));
+        let said: serde_norway::Value =
+            serde_norway::from_str(&text).unwrap_or_else(|e| panic!("{}: {e}", name.display()));
         let mapping = said.as_mapping().expect("a description is a mapping");
         for (key, value) in mapping {
             let key = key.as_str().expect("a named word").to_string();
@@ -577,8 +581,7 @@ fn every_node_is_described_once_and_in_one_spelling() {
                 .next()
                 .unwrap_or_else(|| panic!("{}: no node name", name.display()))
         } else {
-            let said: serde_norway::Value =
-                serde_norway::from_str(&text).expect("a description");
+            let said: serde_norway::Value = serde_norway::from_str(&text).expect("a description");
             said.get("node")
                 .and_then(|node| node.as_str().map(str::to_string))
                 .unwrap_or_else(|| panic!("{}: no node name", name.display()))

@@ -15,11 +15,11 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::endpoint_config::{validate_stream, StreamParams};
 use crate::endpoint_config::{
-    bad, parse_u32, reject_foreign_fields, require, EndpointConfigError,
-    EndpointConfigResult, GroupKind, LinkTerms, Scalar,
+    bad, parse_u32, reject_foreign_fields, require, EndpointConfigError, EndpointConfigResult,
+    GroupKind, LinkTerms, Scalar,
 };
+use crate::endpoint_config::{validate_stream, StreamParams};
 
 /// Which parity a file's word names, for an asynchronous line.
 fn parse_parity(group: &str, s: &Scalar) -> EndpointConfigResult<Parity> {
@@ -169,18 +169,13 @@ fn parse_stop_bits(group: &str, s: &Scalar) -> EndpointConfigResult<StopBits> {
     }
 }
 
-
 /// What a serial group says, and what it must say.
 ///
 /// A serial line is a stream, so a stream section is required: a read of one
 /// needs a rule for where it ends. The framing attributes are required too --
 /// no default data rate or byte length is right for a line somebody else's
 /// hardware is at the other end of.
-pub(crate) fn group_kind_of(
-    name: &str,
-    g: LinkTerms,
-) -> EndpointConfigResult<GroupKind> {
-
+pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<GroupKind> {
     reject_foreign_fields(
         name,
         "serial",
@@ -211,8 +206,8 @@ pub(crate) fn group_kind_of(
 
     let byte_length = require(name, "serial", "byte_length", g.byte_length.as_ref())?;
     let byte_length = parse_u32(name, "byte_length", byte_length)?;
-    let byte_length = ByteLength::new(byte_length.min(u8::MAX as u32) as u8)
-        .map_err(|m| bad(name, &m))?;
+    let byte_length =
+        ByteLength::new(byte_length.min(u8::MAX as u32) as u8).map_err(|m| bad(name, &m))?;
 
     // The electrical layer under a start-stop line, which a two-wire bus
     // needs told and a four-wire line says nothing about. Read before the

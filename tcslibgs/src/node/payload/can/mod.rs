@@ -25,9 +25,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::endpoint_config::{bad, parse_flag, EndpointConfigResult, GroupKind, LinkTerms};
 use crate::endpoint_config::reject_foreign_fields;
 use crate::endpoint_config::reject_stream;
+use crate::endpoint_config::{bad, parse_flag, EndpointConfigResult, GroupKind, LinkTerms};
 
 /// What a CAN payload's bus is set to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -112,17 +112,13 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
     // say: the reason a bus has none either.
     reject_stream(name, "can", g.stream.is_some())?;
 
-
     let fd = parse_flag(name, "can_fd", g.can_fd.as_ref())?.unwrap_or(false);
 
     // On unless a file says otherwise, which is the kernel's own default and
     // what two programs on one host need of a virtual bus.
     let loopback = parse_flag(name, "loopback", g.loopback.as_ref())?.unwrap_or(true);
 
-    Ok(GroupKind::Can(CanParams {
-        fd,
-        loopback,
-    }))
+    Ok(GroupKind::Can(CanParams { fd, loopback }))
 }
 
 #[cfg(test)]
@@ -179,7 +175,6 @@ mod tests {
                 loopback: false,
             }
         );
-
     }
 
     /// A term of another kind of link is refused here as everywhere.

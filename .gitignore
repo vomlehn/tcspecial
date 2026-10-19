@@ -24,6 +24,10 @@ target
 # it is output and not source. docs/ ignores its own built pages itself.
 README.html
 Cargo.lock
+
+# What Python leaves beside a module it has run: the ping example's ground
+# station and python/'s libraries, each time a test or a person runs them.
+__pycache__/
 build.out
 
 # Resume command written by the SessionEnd hook

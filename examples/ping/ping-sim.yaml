@@ -1,0 +1,7 @@
+# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial-sim.schema.json
+
+description: Simulator settings for ping.yaml, which has no payloads to stand in for
+
+# The ping node is the vehicle's own, and what it answers is the ground
+# station's ping: nothing here is a payload, so there is nothing to simulate.
+simulated_payloads: []

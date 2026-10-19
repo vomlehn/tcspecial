@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="450" viewBox="0 0 900 450" role="img" aria-labelledby="title desc">
+  <title id="title">The ping example</title>
+  <desc id="desc">The ground station ping_moc.py sends each ping, "ping #count time", up to the moc node, which tcspecial binds at 127.0.0.1:7600. It leaves the moc node by its moc-out link for the ping node, which answers it with the vehicle's time on the end and sends the answer by its payload-out link back to the moc node, and so down to the ground at 127.0.0.1:7701: the moc node's ground_base, 7700, plus the ping node's device id, 1. The ground station shows the ping sent, the answer received, and the round trip and its two halves. Beside it is the beacon panel, fed by the beacon tcspecial sends from 0.0.0.0:7500 to 127.0.0.1:7510.</desc>
+  <defs>
+    <style>
+      text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
+      .name { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 15px; font-weight: bold; }
+      .kind { font-size: 12.5px; fill: #374151; }
+      .detail { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 11.5px; fill: #4b5563; }
+      .heading { font-size: 13px; font-weight: bold; fill: #475569; letter-spacing: 0.06em; }
+      .label { font-size: 12px; fill: #1f2937; }
+      .note { font-size: 12px; fill: #4b5563; }
+      .vehicle { fill: #eef7ee; stroke: #2f7d4a; stroke-width: 1.6; }
+      .socket { fill: #ffffff; stroke: #2f6db5; stroke-width: 1.4; stroke-dasharray: 5 3; }
+      .ground { fill: #f3f4f6; stroke: #4b5563; stroke-width: 1.6; }
+      .boundary { fill: #fbfbfd; stroke: #94a3b8; stroke-width: 1.4; stroke-dasharray: 7 5; }
+      .up { fill: none; stroke: #b45309; stroke-width: 2; }
+      .down { fill: none; stroke: #2563eb; stroke-width: 2; }
+      .beacon { fill: none; stroke: #15803d; stroke-width: 2.4; }
+      .lamp { stroke: #6b7280; stroke-width: 1; }
+    </style>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#b45309"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#15803d"/>
+    </marker>
+  </defs>
+
+  <rect width="900" height="450" fill="#ffffff"/>
+
+  <!-- Column headings -->
+  <text class="heading" x="45" y="44">TCSPECIAL (VEHICLE)</text>
+  <text class="heading" x="640" y="44">GROUND</text>
+
+  <rect class="boundary" x="30" y="58" width="560" height="262" rx="14"/>
+
+  <!-- The ping node, the vehicle's own -->
+  <rect class="vehicle" x="55" y="150" width="200" height="90" rx="10"/>
+  <text class="name" x="71" y="177">ping</text>
+  <text class="kind" x="71" y="198">vehicle node, device id 1</text>
+  <text class="detail" x="71" y="217">answers with its time</text>
+
+  <!-- The moc node, the ground's end of the link both ways -->
+  <rect class="socket" x="340" y="120" width="220" height="150" rx="10"/>
+  <text class="name" x="356" y="147">moc</text>
+  <text class="kind" x="356" y="168">moc node, device id 0</text>
+  <text class="detail" x="356" y="190">binds 127.0.0.1:7600</text>
+  <text class="detail" x="356" y="208">ground_base</text>
+  <text class="detail" x="356" y="224">  127.0.0.1:7700</text>
+
+  <!-- The beacon, tcspecial's own -->
+  <rect class="socket" x="340" y="74" width="220" height="36" rx="8"/>
+  <text class="label" x="356" y="97">beacon: 0.0.0.0:7500, every 5 s</text>
+
+  <!-- The ground station -->
+  <rect class="ground" x="640" y="74" width="235" height="246" rx="10"/>
+  <text class="name" x="656" y="101">ping_moc.py</text>
+  <text class="kind" x="656" y="122">ground station, Python 3</text>
+  <!-- Its beacon panel, drawn as it looks -->
+  <rect class="socket" x="656" y="134" width="203" height="40" rx="6"/>
+  <text class="label" x="668" y="159">Beacon:</text>
+  <circle class="lamp" cx="728" cy="155" r="7" fill="#00ff00"/>
+  <text class="detail" x="744" y="159">127.0.0.1:7510</text>
+  <!-- Its ping panel -->
+  <rect class="socket" x="656" y="184" width="203" height="122" rx="6"/>
+  <rect x="668" y="194" width="74" height="20" rx="3" fill="#e5e7eb" stroke="#6b7280"/>
+  <text class="label" x="674" y="208">Send ping</text>
+  <text class="detail" x="668" y="232">sent, time sent</text>
+  <text class="detail" x="668" y="250">received, time</text>
+  <text class="detail" x="668" y="268">round trip</text>
+  <text class="detail" x="668" y="286">up, down</text>
+
+  <!-- Up: the ping, to the moc node and on to the ping node -->
+  <path class="up" d="M636,228 L564,228" marker-end="url(#arrow-amber)"/>
+  <text class="label" x="574" y="219">ping</text>
+  <path class="up" d="M340,175 L259,175" marker-end="url(#arrow-amber)"/>
+  <text class="label" x="266" y="166">moc-out</text>
+
+  <!-- Down: the answer, back to the moc node and on to the ground -->
+  <path class="down" d="M255,215 L336,215" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="262" y="232">payload-out</text>
+  <path class="down" d="M560,255 L636,255" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="566" y="272">answer</text>
+  <text class="detail" x="566" y="288">:7701</text>
+
+  <!-- The beacon, to the panel -->
+  <path class="beacon" d="M560,92 L600,92 L600,155 L652,155" marker-end="url(#arrow-green)"/>
+
+  <text class="note" x="55" y="266">The answer is the ping with the</text>
+  <text class="note" x="55" y="282">vehicle's time on the end. It comes</text>
+  <text class="note" x="55" y="298">down at ground_base plus ping's id.</text>
+
+  <!-- Legend -->
+  <line x1="45" y1="345" x2="860" y2="345" stroke="#e5e7eb" stroke-width="1"/>
+  <path class="up" d="M45,377 L95,377" marker-end="url(#arrow-amber)"/>
+  <text class="label" x="105" y="381">ping #count time, up</text>
+  <path class="down" d="M290,377 L340,377" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="350" y="381">answer, with the vehicle's time, down</text>
+  <path class="beacon" d="M610,377 L660,377" marker-end="url(#arrow-green)"/>
+  <text class="label" x="670" y="381">beacon</text>
+  <rect class="vehicle" x="45" y="401" width="22" height="16" rx="4"/>
+  <text class="label" x="75" y="414">vehicle node</text>
+  <rect class="socket" x="200" y="401" width="22" height="16" rx="4"/>
+  <text class="label" x="230" y="414">opened by tcspecial</text>
+  <rect class="ground" x="380" y="401" width="22" height="16" rx="4"/>
+  <text class="label" x="410" y="414">ground program</text>
+</svg>

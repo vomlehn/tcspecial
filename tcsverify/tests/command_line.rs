@@ -207,3 +207,75 @@ fn a_bad_option_is_a_command_line_of_none_of_the_shapes() {
         assert!(lines.is_empty(), "{bad}: nothing is checked: {lines:?}");
     }
 }
+
+/// A configuration whose one vehicle node is written as `node`, beside a
+/// ground link it is joined to both ways.
+fn with_vehicle_node(dir: &Path, node: &str) -> PathBuf {
+    let text = format!(
+        "\
+description: one vehicle node
+tcspecial:
+  beacon:
+    interval: \"5 s\"
+    recv: \"127.0.0.1:5650\"
+    send: \"0.0.0.0:5550\"
+  log:
+    directory: \"/tmp/telemetry\"
+    segment_size: \"65536\"
+  payload_command:
+    dest_base: \"0.0.0.0:4200\"
+    source_base: \"127.0.0.1:4300\"
+  payload_telemetry:
+    dest_base: \"127.0.0.1:6100\"
+    source_base: \"0.0.0.0:6000\"
+  tcs_cmd:
+    recv: \"0.0.0.0:4000\"
+    send: \"127.0.0.1:4100\"
+moc:
+  - name: ground
+    type: moc
+    address: \"127.0.0.1\"
+    port: \"5000\"
+    ground_base: \"127.0.0.1:5100\"
+    moc-out:
+      - target: pinger
+vehicle:
+  - name: pinger
+{node}
+    payload-out:
+      - target: ground
+"
+    );
+    let path = dir.join("one.yaml");
+    std::fs::write(&path, text).expect("written");
+    path
+}
+
+/// Warnings and no errors is a run that passes: the warnings are printed,
+/// and the exit status is success.
+#[test]
+fn warnings_alone_are_a_run_that_passes() {
+    let dir = tempfile::tempdir().expect("a directory");
+    let file = with_vehicle_node(dir.path(), "    type: ping\n    interval: \"1 s\"");
+
+    let (lines, status) = run(&[file.to_str().expect("a path")]);
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert!(lines[0].contains(": warning: "), "{lines:?}");
+    assert_eq!(status, 0);
+}
+
+/// A node of a type that does not exist is an error, and fails the run.
+#[test]
+fn a_type_that_does_not_exist_fails_the_run() {
+    let dir = tempfile::tempdir().expect("a directory");
+    let file = with_vehicle_node(dir.path(), "    type: bogus");
+
+    let (lines, status) = run(&[file.to_str().expect("a path")]);
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.contains(": error: ") && line.contains("\"bogus\"")),
+        "{lines:?}"
+    );
+    assert_eq!(status, 1);
+}

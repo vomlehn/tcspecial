@@ -82,11 +82,57 @@
     </xs:sequence>
   </xs:complexType>
 
-  <xs:complexType name="node">
-    <xs:choice minOccurs="0" maxOccurs="unbounded">
+  <!-- The node types each section may hold, as a file spells them. One
+       list per section, so that a type written in the wrong section is
+       refused here as it is where the file is read; held against the
+       software's own lists (tcslibgs::graph::types_in) by tcsgui's schema
+       tests. xs:token, so that the whitespace around a word in an element
+       is not part of it. -->
+  <!-- A ground link. -->
+  <xs:simpleType name="mocType">
+    <xs:restriction base="xs:token">
+      <xs:enumeration value="moc"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- What the vehicle itself runs. -->
+  <xs:simpleType name="vehicleType">
+    <xs:restriction base="xs:token">
+      <xs:enumeration value="compute"/>
+      <xs:enumeration value="log"/>
+      <xs:enumeration value="null"/>
+      <xs:enumeration value="ping"/>
+      <xs:enumeration value="app_payload_veh"/>
+      <xs:enumeration value="app_moc_veh"/>
+      <xs:enumeration value="app_all_veh"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- What the vehicle carries: an interface, or a program. -->
+  <xs:simpleType name="payloadType">
+    <xs:restriction base="xs:token">
+      <xs:enumeration value="network"/>
+      <xs:enumeration value="device-file"/>
+      <xs:enumeration value="serial"/>
+      <xs:enumeration value="i2c"/>
+      <xs:enumeration value="spi"/>
+      <xs:enumeration value="can"/>
+      <xs:enumeration value="iio"/>
+      <xs:enumeration value="rpmsg"/>
+      <xs:enumeration value="gpio"/>
+      <xs:enumeration value="hdlc"/>
+      <xs:enumeration value="app_pl"/>
+      <xs:enumeration value="app_all_pl"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- What a node says, whichever section it is in, but for its type. A
+       group so that the three node types below share one list of words and
+       differ only in which types they take. -->
+  <xs:group name="nodeWords">
+    <xs:choice>
       <!-- What every node says about itself. -->
       <xs:element name="name" type="xs:string"/>
-      <xs:element name="type" type="xs:string"/>
       <xs:element name="group" type="xs:string"/>
       <!-- The two data sources, which are where links are written. -->
       <xs:element name="payload-out" type="destination"/>
@@ -194,6 +240,29 @@
       <xs:element name="segment_bytes" type="xs:string"/>
       <!-- A page of its own. -->
       <xs:element name="file" type="xs:string"/>
+    </xs:choice>
+  </xs:group>
+
+  <!-- A node of each section: its type, from the section's list, and the
+       rest of what a node may say. -->
+  <xs:complexType name="mocNode">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="type" type="mocType"/>
+      <xs:group ref="nodeWords"/>
+    </xs:choice>
+  </xs:complexType>
+
+  <xs:complexType name="vehicleNode">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="type" type="vehicleType"/>
+      <xs:group ref="nodeWords"/>
+    </xs:choice>
+  </xs:complexType>
+
+  <xs:complexType name="payloadNode">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="type" type="payloadType"/>
+      <xs:group ref="nodeWords"/>
     </xs:choice>
   </xs:complexType>
 
@@ -310,9 +379,9 @@
         <xs:element name="include" type="xs:string"/>
         <xs:element name="tcspecial" type="tcspecial"/>
         <xs:element name="payload_groups" type="payload_group"/>
-        <xs:element name="moc" type="node"/>
-        <xs:element name="vehicle" type="node"/>
-        <xs:element name="payloads" type="node"/>
+        <xs:element name="moc" type="mocNode"/>
+        <xs:element name="vehicle" type="vehicleNode"/>
+        <xs:element name="payloads" type="payloadNode"/>
         <xs:element name="commands" type="command"/>
         <xs:element name="tcsgui" type="tcsgui"/>
       </xs:choice>

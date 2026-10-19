@@ -133,6 +133,165 @@ fn the_configuration_schema_has_the_sections_the_reader_reads() {
     }
 }
 
+/// The values an XSD's simple type enumerates, in the order it lists them.
+fn enumerated(xsd: &str, simple_type: &str) -> Vec<String> {
+    let opens = format!("<xs:simpleType name=\"{simple_type}\">");
+    let start = xsd
+        .find(&opens)
+        .unwrap_or_else(|| panic!("the XSD has no simple type {simple_type}"));
+    let body = &xsd[start..start + xsd[start..].find("</xs:simpleType>").expect("closed")];
+    body.lines()
+        .filter_map(|line| {
+            let rest = line.trim().strip_prefix("<xs:enumeration value=\"")?;
+            Some(rest[..rest.find('"')?].to_string())
+        })
+        .collect()
+}
+
+/// The text of a schema in this repository.
+fn text_of(name: &str) -> String {
+    let path = schema().join(name);
+    std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
+}
+
+/// Each section of a configuration takes the node types the software knows
+/// for it, in both schemas, and no others.
+///
+/// Held against `tcslibgs::graph::types_in`, which is what the checker
+/// refuses an unknown type by: a type the schemas offer and the checker
+/// refuses, or the other way round, is a schema arguing with the software.
+#[test]
+fn each_section_takes_the_node_types_the_software_knows() {
+    use tcslibgs::graph::{types_in, Section};
+
+    let json = read("tcspecial.schema.json");
+    let xsd = text_of("tcspecial.xsd");
+    for (section, key, simple_type) in [
+        (Section::Moc, "moc", "mocType"),
+        (Section::Vehicle, "vehicle", "vehicleType"),
+        (Section::Payloads, "payloads", "payloadType"),
+    ] {
+        let wanted: Vec<String> = types_in(section).into_iter().map(str::to_string).collect();
+
+        let said: Vec<String> = json["properties"][key]["items"]["properties"]["type"]["enum"]
+            .as_array()
+            .unwrap_or_else(|| panic!("{key}: the JSON schema lists no types"))
+            .iter()
+            .map(|value| value.as_str().expect("a type is a word").to_string())
+            .collect();
+        assert_eq!(said, wanted, "{key}, in the JSON schema");
+
+        assert_eq!(enumerated(&xsd, simple_type), wanted, "{key}, in the XSD");
+    }
+}
+
+/// A simulated payload stands in for one of the interfaces, in both
+/// schemas, and an XML simulator file with every word in it is valid and
+/// reads.
+///
+/// The kinds are `DHType`'s, which is what the simulator reads a `type`
+/// with. Empty is allowed, as not stated. And the XSD offers every setting
+/// the one list of them has, which the XSD once did not: it was missing the
+/// thermal masses and what attaches a payload to one.
+#[test]
+fn the_simulator_schemas_take_the_kinds_and_words_the_simulator_reads() {
+    let mut kinds: Vec<String> = tcslibgs::DHType::ALL
+        .iter()
+        .map(|kind| kind.spelling().to_string())
+        .collect();
+    kinds.push(String::new());
+
+    let json = read("tcspecial-sim.schema.json");
+    for section in ["simulated_payloads", "simulated_payload_groups"] {
+        let enumerated = json["properties"][section]["items"]["properties"]["type"]["enum"]
+            .as_array()
+            .unwrap_or_else(|| panic!("{section}: the JSON schema lists no kinds"));
+        let said: Vec<String> = enumerated
+            .iter()
+            .filter_map(|value| value.as_str().map(str::to_string))
+            .collect();
+        assert_eq!(said, kinds, "{section}, in the JSON schema");
+        assert!(enumerated.contains(&serde_json::Value::Null), "{section}");
+    }
+
+    let xsd = text_of("tcspecial-sim.xsd");
+    assert_eq!(enumerated(&xsd, "kind"), kinds, "in the XSD");
+    for word in tcslibgs::sim_config::SETTINGS
+        .iter()
+        .chain(&["thermal_mass", "group"])
+    {
+        assert!(
+            xsd.contains(&format!("<xs:element name=\"{word}\"")),
+            "the simulator XSD has no {word}"
+        );
+    }
+
+    // A file that says everything, valid against the XSD and read by the
+    // simulator's own reader.
+    let dir = tempfile::tempdir().expect("a directory");
+    let file = dir.path().join("every-sim.xml");
+    std::fs::write(
+        &file,
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<simulator>
+  <description>every word</description>
+  <thermal_mass>
+    <name>cabin</name>
+    <environment>280</environment>
+    <time_constant>60 s</time_constant>
+  </thermal_mass>
+  <simulated_payload_groups>
+    <name>fast</name>
+    <type>network</type>
+    <protocol>udp</protocol>
+    <packet_interval>100 ms</packet_interval>
+  </simulated_payload_groups>
+  <simulated_payloads>
+    <name>temp</name>
+    <group>fast</group>
+    <type>i2c</type>
+    <reads>cabin</reads>
+    <drop_percent>1</drop_percent>
+  </simulated_payloads>
+  <simulated_payloads>
+    <name>heater</name>
+    <type>gpio</type>
+    <heats>cabin</heats>
+    <rate>0.5</rate>
+  </simulated_payloads>
+</simulator>
+",
+    )
+    .expect("written");
+    tcslibgs::sim_config::SimConfigFile::load(&file)
+        .unwrap_or_else(|e| panic!("the simulator does not read it: {e}"));
+
+    if Command::new("xmllint").arg("--version").output().is_err() {
+        eprintln!("xmllint is not installed: the simulator XSD was not checked");
+        return;
+    }
+    let valid = |text: &str| {
+        std::fs::write(&file, text).expect("written");
+        Command::new("xmllint")
+            .arg("--noout")
+            .arg("--schema")
+            .arg(schema().join("tcspecial-sim.xsd"))
+            .arg(&file)
+            .output()
+            .expect("xmllint runs")
+    };
+    let every = std::fs::read_to_string(&file).expect("read back");
+    let output = valid(&every);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    // And a kind that is not one is refused.
+    let output = valid(&every.replace("<type>gpio</type>", "<type>ping</type>"));
+    assert!(!output.status.success(), "ping is not a kind of payload");
+}
+
 /// What the tcspecial section may say, held against the one list of it.
 ///
 /// `graph::parameters::ATTRIBUTES` is what the checker refuses anything else

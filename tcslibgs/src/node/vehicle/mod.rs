@@ -20,6 +20,8 @@
 pub mod compute;
 // Somewhere data stops rather than being passed on.
 pub mod log;
+// What a ping from the ground says, and the answer the vehicle sends back.
+pub mod ping;
 
 use serde::{Deserialize, Serialize};
 

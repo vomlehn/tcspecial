@@ -682,6 +682,7 @@ mod tests {
                 "vote",
                 "log",
                 "null",
+                "ping",
             ],
             "sorted by path, which puts a family's descriptions together"
         );

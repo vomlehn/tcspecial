@@ -196,6 +196,9 @@ node
     terminals, which is what makes it the statement of what a vehicle node is:
     see `Terminals: where a link is attached`_.
 
+    *link checks* -- ``ping`` -- a node that answers each ping the ground sends
+    it with the vehicle's time. See `The ping node`_.
+
 group
     A set of devices read on one interval, so that readings which will be
     compared with one another are taken as close to together as the hardware
@@ -410,6 +413,10 @@ MOC links
 
 ``null``
     all four.
+
+``ping``
+    ``moc-in`` and ``payload-out``, a payload's pair: what the ground sends
+    arrives, and the answer leaves groundward, to arrive at a MOC link.
 
 A computation's and a log's terminals are their own rules' business: a
 computation's data sinks are the inputs it declares, and a log's are whatever
@@ -1016,6 +1023,70 @@ That is the thermostat's three converted readings and what the comparison
 decided, in one log, in the order they happened -- which is what reconstructing
 the loop's behaviour afterwards requires, and what a log per sensor could not
 give.
+
+The ping node
+-------------
+
+``type: ping`` answers the ground. Each message the MOC sends it comes back
+with the time the vehicle had it written on the end, so that the ground can
+see how long a message takes to reach the vehicle and to come back, and how
+far apart the two clocks are -- which a ping is the one exchange able to show.
+
+.. code-block:: yaml
+
+   moc:
+     - { name: ground, type: moc, address: 127.0.0.1, port: "5000",
+         ground_base: "127.0.0.1:5100", moc-out: pinger }
+   vehicle:
+     - { name: pinger, type: ping, payload-out: ground }
+
+The ground sends its pings to the MOC link's ``address`` and ``port``, and the
+answers arrive at its ``ground_base`` plus the ping node's device id, as any
+node's telemetry does.
+
+Requirement
+    A ping is ``ping #`` followed by the count, a space, and the time the MOC
+    sent it: ``ping #1 1760900000.000000001``. The count is a decimal number
+    with no leading nought, which is one for the first ping and one more for
+    each after it. The time is the number of seconds since the UNIX epoch,
+    with exactly nine digits after the point, so that it is written to the
+    nanosecond.
+
+Requirement
+    The answer is the ping as it arrived, one space, and the vehicle's time,
+    written as the ping's time is: ``ping #1 1760900000.000000001
+    1760900000.250000000``. The vehicle's time is the time the ping was handed
+    to the node, which is the vehicle's account of when it arrived.
+
+Requirement
+    Every number has a largest value -- a count and a whole number of seconds
+    are each at most ``u64::MAX``, twenty digits -- so a ping is at most 57
+    bytes and an answer at most 88. A ping is answered in a buffer of the
+    second size, which holds the largest ping, the space and the largest time
+    the vehicle could add: an answer is never cut short, and nothing is
+    allocated per ping.
+
+Requirement
+    A message that is not a ping is refused and not answered, and the refusal
+    is logged aboard naming the node and what was wrong. An answer to it would
+    be a message the ground could not read as one, which tells it less.
+
+Requirement
+    A ping node has no attributes, and one written on it is refused when the
+    configuration is checked: what it does is fixed by the format.
+
+Requirement
+    A ping node may be neither stopped nor started from the ground. A
+    ``STOP_NODE`` or ``START_NODE`` about one is answered ``InvalidCommand`` and
+    changes nothing. A ping node is how the ground learns that the link and
+    the vehicle are alive, and a check that can be switched off is one that
+    can be silenced by mistake, after which a vehicle that is well and one
+    that is not look the same from the ground. It comes up enabled, as every
+    node does, and so it stays.
+
+What a ping and its answer say is ``tcslibgs::node::vehicle::ping``, which a
+ground station writes pings and reads answers with: the format is stated once,
+for both ends. The node is ``tcspecial::node::vehicle::ping``.
 
 Compute elements
 ----------------
@@ -1790,10 +1861,12 @@ both ends read; what follows is what a vehicle made of nodes does with each.
     command that says ``setpoint`` is one a log reads back.
 
 Requirement
-    Any node may be disabled, whatever its kind. A graph does not divide into
-    payloads and the rest -- a computation that must stop and a sensor that
-    must stop are the same request -- and a rule that admitted only some kinds
-    would be a rule an operator has to remember in the middle of a fault.
+    Any node may be disabled, whatever its kind, but a ping node. A graph does
+    not divide into payloads and the rest -- a computation that must stop and a
+    sensor that must stop are the same request -- and a rule that admitted only
+    some kinds would be a rule an operator has to remember in the middle of a
+    fault. The one exception is the node the ground checks the vehicle with,
+    which is refused both commands: see `The ping node`_.
 
 Requirement
     Enabling a node opens what it needs again, and a node that cannot be
@@ -8128,11 +8201,18 @@ Requirement
 Requirement
     A problem is an **error** where the configuration says something wrong --
     two nodes of one name, a link to a node that is not there, a link carrying
-    one stream into the other -- and a **warning** where it has not finished
+    one stream into the other, a node of a type that does not exist -- and a
+    **warning** where it has not finished
     saying it: a node whose attributes are not all in yet, a node nothing is
     linked to. One statement of which is which,
     ``tcslibgs::graph::check::Problem::severity``, so that the verifier, the
     editor and the flight software agree about what a half-built graph is.
+
+    A type that does not exist is an error and not an unfinished attribute,
+    because no amount of finishing makes it work: it is most likely a
+    misspelling, and the flight software would have nothing to open it as.
+    The types are ``tcslibgs::graph::types_in``, one list per section, which
+    the configuration schemas beside tcsgui are tested against.
 
     The split changes no rule. The flight software refuses a configuration
     with any problem in it, warnings included: a sensor whose device nobody

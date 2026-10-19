@@ -787,6 +787,9 @@ pub enum NodeType {
     /// what passes. The one type with all four terminals, which is what makes
     /// it the statement of what a vehicle node is.
     Null,
+    /// A vehicle node that answers each ping from the ground with the
+    /// vehicle's time. See `tcslibgs::node::vehicle::ping`.
+    Ping,
     Log,
     /// A program of the vehicle's own, taking part in the graph over the file
     /// interfaces `tcsapp` describes. Three of them, which differ in which of
@@ -808,7 +811,7 @@ pub enum NodeType {
 
 impl NodeType {
     /// Every type, for the palette and for the tests.
-    pub const ALL: [NodeType; 20] = [
+    pub const ALL: [NodeType; 21] = [
         NodeType::I2c,
         NodeType::Spi,
         NodeType::Serial,
@@ -821,6 +824,7 @@ impl NodeType {
         NodeType::Gpio,
         NodeType::Compute,
         NodeType::Null,
+        NodeType::Ping,
         NodeType::Log,
         NodeType::AppPayloadVeh,
         NodeType::AppMocVeh,
@@ -848,6 +852,7 @@ impl NodeType {
             NodeType::Gpio => "gpio",
             NodeType::Compute => "compute",
             NodeType::Null => "null",
+            NodeType::Ping => "ping",
             NodeType::Log => "log",
             NodeType::AppPayloadVeh => "app_payload_veh",
             NodeType::AppMocVeh => "app_moc_veh",
@@ -1029,6 +1034,10 @@ impl NodeType {
             // the whole of what there is to say, and the configuration check
             // refuses any attribute written on one.
             NodeType::Null => &[],
+            // Nothing either, for the same reason: what a ping node does is
+            // fixed by the format of a ping, and the check refuses an
+            // attribute on one as it does on a null node.
+            NodeType::Ping => &[],
             NodeType::Log => &[("directory", true), ("format", true)],
             // Read from the rules rather than repeated, as the terminals are:
             // what an app node may say is `tcslibgs::node::app`'s, and it
@@ -1145,6 +1154,7 @@ impl NodeType {
             NodeType::Gpio => "Driven",
             NodeType::Compute => "Computation",
             NodeType::Null => "Pass-through",
+            NodeType::Ping => "Link checks",
             // Two families of one, because they are two kinds of end and now
             // two shapes: the log is where the data stops on board and the
             // ground station is where it leaves the vehicle. They are also in
@@ -1207,6 +1217,7 @@ impl NodeType {
             | NodeType::AppAllPl => true,
             NodeType::Compute
             | NodeType::Null
+            | NodeType::Ping
             | NodeType::Log
             | NodeType::AppPayloadVeh
             | NodeType::AppMocVeh
@@ -1352,6 +1363,21 @@ impl NodeType {
                 label_italic: false,
                 outline: Rounded,
                 edge: Single,
+                weight: Narrow,
+                size: (WIDTH, HEIGHT),
+            },
+            // The node that answers the ground: rounded, being software aboard,
+            // and narrow and dashed, a dashed line being the one that comes
+            // and goes -- which is a ping, out and back. No other type is
+            // drawn rounded, dashed and narrow, so it is told apart without
+            // colour.
+            NodeType::Ping => Appearance {
+                face: Face::Plain,
+                label_size: 12,
+                label_weight: 700,
+                label_italic: false,
+                outline: Rounded,
+                edge: Dashed,
                 weight: Narrow,
                 size: (WIDTH, HEIGHT),
             },
@@ -2164,13 +2190,13 @@ mod tests {
     fn every_type_states_what_it_requires() {
         for t in NodeType::ALL {
             let attributes = t.attributes();
-            // A null node is the one type with nothing to say: it carries
-            // what arrives through, so its name and its type are the whole of
-            // it, and the configuration check refuses any attribute written
-            // on one. Every other type that said nothing would be a node that
-            // means nothing.
-            if t == NodeType::Null {
-                assert!(attributes.is_empty(), "a null node says nothing");
+            // A null node and a ping node are the two types with nothing to
+            // say: one carries what arrives through and the other answers
+            // pings, so a name and a type are the whole of either, and the
+            // configuration check refuses any attribute written on one. Every
+            // other type that said nothing would be a node that means nothing.
+            if matches!(t, NodeType::Null | NodeType::Ping) {
+                assert!(attributes.is_empty(), "{} says nothing", t.spelling());
                 continue;
             }
             assert!(!attributes.is_empty(), "{} says nothing", t.spelling());

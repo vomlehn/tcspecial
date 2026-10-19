@@ -26,7 +26,7 @@
 //! # Which types this knows
 //!
 //! The types whose terminals are fixed: a payload kind, a `moc`, the `null`
-//! vehicle node, and the five app node types. A computation's sinks are the inputs it declares and a
+//! and `ping` vehicle nodes, and the five app node types. A computation's sinks are the inputs it declares and a
 //! log's are whatever is written to it, so their terminals are their own rules'
 //! business -- see [`crate::graph::check`] -- and [`terminals_of`] says so by
 //! answering `None`.
@@ -222,7 +222,11 @@ pub fn terminals_of(node_type: &str) -> Option<Terminals> {
         "moc" => Some(MOC),
         "null" => Some(NULL),
         "app_payload_veh" => Some(APP_PAYLOAD),
-        "app_moc_veh" => Some(APP_MOC),
+        // A node that answers the ground's pings takes what the ground sends
+        // and sends its answer groundward, which is an `app_moc_veh`'s shape:
+        // the same table, because it is the same fact. See
+        // `crate::node::vehicle::ping`.
+        "app_moc_veh" | "ping" => Some(APP_MOC),
         "app_all_veh" => Some(APP_ALL),
         "app_pl" => Some(APP_PL),
         // A payload that is a program and is asked, which is a payload: the
@@ -417,6 +421,18 @@ mod tests {
                 "{name} is not a source of null"
             );
         }
+    }
+
+    /// A ping node hears the ground and answers it: what the ground sends
+    /// arrives, and the answer leaves groundward, to arrive at a `moc` node.
+    #[test]
+    fn a_ping_node_hears_the_ground_and_answers_it() {
+        let ping = terminals_of("ping").expect("the ping node");
+        assert_eq!(ping.sinks, &["moc-in"]);
+        assert_eq!(ping.sources, &["payload-out"]);
+        assert!(!ping.merges);
+        assert!(pairs_with("moc-out", ping.sinks[0]));
+        assert!(pairs_with(ping.sources[0], "payload-in"));
     }
 
     /// Each app kind has the terminals its interfaces are.

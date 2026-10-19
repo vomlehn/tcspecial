@@ -2183,6 +2183,7 @@ fn said_already(problem: &Problem, faults: &[Fault]) -> bool {
     faults.iter().any(|fault| match (problem, fault) {
         (Problem::DuplicateNode { name }, Fault::DuplicateName { name: said }) => name == said,
         (Problem::NamelessNode, Fault::NamelessNode { .. }) => true,
+        (Problem::UnknownType { node, .. }, Fault::UnknownType { node: said, .. }) => node == said,
         (Problem::NoSuchNode { from, missing, .. }, Fault::DanglingLink { from: f, to }) => {
             (from == f || missing == f) && (missing == to || from == to)
         }

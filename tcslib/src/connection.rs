@@ -1,6 +1,6 @@
 //! Connection management for ground-to-space communication
 
-use std::io::{self, Read, Write};
+use std::io;
 use std::net::{SocketAddr, UdpSocket};
 use std::time::{Duration, Instant};
 use tcslibgs::{came_from, Command, HostPort, TcsError, TcsResult, Telemetry};
@@ -146,82 +146,6 @@ impl Connection for UdpConnection {
 
     fn close(&mut self) -> TcsResult<()> {
         // UDP sockets don't need explicit closing
-        Ok(())
-    }
-}
-
-/// TCP-based connection to the spacecraft (for LEO/MEO or indirect links)
-pub struct TcpConnection {
-    stream: std::net::TcpStream,
-    recv_buffer: Vec<u8>,
-}
-
-impl TcpConnection {
-    /// Create a new TCP connection
-    pub fn new(remote_addr: &str) -> TcsResult<Self> {
-        let stream = std::net::TcpStream::connect(remote_addr)?;
-        stream.set_nonblocking(false)?;
-
-        Ok(Self {
-            stream,
-            recv_buffer: vec![0u8; 65535],
-        })
-    }
-
-    /// Set the read timeout
-    pub fn set_read_timeout(&self, timeout: Option<Duration>) -> TcsResult<()> {
-        self.stream.set_read_timeout(timeout)?;
-        Ok(())
-    }
-
-    /// Set the write timeout
-    pub fn set_write_timeout(&self, timeout: Option<Duration>) -> TcsResult<()> {
-        self.stream.set_write_timeout(timeout)?;
-        Ok(())
-    }
-}
-
-impl Connection for TcpConnection {
-    fn send(&mut self, command: &Command) -> TcsResult<()> {
-        let data = serde_json::to_vec(command)?;
-        // Send length prefix (4 bytes big endian)
-        let len_bytes = (data.len() as u32).to_be_bytes();
-        self.stream.write_all(&len_bytes)?;
-        self.stream.write_all(&data)?;
-        self.stream.flush()?;
-        Ok(())
-    }
-
-    fn receive(&mut self) -> TcsResult<Telemetry> {
-        // Read length prefix
-        let mut len_bytes = [0u8; 4];
-        self.stream.read_exact(&mut len_bytes)?;
-        let len = u32::from_be_bytes(len_bytes) as usize;
-
-        if len > self.recv_buffer.len() {
-            self.recv_buffer.resize(len, 0);
-        }
-
-        self.stream.read_exact(&mut self.recv_buffer[..len])?;
-        let telemetry: Telemetry = serde_json::from_slice(&self.recv_buffer[..len])?;
-        Ok(telemetry)
-    }
-
-    fn receive_timeout(&mut self, timeout: Duration) -> TcsResult<Telemetry> {
-        self.stream.set_read_timeout(Some(timeout))?;
-        let result = self.receive();
-        self.stream.set_read_timeout(None)?;
-        result
-    }
-
-    fn has_data(&self) -> TcsResult<bool> {
-        // For TCP we'd need to use peek or platform-specific calls
-        // This is a simplified implementation
-        Ok(true) // Assume data might be available
-    }
-
-    fn close(&mut self) -> TcsResult<()> {
-        self.stream.shutdown(std::net::Shutdown::Both)?;
         Ok(())
     }
 }

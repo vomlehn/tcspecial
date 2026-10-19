@@ -6,9 +6,10 @@
 //! [`TcsClient`] rather than speaking the command and telemetry protocol
 //! itself.
 //!
-//! The transport is a [`Connection`], so a client is as happy over a UDP
-//! socket to a radio as over a TCP socket to a test harness, and neither the
-//! operations nor their callers change with it.
+//! The transport is a [`Connection`]. The link to tcspecial is UDP, and
+//! [`UdpConnection`](crate::UdpConnection) is the one a client is built on;
+//! the trait is what lets the tests here stand a canned spacecraft in its
+//! place.
 //!
 //! There are two of them, because the spacecraft takes commands on two links:
 //! what the ground needs in a hurry must never be queued behind what it asked

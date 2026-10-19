@@ -4882,10 +4882,10 @@ with datagrams. Status messages are queued with a fixed-length queue.
 
 Ground/Space Link
 "^^^^^^^^^^^^^^^^^
-The connection between the OC and the CI is usually implemented with a UDP/IP
-datagram since it is generally the ground/space link, for which TCP/IP
-is unsuitable beyond MEO. However, TCP/IP may be suitable if the link is
-indirect, that is, to the radio, or for LEO and MEO orbits.
+The connection between the OC and the CI is UDP/IP datagrams, and never
+TCP/IP. It is generally the ground/space link, for which TCP/IP is unsuitable
+beyond MEO, and one transport is one thing to build, test and keep correct at
+both ends.
 
 The CI has a Mutex<BTreeMap<<DH>>> which holds all of the allocated DHs. The
 use of a Mutex allows status of all DHs to be determined atomically.
@@ -5537,9 +5537,9 @@ Requirement
     A control application on a link that has gone quiet is told so rather than
     left waiting.
 
-The transport is a ``Connection``, so the same client serves a UDP socket to a
-radio and a TCP socket to a test harness without the operations or their
-callers changing. Tcsmoc is built on this client, which is why it is here
+The transport is a ``Connection``. The link to the CI is UDP, so a client is
+built on a ``UdpConnection``; the trait is what lets the client's tests stand a
+canned spacecraft in its place. Tcsmoc is built on this client, which is why it is here
 rather than in tcsmoc: a second copy of it would be a second thing to keep
 correct, and the one in tcsmoc was the only one that existed.
 

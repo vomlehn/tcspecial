@@ -13,11 +13,6 @@
 //! binding the same address: two opens of a file are fine where two binds of a
 //! socket are not.
 //!
-//! The configuration still spells this type `device`, and the shipped sets
-//! still say so. That word changes with the version 2 schema, which has no
-//! reader yet; `design.rst` gives the new one. Renaming it here and not there
-//! would be a module whose name no configuration can ask for.
-//!
 //! See [`crate::endpoint`] for the traits.
 
 use std::fs::{File, OpenOptions};

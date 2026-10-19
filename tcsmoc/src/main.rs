@@ -900,12 +900,8 @@ mod tests {
         // the rule is about the width every panel of a row is given, so it
         // has to hold whatever the row holds.
         //
-        // It used to be one of each *kind* of payload -- periodic and
-        // triggered -- because a triggered one carried two lines the other
-        // did not, and a layout whose children come and go is measured
-        // differently from one whose children are always there: the two came
-        // out 196 and 458 wide. A version 2 panel has one shape, there being
-        // nothing in a node that adds a line to it.
+        // The panels need not differ in kind: a panel has one shape, there
+        // being nothing in a node that adds a line to it.
         for (what, names) in [
             ("a row of two", vec!["k_1", "k_2"]),
             ("a row of three", vec!["k_1", "k_2", "cabin_temp"]),
@@ -1339,10 +1335,7 @@ mod tests {
         let payload_path = root.join(DEFAULT_PAYLOAD_CONFIG_PATH);
 
         // One file says it, and one function reads it, which is what both
-        // ends call: tcspecial resolves the pair the same way. It was two
-        // files -- the set's section and the command interpreter's own
-        // configuration, the second being the fallback for a set that said
-        // nothing -- and version 1 was the only thing that had either.
+        // ends call: tcspecial resolves the pair the same way.
         let graph = tcslibgs::graph::Graph::load(&payload_path)
             .unwrap_or_else(|e| panic!("{} failed to load: {e}", payload_path.display()));
         let mine = tcslibgs::graph::parameters::beacon_of(&graph)
@@ -1389,12 +1382,8 @@ mod tests {
                 .collect::<Vec<_>>()
         };
 
-        // One panel, which is every panel: a version 2 panel has one shape.
-        // This ran twice, once for a payload that sends on its own and once
-        // for one that answers requests, because a version 1 panel carried
-        // two extra lines for the second -- what it was asked with and when.
-        // A node says nothing of the sort, there being nothing in a graph
-        // that adds a line to a panel.
+        // One panel, which is every panel: a panel has one shape, there
+        // being nothing in a graph that adds a line to a panel.
         {
             let kind = "sends to the ground";
             let lines = shown(a_panel(0, "DH0"));

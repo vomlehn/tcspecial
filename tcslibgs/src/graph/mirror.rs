@@ -142,7 +142,7 @@ fn arrivals(graph: &Graph) -> BTreeMap<(String, String), BTreeSet<String>> {
     let mut arriving: BTreeMap<(String, String), BTreeSet<String>> = BTreeMap::new();
     for link in &graph.links {
         let origin = link.origin();
-        // The source terminal, which every version 2 link has: a link is
+        // The source terminal, which every link has: a link is
         // written under the terminal it leaves by, so the name is how it was
         // found at all.
         let Some(leaves) = origin.input.as_deref() else {

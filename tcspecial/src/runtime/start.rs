@@ -1,4 +1,4 @@
-//! Starting a version 2 configuration, and stopping it.
+//! Starting a configuration, and stopping it.
 //!
 //! The program-level part of running a graph: read the file, check it, say
 //! what is about to run, run it, and stop when the vehicle is asked to. It is
@@ -56,8 +56,8 @@ pub fn run_graph(path: &str) -> Result<(), Vec<String>> {
         eprintln!("  {name}: {what}");
     }
 
-    // What this vehicle is serving, said as version 1 says it: the build,
-    // the configuration's version and its digest. The ground compares the
+    // What this vehicle is serving: the build, the configuration's version
+    // and its digest. The ground compares the
     // digest in every beacon with its own, which is how it knows the vehicle
     // is running the configuration it is reading -- the same ports, the same
     // device ids, the same nodes.
@@ -193,10 +193,9 @@ fn telemetry_log(graph: &Graph) -> Result<TelemetryLog, String> {
 /// Start sending beacons where the configuration's `tcspecial` section says.
 ///
 /// From `beacon.send` to `beacon.recv`, every `beacon.interval`, carrying
-/// this build's version, the configuration's and the configuration's digest:
-/// the same beacon a version 1 vehicle sends, by the same code. An interval of
-/// nought sends none, as it does in version 1. Recorded in the telemetry
-/// log, which is the vehicle's own account of what it sent.
+/// this build's version, the configuration's and the configuration's digest.
+/// An interval of nought sends none. Recorded in the telemetry log, which is
+/// the vehicle's own account of what it sent.
 fn beacons(
     graph: &Graph,
     config_version: ConfigVersion,
@@ -233,10 +232,10 @@ fn beacons(
 /// Take the ground's commands where the configuration's `tcspecial` section
 /// says.
 ///
-/// Two links, as version 1 has: the spacecraft's at `tcs_cmd.recv`, and the
-/// one commands about nodes arrive on at `payload_command.dest_base`. See
-/// [`crate::runtime::command`], which says why the second is one socket here
-/// where version 1 bound one per payload.
+/// Two links: the spacecraft's at `tcs_cmd.recv`, and the one commands about
+/// nodes arrive on at `payload_command.dest_base`. See
+/// [`crate::runtime::command`], which says why there are two and why the
+/// second is one socket.
 ///
 /// A configuration with no `tcspecial` section takes no commands, as it sends
 /// no beacons: the section is where the ports are written down, and a vehicle

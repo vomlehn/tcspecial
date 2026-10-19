@@ -245,7 +245,7 @@ impl EndpointPort {
         self
     }
 
-    /// Open the node a version 2 configuration describes.
+    /// Open the node a configuration describes.
     ///
     /// Everything the node says about reaching it comes from
     /// [`tcslibgs::graph::reach`], and which way it is used from the links --

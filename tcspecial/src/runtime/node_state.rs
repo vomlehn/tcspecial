@@ -22,17 +22,12 @@
 //! A port's wait has that descriptor in its poll set beside the endpoint's, so
 //! the wait returns at once and the operation is abandoned where it stands.
 //!
-//! This is version 1's mechanism per node rather than per conduit:
-//! `Conduit::stop` sets its running flag down and writes one byte to a pipe
-//! that is in the poll set beside the endpoint's descriptor, which is why a
-//! conduit waiting on a silent payload can be stopped at all.
-//!
 //! # Why a pipe
 //!
 //! An eventfd would do and would cost one descriptor instead of two. A pipe is
-//! used because it is what version 1 uses and what [`crate::endpoint`]'s waits
-//! already take: one mechanism, understood in one way, in a program where the
-//! thing being woken is a `poll` somebody has to be able to reason about.
+//! used because it is what [`crate::endpoint`]'s waits already take: one
+//! mechanism, understood in one way, in a program where the thing being woken
+//! is a `poll` somebody has to be able to reason about.
 //! Both ends are non-blocking, so a poke cannot block when nothing has drained
 //! the pipe and a drain cannot block when nothing has poked it.
 
@@ -136,8 +131,8 @@ impl Drop for Wakeup {
 /// computation's deadline. This is what makes those abandonable.
 ///
 /// Carried down into the ports and into a computation's own waiting, which is
-/// the convention version 1 set: a conduit hands its endpoints a `cmd_fd` and
-/// they poll it beside the device's. The descriptor is readable exactly while
+/// the convention [`crate::endpoint`]'s waits take: an endpoint is handed a
+/// `cmd_fd` and polls it beside the device's. The descriptor is readable exactly while
 /// the node is disabled, and nothing but enabling the node drains it, so a
 /// wait that finds it readable has been told to stop and not merely nudged.
 ///
@@ -365,9 +360,9 @@ impl NodeState {
     /// and runs until it is stopped, because what a graph describes is a
     /// system that works as a whole -- telemetry reaches the ground with no
     /// ground station having said anything, which is what a vehicle out of
-    /// contact has to do. Version 1 came up with its handlers idle and was
-    /// told which to start, which suited a set of payloads that are separately
-    /// useful and does not suit a graph whose links describe one machine.
+    /// contact has to do. Nodes that came up idle and were told which to start
+    /// would suit a set of separately useful payloads, and do not suit a graph
+    /// whose links describe one machine.
     pub fn new(name: &str, id: NodeId) -> std::io::Result<NodeState> {
         Ok(NodeState {
             name: name.to_string(),

@@ -408,7 +408,7 @@ impl DHName {
     }
 }
 
-/// Which node of a version 2 configuration a command is about.
+/// Which node of a configuration a command is about.
 ///
 /// A node's position among the configuration's nodes, counting from nought in
 /// the order the files declare them: the device id
@@ -535,7 +535,7 @@ impl BeaconInterval {
     }
 }
 
-/// What one node of a version 2 graph has moved.
+/// What one node of a graph has moved.
 ///
 /// Since the vehicle started, and not since the node was last enabled: a node
 /// that was stopped and started again has moved what it moved before, and an
@@ -547,11 +547,9 @@ impl BeaconInterval {
 /// since the vehicle came up. A query answered from a pass's figures would
 /// answer about the last twenty milliseconds.
 ///
-/// Named for what a node does rather than for what a data handler did. A
-/// handler had two conduits and talked about what it received from the ground
-/// and sent back; a node has one interface and two directions -- what the
-/// vehicle takes from it and what the vehicle gives it -- so those are the
-/// words. See [`Statistics`] for version 1's.
+/// Named for what a node does: a node has one interface and two directions --
+/// what the vehicle takes from it and what the vehicle gives it -- so those
+/// are the words.
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NodeCounts {
     /// Bytes the vehicle has taken from this node.
@@ -1293,11 +1291,11 @@ pub(crate) fn link_params_of(
 
 /// What the rules for `kind` make of these terms.
 ///
-/// Apart from [`link_params_of`] because the terms arrive from two schemas
-/// now: a version 1 payload and the group it names state them between them,
-/// and a version 2 node states them as its attributes -- see
-/// [`crate::graph::reach`]. The rules themselves are asked here, once, so
-/// that the two schemas cannot come to be read differently.
+/// Apart from [`link_params_of`] because the terms arrive two ways: a payload
+/// entry and the group it names state them between them, and a node states
+/// them as its attributes -- see [`crate::graph::reach`]. The rules
+/// themselves are asked here, once, so that the two cannot come to be read
+/// differently.
 pub(crate) fn kind_of_terms(
     name: &str,
     kind: DHType,
@@ -1428,8 +1426,8 @@ fn link_terms_of(
         edge: inherited!(edge),
         bias: inherited!(bias),
         debounce: inherited!(debounce),
-        // Version 1 has no state report: its gpio payloads are watched for
-        // edges and nothing else.
+        // A payload entry has no state report: its gpio lines are watched
+        // for edges and nothing else.
         state_interval: None,
         direction: inherited!(direction),
         stream: inherited!(stream).map(|s| crate::endpoint_config::StreamTerms {
@@ -3458,8 +3456,7 @@ mod tests {
     /// The attributes are written as a file writes them, indented under a
     /// payload entry, and an entry read on its own is read at column nought
     /// -- so four spaces come off each line, which leaves whatever is nested
-    /// inside them nested. The file around the entry is gone: it was a
-    /// version 1 payload set, and these rules are a node's now.
+    /// inside them nested. The file around the entry is gone.
     fn link(kind: &str, attributes: &str) -> Result<DHConfigJson, String> {
         let body: String = attributes
             .lines()

@@ -31,23 +31,20 @@ pub const SIM_PAYLOAD_CONFIG_PATH_VAR: &str = "SIM_PAYLOAD_CONFIG_PATH";
 
 /// The configuration read when nothing names one.
 ///
-/// The shipped fixture, which is a version 2 configuration: it was
-/// `tcspecial1.yaml`, one of the four version 1 payload sets, and those are
-/// gone. A default at all is for running the programs from the repository by
-/// hand -- every one of them takes the path as its argument, and that is what
-/// a real run names.
+/// The shipped fixture. A default at all is for running the programs from
+/// the repository by hand -- every one of them takes the path as its
+/// argument, and that is what a real run names.
 pub const DEFAULT_PAYLOAD_CONFIG_PATH: &str = "tests/manual/thermostat.yaml";
 
 
 /// The simulator file beside a configuration and named for it, where there is
 /// one.
 ///
-/// Two spellings, both in use: `<stem>-sim.yaml`, which the examples use, and
-/// `<stem>sim.yaml`, which the version 1 payload sets under `tests/manual`
-/// use. The stem is the configuration's name without `.yaml`, `.yml` or
-/// `.xml`, so either spelling of a configuration finds the same simulator
-/// file. One function for every program that looks, so that tcsmoc and the
-/// tcssim it starts cannot pick different files.
+/// Two spellings are looked for: `<stem>-sim.yaml`, which the examples use,
+/// and the older `<stem>sim.yaml`. The stem is the configuration's name
+/// without `.yaml`, `.yml` or `.xml`, so either spelling of a configuration
+/// finds the same simulator file. One function for every program that looks,
+/// so that tcsmoc and the tcssim it starts cannot pick different files.
 pub fn sim_path_beside(payload_path: &str) -> Option<String> {
     let stem = [".yaml", ".yml", ".xml"]
         .iter()

@@ -36,11 +36,10 @@ pub struct TcsClient {
     /// The one link every node is commanded on.
     ///
     /// One socket and not one per node: a node command carries the node's id
-    /// -- see [`Command::node_id`] -- so the message says which node, where
-    /// version 1 needed a socket apiece to say it by name. A graph also has
-    /// more nodes than a payload set had payloads, so a socket each would
-    /// spend ports on computations and logs that nothing addresses from the
-    /// ground.
+    /// -- see [`Command::node_id`] -- so the message says which node and a
+    /// socket apiece would only say it again. A graph also has nodes that are
+    /// not payloads, so a socket each would spend ports on computations and
+    /// logs that nothing addresses from the ground.
     ///
     /// `None` for a client that has not been given one, which can command the
     /// spacecraft and no node of it.
@@ -132,9 +131,7 @@ impl TcsClient {
     fn link_for(&mut self, command: &Command) -> TcsResult<&mut Box<dyn Connection>> {
         match command.link() {
             // Every node command on the one link, the id in the message
-            // saying which node it is about. It was a link per payload, found
-            // by the name the command carried, which is what version 1's
-            // five payload commands needed.
+            // saying which node it is about.
             CommandLink::Payload => self.nodes.as_mut().ok_or_else(|| {
                 TcsError::Config(format!(
                     "{:?} is about a node and this client has no link for one: it \
@@ -236,11 +233,7 @@ impl TcsClient {
         }
     }
 
-    // -- per data handler --------------------------------------------------
-
-
-
-    // -- a version 2 graph's nodes -----------------------------------------
+    // -- a graph's nodes ---------------------------------------------------
 
     /// Enable a node: START_NODE.
     ///
@@ -337,9 +330,7 @@ impl TcsClient {
         }
     }
 
-    // -- one payload of a version 1 set ------------------------------------
-
-
+    // -- configuring the spacecraft ----------------------------------------
 
     /// Send a CONFIG command
     pub fn configure(&mut self, beacon_interval: BeaconInterval) -> TcsResult<CommandStatus> {

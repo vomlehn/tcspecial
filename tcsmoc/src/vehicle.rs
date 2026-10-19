@@ -1,18 +1,17 @@
-//! Running a version 2 configuration.
+//! The MOC's view of the vehicle: running a configuration.
 //!
-//! A version 2 vehicle is a graph of nodes, and what the window shows is that
-//! graph: each node drawn into a `moc` node sends to the `moc` node's
-//! `ground_base` plus its device id, and each payload nothing touches sends
+//! A vehicle is a graph of nodes, and what the window shows is that graph:
+//! each node drawn into a `moc` node sends to the `moc` node's `ground_base`
+//! plus its device id, and each payload nothing touches sends
 //! over `payload_telemetry` -- see `tcslibgs::graph::telemetry`. So there is
 //! one panel per source, filled through `tcslib::moc`, the same function call
 //! any ground software uses.
 //!
 //! # What the buttons send
 //!
-//! The same two links a version 1 vehicle takes commands on, and the second
-//! is where they differ: version 1 binds a socket per payload, and a version 2
-//! vehicle binds one for every node, the node's id in the message saying which
-//! -- see `tcslibgs::NodeId`. So Enable and Disable on a panel are START_NODE
+//! The vehicle takes commands on two links, and binds the second once for
+//! every node, the node's id in the message saying which -- see
+//! `tcslibgs::NodeId`. So Enable and Disable on a panel are START_NODE
 //! and STOP_NODE about the node that panel is for, by the device id the panel
 //! already shows.
 //!
@@ -208,10 +207,9 @@ fn command_links_of(graph: &Graph) -> Result<Option<(String, String, Commanded)>
 
 /// Say what the vehicle answered a CONNECT with, and whether it agrees.
 ///
-/// What version 1 does, by the same words: the three facts said the way a
-/// beacon says them, so the two can be read against each other. What version
-/// 2 adds is that the verdict is kept -- a node id means nothing until the
-/// two ends have agreed which configuration they are talking about.
+/// The three facts said the way a beacon says them, so the two can be read
+/// against each other, and the verdict kept: a node id means nothing until
+/// the two ends have agreed which configuration they are talking about.
 fn hear_what_the_vehicle_read(
     ui: &MainWindow,
     link: &Mutex<CiLink>,
@@ -645,12 +643,12 @@ pub(crate) fn command_buttons(
                         None => crate::ci_link::NOT_CONNECTED.to_string(),
                     }));
                 }
-                // The rest are version 1's. A restart is not answered by a
-                // version 2 vehicle yet, and the three DH items name a data
+                // The rest are not answered: the vehicle does not answer a
+                // restart yet, and the three DH items name a data
                 // handler where a graph has nodes -- which the panels'
                 // buttons command.
                 other => ui.set_last_response(SharedString::from(format!(
-                    "{other:?} is not answered by a version 2 vehicle: a graph has \
+                    "{other:?} is not answered by the vehicle: a graph has \
                      nodes, which each panel's buttons start, stop and set"
                 ))),
             }
@@ -797,7 +795,7 @@ fn serve(
     }
 }
 
-/// Run the MOC on a version 2 configuration. Does not return.
+/// Run the MOC on a configuration. Does not return.
 pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> ! {
     let graph = match Graph::load(payload_path) {
         Ok(graph) => graph,
@@ -858,7 +856,7 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
     let shape = grid_shape(&sizes, count);
     ui.window().set_size(window_size(&sizes, &shape, count));
     eprintln!(
-        "{payload_path}: a version 2 configuration, {count} source(s) sending to the ground"
+        "{payload_path}: {count} source(s) sending to the ground"
     );
 
     // The two command links, both ends of each from the file. A configuration
@@ -888,17 +886,17 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
     ui.set_ci_status(SharedString::from(DISCONNECTED_STATUS));
     ui.set_ci_address(SharedString::from(vehicle_at));
     ui.set_last_response(SharedString::from(
-        "Version 2: each panel is a node. Press Connect to command them",
+        "Each panel is a node. Press Connect to command them",
     ));
 
     // Whether the vehicle has agreed which configuration it is flying, which
     // is what licenses a node id: see `Agreed`.
     let agreed: Agreed = Arc::new(Mutex::new(None));
 
-    // The vehicle, and the simulator where there is anything to simulate. A
-    // version 2 tcspecial has no command interpreter to ask whether it is
-    // already running, so one is started; and tcssim with nothing to be would
-    // exit at once, taking the MOC with it.
+    // The vehicle, and the simulator where there is anything to simulate.
+    // tcspecial has no command interpreter to ask whether it is already
+    // running, so one is started; and tcssim with nothing to be would exit at
+    // once, taking the MOC with it.
     let [tcspecial, tcssim] = CHILDREN;
     let pm_tcspecial = Arc::new(ProcessManager::new());
     pm_tcspecial.start_child(tcspecial, payload_path);

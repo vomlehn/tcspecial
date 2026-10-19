@@ -119,10 +119,8 @@ mod tests {
     /// A panel's two lines of an arrival: when it came, and what it was.
     ///
     /// What the ground received, which is the whole of what this module is
-    /// for now. It used to open a socket per payload and listen on it -- the
-    /// version 1 arrangement, where each payload had a ground endpoint of its
-    /// own -- and a version 2 node's data reaches the ground through
-    /// `tcslib::moc`, which is where the receiving is tested.
+    /// for: a node's data reaches the ground through `tcslib::moc`, which is
+    /// where the receiving is tested.
     #[test]
     fn an_arrival_says_when_it_came_and_what_it_was() {
         let at = Timestamp::at(

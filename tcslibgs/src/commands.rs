@@ -31,12 +31,11 @@ pub enum CommandType {
     Config,
     /// Enable a node.
     ///
-    /// There were five commands beside these naming a data handler by name --
-    /// START_DH, STOP_DH, QUERY_DH, QUERY_DH_SAMPLE and CONFIG_DH -- and they
-    /// went with version 1. The five below are what answer for a node, which
-    /// a command names by id: the opcodes are not reused, so a ground station
-    /// of the older build is told its command is not one rather than having
-    /// it acted on as another.
+    /// The five below are what answer for a node, which a command names by
+    /// id. They do not reuse the opcodes of the five that named a data handler
+    /// before them -- START_DH, STOP_DH, QUERY_DH, QUERY_DH_SAMPLE and
+    /// CONFIG_DH -- so a ground station of an older build is told its command
+    /// is not one rather than having it acted on as another.
     StartNode,
     /// And disable one.
     StopNode,
@@ -46,10 +45,8 @@ pub enum CommandType {
     QueryNodeSample,
     /// Set an attribute of a node.
     ///
-    /// Version 1's CONFIG_DH carried a name and nothing to configure with,
-    /// and was refused as unimplemented. A graph's `commands` section says
-    /// which attribute of which node the ground may set, so this is the
-    /// command that section was written for.
+    /// A graph's `commands` section says which attribute of which node the
+    /// ground may set, so this is the command that section was written for.
     SetNode,
 }
 
@@ -243,11 +240,10 @@ impl ConnectCommand {
 /// START_NODE, STOP_NODE, QUERY_NODE and QUERY_NODE_SAMPLE. One body for the
 /// four, because there is nothing to say about a node beyond which node it
 /// is: enabling it, disabling it, asking what it has moved and asking what it
-/// last moved all name a node and ask for one thing. Version 1's START_DH
-/// carried the kind of handler it expected as a check that the two ends had
-/// read the same configuration; the id and the digest make that check
-/// beforehand and for every command, so a kind here would be a second answer
-/// to a settled question.
+/// last moved all name a node and ask for one thing. No kind of node rides
+/// along as a check that the two ends read the same configuration: the id and
+/// the digest make that check beforehand and for every command, so a kind
+/// here would be a second answer to a settled question.
 ///
 /// Either of them about a node already in the state asked for answers
 /// success. A command that arrives twice, or whose answer was lost, is the
@@ -289,7 +285,7 @@ impl NodeCommand {
     }
 }
 
-/// SET_NODE - set an attribute of a node of a version 2 graph
+/// SET_NODE - set an attribute of a node
 ///
 /// Which node, which of its attributes, and what to set it to. The
 /// configuration's `commands` section says which attribute of which node the
@@ -386,9 +382,9 @@ impl Command {
 
     /// Which node this command is about, where it is about one.
     ///
-    /// What [`Command::payload_name`] is for a version 1 payload set, for a
-    /// version 2 graph: `None` for every command that names no node, so that
-    /// a command added later is placed by someone who had to decide.
+    /// `None` for every command that names no node, each of them named in
+    /// the match, so that a command added later is placed by someone who had
+    /// to decide.
     pub fn node_id(&self) -> Option<NodeId> {
         match self {
             Command::StartNode(cmd)
@@ -427,7 +423,7 @@ impl Command {
             | Command::RestartArm(_)
             | Command::Restart(_)
             | Command::Config(_)
-            // A version 2 node command names a node, which is not a payload
+            // A node command names a node, which is not a payload
             // name: see [`Command::node_id`].
             | Command::StartNode(_)
             | Command::StopNode(_)
@@ -473,9 +469,9 @@ mod tests {
             CommandType::Config,
         ];
         let payload = [
-            // A node's commands go on this link for the reason version 1's
-            // five payload commands did: what the ground needs in a hurry
-            // must not be queued behind what it asked for at leisure.
+            // A node's commands go on this link because what the ground
+            // needs in a hurry must not be queued behind what it asked for at
+            // leisure.
             CommandType::StartNode,
             CommandType::StopNode,
             CommandType::SetNode,

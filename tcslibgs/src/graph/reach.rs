@@ -1,17 +1,16 @@
-//! What a version 2 node says about the thing it reaches.
+//! What a node says about the thing it reaches.
 //!
 //! A node of a graph is text: a type and a map of attributes as somebody wrote
 //! them. What the flight software opens is an [`EndpointConfig`] -- a bus and
 //! an address, a chip and three line numbers, a line and the framing of it.
 //! This is the piece between, and it is deliberately thin: the rules about
 //! what each type of interface may be told, and what each term means, are the
-//! version 1 rules in [`crate::endpoint_config`] and the per-type modules
-//! under [`crate::node`], and they are reached from here rather than written
-//! again.
+//! rules in [`crate::endpoint_config`] and the per-type modules under
+//! [`crate::node`], and they are reached from here rather than written again.
 //!
 //! That is the whole argument for the shape of this module. Those rules are
 //! the ones that have been tested against real buses; a second set of them
-//! for a second schema would be two statements of every rule, drifting apart
+//! written here would be two statements of every rule, drifting apart
 //! one flight at a time, and the first symptom would be a configuration that
 //! verifies on the ground and opens something else aboard.
 //!
@@ -49,9 +48,8 @@ pub struct Reach {
     /// What to write to make this node answer, where it must be asked.
     ///
     /// A node with a trigger is a node that is asked; there is no separate
-    /// word for the mode, because a trigger and nothing else is what made a
-    /// version 1 payload triggered and the extra word could only disagree
-    /// with it.
+    /// word for the mode, because a trigger and nothing else is what makes a
+    /// node triggered and the extra word could only disagree with it.
     pub trigger: Option<Vec<u8>>,
     /// How long to wait between asking this node and reading it.
     ///
@@ -155,9 +153,8 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
                 );
             }
             // Where one read of a stream ends. Three attributes rather than a
-            // section of its own, because a node's attributes are flat: a
-            // version 1 file nested them under `stream`, and a version 2 node
-            // has nowhere to nest them.
+            // section of its own, because a node's attributes are flat and
+            // there is nowhere to nest them.
             "max_length" => {
                 stream.max_length = Some(value.clone());
                 stream_stated = true;
@@ -439,14 +436,14 @@ fn locators(kind: DHType) -> &'static [&'static str] {
     }
 }
 
-/// Which of the version 1 types this node's type is.
+/// Which [`DHType`] this node's type is.
 ///
-/// The type names differ in two places and both are deliberate. `device-file`
-/// is what version 2 calls a file opened in the filesystem, the word `device`
-/// having meant that and a piece of hardware on a bus at once. And `moc` is a
-/// network link named for what is at the far end of it rather than for how it
-/// is reached, because that is the thing a reader of the configuration cares
-/// about.
+/// The type names differ from those in two places and both are deliberate.
+/// `device-file` is what a configuration calls a file opened in the
+/// filesystem, the word `device` having meant that and a piece of hardware on
+/// a bus at once. And `moc` is a network link named for what is at the far end
+/// of it rather than for how it is reached, because that is the thing a reader
+/// of the configuration cares about.
 fn kind_of(node: &Node) -> Result<DHType, String> {
     match node.node_type.as_str() {
         "i2c" => Ok(DHType::I2c),
@@ -631,11 +628,12 @@ fn port_named(
 ///
 /// A term a configuration used to write, and what to write instead.
 ///
-/// The version 1 spellings of the three above. Refused by name rather than as
-/// a term nothing knows, because the value changes with the name: a node that
-/// says `debounce_us: 50` is not a node with a misspelling on it, it is a node
-/// written for the spelling before this one. Version 1 files were renamed
-/// with these, so the old spelling is nobody's now.
+/// The spellings three terms had before each became a length of time.
+/// Refused by name rather than as a term nothing knows, because the value
+/// changes with the name: a node that says `debounce_us: 50` is not a node
+/// with a misspelling on it, it is a node written for the spelling before
+/// this one. The files here were renamed with these, so the old spelling is
+/// nobody's now.
 pub fn retired_term(attribute: &str) -> Option<&'static str> {
     match attribute {
         "debounce_us" => Some("say debounce, as a length of time: 50 us rather than 50"),
@@ -1179,9 +1177,8 @@ mod tests {
 
     /// A line says where one of its reads ends, as three attributes.
     ///
-    /// A version 1 file nests them under `stream`; a node's attributes are
-    /// flat, so they are written beside the rest of the line's terms. The
-    /// rule they are checked by is the same one.
+    /// A node's attributes are flat, so they are written beside the rest of
+    /// the line's terms.
     #[test]
     fn a_line_says_where_a_read_ends() {
         let reach = reach_of(&node(

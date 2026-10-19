@@ -51,10 +51,10 @@ impl Where {
     /// being the definition the others are duplicates of.
     pub fn line_of(&self, about: &About) -> usize {
         // Which sections an entry of this kind may be written in, and the name
-        // to look for. Three for a node of a version 2 configuration: the
-        // sections are the editor's three working panes, and which one a node
-        // is in is decided by its type -- see `tcslibgs::graph::section_of` --
-        // so a complaint about a node has to be looked for in all of them.
+        // to look for. Three for a node: the sections are the editor's three
+        // working panes, and which one a node is in is decided by its type --
+        // see `tcslibgs::graph::section_of` -- so a complaint about a node has
+        // to be looked for in all of them.
         let (sections, name): (&[&str], &String) = match about {
             About::File => return THE_FILE_ITSELF,
             About::Section(section) => {
@@ -134,8 +134,8 @@ fn yaml(text: &str) -> Where {
         }
 
         // A key at the left margin opens a section, whether or not it has a
-        // value of its own: `payloads:` opens one and `version: "1.0"` opens
-        // one nothing ever asks about.
+        // value of its own: `payloads:` opens one and `description: ...`
+        // opens one nothing ever asks about.
         if !line.starts_with(' ') && !line.starts_with('\t') {
             if let Some(key) = trimmed.split(':').next() {
                 section = key.trim().to_string();
@@ -152,9 +152,9 @@ fn yaml(text: &str) -> Where {
             continue;
         }
 
-        // Or a name inside a flow mapping, which is how a version 2 file is
-        // commonly written: `- { name: temp_1, type: i2c }` on one line.
-        // Without this such an entry is never found and a problem about it is
+        // Or a name inside a flow mapping, which is how a file is commonly
+        // written: `- { name: temp_1, type: i2c }` on one line. Without this
+        // such an entry is never found and a problem about it is
         // reported from its section's line, which sends a reader to the top of
         // a list rather than to the thing.
         if let Some(inside) = key.strip_prefix('{') {

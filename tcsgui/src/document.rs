@@ -210,7 +210,7 @@ pub struct Document {
     /// A group is one of the four things a configuration is made of and it was
     /// missing here: nodes could say `group: cabin_temps` and nothing declared
     /// what that group was, so the editor wrote a configuration the flight
-    /// reader refuses. Found by the version 2 checker on the shipped example,
+    /// reader refuses. Found by the checker on the shipped example,
     /// which is what a checker is for.
     #[serde(default)]
     pub groups: BTreeMap<String, String>,

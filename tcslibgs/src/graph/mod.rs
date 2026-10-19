@@ -1,4 +1,4 @@
-//! The version 2 configuration: a graph of nodes.
+//! A configuration: a graph of nodes.
 //!
 //! What a vehicle does, as `design.rst` specifies it. Four things and no more:
 //! nodes, groups of nodes that share a sampling interval, links between nodes,
@@ -165,7 +165,7 @@ pub struct GraphFile {
     /// and a second file to keep in step is a second file to lose.
     #[serde(default)]
     pub tcsgui: Option<Tcsgui>,
-    /// The sections a version 2 file used to have, kept to be refused.
+    /// The sections a configuration file used to have, kept to be refused.
     ///
     /// Declared so that a file written against the earlier shape is refused by
     /// name, saying where its contents have moved. Without them the complaint
@@ -456,8 +456,8 @@ impl<'de> Deserialize<'de> for NodeFile {
 pub struct Group {
     pub name: String,
     /// How often the group is read: a whole number with a unit, `500 ms` or
-    /// `3 s`. The same grammar a timeout uses in version 1, so that a reader
-    /// who has learned one has learned the other.
+    /// `3 s`. The same grammar a timeout uses, so that a reader who has
+    /// learned one has learned the other.
     pub interval: String,
 }
 
@@ -494,10 +494,9 @@ pub struct Node {
     /// turns `0x48` into the integer 72 and `yes` into a boolean before
     /// anything here sees it, and an XML value arrives as an element with text
     /// in it rather than as a string -- so a map of strings cannot hold what
-    /// either format actually writes. Scalar is version 1's answer to exactly
-    /// that and it is not version 1's concern: a value as a file spelled it is
-    /// a question about formats. It should move to `format` when version 1
-    /// goes.
+    /// either format actually writes. Scalar is the answer to exactly that,
+    /// and a value as a file spelled it is a question about formats: it should
+    /// move to `format`.
     #[serde(flatten)]
     pub attributes: BTreeMap<String, Scalar>,
 }
@@ -1024,7 +1023,7 @@ impl Graph {
 
 /// Read one file of a configuration.
 ///
-/// The sections older than version 1 are named before the file is read as a
+/// The sections of an older spelling are named before the file is read as a
 /// graph: a file still written in them is not a graph with problems in it,
 /// and every complaint the graph reader made about it would be noise.
 fn read_one(path: &Path) -> TcsResult<GraphFile> {
@@ -1040,7 +1039,7 @@ fn read_one(path: &Path) -> TcsResult<GraphFile> {
         .parse(&text)
         .map_err(|e| TcsError::Config(format!("{}: {e}", path.display())))?;
 
-    // The sections a version 2 file used to have, refused by name and told
+    // The sections a configuration file used to have, refused by name and told
     // where their contents have gone. A file full of them would otherwise be
     // read as far as the first one and complained about in serde's words --
     // "unknown field `nodes`" -- which says what is wrong and not what to do.

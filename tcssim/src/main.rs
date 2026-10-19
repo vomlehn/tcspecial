@@ -240,14 +240,13 @@ fn thermal_masses(
         return Ok(BTreeMap::new());
     }
 
-    // A mass needs a graph to take its sensors' encodings from, and a version
-    // 1 payload set has no conversions at all: the handler reads raw bytes
-    // and whatever turns them into a temperature is somebody else's program.
+    // A mass needs a graph to take its sensors' encodings from: without the
+    // graph's conversions nothing says which bytes stand for a temperature.
     let Some(graph) = graph else {
         return Err(format!(
-            "a thermal_mass is declared ({}), and this is a version 1 payload \
-             set: a simulated sensor sends the bytes a to_kelvin node reads \
-             back as the temperature, and a version 1 set has no such node",
+            "a thermal_mass is declared ({}), and no graph was read: a \
+             simulated sensor sends the bytes a to_kelvin node reads back as \
+             the temperature, and without a graph there is no such node",
             declared
                 .iter()
                 .map(|m| m.name.clone())
@@ -301,9 +300,9 @@ fn thermal_masses(
 /// `startup` whatever stops it being simulated.
 ///
 /// Every one of these is a refusal tcsverify has already made, bar the ones
-/// that are the simulator's alone -- a version 2 payload it cannot stand in
-/// for, and a set with no payloads to simulate, which leaves it nothing to be. They
-/// are asked again rather than assumed: the files can change between the two
+/// that are the simulator's alone -- a payload it cannot stand in for, and a
+/// set with no payloads to simulate, which leaves it nothing to be. They are
+/// asked again rather than assumed: the files can change between the two
 /// reads, and a simulator running on a half-read pair would be worse than one
 /// that says so.
 fn load(
@@ -321,10 +320,9 @@ fn load(
         }
     };
 
-    // A version 2 configuration's payloads are nodes of a graph, and the ones
-    // simulated are the ones the simulator file names: see
-    // tcslibgs::graph::simulated, which makes of each what a version 1 set
-    // describes, reached where tcspecial reaches it.
+    // A configuration's payloads are nodes of a graph, and the ones simulated
+    // are the ones the simulator file names: see tcslibgs::graph::simulated,
+    // which makes of each a data handler, reached where tcspecial reaches it.
     // Kept rather than dropped once the handlers are made: a sensor attached
     // to a thermal mass sends its temperature in the encoding the graph's own
     // conversion reads, and that is where the encoding is.
@@ -671,11 +669,11 @@ mod tests {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join(name)
     }
 
-    /// A version 2 example is simulated: its simulated payload nodes, reached
-    /// where tcspecial reaches them, with the simulator file beside it found
-    /// as tcsmoc finds it.
+    /// An example is simulated: its simulated payload nodes, reached where
+    /// tcspecial reaches them, with the simulator file beside it found as
+    /// tcsmoc finds it.
     #[test]
-    fn a_version_2_example_is_simulated() {
+    fn an_example_is_simulated() {
         let payload = repo_file("examples/minimal/minimal.yaml");
         let payload = payload.to_str().expect("a path");
         let sim = tcslibgs::config::sim_path_beside(payload).expect("its simulator file");
@@ -694,7 +692,7 @@ mod tests {
     /// One whose simulator file names nothing is refused, saying so: there is
     /// nothing for a simulator to be.
     #[test]
-    fn a_version_2_example_with_nothing_simulated_is_refused() {
+    fn an_example_with_nothing_simulated_is_refused() {
         let payload = repo_file("examples/simple-app/simple-app.yaml");
         let payload = payload.to_str().expect("a path");
         let sim = tcslibgs::config::sim_path_beside(payload).expect("its simulator file");
@@ -1404,9 +1402,7 @@ mod tests {
     ///
     /// The examples, found rather than listed, so an example added to the
     /// repository is covered by these tests without anyone remembering to
-    /// name it here. They were the four version 1 payload sets under
-    /// `tests/manual`, which are gone: what tcssim simulates is the payloads
-    /// of a graph.
+    /// name it here.
     fn shipped_sets() -> Vec<(std::path::PathBuf, std::path::PathBuf)> {
         let root = repo_file("examples");
         let mut sets = Vec::new();
@@ -1473,14 +1469,12 @@ mod tests {
         }
     }
 
-    // A test that no shipped simulator file fits another configuration was
-    // here. It held while the shipped files were the four version 1 payload
-    // sets, which differed from each other in how their one payload was
-    // reached; the examples do not -- `minimal` and `beacon` both have a
+    // Nothing here checks that no shipped simulator file fits another
+    // configuration, because some do: `minimal` and `beacon` both have a
     // sensor on a UDP socket, and `minimal`'s simulator file fits either,
-    // which is a true thing about two examples rather than a fault. What the
-    // test protected is the rule that a simulated payload states the kind it
-    // stands in for, and that is tested where the rule is:
+    // which is a true thing about two examples rather than a fault. The rule
+    // that matters is that a simulated payload states the kind it stands in
+    // for, and that is tested where the rule is:
     // `tcslibgs::sim_config`'s `the_two_files_cannot_disagree_about_the_kind`.
 
 

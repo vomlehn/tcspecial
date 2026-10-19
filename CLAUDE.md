@@ -102,6 +102,9 @@ killing tcsmoc can leave them running; look for strays afterwards.
   that place.
 - Makefiles: each phony target has its own `.PHONY: <target>` line directly
   above its rule, never one combined list.
-- The tree is not kept under `rustfmt`: it would change most files, so
-  `make check`'s `cargo fmt --check` step fails. Do not run `cargo fmt` over
-  files you are editing, because it would reformat code you did not change.
+- The tree is kept under `rustfmt` with its defaults: run `cargo fmt --all`
+  before committing, and `make check`'s `cargo fmt --check` step must pass.
+  The commit that first formatted the tree is listed in
+  `.git-blame-ignore-revs`; run
+  `git config blame.ignoreRevsFile .git-blame-ignore-revs` once so that
+  `git blame` looks through it.

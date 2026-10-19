@@ -41,7 +41,7 @@ use crate::endpoint::bind_oc_pair;
 use crate::node::vehicle::log::LogNode;
 use crate::runtime::fabric::{Fabric, Moved, Port};
 use crate::runtime::node_state::{Abandon, NodeStates, Nudge};
-use crate::runtime::port::{AppPort, ComputePort, EndpointPort, LogPort, NullPort, Use};
+use crate::runtime::port::{AppPort, ComputePort, EndpointPort, LogPort, NullPort, PingPort, Use};
 use crate::runtime::route::Routes;
 use crate::runtime::schedule::Schedule;
 
@@ -683,10 +683,11 @@ fn is_polled(node: &tcslibgs::graph::Node, routes: &Routes, port: &dyn Port) -> 
     node.group.is_none()
         && port.produces()
         && routes.fan_out(&node.name) > 0
-        // A computation and a `null` node produce because something arrived,
-        // which `Port::ready` has already said and the pass has already
-        // taken: polling one would be asking a question whose answer is gone.
-        && !matches!(node.node_type.as_str(), "compute" | "log" | "null")
+        // A computation, a `null` node and a `ping` node produce because
+        // something arrived, which `Port::ready` has already said and the pass
+        // has already taken: polling one would be asking a question whose
+        // answer is gone.
+        && !matches!(node.node_type.as_str(), "compute" | "log" | "null" | "ping")
 }
 
 /// One source's link to the ground: bound at tcspecial's end and sending to
@@ -730,6 +731,9 @@ pub fn open(
         // A node that carries both streams through and does nothing to what
         // passes. Nothing is opened for it: it is not an interface.
         "null" => Ok(Box::new(NullPort::of(&node.name))),
+        // A node that answers the ground's pings. Nothing is opened for it
+        // either: what it hears and where its answers go are its links.
+        "ping" => Ok(Box::new(PingPort::of(&node.name))),
         // A ground link is where the ground's commands and lines arrive.
         // What goes to the ground does not pass through it: each source has
         // a link of its own to the node's ground_base, opened beside it --
@@ -766,6 +770,7 @@ pub fn described(graph: &Graph) -> BTreeMap<String, String> {
             let how = match node.node_type.as_str() {
                 "compute" | "log" => String::new(),
                 "null" => "passes through".to_string(),
+                "ping" => "answers pings".to_string(),
                 // An app node is a program of its own, and what it does with
                 // what arrives is in that program: nothing here can say more
                 // than which of the two streams it is run with, which its type
@@ -1727,6 +1732,78 @@ vehicle:
             sent.lock().expect("the record").clone(),
             vec![b"reading 1".to_vec()]
         );
+    }
+
+    /// A ping from the ground is answered to the ground in the same pass.
+    ///
+    /// The ground link stands in for the socket the MOC sends to; the ping
+    /// node is the real one. What reaches the ground is the ping, a space and
+    /// the vehicle's time, over the link drawn from the ping node to the
+    /// `moc` node; and what is not a ping is refused and answers nothing.
+    #[test]
+    fn a_ping_from_the_ground_is_answered_to_the_ground() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("ping.yaml");
+        std::fs::write(
+            &path,
+            "moc:\n\
+             \x20 - { name: ground, type: moc, address: 127.0.0.1, port: \"5000\", \
+             ground_base: \"127.0.0.1:5100\", moc-out: pinger }\n\
+             vehicle:\n\
+             \x20 - { name: pinger, type: ping, payload-out: ground }\n",
+        )
+        .expect("written");
+        let graph = Graph::load(&path).expect("it reads");
+
+        let pings = Arc::new(TestLock::new(vec![
+            b"ping #1 1760900000.000000001".to_vec(),
+            b"hello".to_vec(),
+        ]));
+        let sent = kept();
+        let mut system = System::of_opening(
+            &graph,
+            Instant::now(),
+            move |node: &Node, routes: &Routes, abandon: &Abandon| {
+                if node.node_type == "moc" {
+                    Ok(Box::new(Sensor {
+                        readings: Arc::clone(&pings),
+                    }) as Box<dyn Port>)
+                } else {
+                    open(node, routes, abandon)
+                }
+            },
+            |link: &Telemetered| {
+                assert_eq!(link.source, "pinger");
+                assert_eq!(
+                    link.via,
+                    tcslibgs::graph::telemetry::Via::Moc("ground".to_string())
+                );
+                Ok(Box::new(Ground {
+                    got: Arc::clone(&sent),
+                }) as Box<dyn Port>)
+            },
+        )
+        .expect("it opens");
+        assert_eq!(
+            system.polled(),
+            ["ground"],
+            "the ground link is read; the ping node is not"
+        );
+
+        let moved = system.pass(Instant::now());
+        assert!(moved.all_delivered(), "{:?}", moved.refused);
+        let answers = sent.lock().expect("the record").clone();
+        assert_eq!(answers.len(), 1, "{answers:?}");
+        let pong = tcslibgs::node::vehicle::ping::read_reply(&answers[0]).expect("an answer");
+        assert_eq!(pong.ping.count, 1);
+        assert!(answers[0].starts_with(b"ping #1 1760900000.000000001 "));
+
+        // The second datum is not a ping: refused by the node, and nothing goes
+        // to the ground.
+        let moved = system.pass(Instant::now());
+        assert_eq!(moved.refused.len(), 1, "{:?}", moved.refused);
+        assert_eq!(moved.refused[0].0, "pinger");
+        assert_eq!(sent.lock().expect("the record").len(), 1);
     }
 
     /// The group is read on its interval and not before.

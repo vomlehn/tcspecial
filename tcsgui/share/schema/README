@@ -8,7 +8,9 @@ Schemas for the files tcsgui edits.
 What these are for is the thing an editor cannot do for a file somebody is
 writing by hand or with another tool: tell them, in their own editor, that
 `payloads` is a section and `payload` is not. They check the *shape* of a file --
-which sections there are, what an entry may say, and which words are words.
+which sections there are, what an entry may say, and which words are words --
+the node types each section takes among them, and the kinds of payload a
+simulator file may stand in for.
 
 What they do not check is whether a configuration can be flown. Which
 attributes a node of a given type must state, whether two payloads claim one

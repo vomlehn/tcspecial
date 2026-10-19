@@ -22,3 +22,5 @@ pub mod compute;
 pub mod log;
 // A node that carries both streams through and does nothing to what passes.
 pub mod null;
+// A node that answers each ping from the ground with the vehicle's time.
+pub mod ping;

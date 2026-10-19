@@ -50,10 +50,24 @@
             "type": "string"
           },
           "type": {
-            "description": "What kind of payload this stands in for. Said here as well as in the configuration so that a simulator file paired with the wrong configuration is caught rather than simulating the wrong thing.",
+            "description": "What kind of payload this stands in for: one of the interfaces a payload is reached over, a payload that is a program being the program itself and needing no stand-in. Said here as well as in the configuration so that a simulator file paired with the wrong configuration is caught rather than simulating the wrong thing. Empty is not stated.",
             "type": [
               "string",
               "null"
+            ],
+            "enum": [
+              "network",
+              "device-file",
+              "serial",
+              "i2c",
+              "spi",
+              "can",
+              "iio",
+              "rpmsg",
+              "gpio",
+              "hdlc",
+              "",
+              null
             ]
           },
           "protocol": {
@@ -215,10 +229,24 @@
             ]
           },
           "type": {
-            "description": "What kind of payload this stands in for. Said here as well as in the configuration so that a simulator file paired with the wrong configuration is caught rather than simulating the wrong thing.",
+            "description": "What kind of payload this stands in for: one of the interfaces a payload is reached over, a payload that is a program being the program itself and needing no stand-in. Said here as well as in the configuration so that a simulator file paired with the wrong configuration is caught rather than simulating the wrong thing. Empty is not stated.",
             "type": [
               "string",
               "null"
+            ],
+            "enum": [
+              "network",
+              "device-file",
+              "serial",
+              "i2c",
+              "spi",
+              "can",
+              "iio",
+              "rpmsg",
+              "gpio",
+              "hdlc",
+              "",
+              null
             ]
           },
           "protocol": {

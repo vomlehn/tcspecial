@@ -62,6 +62,7 @@ use crate::node::vehicle::app_payload_veh::AppPayloadVeh;
 use crate::node::vehicle::compute::{self, Function};
 use crate::node::vehicle::log::LogNode;
 use crate::node::vehicle::null::Through;
+use crate::node::vehicle::ping::Answers;
 
 use crate::runtime::frame::Framer;
 use crate::runtime::node_state::Abandon;
@@ -863,6 +864,47 @@ impl Port for NullPort {
     /// read the node.
     fn ready(&self) -> bool {
         self.through.waiting()
+    }
+}
+
+/// A `ping` node, as a node of the graph.
+///
+/// As thin as the `null` node's adapter, and for the same reason: the node
+/// holds what there is to hold -- see
+/// [`crate::node::vehicle::ping::Answers`], which is where the answers wait
+/// and where a ping is told from what is not one.
+pub struct PingPort {
+    /// The node's name in the configuration, which every complaint names.
+    what: String,
+    answers: Answers,
+}
+
+impl PingPort {
+    /// A ping node that has answered nothing yet.
+    pub fn of(what: &str) -> PingPort {
+        PingPort {
+            what: what.to_string(),
+            answers: Answers::new(),
+        }
+    }
+}
+
+impl Port for PingPort {
+    /// The oldest answer, to go wherever this node's links go, which is
+    /// groundward: a ping node has one data source.
+    fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
+        self.answers.take(&self.what, buffer).map(Taken::of)
+    }
+
+    /// A ping, answered as it is handed over: the time is when it arrived.
+    fn give(&mut self, _arriving: Arriving<'_>, data: &[u8]) -> Result<(), String> {
+        self.answers.give(&self.what, data)
+    }
+
+    /// It has something to send as a consequence of what arrived, as a
+    /// `null` node does, and never on a schedule of its own.
+    fn ready(&self) -> bool {
+        self.answers.waiting()
     }
 }
 
@@ -1776,6 +1818,35 @@ mod tests {
         // And it is gone once taken, rather than being handed out again.
         assert!(!port.ready());
         assert_eq!(port.take(&mut buffer).map(|taken| taken.bytes), Ok(0));
+    }
+
+    /// A ping node answers each ping as it is handed over, and refuses what is
+    /// not one.
+    #[test]
+    fn a_ping_node_answers_what_arrives() {
+        let mut port = PingPort::of("pinger");
+        assert!(!port.ready(), "nothing has arrived");
+
+        assert_eq!(
+            port.give(Arriving::ANYWHERE, b"ping #1 1760900000.000000001"),
+            Ok(())
+        );
+        assert!(port.ready(), "an answer is made as the ping arrives");
+
+        let mut buffer = [0u8; tcslibgs::DATUM_BYTES];
+        let got = port
+            .take(&mut buffer)
+            .map(|taken| taken.bytes)
+            .expect("an answer");
+        let pong = tcslibgs::node::vehicle::ping::read_reply(&buffer[..got]).expect("it reads");
+        assert_eq!(pong.ping.count, 1);
+        assert!(!port.ready());
+
+        let why = port
+            .give(Arriving::ANYWHERE, b"290.0")
+            .expect_err("not a ping");
+        assert!(why.starts_with("pinger: "), "{why}");
+        assert!(!port.ready(), "and nothing is answered");
     }
 
     /// A null node passes what arrives through, in order and unchanged.

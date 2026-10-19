@@ -271,6 +271,61 @@ pub fn section_of(node_type: &str) -> Section {
     }
 }
 
+/// The vehicle's own node types that are not programs.
+///
+/// The app kinds are the rest of the vehicle's, and which of those are the
+/// vehicle's and which are payloads is `crate::node::app`'s to say: see
+/// [`types_in`], which puts the two together.
+const VEHICLE_TYPES: &[&str] = &["compute", "log", "null", "ping"];
+
+/// Every node type a section may hold, as a file spells them.
+///
+/// The one statement of which types there are. Each section's list is made
+/// from where its types are defined -- the interfaces from
+/// [`crate::types::DHType`], the programs from [`crate::node::app::Kind`] --
+/// so a type added there is a type here. The checking refuses a node whose
+/// type is in none of them, and the schemas beside tcsgui are tested against
+/// them, so a file an editor accepts is one this reader knows.
+pub fn types_in(section: Section) -> Vec<&'static str> {
+    use crate::node::app::Kind;
+    let apps = |payload: bool| {
+        Kind::ALL
+            .into_iter()
+            .filter(move |kind| kind.is_payload() == payload)
+            .map(|kind| kind.node_type())
+    };
+    match section {
+        Section::Moc => vec!["moc"],
+        Section::Vehicle => VEHICLE_TYPES.iter().copied().chain(apps(false)).collect(),
+        Section::Payloads => crate::types::DHType::ALL
+            .iter()
+            .map(|kind| kind.spelling())
+            .chain(apps(true))
+            .collect(),
+    }
+}
+
+/// Whether there is a node type of this name.
+pub fn is_node_type(node_type: &str) -> bool {
+    [Section::Moc, Section::Vehicle, Section::Payloads]
+        .into_iter()
+        .any(|section| types_in(section).contains(&node_type))
+}
+
+/// Whether the ground may start and stop a node of this type.
+///
+/// Every type but `ping`. A ping node is how the ground learns that the link
+/// and the vehicle are alive, and a check that can be switched off is one
+/// that can be silenced by mistake -- after which a vehicle that is well and
+/// a vehicle that is not look the same from the ground. So START_NODE and
+/// STOP_NODE about one are answered with a bad status and change nothing.
+///
+/// The one statement of the rule: the vehicle reads it to answer the
+/// commands, and a ground station may read it to know not to send them.
+pub fn starts_and_stops(node_type: &str) -> bool {
+    node_type != "ping"
+}
+
 /// One node as a file writes it: the node, and the links that leave it.
 ///
 /// Apart from [`Node`] because the two are different things. A node is what the
@@ -518,19 +573,8 @@ impl Node {
     ///
     /// For [`section_of`], which is asked before there is a node to ask about.
     pub fn is_payload_type(node_type: &str) -> bool {
-        matches!(
-            node_type,
-            "i2c"
-                | "spi"
-                | "serial"
-                | "hdlc"
-                | "can"
-                | "iio"
-                | "rpmsg"
-                | "network"
-                | "device-file"
-                | "gpio"
-        ) || crate::node::app::Kind::of(node_type).is_some_and(|kind| kind.is_payload())
+        crate::types::DHType::from_spelling(node_type).is_some()
+            || crate::node::app::Kind::of(node_type).is_some_and(|kind| kind.is_payload())
     }
 }
 
@@ -1303,6 +1347,27 @@ fn whole_micros(text: &str, digits: &str, unit: &str, micros: f64) -> Result<u64
 mod tests {
     use super::*;
     use std::path::Path;
+
+    /// Each type is in one section, the one [`section_of`] says, and the
+    /// payloads' list is [`Node::is_payload_type`]'s.
+    #[test]
+    fn each_type_is_in_the_section_it_belongs_in() {
+        let mut seen = std::collections::BTreeSet::new();
+        for section in [Section::Moc, Section::Vehicle, Section::Payloads] {
+            for node_type in types_in(section) {
+                assert!(seen.insert(node_type), "{node_type} is listed twice");
+                assert_eq!(section_of(node_type), section, "{node_type}");
+                assert_eq!(
+                    Node::is_payload_type(node_type),
+                    section == Section::Payloads,
+                    "{node_type}"
+                );
+                assert!(is_node_type(node_type));
+            }
+        }
+        assert!(seen.contains("ping") && seen.contains("app_pl"));
+        assert!(!is_node_type("bogus") && !is_node_type(""));
+    }
 
     /// The two spellings of a shipped example say the same thing.
     ///

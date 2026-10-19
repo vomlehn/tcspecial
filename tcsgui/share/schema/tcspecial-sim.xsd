@@ -13,13 +13,34 @@
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
            elementFormDefault="qualified">
 
+  <!-- What kind of payload an entry stands in for: one of the interfaces a
+       payload is reached over, as DHType spells them. A payload that is a
+       program is the program itself and needs no stand-in. Empty is not
+       stated, which is what the editor writes into the form it makes.
+       xs:token, so that the whitespace around a word is not part of it. -->
+  <xs:simpleType name="kind">
+    <xs:restriction base="xs:token">
+      <xs:enumeration value="network"/>
+      <xs:enumeration value="device-file"/>
+      <xs:enumeration value="serial"/>
+      <xs:enumeration value="i2c"/>
+      <xs:enumeration value="spi"/>
+      <xs:enumeration value="can"/>
+      <xs:enumeration value="iio"/>
+      <xs:enumeration value="rpmsg"/>
+      <xs:enumeration value="gpio"/>
+      <xs:enumeration value="hdlc"/>
+      <xs:enumeration value=""/>
+    </xs:restriction>
+  </xs:simpleType>
+
   <!-- One entry of either list: a name, and the settings it states. A choice
        repeated rather than xs:all, so that the order is free. -->
   <xs:complexType name="entry">
     <xs:choice minOccurs="0" maxOccurs="unbounded">
       <xs:element name="name" type="xs:string"/>
       <xs:element name="group" type="xs:string"/>
-      <xs:element name="type" type="xs:string"/>
+      <xs:element name="type" type="kind"/>
       <xs:element name="protocol" type="xs:string"/>
       <xs:element name="payload_address" type="xs:string"/>
       <xs:element name="payload_port" type="xs:string"/>
@@ -33,7 +54,23 @@
       <xs:element name="silent_after" type="xs:string"/>
       <xs:element name="close_after" type="xs:string"/>
       <xs:element name="ignore_trigger_percent" type="xs:string"/>
+      <!-- What a payload is attached to: the thermal mass it reports, or the
+           one it warms and how fast. -->
+      <xs:element name="reads" type="xs:string"/>
+      <xs:element name="heats" type="xs:string"/>
+      <xs:element name="rate" type="xs:string"/>
     </xs:choice>
+  </xs:complexType>
+
+  <!-- A thermal mass: what the simulated sensors read and the simulated
+       heaters warm. All three are required, as they are where the file is
+       read; the order is free. -->
+  <xs:complexType name="thermal_mass">
+    <xs:all>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="environment" type="xs:string"/>
+      <xs:element name="time_constant" type="xs:string"/>
+    </xs:all>
   </xs:complexType>
 
   <xs:element name="simulator">
@@ -41,6 +78,7 @@
       <xs:choice minOccurs="0" maxOccurs="unbounded">
         <xs:element name="description" type="xs:string"/>
         <xs:element name="simulated_payload_groups" type="entry"/>
+        <xs:element name="thermal_mass" type="thermal_mass"/>
         <xs:element name="simulated_payloads" type="entry"/>
       </xs:choice>
     </xs:complexType>

@@ -281,6 +281,22 @@ fn binds_every_interface(address: &str) -> bool {
 }
 
 impl DHType {
+    /// Every kind, in the order [`DHType::spellings`] lists them: the
+    /// interfaces a payload node may be reached over, and the kinds a
+    /// simulator file may stand in for.
+    pub const ALL: [DHType; 10] = [
+        DHType::Network,
+        DHType::Device,
+        DHType::Serial,
+        DHType::I2c,
+        DHType::Spi,
+        DHType::Can,
+        DHType::Iio,
+        DHType::Rpmsg,
+        DHType::Gpio,
+        DHType::Hdlc,
+    ];
+
     /// The word a configuration file uses for this kind.
     ///
     /// One table, read in both directions and from both files, so that the
@@ -310,20 +326,7 @@ impl DHType {
     /// is left out here rather than quietly accepted, so that a file still
     /// using it is told the name it has now -- see [`DHType::renamed`].
     pub fn from_spelling(text: &str) -> Option<DHType> {
-        [
-            DHType::Network,
-            DHType::Device,
-            DHType::Serial,
-            DHType::I2c,
-            DHType::Spi,
-            DHType::Can,
-            DHType::Iio,
-            DHType::Rpmsg,
-            DHType::Gpio,
-            DHType::Hdlc,
-        ]
-        .into_iter()
-        .find(|kind| kind.spelling() == text)
+        DHType::ALL.into_iter().find(|kind| kind.spelling() == text)
     }
 
     /// "a" or "an", for a sentence naming this kind.

@@ -155,7 +155,8 @@ terminal
     where they arrive; ``moc-out`` is where what the ground sends leaves and
     ``moc-in`` is where it arrives. A payload has ``moc-in`` and
     ``payload-out``; a MOC link has ``payload-in`` and ``moc-out``; a ``null``
-    node has all four. With no vehicle node in the way, a payload's ``payload-out``
+    node has all four; and a ``ping`` node has a payload's pair, ``moc-in`` and
+    ``payload-out``. With no vehicle node in the way, a payload's ``payload-out``
     connects to a MOC link's ``payload-in``.
 
     A link is written as an attribute of the node it leaves, named after the
@@ -209,6 +210,16 @@ terminal
 ``null`` node
     A vehicle node that carries both streams through and does nothing to what
     passes. It is the one type with all four terminals.
+
+``ping`` node
+    A vehicle node that answers the ground. Link a MOC link's ``moc-out`` to
+    it and its ``payload-out`` back to the MOC link. Each ping the ground sends,
+    ``ping #<count> <time>``, comes back with a space and the vehicle's time on
+    the end. Each time is seconds since the UNIX epoch with nine digits after
+    the point, such as ``1760900000.000000001``, and the count starts at one.
+    A message that is not a ping is refused and logged aboard, not answered.
+    A ping node takes no attributes, and it cannot be stopped or started from
+    the ground: both commands are answered ``InvalidCommand``.
 
 command binding
     A statement that a named command from the MOC sets a named attribute of a
@@ -2270,8 +2281,9 @@ the file, the line and what is wrong there:
    /tmp/draft.yaml:68: error: payload "random-device" is a device-file payload, so port does not apply to it
 
 Each line says which kind it is. An **error** is a configuration that says
-something wrong -- two nodes of one name, a link to a node that is not there.
-A **warning** is one that has not finished saying it: a node whose attributes
+something wrong -- two nodes of one name, a link to a node that is not there,
+a node whose type does not exist (the message lists the types each section
+takes). A **warning** is one that has not finished saying it: a node whose attributes
 are not all in yet, a node nothing is linked to. That is the state every
 configuration is in while it is being drawn, so warnings do not fail the run.
 

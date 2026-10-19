@@ -1,0 +1,12 @@
+# A vehicle node that answers each ping from the ground with the vehicle's
+# time.
+#
+# What the MOC sends arrives at its moc-in, and the ping comes back by its
+# payload-out with one space and the vehicle's time on the end. What a ping
+# says is tcslibgs/src/node/vehicle/ping/; its Rust is
+# tcspecial/src/node/vehicle/ping/.
+node: ping
+type: ping
+about: Answers each ping from the ground with the vehicle's time.
+moc-sink: true
+payload-source: true

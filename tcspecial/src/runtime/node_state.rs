@@ -351,6 +351,10 @@ pub struct NodeState {
     counters: Counters,
     /// The last datum each way.
     samples: Mutex<Samples>,
+    /// Whether the ground may start and stop it: see
+    /// [`tcslibgs::graph::starts_and_stops`]. Fixed when the state is made,
+    /// because a node's type is.
+    switchable: bool,
 }
 
 impl NodeState {
@@ -371,6 +375,7 @@ impl NodeState {
             wakeup: Arc::new(Wakeup::new()?),
             counters: Counters::default(),
             samples: Mutex::new(Samples::default()),
+            switchable: true,
         })
     }
 
@@ -380,6 +385,11 @@ impl NodeState {
 
     pub fn id(&self) -> NodeId {
         self.id
+    }
+
+    /// Whether the ground may start and stop this node.
+    pub fn is_switchable(&self) -> bool {
+        self.switchable
     }
 
     /// Whether the pass may touch this node.
@@ -535,7 +545,13 @@ impl NodeStates {
             ids.iter().map(|(name, &id)| (id, name.as_str())).collect();
         in_order.sort_unstable();
         for (id, name) in in_order {
-            let state = Arc::new(NodeState::new(name, NodeId::of(id))?);
+            let mut state = NodeState::new(name, NodeId::of(id))?;
+            state.switchable = graph
+                .nodes
+                .iter()
+                .find(|node| node.name == name)
+                .is_none_or(|node| tcslibgs::graph::starts_and_stops(&node.node_type));
+            let state = Arc::new(state);
             states.by_name.insert(name.to_string(), state.clone());
             states.by_id.push(state);
         }

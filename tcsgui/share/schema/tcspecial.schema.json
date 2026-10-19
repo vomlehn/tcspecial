@@ -171,8 +171,11 @@
             "type": "string"
           },
           "type": {
-            "description": "What it is: the configuration's own word for the type.",
-            "type": "string"
+            "description": "What it is: the configuration's own word for the type. A ground link is moc.",
+            "type": "string",
+            "enum": [
+              "moc"
+            ]
           },
           "group": {
             "description": "The payload group that reads it, where it is in one. Optional, though a payload that states a trigger needs one: the interval of its group is how often it is asked.",
@@ -748,8 +751,17 @@
             "type": "string"
           },
           "type": {
-            "description": "What it is: the configuration's own word for the type.",
-            "type": "string"
+            "description": "What it is: the configuration's own word for the type. One of the vehicle's own: a computation, a log, a pass-through, a node that answers pings, or a program of the vehicle's.",
+            "type": "string",
+            "enum": [
+              "compute",
+              "log",
+              "null",
+              "ping",
+              "app_payload_veh",
+              "app_moc_veh",
+              "app_all_veh"
+            ]
           },
           "group": {
             "description": "The payload group that reads it, where it is in one. Optional, though a payload that states a trigger needs one: the interval of its group is how often it is asked.",
@@ -1334,8 +1346,22 @@
             "type": "string"
           },
           "type": {
-            "description": "What it is: the configuration's own word for the type.",
-            "type": "string"
+            "description": "What it is: the configuration's own word for the type. One of the interfaces a payload is reached over, or a payload that is a program.",
+            "type": "string",
+            "enum": [
+              "network",
+              "device-file",
+              "serial",
+              "i2c",
+              "spi",
+              "can",
+              "iio",
+              "rpmsg",
+              "gpio",
+              "hdlc",
+              "app_pl",
+              "app_all_pl"
+            ]
           },
           "group": {
             "description": "The payload group that reads it, where it is in one. Optional, though a payload that states a trigger needs one: the interval of its group is how often it is asked.",

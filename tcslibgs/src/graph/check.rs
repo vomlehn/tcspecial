@@ -74,6 +74,14 @@ pub enum Problem {
     EmptyGroup { group: String },
     /// A node with no name, which nothing can link to.
     NamelessNode,
+    /// A node whose type is no node type at all.
+    ///
+    /// An error and not a warning, which is what an attribute that is wrong
+    /// is: a node whose attributes are unfinished is a node of a known kind
+    /// that somebody is still describing, and one whose type is unknown is a
+    /// node the flight software has no way to open -- most likely a misspelled
+    /// type, which no amount of finishing will make work.
+    UnknownType { node: String, node_type: String },
     /// A link naming a node that is not in the configuration.
     ///
     /// `from` is the node the link leaves, which is where the link is written:
@@ -265,6 +273,7 @@ impl Problem {
         match self {
             Problem::DuplicateNode { name } => About::Node(name.clone()),
             Problem::NamelessNode => About::Section("nodes"),
+            Problem::UnknownType { node, .. } => About::Node(node.clone()),
             Problem::DuplicateGroup { name } => About::NodeGroup(name.clone()),
             Problem::EmptyGroup { group } => About::NodeGroup(group.clone()),
             Problem::BadInterval { group, .. } => About::NodeGroup(group.clone()),
@@ -345,6 +354,17 @@ impl Problem {
                 format!("group \"{group}\" has no nodes in it")
             }
             Problem::NamelessNode => "a node has no name".to_string(),
+            Problem::UnknownType { node, node_type } => {
+                use crate::graph::{types_in, Section};
+                let listed = |section| types_in(section).join(", ");
+                format!(
+                    "\"{node}\": there is no node type called \"{node_type}\". Write one \
+                     of these: in moc, {}; in vehicle, {}; in payloads, {}",
+                    listed(Section::Moc),
+                    listed(Section::Vehicle),
+                    listed(Section::Payloads)
+                )
+            }
             Problem::NoSuchNode { link, missing, .. } => {
                 format!("{link}: there is no node called \"{missing}\"")
             }
@@ -565,6 +585,12 @@ impl Graph {
                 continue;
             }
             *seen.entry(node.name.as_str()).or_insert(0) += 1;
+            if !crate::graph::is_node_type(&node.node_type) {
+                problems.push(Problem::UnknownType {
+                    node: node.name.clone(),
+                    node_type: node.node_type.clone(),
+                });
+            }
         }
         for (name, count) in &seen {
             if *count > 1 {
@@ -988,20 +1014,29 @@ impl Graph {
             }
         }
 
-        // A `null` node says nothing about itself.
+        // A `null` node and a `ping` node say nothing about themselves.
         //
-        // It has nothing to say: it is not opened, it has no parameters, and
-        // what it does is carry what arrives through. So an attribute on one
-        // is a word nothing reads -- most likely a node whose type was changed
-        // and whose attributes were left behind -- and it is refused by name
-        // rather than ignored, which is the rule every other type is held to.
-        for node in self.nodes.iter().filter(|n| n.node_type == "null") {
+        // They have nothing to say: neither is opened, neither has
+        // parameters, and what each does is fixed -- a null node carries what
+        // arrives through, and a ping node answers each ping with the time
+        // (see `crate::node::vehicle::ping`). So an attribute on one is a word
+        // nothing reads -- most likely a node whose type was changed and whose
+        // attributes were left behind -- and it is refused by name rather than
+        // ignored, which is the rule every other type is held to.
+        for node in self.nodes.iter() {
+            let does = match node.node_type.as_str() {
+                "null" => "carries what arrives through",
+                "ping" => "answers each ping from the ground with the vehicle's time",
+                _ => continue,
+            };
             for attribute in node.attributes.keys() {
                 problems.push(Problem::BadNode {
                     node: node.name.clone(),
                     why: format!(
-                        "\"{}\": \"{attribute}\" is not an attribute of a null                          node: a null node carries what arrives through and has                          nothing to be told",
-                        node.name
+                        "\"{}\": \"{attribute}\" is not an attribute of a {} node: a \
+                         {} node {does} and has nothing to be told, so take the \
+                         attribute out",
+                        node.name, node.node_type, node.node_type
                     ),
                 });
             }
@@ -1404,7 +1439,7 @@ fn claim_text(claim: &Claim) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::graph::{CommandBinding, Destinations, Group, Link, Node};
+    use crate::graph::{CommandBinding, Destinations, Group, Link, Node, Section};
     use crate::Scalar;
     use std::collections::BTreeMap;
 
@@ -3132,6 +3167,77 @@ mod tests {
         );
     }
 
+    /// A node of a type that does not exist is an error, and says which types
+    /// there are; every type there is passes.
+    #[test]
+    fn a_type_that_does_not_exist_is_an_error() {
+        let g = graph(vec![node("a", "bogus")], Vec::new());
+        let problems = g.check();
+        let unknown = problems
+            .iter()
+            .find(|p| matches!(p, Problem::UnknownType { .. }))
+            .unwrap_or_else(|| panic!("{problems:?}"));
+        assert_eq!(unknown.severity(), Severity::Error);
+        assert_eq!(unknown.about(), About::Node("a".to_string()));
+        let said = unknown.describe();
+        assert!(
+            said.contains("\"bogus\"") && said.contains("ping") && said.contains("i2c"),
+            "{said}"
+        );
+
+        for section in [Section::Moc, Section::Vehicle, Section::Payloads] {
+            for node_type in crate::graph::types_in(section) {
+                let g = graph(vec![node("a", node_type)], Vec::new());
+                assert!(
+                    !g.check()
+                        .iter()
+                        .any(|p| matches!(p, Problem::UnknownType { .. })),
+                    "{node_type} is a type"
+                );
+            }
+        }
+    }
+
+    /// A ping node hears the ground and answers it, and is told nothing else.
+    ///
+    /// What the ground sends arrives at its `moc-in` and its answer leaves by
+    /// its `payload-out`, so it stands between a ground link's two ends.
+    #[test]
+    fn a_ping_node_answers_the_ground_and_is_told_nothing() {
+        let g = graph(
+            vec![node("c", "moc"), node("p", "ping")],
+            vec![link("c.moc-out", &["p"]), link("p", &["c"])],
+        );
+        assert_eq!(g.check(), Vec::new());
+
+        // A payload's readings are not pings, and a ping node has nowhere for
+        // them to arrive.
+        let g = graph(
+            vec![node("a", "i2c"), node("c", "moc"), node("p", "ping")],
+            vec![link("a.payload-out", &["p.payload-in"]), link("p", &["c"])],
+        );
+        assert_ne!(g.check(), Vec::new());
+
+        // And an attribute on one is a word nothing reads, refused by name.
+        let mut said_something = node("p", "ping");
+        said_something
+            .attributes
+            .insert("interval".to_string(), Scalar::of("1 s"));
+        let g = graph(
+            vec![node("c", "moc"), said_something],
+            vec![link("c.moc-out", &["p"]), link("p", &["c"])],
+        );
+        let problems = g.check();
+        assert!(
+            problems.iter().any(|p| matches!(
+                p,
+                Problem::BadNode { node, why }
+                    if node == "p" && why.contains("\"interval\" is not an attribute of a ping node")
+            )),
+            "{problems:?}"
+        );
+    }
+
     /// Every payload aboard may report to the one ground link.
     ///
     /// A sink takes one source, and the ground's is the exception the whole
@@ -3223,6 +3329,10 @@ mod tests {
             Problem::DuplicateGroup { name: "g".into() },
             Problem::EmptyGroup { group: "g".into() },
             Problem::NamelessNode,
+            Problem::UnknownType {
+                node: "a".into(),
+                node_type: "bogus".into(),
+            },
             Problem::NoSuchNode {
                 from: "a".into(),
                 link: "\"a\" to \"b\"".into(),

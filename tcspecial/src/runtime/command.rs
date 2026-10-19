@@ -519,6 +519,18 @@ impl Serving {
         };
         let name = state.name().to_string();
 
+        // A node the ground may not start or stop -- a ping node, which is
+        // how the ground knows the vehicle is there -- is refused and left as
+        // it was: see `tcslibgs::graph::starts_and_stops`. Before anything
+        // below, because stopping begins the moment this is asked.
+        if !state.is_switchable() {
+            warn!(
+                "\"{name}\" may not be {} from the ground, and is left as it was",
+                if enabled { "started" } else { "stopped" }
+            );
+            return CommandStatus::InvalidCommand;
+        }
+
         // Stopping takes effect here and now, before anything is handed over:
         // a node the ground has disabled must stop, not stop after the
         // operation it is in the middle of. The flag goes down and the node's
@@ -827,6 +839,61 @@ mod tests {
             handed_over().last(),
             Some(&Work::Enable("inside".to_string())),
             "opening a node is the pass's work, and the flag goes up with it"
+        );
+    }
+
+    /// A ping node is neither stopped nor started: both are answered with a
+    /// bad status, and the node is left running with nothing handed over.
+    #[test]
+    fn a_ping_node_is_neither_stopped_nor_started() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("ping.yaml");
+        std::fs::write(
+            &path,
+            "moc:\n\
+             \x20 - { name: ground, type: moc, address: 127.0.0.1, port: \"5000\", \
+             ground_base: \"127.0.0.1:5100\", moc-out: pinger }\n\
+             vehicle:\n\
+             \x20 - { name: pinger, type: ping, payload-out: ground }\n",
+        )
+        .expect("written");
+        let graph = Graph::load(&path).expect("it reads");
+        let states = Arc::new(NodeStates::of(&graph).expect("states"));
+        let pinger = NodeId::of(tcslibgs::graph::telemetry::ids(&graph)["pinger"]);
+
+        let (bench, done) = a_pass_answering(|_| Ok(()));
+        let (ground, commands) = started_with(states.clone(), bench);
+        let at = commands.node_address();
+
+        match ask(
+            &ground,
+            at,
+            &Command::StopNode(NodeCommand::stop(1, pinger)),
+        ) {
+            Some(Telemetry::StopNode(tm)) => {
+                assert_eq!(tm.header.status, CommandStatus::InvalidCommand);
+                assert_eq!(tm.node, pinger, "the answer says which node");
+            }
+            other => panic!("expected a stop answer, got {other:?}"),
+        }
+        assert!(states.is_enabled("pinger"), "a refused stop stops nothing");
+
+        match ask(
+            &ground,
+            at,
+            &Command::StartNode(NodeCommand::start(2, pinger)),
+        ) {
+            Some(Telemetry::StartNode(tm)) => {
+                assert_eq!(tm.header.status, CommandStatus::InvalidCommand);
+                assert_eq!(tm.node, pinger);
+            }
+            other => panic!("expected a start answer, got {other:?}"),
+        }
+        assert!(states.is_enabled("pinger"));
+        assert_eq!(
+            *done.lock().expect("the record"),
+            Vec::<Work>::new(),
+            "and the pass is asked to do nothing"
         );
     }
 

@@ -1616,7 +1616,7 @@ fn link_terms_of(
         };
     }
 
-    let wire = crate::endpoint_config::LinkTerms {
+    crate::endpoint_config::LinkTerms {
         datarate: inherited!(datarate),
         stop_bits: inherited!(stop_bits),
         parity: inherited!(parity),
@@ -1657,9 +1657,7 @@ fn link_terms_of(
             timeout: s.timeout,
             terminators: s.terminators,
         }),
-    };
-
-    wire
+    }
 }
 
 /// A length of time, named so that a bad one says which attribute it was.

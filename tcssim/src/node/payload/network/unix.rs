@@ -219,6 +219,19 @@ pub fn run_unix_dgram_node(
     stats: Arc<std::sync::Mutex<PayloadStats>>,
 ) {
     let handler = PathBuf::from(&config.address);
+
+    // A heater is the other way round, exactly as it is over UDP. It sends
+    // nothing -- being driven is the whole of what it is for -- so the
+    // vehicle cannot learn where it is from a datagram and sends to the path
+    // the configuration gives instead. Then this end is the one that has to
+    // be findable, so it binds that path rather than one of its own.
+    //
+    // The vehicle's end is unbound, so nothing arrives here from a path: see
+    // `tcspecial::node::payload::network::unix::UnixDatagramEndpoint::driving`.
+    if matches!(config.thermal, Some(crate::thermal::Thermal::Heats { .. })) {
+        run_driven_unix_dgram_node(config, running, stats, &handler);
+        return;
+    }
     // The path this end answers from: the one the simulator file asked for,
     // or one beside the handler's. A file that says nothing gets the second,
     // which is what every simulator file asked for before this could be
@@ -301,6 +314,83 @@ pub fn run_unix_dgram_node(
                     sent += 1;
                 }
             }
+        }
+
+        wait_out_packet(&pacing, started, &running);
+    }
+}
+
+/// Stand in for a datagram payload the vehicle drives and never reads.
+///
+/// The mirror of `run_driven_udp_node`, and the same loop with the sending
+/// taken out: whatever the vehicle writes is counted and acted on, and
+/// nothing goes the other way. The pacing is still the file's, and for a
+/// device that sends nothing it means the one thing left -- how often it
+/// looks for what the vehicle decided.
+///
+/// This end binds the path the configuration names, which is where the
+/// vehicle's end sends. The dead-socket rule applies to it as it does to
+/// every path this crate binds, and the path is unlinked when the device
+/// goes.
+fn run_driven_unix_dgram_node(
+    config: PayloadConfig,
+    running: Arc<AtomicBool>,
+    stats: Arc<std::sync::Mutex<PayloadStats>>,
+    at: &Path,
+) {
+    if let Err(e) = clear_a_dead_socket(at) {
+        eprintln!(
+            "{}: failed to stand in for a driven Unix datagram device: {}",
+            config.name, e
+        );
+        return;
+    }
+
+    let socket = match UnixDatagram::bind(at) {
+        Ok(socket) => socket,
+        Err(e) => {
+            eprintln!(
+                "{}: failed to wait for the vehicle at {}: {}",
+                config.name,
+                at.display(),
+                e
+            );
+            return;
+        }
+    };
+    let _bound = BoundPath {
+        path: at.to_path_buf(),
+    };
+    socket.set_nonblocking(true).ok();
+    eprintln!(
+        "{}: a driven Unix datagram device is waiting at {}",
+        config.name,
+        at.display()
+    );
+
+    while running.load(Ordering::SeqCst) {
+        let started = Instant::now();
+        let pacing = Pacing::read(&config);
+
+        // Everything that has arrived, and not one datagram a pass: a
+        // decision says what the device should be *now*, so an older one is
+        // superseded rather than queued. Taking one a pass means a vehicle
+        // deciding faster than this device looks leaves it acting on a
+        // decision that is older every pass -- which is a heater that goes on
+        // when it is told to and stays on through every later word to the
+        // contrary. The reasoning is `run_driven_udp_node`'s, which found it
+        // the hard way.
+        let mut buf = vec![0u8; 4096];
+        while let Ok((n, _from)) = socket.recv_from(&mut buf) {
+            if n == 0 {
+                break;
+            }
+            // The mass is told before the statistics are, so that nothing
+            // holds the stats lock across the mass's own.
+            crate::thermal::driven(&config.thermal, &config.name, &buf[..n]);
+            let mut guard = stats.lock().unwrap();
+            guard.a_packet_has_come(&buf[..n]);
+            guard.bytes_recv += n as u64;
         }
 
         wait_out_packet(&pacing, started, &running);
@@ -442,6 +532,85 @@ mod tests {
 
     /// A socket file left by a run that was killed is replaced: the path is
     /// the address, and a dead socket at it would stop every run from then on.
+    /// A driven datagram device waits where the vehicle sends, and the mass
+    /// is warmed by what arrives.
+    ///
+    /// The case the ordinary arrangement cannot serve: a heater sends nothing,
+    /// so the vehicle cannot learn where it is and sends to the path the
+    /// configuration names -- which means this end has to be waiting there.
+    /// Bound the other way round, the vehicle's write would have had nowhere
+    /// to land and the mass would never have warmed.
+    #[test]
+    fn a_driven_datagram_device_waits_where_the_vehicle_sends() {
+        use crate::thermal::{Thermal, ThermalMass};
+        use tcslibgs::sim_config::ResolvedMass;
+
+        let path = a_path("driven");
+        std::fs::remove_file(&path).ok();
+
+        let mass = Arc::new(ThermalMass::new(
+            &ResolvedMass {
+                name: "cabin".to_string(),
+                environment: 283.15,
+                time_constant: Duration::from_secs(50),
+            },
+            Instant::now(),
+        ));
+        let cold = mass.temperature();
+
+        // A heater at the path the configuration names, looking for what the
+        // vehicle decided every 20 ms -- which is all pacing means for a
+        // device that sends nothing.
+        let mut device = SimulatedPayload::new(PayloadConfig {
+            thermal: Some(Thermal::Heats {
+                mass: mass.clone(),
+                rate: 3.0,
+            }),
+            name: "heaters_1".to_string(),
+            protocol: PayloadProtocol::UnixDgram,
+            address: path.display().to_string(),
+            port: 0,
+            bus_address: 0,
+            can_id: 0,
+            can_fd: false,
+            gpio_lines: Vec::new(),
+            triggered: false,
+            faults: Default::default(),
+            own_address: None,
+            own_port: None,
+            packet_size: Arc::new(AtomicU32::new(1)),
+            segment_size: Arc::new(AtomicU32::new(1)),
+            packet_interval_ms: Arc::new(AtomicU32::new(20)),
+            segment_interval_ms: Arc::new(AtomicU32::new(0)),
+        });
+        device.start().expect("the device starts");
+
+        // The vehicle's end: unbound, sending where the file says the device
+        // is. Written in a loop because the device binds the path on a thread
+        // of its own and may not have reached it yet.
+        let vehicle = UnixDatagram::unbound().expect("the vehicle's socket");
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while Instant::now() < deadline && vehicle.send_to(b"1", &path).is_err() {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        vehicle.send_to(b"1", &path).expect("the heater is driven on");
+
+        // Warming, which is the whole of what a heater does: three kelvin a
+        // second, so a tenth of a second is plenty to tell from nothing.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while mass.temperature() <= cold && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert!(
+            mass.temperature() > cold,
+            "the mass should have warmed, and is at {}",
+            mass.temperature()
+        );
+
+        device.stop();
+        std::fs::remove_file(&path).ok();
+    }
+
     #[test]
     fn a_dead_socket_is_replaced() {
         let path = a_path("stale");

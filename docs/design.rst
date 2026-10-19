@@ -1654,10 +1654,22 @@ Requirement
     that speaks to the vehicle's end of a heater link does not become the
     heater.
 
-A Unix datagram payload has the same shape and is not yet handled: driving one
-would need a path for the vehicle's own end, and a path is a thing for a file
-to state rather than for the software to invent. One used as a heater is bound
-as a UDP payload used to be, so nothing can be written to it.
+A Unix datagram payload has the same shape and is driven the same way, with
+one difference: the vehicle's end is *unbound* where the UDP one binds a port
+of its own. This is what used to want a path for the vehicle's end -- a path
+being a thing for a file to state rather than for the software to invent --
+and it turns out to need none. A datagram sent from an unbound Unix socket
+arrives; what it costs is that the receiver has no path to answer at, and a
+device that is only driven does not answer. Nothing of the vehicle's end is
+left in the filesystem either, where a bound path would have to be cleared up
+after a vehicle that was killed.
+
+Requirement
+    For a Unix datagram payload nothing is read from, the ends swap roles as
+    they do for UDP: the vehicle sends to the path the node states, from an
+    unbound socket, and the payload is the end that binds that path. The
+    simulator's stand-in binds it, as the vehicle's end used to, and the
+    dead-socket rule applies to it like any other path this software binds.
 
 Holding a device at a decision
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

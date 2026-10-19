@@ -35,10 +35,10 @@ What there is, in the order a reader meets it:
 
 ``tcssim``
     Simulated payloads, for testing: it stands in for the far end of every
-    link a payload set describes.
+    link a configuration describes.
 
 ``tcsverify``
-    Reads a payload set and says what is wrong with it, running none of it.
+    Reads a configuration and says what is wrong with it, running none of it.
     See `tcsverify`_.
 
 The ranked quality attributes
@@ -124,7 +124,8 @@ tcspecial configuration file
     The file tcspecial is configured by: the command interpreter's own
     settings in its ``tcspecial`` section, and the payload configuration
     section beside them. No name of its own -- any name ending ``.yaml`` or
-    ``.xml`` -- the shipped examples being ``tcspecial1.yaml`` and the rest.
+    ``.xml`` -- the shipped examples being ``examples/minimal/minimal.yaml``
+    and the rest.
 
 payload configuration section
     The part of that file describing payloads: which data handlers there are,
@@ -351,7 +352,7 @@ Requirement
     nothing under it reads back as nothing anyway.
 
 The sets of payloads that share a sampling interval are ``payload_groups``,
-which is what a payload set calls them too: one vocabulary for the two
+which is what the simulator's file calls them too: one vocabulary for the two
 languages, so a reader who has learned one has learned the other.
 
 Terminals: where a link is attached
@@ -492,7 +493,7 @@ What tcspecial itself is configured with
 
 Four concepts describe what a vehicle carries and what is done with it. None of
 them says where any of it goes, and one section does: ``tcspecial``, the same
-section a payload set's file holds, which is required of every configuration.
+section every configuration holds, and it is required of every one of them.
 
 .. code-block:: yaml
 
@@ -590,9 +591,9 @@ from the first datagram, and the MOC sends nothing at all.
 It did have to be told. The ground's end was whatever port the system chose, so
 nothing in the configuration said where it was; tcspecial's end learnt it from
 whatever arrived there, and the MOC taught it by saying hello -- an empty
-datagram, once a second, to every payload. Once a second because START_DH and
-STOP_DH rebind that socket and the learnt peer went with it, so a ground
-station that said hello once was silently cut off by the next Enable. Naming
+datagram, once a second, to every payload. Once a second because starting or
+stopping a payload rebound that socket and the learnt peer went with it, so a
+ground station that said hello once was silently cut off by the next Enable. Naming
 the ground's end removed the hello, the silence after it, and the last traffic
 the MOC sent without being asked.
 
@@ -608,7 +609,7 @@ The protocol is not stated and cannot be. Every link in this section is UDP,
 so an attribute for it would be an attribute that could say something untrue -- and a configuration able to describe a link the software
 cannot make is worse than one that cannot describe it at all.
 
-It is read by the same struct a payload set's section is read by. A second
+It is read by one struct wherever it is written. A second
 statement of what the command interpreter needs would be two statements
 drifting apart a flight at a time, and the first symptom would be a
 configuration that verifies on the ground and starts something else aboard.
@@ -1870,7 +1871,7 @@ Requirement
     per payload, which did two things: it said which payload a command was
     about, and it kept a command that takes time from delaying a command about
     another payload. The node id does the first now, and the thread a node
-    operation runs on does the second. A graph also has more nodes than a payload set has payloads -- a
+    operation runs on does the second. A graph also has more nodes than a payload set had payloads -- a
     thermostat of four sensors is eleven nodes -- so a socket apiece would
     spend ports on computations and logs that nothing addresses from the
     ground.
@@ -4000,7 +4001,7 @@ These are the checks:
   the telemetry log is written -- is required of every configuration, and
   required rather than defaulted for the reason the attributes inside it are:
   a configuration that has not been asked the question has not answered it. It
-  is the same section a payload set's file holds and is read by the same
+  is the one section every configuration holds and is read by the one
   struct, so one mistake is one complaint wherever it is written. Only the top
   file of a configuration may state one: a configuration has one command
   interpreter, and a second section would be two answers to one question with
@@ -4174,11 +4175,12 @@ Features
       here, including the simulator's, and a time or a sample of a transfer is
       formatted here so that both windows show it the same way
 
-    * tcspecial1.yaml: Configuration information for the payloads tcspecial
-      serves, tcsmoc controls, and tcssim simulates
+    * the configuration: the nodes tcspecial serves, tcsmoc watches and
+      commands, and tcssim simulates the payloads of -- one file, named on
+      each program's command line
 
-    * tcspecial1sim.yaml: What simulating those payloads takes, which is not part
-      of describing them
+    * the simulator file beside it: what simulating those payloads takes,
+      which is not part of describing them
 
       * Network connections support Stream and datagram
     
@@ -4259,14 +4261,14 @@ FIXME: tweak diagram as necessary):
    |  | tcslib          |<------   | |  +-----------------+  |     |  +-----------+  |
    |  | (tcslibgs)      |  |  :    | |  | Data            |<--------->| Payload 1 |  |
    |  +-----------------+  |  :    | |  | Handler 1       |  |     |  +-----------+  |
-   |  | tcspecial1.yaml |  |  :    | |  |      .          |  |     |                 |
+   |  |  configuration  |  |  :    | |  |      .          |  |     |                 |
    |  +-----------------+  |  :    |           .             |     |                 |
    +-----------------------+  :    | |  |      .          |  |     |                 |
                               :    | |  +-----------------+  |     |  +-----------+  |
                               :    | +->| Data            |<--------->| Payload n |  |
                               :    |    | Handler n       |  |     |  +-----------+  |
                               :    |    +-----------------+  |     |                 |
-                              :    |    | tcspecial1.yaml |  |     |                 |
+                              :    |    |  configuration  |  |     |                 |
                               :    |    +-----------------+  |     |                 |
                               :    +-------------------------+     +-----------------+
 
@@ -4426,179 +4428,6 @@ command
 
 **The rest of these need work done, but do list the applicatable commands**
 
-START_DH
-~~~~~~~~
-Start a data handler. 
-
-+----------------+-------------------------------------------------------------+
-| Name           | Parameters                                                  |
-+================+============+===========+====================================+
-| START_DH_CM    | Name       | Type      | Description                        |
-|                +------------+-----------+------------------------------------+
-|                | type       | DHType    | Which type the handler is, which   |
-|                |            |           | must be the type its configuration |
-|                |            |           | gives it                           |
-|                +------------+-----------+------------------------------------+
-|                | name       | DHName    | Which handler to start, as the     |
-|                |            |           | configuration names it. If the DH  |
-|                |            |           | is a network interface             |
-|                |            |           | this is server:port optionally     |
-|                |            |           | followed by a colon and a          |
-|                |            |           | protocol. If this is a device      |
-|                |            |           | DH, this is the path to the        |
-|                |            |           | device.                            |
-+----------------+------------+-----------+------------------------------------+
-| START_DH_TM    | Parameters                                                  |
-|                +------------+-----------+------------------------------------+
-|                | Name       | Type      |  Description                       |
-|                +------------+-----------+------------------------------------+
-|                | None                                                        |
-+----------------+------------+-----------+------------------------------------+
-
-STOP_DH
-~~~~~~~
-Stop stop a data handler. To make this idempotent, if the command has previously
-been executed sucessfully, supplying a DH that has been stopped must also
-produce a successful value. This, in turn, means a handler's name must not be
-reused.
-
-+----------------+-------------------------------------------------------------+
-| Name           | Parameters                                                  |
-+================+============+===========+====================================+
-| STOP_DH_CM     | Name       | Type      | Description                        |
-|                +------------+-----------+------------------------------------+
-|                | name       | DHName    | Data handler to stop               |
-+----------------+------------+-----------+------------------------------------+
-| STOP_DH_TM     | Parameters                                                  |
-|                +------------+-----------+------------------------------------+
-|                | Name       | Type      |  Description                       |
-|                +------------+-----------+------------------------------------+
-|                | None                                                        |
-+----------------+------------+-----------+------------------------------------+
-
-QUERY_DH
-~~~~~~~~
-Return what the indicated data handler is doing and what it has moved.
-
-Requirement
-    A QUERY_DH answer says what state the handler is in, and says nothing
-    where there is no such handler. Nothing else on the link says it: the
-    ground had only its own commands to go by, so a panel showed what the
-    last START_DH or STOP_DH implied and went on showing it -- through a
-    handler stopped on the spacecraft, and through a MOC attached to a
-    tcspecial serving another payload set, whose every command is answered
-    NotFound for payloads the operator can see on the screen. A state for a
-    handler that does not exist would have to be invented, and a ground
-    station reading one would show it, so a NotFound carries none.
-
-Requirement
-    A running data handler reports what has moved so far. Its conduits count
-    as data passes and a handler reads those counts where they stand, rather
-    than receiving them when a conduit finishes, so a handler that is working
-    does not report an idle one.
-
-Requirement
-    What a handler reports does not go backwards. Stopping a conduit folds its
-    counts into the handler's own, so the same numbers are reported before and
-    after.
-
-The statistics are:
-
-* Spacecraft time
-
-* Number of bytes received
-
-* Number of read operations completed successfully
-
-* Number of read operations that returned an error
-
-* Number of bytes sent
-
-* Number of write operations completed successfull
-  
-* Number of write operations that returned an error
-
-* Number of triggers sent to a triggered payload, and the number that would
-  not go -- counted apart from the writes above and from each other, because a
-  payload that is answering, one that has gone away, and a handler that has
-  stopped asking are three states that one count could not tell apart
-
-+----------------+-------------------------------------------------------------+
-| Name           | Parameters                                                  |
-+================+============+===========+====================================+
-| QUERY_DH_CM    | Name       | Type      | Description                        |
-|                +------------+-----------+------------------------------------+
-|                | name       | DHName    | Data handler to ask about          |
-+----------------+------------+-----------+------------------------------------+
-| QUERY_DH_TM    | Parameters                                                  |
-|                +------------+-----------+------------------------------------+
-|                | Name       | Type      |  Description                       |
-|                +------------+-----------+------------------------------------+
-|                | name       | DHName    | Data handler this answers for      |
-|                +------------+-----------+------------------------------------+
-|                | state      | DHState?  | Created, Active or Stopped, and    |
-|                |            |           | absent for a handler this          |
-|                |            |           | tcspecial has not got              |
-|                +------------+-----------+------------------------------------+
-|                | Statistics                                                  |
-+----------------+------------+-----------+------------------------------------+
-
-QUERY_DH_SAMPLE
-~~~~~~~~~~~~~~~
-Return what the indicated data handler last sent and last received. Each is
-the time the data moved and the first few bytes of it.
-
-This is a separate command rather than more of QUERY_DH so that the statistics
-every poll asks for stay the size they are. A sample is wanted only while
-someone is looking at a data handler's panel, and carrying payload bytes in
-routine telemetry would spend downlink on data nobody reads.
-
-Requirement
-    A command tcspecial does not implement is refused. CONFIG_DH is the one
-    such command: nothing configures a data handler, and the command carries
-    nothing to configure one with, so it answers ``InvalidCommand``. Answering
-    success would tell the ground a handler had been reconfigured when none
-    had, and there is no way to tell that from a success that was earned.
-
-Requirement
-    A sample carries the time the data moved, not the time it was asked about.
-    A panel showing the latter would read as activity whenever it was looked
-    at.
-
-Requirement
-    A sample carries at most ``DH_SAMPLE_BYTES`` bytes, and the length of the
-    whole transfer. Keeping the length is what lets a display say a packet was
-    longer than what it shows; without it a transfer of exactly that many
-    bytes and one of a thousand look alike.
-
-Requirement
-    A direction that has carried nothing has no time. It is distinct from one
-    that carried a transfer of no bytes, which has a time and no data.
-
-Recording a sample is best effort: the conduit moving payload data does not
-wait for a reader of the samples to finish. A lost sample costs one stale line
-on a display, where a blocked conduit costs data.
-
-+----------------+-------------------------------------------------------------+
-| Name           | Parameters                                                  |
-+================+============+===========+====================================+
-| QUERY_DH_      | Name       | Type      | Description                        |
-| SAMPLE_CM      +------------+-----------+------------------------------------+
-|                | name       | DHName    | Data handler to ask about          |
-+----------------+------------+-----------+------------------------------------+
-| QUERY_DH_      | Parameters                                                  |
-| SAMPLE_TM      +------------+-----------+------------------------------------+
-|                | Name       | Type      |  Description                       |
-|                +------------+-----------+------------------------------------+
-|                | name       | DHName    | Data handler this answers for      |
-|                +------------+-----------+------------------------------------+
-|                | sent       | DHSample  | Time and head of the last data     |
-|                |            |           | written towards its destination    |
-|                +------------+-----------+------------------------------------+
-|                | received   | DHSample  | Time and head of the last data     |
-|                |            |           | read from its source               |
-+----------------+------------+-----------+------------------------------------+
-
 Configure
 ~~~~~~~~~
 Configure various TCSpecial values
@@ -4640,25 +4469,6 @@ and the time a beacon carries is the timestamp in its header, so the one
 thing in the system named "beacon time" was the one thing that was not a
 time.
 
-Configure Data Handler
-~~~~~~~~~~~~~~~~~~~~~~
-Configure various TCSpecial data handler values
-
-+----------------+-------------------------------------------------------------+
-| Name           | Parameters                                                  |
-+================+============+===========+====================================+
-| CONFIG_CM      | Name       | Type      | Description                        |
-|                +------------+-----------+------------------------------------+
-|                |            |           |                                    |
-+----------------+------------+-----------+------------------------------------+
-| CONFIG_TM      | Parameters                                                  |
-|                +------------+-----------+------------------------------------+
-|                | Name       | Type      |  Description                       |
-|                +------------+-----------+------------------------------------+
-|                | None                                                        |
-+----------------+------------+-----------+------------------------------------+
-
-
 Asynchronous Telemetry
 ----------------------
 Beacon
@@ -4697,13 +4507,13 @@ Requirement
 
 Requirement
     A beacon carries the version and the digest a CONNECT is answered with,
-    and the version the payload set states as well. A beacon arrives whether
+    and the version the configuration states as well. A beacon arrives whether
     or not anything has connected, so a ground station that is only listening
-    can see which software is flying and which payload set it is serving
+    can see which software is flying and which configuration it is serving
     rather than having to ask first.
 
 Requirement
-    The payload set's version is the three decimal parts its ``version``
+    The configuration's version is the three decimal parts its ``version``
     states: ``1.0`` is 1.0.0, the part it leaves off being nought. A version
     that cannot be read that way is refused where the file is read, rather
     than announced as 0.0.0 -- which is a version some other set might really
@@ -4724,11 +4534,11 @@ Requirement
 Requirement
     Every telemetry response carries the time the spacecraft made it, in its
     header. Not the time the command was received, and not the time of
-    whatever the answer is about: a QUERY_DH_SAMPLE carries the times its
-    samples moved, and this is the time it was asked. The two are worth
+    whatever the answer is about: a ``QUERY_NODE_SAMPLE`` carries the times
+    its samples moved, and this is the time it was asked. The two are worth
     telling apart -- a sample from an hour ago in an answer made a second ago
-    is a handler that has gone quiet, and without a time on the answer there
-    is nothing to read that against.
+    is a node that has gone quiet, and without a time on the answer there is
+    nothing to read that against.
 
 Two of them used to carry a time of their own, PING and the beacon, and the
 other eight carried none; the header carries it for all of them now, and a
@@ -4778,7 +4588,7 @@ written in JSON that was not also written in YAML.
 
 The structs the files parse into are the single description of the data, in
 ``tcslibgs``; a format is a spelling of it. Adding a third would be a variant
-of ``ConfigFormat`` and no second set of structs. Every shipped payload set
+of ``ConfigFormat`` and no second set of structs. Every shipped configuration
 exists in both formats, so each parser is exercised by a file someone runs
 rather than only by a fixture, and a test loads both of every set and
 compares the payloads they produce.
@@ -4814,11 +4624,16 @@ not configuration and is no part of this.)
 
 tcspecial
 ---------
-Tcspecial reads two configuration files. Its own is
-``tcspecial/src/tcspecial.yaml``, named by ``TCSPECIAL_CONFIG_PATH`` when that
-is set, and holds the address the command interpreter listens on, where
-beacons are sent, the beacon interval, and where the telemetry log goes. The other describes the payloads
-and is named on the command line; see `The Payload Configuration`_.
+Tcspecial reads one configuration file, named on its command line. It
+describes the nodes, the links between them and the payloads among them --
+see `Payloads`_ -- and it states what tcspecial itself is configured with in
+its ``tcspecial`` section: where commands are taken, where beacons go, the
+beacon interval, and where the telemetry log is written.
+
+It read two. The second was its own, ``tcspecial/src/tcspecial.yaml``, named
+by ``TCSPECIAL_CONFIG_PATH``, and it answered what a version 1 payload set did
+not have to say. A version 2 configuration must have the section, so a second
+file could only disagree with the one being flown.
 
 Both choose their parser from their extension, as every configuration file in
 the project does, so either may be written in YAML or XML; see `Configuration
@@ -4872,266 +4687,6 @@ not only the core communication protocols supported by the operating system, suc
 as stream or datagram protocols, or serial or parallel interfaces,
 but also stackable DH protocols that can be
 employed to build custom protocol stacks.
-
-Command Interpreter (CI)
-~~~~~~~~~~~~~~~~~~~~~~~~
-The payload system
-software has a command interpreter with two threads. The threads manage
-commands from the OC and status messages to the OC. I/O is done
-with datagrams. Status messages are queued with a fixed-length queue.
-
-Ground/Space Link
-"^^^^^^^^^^^^^^^^^
-The connection between the OC and the CI is UDP/IP datagrams, and never
-TCP/IP. It is generally the ground/space link, for which TCP/IP is unsuitable
-beyond MEO, and one transport is one thing to build, test and keep correct at
-both ends.
-
-The CI has a Mutex<BTreeMap<<DH>>> which holds all of the allocated DHs. The
-use of a Mutex allows status of all DHs to be determined atomically.
-
-Initialization
-"^^^^^^^^^^^^^^
-When the CI starts up, it will allocate all resources, including threads
-and communication links. It then enters the main loop.
-
-Main Loop
-"^^^^^^^^^
-The main CI loop simply reads and processes command from the OC, along with
-periodic sending Beacon Telemetry. The Exit command causes the CI to exit.
-
-Shut Down
-"^^^^^^^^^
-During CI shutdown, all DHs are also shut down.
-
-Data Handlers (DHs)
-~~~~~~~~~~~~~~~~~~~
-The usual lifetime of a DH starts with creation by CI, followed by start up
-of the threads used and allocation of any other resources. It then waits for
-activation. 
-
-After activation, it enters a loop conduiting data between OC
-and a payload. During I/O, it may receive notification from CI that something
-command needs to be done. This could be something like transmitting statistics
-or deactivating the DH.
-
-After the DH is deactivated, all resources are freed and the threads used are
-exiting.
-
-Initialization
-"^^^^^^^^^^^^^^
-When the CI Allocate command is given, a DH is sets up all require resources
-and then waits for a DH Activate command.
-
-Main Loop
-"^^^^^^^^^
-Data handlers (DHs) conduit data between the OC and
-a payload. Data is transmitted between the OC and a DH is done with a
-UDP/IP link. The data exchange between a DH and a payload may be done
-with stream and datagram methods. 
-
-A DH has four functions used to send and receive data:
-
-* oc_read(): receives data from the OC. No protocol conversion done.
-* oc_write(): sends data to the OC. No protocol conversion done.
-* payload_read(): receives data from a payload. Protocol conversion possible.
-* payload_write(): sends data to a payload. Protocol conversion possible.
-
-A communication path between the OC and a DH uses UDP/IP. A path between
-a DH and a payload uses one of multiple different communication protocols.
-
-Requirement
-    Exactly one end of a payload link waits at the address the configuration
-    gives, and which end that is follows from which end can speak first.
-
-Both ends binding the same address is what they did, and an address can be
-bound once, so whichever started second got "address already in use" and no
-data moved through a network handler at all. A device handler was the only one
-that ever worked, because two opens of a device are fine where two binds of a
-socket are not.
-
-Requirement
-    For a stream payload the payload waits and the handler connects to it. The
-    payload is what exists at that address, and a stream has to be accepted
-    before anything can pass either way, so the connection itself tells each
-    end where the other is.
-
-Requirement
-    For a datagram payload the handler waits and the payload sends to it. A
-    datagram connect sends nothing, so a payload waiting at that address is
-    never spoken to; and a payload produces data because it is running rather
-    than because it was asked, so it must be able to send without having
-    heard anything. The handler learns where its payload is from the first
-    datagram that arrives, as it does for the OC.
-
-A payload that waits to be spoken to before it sends is a payload that never
-sends over a datagram link. Both ends sat there with nothing moving: the
-handler waiting for data from a payload that was waiting to be asked.
-
-Requirement
-    A handler whose stream payload refuses the connection keeps trying.
-    Nothing listening yet is the ordinary case rather than a fault: a
-    simulated payload is a program someone has to start, and a handler started
-    first would otherwise fail for a reason that fixes itself a moment later.
-    A datagram handler needs none of this, having nothing to be refused by.
-
-The delay doubles from ``ENDPOINT_DELAY_INIT``, never exceeds
-``ENDPOINT_DELAY_MAX``, and the whole attempt is bounded by
-``ENDPOINT_CONNECT_BUDGET``.
-
-Requirement
-    The waiting is bounded, and bounded well below the ground's command
-    timeout. START_DH is answered on the command interpreter's own thread, so a
-    handler that waited longer would hold up every other command and leave the
-    ground with no answer rather than a refusal.
-
-Requirement
-    Only a refused connection is retried. An address that cannot be resolved,
-    or a network that cannot be reached, does not become right by being asked
-    again, and repeating those would turn a clear fault into a slow one.
-
-Requirement
-    Everything a program says about a payload names it as the payload
-    configuration file names it. Not a row of a window, not an index, and not
-    only the device or address it is reached at: the name is what every other
-    part of the system calls it -- a panel, a log line, the list a panel's
-    Configuration button shows -- so a message that used anything else left
-    the reader to work out which payload of four was being talked about.
-
-So every endpoint constructor takes the name as its first argument, and the
-two that open a handler's pair of them -- ``bind_endpoint_pair`` for the OC
-side and ``connect_endpoint_pair`` for the payload side -- take it and pass it
-down. The endpoint layer otherwise knows nothing but a path or an address, and
-a path is not a name: several handlers may wait on one bus, a stand-in pty is
-whichever one the system handed out that run, and a refused connection says
-only which address refused it. A handler that cannot open its line now says
-which handler could not and what it was reaching for, in that order.
-
-Requirement
-    A handler that has been stopped starts again. Both windows offer one
-    button that stops and starts a payload, so a run is a thing to be begun
-    and ended more than once -- and a handler that could be started only once
-    answered ``START_DH`` with a failure for the rest of the process, in the
-    words of a state machine rather than of anything anyone had written.
-
-Requirement
-    A handler's command pipes belong to a run rather than to the handler.
-    They are made when it starts and closed when it stops, and a start that
-    fails closes them too: they used to be made once, and stopping closed
-    them, so even a state machine that allowed a restart would have failed on
-    the pipe that was no longer there. Four descriptors a run would otherwise
-    leak quietly and work perfectly well until a spacecraft that had been up
-    for months ran out.
-
-Requirement
-    A handler that is already running is the one state a start refuses, and it
-    says so in those words. The command interpreter answers such a ``START_DH``
-    with ``Success`` without reaching the handler -- what makes the command
-    idempotent is the state and not the presence -- so this is the backstop
-    rather than the path.
-
-Requirement
-    A START_DH naming a type that is not the handler's type is refused with
-    ``InvalidParameter``, and starts nothing. The ground and the spacecraft
-    read the same configuration file, so a mismatch is not a handler to be
-    started differently: it is the two ends disagreeing about what that file
-    says, or a command made by hand. Starting it anyway would open the
-    endpoint the configuration describes while the ground believed it had
-    started something else.
-
-The type a START_DH carries is worked out from the endpoint by one mapping,
-``EndpointConfig::kind``, which both ends use: the ground to say what it is
-asking for and the spacecraft to check what was asked. Two copies of it would
-be two chances for the ground to ask for something the spacecraft refuses. The
-check is made before the handler's state is looked at, so a mis-named START_DH
-is refused whether or not the handler happens to be running.
-
-Requirement
-    An endpoint is of one type: ``network``, ``device-file``, ``serial``,
-    ``i2c`` or ``spi``, or one of the experimental ``can``, ``iio``,
-    ``rpmsg``, ``gpio`` and ``hdlc``. The type decides what locates the endpoint and what terms it is
-    opened on, and a handler carries both: a serial line's framing, the address
-    of a device on a bus, and a SPI peripheral's clock are as much a part of
-    where the payload is as the name of the file.
-
-A serial line, an I2C device and a SPI peripheral are all reached through
-device files, and all three used to become device endpoints on the way to
-being started -- which opened the right file and then talked to it on whatever
-terms it had been left on: a line at the wrong rate, a peripheral in the wrong
-mode. An I2C endpoint could not be started at all, there being nowhere in a
-handler's configuration to put the address of a device on a bus. Each is its
-own type now, and tcspecial has an endpoint implementation for each.
-
-Requirement
-    A data handler binds the UDP address its configuration gives as
-    ``oc_address`` and ``oc_port``. That is where the OC sends to, and it is
-    distinct from the address of the payload link. A handler with a stream
-    payload therefore binds one of its two addresses and connects the other;
-    one with a datagram payload binds both, and learns where each far end is
-    from what arrives.
-
-Requirement
-    A data handler sends to the OC at the address the OC last sent from. No
-    configuration states where the OC is, and a datagram's sender is the only
-    statement of it; this is how the command interpreter already answers the
-    ground.
-
-A consequence worth stating: a handler cannot send to the OC before the OC has
-sent to it. Until then its payload-to-ground writes fail and the data is
-dropped, which its statistics record as failed writes rather than as writes of
-no bytes. A handler whose payload only produces telemetry therefore needs the
-OC to speak first, even if only once. Configuring the OC's address instead
-would remove that, at the cost of stating in every tcspecial configuration
-where the ground is.
-
-A handler's stream payload socket knows where to send from the moment it is
-connected, so a handler can speak to such a payload before the payload has
-said anything. Neither its datagram payload socket nor its OC socket does;
-both learn as above, so until each far end has spoken once the writes that way
-fail and the data is dropped.
-
-The two conduits of a handler share one socket on each side rather than
-opening one each, because a socket cannot be opened twice; the conduit reading a
-socket is what learns where the far end is, and the conduit writing it holds a
-duplicate of the same socket, so it sends where the reader learnt.
-For example:
-
-.. code-block:: text
-
-         ______     ___________________     _________
-        |      |   |                   |   |         |
-        |      |-->| OC        OC      |-->|         |
-        |      |   | read      write   |   |         |
-        |      |   |                   |   |         |
-        |  OC  |   |        DH1        |   | Payload |
-        |      |   |                   |   |         |
-        |      |<--| Payload   Payload |<--|         |
-        |      |   | write     read    |   |         |
-        |______|   |___________________|   |_________|
-
-**Insert description of how we push DH Helpers on a DH to modify data as it flows from one side to the other**
-
-Before the read and write interfaces to a DH are called,
-a select(), epoll(), or an equivalent multiple file descriptor wait for
-I/O ready operation is called. In addition to the corresponding read or
-write file descriptor, a pipe file descriptor is supplied to the wait for
-I/O read operation. A byte is written to the pipe file descriptor to
-wake up the DH so that it can read a command from the CI. Thus, each
-wait for I/O ready operation has a pipe file descriptor and a read or write
-file descriptor to either the OC or payoad.
-
-NOTE: The mio crate might be suitable for the wait for I/O ready operation.
-
-Each static DH is assign static address information. This can be a path to a
-device or a network address.
-
-Payload data can be sent by the payload as datagrams or as a stream. 
-
-When data is being read as a stream, there are two options:
-
-:Send any data: All pending data on the file descriptor will be read when there is at least one byte pending.
-
-:Wait for full: Wait for the buffer to fill up. A timer is set so that, if the buffer does not fill up, all data in the input buffer is sent
 
 EndPoints
 ~~~~~~~~~
@@ -5391,134 +4946,6 @@ endpoints until each was given a type of its own, which is what let their terms
 reach the handler that opens them.
 
 
-Conduits
-~~~~~~~~
-Conduits contain two Endpoints, an EndpointReadable and an EndpointWritable. Data
-flows in just one direction, from the EndpointReadable to the EndpointWriteable.
-A Conduit is implemented as a thread that simply looks between the Read and
-EndpointWriteables, handling commands from the Command Interpreter as necessary.
-The directions are denoted "Ground to Payload" and "Payload to Ground"
-
-Data Handlers
-~~~~~~~~~~~~~
-Data Handlers package two Conduits, one in one direction and one in the
-other. File descriptors are shared between the EndpointReadable of one direction
-and the EndpointWriteable of the other direction, and the EndpointWriteable of
-the first direction and the EndpointReadable of the other direction, as show below:
-
-**Visualization of a Data Handler**
-
-.. code-block:: text
-
-         ______     ___________________     _________
-        |      |   |                   |   |         |
-        |      |-->| OC        OC      |-->|         |
-        |      |   | read      write   |   |         |
-        |      |   |                   |   |         |
-        |  OC  |   |        DH1        |   | Payload |
-        |      |   |                   |   |         |
-        |      |<--| Payload   Payload |<--|         |
-        |      |   | write     read    |   |         |
-        |______|   |___________________|   |_________|
-
-
-Resource Allocation
-~~~~~~~~~~~~~~~~~~~
-In an ideal world, resources would be allocated at link time (really, process
-load time). From a practical standpoint, however, the constraint of
-pre-execution allocation is not possible to meet for verious reasons. For
-example, configuration-dependent code may require runtime allocations. The
-constraint TCSpecial is intend to obey is to have all allocations done before
-entering the main loop.
-
-This approach allows TCSpecial resources to be allocated statically, but
-the underlying operating system may use dynamic resource allocation. These
-may fail, so the CI and DH code must be prepared to handle failures in
-in the operating system and retry at intervals if the various protocols do
-not already support this.
-
-The software running on the spacecraft is TCSpecial. This has a command
-interpreter and some number of data handlers (DHs). The CI talks to ground
-software and to the DHs. The DHs talk to the CI and to the payloads.
-
-DH Links
-~~~~~~~~
-Supported DH protocols include networking protocols and device interfaces,
-such as RS-422, as well as stackable protocols. These links can be divided
-into stream and datagram types. Stream data has no delimiters, no error
-detection and correction codes, etc. There may be gaps between bytes and
-sequences of bytes that can be used to identify groups of data.
-
-Datagrams are groups of data with a count or other mechanism to identify the
-start and end locations. Under normal situations, datagrams are limited to a specific length, but the DH interfaces optionally allow examining incoming
-packets to determine whether they exceed the previously expected length and
-reallocating a larger buffer to be able to read the whole packet with
-truncation. This is only effective up to some size, however, the kernel
-itself will have limitations on the packet size it can read.
-
-Provided Stacked DHs
-==≈=≈===============
-TCSpecial offers several several stacked DHs that can be used as-is and as examples.
-
-Supported payload protocols are (or will be):
-
-**Currently supported payload protocols**
-
-+-----------------------+----------+----------+--------------------+
-| Name                  | Stream/  | Async/   | Count(n bytes)[#]_ |
-|                       | Datagram | Cmd/Resp | Term(n bytes)[#]_) |
-+=======================+==========+==========+====================+
-| UDP/IP Telemetry      | Datagram | Async    | None               |
-+-----------------------+----------+----------+--------------------+
-| UDP/IP Cmd/Resp       | Datagram | Cmd/Resp | None               |
-+-----------------------+----------+----------+--------------------+
-| TCP/IP Raw            | Stream   | Async    | None [#]_          |
-+-----------------------+----------+----------+--------------------+
-| TCP/IP Raw Cmd/Resp   | Stream   | Async    | None [#]_          |
-+-----------------------+----------+----------+--------------------+
-| TCP/IP Term           | Stream   | Async    | Term(1-2 bytes)    |
-+-----------------------+----------+----------+--------------------+
-| TCP/IP Count          | Stream   | Async    | Count(1-2 bytes)   |
-+-----------------------+----------+----------+--------------------+
-| TCP/IP Term Cmd/Resp  | Stream   | Async    | Term(1-2 bytes)    |
-+-----------------------+----------+----------+--------------------+
-| TCP/IP Count Cmd/Resp | Stream   | Async    | Count(1-2 bytes)   |
-+-----------------------+----------+----------+--------------------+
-| Device Raw            | Stream   | Async    | None [#]_          |
-+-----------------------+----------+----------+--------------------+
-| Device Raw Cmd/Resp   | Stream   | Async    | None [#]_          |
-+-----------------------+----------+----------+--------------------+
-| Device Term           | Stream   | Async    | Term(1-2 bytes)    |
-+-----------------------+----------+----------+--------------------+
-| Device Count          | Stream   | Async    | Count(1-2 bytes)   |
-+-----------------------+----------+----------+--------------------+
-| Device Term Cmd/Resp  | Stream   | Async    | Term(1-2 bytes)    |
-+-----------------------+----------+----------+--------------------+
-| Device Count Cmd/Resp | Stream   | Async    | Count(1-2 bytes)   |
-+-----------------------+----------+----------+--------------------+
-
-.. [#] Counts are the first n bytes of the data.
-
-.. [#] Terminators are the last n bytes of the data.
-
-.. [#] The data rate must be limited to that which can be handled
-   since there is no data throttling.
-
-.. [#] Data volume must be limited to that which can be handled as a
-   response
-
-Packetizing U32 Streaming Data
-"^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-The payload is sending big-endian u32 data items every three seconds. The DH accumulates up to four of these. If the bytes have a time interval > between 100 mS, that data item is discarded. The resulting packet has a leading byte with a bit set for each valid data item, followed by valid data item values.
-
-Byte Swapping Values
-"^^^^^^^^^^^^^^^^^^^
-This DH is composited with the DH that packetizes streaming data. It converts the big-endian u32s to little-endian u32s.
-
-Packetizing Arbitrary Streaming Data With Constant Overhead Byte Stuffing
-‐-----‐------------------------------------------------------------------
-Read 254  * 4 bytes from the payload, write to a buffer with COBS, stick a u16 header which is a byte count and send to the OC.
-
 tcslib
 ------
 The TCSpecial library has a set of operations for global control and status
@@ -5528,9 +4955,9 @@ software such as YAMCS or MCT.
 Those operations are ``tcslib::client::TcsClient``. A control application
 drives one of those rather than speaking the command and telemetry protocol
 itself: each operation sends its command, waits for the answering telemetry,
-and hands back what that telemetry carried. The global operations are PING,
-RESTART_ARM, RESTART and CONFIG; the per-handler ones are START_DH, STOP_DH,
-QUERY_DH and QUERY_DH_SAMPLE.
+and hands back what that telemetry carried. The spacecraft's own operations
+are PING, CONNECT, RESTART_ARM, RESTART and CONFIG; the per-node ones are
+START_NODE, STOP_NODE, SET_NODE, QUERY_NODE and QUERY_NODE_SAMPLE.
 
 Requirement
     An operation that is not answered within the client's timeout is an error.
@@ -5548,42 +4975,13 @@ tcslibgs
 The TCSpecial ground/space library contains definitions used by both
 tcslib and tcspecial.
 
-tcspecial1.yaml
----------------
-This is a YAML file that defines the actual payloads. It is considered part
-of TCSpecial as it must be supplied, but is also used by the
-test software. All three programs read it: tcspecial serves the payloads it
-describes, tcsmoc controls them, and tcssim simulates them, so a handler
-changed in it changes for all three at once. Its format is given under
-`The Payload Configuration`_.
-
-The ``1`` names a payload set rather than a version, leaving room for further
-sets alongside it. The data handlers of this one have the following
-configurations:
-
-+------+---------+-------------------------+-------------+
-| DH # | Type    | Configuration           | Packet Size |
-+======+======+============================+=============+
-| 0    | Network | TCP/IP | localhost:5000 | 12 bytes    |
-+------+---------+--------+----------------+-------------+
-| 1    | Network | UDP/IP | localhost:5001 | 11 bytes    |
-+------+---------+--------+----------------+-------------+
-| 2    | Device  | n/a    | /dev/urandom   | 1 byte      |
-+------+---------+--------+----------------+-------------+
-| 3    | Network | UDP/IP | localhost:5003 | 15 bytes    |
-+------+---------+--------+----------------+-------------+
-
-There is no packet interval here. How often a payload produces a packet is a
-property of a simulation rather than of the payload, so it is stated in a
-simulator configuration file; see `Simulator Configuration Files`_.
-
 What Each End Read
 ------------------
 Requirement
     A link begins with each end saying what it read. The ground sends a
     ``CONNECT`` carrying its software version and a digest of its
     configuration, and the spacecraft answers with its own, and with the
-    version the payload set it is serving states.
+    version the configuration it is serving states.
 
 Requirement
     Each version is three bytes -- major, minor and patch, each in binary --
@@ -5615,14 +5013,14 @@ Requirement
 
        v0.1.0, configuration tests/manual/tcspecial2.yaml config v1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
 
-    Two ends reading one payload set therefore print the same line twice,
+    Two ends reading one configuration therefore print the same line twice,
     which is what makes a difference in any part of it worth reading. The
     MOC's line used to be written differently -- ``Version 0.1.0``, a bare
     ``md5``, and no set version at all -- so the two could only be compared
     by the one fact they spelled alike.
 
 Nothing else in the protocol makes the two ends prove they are talking about
-the same payload set, and when they were not, the only sign was a command
+the same configuration, and when they were not, the only sign was a command
 answered ``NotFound`` for a payload the operator could see on the screen: a
 tcspecial left running from an earlier set, which tcsmoc attaches to rather
 than replacing. The two ends also say what they read on their own consoles as
@@ -5630,7 +5028,7 @@ they start, so the question can be answered without a link at all.
 
 Requirement
     The digest is of what a file says, not of its bytes. Two ends reading
-    different spellings of one payload set have read the same set and must
+    different spellings of one configuration have read the same thing and must
     agree, so the two formats a set is written in digest alike, and so do
     two files differing only in comments, indentation, the order of their
     sections or the order of one payload's attributes.
@@ -5690,179 +5088,23 @@ What a file's own order does reach the digest through is the sequence number
 each payload was given as it was read, which is the one ordering that means
 something.
 
-The Payload Configuration
-=========================
-The payload configuration section of a tcspecial configuration file describes
-the payloads themselves: which data handlers there are, how tcspecial reaches
-each one, and how big its packets are. What it deliberately does not describe
-is how a simulated payload behaves; see `Simulator Configuration Files`_ for
-that. The parser is ``tcslibgs::config``.
+Payloads
+========
+The ``payloads`` section of a configuration describes the payloads themselves:
+which there are, how tcspecial reaches each one, and what one read of it asks
+for. What it deliberately does not describe is how a *simulated* payload
+behaves; see `Simulator Configuration Files`_ for that.
 
-Four sets are shipped, each with a simulator configuration beside it named
-for it -- ``tcspecial1sim.yaml`` for ``tcspecial1.yaml``, and so on -- and a set
-added by that convention needs no change anywhere to be run. Each is named
-below by its YAML, and each exists in both formats; see the requirement
-at the end of this section.
+This chapter is about reaching a payload, which is the same question whatever
+draws the rest of the configuration: a line, a bus, a peripheral, a socket and
+a set of discrete lines each have terms of their own, and each is checked
+against the rules of its kind. Where those terms are written is in `The Node
+Architecture`_; what they mean is here.
 
-``tcspecial1.yaml``
-    Four handlers of three types, which is what exercises the panels and the
-    grid. It is also what every program falls back to when nothing names a
-    file.
-
-``tcspecial2.yaml``
-    Two handlers, one of each type of payload: one that sends of its own
-    accord and one that answers a request. The Makefile defaults to this set.
-
-``tcspecial3.yaml``
-    One handler, reached over a stream, which is what a single link is
-    debugged against. It differs from set 2's first handler only in the
-    transport, which is what the type and transport stated in a simulator file
-    are there to tell apart.
-
-``tcspecial4.yaml``
-    One handler of every supported type. It began as the set that exercises a
-    line's own terms -- a data rate, a framing, a rule for where a read ends --
-    and the simulator's pty stand-in, and it was written in a second language,
-    there being no words in a tcspecial configuration for a line; `Link Terms`_
-    are those words, and the set is written here like every other.
-
-    The other four types were added beside the line so that one set reaches
-    all five: a socket, a device file, a bus and a clocked link. One payload
-    each, no more -- a set is for running, and what covers a type thoroughly
-    is its tests.
-
-A set is a pair of files: the tcspecial configuration and the simulator file
-beside it, each read by whichever programs need it.
-
-The format is chosen from the extension exactly as every other configuration
-file's is, so a tcspecial configuration may be written in YAML or XML.
-
-Requirement
-    Every shipped set is written in both formats, and the two describe the
-    same data handlers. ``tcspecial2.yaml`` and ``tcspecial2.xml`` are one set
-    written two ways.
-
-The formats are two spellings of one configuration, which nothing in the
-code enforces: each is parsed by its own parser, and a set transcribed by hand
-can differ in a port or lose an attribute without either file becoming invalid.
-So a test loads both of every set and compares the handlers they produce.
-Shipping both also means each parser is exercised by a file someone runs
-rather than only by a fixture -- ``make runmocx`` runs the XML of a set --
-which is what turned up the one bug this found:
-the check that a file describes payloads at all asked for the
-``payloads`` section with a single field, and a sequence in XML is repeated
-sibling elements, so every XML configuration of more than one payload was
-refused as a duplicate field.
-
-The YAML of a set is the one to read: it carries the comments. The simulator
-files are YAML alone, nothing having asked for them in both spellings.
-
-File Structure
---------------
-A tcspecial configuration file has a version, a description, and three
-sections, two of them optional. They are given below in the order the files
-carry them.
-
-``tcspecial``
-    What tcspecial itself is configured with for this payload set: the same
-    section a ``tcspecial.yaml`` holds, with the same attributes. Optional.
-    Where the set's beacons go is read from here -- ``beacon.send`` and
-    ``beacon.recv``; see `Where the Addresses Are`_ -- and the rest is
-    carried and checked and not read, tcspecial being placed by the file
-    ``TCSPECIAL_CONFIG_PATH`` names. Which includes the two command ports: a
-    set does not decide where the interpreter serving it takes commands. The section is here so
-    that one file can describe a whole payload set, the command interpreter
-    included.
-
-``payload_groups``
-    Named groups of attributes. A group carries what several payloads have
-    in common. Optional: a file whose payloads share nothing, or that prefers
-    to spell every one of them out, has no groups.
-
-``payloads``
-    The payloads themselves. Each has an id and a name, may name a group,
-    and states whatever attributes it does not take from that group.
-
-Requirement
-    ``tcspecial`` is the first of the sections, in every tcspecial
-    configuration. It is about the set as a whole where the other two are about
-    the payloads in it, and a reader opening a file to find out what it
-    describes should not have to pass a list of payloads to find where its
-    command interpreter is.
-
-Requirement
-    A ``tcspecial`` section a file states is checked when the file is loaded,
-    whether or not anything reads the attribute in question. A section stating
-    a protocol that is not a protocol is refused where the file is read,
-    rather than left for whichever program first tries to be placed by it.
-
-The section was ``ci_config``, and named for the command interpreter rather
-than for the program whose configuration it is. No shipped file carried one,
-so the old name is not accepted: a file using it is refused the way any other
-unknown section is.
-
-Requirement
-    The sections are ``payloads`` and ``payload_groups``. They were
-    ``data_handlers`` and ``data_handler_groups``, and a file still naming
-    either is refused with the names they have now rather than read as a file
-    describing no payloads -- which is what it would otherwise look like,
-    since a section this does not recognise is a section it does not see.
-
-**Attributes**
-
-+---------------------+--------+---------------------------------------------+
-| Attribute           | Type   | Meaning                                     |
-+=====================+========+=============================================+
-| type                | string | ``network`` or ``device-file``              |
-+---------------------+--------+---------------------------------------------+
-| protocol            | string | ``tcp``, ``udp``, ``unix_stream``, or       |
-|                     |        | ``unix_dgram``. Network handlers only       |
-+---------------------+--------+---------------------------------------------+
-| address             | string | Host a network handler connects to          |
-+---------------------+--------+---------------------------------------------+
-| port                | number | Port a network handler connects to          |
-+---------------------+--------+---------------------------------------------+
-| path                | string | Device a device handler opens               |
-+---------------------+--------+---------------------------------------------+
-| packet_size         | number | Bytes in one packet                         |
-+---------------------+--------+---------------------------------------------+
-| oc_address          | string | Host the handler exchanges payload data     |
-|                     |        | with the OC on. Always UDP                  |
-+---------------------+--------+---------------------------------------------+
-| oc_port             | number | Port it does so on                          |
-+---------------------+--------+---------------------------------------------+
-| trigger             | bytes  | What to send to make the payload answer:    |
-|                     | or     | one byte, as one or two hexadecimal         |
-|                     | string | digits, or text, as a quoted C string. A    |
-|                     |        | payload with one is asked; a payload with   |
-|                     |        | none sends of its own accord                |
-+---------------------+--------+---------------------------------------------+
-| packet_interval     | length | How often the triggers of a group's         |
-|                     | of     | payloads are sent. A group's attribute: a   |
-|                     | time   | payload that is asked takes its rate from   |
-|                     |        | its group, and a payload that sends of its  |
-|                     |        | own accord has its rate in the simulator    |
-|                     |        | configuration                               |
-+---------------------+--------+---------------------------------------------+
-
-A group states any of these; a data handler states any of these plus its
-``name`` and the ``group`` it takes attributes from.
-
-The OC address is where a handler is reached from the ground, and is a
-different thing from the address at which it reaches its payload. It is
-commonly shared by every handler of a group, which is why a group may carry
-it, while the port is what tells one handler of a group from another.
-
-Requirement
-    A data handler states both an OC address and an OC port, or neither. Half
-    of an address reaches nothing, and nothing in the file says which half was
-    meant.
-
-Requirement
-    The payload configuration need not give any handler an OC address. Only
-    starting a handler needs one, so a file describing payloads is complete
-    without it and a handler without one is refused at the point it would be
-    started.
+It was a chapter about a file of its own -- a version 1 payload set, four of
+which were shipped, each payload paired with a ground endpoint and commanded
+by name. Version 1 is gone: a payload is a node, and `What a device node
+says`_ is the section a reader of a configuration wants beside this one.
 
 How a Payload Is Made to Send
 -----------------------------
@@ -5996,8 +5238,8 @@ Requirement
 Requirement
     A handler goes on asking its payload however the asking goes. A trigger
     that will not go is the payload's silence and not the handler's: the
-    payload may come back, and a handler is stopped by a STOP_DH rather than
-    by a payload that has gone away. It used to give up three different ways
+    payload may come back, and a node is stopped by a ``STOP_NODE`` rather
+    than by a payload that has gone away. It used to give up three different ways
     -- the write failing, the payload's end of a stream reading as end of
     file, and the wait on the endpoint reporting POLLERR or POLLHUP -- and in
     two of them it spun through the interval it was no longer asking in.
@@ -6016,7 +5258,7 @@ Requirement
     asleep. An endpoint in error or at its end is ready the instant it is
     polled and yields nothing every time, so a conduit that only went round
     held a core down for as long as its handler ran; and one that slept the
-    pause out would answer a STOP_DH only when it woke. A conduit that asks
+    pause out would answer a ``STOP_NODE`` only when it woke. A conduit that asks
     pauses until its next trigger is due, so the asking keeps its interval.
 
 The format has no packet interval. How fast a payload produces packets is a
@@ -6218,7 +5460,7 @@ Some of what follows is **experimental and not yet supported**: RS-485 on a
 serial line, and the ``can``, ``iio``, ``rpmsg``, ``gpio`` and ``hdlc`` types
 of payload. Each is written, parses, reaches a handler and has tests of its
 rules; none has been run against the hardware it describes, and no shipped
-payload set uses one. ``hdlc`` is the furthest out of them: every other has
+configuration uses one. ``hdlc`` is the furthest out of them: every other has
 something in the kernel to be exercised against, and a synchronous line has
 nothing but a card.
 
@@ -7040,54 +6282,6 @@ Requirement
 
 Attribute names may be spelled with either underscores or hyphens, so
 ``max_length`` and ``max-length`` are the same attribute.
-Example
--------
-This is the shipped tcspecial1.yaml. ``udp-steady`` and ``udp-fast`` are
-reached the same way, over a UDP socket on this host, so what they share is a
-group and what tells them apart stays with each of them. ``tcp-stream`` and
-``random-device`` share nothing with anything and so state every attribute for
-themselves. Each payload is named for what it is: a set whose payloads were
-called DH0 to DH3 said which handler each was and nothing else, and the name
-is what a panel in the MOC shows.
-
-.. code-block:: yaml
-
-   version: "1.0"
-   description: TCSpecial payload set 1
-
-   payload_groups:
-     - name: udp_localhost
-       type: network
-       protocol: udp
-
-   payloads:
-     - name: tcp-stream
-       type: network
-       protocol: tcp
-       payload_interface: localhost:5000
-       packet_size: 12
-
-     - name: udp-steady
-       group: udp_localhost
-       payload_interface: localhost:5001
-       packet_size: 11
-
-     - name: random-device
-       type: device-file
-       path: /dev/urandom
-       packet_size: 1
-
-     - name: udp-fast
-       group: udp_localhost
-       payload_interface: localhost:5003
-       packet_size: 15
-
-Not one of them states where its telemetry goes. Each used to carry an
-``oc_address`` and an ``oc_port``, which for four handlers was four chances to
-repeat a port; it is ``payload_telemetry`` counted on by the payload's own id
-now, which the file as a whole says once. What a payload does state is where
-*it* is -- one attribute, ``payload_interface``, for the kinds that are on a
-network -- and the group holds what its members share.
 
 Simulator Configuration Files
 =============================
@@ -7095,8 +6289,8 @@ The tcspecial configuration describes payloads. Simulating one takes more than
 that description holds, and the extra is not payload configuration: how often a
 payload produces a packet, and how it divides a packet into segments, are
 choices about a simulation. They are stated in a separate file, which only
-tcssim acts on. The shipped pair is tcspecial1.yaml and tcspecial1sim.yaml; the
-parser is ``tcslibgs::sim_config``.
+tcssim acts on. A shipped pair is ``examples/minimal/minimal.yaml`` and
+``minimal-sim.yaml`` beside it; the parser is ``tcslibgs::sim_config``.
 
 Requirement
     The parser lives with the other three configuration languages rather than
@@ -7306,8 +6500,9 @@ Requirement
 Requirement
     A group may carry the type and the transport, like every other setting a
     payload does not state. A group whose payloads are not all reached the
-    same way leaves them with the payloads: the shipped ``tcspecial1sim.yaml``
-    has two payloads sharing a rate that do not share a transport.
+    same way leaves them with the payloads: the thermostat's sensors share a
+    rate and a thermal mass, and two of the three are on a different kind of
+    bus from the third.
 
 Thermal Masses
 --------------
@@ -7526,40 +6721,39 @@ Requirement
 
 Example
 -------
-This is the shipped tcspecial1sim.yaml, which simulates the four data handlers of
-tcspecial1.yaml. Two of them are driven alike and so share a group; the last
-states its own rate instead.
+This is the shipped ``examples/thermostat/thermostat-sim.yaml``, which
+simulates the three sensors of ``thermostat.yaml``. All three are read together
+and so share a group, which carries their rate and the thermal mass they
+report; the mass is what makes three sensors agree about a temperature. The
+heaters are not simulated: they are discrete lines, which the simulator drives
+rather than being driven through.
 
 .. code-block:: yaml
 
-   description: Simulator settings for the payloads of tcspecial1.yaml
+   description: Simulator settings for the payloads of thermostat.yaml
+
+   thermal_mass:
+     - name: cabin
+       environment: "283.15"
+       time_constant: "50 s"
 
    simulated_payload_groups:
-     - name: steady_1hz
-       packet_interval: 1 s
-
-     - name: continuous
-       packet_interval: continuous
+     - name: cabin_temps
+       packet_interval: 100 ms
+       reads: cabin
 
    simulated_payloads:
-     - name: tcp-stream
-       type: network
-       protocol: tcp
-       group: steady_1hz
+     - name: temp_1
+       type: i2c
+       group: cabin_temps
 
-     - name: udp-steady
-       type: network
-       protocol: udp
-       group: steady_1hz
+     - name: temp_2
+       type: i2c
+       group: cabin_temps
 
-     - name: random-device
-       type: device-file
-       group: continuous
-
-     - name: udp-fast
-       type: network
-       protocol: udp
-       packet_interval: 500 ms
+     - name: temp_3
+       type: spi
+       group: cabin_temps
 
 Testing
 =======
@@ -7592,24 +6786,24 @@ what is wrong with them.
    |  | tcslib          |<------   | |  +-----------------+  |     |  +-----------+  |
    |  | (tcslibgs)      |  |  :    | |  | Data            |<--------->| Payload 1 |  |
    |  +-----------------+  |  :    | |  | Handler 1       |  |     |  +-----------+  |
-   |  | tcspecial1.yaml |  |  :    | |  |      .          |  |     |                 |
+   |  |  configuration  |  |  :    | |  |      .          |  |     |                 |
    |  +-----------------+  |  :    |           .             |     |                 |
    +-----------------------+  :    | |  |      .          |  |     |                 |
                               :    | |  +-----------------+  |     |  +-----------+  |
                               :    | +->| Data            |<--------->| Payload n |  |
                               :    |    | Handler n       |  |     |  +-----------+  |
                               :    |    +-----------------+  |     |                 |
-                              :    |    | tcspecial1.yaml |  |     |                 |
+                              :    |    |  configuration  |  |     |                 |
                               :    |    +-----------------+  |     |                 |
                               :    +-------------------------+     +-----------------+
 
 tcssim
 ------
 Tcssim is a GUI simulating the payloads. It reads two files. The payload
-definition comes from tcspecial1.yaml, named by the ``SIM_PAYLOAD_CONFIG_PATH``
+definition comes from the configuration, named by the ``SIM_PAYLOAD_CONFIG_PATH``
 environment variable when that is set, and says which payloads exist, how each
 is reached, and how big its packets are. What simulating them takes comes from
-tcspecial1sim.yaml, named by ``PAYLOAD_SIM_YAML``; see `Simulator Configuration
+the simulator file beside it, named by ``PAYLOAD_SIM_YAML``; see `Simulator Configuration
 Files`_.
 
 Requirement
@@ -8006,7 +7200,7 @@ reflows the grid into the room that appeared. Rust opens the window wide enough
 for the columns the payload count calls for, and because it opens it at exactly
 that many panels' width plus the chrome, the window arrives at the same count.
 
-The four payloads of tcspecial1.yaml give a row of three and a row of one in a
+The five sources of the thermostat example give a row of three and a row of two in a
 1062x668 window. The size is the one ``window_size`` gives, which a test reads
 out of this document so that the number here cannot quietly stop being the one
 the program opens at.
@@ -8021,7 +7215,7 @@ the tcslib library over a datagram connection to tcspecial.  For testing
 purposes, tcsmoc uses tcslib, along with simulated payloads, to support a simple GUI.
 
 Tcsmoc gets the payload definition from a file named on its command line, and
-reads tcspecial1.yaml when the command line names none. It takes an argument
+reads the shipped fixture when the command line names none. It takes an argument
 rather than an environment variable because it starts tcspecial and tcssim as
 subprocesses and they inherit its environment: a variable naming tcsmoc's file
 would name theirs too, and so could not point tcsmoc at one file and its
@@ -8109,13 +7303,13 @@ Requirement
     and Query all are what ask.
 
 Requirement
-    A panel's status is what a START_DH or STOP_DH was answered, and the
-    beacons are what can take it away. Beacons stopping makes every panel's
-    status unknown: the status is the answer to a command and is worth as much
-    as the ground's hearing from the spacecraft, where a handler may since
-    have stopped or gone with a process that restarted, and a panel still
-    saying Active would be read as a reading. It is said once, when contact is
-    lost, rather than every pass of the silence.
+    A panel's status is what a ``START_NODE`` or ``STOP_NODE`` was answered,
+    and the beacons are what can take it away. Beacons stopping makes every
+    panel's status unknown: the status is the answer to a command and is worth
+    as much as the ground's hearing from the spacecraft, where a node may
+    since have stopped or gone with a process that restarted, and a panel
+    still claiming a state would be read as a reading. It is said once, when
+    contact is lost, rather than every pass of the silence.
 
 Requirement
     The panels are made unknown whether or not there is a command link. A MOC
@@ -8158,13 +7352,14 @@ Requirement
     socket, where the ground times it. So the ground has what it needs to say
     whether a payload is still delivering without asking anybody.
 
-    There was a poller: a thread that sent QUERY_DH to every payload once a
-    second and painted the panels from the answers. It cost a command and a
-    response per payload per second -- for forty payloads, eighty datagrams a
-    second of housekeeping on the link the spacecraft is also commanded over
-    -- and most of what it learnt the arrivals had already said. It was also
-    the MOC's second sender of payload commands, which is why the ground's end
-    of a payload command link could not be a socket the configuration names.
+    There was a poller: a thread that asked every payload what it had moved
+    once a second and painted the panels from the answers. It cost a command
+    and a response per payload per second -- for forty payloads, eighty
+    datagrams a second of housekeeping on the link the spacecraft is also
+    commanded over -- and most of what it learnt the arrivals had already
+    said. It was also the MOC's second sender of payload commands, which is
+    why the ground's end of that link could not be a socket the configuration
+    names.
 
 Requirement
     Each payload states how long the ground should wait for its data before
@@ -8213,7 +7408,7 @@ Every program is pointed at its tcspecial configuration the same way: as a
 command line argument, failing that the program's own environment variable --
 ``PAYLOAD_CONFIG_PATH`` for tcspecial and ``SIM_PAYLOAD_CONFIG_PATH`` for
 tcssim, while tcsmoc has none for the reason below -- and failing that
-tcspecial1.yaml. Tcssim names its simulator configuration separately again,
+the shipped fixture. Tcssim names its simulator configuration separately again,
 through ``PAYLOAD_SIM_YAML``.
 
 Requirement
@@ -8235,28 +7430,26 @@ Requirement
     its only argument.
 
 Requirement
-    The address and ports the command interpreter binds are in its own
-    configuration file.
+    The address and ports the command interpreter binds are in the
+    configuration's ``tcspecial`` section. They were in a configuration file
+    of tcspecial's own, which is what a version 1 payload set needed: a set
+    did not have to say where commands are taken.
 
 Requirement
-    The command interpreter takes commands on one link for the spacecraft and
-    one per payload. A command about the spacecraft -- ``PING``,
-    ``RESTART_ARM``, ``RESTART``, ``CONFIGURE`` -- arrives on
-    ``tcs_cmd.recv``; a command about a payload -- ``START_DH``, ``STOP_DH``,
-    ``QUERY_DH``, ``QUERY_DH_SAMPLE``, ``CONFIGURE_DH`` -- arrives on
-    ``payload_command.dest_base`` counted on by that payload's id, and is
-    answered there. ``CONNECT`` is the spacecraft's: it asks whether there is
-    a connection to the vehicle, which is what that link is, and a ground
-    station without one has nothing to ask a payload. A ``CONNECT`` that
-    arrives on a payload's link is refused like any other command on the wrong
-    one.
+    The command interpreter takes commands on two links: one for the
+    spacecraft and one for every node. A command about the spacecraft --
+    ``PING``, ``RESTART_ARM``, ``RESTART``, ``CONFIGURE`` -- arrives on
+    ``tcs_cmd.recv``; a command about a node -- ``START_NODE``, ``STOP_NODE``,
+    ``SET_NODE``, ``QUERY_NODE``, ``QUERY_NODE_SAMPLE`` -- arrives on
+    ``payload_command.dest_base``, with nothing added to it, and is answered
+    there. ``CONNECT`` is the spacecraft's: it asks whether there is a
+    connection to the vehicle, which is what that link is, and a ground
+    station without one has nothing to ask a node. A ``CONNECT`` that arrives
+    on the node link is refused like any other command on the wrong one.
 
-Requirement
-    A command about one payload that arrives on another payload's link is
-    refused with ``InvalidCommand``, as a command on the wrong kind of link
-    is: every payload command carries the name of its payload, and the socket
-    it arrived on says which payload it should be about, so the two
-    disagreeing is one end not reading the configuration the other is.
+    It was one socket per payload, counted from the base by the payload's id,
+    because a version 1 command said which payload it was about by arriving
+    there. A node command carries the node's id, so one socket says it.
 
 Requirement
     Each payload's link is served by a loop in a thread of its own, and every
@@ -8314,9 +7507,8 @@ Requirement
 Requirement
     Each link is served by a loop of its own, in a thread of its own. Two
     sockets read by one loop are two queues into one bottleneck: a payload
-    command that takes its time -- ``START_DH`` opens the payload's endpoint
-    and the handler's pair of OC sockets -- would still be ahead of whatever
-    the ground sent next. The split is only worth having if what it separates
+    command that takes its time -- a ``START_NODE`` opens the node, which may
+    be a device -- would still be ahead of whatever the ground sent next. The split is only worth having if what it separates
     cannot wait for the other.
 
 Requirement
@@ -8433,20 +7625,17 @@ than one ground station listening is then something configured -- a relay that
 fans the beacons out -- rather than something the network did silently.
 
 Requirement
-    Every command interpreter configuration states where beacons come from,
-    where they are received, and how often: ``beacon.send``, ``beacon.recv``
-    and ``beacon.interval``. None has a default and none may be left out,
-    in the command interpreter's own file or in a payload set's ``tcspecial``
-    section.
+    Every configuration states where beacons come from, where they are
+    received, and how often: ``beacon.send``, ``beacon.recv`` and
+    ``beacon.interval``, in its ``tcspecial`` section. None has a default and
+    none may be left out.
 
 Requirement
     How often is a length of time, like every other length of time in these
-    files: ``5 s`` rather than ``5000``. That is so in every one of the three
-    configurations that states the section -- the interpreter's own file, a
-    payload set's section and a graph's. The protocol still
-    counts milliseconds, the command that changes the interval carrying four
-    bytes of them, so the conversion happens where the file is read and in one
-    place: ``CIConfigJson::to_ci_config``.
+    files: ``5 s`` rather than ``5000``. The protocol still counts
+    milliseconds, the command that changes the interval carrying four bytes of
+    them, so the conversion happens where the file is read and in one place:
+    ``CIConfigJson::to_ci_config``.
 
 Beacons are how the ground knows the spacecraft is alive. A configuration that
 has not been asked where to send them has not answered, and a default is a way
@@ -8455,15 +7644,14 @@ listening, which looks from the ground exactly like a spacecraft that has
 stopped.
 
 Requirement
-    A payload set's section wins over the command interpreter's own file. A
-    set's own ground station is what listens for its beacons, so the set is
-    where it is said; the file's is what places a set whose own configuration
-    states no section at all.
+    Tcsmoc reads both beacon addresses from the configuration tcspecial reads,
+    through the one function that answers it:
+    ``graph::parameters::beacon_of``. The two programs read one file, so they
+    cannot name different addresses.
 
-Requirement
-    Tcsmoc reads both beacon addresses from the same two configurations,
-    resolved the same way. The two programs call one function over the same
-    files, so they cannot name different ones.
+    There was a second file to resolve against -- the command interpreter's
+    own, which placed a version 1 payload set that stated no section -- and a
+    rule about which won. One file states it now.
 
 That is what makes the earlier drift impossible rather than merely unlikely.
 The MOC used to bind a compiled-in address and read neither file, so a mission
@@ -8528,9 +7716,9 @@ Requirement
     decision.
 
 Requirement
-    A ``START_DH`` for a handler tcspecial does not have says which payload was
-    asked for, which id it came in as, what this tcspecial does serve, and that
-    the two ends are reading different configurations.
+    A ``START_NODE`` for a node tcspecial does not have says which id came
+    in, how many nodes this tcspecial does serve, and that the two ends are
+    reading different configurations.
 
 Attaching is what makes this worth saying. A tcspecial left running from an
 earlier payload set is attached to rather than replaced, and it goes on serving
@@ -8572,7 +7760,7 @@ set read two ways:
 .. code-block:: console
 
    $ make runmocy
-   $ make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial1
+   $ make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/thermostat
    $ make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial2
 
 Requirement
@@ -8595,9 +7783,9 @@ given for different sets:
 
 .. code-block:: console
 
-   $ make run TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial1
-   $ make runsim TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial1
-   $ make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial1
+   $ make run TCSPECIAL_CONFIG_FILE=tests/manual/thermostat
+   $ make runsim TCSPECIAL_CONFIG_FILE=tests/manual/thermostat
+   $ make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/thermostat
 
 Started in that order, the three run as separately as they can: tcsmoc finds
 the tcspecial already there, attaches to it rather than starting a second, and
@@ -8609,13 +7797,13 @@ is for -- a debugger on the one being worked on, and the others left alone.
 .. code-block:: console
 
    $ make runmocy RUST_LOG=debug
-   $ make run TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial1 RUST_LOG=tcspecial::ci=trace
+   $ make run TCSPECIAL_CONFIG_FILE=tests/manual/thermostat RUST_LOG=debug
 
 The manual says the same thing from the other end -- what to type to run a
 set -- under "Running the Programs".
 
 The window is built from that file. Nothing in the GUI names a data handler or
-fixes how many there are, so a handler added to or removed from tcspecial1.yaml
+fixes how many there are, so a source added to or removed from the configuration
 adds or removes a rectangle.
 
 Requirement
@@ -8641,9 +7829,10 @@ Before the ground's end was named there was a hello: an empty datagram from
 the MOC to every payload's handler, once a second, because the handler learnt
 where to answer from what arrived and with nobody there it had no peer at all
 -- every write to the ground failed, and a payload's data went into a handler
-and no further. Once a second because START_DH and STOP_DH rebind that socket
-and the learnt peer went with it, so a ground station that said hello once was
-silently cut off by the next Enable, with nothing anywhere to say so.
+and no further. Once a second because starting or stopping a payload rebound
+that socket and the learnt peer went with it, so a ground station that said
+hello once was silently cut off by the next Enable, with nothing anywhere to
+say so.
 
 Naming both ends removed all of it: the hello, that silence, and the last
 traffic the MOC sent without being asked. What remains of the reason the
@@ -8698,7 +7887,7 @@ test holds every button to the panel that contains it and not merely to the
 window.
 
 So the shape follows from the count alone: three handlers are one row of three,
-and the four of the shipped tcspecial1.yaml are a row of three and a row of
+and the five of the shipped thermostat are a row of three and a row of
 one, in a 821x884 window. A test reads that size out of this document and
 checks it against the one the program opens at, as one does for tcssim.
 
@@ -8721,24 +7910,25 @@ three-row floor, which is a different thing: the floor is room to grow into.
 A test measures where the panels land in a laid-out window rather than reading
 the arithmetic back, because the arithmetic was not the part that was wrong.
 
-The GUI has a section at the
-top of its single window that allows issuing of CI commands and viewing responses.
-Below that are as many rectangles as there are data handlers.
-Each displays the DH name, its status, configuration information, and packet
-size, whether or not it has been started: what the panels are for is comparing
-a handler against the file that describes it, and a panel that showed nothing
-until it was started would say nothing about the set that had been loaded. It
-shows no packet interval: that is a simulator setting, stated in
-tcspecial1sim.yaml and shown by tcssim.
-Below that it displays the time and the data most recently sent. Underneath
-that is the time and data most recently received. Both come from
-`QUERY_DH_SAMPLE`_ telemetry, which tcsmoc asks for alongside the statistics;
-the times are when the data moved rather than when it was asked about, and
-data longer than a sample is shown as a head followed by an ellipsis.
+The GUI has a section at the top of its single window for commanding the
+spacecraft and reading what it answers, with the beacon's panel beside it.
+Below that is a rectangle for every source the configuration sends to the
+ground, each showing the node's name, what it is, where its data arrives and
+what has arrived -- whether or not anything has, because what a panel is for
+is comparing a node against the file that describes it.
 
-A handler whose conduits have carried nothing in a direction shows
-``--:--:--`` and no data for it, which is also what a panel shows before it
-has been queried at all.
+It shows no packet interval: that is a simulator setting, stated in the
+simulator file and shown by tcssim.
+
+The two lines of what arrived are the ground's own reading: when something
+last came from that source and the head of it, counted from the moment the MOC
+started. A source that has sent nothing shows ``--:--:--`` and no data, which
+is what a panel says before anything arrives.
+
+It was the spacecraft's account of its data handlers, asked for with
+``QUERY_DH_SAMPLE`` and shown as the last transfer each way. That command was
+version 1's, and what a panel shows now is what reached the ground, which is
+the thing an operator is watching the window for.
 
 Requirement
     A panel says which payload of the configuration it is, beside the name:
@@ -8756,14 +7946,16 @@ the panel was narrower than the word.
 
 Requirement
     A panel has a button per command, each labelled with the command it
-    sends. ``Enable`` sends START_DH and ``Disable`` sends STOP_DH, with
+    sends. ``Enable`` sends ``START_NODE`` and ``Disable`` sends
+    ``STOP_NODE``, with
     Enable first: that is the press a panel is opened to make, and the status
     beside the name is what says which of the two has taken effect.
 
 Requirement
-    Both are pressable whatever the handler is doing. tcspecial answers a
-    START_DH for a handler already running and a STOP_DH for one already
-    stopped without harm, and what an operator wants when a panel looks wrong
+    Both are pressable whatever the node is doing. tcspecial answers a
+    ``START_NODE`` for a node already running and a ``STOP_NODE`` for one
+    already stopped without harm, and what an operator wants when a panel
+    looks wrong
     is what the spacecraft says to the command -- which a button that cannot
     be pressed does not say.
 
@@ -8783,8 +7975,9 @@ Requirement
     in tcssim starts or stops a payload in that same program: the press is the
     act, it cannot be lost, and one button labelled with what it will do says
     everything there is to say. A press in the MOC sends a datagram to a
-    spacecraft, which may not arrive -- so the same START_DH or STOP_DH may
-    have to be sent again, and again, before tcspecial has it. A single button
+    spacecraft, which may not arrive -- so the same ``START_NODE`` or
+    ``STOP_NODE`` may have to be sent again, and again, before tcspecial has
+    it. A single button
     offering the press that suits the status cannot be pressed twice: the
     status it reads is the ground's own guess about a handler it may not have
     reached, and the press worth making is exactly the one such a button
@@ -8809,15 +8002,15 @@ Requirement
     payload. Three rows and a counter carried that account and are gone: a
     panel is watched for what reached the ground, and the claim about it took
     a third of the panel's height to say nearly the same thing.
-    QUERY_DH_SAMPLE is not asked for any more either -- a command a second
-    per handler whose answer nothing showed.
+    The spacecraft's own sample is not asked for any more either -- a command
+    a second per node whose answer nothing showed.
 
 Requirement
     All three of those readings are kept by the end that received them, which
-    is the ground. The count was taken from the QUERY_DH statistics instead,
-    and from the wrong half of them: a handler's ``bytes_received`` is what it
-    read from the ground, which is the direction nobody sends in, so a panel
-    beside a payload sending steadily read ``0 bytes``. The listener that
+    is the ground. The count was taken from the spacecraft's statistics
+    instead, and from the wrong half of them: what a handler had *received*
+    was what it read from the ground, which is the direction nobody sends in,
+    so a panel beside a payload sending steadily read ``0 bytes``. The listener that
     already kept the time and the data counts the packets as it receives
     them.
 
@@ -8838,9 +8031,8 @@ when tcsmoc is halted.
 
 tcsverify
 ---------
-Tcsverify reads a payload set -- the tcspecial configuration file, and the
-simulator file beside it when one is given -- and prints what is wrong with
-it. It opens no socket and no device node, so it can be run anywhere, by a
+Tcsverify reads a configuration -- the file itself, and the simulator file
+beside it when one is given -- and prints what is wrong with it. It opens no socket and no device node, so it can be run anywhere, by a
 person editing a file or by a recipe: it is given the files to read and says
 nothing when they are good.
 
@@ -9211,9 +8403,9 @@ CI must support a STATUS command that sends telemetry containing status to groun
 
 .. note::
    Not implemented. There is no STATUS command for the interpreter as a
-   whole. QUERY_DH answers for one handler -- what state it is in and what it
-   has moved -- and QUERY_DH_SAMPLE for what it last sent and received; a
-   ground station asks about every handler by asking about each.
+   whole. ``QUERY_NODE`` answers for one node -- whether it is enabled and
+   what it has moved -- and ``QUERY_NODE_SAMPLE`` for what it last took and
+   gave; a ground station asks about every node by asking about each.
 
 Tcspecial includes zero or more components named Data Handler (DH)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

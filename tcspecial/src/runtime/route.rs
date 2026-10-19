@@ -56,7 +56,7 @@ pub struct Delivery {
     /// which is what [`tcslibgs::graph::check::Problem::CrossedStreams`]
     /// refuses a configuration for. So it is a property of the link and is
     /// settled here, once, from the terminals the file names or from the only
-    /// terminal the type at either end has -- see [`stream_of`].
+    /// terminal the type at either end has -- see `stream_of`.
     ///
     /// `None` is a link whose stream nothing settles, which a checked
     /// configuration does not have: it is carried as "wherever its links go",

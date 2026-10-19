@@ -32,7 +32,7 @@
 //! So the stream travels with the bytes -- [`Taken::stream`] on the way out,
 //! [`Arriving::stream`] on the way in -- and [`Fabric::deliver_on`] follows
 //! only the links that carry it. Which stream a link carries is settled once,
-//! where the table is built: see [`crate::runtime::route::stream_of`].
+//! where the table is built: see `route::stream_of`.
 //!
 //! Delivery is best-effort per destination and the failures are counted. That
 //! is the reliability choice and it is worth stating: a log that cannot be
@@ -135,7 +135,7 @@ pub struct Arriving<'a> {
     /// most of them.
     pub input: Option<&'a str>,
     /// Which stream it is on, where the link settles it. See
-    /// [`crate::runtime::route::stream_of`].
+    /// `route::stream_of`.
     pub stream: Option<Stream>,
 }
 
@@ -475,7 +475,7 @@ impl Fabric {
     /// stop arriving twice gives.
     ///
     /// Nothing else changes. The routing still names the node, and a delivery
-    /// to it is dropped by the gate before it gets this far: see [`Gate`].
+    /// to it is dropped before it gets this far, by what [`Watch`] says of it.
     pub fn release(&mut self, name: &str) -> Option<Box<dyn Port>> {
         self.nodes
             .remove(name)

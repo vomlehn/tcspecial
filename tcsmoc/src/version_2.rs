@@ -1065,10 +1065,13 @@ pub(crate) mod tests {
         assert_eq!(
             named,
             vec![
-                ("k_fore".to_string(), 1),
-                ("k_aft".to_string(), 2),
-                ("k_bay".to_string(), 3),
-                ("mean_temp".to_string(), 4),
+                ("k_1".to_string(), 1),
+                ("k_2".to_string(), 2),
+                ("k_3".to_string(), 3),
+                ("cabin_temp".to_string(), 4),
+                // The decision too, which the ground sees as well as the
+                // heaters.
+                ("thermostat".to_string(), 5),
             ]
         );
         assert!(panels[3].config.contains("to moc"), "{}", panels[3].config);
@@ -1132,14 +1135,19 @@ pub(crate) mod tests {
         );
 
         let shown = panels(&telemetry::of(&graph).expect("its links"), &settable);
-        // The thermostat is not drawn into the moc node in this example -- its
-        // decision goes to the heaters -- so the panels are the four sources,
-        // none of which binds anything.
+        // The thermostat is one of the panels, its decision reaching the
+        // ground as well as the heaters, and it is the one that binds
+        // something: its panel offers the setpoint and the others offer
+        // nothing.
         for panel in &shown {
+            let offered = match panel.name.as_str() {
+                "thermostat" => ("setpoint", "setpoint"),
+                _ => ("", ""),
+            };
             assert_eq!(
                 (panel.settable.as_str(), panel.setting.as_str()),
-                ("", ""),
-                "{} binds nothing, so its panel offers nothing",
+                offered,
+                "what {} offers",
                 panel.name
             );
         }

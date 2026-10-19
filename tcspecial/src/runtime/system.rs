@@ -1609,9 +1609,9 @@ vehicle:
         let mut vehicle = vehicle(
             start,
             &[
-                ("temp_fore", &[0x01, 0x00]),
-                ("temp_aft", &[0x01, 0x00]),
-                ("temp_bay", &[0x00, 0x10, 0x00]),
+                ("temp_1", &[0x01, 0x00]),
+                ("temp_2", &[0x01, 0x00]),
+                ("temp_3", &[0x00, 0x10, 0x00]),
             ],
         );
 
@@ -1627,13 +1627,21 @@ vehicle:
             .collect();
         assert_eq!(
             to_ground,
-            vec!["289.15", "289.15", "287.3188", "288.5396"],
-            "the ground should have three readings and their mean"
+            // The three readings, the one temperature voted out of them, and
+            // the decision. The vote is 289.15 and not the mean's 288.5396:
+            // sorted, the readings are 287.3188, 289.15 and 289.15, so the
+            // median is 289.15 and the low one is left out -- which is what
+            // a trio is for.
+            vec!["289.15", "289.15", "287.3188", "289.15", "1"],
+            "the ground should have three readings, the vote over them, and \
+             the decision"
         );
         assert_eq!(
             vehicle.heaters.lock().expect("the record").clone(),
-            vec![b"1".to_vec()],
-            "a cabin below the band should have its heaters on"
+            // One decision, reaching both heaters: they are driven together,
+            // so that one failing leaves the other warming the mass.
+            vec![b"1".to_vec(), b"1".to_vec()],
+            "a cabin below the band should have both its heaters on"
         );
         assert!(
             vehicle.telemetry.lock().expect("the record").is_empty(),
@@ -1689,16 +1697,16 @@ vehicle:
     #[test]
     fn a_group_is_read_when_it_is_due_and_not_otherwise() {
         let start = Instant::now();
-        let mut vehicle = vehicle(start, &[("temp_fore", &[0x01, 0x00])]);
+        let mut vehicle = vehicle(start, &[("temp_1", &[0x01, 0x00])]);
 
         // The first pass reads the group, the sensors having been scripted
         // with one reading each.
         let first = vehicle.system.pass(start);
         assert!(first.delivered > 0, "the group is due at a start");
 
-        // A pass a moment later is not: three seconds is the example's
+        // A pass a moment later is not: a tenth of a second is the example's
         // interval, so nothing is read and nothing is delivered.
-        let soon = start + Duration::from_millis(500);
+        let soon = start + Duration::from_millis(30);
         let second = vehicle.system.pass(soon);
         assert_eq!(second.delivered, 0, "{:?}", second);
         assert!(second.all_delivered(), "{:?}", second.refused);
@@ -1706,8 +1714,8 @@ vehicle:
         // And what the loop waits for is the rest of the interval.
         let waiting = vehicle.system.until_next_pass(soon);
         assert!(
-            waiting > Duration::from_millis(2_000) && waiting <= Duration::from_millis(2_500),
-            "{waiting:?} is not the rest of three seconds"
+            waiting > Duration::from_millis(50) && waiting <= Duration::from_millis(70),
+            "{waiting:?} is not the rest of a tenth of a second"
         );
     }
 
@@ -1729,8 +1737,8 @@ vehicle:
         assert_eq!(vehicle.system.logs(), ["housekeeping"]);
         assert_eq!(
             vehicle.system.holds(),
-            15,
-            "eleven nodes in the example, and a link to the ground for each of the four \
+            17,
+            "twelve nodes in the example, and a link to the ground for each of the five \
              nodes drawn into its moc node"
         );
     }
@@ -1776,8 +1784,8 @@ vehicle:
 
         assert_eq!(refused.len(), 3, "{refused:?}");
         assert!(
-            refused.iter().any(|why| why.contains("temp_fore"))
-                && refused.iter().any(|why| why.contains("temp_aft"))
+            refused.iter().any(|why| why.contains("temp_1"))
+                && refused.iter().any(|why| why.contains("temp_2"))
                 && refused.iter().any(|why| why.contains("housekeeping")),
             "every reason should be given: {refused:?}"
         );
@@ -1791,10 +1799,11 @@ vehicle:
             Graph::load(root.join("tests/manual/thermostat.yaml")).expect("the example reads");
 
         let described = described(&graph);
-        assert_eq!(described["temp_fore"], "i2c, read");
-        assert_eq!(described["heaters"], "gpio, driven");
+        assert_eq!(described["temp_1"], "i2c, read");
+        assert_eq!(described["heaters_1"], "gpio, driven");
+        assert_eq!(described["heaters_2"], "gpio, driven");
         assert_eq!(described["moc"], "moc, read");
-        assert_eq!(described["k_fore"], "compute");
+        assert_eq!(described["k_1"], "compute");
         assert_eq!(described["housekeeping"], "log");
     }
 
@@ -1817,16 +1826,17 @@ vehicle:
         // A cabin at 289.15 K, which is below the example's band around
         // 293.15: the heaters go on.
         let readings = [
-            ("temp_fore", &[0x01, 0x00][..]),
-            ("temp_aft", &[0x01, 0x00][..]),
-            ("temp_bay", &[0x00, 0x10, 0x00][..]),
+            ("temp_1", &[0x01, 0x00][..]),
+            ("temp_2", &[0x01, 0x00][..]),
+            ("temp_3", &[0x00, 0x10, 0x00][..]),
         ];
         let mut vehicle = vehicle(start, &readings);
         vehicle.system.pass(start);
         assert_eq!(
             vehicle.heaters.lock().expect("the record").clone(),
-            vec![b"1".to_vec()],
-            "a cabin below the band has its heaters on"
+            // One decision reaching both heaters.
+            vec![b"1".to_vec(), b"1".to_vec()],
+            "a cabin below the band has both its heaters on"
         );
 
         // The ground lowers the setpoint under the cabin, from a thread of
@@ -1880,8 +1890,9 @@ vehicle:
 
         assert_eq!(
             vehicle.heaters.lock().expect("the record").clone(),
-            vec![b"1".to_vec(), b"0".to_vec()],
-            "the same cabin is now above the band, so the heaters go off"
+            // On, then off: each decision reaching both heaters.
+            vec![b"1".to_vec(), b"1".to_vec(), b"0".to_vec(), b"0".to_vec()],
+            "the same cabin is now above the band, so both heaters go off"
         );
     }
 
@@ -1892,9 +1903,9 @@ vehicle:
         let mut vehicle = vehicle(
             start,
             &[
-                ("temp_fore", &[0x01, 0x00]),
-                ("temp_aft", &[0x01, 0x00]),
-                ("temp_bay", &[0x00, 0x10, 0x00]),
+                ("temp_1", &[0x01, 0x00]),
+                ("temp_2", &[0x01, 0x00]),
+                ("temp_3", &[0x00, 0x10, 0x00]),
             ],
         );
 
@@ -1909,11 +1920,20 @@ vehicle:
         );
 
         assert_eq!(passes.get(), 1, "one pass, then the stop");
+        // It waited, and for no longer than the group's own interval. Not a
+        // tighter bound than that: what is left of the interval depends on
+        // how long the pass took, and a machine running the rest of this
+        // suite beside it takes longer -- which is a loaded machine and not a
+        // loop that failed to wait.
         assert!(
-            waits.get() >= Duration::from_millis(2_500),
+            waits.get() > Duration::ZERO && waits.get() <= Duration::from_millis(100),
             "the loop should have waited for the next group: {:?}",
             waits.get()
         );
-        assert_eq!(vehicle.heaters.lock().expect("the record").len(), 1);
+        assert_eq!(
+            vehicle.heaters.lock().expect("the record").len(),
+            2,
+            "one decision, reaching both heaters"
+        );
     }
 }

@@ -155,7 +155,7 @@ fn yaml(text: &str) -> Where {
         }
 
         // Or a name inside a flow mapping, which is how a version 2 file is
-        // commonly written: `- { name: temp_fore, type: i2c }` on one line.
+        // commonly written: `- { name: temp_1, type: i2c }` on one line.
         // Without this such an entry is never found and a problem about it is
         // reported from its section's line, which sends a reader to the top of
         // a list rather than to the thing.

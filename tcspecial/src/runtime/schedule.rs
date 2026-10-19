@@ -155,7 +155,7 @@ mod tests {
         assert_eq!(schedule.groups(), vec!["cabin_temps"]);
         let members = schedule.members("cabin_temps");
         assert_eq!(members.len(), 3, "{members:?}");
-        for sensor in ["temp_fore", "temp_aft", "temp_bay"] {
+        for sensor in ["temp_1", "temp_2", "temp_3"] {
             assert!(
                 members.iter().any(|m| m == sensor),
                 "{sensor} is not in the group: {members:?}"
@@ -182,30 +182,30 @@ mod tests {
     /// A group read is next due an interval after it was due.
     ///
     /// From the due time and not from the finish time: the second is how a
-    /// three-second loop becomes a three-point-one-second loop and drifts
-    /// away from the clock it was meant to keep.
+    /// tenth-of-a-second loop becomes a hundred-and-ten-millisecond loop and
+    /// drifts away from the clock it was meant to keep.
     #[test]
     fn the_next_time_does_not_drift() {
         let start = Instant::now();
         let mut schedule = Schedule::of(&thermostat(), start);
 
-        // Read a tenth of a second late, as a real pass would be.
-        let late = start + Duration::from_millis(100);
+        // Read ten milliseconds late, as a real pass would be.
+        let late = start + Duration::from_millis(10);
         let then = schedule.read("cabin_temps", late).expect("a next time");
         assert_eq!(
             then,
-            start + Duration::from_secs(3),
+            start + Duration::from_millis(100),
             "the next time was taken from the finish rather than from the due time"
         );
 
         // And it is not due before then.
-        assert!(schedule.due(start + Duration::from_secs(2)).is_empty());
-        assert_eq!(schedule.due(start + Duration::from_secs(3)).len(), 1);
+        assert!(schedule.due(start + Duration::from_millis(50)).is_empty());
+        assert_eq!(schedule.due(start + Duration::from_millis(100)).len(), 1);
 
         // A hundred passes, each late: still on the original clock.
         let mut schedule = Schedule::of(&thermostat(), start);
         for n in 0..100 {
-            let due = start + Duration::from_secs(3 * n) + Duration::from_millis(37);
+            let due = start + Duration::from_millis(100 * n) + Duration::from_millis(7);
             schedule.read("cabin_temps", due);
         }
         assert_eq!(
@@ -234,7 +234,7 @@ mod tests {
             then > very_late,
             "the next time is in the past, so the group is due for ever"
         );
-        assert_eq!(then, very_late + Duration::from_secs(3));
+        assert_eq!(then, very_late + Duration::from_millis(100));
         assert!(schedule.due(very_late).is_empty());
     }
 
@@ -286,7 +286,7 @@ mod tests {
         // And the wait is until the sooner of the two.
         assert_eq!(
             schedule.until_next(start),
-            Some(Duration::from_secs(3)),
+            Some(Duration::from_millis(100)),
             "the wait should be until the soonest group, not the latest"
         );
     }

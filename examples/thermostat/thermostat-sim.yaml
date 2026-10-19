@@ -15,14 +15,14 @@ simulated_payload_groups:
     packet_interval: 3 s
 
 simulated_payloads:
-  - name: temp_fore
+  - name: temp_1
     type: i2c
     group: cabin_temps
 
-  - name: temp_aft
+  - name: temp_2
     type: i2c
     group: cabin_temps
 
-  - name: temp_bay
+  - name: temp_3
     type: spi
     group: cabin_temps

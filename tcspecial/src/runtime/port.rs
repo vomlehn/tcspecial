@@ -1104,9 +1104,9 @@ mod tests {
         let routes = thermostat();
 
         // A sensor's output goes somewhere and nothing arrives at it.
-        assert_eq!(Use::of(&routes, "temp_fore"), Ok(Use::Read));
+        assert_eq!(Use::of(&routes, "temp_1"), Ok(Use::Read));
         // The heaters are the other way round.
-        assert_eq!(Use::of(&routes, "heaters"), Ok(Use::Driven));
+        assert_eq!(Use::of(&routes, "heaters_1"), Ok(Use::Driven));
         // And the ground link is read: the setpoint is commanded through it,
         // which is the binding and not a link -- see the commanded case
         // below. Nothing is delivered to it: what is drawn into it goes to
@@ -1194,7 +1194,7 @@ mod tests {
     /// What a device produces is taken, and nothing to read is not a failure.
     #[test]
     fn a_reading_is_taken_and_quiet_is_not_a_failure() {
-        let (script, mut port) = port("temp_fore", Use::Read);
+        let (script, mut port) = port("temp_1", Use::Read);
         script.lock().expect("the script").to_read = vec![Ok(b"293.15".to_vec())];
 
         let mut buffer = [0u8; 64];
@@ -1212,7 +1212,7 @@ mod tests {
     /// A read that fails is reported, and names the node.
     #[test]
     fn a_read_that_fails_is_reported() {
-        let (script, mut port) = port("temp_fore", Use::Read);
+        let (script, mut port) = port("temp_1", Use::Read);
         script.lock().expect("the script").to_read =
             vec![Err(TcsError::Endpoint("the bus did not answer".to_string()))];
 
@@ -1220,7 +1220,7 @@ mod tests {
             .take(&mut [0u8; 64])
             .expect_err("a bus that did not answer");
         assert!(
-            said.contains("temp_fore") && said.contains("did not answer"),
+            said.contains("temp_1") && said.contains("did not answer"),
             "the complaint should name the node and carry the reason: {said}"
         );
     }
@@ -1228,7 +1228,7 @@ mod tests {
     /// What arrives at a driven node is written whole.
     #[test]
     fn a_command_is_written_whole() {
-        let (script, mut port) = port("heaters", Use::Driven);
+        let (script, mut port) = port("heaters_1", Use::Driven);
 
         assert_eq!(port.give(Arriving::ANYWHERE, b"1"), Ok(()));
         assert_eq!(script.lock().expect("the script").written, vec![b"1".to_vec()]);
@@ -1269,18 +1269,18 @@ mod tests {
     /// A write that failed outright carries the endpoint's own reason.
     #[test]
     fn a_write_that_fails_carries_the_reason() {
-        let (script, mut port) = port("heaters", Use::Driven);
+        let (script, mut port) = port("heaters_1", Use::Driven);
         script.lock().expect("the script").write_answers = vec![Err(TcsError::Endpoint(
             "cannot drive the lines of /dev/gpiochip0".to_string(),
         ))];
 
         let said = port.give(Arriving::ANYWHERE, b"1").expect_err("a chip that refused");
         assert!(
-            said.contains("heaters") && said.contains("/dev/gpiochip0"),
+            said.contains("heaters_1") && said.contains("/dev/gpiochip0"),
             "the complaint should name the node and the chip: {said}"
         );
         assert_eq!(
-            said.matches("heaters").count(),
+            said.matches("heaters_1").count(),
             1,
             "the node is named once: every endpoint names the node it belongs \
              to, and so does the line this is reported on -- {said}"
@@ -1290,7 +1290,7 @@ mod tests {
     /// Each direction refuses what the configuration does not use it for.
     #[test]
     fn a_node_refuses_the_direction_it_is_not_used_in() {
-        let (_, mut sensor) = port("temp_fore", Use::Read);
+        let (_, mut sensor) = port("temp_1", Use::Read);
         let said = sensor.give(Arriving::ANYWHERE, b"1").expect_err("a write to a sensor");
         assert!(
             said.contains("read and not written"),
@@ -1298,7 +1298,7 @@ mod tests {
         );
         assert!(!sensor.accepts() && sensor.produces());
 
-        let (_, mut heaters) = port("heaters", Use::Driven);
+        let (_, mut heaters) = port("heaters_1", Use::Driven);
         let said = heaters
             .take(&mut [0u8; 64])
             .expect_err("a read of the heaters");
@@ -1312,7 +1312,7 @@ mod tests {
     /// A named input arriving at a device is a mis-wiring, not a datum.
     #[test]
     fn a_named_input_on_a_device_is_refused() {
-        let (script, mut port) = port("heaters", Use::Driven);
+        let (script, mut port) = port("heaters_1", Use::Driven);
 
         let said = port
             .give(Arriving::named("in0"), b"1")
@@ -1330,7 +1330,7 @@ mod tests {
     /// A read asks for what the part answers in, not what the buffer holds.
     #[test]
     fn a_read_asks_for_what_the_node_says() {
-        let (script, port) = port("temp_fore", Use::Read);
+        let (script, port) = port("temp_1", Use::Read);
         let mut port = port.reading(2);
         script.lock().expect("the script").to_read = vec![Ok(b"293.15".to_vec())];
 
@@ -1342,7 +1342,7 @@ mod tests {
 
         // And the buffer is the other bound: a caller with room for one byte
         // gets one, whatever the node says.
-        let (script, port) = port_of_script("temp_fore", Use::Read, vec![Ok(b"293.15".to_vec())]);
+        let (script, port) = port_of_script("temp_1", Use::Read, vec![Ok(b"293.15".to_vec())]);
         let mut port = port.reading(2);
         let got = port.take(&mut [0u8; 1]).expect("a reading");
         assert_eq!(got.bytes, 1);
@@ -1363,7 +1363,7 @@ mod tests {
         let routes = Routes::of(&graph);
 
         let said = match EndpointPort::open(
-            graph.node("temp_fore").expect("a sensor"),
+            graph.node("temp_1").expect("a sensor"),
             &routes,
             &Abandon::nothing(),
         ) {
@@ -1476,16 +1476,17 @@ mod tests {
     /// A computation holds its result until it is taken.
     #[test]
     fn a_computation_has_a_result_when_it_has_enough() {
-        use crate::node::vehicle::compute::mean::Mean;
-        use tcslibgs::node::vehicle::compute::MeanParams;
+        use crate::node::vehicle::compute::vote::Vote;
+        use tcslibgs::node::vehicle::compute::{Algorithm, VoteParams};
 
         let mut port = ComputePort::of(
-            "mean_temp",
-            Box::new(Mean::of(MeanParams {
+            "cabin_temp",
+            Box::new(Vote::of(VoteParams {
+                algorithm: Algorithm::Median,
                 inputs: vec!["in0".to_string(), "in1".to_string()],
             })),
         );
-        assert_eq!(port.function(), "mean");
+        assert_eq!(port.function(), "vote");
 
         // The first arrival is not a result: a mean of one of two sensors
         // would be an average of a reading and nothing.
@@ -1548,12 +1549,13 @@ mod tests {
     /// A datum a computation cannot use is refused, naming both.
     #[test]
     fn a_datum_a_computation_cannot_use_is_refused() {
-        use crate::node::vehicle::compute::mean::Mean;
-        use tcslibgs::node::vehicle::compute::MeanParams;
+        use crate::node::vehicle::compute::vote::Vote;
+        use tcslibgs::node::vehicle::compute::{Algorithm, VoteParams};
 
         let mut port = ComputePort::of(
-            "mean_temp",
-            Box::new(Mean::of(MeanParams {
+            "cabin_temp",
+            Box::new(Vote::of(VoteParams {
+                algorithm: Algorithm::Median,
                 inputs: vec!["in0".to_string(), "in1".to_string()],
             })),
         );
@@ -1562,7 +1564,7 @@ mod tests {
             .give(Arriving::named("in0"), b"29x.15")
             .expect_err("a reading that is not a number");
         assert!(
-            said.contains("mean_temp") && said.contains("mean"),
+            said.contains("cabin_temp") && said.contains("vote"),
             "the complaint should name the node and the computation: {said}"
         );
     }
@@ -1570,12 +1572,13 @@ mod tests {
     /// A result that will not fit is reported and kept, not cut down.
     #[test]
     fn a_result_too_large_for_the_buffer_is_kept() {
-        use crate::node::vehicle::compute::mean::Mean;
-        use tcslibgs::node::vehicle::compute::MeanParams;
+        use crate::node::vehicle::compute::vote::Vote;
+        use tcslibgs::node::vehicle::compute::{Algorithm, VoteParams};
 
         let mut port = ComputePort::of(
-            "mean_temp",
-            Box::new(Mean::of(MeanParams {
+            "cabin_temp",
+            Box::new(Vote::of(VoteParams {
+                algorithm: Algorithm::Median,
                 inputs: vec!["in0".to_string(), "in1".to_string()],
             })),
         );
@@ -1683,7 +1686,7 @@ mod tests {
     /// A device that must be asked is asked after each read.
     #[test]
     fn a_triggered_device_is_asked_after_it_is_read() {
-        let (script, port) = port("temp_bay", Use::Read);
+        let (script, port) = port("temp_3", Use::Read);
         let mut port = port.triggered_by(b"R".to_vec());
         script.lock().expect("the script").to_read = vec![Ok(b"42".to_vec()), Ok(b"43".to_vec())];
 
@@ -1715,7 +1718,7 @@ mod tests {
     /// halves of a pass that `take` joins are apart here.
     #[test]
     fn a_device_can_be_read_without_asking_and_asked_without_reading() {
-        let (script, opened) = port("temp_bay", Use::Read);
+        let (script, opened) = port("temp_3", Use::Read);
         let mut asked = opened.triggered_by(b"R".to_vec());
         script.lock().expect("the script").to_read = vec![Ok(b"42".to_vec())];
 
@@ -1738,7 +1741,7 @@ mod tests {
         );
 
         // And a device with no trigger is asked nothing.
-        let (script, mut unasked) = port("temp_fore", Use::Read);
+        let (script, mut unasked) = port("temp_1", Use::Read);
         assert_eq!(unasked.ask(), Ok(()));
         assert!(script.lock().expect("the script").written.is_empty());
     }
@@ -1752,7 +1755,7 @@ mod tests {
     /// same pass, and then the reading is of this moment.
     #[test]
     fn a_device_with_a_read_delay_is_asked_before_it_is_read() {
-        let (script, port) = port("temp_bay", Use::Read);
+        let (script, port) = port("temp_3", Use::Read);
         let mut port = port
             .triggered_by(b"R".to_vec())
             .waiting(Duration::from_millis(1));
@@ -1786,8 +1789,8 @@ mod tests {
         use crate::runtime::node_state::NodeState;
         use tcslibgs::NodeId;
 
-        let state = NodeState::new("temp_bay", NodeId::of(0)).expect("a state");
-        let (script, port) = port("temp_bay", Use::Read);
+        let state = NodeState::new("temp_3", NodeId::of(0)).expect("a state");
+        let (script, port) = port("temp_3", Use::Read);
         let mut port = port
             .triggered_by(b"R".to_vec())
             .waiting(Duration::from_secs(5))
@@ -1824,7 +1827,7 @@ mod tests {
     /// that took one and could not ask for the next has not succeeded.
     #[test]
     fn a_trigger_that_cannot_be_written_is_reported() {
-        let (script, port) = port("temp_bay", Use::Read);
+        let (script, port) = port("temp_3", Use::Read);
         let mut port = port.triggered_by(b"R".to_vec());
         script.lock().expect("the script").to_read = vec![Ok(b"42".to_vec())];
         script.lock().expect("the script").write_answers = vec![Err(TcsError::Endpoint(

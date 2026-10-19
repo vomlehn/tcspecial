@@ -50,7 +50,7 @@ pub struct Qualified {
 impl Qualified {
     /// Read a name as a link wrote it.
     ///
-    /// One separator and no more: `cabin/temp_fore` reaches into `cabin`, and
+    /// One separator and no more: `cabin/temp_1` reaches into `cabin`, and
     /// a name with two separators in it is a name this cannot mean anything
     /// by, so the whole of it after the first is taken as the node's. That
     /// keeps the function total -- a name is always readable as something --
@@ -73,8 +73,8 @@ impl Qualified {
     ///
     /// Plain where the two are in the same file, qualified where they are not.
     /// This is the half that keeps a subdiagram's own links readable: inside
-    /// `cabin.yaml` a link says `temp_fore`, and only a link reaching out of
-    /// it says `cabin/temp_fore`.
+    /// `cabin.yaml` a link says `temp_1`, and only a link reaching out of
+    /// it says `cabin/temp_1`.
     pub fn written_from(&self, from: &Home) -> String {
         match (&self.in_, from) {
             (a, b) if a == b => self.node.clone(),
@@ -86,7 +86,7 @@ impl Qualified {
     /// The name this is, seen from outside every file.
     ///
     /// What the editor holds a node under, so that two subdiagrams may both
-    /// have a `temp_fore` without either of them having to be renamed.
+    /// have a `temp_1` without either of them having to be renamed.
     pub fn absolute(&self) -> String {
         match &self.in_ {
             Some(home) => format!("{home}/{}", self.node),
@@ -129,16 +129,16 @@ mod tests {
     /// A name is local until it has to travel.
     #[test]
     fn a_name_is_plain_at_home_and_qualified_away_from_it() {
-        let inside = Qualified::of("temp_fore", &Some("cabin".to_string()));
+        let inside = Qualified::of("temp_1", &Some("cabin".to_string()));
 
         // Written from inside the same subdiagram: plain.
-        assert_eq!(inside.written_from(&Some("cabin".to_string())), "temp_fore");
+        assert_eq!(inside.written_from(&Some("cabin".to_string())), "temp_1");
 
         // Written from the top diagram, or from another subdiagram: qualified.
-        assert_eq!(inside.written_from(&None), "cabin/temp_fore");
+        assert_eq!(inside.written_from(&None), "cabin/temp_1");
         assert_eq!(
             inside.written_from(&Some("antenna".to_string())),
-            "cabin/temp_fore"
+            "cabin/temp_1"
         );
 
         // And a node of the top diagram is plain from anywhere, there being no
@@ -152,7 +152,7 @@ mod tests {
     #[test]
     fn a_qualified_name_reads_back_as_itself() {
         for (text, in_, node) in [
-            ("cabin/temp_fore", Some("cabin"), "temp_fore"),
+            ("cabin/temp_1", Some("cabin"), "temp_1"),
             ("moc", None, "moc"),
         ] {
             let read = Qualified::parse(text);
@@ -169,12 +169,12 @@ mod tests {
     /// made two copies collide would take the reuse away.
     #[test]
     fn the_same_name_in_two_subdiagrams_is_two_nodes() {
-        let one = Qualified::of("temp_fore", &Some("cabin".to_string()));
-        let two = Qualified::of("temp_fore", &Some("bay".to_string()));
+        let one = Qualified::of("temp_1", &Some("cabin".to_string()));
+        let two = Qualified::of("temp_1", &Some("bay".to_string()));
 
         assert_ne!(one.absolute(), two.absolute());
-        assert_eq!(one.absolute(), "cabin/temp_fore");
-        assert_eq!(two.absolute(), "bay/temp_fore");
+        assert_eq!(one.absolute(), "cabin/temp_1");
+        assert_eq!(two.absolute(), "bay/temp_1");
     }
 
     /// A name nobody can mean anything by is still readable.
@@ -185,7 +185,7 @@ mod tests {
     /// nothing to attach it to.
     #[test]
     fn an_unusable_name_is_read_as_a_plain_one() {
-        for odd in ["/temp_fore", "cabin/", "/", ""] {
+        for odd in ["/temp_1", "cabin/", "/", ""] {
             let read = Qualified::parse(odd);
             assert_eq!(read.in_, None, "{odd:?}");
             assert_eq!(read.node, odd, "{odd:?}");

@@ -1,8 +1,8 @@
 //! A setpoint, a dead band, and a decision.
 //!
 //! The end of the thermostat: a temperature arrives, and this says whether the
-//! heaters should be on. More than `above` degrees over the setpoint, off;
-//! more than `below` degrees under it, on; between the two, nothing at all.
+//! heaters should be on. More than `half_band` over the setpoint, off; more
+//! than `half_band` under it, on; between the two, nothing at all.
 //!
 //! The band in the middle is the point of it. A comparison against a bare
 //! setpoint switches on and off every time the temperature wobbles across one
@@ -43,12 +43,12 @@ impl Decision {
     }
 }
 
-/// A setpoint and the band either side of it.
+/// A setpoint and how far either side of it the decision changes.
 #[derive(Debug)]
 pub struct Hysteresis {
     setpoint: f64,
-    above: f64,
-    below: f64,
+    /// Half the band's width, the setpoint being in the middle of it.
+    half_band: f64,
     /// The last decision, or nothing before the first one.
     ///
     /// Nothing, and not Off: a vehicle that comes up cold must decide On on
@@ -67,8 +67,7 @@ impl Hysteresis {
     pub fn of(params: HysteresisParams) -> Hysteresis {
         Hysteresis {
             setpoint: params.setpoint,
-            above: params.above,
-            below: params.below,
+            half_band: params.half_band,
             last: None,
         }
     }
@@ -76,9 +75,9 @@ impl Hysteresis {
     /// Set the setpoint, which is what a command from the ground does.
     ///
     /// The decision is not recomputed here and the last one is kept: the next
-    /// reading will decide, three seconds away at most, and acting on a
-    /// setpoint before measuring against it would switch the heaters on the
-    /// strength of a number rather than a temperature.
+    /// reading will decide, one sample away, and acting on a setpoint before
+    /// measuring against it would switch the heaters on the strength of a
+    /// number rather than a temperature.
     pub fn set_setpoint(&mut self, setpoint: f64) {
         self.setpoint = setpoint;
     }
@@ -89,9 +88,9 @@ impl Hysteresis {
 
     /// What this temperature calls for, whatever was decided before.
     fn decide(&self, temperature: f64) -> Option<Decision> {
-        if temperature > self.setpoint + self.above {
+        if temperature > self.setpoint + self.half_band {
             Some(Decision::Off)
-        } else if temperature < self.setpoint - self.below {
+        } else if temperature < self.setpoint - self.half_band {
             Some(Decision::On)
         } else {
             // In the band: whatever is being done now goes on being done.
@@ -130,24 +129,30 @@ impl Function for Hysteresis {
 
         match attribute {
             "setpoint" => self.set_setpoint(wanted),
-            "above" | "below" => {
+            "half_band" => {
                 if wanted <= 0.0 {
                     return Err(format!(
-                        "{attribute}: {wanted} is not more than nought, and a band \
+                        "half_band: {wanted} is not more than nought, and a band \
                          of nothing is a bare comparison, which cycles a relay on \
                          a wobble"
                     ));
                 }
-                if attribute == "above" {
-                    self.above = wanted;
-                } else {
-                    self.below = wanted;
-                }
+                self.half_band = wanted;
+            }
+            // The two the band used to be, told the name it has now rather
+            // than refused as unknown: a file or a command written against
+            // the older vocabulary is a thing to correct, and the correction
+            // is the one fact the sender needs.
+            retired @ ("above" | "below") => {
+                return Err(format!(
+                    "\"{retired}\" is now half_band, one width with the setpoint in \
+                     the middle of it"
+                ))
             }
             other => {
                 return Err(format!(
                     "a hysteresis has nothing called \"{other}\" to set: there are \
-                     setpoint, above and below"
+                     setpoint and half_band"
                 ))
             }
         }
@@ -167,8 +172,7 @@ mod tests {
     fn thermostat() -> Hysteresis {
         Hysteresis::of(HysteresisParams {
             setpoint: 293.15,
-            above: 2.0,
-            below: 2.0,
+            half_band: 2.0,
         })
     }
 
@@ -280,14 +284,13 @@ mod tests {
     fn a_band_of_nothing_is_refused_before_it_is_built() {
         use tcslibgs::node::vehicle::compute::params_of;
 
-        for (above, below) in [("0", "2"), ("2", "0"), ("-1", "2")] {
+        for half_band in ["0", "-1"] {
             let said = params_of(
                 "thermostat",
                 &[
                     ("function", "hysteresis"),
                     ("setpoint", "293"),
-                    ("above", above),
-                    ("below", below),
+                    ("half_band", half_band),
                 ]
                 .iter()
                 .map(|(k, v)| (k.to_string(), tcslibgs::Scalar::of(*v)))

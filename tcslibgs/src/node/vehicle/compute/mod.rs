@@ -78,23 +78,78 @@ pub struct ToKelvinParams {
 
 /// The mean over a named set of inputs.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MeanParams {
-    /// The inputs this is waiting for, as the node declares them.
+pub struct VoteParams {
+    /// The inputs it votes over, as the node declares them.
     ///
     /// Declared and then checked against the links, which is the point of
-    /// having them written down: a mean over three sensors whose third link
+    /// having them written down: a vote over three sensors whose third link
     /// was deleted has two inputs, each bound exactly once, and would quietly
-    /// become a mean over two. The declaration is what makes that a
-    /// configuration fault instead.
+    /// become a vote over two -- which is no vote at all, two readings that
+    /// disagree having no majority between them. The declaration is what
+    /// makes that a configuration fault instead.
     pub inputs: Vec<String>,
+    /// How the one value is picked out of them.
+    pub algorithm: Algorithm,
 }
 
-/// A setpoint and the band either side of it.
+/// How a vote turns several readings of one thing into the value to use.
+///
+/// Both of these reject an outlier, which is the whole point: the readings
+/// are of one quantity, so they disagree only because a sensor is wrong, and
+/// a mean over all of them would carry the wrong one into the answer in
+/// proportion to how wrong it is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Algorithm {
+    /// The middle reading, which an outlier cannot be.
+    ///
+    /// For an even count, the mean of the two middle ones; an odd count is
+    /// what a vote wants, so that there is a middle to take.
+    Median,
+    /// The mean of the two readings closest to each other.
+    ///
+    /// Where the median takes one sensor's word, this takes the two that
+    /// agree -- so a third that has drifted is left out of the answer
+    /// altogether rather than being the one consulted.
+    ClosestMean,
+}
+
+impl Algorithm {
+    /// The word a file uses for it.
+    pub fn spelling(&self) -> &'static str {
+        match self {
+            Algorithm::Median => "median",
+            Algorithm::ClosestMean => "closest_mean",
+        }
+    }
+
+    /// What a file said, or what is wrong with it.
+    pub fn of(said: &str) -> Result<Algorithm, String> {
+        match said.trim() {
+            "median" => Ok(Algorithm::Median),
+            "closest_mean" => Ok(Algorithm::ClosestMean),
+            other => Err(format!(
+                "algorithm: \"{other}\" is not one this knows. There are median, \
+                 which takes the middle reading, and closest_mean, which takes \
+                 the mean of the two that agree best"
+            )),
+        }
+    }
+}
+
+/// A setpoint and how far either side of it the decision changes.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HysteresisParams {
+    /// What the reading is held at.
     pub setpoint: f64,
-    pub above: f64,
-    pub below: f64,
+    /// How far from the setpoint the decision changes, each way.
+    ///
+    /// One width and not two. It was `above` and `below`, which could differ
+    /// -- and a band wider on one side than the other is a setpoint that is
+    /// not in the middle of its own band, which is a different thing said in
+    /// a way nobody reading the file would notice. What is wanted is a narrow
+    /// band around a goal, so the goal and the half-width are the two numbers
+    /// there are.
+    pub half_band: f64,
 }
 
 /// A computation that is a program of its own.
@@ -109,7 +164,7 @@ pub struct ProcessParams {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Computation {
     ToKelvin(ToKelvinParams),
-    Mean(MeanParams),
+    Vote(VoteParams),
     Hysteresis(HysteresisParams),
     Process(ProcessParams),
 }
@@ -119,7 +174,7 @@ impl Computation {
     pub fn function(&self) -> &'static str {
         match self {
             Computation::ToKelvin(_) => "to_kelvin",
-            Computation::Mean(_) => "mean",
+            Computation::Vote(_) => "vote",
             Computation::Hysteresis(_) => "hysteresis",
             Computation::Process(_) => "process",
         }
@@ -128,7 +183,7 @@ impl Computation {
 
 /// Every function there is, for an error to list.
 pub fn functions() -> &'static str {
-    "to_kelvin, mean, hysteresis, or process"
+    "to_kelvin, vote, hysteresis, or process"
 }
 
 /// What a computation is told, by name.
@@ -145,8 +200,8 @@ pub fn functions() -> &'static str {
 pub fn attributes_of(function: &str) -> Option<&'static [&'static str]> {
     match function {
         "to_kelvin" => Some(&["function", "format", "scale", "offset"]),
-        "mean" => Some(&["function", "inputs"]),
-        "hysteresis" => Some(&["function", "setpoint", "above", "below"]),
+        "vote" => Some(&["function", "inputs", "algorithm"]),
+        "hysteresis" => Some(&["function", "setpoint", "half_band"]),
         "process" => Some(&["function", "executable", "timeout", "restart"]),
         _ => None,
     }
@@ -178,7 +233,7 @@ pub fn params_of(
     let Some(own) = attributes_of(function.as_str()) else {
         return Err(format!(
             "\"{what}\": there is no computation called \"{function}\". The \
-             built-in ones are to_kelvin, mean and hysteresis; \"process\" \
+             built-in ones are to_kelvin, vote and hysteresis; \"process\" \
              runs a program of your own"
         ));
     };
@@ -221,11 +276,11 @@ pub fn params_of(
                 offset: number(attributes, "offset").map_err(named)?,
             }))
         }
-        "mean" => {
+        "vote" => {
             let inputs = attributes.get("inputs").ok_or_else(|| {
                 named(
-                    "inputs is not set: a mean says which inputs it is over, so \
-                     that a link deleted from it is a fault and not a mean over \
+                    "inputs is not set: a vote says which inputs it is over, so \
+                     that a link deleted from it is a fault and not a vote over \
                      fewer"
                         .to_string(),
                 )
@@ -238,10 +293,11 @@ pub fn params_of(
                 .map(str::to_string)
                 .collect();
 
-            if inputs.len() < 2 {
+            if inputs.len() < 3 {
                 return Err(named(format!(
-                    "a mean is over at least two inputs, and this says {}: a mean \
-                     over one is the number itself",
+                    "a vote is over at least three inputs, and this says {}: two \
+                     readings that disagree have no majority between them, and \
+                     one is the number itself",
                     inputs.len()
                 )));
             }
@@ -250,30 +306,40 @@ pub fn params_of(
             once.dedup();
             if once.len() != inputs.len() {
                 return Err(named(
-                    "an input is named twice: a mean over an input counted twice \
-                     weights it twice"
+                    "an input is named twice: a vote over an input counted twice \
+                     gives that sensor two votes"
                         .to_string(),
                 ));
             }
 
-            Ok(Computation::Mean(MeanParams { inputs }))
+            let algorithm = attributes
+                .get("algorithm")
+                .ok_or_else(|| {
+                    named(
+                        "algorithm is not set: a vote says how it picks the one \
+                         value out of its readings, there being more than one way \
+                         to and no reason to prefer either by default"
+                            .to_string(),
+                    )
+                })
+                .and_then(|said| Algorithm::of(said.as_str()).map_err(named))?;
+
+            Ok(Computation::Vote(VoteParams { inputs, algorithm }))
         }
         "hysteresis" => {
-            let above = number(attributes, "above").map_err(named)?;
-            let below = number(attributes, "below").map_err(named)?;
-            if above <= 0.0 || below <= 0.0 {
+            let half_band = number(attributes, "half_band").map_err(named)?;
+            if half_band <= 0.0 {
                 return Err(named(
-                    "above and below are how far from the setpoint the decision \
-                     changes, and must be more than nought: a band of nothing is \
-                     a bare comparison, which cycles a relay on a wobble"
+                    "half_band is how far from the setpoint the decision changes, \
+                     and must be more than nought: a band of nothing is a bare \
+                     comparison, which cycles a relay on a wobble"
                         .to_string(),
                 ));
             }
 
             Ok(Computation::Hysteresis(HysteresisParams {
                 setpoint: number(attributes, "setpoint").map_err(named)?,
-                above,
-                below,
+                half_band,
             }))
         }
         "process" => {
@@ -376,9 +442,14 @@ mod tests {
         );
 
         assert_eq!(
-            params(&[("function", "mean"), ("inputs", "in0,in1,in2")]),
-            Computation::Mean(MeanParams {
+            params(&[
+                ("function", "vote"),
+                ("inputs", "in0,in1,in2"),
+                ("algorithm", "median"),
+            ]),
+            Computation::Vote(VoteParams {
                 inputs: vec!["in0".to_string(), "in1".to_string(), "in2".to_string()],
+                algorithm: Algorithm::Median,
             })
         );
 
@@ -386,13 +457,11 @@ mod tests {
             params(&[
                 ("function", "hysteresis"),
                 ("setpoint", "293.15"),
-                ("above", "2.0"),
-                ("below", "2.0"),
+                ("half_band", "2.0"),
             ]),
             Computation::Hysteresis(HysteresisParams {
                 setpoint: 293.15,
-                above: 2.0,
-                below: 2.0,
+                half_band: 2.0,
             })
         );
 
@@ -410,7 +479,15 @@ mod tests {
         );
 
         // And each says what it is called, which is what a complaint names.
-        assert_eq!(params(&[("function", "mean"), ("inputs", "a,b")]).function(), "mean");
+        assert_eq!(
+            params(&[
+                ("function", "vote"),
+                ("inputs", "a,b,c"),
+                ("algorithm", "median"),
+            ])
+            .function(),
+            "vote"
+        );
     }
 
     /// A function nobody has is refused, listing the ones there are.
@@ -439,10 +516,14 @@ mod tests {
                 vec![("function", "to_kelvin"), ("format", "i16_be"), ("scale", "1")],
                 "offset",
             ),
-            (vec![("function", "mean")], "inputs is not set"),
+            (vec![("function", "vote")], "inputs is not set"),
             (
-                vec![("function", "hysteresis"), ("setpoint", "293"), ("above", "2")],
-                "below",
+                vec![("function", "vote"), ("inputs", "in0,in1,in2")],
+                "algorithm is not set",
+            ),
+            (
+                vec![("function", "hysteresis"), ("setpoint", "293")],
+                "half_band",
             ),
             (vec![("function", "process")], "executable is not set"),
             (
@@ -491,8 +572,7 @@ mod tests {
                 vec![
                     ("function", "hysteresis"),
                     ("setpoint", "293"),
-                    ("above", "0"),
-                    ("below", "2"),
+                    ("half_band", "0"),
                 ],
                 "more than nought",
             ),
@@ -519,20 +599,51 @@ mod tests {
         }
     }
 
-    /// A mean is over at least two inputs, each named once.
+    /// A vote is over at least three inputs, each named once, by an
+    /// algorithm it knows.
+    ///
+    /// Three and not two: two readings that disagree have no majority between
+    /// them, so a vote over two is a coin toss dressed as a decision.
     #[test]
-    fn a_mean_is_over_several_inputs() {
+    fn a_vote_is_over_at_least_three_inputs() {
         // Commas or spaces, as a file writes a list.
         assert_eq!(
-            params(&[("function", "mean"), ("inputs", "in0 in1")]),
-            params(&[("function", "mean"), ("inputs", "in0, in1")])
+            params(&[
+                ("function", "vote"),
+                ("inputs", "in0 in1 in2"),
+                ("algorithm", "median"),
+            ]),
+            params(&[
+                ("function", "vote"),
+                ("inputs", "in0, in1, in2"),
+                ("algorithm", "median"),
+            ])
         );
 
-        let said = refused(&[("function", "mean"), ("inputs", "in0")]);
-        assert!(said.contains("at least two"), "{said}");
+        let said = refused(&[
+            ("function", "vote"),
+            ("inputs", "in0,in1"),
+            ("algorithm", "median"),
+        ]);
+        assert!(said.contains("at least three"), "{said}");
 
-        let said = refused(&[("function", "mean"), ("inputs", "in0,in0")]);
+        let said = refused(&[
+            ("function", "vote"),
+            ("inputs", "in0,in0,in1"),
+            ("algorithm", "median"),
+        ]);
         assert!(said.contains("twice"), "{said}");
+
+        // And an algorithm it does not have, which names the ones it does.
+        let said = refused(&[
+            ("function", "vote"),
+            ("inputs", "in0,in1,in2"),
+            ("algorithm", "average"),
+        ]);
+        assert!(
+            said.contains("average") && said.contains("median") && said.contains("closest_mean"),
+            "{said}"
+        );
     }
 
     /// An attribute nothing reads is refused, naming what the computation
@@ -543,19 +654,19 @@ mod tests {
             ("function", "hysteresis"),
             ("setpoint", "293.15"),
             ("setpiont", "300.0"),
-            ("above", "2"),
-            ("below", "2"),
+            ("half_band", "2"),
         ]);
         assert!(
-            said.contains("setpiont") && said.contains("setpoint, above, below"),
+            said.contains("setpiont") && said.contains("setpoint, half_band"),
             "{said}"
         );
 
         // And one that belongs to another computation, which is the same
         // mistake from the other direction.
         let said = refused(&[
-            ("function", "mean"),
-            ("inputs", "in0,in1"),
+            ("function", "vote"),
+            ("inputs", "in0,in1,in2"),
+            ("algorithm", "median"),
             ("setpoint", "293.15"),
         ]);
         assert!(said.contains("setpoint"), "{said}");

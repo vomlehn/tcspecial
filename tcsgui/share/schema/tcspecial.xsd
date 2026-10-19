@@ -5,7 +5,7 @@
   What this checks is the shape of the file: which sections there are, what an
   entry may say, and which words are words. What it cannot check is whether the
   configuration can be flown. Which attributes a node of a given type must
-  state, whether two payloads claim one socket, whether a mean's inputs are the
+  state, whether two payloads claim one socket, whether a vote's inputs are the
   ones its links bind: those are rules about meaning, they are tested against
   real buses, and tcsverify is the one place they live. A file this accepts may
   still be refused, and the refusal will say why.
@@ -170,8 +170,8 @@
       <xs:element name="scale" type="xs:string"/>
       <xs:element name="offset" type="xs:string"/>
       <xs:element name="setpoint" type="xs:string"/>
-      <xs:element name="above" type="xs:string"/>
-      <xs:element name="below" type="xs:string"/>
+      <xs:element name="half_band" type="xs:string"/>
+      <xs:element name="algorithm" type="xs:string"/>
       <!-- The program this node runs: an app node's application, or the
            program a `process` computation runs on what arrives. Executed with
            a leading `~` and `$HOME` expanded as a shell would expand them, to

@@ -41,9 +41,9 @@ fn the_options_are_taken_as_options() {
     let set = with_errors(dir.path(), 12);
     let set = set.to_str().expect("a path");
 
-    // Five unless asked.
+    // Every one unless asked.
     let (lines, status) = run(&[set]);
-    assert_eq!(lines.len(), 5, "{lines:?}");
+    assert_eq!(lines.len(), 12, "{lines:?}");
     assert_eq!(status, 1);
 
     // Before the file or after it, either way.

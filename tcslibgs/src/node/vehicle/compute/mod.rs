@@ -149,6 +149,42 @@ pub fn from_value(data: &[u8], what: &str) -> Result<f64, String> {
     Ok(f64::from(i32::from_le_bytes(bytes)) / MICRO_KELVIN)
 }
 
+/// Whether what this computation produces is a value.
+///
+/// Three of the four are: a conversion makes one out of a part's counts, a
+/// vote makes one out of several, and a program's answer is read as one. A
+/// hysteresis is the exception -- what it produces is a decision, the text
+/// `1` or `0`, because what it drives is a set of discrete lines.
+///
+/// Asked by whoever has to read a datum back: the ground shows a reading as a
+/// temperature and a decision as what it is, and the only thing that can tell
+/// them apart is the configuration. Not the width -- every four bytes are a
+/// value, so a decision of four characters would read as a temperature, which
+/// is the one guess this exists to avoid.
+pub fn result_is_a_value(function: &str) -> bool {
+    match function {
+        "to_kelvin" | "vote" | "process" => true,
+        "hysteresis" => false,
+        // Not a computation at all. Said as "no" rather than refused: this
+        // answers how to show a datum, and a node nobody can name does not
+        // have its data read as a temperature on the strength of a typo.
+        _ => false,
+    }
+}
+
+/// Whether what this node sends is a value.
+///
+/// Only a computation makes one, and only three of the four: see
+/// [`result_is_a_value`]. Everything else sends what it was given or what its
+/// part produced -- a sensor's own bytes, a log record, whatever a program
+/// wrote -- and none of that is a number in this form.
+pub fn node_sends_a_value(node_type: &str, attributes: &BTreeMap<String, Scalar>) -> bool {
+    node_type == "compute"
+        && attributes
+            .get("function")
+            .is_some_and(|function| result_is_a_value(function.as_str()))
+}
+
 /// A value as a program reads and writes one: decimal text.
 ///
 /// The one place a value is text, because the far end is a program reading
@@ -678,6 +714,40 @@ mod tests {
         // pattern of a 32-bit integer that is not a number of micro-kelvin.
         // What a sensor cannot produce is refused where a value is made.
         assert_eq!(from_value(&[0xFF, 0xFF, 0xFF, 0x7F], "the top"), Ok(2147.483647));
+    }
+
+    /// Which nodes send values, and which send something else.
+    ///
+    /// The question the ground asks before it shows a datum as a
+    /// temperature. A thermostat is the computation that does not: what it
+    /// sends is a decision.
+    #[test]
+    fn a_configuration_says_which_nodes_send_values() {
+        assert!(result_is_a_value("to_kelvin"));
+        assert!(result_is_a_value("vote"));
+        assert!(result_is_a_value("process"));
+        assert!(!result_is_a_value("hysteresis"), "a decision is not a value");
+        assert!(!result_is_a_value("to_kelvan"), "nor is a misspelling");
+
+        let node = |pairs: &[(&str, &str)]| attributes(pairs);
+        assert!(node_sends_a_value(
+            "compute",
+            &node(&[("function", "vote")])
+        ));
+        assert!(!node_sends_a_value(
+            "compute",
+            &node(&[("function", "hysteresis")])
+        ));
+        // A compute node with no function is a node that will be refused;
+        // until then it does not have its data read as a temperature.
+        assert!(!node_sends_a_value("compute", &node(&[])));
+        // And nothing else makes one, whatever it says.
+        for node_type in ["i2c", "gpio", "network", "log", "moc", "app_pl"] {
+            assert!(
+                !node_sends_a_value(node_type, &node(&[("function", "vote")])),
+                "{node_type}"
+            );
+        }
     }
 
     /// A program's pipe carries a decimal, and it round-trips.

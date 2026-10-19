@@ -28,8 +28,8 @@ usage: tcsverify [options] <tcspecial configuration file> [payload simulator fil
        tcsverify -h | --help
 
 Checks the files and prints the problems it finds, each as
-file:line: what is wrong, in the order it finds them. It stops as soon
-as it has printed as many as its limit.
+file:line: what is wrong, in the order it finds them. Given a limit, it
+stops as soon as it has printed that many errors.
 
 With one file, checks that tcspecial configuration. With two, checks the
 configuration and the payload simulator file, and that the two agree.
@@ -41,9 +41,9 @@ file, the first first, and then the two are compared: every section,
 attribute and value, which must be the same for the two to be read as one
 configuration.
 
-  --error-limit=<n>  stop after <n> errors, five unless asked: a whole
-                     number, 0 included, or \"unlimited\" to look at
-                     everything
+  --error-limit=<n>  stop after <n> errors: a whole number, 0 included,
+                     or \"unlimited\", which is the default and looks
+                     at everything
   --warnings=<what>  on: print warnings, not counting them (the default);
                      off: print none; errors: print them and count them
                      against the limit as errors are
@@ -53,8 +53,8 @@ Exit status: 0 no error was printed -- a run that stopped before it found
 one included, as --error-limit=0 always does, and warnings never fail a
 run -- 1 an error was printed, 2 the command line was not one of these.";
 
-/// How many errors are printed before the run stops looking, five unless
-/// asked.
+/// How many errors are printed before the run stops looking: every one
+/// unless asked.
 ///
 /// Nought is a limit like any other: whether the files are good is the exit
 /// status, which does not depend on how much of the reason was printed, so a
@@ -62,18 +62,12 @@ run -- 1 an error was printed, 2 the command line was not one of these.";
 /// answered at the first error.
 const ERROR_LIMIT_FLAG: &str = "--error-limit=";
 
-/// The limit when none is asked for.
-const DEFAULT_ERROR_LIMIT: usize = 5;
-
 /// What is done with warnings: printed and not counted unless asked.
 const WARNINGS_FLAG: &str = "--warnings=";
 
 fn main() -> ExitCode {
     let mut files: Vec<PathBuf> = Vec::new();
-    let mut limits = tcsverify::Limits {
-        error_limit: Some(DEFAULT_ERROR_LIMIT),
-        warnings: tcsverify::Warnings::On,
-    };
+    let mut limits = tcsverify::Limits::EVERYTHING;
     for arg in std::env::args_os().skip(1) {
         let said = arg.to_string_lossy();
         // Asked for, so on stdout and a success: the message is the answer.

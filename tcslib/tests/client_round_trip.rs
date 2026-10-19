@@ -15,29 +15,12 @@ use std::thread;
 use std::time::Duration;
 
 use tcslibgs::{
-    ArmKey, BeaconInterval, Command, CommandStatus, ConfigDHTelemetry, ConfigTelemetry,
-    NodeCounts, NodeId, NodeTelemetry, QueryNodeSampleTelemetry, QueryNodeTelemetry,
-    ConfigDigest, ConfigVersion, ConnectTelemetry, DHName,
-    DHSample, DHState, DHType, PingTelemetry, QueryDHSampleTelemetry, QueryDHTelemetry,
-    RestartArmTelemetry,
-    RestartTelemetry, StartDHTelemetry, Statistics, StopDHTelemetry, Telemetry,
+    ArmKey, BeaconInterval, Command, CommandStatus, ConfigDigest, ConfigTelemetry, ConfigVersion,
+    ConnectTelemetry, DHSample, NodeCounts, NodeId, NodeTelemetry, PingTelemetry,
+    QueryNodeSampleTelemetry, QueryNodeTelemetry, RestartArmTelemetry, RestartTelemetry, Telemetry,
 };
 use tcslib::{TcsClient, UdpConnection};
 
-/// Statistics distinct enough that passing the wrong field through would show.
-fn stub_statistics() -> Statistics {
-    Statistics {
-        timestamp: None,
-        bytes_received: 11,
-        reads_completed: 22,
-        reads_failed: 33,
-        bytes_sent: 44,
-        writes_completed: 55,
-        writes_failed: 66,
-        triggers_sent: 77,
-        triggers_failed: 88,
-    }
-}
 
 fn stub_sample(first: u8) -> DHSample {
     let mut sample = DHSample::new();
@@ -98,33 +81,8 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
                 Command::Restart(_) => {
                     Telemetry::Restart(RestartTelemetry::new(seq, CommandStatus::Success))
                 }
-                Command::StartDH(_) => {
-                    Telemetry::StartDH(StartDHTelemetry::new(seq, CommandStatus::Success))
-                }
-                Command::StopDH(_) => {
-                    Telemetry::StopDH(StopDHTelemetry::new(seq, CommandStatus::Success))
-                }
-                Command::QueryDH(cmd) => Telemetry::QueryDH(QueryDHTelemetry::new(
-                    seq,
-                    CommandStatus::Success,
-                    cmd.name.clone(),
-                    Some(DHState::Active),
-                    stub_statistics(),
-                )),
-                Command::QueryDHSample(cmd) => {
-                    Telemetry::QueryDHSample(QueryDHSampleTelemetry::new(
-                        seq,
-                        CommandStatus::Success,
-                        cmd.name.clone(),
-                        stub_sample(0x10),
-                        stub_sample(0x20),
-                    ))
-                }
                 Command::Config(_) => {
                     Telemetry::Config(ConfigTelemetry::new(seq, CommandStatus::Success))
-                }
-                Command::ConfigDH(_) => {
-                    Telemetry::ConfigDH(ConfigDHTelemetry::new(seq, CommandStatus::Success))
                 }
                 // A version 2 vehicle's own two. This client is version 1's,
                 // so it sends neither; they are answered here because the
@@ -177,20 +135,9 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
 /// here. What the links are for is tested where they are served; this is
 /// about every operation reaching the far end and coming back. The one
 /// payload is DH2, which is the payload the operations below ask about.
+/// A client: the spacecraft's link and the one link every node is commanded
+/// on.
 fn client_to(addr: &str) -> TcsClient {
-    let spacecraft = UdpConnection::new("127.0.0.1:0", addr).expect("connection");
-    let payload = UdpConnection::new("127.0.0.1:0", addr).expect("the payload link");
-    let mut client = TcsClient::new(
-        Box::new(spacecraft),
-        vec![(DHName::new("DH2"), Box::new(payload) as _)],
-    );
-    client.set_timeout(Duration::from_secs(10));
-    client
-}
-
-/// A client for a version 2 graph: the spacecraft's link and the one link
-/// every node is commanded on.
-fn graph_client_to(addr: &str) -> TcsClient {
     let spacecraft = UdpConnection::new("127.0.0.1:0", addr).expect("connection");
     let nodes = UdpConnection::new("127.0.0.1:0", addr).expect("the node link");
     let mut client = TcsClient::of_a_graph(Box::new(spacecraft), Box::new(nodes));
@@ -218,7 +165,7 @@ fn stub_counts() -> NodeCounts {
 #[test]
 fn what_a_node_has_moved_comes_back() {
     let (addr, stub) = stub_spacecraft(2);
-    let mut client = graph_client_to(&addr);
+    let mut client = client_to(&addr);
 
     let (status, enabled, counts) = client.query_node(NodeId::of(2)).expect("an answer");
     assert!(status.is_success());
@@ -241,7 +188,7 @@ fn what_a_node_has_moved_comes_back() {
 #[test]
 fn a_nodes_attribute_is_set_by_id_and_name() {
     let (addr, stub) = stub_spacecraft(1);
-    let mut client = graph_client_to(&addr);
+    let mut client = client_to(&addr);
 
     let (status, node) = client
         .set_node(NodeId::of(4), "setpoint", b"295.0")
@@ -260,7 +207,7 @@ fn a_nodes_attribute_is_set_by_id_and_name() {
 #[test]
 fn a_node_is_commanded_by_its_id_and_the_answer_says_which() {
     let (addr, stub) = stub_spacecraft(2);
-    let mut client = graph_client_to(&addr);
+    let mut client = client_to(&addr);
 
     let (status, node) = client.start_node(NodeId::of(3)).expect("an answer");
     assert!(status.is_success());
@@ -273,20 +220,22 @@ fn a_node_is_commanded_by_its_id_and_the_answer_says_which() {
     stub.join().expect("the stand-in answered both");
 }
 
-/// A client built for a version 1 payload set will not send a node command.
+/// A client with no node link refuses a node command rather than sending it.
 ///
-/// Refused here rather than sent somewhere it would be refused: a graph's
-/// nodes are commanded on a link this client has not got, and what has gone
-/// wrong is the ground's own configuration rather than anything the vehicle
-/// could tell it.
+/// The link is what a node command goes on, and a client may be built with
+/// the spacecraft's alone -- a program that only pings, or watches beacons.
+/// Refused before anything is sent: a command on the wrong socket means the
+/// two ends are not reading the same configuration, and the spacecraft is
+/// right to refuse one.
 #[test]
-fn a_version_1_client_has_no_link_for_a_node() {
+fn a_client_with_no_node_link_refuses_a_node_command() {
     // Nothing is listening: the refusal happens before anything is sent, so
     // there is nothing for a far end to do.
-    let mut client = client_to("127.0.0.1:1");
+    let spacecraft = UdpConnection::new("127.0.0.1:0", "127.0.0.1:1").expect("connection");
+    let mut client = TcsClient::spacecraft_only(Box::new(spacecraft));
     let said = format!("{}", client.start_node(NodeId::of(0)).expect_err("refused"));
     assert!(
-        said.contains("version 1") && said.contains("node"),
+        said.contains("node") && said.contains("link"),
         "the refusal should say why: {said}"
     );
 }
@@ -317,27 +266,6 @@ fn every_operation_reaches_the_spacecraft_and_comes_back() {
     );
     assert_eq!(
         client
-            .start_dh(DHType::Device, DHName::new("DH2"))
-            .unwrap(),
-        CommandStatus::Success
-    );
-    assert_eq!(client.stop_dh(DHName::new("DH2")).unwrap(), CommandStatus::Success);
-
-    // The statistics must arrive field for field, not merely arrive, and the
-    // state beside them: a panel says what a handler is doing from this.
-    let (status, state, stats) = client.query_dh(DHName::new("DH2")).unwrap();
-    assert_eq!(status, CommandStatus::Success);
-    assert_eq!(state, Some(DHState::Active));
-    assert_eq!(stats, stub_statistics());
-
-    // Sent first, received second, which is the order the client documents.
-    let (status, sent, received) = client.query_dh_sample(DHName::new("DH2")).unwrap();
-    assert_eq!(status, CommandStatus::Success);
-    assert_eq!(sent.data(), &[0x10, 0x11, 0x12]);
-    assert_eq!(received.data(), &[0x20, 0x21, 0x22]);
-
-    assert_eq!(
-        client
             .configure(BeaconInterval::of(Duration::from_secs(1)))
             .unwrap(),
         CommandStatus::Success
@@ -355,11 +283,8 @@ fn a_spacecraft_that_does_not_answer_times_out() {
     drop(socket);
 
     let connection = UdpConnection::new("127.0.0.1:0", &addr).unwrap();
-    let payload = UdpConnection::new("127.0.0.1:0", &addr).unwrap();
-    let mut client = TcsClient::new(
-        Box::new(connection),
-        vec![(DHName::new("DH2"), Box::new(payload) as _)],
-    );
+    let nodes = UdpConnection::new("127.0.0.1:0", &addr).unwrap();
+    let mut client = TcsClient::of_a_graph(Box::new(connection), Box::new(nodes));
     client.set_timeout(Duration::from_millis(250));
 
     assert!(client.ping().is_err(), "a silent link should be an error");

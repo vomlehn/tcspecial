@@ -53,7 +53,7 @@ use std::path::{Path, PathBuf};
 
 use tcslibgs::graph::check::Severity;
 use tcslibgs::{
-    describes_payloads_text, names_what_is_gone, ConfigFormat, DHConfig, PayloadConfig, SimConfigFile, TcsError,
+    names_what_is_gone, ConfigFormat, SimConfigFile, TcsError,
 };
 
 pub mod locate;
@@ -314,34 +314,52 @@ pub fn verify(payload_path: &Path, sim_path: Option<&Path>, limits: Limits) -> R
         return report;
     }
 
+    // A version this build does not know is told so, which is the other way a
+    // file reaches here: version 1 -- a set of payloads, each paired with a
+    // ground endpoint and commanded by name -- was read until it was deleted,
+    // every one of its capabilities being a node's.
+    //
+    // Only a file that says a version this is not. A file that cannot be read
+    // at all says no version either, and telling such a file about versions
+    // would bury what is actually wrong with it: those go down the path
+    // below, which reports a parse error at the line the parser stopped on.
+    //
     // Asked of the library rather than worked out here: one place knows how
-    // to read a version. A file that cannot be read at all answers "not
-    // version 2", and version 1's path reports it -- it has the better
-    // messages for a file that does not parse, having had them longer.
-    if tcslibgs::graph::is_version_2(payload_path) {
-        let payloads = check_graph(payload_path, &mut report);
-        if let Some(sim_path) = sim_path {
-            // Against the graph's payloads by name, which is all a graph's
-            // simulator file is joined to it by -- and only when the graph
-            // read, as version 1's is only when its handlers settled: see
-            // the module comment.
-            report.joined = payloads.is_some();
-            check_graph_simulator(sim_path, payloads.as_deref(), &mut report);
+    // to read a version.
+    match tcslibgs::graph::version_of(payload_path) {
+        Some(said) if said != tcslibgs::graph::VERSION => {
+            report.add(payload_path, THE_FILE_ITSELF, not_version_2(&said));
+            return report;
         }
-        return report;
+        _ => {}
     }
 
-    let handlers = check_payloads(payload_path, &mut report);
-
+    let payloads = check_graph(payload_path, &mut report);
     if let Some(sim_path) = sim_path {
-        // Only against a tcspecial configuration that settled; see the module
-        // comment.
-        let clean = handlers.as_ref().filter(|_| !report.found_errors());
-        report.joined = clean.is_some();
-        check_simulator(sim_path, clean.map(Vec::as_slice), &mut report);
+        // Against the graph's payloads by name, which is all a graph's
+        // simulator file is joined to it by -- and only when the graph read:
+        // see the module comment.
+        report.joined = payloads.is_some();
+        check_graph_simulator(sim_path, payloads.as_deref(), &mut report);
     }
 
     report
+}
+
+/// What is said about a configuration whose version this build does not read.
+///
+/// `said` is the version the file states -- a file that states none is told
+/// that first, above, and one that cannot be read at all is told what is
+/// wrong with it rather than about versions. The only other version there has
+/// been is 1, and the message says what became of it rather than leaving a
+/// reader to wonder which of the two their file is.
+fn not_version_2(said: &str) -> String {
+    format!(
+        "this file says it is version {said}, and the only version there is is 2. \
+Version 1 -- a set of payloads, each paired with a ground endpoint and commanded by \
+name -- is gone, and nothing reads such a file any more: every one of its capabilities \
+is a version 2 node's."
+    )
 }
 
 /// Check two spellings of one configuration -- one XML, one YAML -- each
@@ -729,68 +747,7 @@ fn check_graph_simulator(path: &Path, payloads: Option<&[String]>, report: &mut 
     }
 }
 
-/// Check the tcspecial configuration file, and hand back what it describes.
-///
-/// The handlers come back even when something is wrong, because what came
-/// back is what the file does describe; whether that is all of it is what the
-/// report says.
-fn check_payloads(path: &Path, report: &mut Report) -> Option<Vec<DHConfig>> {
-    let (text, format) = read(path, report)?;
 
-    let config: PayloadConfig = match format.parse(&text) {
-        Ok(config) => config,
-        Err(parse_error) => {
-            // A file written to the old section names, or in the language
-            // that is gone, is told so: "names endpoints, which was a second
-            // way to describe payloads" says what to do about it, where
-            // "missing field `payloads`" says what the parser wanted.
-            // Told at the line of whichever error is said: the two are
-            // different parses, and stop at different places.
-            let said = describes_payloads_text(&text, format).err();
-            let said = said.as_ref().unwrap_or(&parse_error);
-            report.add(path, line_of(said), said.to_string());
-            return None;
-        }
-    };
-
-    let found = Where::of(&text, format);
-    let (handlers, problems) = config.check();
-    for problem in problems {
-        if !report.room() {
-            break;
-        }
-        report.add(path, found.line_of(&problem.about), problem.message);
-    }
-
-    Some(handlers)
-}
-
-/// Check the simulator file, against those handlers if there are any.
-fn check_simulator(path: &Path, handlers: Option<&[DHConfig]>, report: &mut Report) {
-    let Some((text, format)) = read(path, report) else {
-        return;
-    };
-
-    let sim: SimConfigFile = match format.parse(&text) {
-        Ok(sim) => sim,
-        Err(parse_error) => {
-            report.add(path, line_of(&parse_error), parse_error.to_string());
-            return;
-        }
-    };
-
-    // Everything else this file says is said about a payload of the other
-    // one, so without those there is nothing more to ask.
-    let Some(handlers) = handlers else { return };
-
-    let found = Where::of(&text, format);
-    for problem in sim.problems(handlers) {
-        if !report.room() {
-            break;
-        }
-        report.add(path, found.line_of(&problem.about()), problem.to_string());
-    }
-}
 
 /// The text of a file and the format its name says it is written in.
 fn read(path: &Path, report: &mut Report) -> Option<(String, ConfigFormat)> {
@@ -1202,19 +1159,44 @@ vehicle:
         assert_eq!(line_in_message(""), THE_FILE_ITSELF);
     }
 
+    /// A configuration with nothing wrong with it, and nothing in it but what
+    /// every configuration must have: the `tcspecial` section and a payload.
+    ///
+    /// Two payloads, neither touched by a link, which report to the ground
+    /// over `payload_telemetry` -- the shape of `examples/minimal`. It was a
+    /// version 1 payload set, each payload paired with a ground endpoint; the
+    /// tests below are about the reporting rather than about either version,
+    /// so what they are given is the simplest thing that reads.
     const GOOD: &str = "\
-version: \"1.0\"
+version: \"2.0\"
 description: two payloads
+tcspecial:
+  beacon:
+    interval: \"5 s\"
+    recv: \"127.0.0.1:5650\"
+    send: \"0.0.0.0:5550\"
+  log:
+    directory: \"/tmp/telemetry\"
+    segment_size: \"65536\"
+  payload_command:
+    dest_base: \"0.0.0.0:4200\"
+    source_base: \"127.0.0.1:4300\"
+  payload_telemetry:
+    dest_base: \"127.0.0.1:6100\"
+    source_base: \"0.0.0.0:6000\"
+  tcs_cmd:
+    recv: \"0.0.0.0:4000\"
+    send: \"127.0.0.1:4100\"
 payloads:
   - name: DH0
     type: device-file
     path: /dev/zero
-    packet_size: 4
+    read_size: \"4\"
   - name: DH1
     type: network
     protocol: udp
-    payload_interface: localhost:5000
-    packet_size: 4
+    address: \"127.0.0.1\"
+    port: \"5000\"
 ";
 
     const GOOD_SIM: &str = "\
@@ -1252,47 +1234,51 @@ simulated_payloads:
     /// runs to find them.
     #[test]
     fn every_payload_with_something_wrong_is_reported() {
-        let text = "\
-version: \"1.0\"
-description: three bad payloads
+        // Three links to nodes that are not there, which is an error apiece.
+        // It was three payloads each missing something its kind needs, which
+        // in a graph is a warning rather than an error: an unfinished node is
+        // a drawing somebody is working on. What the file is wrong about has
+        // changed; that every one of them is reported has not.
+        let text = GOOD.replace(
+            "payloads:",
+            "\
 payloads:
-  - name: no_size
+  - name: first
     type: device-file
     path: /dev/zero
-  - name: no_path
+    payload-out:
+      - target: nowhere
+  - name: second
     type: device-file
-    packet_size: 4
-  - name: bad_kind
+    path: /dev/zero
+    payload-out:
+      - target: elsewhere
+  - name: third
     type: device-file
-    path: /dev/null
-    payload_port: 5000
-    packet_size: 4
-";
-        let set = written(".yaml", text, GOOD_SIM);
+    path: /dev/zero
+    payload-out:
+      - target: anywhere
+# what GOOD's own payloads were:",
+        );
+        let set = written(".yaml", &text, GOOD_SIM);
         let report = verify(&set.payload, None, Limits::EVERYTHING);
 
         assert_eq!(report.findings.len(), 3, "{:?}", report.findings);
         assert_eq!(report.status(), 1);
 
-        // Each beside the payload it is about, in the order the file wrote
-        // them.
+        // Each beside the node it is about, in the order the file wrote them.
         let lines: Vec<usize> = report.findings.iter().map(|f| f.line).collect();
-        assert_eq!(lines, vec![4, 7, 10]);
-        assert!(
-            report.findings[0].message.contains("packet_size"),
-            "{:?}",
-            report.findings[0]
-        );
-        assert!(
-            report.findings[1].message.contains("path"),
-            "{:?}",
-            report.findings[1]
-        );
-        assert!(
-            report.findings[2].message.contains("port"),
-            "{:?}",
-            report.findings[2]
-        );
+        assert_eq!(lines, vec![21, 26, 31], "{:?}", report.findings);
+        for (finding, missing) in report
+            .findings
+            .iter()
+            .zip(["nowhere", "elsewhere", "anywhere"])
+        {
+            assert!(
+                finding.message.contains(missing),
+                "a finding should name what the link could not find: {finding:?}"
+            );
+        }
     }
 
     /// A finding says the file, the line, which kind it is and what is wrong.
@@ -1351,8 +1337,8 @@ payloads:
     /// A file that does not parse is reported from where the parser stopped.
     #[test]
     fn a_file_that_does_not_parse_says_where_it_stopped() {
-        let text = "version: \"1.0\"\ndescription: x\npayloads:\n  - name: bad\n";
-        let set = written(".yaml", text, GOOD_SIM);
+        let text = GOOD.replace("payloads:", "payloads:\n  - name: bad\n   type: oops");
+        let set = written(".yaml", &text, GOOD_SIM);
         let report = verify(&set.payload, None, Limits::EVERYTHING);
         assert_eq!(report.findings.len(), 1, "{:?}", report.findings);
         assert!(
@@ -1410,8 +1396,8 @@ payloads:
         for (file, version) in [
             ("examples/minimal/minimal.yaml", "version: \"2.0\"\n"),
             ("examples/minimal/minimal.xml", "<version>2.0</version>"),
-            ("tests/manual/tcspecial2.yaml", "version: \"1.0\"\n"),
-            ("tests/manual/tcspecial2.xml", "<version>1.0</version>"),
+            ("examples/thermostat/thermostat.yaml", "version: \"2.0\"\n"),
+            ("examples/thermostat/thermostat.xml", "<version>2.0</version>"),
         ] {
             let text = std::fs::read_to_string(root.join(file)).expect("the file");
             assert!(text.contains(version), "{file} states {version}");
@@ -1449,27 +1435,32 @@ payloads:
         );
     }
 
-    /// A version a beacon cannot carry is reported from the version line.
+    /// A version this build does not read is told what became of it.
     ///
-    /// Which is the one problem reported from a line that is not a payload's:
-    /// the set's version is the set's, and the line that states it is the one
-    /// to change.
+    /// The one problem reported from a line that is not a node's: the version
+    /// is the file's, and the line that states it is the one to change. A
+    /// file saying version 1 is the case that matters -- it was a payload set
+    /// until version 1 was deleted -- and the message says so rather than
+    /// leaving a reader to work out which of the two their file is.
     #[test]
-    fn a_version_a_beacon_cannot_carry_is_reported_from_its_own_line() {
-        let set = written(
-            ".yaml",
-            &GOOD.replace("version: \"1.0\"", "version: \"draft\""),
-            GOOD_SIM,
-        );
-        let report = verify(&set.payload, None, Limits::EVERYTHING);
+    fn a_version_this_build_does_not_read_is_told_what_became_of_it() {
+        for version in ["1.0", "draft"] {
+            let set = written(
+                ".yaml",
+                &GOOD.replace("version: \"2.0\"", &format!("version: \"{version}\"")),
+                GOOD_SIM,
+            );
+            let report = verify(&set.payload, None, Limits::EVERYTHING);
 
-        assert_eq!(report.findings.len(), 1, "{:?}", report.findings);
-        assert_eq!(report.findings[0].line, 1, "the version is the first line");
-        assert!(
-            report.findings[0].message.contains("draft"),
-            "{:?}",
-            report.findings[0]
-        );
+            assert_eq!(report.findings.len(), 1, "{:?}", report.findings);
+            assert_eq!(
+                report.findings[0].line, THE_FILE_ITSELF,
+                "the version is the file's own"
+            );
+            let said = &report.findings[0].message;
+            assert!(said.contains(version), "{said}");
+            assert!(said.contains("Version 1"), "{said}");
+        }
     }
 
     /// An extension this does not read is refused, naming the file.
@@ -1501,9 +1492,13 @@ simulated_payloads:
         let set = written(".yaml", GOOD, sim);
         let report = verify(&set.payload, Some(&set.sim), Limits::EVERYTHING);
 
-        // DH1 is simulated by nothing, and "nobody" is no payload of the
-        // other file: both ends of the join are asked.
-        assert_eq!(report.findings.len(), 2, "{:?}", report.findings);
+        // "nobody" is no payload of the other file, which is the end of the
+        // join this asks about. A payload simulated by nothing is the other
+        // end, and in a graph it is no fault at all: a configuration may
+        // leave a payload unsimulated on purpose -- one that is a program, or
+        // one on real hardware -- so only the names that match nothing are
+        // reported.
+        assert_eq!(report.findings.len(), 1, "{:?}", report.findings);
         for finding in &report.findings {
             assert_eq!(finding.file, set.sim, "a problem in the wrong file");
         }
@@ -1522,7 +1517,15 @@ simulated_payloads:
     /// problems this program caused rather than found.
     #[test]
     fn a_broken_payload_file_is_not_joined_to() {
-        let text = GOOD.replace("    packet_size: 4\n  - name: DH1", "  - name: DH1");
+        // A configuration that does not parse, which is the case there is
+        // nothing to join to: its payloads are not known, and a simulator
+        // file is joined to them by name.
+        //
+        // Not merely a configuration with an error in it. A graph that reads
+        // and fails a check still says which payloads it has, so the two
+        // files are still read against each other -- which is where version 1
+        // differed: it joined only a set whose handlers had settled.
+        let text = GOOD.replace("payloads:", "payloads: [oh dear");
         let set = written(".yaml", &text, GOOD_SIM);
         let report = verify(&set.payload, Some(&set.sim), Limits::EVERYTHING);
 
@@ -1538,7 +1541,12 @@ simulated_payloads:
     /// file is like.
     #[test]
     fn a_simulator_file_is_read_even_when_the_other_one_is_broken() {
-        let text = GOOD.replace("    packet_size: 4\n  - name: DH1", "  - name: DH1");
+        // A link to a node that is not there: an error, so the two files
+        // are not joined.
+        let text = GOOD.replace(
+            "    read_size: \"4\"\n",
+            "    payload-out:\n      - target: nowhere\n",
+        );
         let set = written(
             ".yaml",
             &text,
@@ -1555,14 +1563,19 @@ simulated_payloads:
     /// A configuration with this many errors in it, one per payload: each
     /// states a port a device file cannot have.
     fn with_errors(count: usize) -> Set {
-        let mut text = "version: \"1.0\"\ndescription: many\npayloads:\n".to_string();
+        let mut payloads = "payloads:\n".to_string();
         for id in 0..count {
-            text.push_str(&format!(
-                "  - name: DH{id}\n    type: device-file\n    \
-                 path: /dev/null{id}\n    payload_port: 1\n    packet_size: 4\n"
+            // A link to a node that is not there, which is one error each.
+            payloads.push_str(&format!(
+                "  - name: DH{id}\n    type: device-file\n    path: /dev/null{id}\n    \
+                 payload-out:\n      - target: nowhere{id}\n"
             ));
         }
-        written(".yaml", &text, GOOD_SIM)
+        let head = GOOD
+            .split("payloads:")
+            .next()
+            .expect("GOOD states its payloads");
+        written(".yaml", &format!("{head}{payloads}"), GOOD_SIM)
     }
 
     /// A sound graph with unfinished payloads added: warnings, and no errors.
@@ -1699,28 +1712,6 @@ simulated_payloads:
         }
     }
 
-    /// The shipped sets verify, in both formats, with their simulator files.
-    ///
-    /// The one test that says this program agrees with the programs that run
-    /// the files: every set under `tests/manual` is a set someone runs, so a
-    /// set this faulted would be this program's mistake.
-    #[test]
-    fn every_shipped_set_verifies() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        for set in 1..=4 {
-            let sim = root.join(format!("tests/manual/tcspecial{set}sim.yaml"));
-            for extension in ["yaml", "xml"] {
-                let payload = root.join(format!("tests/manual/tcspecial{set}.{extension}"));
-                let report = verify(&payload, Some(&sim), Limits::EVERYTHING);
-                assert!(
-                    !report.found_errors(),
-                    "set {set}.{extension} was faulted: {:?}",
-                    report.findings
-                );
-                assert!(report.joined, "set {set}.{extension} was not joined");
-            }
-        }
-    }
 
     /// Every shipped version 2 configuration verifies, in both formats.
     ///

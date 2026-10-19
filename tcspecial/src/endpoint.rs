@@ -36,6 +36,24 @@ use crate::node::payload::network::tcp::TcpEndpoint;
 use crate::node::payload::network::udp::UdpEndpoint;
 use crate::node::payload::network::unix::{UnixDatagramEndpoint, UnixStreamEndpoint};
 
+/// Say what could not be bound, and what that usually means.
+///
+/// A bare io::Error carries the kind and nothing else, so the whole of what a
+/// reader got was "Address already in use (os error 98)" -- not which address,
+/// and no hint that the usual cause is a second copy of the program. Both ends
+/// of a data handler bind an address too, so this is used for all of them.
+pub fn bind_failed(what: &str, addr: &str, e: std::io::Error) -> TcsError {
+    if e.kind() == std::io::ErrorKind::AddrInUse {
+        TcsError::Config(format!(
+            "cannot listen on {addr} for the {what}: address already in use. \
+             Something else holds it -- most often another tcspecial, or a \
+             tcsmoc that starts one of its own"
+        ))
+    } else {
+        TcsError::Config(format!("cannot listen on {addr} for the {what}: {e}"))
+    }
+}
+
 /// Trait for endpoints that can wait for events
 pub trait EndpointWaitable {
     /// Get the I/O file descriptor
@@ -88,8 +106,8 @@ pub(crate) fn wait_for_fds(io_fd: RawFd, cmd_fd: RawFd, io_events: PollFlags, ti
     match poll(&mut poll_fds, timeout_ms) {
         Ok(0) => Ok(WaitResult::Timeout),
         Ok(_) => {
-            let io_ready = poll_fds[0].revents().map_or(false, |r| r.intersects(io_events));
-            let cmd_ready = poll_fds[1].revents().map_or(false, |r| r.contains(PollFlags::POLLIN));
+            let io_ready = poll_fds[0].revents().is_some_and(|r| r.intersects(io_events));
+            let cmd_ready = poll_fds[1].revents().is_some_and(|r| r.contains(PollFlags::POLLIN));
 
             match (io_ready, cmd_ready) {
                 (true, true) => Ok(WaitResult::Both),
@@ -102,23 +120,6 @@ pub(crate) fn wait_for_fds(io_fd: RawFd, cmd_fd: RawFd, io_events: PollFlags, ti
     }
 }
 
-/// Wait out a pause, but no longer than until there is a command.
-///
-/// For the passes a conduit has nothing to do and nothing to wait on either:
-/// an endpoint in error or at its end is ready the instant it is polled, so
-/// the pause is what keeps such a conduit from spinning. Spent on the command
-/// pipe rather than asleep, because a conduit that slept through a STOP_DH
-/// would answer it only when it woke -- a stop delayed by as much as the
-/// pause.
-///
-/// Nothing is read here and nothing is reported: the command stays in the
-/// pipe for the conduit's own wait to find on the next pass, which is where
-/// commands are acted on.
-pub(crate) fn pause_until_commanded(cmd_fd: RawFd, timeout_ms: i32) {
-    let cmd_borrowed = unsafe { BorrowedFd::borrow_raw(cmd_fd) };
-    let mut poll_fds = [PollFd::new(&cmd_borrowed, PollFlags::POLLIN)];
-    let _ = poll(&mut poll_fds, timeout_ms);
-}
 
 /// A reader and a writer that wait at one endpoint, opened once.
 ///

@@ -12,39 +12,20 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use tcslib::{TcsClient, UdpConnection};
-use tcslibgs::config::{
-    load_config_version, load_dh_configs, load_tcspecial_section, payload_path_from_args,
-};
-use tcslibgs::config_digest::{digest_of_file, ConfigDigest, ConfigVersion};
-use tcslibgs::{
-    payload_parameters, trigger_as_written, ArmKey, CommandStatus, DHConfig, DHState,
-    HostPort, ResolvedSim, SimConfigFile, Timestamp, NO_TRANSFER_TIME,
-};
-use tcspecial::config::{beacon, load_tcspecial_config, tcspecial_config_path, Beacon};
+use tcslibgs::config::payload_path_from_args;
+use tcslibgs::{Edge, NO_TRANSFER_TIME};
 use tcsverify::startup::Startup;
 
-use crate::beacon_receive::BeaconReceive;
-use tcslib::beacon::Contact;
 use crate::oc_link::Arrivals;
-use tcslibgs::Edge;
-use crate::ci_link::{CiLink, PayloadLink, NOT_CONNECTED};
-use crate::endpoint::endpoint_description;
-use crate::config::constants::{self as constants, beacon_schedule};
-use crate::freshness::freshness_of;
 
 slint::include_modules!();
 
 mod beacon_receive;
 mod ci_link;
 mod config;
-mod endpoint;
-mod freshness;
 mod oc_link;
 mod version_2;
 
-/// Default CI address
-const DEFAULT_CI_ADDRESS: &str = "127.0.0.1:4000";
 
 /// What the window's status line says about the link to the command
 /// interpreter.
@@ -57,58 +38,8 @@ pub(crate) const CONNECTED_STATUS: &str = "Connected";
 pub(crate) const DISCONNECTED_STATUS: &str = "Disconnected";
 pub(crate) const ERROR_STATUS: &str = "Error";
 
-/// What a panel's status says of a handler that is moving data, and of one
-/// that is not.
-///
-/// `ui/main.slint` labels the panel's one button from these, and
-/// `handle_transfer_button` reads the same status back to decide which
-/// command a press sends, so the label and the command cannot disagree.
-///
-/// What the button actually says each way is in `ui/main.slint`: the window
-/// owns its own labels, and the two words appear in Rust only in the test
-/// that holds the window to the rule a press is decided by.
-const ACTIVE_STATUS: &str = "Active";
-const STOPPED_STATUS: &str = "Stopped";
-/// What a panel says about a handler nobody can speak for.
-///
-/// The other two are claims about the spacecraft, and the ground may make
-/// them only while it is hearing from it: the status is set from what a
-/// START_DH or a STOP_DH was answered, and a beacon that stops arriving means
-/// the answer is as old as the silence. A handler could have stopped,
-/// restarted, or gone with the process. Shown as unknown rather than left at
-/// the last thing said, which an operator would read as a reading.
-const UNKNOWN_STATUS: &str = "Unknown";
 
-/// How long the MOC waits for an answer when asking whether a tcspecial is
-/// already there.
-///
-/// Short, because this is a question about something on the same machine and
-/// the answer is wanted before a window opens. A tcspecial that cannot answer
-/// a ping this quickly is one the MOC would rather replace than talk to.
-const ALREADY_RUNNING_TIMEOUT: Duration = Duration::from_millis(500);
 
-/// Whether something is already answering as tcspecial at `address`.
-///
-/// Asked by PING rather than by looking for a process or a bound port,
-/// because what matters is whether there is a command interpreter that
-/// answers: a bound port might be anything, and a process by that name might
-/// be wedged. This also finds a tcspecial that is not a local process at all,
-/// which a process search never would.
-///
-/// A link that cannot even be opened counts as nothing running, not as an
-/// error: the MOC's job then is to start one.
-fn tcspecial_already_running(address: &str) -> bool {
-    let connection = match UdpConnection::new("0.0.0.0:0", address) {
-        Ok(connection) => connection,
-        Err(_) => return false,
-    };
-    // A PING is a spacecraft command, so no payload link is needed to ask
-    // it: a client with none can still send everything about the spacecraft
-    // itself.
-    let mut client = TcsClient::new(Box::new(connection), Vec::new());
-    client.set_timeout(ALREADY_RUNNING_TIMEOUT);
-    client.ping().is_ok()
-}
 
 /// The programs the MOC starts.
 ///
@@ -368,96 +299,7 @@ fn grid_shape(sizes: &Sizes, panels: usize) -> GridShape {
     }
 }
 
-/// Turn a data handler from the tcspecial configuration file into the panel the
-/// window shows for it.
-///
-/// The configured values fill in what the file knows; the run-time fields
-/// start empty and are filled in as tcspecial reports on the handler. There is
-/// no packet interval among them: how often a payload produces a packet is a
-/// property of a simulation rather than of a payload, so it is stated in the
-/// simulator's own file and tcssim is what shows it.
-fn dh_info_from(dev_id: usize, dh: &DHConfig, sim: Option<&ResolvedSim>) -> DHInfo {
-    DHInfo {
-        // Version 1 has no command bindings. Its CONFIG_DH carries a name and
-        // nothing to configure with, and the spacecraft refuses it as
-        // unimplemented, so there is nothing a panel could offer to set.
-        settable: SharedString::new(),
-        setting: SharedString::new(),
-        name: SharedString::from(dh.name.0.clone()),
-        // Its place in the payload configuration, which is the only number a
-        // payload has: nothing in the file states one, and the order the file
-        // describes them in is what both windows count.
-        dev_id: i32::try_from(dev_id).unwrap_or(i32::MAX),
-        config: SharedString::from(endpoint_description(&dh.endpoint)),
-        packet_size: i32::try_from(dh.packet_size).unwrap_or(i32::MAX),
-        // Unknown until the spacecraft has been asked, by Enable or by
-        // Query All. It said Stopped, which is a claim: a MOC that has just
-        // come up has been told nothing, and a tcspecial it attached to may
-        // have been running handlers for hours.
-        status: SharedString::from(UNKNOWN_STATUS),
-        // What the ground has received from this payload, which is nothing
-        // until it has.
-        oc_time: SharedString::from(NO_TRANSFER_TIME),
-        oc_data: SharedString::new(),
-        packets_recv: 0,
-        // Nothing to judge by yet: see crate::freshness.
-        data_color: crate::config::constants::freshness_color(crate::freshness::Freshness::Unjudged),
-        // What both files said about this payload, ready for the panel's
-        // Configuration button. `sim` is absent when the simulator file could
-        // not be read, which is not an error here: the MOC controls payloads
-        // and does not simulate them.
-        parameters: SharedString::from(payload_parameters(dh, sim)),
-    }
-}
 
-/// What the simulator configuration settles for each handler, if it can be
-/// read.
-///
-/// Read so that a panel can show the whole of what a payload set says, and
-/// read loosely for the same reason it is read at all: the MOC does not
-/// simulate anything, so a simulator file that is missing, unreadable, or
-/// written for a different tcspecial configuration must not stop the MOC from
-/// controlling payloads. Each of those is said once on the way past and the
-/// panels then say, where the parameters are shown, that this half was not
-/// read.
-fn simulator_settings(
-    payload_path: &str,
-    dh_configs: &[DHConfig],
-    startup: &mut Startup,
-) -> Option<Vec<ResolvedSim>> {
-    let Some(sim_path) = sim_path_for(payload_path) else {
-        // Nothing to read, which is not something to warn about: a payload
-        // set with no simulator file beside it is a set with nothing
-        // simulated, and the panels say so where the parameters are shown.
-        eprintln!("{payload_path}: no simulator file beside it, so nothing is simulated");
-        return None;
-    };
-
-    let file = match SimConfigFile::load(&sim_path) {
-        Ok(file) => file,
-        Err(e) => {
-            startup.warning(format!(
-                "Not showing simulator settings: {} could not be read: {}",
-                sim_path, e
-            ));
-            return None;
-        }
-    };
-
-    match file.resolve(dh_configs) {
-        Ok(sims) => {
-            eprintln!("Loaded simulator settings from: {}", sim_path);
-            Some(sims)
-        }
-        Err(e) => {
-            startup.warning(format!(
-                "Not showing simulator settings: {} does not fit {}: {}",
-                sim_path, payload_path, e
-            ));
-            None
-        }
-    }
-}
 
 /// Which simulator file goes with this payload set, if it has one.
 ///
@@ -542,180 +384,14 @@ fn stop(startup: &Startup) -> ! {
     exit(1);
 }
 
-/// What one panel shows, gathered from a handler.
-///
-/// Plain values rather than a model row, because this crosses a thread: the
-/// asking happens away from the event loop, where blocking is allowed, and
-/// only the applying happens on it. A Slint model is not `Send`, and the
-/// client's commands wait on the spacecraft for as long as its timeout
-/// allows, so doing both in one place would mean a window that stops
-/// repainting whenever tcspecial is slow to answer.
-#[derive(Debug, Clone)]
-struct PanelUpdate {
-    row: usize,
-    /// What the panel should say the handler is doing, where this pass has
-    /// something to say about it: the beacon stopping, which makes every
-    /// handler unknown, or the beacon returning, which is when the spacecraft
-    /// is asked what its handlers are really doing. Otherwise the status is
-    /// the one the last command was answered with and this leaves it alone.
-    status: Option<&'static str>,
-}
 
-/// What a panel should say a handler is doing, from a QUERY_DH answer.
-///
-/// Only the spacecraft's own account of it counts: a handler it answers for
-/// is active or it is not, and anything else -- a handler this tcspecial has
-/// not got, a command it could not answer -- is a panel that cannot say. A
-/// handler that was made and never started is stopped as far as a panel is
-/// concerned: it is not moving data, which is what the word is read for.
-fn status_from_answer(status: CommandStatus, state: Option<DHState>) -> &'static str {
-    match (status, state) {
-        (CommandStatus::Success, Some(DHState::Active)) => ACTIVE_STATUS,
-        (CommandStatus::Success, Some(DHState::Created | DHState::Stopped)) => STOPPED_STATUS,
-        _ => UNKNOWN_STATUS,
-    }
-}
 
-/// Ask one handler what its panel should show.
-///
-/// `None` when it did not answer at all. A handler that answers the statistics
-/// but not the samples keeps the sample lines it had: the last thing seen is
-/// better than nothing seen, and a blank line reads as no data rather than no
-/// answer.
-/// One line about a payload that has to be asked for its data, or nothing at
-/// all about one that does not.
-///
-/// A triggered payload is the one worth watching this closely. It sends
-/// nothing until tcspecial asks it to, so when a panel shows no data the
-/// question is always what the MOC sent and what came back -- and neither of
-/// those appears anywhere: the window shows a payload's state and not the
-/// traffic that settled it.
-///
-/// Said on stderr, as the startup messages in `main` are, so it appears on the
-/// console of whoever started the MOC whether or not they set `RUST_LOG`.
-fn triggered_note(dh: &DHConfig, what: &str) -> Option<String> {
-    dh.mode.polling()?;
-    Some(format!("triggered payload {}: {}", dh.name.0, what))
-}
 
-/// Say it, if this is a payload there is anything to say about.
-///
-/// For the things that happen once: a button pressed, an answer to it. Two
-/// presses are two lines even when they say the same thing, because they are
-/// two presses.
-fn note_triggered(dh: &DHConfig, what: String) {
-    if let Some(line) = triggered_note(dh, &what) {
-        eprintln!("{line}");
-    }
-}
 
-/// Say it only if it is not what was last said about this payload.
-///
-/// For the things that are said over and over: the panels refresh about once a
-/// second whether or not anything is happening, so a note on every pass buried
-/// what moved under a hundred identical lines. `said` is what was last said
-/// about this payload, kept by the caller -- one per panel -- so a line appears
-/// when something behind it changed and not again until it changes once more.
-///
-/// Returns whether anything was said, which is what makes the rule testable: a
-/// console is not somewhere a test can read.
-fn note_triggered_if_new(dh: &DHConfig, what: String, said: &mut Option<String>) -> bool {
-    let line = match triggered_note(dh, &what) {
-        Some(line) => line,
-        // Nothing to say, and nothing to remember either: `said` belongs to
-        // the payload, and a payload nothing is said about has no last line.
-        None => return false,
-    };
 
-    if said.as_deref() == Some(line.as_str()) {
-        return false;
-    }
 
-    eprintln!("{line}");
-    *said = Some(line);
-    true
-}
 
-/// What the MOC starts out believing about a triggered payload.
-///
-/// The whole of what it will address the payload by and ask it with: the id
-/// every command carries, where the payload and the OC side are, and the
-/// trigger and interval that are tcspecial's to send. A panel shows the first
-/// of those and none of the rest, so a session where the MOC and tcspecial
-/// disagreed about a payload had nothing on the console to compare.
-fn triggered_startup(dh: &DHConfig, status: &str) -> Option<String> {
-    let (trigger, interval) = dh.mode.polling()?;
-    triggered_note(
-        dh,
-        &format!(
-            "{}, trigger {} every {} ms, OC {}, status {}",
-            endpoint_description(&dh.endpoint),
-            trigger_as_written(trigger),
-            interval.as_millis(),
-            oc_of(dh),
-            status
-        ),
-    )
-}
 
-/// A time as the window shows it, or the placeholder if there is none.
-///
-/// The same placeholder every other time in the window uses, so a reading
-/// that has not happened looks the same wherever it is.
-fn shown_time(at: Option<tcslibgs::Timestamp>) -> String {
-    match at {
-        Some(at) => at.time_of_day(),
-        None => NO_TRANSFER_TIME.to_string(),
-    }
-}
-
-/// Where a handler's OC side is, or that it has not got one.
-fn oc_of(dh: &DHConfig) -> String {
-    match &dh.oc {
-        Some(oc) => format!("{}:{}", oc.address, oc.port),
-        None => "none".to_string(),
-    }
-}
-
-fn panel_update_for(
-    client: &mut TcsClient,
-    row: usize,
-    dh: &DHConfig,
-    said: &mut Option<String>,
-    set_status: bool,
-) -> Option<PanelUpdate> {
-    let (status, state, stats) = match client.query_dh(dh.name.clone()) {
-        Ok(answer) => answer,
-        Err(e) => {
-            note_triggered_if_new(dh, format!("QUERY_DH got no answer: {e}"), said);
-            return None;
-        }
-    };
-
-    // The status each answer carried, which nothing else looks at: a handler
-    // tcspecial has not got answers NotFound, and a panel showing zeroes
-    // looks exactly like one whose payload is quiet. Triggers are said too,
-    // since they are what a triggered handler is for and appear in no other
-    // counter.
-    note_triggered_if_new(
-        dh,
-        format!(
-            "QUERY_DH {:?}: {} triggers sent, {} bytes to the ground, {} from it",
-            status, stats.triggers_sent, stats.bytes_sent, stats.bytes_received
-        ),
-        said,
-    );
-
-    Some(PanelUpdate {
-        row,
-        // Said where the caller asked for it: the pass that follows the
-        // beacon coming back, and the Query all button, which is somebody
-        // asking the spacecraft directly. Every other pass leaves the status
-        // the commands set -- that is what the ground asked for and was
-        // answered, and a poll is not a second opinion on it.
-        status: set_status.then(|| status_from_answer(status, state)),
-    })
-}
 
 /// Put what the ground received into the panels.
 ///
@@ -728,6 +404,17 @@ fn panel_update_for(
 /// the point of them coming from one place: when the data arrived, what it
 /// was, and how much of it there has been are one account, kept by the end
 /// that received it.
+/// A time as the window shows it, or the placeholder if there is none.
+///
+/// The same placeholder every other time in the window uses, so a reading
+/// that has not happened looks the same wherever it is.
+pub(crate) fn shown_time(at: Option<tcslibgs::Timestamp>) -> String {
+    match at {
+        Some(at) => at.time_of_day(),
+        None => NO_TRANSFER_TIME.to_string(),
+    }
+}
+
 fn show_arrivals(dh_model: &Rc<VecModel<DHInfo>>, arrivals: &Arrivals) {
     let Ok(slots) = arrivals.lock() else { return };
 
@@ -744,14 +431,6 @@ fn show_arrivals(dh_model: &Rc<VecModel<DHInfo>>, arrivals: &Arrivals) {
     }
 }
 
-/// Put a gathered update into its panel.
-fn apply_panel_update(dh_model: &Rc<VecModel<DHInfo>>, update: &PanelUpdate) {
-    update_row(dh_model, update.row, |info| {
-        if let Some(status) = update.status {
-            info.status = SharedString::from(status);
-        }
-    });
-}
 
 /// Change one panel's contents, leaving the rest of it alone.
 ///
@@ -904,392 +583,24 @@ fn main() {
     );
     present_and_stop_if_fatal(&startup);
 
-    // A version 2 configuration is a graph whose ground end is data, not a
-    // command interpreter: see version_2, which runs the window for it.
-    if tcslibgs::graph::is_version_2(Path::new(&payload_path)) {
-        version_2::run(&payload_path, sim_path.as_deref(), startup);
-    }
-
-    let dh_configs: Arc<Vec<DHConfig>> = match load_dh_configs(&payload_path) {
-        Ok(dh_configs) => Arc::new(dh_configs),
-        Err(e) => {
-            startup.error(format!(
-                "Error loading payload configuration from {}: {}",
-                payload_path, e
-            ));
-            stop(&startup);
-        }
-    };
-    eprintln!("Loaded {} data handler configurations", dh_configs.len());
-
-    // Where each payload is commanded: both ends of its own link, counted
-    // from the two bases by its id. A MOC that cannot work this out cannot
-    // command a payload at all, so it says so and stops rather than coming up
-    // with panels whose buttons would be refused.
+    // The one thing a configuration can be. A version 1 payload set -- a list
+    // of payloads each paired with a ground endpoint, commanded by name --
+    // was the other, and it is gone: every one of its capabilities is a
+    // version 2 node's, and a second way of saying the same thing was a
+    // second thing to keep working.
     //
-    // Asked here, before tcspecial and tcssim are started, so that a MOC that
-    // is going to stop does so before it has started anything.
-    let payload_links = match payload_command_links(&dh_configs) {
-        Ok(links) => Some(links),
-        Err(e) => {
-            startup.error(format!("Cannot tell where payload commands go: {e}"));
-            None
-        }
-    };
-
-    // And where it sends spacecraft commands from, which tcspecial checks
-    // every one of them against: both ends read `tcs_cmd.send` out of the
-    // same file. A MOC that cannot work this out would have every command
-    // ignored by a spacecraft that says nothing about it, so it says so and
-    // stops.
-    let command_from = match moc_command_socket() {
-        Ok(from) => Some(from),
-        Err(e) => {
-            startup.error(format!("Cannot tell where the MOC sends commands from: {e}"));
-            None
-        }
-    };
-
-    // Where the MOC listens for beacons: see below, where it starts. Asked
-    // here so that a MOC that cannot work it out says so with the rest.
-    let beacon = beacon_to_listen_for(&payload_path);
-    if let Err(e) = &beacon {
-        startup.warning(format!("Not listening for beacons: {e}"));
-    }
-
-    let (Some(payload_links), Some(command_from)) = (payload_links, command_from) else {
+    // Said here rather than left to the loaders, which would complain about
+    // whatever of a graph they met first.
+    if !tcslibgs::graph::is_version_2(Path::new(&payload_path)) {
+        startup.error(format!(
+            "{payload_path} is not a version 2 configuration: it states no \
+             version, or states an older one. Version 1 payload sets are no \
+             longer read by anything -- see the manual on converting one."
+        ));
         stop(&startup);
-    };
-
-    let ui = MainWindow::new().unwrap();
-    remember_main_window(&ui);
-
-    let _ = Sizes::settle(&ui);
-    let ui_weak = ui.as_weak();
-
-    // And the simulator file beside it, for the panels to show. Loosely: the
-    // MOC simulates nothing, so a file it cannot read costs it the simulator
-    // half of what a panel can show and nothing else.
-    let sims = simulator_settings(&payload_path, &dh_configs, &mut startup);
-
-    // One panel per configured data handler.
-    let dh_model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(
-        dh_configs
-            .iter()
-            .enumerate()
-            .map(|(row, dh)| {
-                dh_info_from(row, dh, sims.as_ref().and_then(|sims| sims.get(row)))
-            })
-            .collect::<Vec<_>>(),
-    ));
-    ui.set_dh_model(ModelRc::from(dh_model.clone()));
-
-    // And on the console, what the MOC believes about each payload that has
-    // to be asked for its data: see triggered_startup. Said before tcspecial
-    // is started or attached to, so that what the MOC read is on the console
-    // above whatever the spacecraft then says about the same payload.
-    for (row, dh) in dh_configs.iter().enumerate() {
-        let status = dh_model
-            .row_data(row)
-            .map(|info| info.status.to_string())
-            .unwrap_or_default();
-        if let Some(line) = triggered_startup(dh, &status) {
-            eprintln!("{line}");
-        }
     }
 
-    // Shape the grid, and open the window at the size that shape wants. The
-    // window cannot work this out for itself: it would need the panel count
-    // before the model is set.
-    // What the markup says a panel and the chrome come to, asked for rather
-    // than written down here as well: see Sizes.
-    let sizes = Sizes::of(&ui);
-    let shape = grid_shape(&sizes, dh_configs.len());
-    eprintln!(
-        "{} data handlers in a {}x{} grid, window {}x{}",
-        dh_configs.len(),
-        shape.columns,
-        shape.rows,
-        shape.width,
-        shape.height
-    );
-    // Taller than the grid asks for where there is a third row to look ahead
-    // for, and no taller than the panels on hand need otherwise. It is also
-    // why the window can open taller than it is wide, which the shape itself
-    // never is: the shape rule chooses the grid, and the room rule says how
-    // much of the window to give it.
-    ui.window().set_size(window_size(&sizes, &shape, dh_configs.len()));
-
-    // Start tcspecial and tcssim subprocesses first, each reading the payload
-    // file tcsmoc read, so all three describe the same payloads.
-    //
-    // Unless a tcspecial is already there. Starting a second one does not
-    // work and never did: the command interpreter's address can be bound
-    // once, so the second exits and the MOC comes up with a window, no
-    // spacecraft behind it, and the reason only on a terminal nobody is
-    // reading. Talking to the one that is already running is what was wanted
-    // in every case where this happened.
-    let [tcspecial, tcssim] = CHILDREN;
-
-    let mut process_manager_tcspecial = None;
-    if tcspecial_already_running(DEFAULT_CI_ADDRESS) {
-        eprintln!(
-            "a tcspecial is already answering at {}, so not starting another",
-            DEFAULT_CI_ADDRESS
-        );
-        ui.set_last_response(SharedString::from(format!(
-            "Using the tcspecial already running at {}",
-            DEFAULT_CI_ADDRESS
-        )));
-    } else {
-        let manager = Arc::new(ProcessManager::new());
-        manager.start_child(tcspecial, &payload_path);
-        process_manager_tcspecial = Some(manager);
-    }
-
-    let process_manager_tcssim = Arc::new(ProcessManager::new());
-    process_manager_tcssim.start_child(tcssim, &payload_path);
-
-    eprintln!("sleeping to let the subprocesses initialize");
-    thread::sleep(Duration::new(2, 0));
-
-    // What this MOC read, said before there is any link to say it over. A
-    // socket that cannot be made, or a tcspecial that is not answering, takes
-    // the exchange below with it -- and that is exactly when an operator wants
-    // to know which configuration each end was holding.
-    let version = ConfigVersion::of_this_build();
-
-    // The set's version, said the way tcspecial says its own and the way a
-    // beacon says it: this line and tcspecial's are read against each other,
-    // so they state the same three facts in the same words.
-    //
-    // The file has already been loaded, and its version is one of the rules
-    // that loading applies, so a failure here is a file that changed between
-    // the two reads. Said rather than left out: a line missing one of its
-    // three facts reads as a set that has no version.
-    let config_version = load_config_version(&payload_path)
-        .map(|stated| format!("config v{stated}"))
-        .unwrap_or_else(|e| format!("config version unreadable ({e})"));
-
-    let digest = match digest_of_file(&payload_path) {
-        Ok(digest) => {
-            eprintln!("tcsmoc v{version}, {config_version}, md5 {digest}");
-            Some(digest)
-        }
-        Err(e) => {
-            eprintln!(
-                "v{version}, configuration {payload_path} {config_version} cannot be \
-                 digested: {e}"
-            );
-            None
-        }
-    };
-
-    // Open the link to the command interpreter on startup, by the same call
-    // the Connect button makes, so the link the window comes up with is the
-    // one that button would have given it.
-    let mut link = CiLink::down_from(&command_from, payload_links);
-    if let Err(e) = link.connect(DEFAULT_CI_ADDRESS) {
-        // Exit since we can't operate without a connection
-        startup.error(format!("Failed to connect to {}: {}", DEFAULT_CI_ADDRESS, e));
-        present_and_stop_if_fatal(&startup);
-    }
-    eprintln!(
-        "Connected to {}, payload commands to {}",
-        DEFAULT_CI_ADDRESS,
-        link.payload_addresses()
-    );
-    let link: Arc<Mutex<CiLink>> = Arc::new(Mutex::new(link));
-    if let Some(digest) = digest {
-        hear_what_tcspecial_read(&ui, &link, version, digest);
-    }
-    ui.set_ci_status(SharedString::from(CONNECTED_STATUS));
-    ui.set_ci_address(SharedString::from(DEFAULT_CI_ADDRESS));
-
-    // Start receiving beacon data
-    // Where the MOC listens for beacons: the group and interface tcspecial
-    // sends them to, read out of the same two files tcspecial reads -- the
-    // command interpreter's own configuration, and the payload set's
-    // tcspecial section, which wins. Read rather than compiled in, because a
-    // listener that assumed an address would hear nothing the moment a
-    // mission moved the beacon, and say nothing about why.
-    //
-    // Loosely, as the simulator file is read: a MOC that cannot work out
-    // where the beacons are says so and runs without them, the indicator
-    // staying at "none arrived". Controlling payloads does not depend on it.
-    //
-    // What the beacons say about the spacecraft is left here for the poller
-    // to read: the indicator is for an operator, and the panels need the same
-    // thing in a form a program can act on. Lost until a beacon arrives, and
-    // lost for good where there are none to listen for -- which leaves the
-    // panels saying what the commands were answered, as they did before any
-    // of this.
-    let contact = Arc::new(Mutex::new(Contact::Lost));
-    let beacon_ui_weak = ui_weak.clone();
-    let _beacon_receive = match beacon {
-        Ok(beacon) => {
-            eprintln!(
-                "Listening for beacons at {}, which {} sends from",
-                beacon.recv, beacon.send
-            );
-            BeaconReceive::new(
-                beacon_ui_weak,
-                beacon,
-                beacon_schedule(),
-                contact.clone(),
-                digest,
-                Some(ask_whether_to_continue(
-                    process_manager_tcssim.clone(),
-                    process_manager_tcspecial.clone(),
-                )),
-            )
-        }
-        Err(e) => {
-            // Said with the rest as tcsmoc started, and kept on the window
-            // for as long as nothing else has been said there.
-            ui.set_last_response(SharedString::from(format!(
-                "Not listening for beacons: {e}"
-            )));
-            None
-        }
-    };
-
-    // What the operator has asked for, per payload: Disable sets a flag and
-    // Enable clears it, and the asking done when contact is made skips the
-    // payloads it names.
-    let declined: Declined = Arc::new(Mutex::new(vec![false; dh_configs.len()]));
-
-    handle_link_button(&ui, ui_weak.clone(), link.clone());
-    handle_main_menu(&ui, ui_weak.clone(), link.clone());
-    query_dh_buttons(&ui, ui_weak.clone(), link.clone(), dh_configs.clone(), dh_model.clone());
-    // The payload data path, one listener per handler: see oc_link. Opened
-    // before the panels are refreshed, so a payload that is already sending
-    // is heard from on the first pass.
-    let arrivals = oc_link::listen(&dh_configs);
-    refresh_panels(
-        ui_weak.clone(),
-        link.clone(),
-        dh_configs.clone(),
-        dh_model.clone(),
-        arrivals,
-        contact.clone(),
-        declined.clone(),
-        (
-            process_manager_tcssim.clone(),
-            process_manager_tcspecial.clone(),
-        ),
-    );
-    handle_transfer_buttons(
-        &ui,
-        ui_weak.clone(),
-        link.clone(),
-        dh_configs.clone(),
-        dh_model.clone(),
-        declined.clone(),
-    );
-/*
-    // Menu action handler
-    {
-        let client = client.clone();
-        let ui_weak = ui_weak.clone();
-        ui.on_menu_action(move |action| {
-            let ui = ui_weak.unwrap();
-            let mut guard = client.lock().unwrap();
-
-            match action {
-                MenuAction::Ping => {
-                    eprintln!("Ping from menu");
-                    match guard.ping() {
-                        Ok(tm) => {
-                            ui.set_last_response(SharedString::from(format!(
-                                "PING OK at {}",
-                                tm.header.timestamp.time_of_day()
-                            )));
-                        }
-                        Err(e) => {
-                            ui.set_last_response(SharedString::from(format!("PING failed: {}", e)));
-                        }
-                    }
-                }
-                MenuAction::ArmRestart => {
-                    match guard.restart_arm(ArmKey(0xf001adad)) {
-                        Ok(status) => {
-                            ui.set_last_response(SharedString::from(format!("ARM_RESTART: {:?}", status)));
-                        }
-                        Err(e) => {
-                            ui.set_last_response(SharedString::from(format!("ARM_RESTART failed: {}", e)));
-                        }
-                    }
-                }
-                MenuAction::Restart => {
-                    match guard.restart(ArmKey(0xf001adad)) {
-                        Ok(status) => {
-                            ui.set_last_response(SharedString::from(format!("RESTART: {:?}", status)));
-                        }
-                        Err(e) => {
-                            ui.set_last_response(SharedString::from(format!("RESTART failed: {}", e)));
-                        }
-                    }
-                }
-                MenuAction::Query => {
-                    ui.set_last_response(SharedString::from("Query - not yet implemented"));
-                }
-                MenuAction::QueryDh => {
-                    ui.set_last_response(SharedString::from("Query DH - select DH first"));
-                }
-                MenuAction::StartDh => {
-                    ui.set_last_response(SharedString::from("Start DH - select DH first"));
-                }
-                MenuAction::StopDh => {
-                    ui.set_last_response(SharedString::from("Stop DH - select DH first"));
-                }
-            }
-        });
-    }
-*/
-
-    // A signal asking the MOC to stop, which Quit and the close box already
-    // answer: see `listen_for_stop`.
-    listen_for_stop();
-
-    handle_quit(&ui, process_manager_tcssim.clone(), process_manager_tcspecial.clone());
-    // Quit button handler
-/*
-    {
-        let pm_tcssim = process_manager_tcssim.clone();
-        let pm_tcspecial = process_manager_tcspecial.clone();
-        ui.on_quit_clicked(move || {
-            kill_and_exit_all(&pm_tcssim, &pm_tcspecial);
-        });
-    }
-*/
-
-    handle_close(&ui, process_manager_tcssim.clone(), process_manager_tcspecial.clone());
-    // Window close handler (close box)
-/*
-    {
-        let pm_tcssim = process_manager_tcssim.clone();
-        let pm_tcspecial = process_manager_tcspecial.clone();
-        ui.window().on_close_requested(move || {
-            kill_and_exit_all(&pm_tcssim, &pm_tcspecial);
-            slint::CloseRequestResponse::HideWindow
-        });
-    }
-*/
-
-    // Whatever was found as it started and did not stop it, said before the
-    // window it is about is shown -- and before that window asks for its
-    // edge, which it can do only once it is on the screen.
-    if !startup.is_empty() {
-        present(&startup);
-    }
-
-    // Against the top of the display, with tcssim asking for the bottom: the
-    // two windows are read together, and left where a window manager puts
-    // them they land on top of each other.
-    ask_for_the_edge(&ui, Edge::Top);
-
-    ui.run().unwrap();
+    version_2::run(&payload_path, sim_path.as_deref(), startup);
 }
 
 /// Ask for this window to be put against one edge of the display.
@@ -1323,179 +634,8 @@ fn ask_for_the_edge(ui: &MainWindow, edge: Edge) {
     std::mem::forget(timer);
 }
 
-/// The one button that takes the link up and down.
-///
-/// There were two, and neither did anything: the window declared a callback
-/// for each and nothing in Rust answered them, and a Slint callback with no
-/// handler is silently nothing. Disconnect left the link up and the status
-/// line alone, which is how it was found; Connect looked as though it worked
-/// only because the status line already said Connected, the MOC having
-/// opened the link at startup before the window appeared.
-///
-/// Which way a press goes is decided by what the button offered, read back
-/// from the status the window derives its label from -- not by what the link
-/// turns out to be. The two cannot disagree by any path through this
-/// function, and if they ever did, doing what the label said is the honest
-/// answer and a safe one: `connect` replaces whatever the link had, and
-/// `disconnect` is harmless on a link that is already down.
-fn handle_link_button(
-    ui: &MainWindow,
-    ui_weak: slint::Weak<MainWindow>,
-    link: Arc<Mutex<CiLink>>,
-) {
-    ui.on_link_clicked(move || {
-        let ui = ui_weak.unwrap();
-        let mut guard = link.lock().unwrap();
 
-        if ui.get_ci_status() == CONNECTED_STATUS {
-            // Said in terms of where the link was, not of what the address
-            // box says, which may have been edited since.
-            let address = guard.address().to_string();
-            let was_up = guard.is_connected();
-            guard.disconnect();
 
-            eprintln!("Disconnected from {}", address);
-            ui.set_ci_status(SharedString::from(DISCONNECTED_STATUS));
-            ui.set_last_response(SharedString::from(if was_up {
-                format!("Disconnected from {}", address)
-            } else {
-                format!("Already disconnected from {}", address)
-            }));
-            return;
-        }
-
-        // Where the address box points now, rather than where the link last
-        // went: typing an address and pressing Connect is how the MOC is told
-        // to talk to a different command interpreter.
-        let address = ui.get_ci_address().to_string();
-        match guard.connect(&address) {
-            Ok(()) => {
-                eprintln!("Connected to {}", address);
-                ui.set_ci_status(SharedString::from(CONNECTED_STATUS));
-                ui.set_last_response(SharedString::from(format!("Connected to {}", address)));
-            }
-            Err(e) => {
-                eprintln!("Failed to connect to {}: {}", address, e);
-                ui.set_ci_status(SharedString::from(ERROR_STATUS));
-                ui.set_last_response(SharedString::from(format!(
-                    "Connection to {} failed: {}",
-                    address, e
-                )));
-            }
-        }
-    });
-}
-
-// Menu action handler
-fn handle_main_menu (ui: &MainWindow, ui_weak: slint::Weak<MainWindow>, link: Arc<Mutex<CiLink>>) {
-    ui.on_menu_action(move |action| {
-        let ui = ui_weak.unwrap();
-        let mut guard = link.lock().unwrap();
-
-        match action {
-            // The three actions that send a command ask the link for a
-            // client as they go: `None` is the link being down, which is a
-            // thing to say rather than a command that failed.
-            MenuAction::Ping => {
-                eprintln!("Ping from menu");
-                match guard.client().map(|client| client.ping()) {
-                    Some(Ok(tm)) => {
-                        // The time the spacecraft answered, which every
-                        // response carries now. A time of day rather than the
-                        // seconds and nanoseconds it used to print: what an
-                        // operator reads it against is the clock on the wall.
-                        ui.set_last_response(SharedString::from(format!(
-                            "PING OK at {}",
-                            tm.header.timestamp.time_of_day()
-                        )));
-                    }
-                    Some(Err(e)) => {
-                        ui.set_last_response(SharedString::from(format!("PING failed: {}", e)));
-                    }
-                    None => ui.set_last_response(SharedString::from(NOT_CONNECTED)),
-                }
-            }
-            MenuAction::ArmRestart => {
-                match guard.client().map(|client| client.restart_arm(ArmKey(0xf001adad))) {
-                    Some(Ok(status)) => {
-                        ui.set_last_response(SharedString::from(format!("ARM_RESTART: {:?}", status)));
-                    }
-                    Some(Err(e)) => {
-                        ui.set_last_response(SharedString::from(format!("ARM_RESTART failed: {}", e)));
-                    }
-                    None => ui.set_last_response(SharedString::from(NOT_CONNECTED)),
-                }
-            }
-            MenuAction::Restart => {
-                match guard.client().map(|client| client.restart(ArmKey(0xf001adad))) {
-                    Some(Ok(status)) => {
-                        ui.set_last_response(SharedString::from(format!("RESTART: {:?}", status)));
-                    }
-                    Some(Err(e)) => {
-                        ui.set_last_response(SharedString::from(format!("RESTART failed: {}", e)));
-                    }
-                    None => ui.set_last_response(SharedString::from(NOT_CONNECTED)),
-                }
-            }
-            MenuAction::Query => {
-                ui.set_last_response(SharedString::from("Query - not yet implemented"));
-            }
-            MenuAction::QueryDh => {
-                ui.set_last_response(SharedString::from("Query DH - select DH first"));
-            }
-            MenuAction::StartDh => {
-                ui.set_last_response(SharedString::from("Start DH - select DH first"));
-            }
-            MenuAction::StopDh => {
-                ui.set_last_response(SharedString::from("Stop DH - select DH first"));
-            }
-        }
-    });
-}
-
-// Query all DHs button handler
-//
-// Which data handlers to ask about comes from the configuration file: the
-// panels are its rows, so a row and its handler share an index.
-fn query_dh_buttons(
-    ui: &MainWindow,
-    ui_weak: slint::Weak<MainWindow>,
-    link: Arc<Mutex<CiLink>>,
-    dh_configs: Arc<Vec<DHConfig>>,
-    dh_model: Rc<VecModel<DHInfo>>,
-) {
-    ui.on_query_all_clicked(move || {
-        let ui = ui_weak.unwrap();
-        let mut guard = link.lock().unwrap();
-        let client = match guard.client() {
-            Some(client) => client,
-            None => {
-                ui.set_last_response(SharedString::from(NOT_CONNECTED));
-                return;
-            }
-        };
-        let mut results = Vec::new();
-
-        for (row, dh) in dh_configs.iter().enumerate() {
-            // The status as well as the counters: this is somebody asking the
-            // spacecraft what its handlers are doing, which is the one thing
-            // that can answer it.
-            match panel_update_for(client, row, dh, &mut None, true) {
-                Some(update) => {
-                    results.push(format!(
-                        "{}: {}",
-                        dh.name.0,
-                        update.status.unwrap_or(UNKNOWN_STATUS)
-                    ));
-                    apply_panel_update(&dh_model, &update);
-                }
-                None => results.push(format!("{}: no answer", dh.name.0)),
-            }
-        }
-
-        ui.set_last_response(SharedString::from(results.join("; ")));
-    });
-}
 
 /// How often the panels are repainted from what has arrived.
 ///
@@ -1503,428 +643,15 @@ fn query_dh_buttons(
 /// for what it replaced and why.
 const PANEL_REFRESH_INTERVAL: Duration = Duration::from_millis(1000);
 
-/// Keep the panels current, without asking the spacecraft anything.
-///
-/// A timer on the event loop. Each pass shows what arrived on each payload's
-/// own telemetry socket, works out each payload's data indicator from that and
-/// its `stale_interval`, blanks the statuses when the beacons stop, and
-/// shows what the command link has been doing. No command goes out.
-///
-/// This replaced a poller that asked every payload what it was doing once a
-/// second, on a thread and a connection of its own. An enabled payload sends
-/// on its own, so its data arriving is the answer the poller was asking for --
-/// and the asking cost a command and a response per payload per second, which
-/// for forty payloads is eighty datagrams a second of housekeeping. What the
-/// poller alone could say -- the spacecraft's own counters -- Query All still
-/// asks for when somebody wants it.
-///
-/// It does no I/O, so it cannot hold the window up, which is what the poller's
-/// thread was for.
-fn refresh_panels(
-    ui_weak: slint::Weak<MainWindow>,
-    link: Arc<Mutex<CiLink>>,
-    dh_configs: Arc<Vec<DHConfig>>,
-    dh_model: Rc<VecModel<DHInfo>>,
-    arrivals: Arrivals,
-    contact: Arc<Mutex<Contact>>,
-    declined: Declined,
-    stopping: (Arc<ProcessManager>, Option<Arc<ProcessManager>>),
-) {
-    // What the pass before this one found, so a pass can tell a change from a
-    // state of affairs. Starts lost: a MOC that has heard nothing knows
-    // nothing.
-    let mut seen = Contact::Lost;
-    // When the ground came to believe each payload was running, so a payload
-    // just enabled has its interval to produce something rather than being
-    // late the moment it is switched on.
-    let mut enabled_at: Vec<Option<Timestamp>> = vec![None; dh_configs.len()];
-    // What an asking done off the event loop left for the panels.
-    let gathered: Arc<Mutex<Vec<PanelUpdate>>> = Arc::new(Mutex::new(Vec::new()));
 
-    let timer = slint::Timer::default();
-    timer.start(
-        slint::TimerMode::Repeated,
-        PANEL_REFRESH_INTERVAL,
-        move || {
-            // A signal asking the MOC to stop, which is noticed here because
-            // this is what runs on the event loop regardless: see
-            // `stop_if_asked`.
-            stop_if_asked(&stopping.0, stopping.1.as_ref());
 
-            // The beacons stopping makes every status unknown. A status is
-            // the answer to a command and is worth exactly as much as the
-            // ground's hearing from the spacecraft: a handler could have
-            // stopped in the silence, or gone with a process that restarted.
-            //
-            // Nothing is asked when contact comes back, there being nothing
-            // to ask with -- the statuses stay unknown until somebody presses
-            // Enable or Query All. The data indicator is what says, meanwhile,
-            // whether a payload is still sending.
-            let heard = contact.lock().map(|seen| *seen).unwrap_or(Contact::Lost);
-            if statuses_go_unknown(seen, heard) {
-                for row in 0..dh_configs.len() {
-                    update_row(&dh_model, row, |info| {
-                        info.status = SharedString::from(UNKNOWN_STATUS);
-                    });
-                }
-            }
-            // And the two moments when the spacecraft is asked what its
-            // handlers are doing without anyone pressing anything: the first
-            // beacon, and the end of an outage. Both are a MOC that has just
-            // learnt the spacecraft is there and knows nothing about its
-            // payloads -- it may have been serving them for hours.
-            //
-            // Off the event loop, because each question waits on the
-            // spacecraft: a burst of them on this thread would stop the
-            // window repainting exactly while an operator was looking at it.
-            // What comes back is left for the next pass to paint.
-            if contact_is_made(seen, heard) {
-                ask_what_handlers_are_doing(
-                    link.clone(),
-                    dh_configs.clone(),
-                    declined.clone(),
-                    gathered.clone(),
-                );
-            }
-            seen = heard;
 
-            if let Ok(mut updates) = gathered.lock() {
-                for update in std::mem::take(&mut *updates) {
-                    apply_panel_update(&dh_model, &update);
-                }
-            }
 
-            show_arrivals(&dh_model, &arrivals);
-            show_freshness(
-                &dh_model,
-                &dh_configs,
-                &arrivals,
-                &mut enabled_at,
-                Timestamp::now(),
-            );
 
-            // And what the command link has been doing, under Last Response.
-            //
-            // try_lock rather than lock: that link belongs to the buttons,
-            // and a window that waited for it here would stop repainting
-            // exactly while a command was in flight -- which is when an
-            // operator is watching it. A pass that cannot have it leaves the
-            // times as they are and the next one is a second away.
-            if let (Some(ui), Ok(guard)) = (ui_weak.upgrade(), link.try_lock()) {
-                let (sent, received) = guard.command_times().unwrap_or((None, None));
-                ui.set_cmd_sent_time(SharedString::from(shown_time(sent)));
-                ui.set_cmd_recv_time(SharedString::from(shown_time(received)));
-            }
-        },
-    );
 
-    // The timer stops when it is dropped, and this function is returning.
-    std::mem::forget(timer);
-}
 
-/// Whether this pass is the moment contact was made.
-///
-/// The first beacon, and the end of an outage: the pass where the beacon
-/// indicator came into its contact colour. Not every pass of a contact that
-/// is simply holding, which would be a poll.
-fn contact_is_made(was: Contact, now: Contact) -> bool {
-    was == Contact::Lost && now == Contact::Made
-}
 
-/// Ask the spacecraft what each payload is doing, in a thread of its own.
-///
-/// Every payload but the ones the operator has turned off: a payload whose
-/// last press was Disable is a payload somebody stopped, and asking the
-/// spacecraft about it would be spending a command to be told what the
-/// operator already said.
-///
-/// Nothing is asked while the link is down, and nothing waits for it either:
-/// the panels then keep saying unknown until the next time contact is made or
-/// somebody presses Query all. Contact returning while the link is down is
-/// rare -- the beacon and the link come back together -- and a question owed
-/// indefinitely is a question that goes out at a moment nobody chose.
-fn ask_what_handlers_are_doing(
-    link: Arc<Mutex<CiLink>>,
-    dh_configs: Arc<Vec<DHConfig>>,
-    declined: Declined,
-    gathered: Arc<Mutex<Vec<PanelUpdate>>>,
-) {
-    thread::spawn(move || {
-        let asked_to_stop = declined.lock().map(|flags| flags.clone()).unwrap_or_default();
 
-        // The link the buttons hold, for as long as this burst takes. A press
-        // waits on it, which is the cost of there being one sender of payload
-        // commands: the burst happens when contact is made and not again.
-        let Ok(mut guard) = link.lock() else { return };
-        let Some(client) = guard.client() else { return };
-
-        let mut updates = Vec::new();
-        for (row, dh) in dh_configs.iter().enumerate() {
-            if asked_to_stop.get(row).copied().unwrap_or(false) {
-                continue;
-            }
-            if let Some(update) = panel_update_for(client, row, dh, &mut None, true) {
-                updates.push(update);
-            }
-        }
-        drop(guard);
-
-        if let Ok(mut queue) = gathered.lock() {
-            queue.extend(updates);
-        }
-    });
-}
-
-/// Whether this pass should blank every panel's status.
-///
-/// Only the change from being heard from to not: a pass that blanked them
-/// every time contact was lost would overwrite an answer somebody had just
-/// pressed a button for.
-fn statuses_go_unknown(was: Contact, now: Contact) -> bool {
-    was == Contact::Made && now == Contact::Lost
-}
-
-/// Set each panel's data indicator from what has arrived and what the payload
-/// said to expect.
-///
-/// `enabled_at` is carried in and out: it is when the ground came to believe
-/// each payload was running, which is where staleness is measured from until
-/// something arrives. `now` is given rather than read so that this can be
-/// tested at a time of the test's choosing.
-fn show_freshness(
-    dh_model: &Rc<VecModel<DHInfo>>,
-    dh_configs: &[DHConfig],
-    arrivals: &Arrivals,
-    enabled_at: &mut [Option<Timestamp>],
-    now: Timestamp,
-) {
-    let last: Vec<Option<Timestamp>> = match arrivals.lock() {
-        Ok(slots) => slots
-            .iter()
-            .map(|arrival| arrival.as_ref().map(|arrival| arrival.at))
-            .collect(),
-        // Nothing can be said about arrivals this pass, and the indicators
-        // keep what they showed: the next pass is a second away.
-        Err(_) => return,
-    };
-
-    for (row, dh) in dh_configs.iter().enumerate() {
-        // What the ground believes, which is what the panel says: the answer
-        // to the last command about this payload, or nothing.
-        let enabled = dh_model
-            .row_data(row)
-            .is_some_and(|info| info.status.as_str() == ACTIVE_STATUS);
-        match (enabled, enabled_at.get(row).copied().flatten()) {
-            (true, None) => enabled_at[row] = Some(now),
-            (false, Some(_)) => enabled_at[row] = None,
-            _ => {}
-        }
-
-        // The later of the two, so a payload that has sent something is
-        // judged by that and one just enabled by when it was enabled.
-        let since = [last.get(row).copied().flatten(), enabled_at[row]]
-            .into_iter()
-            .flatten()
-            .max();
-        let showing = constants::freshness_color(freshness_of(
-            enabled,
-            since,
-            dh.stale_interval,
-            now,
-        ));
-        update_row(dh_model, row, |info| info.data_color = showing);
-    }
-}
-
-/// Where this MOC should listen for beacons.
-///
-/// The same two configurations tcspecial resolves it from, in the same order:
-/// the payload set's `tcspecial` section if it has one, and the command
-/// interpreter's own file otherwise. Reading the same files is what makes the
-/// two ends name one group and one interface -- a listener with an address of
-/// its own would go deaf the moment a mission moved the beacon, and the only
-/// symptom would be an indicator saying nothing had arrived.
-fn beacon_to_listen_for(payload_path: &str) -> Result<Beacon, String> {
-    let config_path = tcspecial_config_path();
-    let config = load_tcspecial_config(&config_path)
-        .map_err(|e| format!("{config_path} could not be read: {e}"))?;
-
-    let section = load_tcspecial_section(payload_path)
-        .map_err(|e| format!("{payload_path} could not be read: {e}"))?;
-
-    beacon(&config, section.as_ref())
-}
-
-/// Where the MOC sends spacecraft commands from, as `address:port`.
-///
-/// `tcs_cmd.send`, from the command interpreter's own configuration -- the
-/// file tcspecial reads it from too, which is what lets tcspecial refuse a
-/// command from anywhere else. One file, read by both ends, so the two cannot
-/// name different sockets.
-fn moc_command_socket() -> Result<String, String> {
-    let config_path = tcspecial_config_path();
-    let config = load_tcspecial_config(&config_path)
-        .map_err(|e| format!("{config_path} could not be read: {e}"))?;
-
-    Ok(config.moc_cmd_send.to_string())
-}
-
-/// Where each payload is commanded: both ends of its own link.
-///
-/// From the command interpreter's own configuration, which is where tcspecial
-/// takes them from: one file, read by both ends, so they cannot name
-/// different sockets. The payload set's section states them too and is not
-/// read for them, for the reason tcspecial does not read them there -- where
-/// commands are taken is the interpreter's own business, not the set's.
-///
-/// A payload's id is its position in the payload configuration, which is the
-/// order this walks.
-fn payload_command_links(dh_configs: &[DHConfig]) -> Result<Vec<PayloadLink>, String> {
-    let config_path = tcspecial_config_path();
-    let config = load_tcspecial_config(&config_path)
-        .map_err(|e| format!("{config_path} could not be read: {e}"))?;
-
-    let mut links = Vec::with_capacity(dh_configs.len());
-    for (id, dh) in dh_configs.iter().enumerate() {
-        let from = config.payload_command_source_base.at(id)?;
-        let to = config.payload_command_dest_base.at(id)?;
-        links.push(PayloadLink {
-            name: dh.name.clone(),
-            from: HostPort {
-                address: from.address,
-                port: from.port,
-            },
-            to: HostPort {
-                address: to.address,
-                port: to.port,
-            },
-        });
-    }
-
-    Ok(links)
-}
-
-/// Send what this MOC read, and hear what the spacecraft read.
-///
-/// The two ends each read a payload set -- the MOC to build its panels,
-/// tcspecial to serve the handlers -- and nothing made them prove it was the
-/// same set. When it was not, the only sign was a command answered `NotFound`
-/// for a payload the operator could see: a tcspecial left running from an
-/// earlier set, attached to rather than replaced, since the MOC attaches to
-/// whatever answers a ping.
-///
-/// `version` and `digest` are this end's, said on the console before the
-/// socket was made; what this adds is the other end's, so the two can be read
-/// against each other whether or not anything is wrong, with `Last Response`
-/// carrying the verdict for the operator.
-fn hear_what_tcspecial_read(
-    ui: &MainWindow,
-    link: &Mutex<CiLink>,
-    version: ConfigVersion,
-    digest: ConfigDigest,
-) {
-    let mut guard = link.lock().unwrap();
-    let answer = match guard.client() {
-        Some(client) => client.connect(version, digest),
-        None => {
-            ui.set_last_response(SharedString::from(NOT_CONNECTED));
-            return;
-        }
-    };
-
-    match answer {
-        Ok((their_version, their_config_version, their_digest)) => {
-            // Said the way a beacon says the same three facts, by the one
-            // function that writes them: the two are read against each other.
-            eprintln!(
-                "CONNECT answer: {}",
-                tcslib::beacon::what_it_read(
-                    their_version,
-                    their_config_version,
-                    their_digest
-                )
-            );
-
-            // What the answer said, in the words a beacon and tcspecial's own
-            // console line use: the set's version labelled config v, and the
-            // digest after md5. The set's version is the one tcspecial sent,
-            // which is the version of the file it read -- this end does not
-            // send its own, so there is nothing here to compare it with.
-            let said = if their_version != version {
-                format!("tcspecial is version {their_version}, this is {version}")
-            } else if their_digest != digest {
-                format!(
-                    "tcspecial is serving a different configuration: \
-                     config v{their_config_version}, md5 {their_digest}, not {digest}"
-                )
-            } else {
-                format!(
-                    "tcspecial agrees: v{version}, \
-                     config v{their_config_version}, md5 {digest}"
-                )
-            };
-            if their_version != version || their_digest != digest {
-                eprintln!("{said}");
-            }
-            ui.set_last_response(SharedString::from(said));
-        }
-        Err(e) => {
-            eprintln!("CONNECT did not get through: {e}");
-            ui.set_last_response(SharedString::from(format!("CONNECT failed: {e}")));
-        }
-    }
-}
-
-/// Wire a panel's two buttons.
-///
-/// One button per command, each saying what it sends: Enable starts the
-/// handler and Disable stops it. There was one button whose label followed
-/// the status -- the one thing worth doing next -- and a press then had to be
-/// decided by reading that status back, so that the button and the command
-/// could not disagree. Two buttons have nothing to disagree about: a press is
-/// the command on the label.
-///
-/// Both are pressable whatever the handler is doing. tcspecial answers a
-/// START_DH for a handler already running and a STOP_DH for one already
-/// stopped without harm, and what the operator wants to know when a panel
-/// looks wrong is what the spacecraft says to the command, which a button
-/// that cannot be pressed does not say.
-fn handle_transfer_buttons(
-    ui: &MainWindow,
-    ui_weak: slint::Weak<MainWindow>,
-    link: Arc<Mutex<CiLink>>,
-    dh_configs: Arc<Vec<DHConfig>>,
-    dh_model: Rc<VecModel<DHInfo>>,
-    declined: Declined,
-) {
-    let enable = {
-        let (ui_weak, link, dh_configs, dh_model, declined) = (
-            ui_weak.clone(),
-            link.clone(),
-            dh_configs.clone(),
-            dh_model.clone(),
-            declined.clone(),
-        );
-        move |row: i32| {
-            let ui = ui_weak.unwrap();
-            let row = row as usize;
-            if let Some(dh) = dh_configs.get(row) {
-                set_declined(&declined, row, false);
-                enable(&ui, &link, dh, &dh_model, row);
-            }
-        }
-    };
-    ui.on_enable_dh(enable);
-
-    ui.on_disable_dh(move |row| {
-        let ui = ui_weak.unwrap();
-        let row = row as usize;
-        if let Some(dh) = dh_configs.get(row) {
-            set_declined(&declined, row, true);
-            disable(&ui, &link, dh, &dh_model, row);
-        }
-    });
-}
 
 /// Which payloads the operator has turned off, one flag per panel.
 ///
@@ -1934,121 +661,8 @@ fn handle_transfer_buttons(
 /// stopped is not a payload to go asking the spacecraft about.
 pub type Declined = Arc<Mutex<Vec<bool>>>;
 
-/// Remember what the operator just pressed about one payload.
-///
-/// A poisoned lock leaves the flags as they were: what it costs is a question
-/// asked about a payload somebody stopped, which is a wasted command and not a
-/// wrong one.
-fn set_declined(declined: &Declined, row: usize, asked_to_stop: bool) {
-    if let Ok(mut flags) = declined.lock() {
-        if let Some(flag) = flags.get_mut(row) {
-            *flag = asked_to_stop;
-        }
-    }
-}
 
-/// Start the handler: what the payload sends begins reaching the MOC.
-///
-/// The identity, name, and kind of the handler come from the configuration
-/// file rather than from the row number; the panel passes only its own row.
-fn enable(
-    ui: &MainWindow,
-    link: &Mutex<CiLink>,
-    dh: &DHConfig,
-    dh_model: &Rc<VecModel<DHInfo>>,
-    row: usize,
-) {
-    note_triggered(
-        dh,
-        format!(
-            "Enable pressed: sending START_DH as a {:?} handler",
-            dh.endpoint.kind()
-        ),
-    );
 
-    let mut guard = link.lock().unwrap();
-    let sent = match guard.client() {
-        Some(client) => client.start_dh(dh.endpoint.kind(), dh.name.clone()),
-        None => {
-            note_triggered(dh, format!("START_DH not sent: {NOT_CONNECTED}"));
-            ui.set_last_response(SharedString::from(NOT_CONNECTED));
-            return;
-        }
-    };
-    match sent {
-        Ok(status) => {
-            let showing = if status == CommandStatus::Success {
-                ACTIVE_STATUS
-            } else {
-                ERROR_STATUS
-            };
-            note_triggered(
-                dh,
-                format!("START_DH answered {status:?}, so the panel now says {showing}"),
-            );
-            update_row(dh_model, row, |info| {
-                info.status = SharedString::from(showing);
-            });
-            ui.set_last_response(SharedString::from(format!(
-                "START_DH {} - {:?}",
-                dh.name.0, status
-            )));
-        }
-        Err(e) => {
-            note_triggered(dh, format!("START_DH did not get through: {e}"));
-            ui.set_last_response(SharedString::from(format!(
-                "START_DH {} failed: {}",
-                dh.name.0, e
-            )));
-        }
-    }
-}
-
-/// Stop it: what the payload sends is dropped on the spacecraft instead.
-fn disable(
-    ui: &MainWindow,
-    link: &Mutex<CiLink>,
-    dh: &DHConfig,
-    dh_model: &Rc<VecModel<DHInfo>>,
-    row: usize,
-) {
-    note_triggered(
-        dh,
-        "Disable pressed: sending STOP_DH".to_string(),
-    );
-
-    let mut guard = link.lock().unwrap();
-    let sent = match guard.client() {
-        Some(client) => client.stop_dh(dh.name.clone()),
-        None => {
-            note_triggered(dh, format!("STOP_DH not sent: {NOT_CONNECTED}"));
-            ui.set_last_response(SharedString::from(NOT_CONNECTED));
-            return;
-        }
-    };
-    match sent {
-        Ok(status) => {
-            note_triggered(
-                dh,
-                format!("STOP_DH answered {status:?}, so the panel now says {STOPPED_STATUS}"),
-            );
-            update_row(dh_model, row, |info| {
-                info.status = SharedString::from(STOPPED_STATUS);
-            });
-            ui.set_last_response(SharedString::from(format!(
-                "STOP_DH {} - {:?}",
-                dh.name.0, status
-            )));
-        }
-        Err(e) => {
-            note_triggered(dh, format!("STOP_DH did not get through: {e}"));
-            ui.set_last_response(SharedString::from(format!(
-                "STOP_DH {} failed: {}",
-                dh.name.0, e
-            )));
-        }
-    }
-}
 
 // Quit button handler
 fn handle_quit(
@@ -2208,10 +822,29 @@ mod tests {
 
     use std::ffi::OsStr;
     use std::path::Path;
-    use tcslibgs::{EndpointConfig, NetworkProtocol};
     use tcslibgs::config::DEFAULT_PAYLOAD_CONFIG_PATH;
-    use tcspecial::config::DEFAULT_TCSPECIAL_CONFIG_PATH;
-    use tcslibgs::{DHName, DeviceConfig, NetworkConfig};
+
+    /// A panel for a source called `name`, in row `row`.
+    ///
+    /// Made here rather than from a configuration, because these tests are
+    /// about the window: where a panel lands, how wide it is, what text it
+    /// shows. What a panel is made *of* is `version_2::panels`' business and
+    /// is tested there, against the shipped examples.
+    fn a_panel(row: usize, name: &str) -> DHInfo {
+        DHInfo {
+            name: SharedString::from(name),
+            dev_id: i32::try_from(row).unwrap_or(i32::MAX),
+            config: SharedString::from(format!("to moc, at 127.0.0.1:{}", 5100 + row)),
+            packet_size: 0,
+            status: SharedString::from(crate::version_2::RECEIVING_STATUS),
+            oc_time: SharedString::from(NO_TRANSFER_TIME),
+            oc_data: SharedString::new(),
+            packets_recv: 0,
+            parameters: SharedString::from(format!("{name} (device id {row})")),
+            settable: SharedString::new(),
+            setting: SharedString::new(),
+        }
+    }
 
     /// Arguments as the program really receives them, the program's own name
     /// first.
@@ -2221,70 +854,8 @@ mod tests {
         all.into_iter()
     }
 
-    /// One data handler, for the tests that need something to ask about.
-    fn a_dh() -> DHConfig {
-        DHConfig {
-            name: DHName::new("DH1"),
-            endpoint: EndpointConfig::Device(DeviceConfig {
-                path: "/dev/null".to_string(),
-            }),
-            packet_size: 1,
-            oc: None,
-            ground: None,
-            mode: Default::default(),
-            stale_interval: None,
-        }
-    }
 
-    /// What a panel says a handler is doing, from what the spacecraft
-    /// answered.
-    ///
-    /// Only its own account counts. A handler it answers for is active or it
-    /// is not; a handler it has not got -- a MOC attached to a tcspecial
-    /// serving another payload set, which is the fault this whole path exists
-    /// for -- is a panel that cannot say, and so is a command answered any
-    /// other way.
-    #[test]
-    fn a_panel_says_what_the_spacecraft_said_of_its_handler() {
-        assert_eq!(
-            status_from_answer(CommandStatus::Success, Some(DHState::Active)),
-            ACTIVE_STATUS
-        );
-        assert_eq!(
-            status_from_answer(CommandStatus::Success, Some(DHState::Stopped)),
-            STOPPED_STATUS
-        );
-        // Made and never started: not moving data, which is what the word is
-        // read for.
-        assert_eq!(
-            status_from_answer(CommandStatus::Success, Some(DHState::Created)),
-            STOPPED_STATUS
-        );
 
-        // No such handler, and a handler that answered nothing of itself.
-        assert_eq!(
-            status_from_answer(CommandStatus::NotFound, None),
-            UNKNOWN_STATUS
-        );
-        assert_eq!(
-            status_from_answer(CommandStatus::Failure, Some(DHState::Active)),
-            UNKNOWN_STATUS,
-            "a command that failed says nothing about the handler"
-        );
-    }
-
-    /// A panel claims nothing about its handler until the spacecraft has been
-    /// asked.
-    ///
-    /// It said Stopped, which is a claim and was commonly wrong: the MOC
-    /// attaches to a tcspecial that is already running rather than starting a
-    /// second, and that one's handlers may have been moving data for hours.
-    #[test]
-    fn a_fresh_panel_claims_nothing_about_its_handler() {
-        let dh = a_dh();
-        let info = dh_info_from(0, &dh, None);
-        assert_eq!(info.status, SharedString::from(UNKNOWN_STATUS));
-    }
 
     /// The room the window opens with, which is a rule rather than a floor.
     ///
@@ -2342,27 +913,24 @@ mod tests {
     fn every_panel_in_a_row_is_the_same_width() {
         use i_slint_backend_testing::ElementHandle;
 
-        // One of each kind, which is the case that showed it, and then both
-        // kinds alone: a rule about widths has to hold for a row of one kind
-        // as much as for a mixed one.
-        let mut periodic = a_dh();
-        periodic.name = DHName::new("auto-send");
-        let mut triggered = a_dh();
-        triggered.name = DHName::new("triggered-send");
-        triggered.mode = tcslibgs::DHMode::Triggered {
-            trigger: b"go".to_vec(),
-            interval: Duration::from_millis(1000),
-        };
-
-        for (what, dhs) in [
-            ("one of each", vec![&periodic, &triggered]),
-            ("both periodic", vec![&periodic, &periodic]),
-            ("both triggered", vec![&triggered, &triggered]),
+        // A row of two and a row of three, which are the rows a window has:
+        // the rule is about the width every panel of a row is given, so it
+        // has to hold whatever the row holds.
+        //
+        // It used to be one of each *kind* of payload -- periodic and
+        // triggered -- because a triggered one carried two lines the other
+        // did not, and a layout whose children come and go is measured
+        // differently from one whose children are always there: the two came
+        // out 196 and 458 wide. A version 2 panel has one shape, there being
+        // nothing in a node that adds a line to it.
+        for (what, names) in [
+            ("a row of two", vec!["k_1", "k_2"]),
+            ("a row of three", vec!["k_1", "k_2", "cabin_temp"]),
         ] {
-            let rows: Vec<DHInfo> = dhs
+            let rows: Vec<DHInfo> = names
                 .iter()
                 .enumerate()
-                .map(|(row, dh)| dh_info_from(row, dh, None))
+                .map(|(row, name)| a_panel(row, name))
                 .collect();
             let panels = rows.len();
 
@@ -2403,11 +971,7 @@ mod tests {
 
         for panels in [2usize, 3, 4, 5] {
             let rows: Vec<DHInfo> = (0..panels)
-                .map(|i| {
-                    let mut dh = a_dh();
-                    dh.name = DHName::new(format!("DH{i}"));
-                    dh_info_from(i, &dh, None)
-                })
+                .map(|i| a_panel(i, &format!("DH{i}")))
                 .collect();
 
             let ui = MainWindow::new().unwrap();
@@ -2493,16 +1057,17 @@ mod tests {
 
         testing::init_integration_test_with_system_time();
 
+        // The shipped fixture, through the builder the window really uses:
+        // see `version_2::panels`. A panel's height is what this measures, so
+        // the panels have to be real ones.
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("..")
             .join(DEFAULT_PAYLOAD_CONFIG_PATH);
-        let dh_configs = load_dh_configs(&path)
+        let graph = tcslibgs::graph::Graph::load(&path)
             .unwrap_or_else(|e| panic!("{} failed to load: {e}", path.display()));
-        let shipped: Vec<DHInfo> = dh_configs
-            .iter()
-            .enumerate()
-            .map(|(row, dh)| dh_info_from(row, dh, None))
-            .collect();
+        let links = tcslibgs::graph::telemetry::of(&graph).expect("its links to the ground");
+        let shipped = crate::version_2::panels(&links, &crate::version_2::settable_of(&graph));
+        assert!(!shipped.is_empty(), "{} has no panels", path.display());
 
         // More handlers than the three-row floor covers, as well as the
         // shipped file. Both are needed: the floor leaves the shipped four
@@ -2767,7 +1332,6 @@ mod tests {
 
         // The backend is up and this thread owns its windows, so the other
         // checks that need one run from here.
-        the_params_button_shows_what_both_files_said();
         the_window_shows_when_the_last_beacon_arrived();
         every_panel_shows_what_arrived_from_its_payload();
         panels_fill_left_to_right();
@@ -2775,140 +1339,8 @@ mod tests {
         crate::version_2::tests::pressing_connect_and_enable_commands_the_vehicle();
     }
 
-    /// Only a payload that has to be asked is talked about on the console.
-    ///
-    /// The console carries the traffic of one payload per line per poll, so a
-    /// payload that sends on its own would double the lines and say nothing a
-    /// panel does not already show. The one being watched is the one whose
-    /// data depends on what the MOC and tcspecial said to each other.
-    #[test]
-    fn only_a_triggered_payload_is_talked_about() {
-        let mut dh = a_dh();
 
-        assert_eq!(
-            triggered_note(&dh, "START_DH answered Success"),
-            None,
-            "a payload that sends on its own is talked about"
-        );
 
-        dh.mode = tcslibgs::DHMode::Triggered {
-            trigger: b"go".to_vec(),
-            interval: Duration::from_millis(1000),
-        };
-        let said = triggered_note(&dh, "START_DH answered Success")
-            .expect("a triggered payload is talked about");
-        assert!(said.contains("DH1"), "the payload is not named: {said}");
-        assert!(
-            said.contains("START_DH answered Success"),
-            "what happened is not said: {said}"
-        );
-    }
-
-    /// A refreshed line is said when it changes and not again until it
-    /// changes once more.
-    ///
-    /// The panels poll every handler once a second from the moment the link
-    /// is up, started or not, so saying the poll's answer every pass meant a
-    /// line a second about a payload sitting still -- and the lines that
-    /// mattered, a trigger count moving or a status turning into NotFound,
-    /// went past in the middle of a hundred identical ones.
-    #[test]
-    fn a_refreshed_line_is_said_only_when_it_changes() {
-        let mut dh = a_dh();
-        dh.mode = tcslibgs::DHMode::Triggered {
-            trigger: b"go".to_vec(),
-            interval: Duration::from_millis(1000),
-        };
-
-        let mut said = None;
-        let quiet = "QUERY_DH Success: 0 triggers sent".to_string();
-
-        // The first pass has something to say, and the next pass with the
-        // same answer has not.
-        assert!(
-            note_triggered_if_new(&dh, quiet.clone(), &mut said),
-            "the first line was not said"
-        );
-        assert!(
-            !note_triggered_if_new(&dh, quiet, &mut said),
-            "the same line was said twice"
-        );
-
-        // And the pass where something moved says so.
-        assert!(
-            note_triggered_if_new(
-                &dh,
-                "QUERY_DH Success: 5 triggers sent".to_string(),
-                &mut said
-            ),
-            "a line that changed was not said"
-        );
-
-        // A payload that sends on its own is still said nothing about, and
-        // leaves no mark on what was said about one that does not: the memory
-        // belongs to the payload it is kept for.
-        let was = said.clone();
-        assert!(!note_triggered_if_new(
-            &a_dh(),
-            "anything".to_string(),
-            &mut said
-        ));
-        assert_eq!(
-            said, was,
-            "a payload nothing is said about changed the memory"
-        );
-    }
-
-    /// The startup line says the whole of what the payload will be addressed
-    /// by and asked with.
-    ///
-    /// Every one of these is a thing the two ends can disagree about, and a
-    /// panel shows only the first: the name addresses the handler, the OC
-    /// address is where its data comes back to, and the trigger and interval
-    /// are what tcspecial will be sending while the panel just says Active.
-    #[test]
-    fn the_startup_line_says_what_the_payload_will_be_asked_with() {
-        let dh = DHConfig {
-            name: DHName::new("triggered-send"),
-            endpoint: EndpointConfig::Network(NetworkConfig {
-                protocol: NetworkProtocol::Tcp,
-                address: "localhost".to_string(),
-                port: 5003,
-            }),
-            packet_size: 12,
-            oc: Some(NetworkConfig {
-                protocol: NetworkProtocol::Udp,
-                address: "127.0.0.1".to_string(),
-                port: 6003,
-            }),
-            ground: None,
-            mode: tcslibgs::DHMode::Triggered {
-                trigger: b"go".to_vec(),
-                interval: Duration::from_millis(1000),
-            },
-            stale_interval: None,
-        };
-
-        let said = triggered_startup(&dh, STOPPED_STATUS).expect("a triggered payload");
-        for wanted in [
-            "triggered-send",
-            // As the configuration writes it, so that the console and the
-            // file can be read against each other.
-            &trigger_as_written(b"go"),
-            "1000 ms",
-            "127.0.0.1:6003",
-            STOPPED_STATUS,
-        ] {
-            assert!(said.contains(wanted), "{wanted:?} is not said: {said}");
-        }
-
-        // And a handler with no OC address says so rather than saying nothing:
-        // it is the one fault that stops a start, and it is in this file.
-        let mut without = dh.clone();
-        without.oc = None;
-        let said = triggered_startup(&without, STOPPED_STATUS).expect("a triggered payload");
-        assert!(said.contains("OC none"), "a missing OC is not said: {said}");
-    }
 
     /// The MOC listens where tcspecial sends, by reading the same files.
     ///
@@ -2922,19 +1354,24 @@ mod tests {
     fn the_moc_listens_where_tcspecial_sends() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let payload_path = root.join(DEFAULT_PAYLOAD_CONFIG_PATH);
-        let payload_path = payload_path.to_str().expect("a path");
 
-        // The MOC's answer, from the payload set and the command
-        // interpreter's own file.
-        let config_path = root.join(DEFAULT_TCSPECIAL_CONFIG_PATH);
-        let config = load_tcspecial_config(&config_path)
-            .unwrap_or_else(|e| panic!("{} failed to load: {e}", config_path.display()));
-        let section = load_tcspecial_section(payload_path)
-            .unwrap_or_else(|e| panic!("{payload_path} failed to load: {e}"));
-        let mine = beacon(&config, section.as_ref()).expect("it resolves");
+        // One file says it, and one function reads it, which is what both
+        // ends call: tcspecial resolves the pair the same way. It was two
+        // files -- the set's section and the command interpreter's own
+        // configuration, the second being the fallback for a set that said
+        // nothing -- and version 1 was the only thing that had either.
+        let graph = tcslibgs::graph::Graph::load(&payload_path)
+            .unwrap_or_else(|e| panic!("{} failed to load: {e}", payload_path.display()));
+        let mine = tcslibgs::graph::parameters::beacon_of(&graph)
+            .expect("its tcspecial section reads")
+            .expect("the shipped fixture states a beacon");
 
-        // What the set itself says, which is what tcspecial will resolve.
-        let said = section.expect("the shipped set has a tcspecial section");
+        // What the file itself says, in its own words.
+        let section = graph.tcspecial.as_ref().expect("a tcspecial section");
+        let said = tcslibgs::graph::parameters::ci_config_of(
+            &tcslibgs::graph::parameters::flatten(section),
+        )
+        .expect("the section reads");
         assert_eq!(mine.send.to_string(), said.beacon.send);
         assert_eq!(mine.recv.to_string(), said.beacon.recv);
 
@@ -2944,36 +1381,6 @@ mod tests {
         assert_ne!(mine.send, mine.recv, "the two ends of the beacon link are one");
     }
 
-    /// The simulator file beside a tcspecial configuration is found and read.
-    ///
-    /// The MOC shows what the tcssim it starts is simulating, so the two have
-    /// to be looking at one file: the convention is that it sits beside the
-    /// tcspecial configuration and is named for it.
-    #[test]
-    fn the_simulator_file_beside_a_payload_file_is_read() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let payload_path = root.join(DEFAULT_PAYLOAD_CONFIG_PATH);
-        let dh_configs =
-            load_dh_configs(&payload_path).expect("the shipped configuration loads");
-
-        // Named from the tcspecial configuration, since nothing in this test's
-        // environment says otherwise.
-        let sims = simulator_settings(payload_path.to_str().unwrap(), &dh_configs, &mut Startup::default())
-            .expect("the simulator file beside the shipped tcspecial configuration");
-        assert_eq!(
-            sims.len(),
-            dh_configs.len(),
-            "one settings entry per handler"
-        );
-
-        // And a tcspecial configuration with no simulator file beside it costs
-        // the MOC that half and nothing else: it controls payloads, it does not
-        // simulate them.
-        assert!(
-            simulator_settings("no_such_payload_set.yaml", &dh_configs, &mut Startup::default()).is_none(),
-            "a missing simulator file must not stop the MOC"
-        );
-    }
 
     /// Every panel shows what arrived from its payload, and nothing the
     /// spacecraft merely claims.
@@ -2999,22 +1406,15 @@ mod tests {
                 .collect::<Vec<_>>()
         };
 
-        let mut dh = DHConfig {
-            name: DHName::new("DH0"),
-            endpoint: EndpointConfig::Network(NetworkConfig {
-                protocol: NetworkProtocol::Tcp,
-                address: "localhost".to_string(),
-                port: 5000,
-            }),
-            packet_size: 12,
-            oc: None,
-            ground: None,
-            mode: tcslibgs::DHMode::Periodic,
-            stale_interval: None,
-        };
-
-        for kind in ["sends on its own", "answers requests"] {
-            let lines = shown(dh_info_from(0, &dh, None));
+        // One panel, which is every panel: a version 2 panel has one shape.
+        // This ran twice, once for a payload that sends on its own and once
+        // for one that answers requests, because a version 1 panel carried
+        // two extra lines for the second -- what it was asked with and when.
+        // A node says nothing of the sort, there being nothing in a graph
+        // that adds a line to a panel.
+        {
+            let kind = "sends to the ground";
+            let lines = shown(a_panel(0, "DH0"));
             let count = |label: &str| lines.iter().filter(|shown| *shown == label).count();
 
             // The one panel's two readings of what arrived.
@@ -3045,7 +1445,7 @@ mod tests {
             // rather than how many bytes the spacecraft read from the ground:
             // that was the other direction, and read nought for every
             // payload nobody sends to.
-            let mut counted = dh_info_from(0, &dh, None);
+            let mut counted = a_panel(0, "DH0");
             counted.packets_recv = 3;
             let shown_counted = shown(counted);
             assert!(
@@ -3065,11 +1465,6 @@ mod tests {
                 lines.iter().any(|line| line == "Recv: 0 recv"),
                 "a payload that {kind} has no count at all: {lines:?}"
             );
-
-            dh.mode = tcslibgs::DHMode::Triggered {
-                trigger: b"READ\r".to_vec(),
-                interval: Duration::from_millis(500),
-            };
         }
     }
 
@@ -3138,75 +1533,6 @@ mod tests {
         );
     }
 
-    /// Pressing a panel's Config button shows what both configuration files
-    /// said about that handler.
-    ///
-    /// Everything up to the window is checked elsewhere -- the text itself by
-    /// `tcslibgs::payload_parameters` -- and none of it puts anything on
-    /// screen if the button is not wired to the popup or the popup not to the
-    /// text. This presses the button and reads what the window then laid out.
-    ///
-    /// Not a test of its own: one test per binary may start the testing
-    /// backend, and its windows belong to the thread that made them.
-    fn the_params_button_shows_what_both_files_said() {
-        use i_slint_backend_testing::ElementHandle;
-
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("..")
-            .join(DEFAULT_PAYLOAD_CONFIG_PATH);
-        let dh_configs = load_dh_configs(&path).expect("the shipped tcspecial configuration loads");
-        let dh = &dh_configs[0];
-
-        // Without the simulator file, which is the case this program has to
-        // handle: it controls payloads and does not simulate them.
-        let ui = MainWindow::new().unwrap();
-        let _ = Sizes::settle(&ui);
-        ui.set_dh_model(ModelRc::from(Rc::new(VecModel::from(vec![dh_info_from(
-            0, dh, None,
-        )]))));
-        ui.show().unwrap();
-
-        let on_screen = |ui: &MainWindow| -> Vec<String> {
-            // What the popup says is selectable text, whose words are its
-            // accessible value rather than a label: see copy.slint.
-            ElementHandle::find_by_element_type_name(ui, "Text")
-                .filter_map(|e| e.accessible_label())
-                .chain(
-                    ElementHandle::find_by_element_type_name(ui, "TextInput")
-                        .filter_map(|e| e.accessible_value()),
-                )
-                .map(|label| label.to_string())
-                .collect()
-        };
-
-        // Nothing of it is on screen until the button is pressed.
-        assert!(
-            !on_screen(&ui).iter().any(|line| line.contains("packet_size")),
-            "the parameters are shown before anyone asked for them"
-        );
-
-        let button: Vec<_> =
-            ElementHandle::find_by_accessible_label(&ui, "Configuration").collect();
-        assert_eq!(button.len(), 1, "the panel has no Config button to press");
-        button[0].invoke_accessible_default_action();
-
-        let shown = on_screen(&ui);
-        assert!(
-            shown.iter().any(|line| *line == format!("{} parameters", dh.name.0)),
-            "the popup does not say which handler it is describing: {shown:?}"
-        );
-        assert!(
-            shown.iter().any(|line| *line == payload_parameters(dh, None)),
-            "the popup shows something other than this handler's parameters:\n{shown:?}"
-        );
-        assert!(
-            shown
-                .iter()
-                .any(|line| line.contains("not read by this program")),
-            "a program without the simulator file must say so rather than \
-             leaving that half unexplained:\n{shown:?}"
-        );
-    }
 
     /// The window size the design document states is the one the rule gives.
     ///
@@ -3360,274 +1686,18 @@ mod tests {
         }
     }
 
-    /// A panel's two lines, from the sample telemetry that feeds them.
-    /// A panel's three readings of its payload are what arrived at the
-    /// ground, counted by the ground.
-    ///
-    /// When, what, and how many: one account from the end that received it.
-    /// The count was the spacecraft's instead, and the wrong half of its
-    /// statistics -- the bytes its handler had read from the ground, which is
-    /// the direction nobody sends in -- so a payload sending steadily was
-    /// The spacecraft is asked what its handlers are doing when contact is
-    /// made, and not about a payload the operator turned off.
-    ///
-    /// Through a stub that answers QUERY_DH, because what is being tested is
-    /// which payloads are asked about: the first beacon and the end of an
-    /// outage are both a MOC that has just learnt the spacecraft is there and
-    /// knows nothing about its payloads.
-    #[test]
-    fn contact_being_made_asks_about_every_payload_the_operator_wants() {
-        use std::net::UdpSocket;
-        use tcslibgs::{Command, QueryDHTelemetry, Statistics, Telemetry};
 
-        // A stub that answers whatever is asked of it, and remembers which
-        // payloads were asked about.
-        let spacecraft = UdpSocket::bind("127.0.0.1:0").expect("a stub socket");
-        spacecraft
-            .set_read_timeout(Some(Duration::from_millis(500)))
-            .expect("a timeout");
-        let at = spacecraft.local_addr().expect("where it is").to_string();
-        let asked_about: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
-        let heard = asked_about.clone();
-        let stub = thread::spawn(move || {
-            let mut buffer = vec![0u8; 65535];
-            // Two payloads, each answered twice: the statistics and the
-            // sample. A stub that stopped early would leave the asking
-            // waiting on a timeout and say nothing about which payload it
-            // was.
-            while let Ok((size, from)) = spacecraft.recv_from(&mut buffer) {
-                let command: Command =
-                    serde_json::from_slice(&buffer[..size]).expect("a command");
-                if let Some(name) = command.payload_name() {
-                    heard.lock().unwrap().push(name.0.clone());
-                }
-                let answer = Telemetry::QueryDH(QueryDHTelemetry::new(
-                    command.sequence(),
-                    CommandStatus::Success,
-                    command
-                        .payload_name()
-                        .cloned()
-                        .unwrap_or_else(|| DHName::new("unnamed")),
-                    Some(DHState::Active),
-                    Statistics::new(),
-                ));
-                let _ = spacecraft.send_to(&serde_json::to_vec(&answer).unwrap(), from);
-            }
-        });
 
-        // Two payloads, both commanded through the one stub: what the test is
-        // about is which of them is asked about, not where the sockets are.
-        let mut quiet = a_dh();
-        quiet.name = DHName::new("quiet");
-        let dh_configs = Arc::new(vec![a_dh(), quiet]);
-        let payloads = dh_configs
-            .iter()
-            .map(|dh| PayloadLink {
-                name: dh.name.clone(),
-                from: HostPort {
-                    address: "127.0.0.1".to_string(),
-                    port: 0,
-                },
-                to: at.parse::<std::net::SocketAddr>().map(|at| HostPort {
-                    address: at.ip().to_string(),
-                    port: at.port(),
-                })
-                .expect("the stub's address"),
-            })
-            .collect();
-        let link = Arc::new(Mutex::new(CiLink::down_from(
-            crate::ci_link::LOCAL_BIND_ANY,
-            payloads,
-        )));
-        link.lock().unwrap().connect(&at).expect("the link comes up");
 
-        // The second payload is one the operator turned off.
-        let declined: Declined = Arc::new(Mutex::new(vec![false, true]));
-        let gathered: Arc<Mutex<Vec<PanelUpdate>>> = Arc::new(Mutex::new(Vec::new()));
-
-        ask_what_handlers_are_doing(
-            link.clone(),
-            dh_configs.clone(),
-            declined,
-            gathered.clone(),
-        );
-
-        // The asking is in a thread of its own, so this waits for what it
-        // left rather than assuming it has run.
-        let found = (0..50)
-            .find_map(|_| {
-                thread::sleep(Duration::from_millis(20));
-                let updates = gathered.lock().ok()?;
-                (!updates.is_empty()).then(|| updates.clone())
-            })
-            .expect("the asking left something for the panels");
-
-        assert_eq!(found.len(), 1, "one payload was asked about: {found:?}");
-        assert_eq!(found[0].row, 0);
-        assert_eq!(found[0].status, Some(ACTIVE_STATUS));
-
-        let names = asked_about.lock().unwrap().clone();
-        assert!(
-            names.iter().all(|name| name == "DH1"),
-            "the payload the operator stopped was asked about: {names:?}"
-        );
-
-        drop(link);
-        let _ = stub.join();
-    }
-
-    /// Contact being made is the first beacon and the end of an outage, and
-    /// nothing else.
-    ///
-    /// Not every pass of a contact that is holding, which would be a poll:
-    /// the whole point of asking here is that it happens twice and not once a
-    /// second.
-    #[test]
-    fn only_the_first_beacon_and_the_end_of_an_outage_ask() {
-        assert!(contact_is_made(Contact::Lost, Contact::Made));
-        assert!(!contact_is_made(Contact::Made, Contact::Made));
-        assert!(!contact_is_made(Contact::Made, Contact::Lost));
-        assert!(!contact_is_made(Contact::Lost, Contact::Lost));
-    }
-
-    /// A panel's data indicator says what the ground can say about its
-    /// payload's data, and nothing more.
-    ///
-    /// Through the model, because what is being tested is the joining up: the
-    /// rule itself is `freshness::freshness_of` and is tested there. Three
-    /// payloads with one interval between them, so that the three answers are
-    /// distinguished by their state rather than by their configuration.
-    ///
-    /// **Needs examination**, as the feature is: see `crate::freshness`.
-    #[test]
-    fn a_panels_indicator_follows_its_payloads_data() {
-        use crate::oc_link::Arrival;
-        use tcslibgs::{DHSample, Timestamp};
-
-        let dh = |stale: Option<u32>| DHConfig {
-            name: DHName::new("DH0"),
-            endpoint: EndpointConfig::Device(DeviceConfig {
-                path: "/dev/null".to_string(),
-            }),
-            packet_size: 4,
-            oc: None,
-            ground: None,
-            mode: Default::default(),
-            stale_interval: stale.map(|ms: u32| Duration::from_millis(u64::from(ms))),
-        };
-        // Enabled and current, enabled and quiet, and one nobody has enabled.
-        let configs = vec![dh(Some(3_000)), dh(Some(3_000)), dh(Some(3_000))];
-        let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(
-            configs
-                .iter()
-                .enumerate()
-                .map(|(row, dh)| dh_info_from(row, dh, None))
-                .collect::<Vec<_>>(),
-        ));
-        for row in [0, 1] {
-            update_row(&model, row, |info| {
-                info.status = SharedString::from(ACTIVE_STATUS);
-            });
-        }
-
-        let arrived = |millis: u64| {
-            let mut data = DHSample::new();
-            data.record(&[0x01]);
-            Arrival {
-                at: Timestamp::at(
-                    std::time::SystemTime::UNIX_EPOCH + Duration::from_millis(millis),
-                ),
-                data,
-                packets: 1,
-            }
-        };
-        // Neither of the enabled two has sent anything recently: the first
-        // has nothing at all, the second nothing for a minute.
-        let arrivals: Arrivals = Arc::new(Mutex::new(vec![
-            None,
-            Some(arrived(40_000)),
-            Some(arrived(99_000)),
-        ]));
-
-        // The clock the test reads the panel against, written as the
-        // milliseconds since the epoch the arrivals above are written in.
-        let clock = |millis: u64| {
-            Timestamp::at(std::time::SystemTime::UNIX_EPOCH + Duration::from_millis(millis))
-        };
-
-        let colour = |row| model.row_data(row).unwrap().data_color;
-        let unjudged = constants::freshness_color(crate::freshness::Freshness::Unjudged);
-        let current = constants::freshness_color(crate::freshness::Freshness::Current);
-        let stale = constants::freshness_color(crate::freshness::Freshness::Stale);
-
-        // The first pass is where the ground comes to believe the two are
-        // running, and a payload just enabled has its interval to produce
-        // something rather than being late the moment it is switched on.
-        let mut enabled_at = vec![None; configs.len()];
-        show_freshness(&model, &configs, &arrivals, &mut enabled_at, clock(100_000));
-        assert_eq!(colour(0), current, "a payload just enabled is given its interval");
-        assert_eq!(colour(1), current, "and so is this one");
-        assert_eq!(
-            colour(2),
-            unjudged,
-            "a payload nobody has enabled is not judged, whatever has arrived"
-        );
-        assert_eq!(
-            enabled_at[0],
-            Some(clock(100_000)),
-            "when the ground came to believe it"
-        );
-        // And the one nobody enabled is not remembered as enabled, which is
-        // what would otherwise make it stale the moment it was switched on.
-        assert_eq!(enabled_at[2], None);
-
-        // A minute later: the first has sent something since, the second has
-        // not sent anything at all, and the interval it was given has run
-        // out.
-        if let Ok(mut slots) = arrivals.lock() {
-            slots[0] = Some(arrived(159_000));
-        }
-        show_freshness(&model, &configs, &arrivals, &mut enabled_at, clock(160_000));
-        assert_eq!(colour(0), current, "data a second old is current");
-        assert_eq!(
-            colour(1),
-            stale,
-            "nothing for a minute, against an interval of three seconds, is stale"
-        );
-        assert_eq!(colour(2), unjudged);
-    }
-
-    /// The statuses are blanked when the beacons stop, and only then.
-    #[test]
-    fn the_statuses_go_unknown_when_contact_is_lost() {
-        assert!(statuses_go_unknown(Contact::Made, Contact::Lost));
-        // Not on every pass of a silence: a panel that was blanked every
-        // second would overwrite an answer somebody had just asked for.
-        assert!(!statuses_go_unknown(Contact::Lost, Contact::Lost));
-        assert!(!statuses_go_unknown(Contact::Lost, Contact::Made));
-        assert!(!statuses_go_unknown(Contact::Made, Contact::Made));
-    }
 
     /// shown as having brought nothing.
     #[test]
     fn a_panel_counts_what_arrived_at_the_ground() {
         use crate::oc_link::Arrival;
         use tcslibgs::{DHSample, Timestamp};
-
-        let dh = DHConfig {
-            name: DHName::new("DH0"),
-            endpoint: EndpointConfig::Device(DeviceConfig {
-                path: "/dev/null".to_string(),
-            }),
-            packet_size: 4,
-            oc: None,
-            ground: None,
-            mode: Default::default(),
-            stale_interval: None,
-        };
         let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(vec![
-            dh_info_from(0, &dh, None),
-            dh_info_from(1, &dh, None),
+            a_panel(0, "DH0"),
+            a_panel(1, "DH1"),
         ]));
 
         let mut data = DHSample::new();
@@ -3660,56 +1730,6 @@ mod tests {
         assert_eq!(quiet.oc_time, SharedString::from(NO_TRANSFER_TIME));
     }
 
-    /// A gathered update reaches the panel it names, and only that one.
-    #[test]
-    fn an_update_goes_to_its_own_panel() {
-        let dh = DHConfig {
-            name: DHName::new("DH1"),
-            endpoint: EndpointConfig::Device(DeviceConfig {
-                path: "/dev/null".to_string(),
-            }),
-            packet_size: 1,
-            oc: None,
-            ground: None,
-                    mode: Default::default(),
-                    stale_interval: None,
-        };
-
-        let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(vec![
-            dh_info_from(0, &dh, None),
-            dh_info_from(1, &dh, None),
-        ]));
-
-        apply_panel_update(
-            &model,
-            &PanelUpdate {
-                row: 1,
-                status: Some(ACTIVE_STATUS),
-            },
-        );
-
-        let touched = model.row_data(1).unwrap();
-        assert_eq!(touched.status, SharedString::from(ACTIVE_STATUS));
-
-        // Row 0 was not named, so it is untouched -- still saying what a
-        // panel says before anyone has asked the spacecraft about it.
-        let other = model.row_data(0).unwrap();
-        assert_eq!(other.status, SharedString::from(UNKNOWN_STATUS));
-        assert_eq!(other.packets_recv, 0);
-        assert_eq!(
-            other.oc_time,
-            SharedString::from(NO_TRANSFER_TIME),
-            "and nothing has arrived from its payload"
-        );
-
-        // And an update that says nothing about the status leaves it alone:
-        // what a pass has to say about a panel is whatever it learnt.
-        apply_panel_update(&model, &PanelUpdate { row: 1, status: None });
-        assert_eq!(
-            model.row_data(1).unwrap().status,
-            SharedString::from(ACTIVE_STATUS)
-        );
-    }
 
     /// A fresh panel says nothing has arrived from its payload yet.
     ///
@@ -3717,69 +1737,11 @@ mod tests {
     /// has heard nothing and one whose clock read zero do not look alike.
     #[test]
     fn a_fresh_panel_has_heard_nothing_from_its_payload() {
-        let dh = DHConfig {
-            name: DHName::new("DH0"),
-            endpoint: EndpointConfig::Device(DeviceConfig {
-                path: "/dev/null".to_string(),
-            }),
-            packet_size: 1,
-            oc: None,
-            ground: None,
-            mode: Default::default(),
-            stale_interval: None,
-        };
-
-        let info = dh_info_from(0, &dh, None);
+        let info = a_panel(0, "DH0");
         assert_eq!(info.oc_time, SharedString::from(NO_TRANSFER_TIME));
         assert!(info.oc_data.is_empty());
     }
 
-    /// Something answering as tcspecial is found, and nothing is not.
-    ///
-    /// The check is a PING over the loopback, so it can be tested without a
-    /// tcspecial: a socket that answers one is indistinguishable from the real
-    /// thing as far as this question goes, which is the point of asking by
-    /// command rather than by looking for a process.
-    #[test]
-    fn an_answering_tcspecial_is_found_and_silence_is_not() {
-        use std::net::UdpSocket;
-        use tcslibgs::{Command, PingTelemetry, Telemetry};
-
-        // Nothing listening: the MOC's job is to start one.
-        let quiet = UdpSocket::bind("127.0.0.1:0").unwrap();
-        let quiet_addr = quiet.local_addr().unwrap().to_string();
-        drop(quiet);
-        assert!(
-            !tcspecial_already_running(&quiet_addr),
-            "an address nothing answers on should read as nothing running"
-        );
-
-        // A socket that answers a PING, which is all the question asks.
-        let socket = UdpSocket::bind("127.0.0.1:0").unwrap();
-        let addr = socket.local_addr().unwrap().to_string();
-        socket
-            .set_read_timeout(Some(Duration::from_secs(5)))
-            .unwrap();
-        let stub = thread::spawn(move || {
-            let mut buffer = vec![0u8; 65535];
-            let (size, from) = match socket.recv_from(&mut buffer) {
-                Ok(received) => received,
-                Err(_) => return,
-            };
-            let command: Command = serde_json::from_slice(&buffer[..size]).expect("a command");
-            let answer = Telemetry::Ping(PingTelemetry::new(
-                command.sequence(),
-                CommandStatus::Success,
-            ));
-            let _ = socket.send_to(&serde_json::to_vec(&answer).unwrap(), from);
-        });
-
-        assert!(
-            tcspecial_already_running(&addr),
-            "an address that answers a ping should read as a tcspecial running"
-        );
-        stub.join().unwrap();
-    }
 
     /// Each child is started on the tcspecial configuration the MOC read, and
     /// told so by argument.
@@ -3852,82 +1814,45 @@ mod tests {
         assert_eq!(CHILDREN, ["tcspecial", "tcssim"]);
     }
 
-    /// The shipped tcspecial configuration has to be one the MOC can show.
-    ///
-    /// Nothing else checks that: until this test, the window's data handlers
-    /// were transcribed from the file by hand, and a file that had moved on
-    /// showed up only as a panel saying the wrong thing.
+
+    /// The panels and the sources line up by index, which is what lets a
+    /// panel's row number name the node it is about.
     #[test]
-    fn the_shipped_payload_config_becomes_dh_panels() {
+    fn a_panel_row_names_the_source_at_that_index() {
+        // The shipped fixture, through the builder the window uses: the
+        // panels are its sources in device id order, which is what the rows
+        // are counted by.
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("..")
             .join(DEFAULT_PAYLOAD_CONFIG_PATH);
-        let dh_configs = load_dh_configs(&path)
+        let graph = tcslibgs::graph::Graph::load(&path)
             .unwrap_or_else(|e| panic!("{} failed to load: {e}", path.display()));
+        let links = tcslibgs::graph::telemetry::of(&graph).expect("its links to the ground");
+        let model = crate::version_2::panels(&links, &crate::version_2::settable_of(&graph));
 
-        assert!(!dh_configs.is_empty(), "no data handlers to show");
+        assert!(model.len() > 1, "the fixture has {} panels", model.len());
 
-        for (row, (dh, info)) in dh_configs
+        // Row 1 is the second source, whatever it is called, and the number
+        // beside it is the node's own device id rather than the row: a
+        // command names the id, and a panel that showed the row would name
+        // the wrong node the moment a source was left out of the window.
+        let second = links
             .iter()
-            .zip(dh_configs.iter().enumerate().map(|(row, dh)| dh_info_from(row, dh, None)))
-            .enumerate()
-        {
-            assert_eq!(
-                info.dev_id,
-                i32::try_from(row).unwrap(),
-                "a payload's number is its place in the configuration"
-            );
-            assert_eq!(info.name, SharedString::from(dh.name.0.clone()));
-            assert!(!info.config.is_empty(), "{} has no endpoint to show", dh.name.0);
-            // A panel showing a saturated size would be showing a number the
-            // file does not contain.
-            assert_eq!(info.packet_size as usize, dh.packet_size);
-        }
-    }
-
-    /// The panels and the configured data handlers line up by index, which is
-    /// what lets a panel's row number name a data handler.
-    #[test]
-    fn a_panel_row_names_the_handler_at_that_index() {
-        let dh_configs = [
-            DHConfig {
-                name: DHName::new("DH7"),
-                endpoint: EndpointConfig::Device(DeviceConfig {
-                    path: "/dev/urandom".to_string(),
-                }),
-                packet_size: 4,
-                oc: None,
-                ground: None,
-                            mode: Default::default(),
-                            stale_interval: None,
-            },
-            DHConfig {
-                name: DHName::new("DH9"),
-                endpoint: EndpointConfig::Network(NetworkConfig {
-                    protocol: NetworkProtocol::Udp,
-                    address: "localhost".to_string(),
-                    port: 5009,
-                }),
-                packet_size: 8,
-                oc: None,
-                ground: None,
-                            mode: Default::default(),
-                            stale_interval: None,
-            },
-        ];
-
-        let model: Vec<DHInfo> = dh_configs
-            .iter()
-            .enumerate()
-            .map(|(row, dh)| dh_info_from(row, dh, None))
-            .collect();
-
-        assert_eq!(model.len(), dh_configs.len());
-        // Row 1 is the second handler, whatever it is called, and its number
-        // is its row: a payload is numbered by where the file put it.
-        assert_eq!(model[1].dev_id, 1);
-        assert_eq!(model[1].name, SharedString::from("DH9"));
-        assert_eq!(dh_configs[1].name, DHName::new("DH9"));
+            .min_by_key(|link| link.id)
+            .map(|first| first.id)
+            .expect("at least one link");
+        assert_eq!(model[1].dev_id, i32::try_from(second + 1).unwrap());
+        assert_eq!(
+            model[1].name,
+            SharedString::from(
+                links
+                    .iter()
+                    .find(|link| link.id == second + 1)
+                    .expect("the second source")
+                    .source
+                    .clone()
+            )
+        );
     }
 
     /// How many panel counts to check the grid rules against. Well past any
@@ -4010,39 +1935,6 @@ mod tests {
         }
     }
 
-    /// The shipped configuration opens a row of three and a row of one.
-    ///
-    /// The other tests fix the rules; this one records what the rules actually
-    /// produce for the file the MOC ships with, so a change to the panel
-    /// constants or the column count that ruins the shipped case cannot pass
-    /// quietly.
-    #[test]
-    fn the_shipped_payload_config_fills_a_row_of_three() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("..")
-            .join(DEFAULT_PAYLOAD_CONFIG_PATH);
-        let dh_configs = load_dh_configs(&path)
-            .unwrap_or_else(|e| panic!("{} failed to load: {e}", path.display()));
-        assert_eq!(dh_configs.len(), 4, "{} has moved on", path.display());
-
-        // The shape rule and not the sizes, so there is no window to ask.
-        let shape = grid_shape(&Sizes::for_tests(), dh_configs.len());
-        assert_eq!(
-            (shape.columns, shape.rows),
-            (3, 2),
-            "{} opens a {}x{} grid",
-            path.display(),
-            shape.columns,
-            shape.rows
-        );
-        assert!(
-            shape.width >= shape.height,
-            "{} opens a {}x{} window, taller than wide",
-            path.display(),
-            shape.width,
-            shape.height
-        );
-    }
 
     /// An unreadable or empty configuration still produces a window.
     #[test]

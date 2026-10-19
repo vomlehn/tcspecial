@@ -17,7 +17,7 @@ use std::process;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use tcslibgs::config::{load_dh_configs, payload_path_from_args, SIM_PAYLOAD_CONFIG_PATH_VAR};
+use tcslibgs::config::{payload_path_from_args, SIM_PAYLOAD_CONFIG_PATH_VAR};
 use tcslibgs::{payload_parameters, DHConfig, DHSample, Edge, NO_TRANSFER_TIME};
 
 use std::collections::BTreeMap;
@@ -311,8 +311,6 @@ fn load(
     sim_path: &str,
     startup: &mut Startup,
 ) -> Option<(Vec<DHConfig>, SimConfigFile, Vec<ResolvedSim>, Vec<PayloadConfig>)> {
-    let version_2 = tcslibgs::graph::is_version_2(Path::new(payload_path));
-
     let sim_file = match SimConfigFile::load(sim_path) {
         Ok(sim_file) => sim_file,
         Err(e) => {
@@ -331,17 +329,13 @@ fn load(
     // to a thermal mass sends its temperature in the encoding the graph's own
     // conversion reads, and that is where the encoding is.
     let mut graph = None;
-    let loaded = if version_2 {
-        tcslibgs::graph::Graph::load(payload_path)
-            .map_err(|e| e.to_string())
-            .and_then(|read| {
-                let handlers = tcslibgs::graph::simulated::handlers(&read, &sim_file);
-                graph = Some(read);
-                handlers
-            })
-    } else {
-        load_dh_configs(payload_path).map_err(|e| e.to_string())
-    };
+    let loaded = tcslibgs::graph::Graph::load(payload_path)
+        .map_err(|e| e.to_string())
+        .and_then(|read| {
+            let handlers = tcslibgs::graph::simulated::handlers(&read, &sim_file);
+            graph = Some(read);
+            handlers
+        });
     let dh_configs = match loaded {
         Ok(dh_configs) => dh_configs,
         Err(e) => {
@@ -548,7 +542,7 @@ fn main() {
 
     // Create simulated payloads
     let payloads: Arc<Mutex<Vec<SimulatedPayload>>> = Arc::new(Mutex::new(
-        configs.into_iter().map(|c| SimulatedPayload::new(c)).collect()
+        configs.into_iter().map(SimulatedPayload::new).collect()
     ));
 
     // The one button each panel has, which starts and stops its payload.
@@ -1092,24 +1086,28 @@ mod tests {
         // panel and chrome sizes are right.
         let mut cases: Vec<(String, Vec<PayloadInfo>)> = Vec::new();
         for (payload_path, sim_path) in shipped_sets() {
-            let dh_configs = load_dh_configs(&payload_path)
-                .unwrap_or_else(|e| panic!("{} failed to load: {e}", payload_path.display()));
             let sim_file = SimConfigFile::load(&sim_path)
                 .unwrap_or_else(|e| panic!("{} failed to load: {e}", sim_path.display()));
+            let dh_configs = simulated_payloads_of(&payload_path, &sim_file);
             let sims = sim_file
                 .resolve(&dh_configs)
                 .unwrap_or_else(|e| panic!("{} does not fit: {e}", sim_path.display()));
 
-            cases.push((
-                format!("{}", payload_path.display()),
-                dh_configs
-                    .iter()
-                    .zip(&sims)
-                    .enumerate()
-                    .map(|(row, (dh, sim))| payload_info_from(row, dh, sim))
-                    .collect(),
-            ));
+            let panels: Vec<PayloadInfo> = dh_configs
+                .iter()
+                .zip(&sims)
+                .enumerate()
+                .map(|(row, (dh, sim))| payload_info_from(row, dh, sim))
+                .collect();
+            // An example that simulates nothing has no window to measure:
+            // `simple-app`'s payload is a program, which tcspecial runs
+            // rather than reaches, so no simulator stands in for it.
+            if panels.is_empty() {
+                continue;
+            }
+            cases.push((format!("{}", payload_path.display()), panels));
         }
+        assert!(!cases.is_empty(), "no example simulates anything");
         let one = cases[0].1[0].clone();
         cases.push((
             "sixteen payloads".to_string(),
@@ -1386,50 +1384,60 @@ mod tests {
         sizes_that_cannot_be_sent_stop_the_button_and_say_so();
     }
 
-    /// Every shipped payload set: a tcspecial configuration and the simulator
-    /// file beside it.
+    /// The payloads of a configuration that its simulator file names, as
+    /// `load` makes them.
     ///
-    /// The sets are discovered rather than listed, so a set added to the
-    /// repository is covered by the tests that already exist, instead of only
-    /// by whichever one somebody remembers to extend. A tcspecial configuration
-    /// with no simulator file beside it fails here: tcssim needs both, so half
-    /// a set is a set that cannot be run.
+    /// Through `tcslibgs::graph::simulated`, which is what turns a payload
+    /// node into what the simulator stands in for: where it is reached, how
+    /// big a packet is, and whether it answers a trigger.
+    fn simulated_payloads_of(
+        configuration: &std::path::Path,
+        sim_file: &SimConfigFile,
+    ) -> Vec<DHConfig> {
+        let graph = tcslibgs::graph::Graph::load(configuration)
+            .unwrap_or_else(|e| panic!("{} failed to load: {e}", configuration.display()));
+        tcslibgs::graph::simulated::handlers(&graph, sim_file)
+            .unwrap_or_else(|e| panic!("{} cannot be simulated: {e}", configuration.display()))
+    }
+
+    /// Every shipped configuration and the simulator file beside it.
+    ///
+    /// The examples, found rather than listed, so an example added to the
+    /// repository is covered by these tests without anyone remembering to
+    /// name it here. They were the four version 1 payload sets under
+    /// `tests/manual`, which are gone: what tcssim simulates is the payloads
+    /// of a graph.
     fn shipped_sets() -> Vec<(std::path::PathBuf, std::path::PathBuf)> {
-        let root = repo_file("tests/manual");
+        let root = repo_file("examples");
         let mut sets = Vec::new();
 
-        for entry in std::fs::read_dir(&root).expect("the repository root is readable") {
+        for entry in std::fs::read_dir(&root).expect("the examples are readable") {
             let path = entry.expect("a readable directory entry").path();
-            let name = match path.file_name().and_then(|n| n.to_str()) {
-                Some(name) => name,
-                None => continue,
+            let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+                continue;
             };
+            if !path.is_dir() {
+                continue;
+            }
 
-            // The simulator files are found through their tcspecial
-            // configuration, not on their own, so that one with no tcspecial
-            // configuration is noticed too.
-            let stem = match name
-                .strip_prefix("tcspecial")
-                .and_then(|rest| rest.strip_suffix(".yaml"))
-            {
-                Some(stem) if !stem.ends_with("sim") => stem,
-                _ => continue,
-            };
-
-            let sim_path = repo_file(&format!("tests/manual/tcspecial{}sim.yaml", stem));
+            let configuration = path.join(format!("{name}.yaml"));
+            let sim_path = path.join(format!("{name}-sim.yaml"));
+            if !configuration.is_file() {
+                continue;
+            }
             assert!(
                 sim_path.exists(),
-                "{} has no {} beside it, so the set cannot be simulated",
-                path.display(),
+                "{} has no {} beside it, so it cannot be simulated",
+                configuration.display(),
                 sim_path.display()
             );
-            sets.push((path, sim_path));
+            sets.push((configuration, sim_path));
         }
 
         sets.sort();
         assert!(
             !sets.is_empty(),
-            "no payload sets found in {}",
+            "no configurations found in {}",
             root.display()
         );
         sets
@@ -1465,43 +1473,16 @@ mod tests {
         }
     }
 
-    /// No shipped simulator file fits another set's tcspecial configuration.
-    ///
-    /// Two sets of the repository differ only in how their one payload is
-    /// reached -- one by datagram, one by stream -- and the files of a set are
-    /// joined by handler name alone, which a copied set keeps. So the wrong
-    /// pairing is a mistake that can actually be made, by passing the wrong
-    /// path or by copying a set and editing one of its two files. It is caught
-    /// because each simulated payload states the kind of payload it stands in
-    /// for, and nothing else in either file would notice.
-    ///
-    /// Every crossed pairing being refused also says the sets are really
-    /// different from one another: two that were the same but for their names
-    /// would be one set shipped twice.
-    #[test]
-    fn a_simulator_file_does_not_fit_another_sets_payload_file() {
-        let sets = shipped_sets();
-        assert!(sets.len() > 1, "one set cannot be paired with another");
+    // A test that no shipped simulator file fits another configuration was
+    // here. It held while the shipped files were the four version 1 payload
+    // sets, which differed from each other in how their one payload was
+    // reached; the examples do not -- `minimal` and `beacon` both have a
+    // sensor on a UDP socket, and `minimal`'s simulator file fits either,
+    // which is a true thing about two examples rather than a fault. What the
+    // test protected is the rule that a simulated payload states the kind it
+    // stands in for, and that is tested where the rule is:
+    // `tcslibgs::sim_config`'s `the_two_files_cannot_disagree_about_the_kind`.
 
-        for (payload_path, _) in &sets {
-            let dh_configs =
-                load_dh_configs(payload_path).expect("the configuration loads");
-
-            for (other_payload, sim_path) in &sets {
-                if other_payload == payload_path {
-                    continue;
-                }
-
-                let sim_file = SimConfigFile::load(sim_path).expect("the simulator file loads");
-                assert!(
-                    sim_file.resolve(&dh_configs).is_err(),
-                    "{} is accepted for {}, which it was not written for",
-                    sim_path.display(),
-                    payload_path.display()
-                );
-            }
-        }
-    }
 
     /// Every shipped set has to describe payloads the simulator can simulate,
     /// and its two files have to agree with each other.
@@ -1511,10 +1492,9 @@ mod tests {
     #[test]
     fn the_shipped_files_become_simulator_configs() {
         for (payload_path, sim_path) in shipped_sets() {
-            let dh_configs = load_dh_configs(&payload_path)
-                .unwrap_or_else(|e| panic!("{} failed to load: {e}", payload_path.display()));
             let sim_file = SimConfigFile::load(&sim_path)
                 .unwrap_or_else(|e| panic!("{} failed to load: {e}", sim_path.display()));
+            let dh_configs = simulated_payloads_of(&payload_path, &sim_file);
 
             let sims = sim_file.resolve(&dh_configs).unwrap_or_else(|e| {
                 panic!(
@@ -1531,6 +1511,12 @@ mod tests {
                 .collect::<Result<_, _>>()
                 .unwrap_or_else(|e| panic!("{} is not simulatable: {e}", payload_path.display()));
 
+            // An example whose payloads are all programs simulates nothing,
+            // which is a pair tcssim is right to accept: see `simple-app`,
+            // whose payload tcspecial runs rather than reaches.
+            if configs.is_empty() {
+                continue;
+            }
             assert!(
                 !configs.is_empty(),
                 "{} has no payloads to simulate",
@@ -1607,8 +1593,8 @@ mod tests {
     #[test]
     fn the_shipped_files_give_a_panel_each() {
         for (payload_path, sim_path) in shipped_sets() {
-            let dh_configs = load_dh_configs(&payload_path).unwrap();
             let sim_file = SimConfigFile::load(&sim_path).unwrap();
+            let dh_configs = simulated_payloads_of(&payload_path, &sim_file);
             let sims = sim_file.resolve(&dh_configs).unwrap();
 
             let panels: Vec<PayloadInfo> = dh_configs

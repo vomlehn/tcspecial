@@ -7,9 +7,9 @@
 //! `tcsverify` is for.
 //!
 //! So the rules are stated once and collect their answers. The loaders --
-//! [`crate::PayloadConfig::to_dh_configs`] and
-//! [`crate::SimConfigFile::resolve`] -- return the first of them, which is
-//! what they always returned; the verifier takes the lot.
+//! [`crate::graph::Graph::check`] and [`crate::SimConfigFile::resolve`] --
+//! return the first of them, which is what they always returned; the verifier
+//! takes the lot.
 //!
 //! A problem says what it is about rather than where it is. Nothing here has
 //! seen the file: a parser hands up a document, and by then the lines are
@@ -24,22 +24,20 @@ pub enum About {
     File,
     /// One of the file's sections, by the name the file calls it.
     Section(&'static str),
-    /// A payload, by name.
-    Payload(String),
-    /// A group of payloads, by name.
-    Group(String),
     /// A simulated payload, by name.
     SimPayload(String),
     /// A group of simulated payloads, by name.
     SimGroup(String),
-    /// A node of a version 2 configuration, by name.
+    /// A node, by name.
     ///
     /// Here rather than in the graph module because this enum is about
-    /// *locating* a thing in a file, which is the same question whichever
-    /// version wrote it: the scanner that answers it looks for a name under a
-    /// section and does not care what the section means.
+    /// *locating* a thing in a file, which is the same question whatever the
+    /// section means: the scanner that answers it looks for a name under a
+    /// section. The two entries above it are the simulator file's, which has
+    /// payloads and groups of them whatever the configuration beside it
+    /// calls its nodes.
     Node(String),
-    /// A group of a version 2 configuration, by name.
+    /// A group of nodes, by name.
     NodeGroup(String),
 }
 
@@ -69,21 +67,6 @@ impl Problem {
         }
     }
 
-    /// A problem with a payload.
-    pub fn payload(name: &str, message: impl Into<String>) -> Self {
-        Problem {
-            about: About::Payload(name.to_string()),
-            message: message.into(),
-        }
-    }
-
-    /// A problem with a group of payloads.
-    pub fn group(name: &str, message: impl Into<String>) -> Self {
-        Problem {
-            about: About::Group(name.to_string()),
-            message: message.into(),
-        }
-    }
 }
 
 impl std::fmt::Display for Problem {

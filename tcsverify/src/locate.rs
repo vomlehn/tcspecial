@@ -64,8 +64,6 @@ impl Where {
                     .copied()
                     .unwrap_or(THE_FILE_ITSELF)
             }
-            About::Payload(name) => (&["payloads"], name),
-            About::Group(name) => (&["payload_groups"], name),
             About::SimPayload(name) => (&["simulated_payloads"], name),
             About::SimGroup(name) => (&["simulated_payload_groups"], name),
             About::Node(name) => (&["moc", "vehicle", "payloads"], name),
@@ -315,10 +313,10 @@ payloads:
     fn a_yaml_file_says_where_each_payload_is() {
         let found = Where::of(YAML, ConfigFormat::Yaml);
 
-        assert_eq!(found.line_of(&About::Payload("DH0".to_string())), 13);
+        assert_eq!(found.line_of(&About::Node("DH0".to_string())), 13);
         // Quoted or not: the name is the name.
-        assert_eq!(found.line_of(&About::Payload("DH1".to_string())), 17);
-        assert_eq!(found.line_of(&About::Group("shared".to_string())), 9);
+        assert_eq!(found.line_of(&About::Node("DH1".to_string())), 17);
+        assert_eq!(found.line_of(&About::NodeGroup("shared".to_string())), 9);
         assert_eq!(found.line_of(&About::Section("tcspecial")), 4);
     }
 
@@ -328,8 +326,8 @@ payloads:
     fn a_name_is_looked_for_in_the_section_it_belongs_to() {
         let text = "payload_groups:\n  - name: alike\npayloads:\n  - name: alike\n";
         let found = Where::of(text, ConfigFormat::Yaml);
-        assert_eq!(found.line_of(&About::Group("alike".to_string())), 2);
-        assert_eq!(found.line_of(&About::Payload("alike".to_string())), 4);
+        assert_eq!(found.line_of(&About::NodeGroup("alike".to_string())), 2);
+        assert_eq!(found.line_of(&About::Node("alike".to_string())), 4);
     }
 
     /// A name the file does not have falls back to the section, and a section
@@ -342,7 +340,7 @@ payloads:
     fn what_cannot_be_found_is_reported_from_the_nearest_thing() {
         let found = Where::of(YAML, ConfigFormat::Yaml);
         assert_eq!(
-            found.line_of(&About::Payload("nobody".to_string())),
+            found.line_of(&About::Node("nobody".to_string())),
             12,
             "the payloads section is where a payload would be"
         );
@@ -389,9 +387,9 @@ simulated_payloads:
 </payload-configuration>
 ";
         let found = Where::of(text, ConfigFormat::Xml);
-        assert_eq!(found.line_of(&About::Group("shared".to_string())), 4);
-        assert_eq!(found.line_of(&About::Payload("DH0".to_string())), 8);
-        assert_eq!(found.line_of(&About::Payload("DH1".to_string())), 12);
+        assert_eq!(found.line_of(&About::NodeGroup("shared".to_string())), 4);
+        assert_eq!(found.line_of(&About::Node("DH0".to_string())), 8);
+        assert_eq!(found.line_of(&About::Node("DH1".to_string())), 12);
     }
 
     /// A name written as an attribute is found too, on one line or several.
@@ -400,8 +398,8 @@ simulated_payloads:
         let text = "<doc>\n  <payloads name=\"DH0\"/>\n  \
                     <payloads type='device' name='DH1'/>\n</doc>\n";
         let found = Where::of(text, ConfigFormat::Xml);
-        assert_eq!(found.line_of(&About::Payload("DH0".to_string())), 2);
-        assert_eq!(found.line_of(&About::Payload("DH1".to_string())), 3);
+        assert_eq!(found.line_of(&About::Node("DH0".to_string())), 2);
+        assert_eq!(found.line_of(&About::Node("DH1".to_string())), 3);
     }
 
     /// A root whose start tag runs over several lines, and a comment holding
@@ -452,6 +450,6 @@ simulated_payloads:
         let text = "<payload-configuration><payloads><name>DH0</name></payloads>\
                     </payload-configuration>\n";
         let found = Where::of(text, ConfigFormat::Xml);
-        assert_eq!(found.line_of(&About::Payload("DH0".to_string())), 1);
+        assert_eq!(found.line_of(&About::Node("DH0".to_string())), 1);
     }
 }

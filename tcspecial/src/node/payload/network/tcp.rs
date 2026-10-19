@@ -18,7 +18,7 @@ use log::info;
 use nix::poll::PollFlags;
 use tcslibgs::{NetworkConfig, TcsError, TcsResult};
 
-use crate::ci::bind_failed;
+use crate::endpoint::bind_failed;
 use crate::config::constants::{
     ENDPOINT_BUFFER_SIZE, ENDPOINT_CONNECT_BUDGET, ENDPOINT_DELAY_INIT, ENDPOINT_DELAY_MAX,
 };

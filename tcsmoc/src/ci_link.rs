@@ -23,7 +23,7 @@
 //! buttons control -- without the poller having to hold it.
 
 use tcslib::{TcsClient, UdpConnection};
-use tcslibgs::{DHName, HostPort, TcsResult, Timestamp};
+use tcslibgs::{HostPort, TcsResult, Timestamp};
 
 /// The local address the MOC sends from where nothing says otherwise: any
 /// interface, any port.
@@ -36,49 +36,26 @@ use tcslibgs::{DHName, HostPort, TcsResult, Timestamp};
 #[cfg(test)]
 pub const LOCAL_BIND_ANY: &str = "0.0.0.0:0";
 
-/// Where one payload is commanded: both ends of its own link.
-///
-/// Counted from the two bases by the payload's id, which is its position in
-/// the payload configuration. Held as a pair because a connection needs both:
-/// the socket this binds and the socket it sends to.
-#[derive(Debug, Clone)]
-pub struct PayloadLink {
-    /// Which payload, by the name its commands carry.
-    pub name: DHName,
-    /// Where the MOC sends this payload's commands from, and receives its
-    /// answers: `payload_command.source_base` counted on by its id.
-    pub from: HostPort,
-    /// And where they go: `payload_command.dest_base` counted the same way,
-    /// which tcspecial binds.
-    ///
-    /// The file's host and not the operator's. Every other link the MOC opens
-    /// takes its host from the address box so that one typed address moves
-    /// them all; these take both ends from the file, because both ends of a
-    /// payload command link are written there and tcspecial checks the one it
-    /// receives on against it.
-    pub to: HostPort,
-}
 
 /// What the second command link is, which is where the two versions differ.
 ///
-/// Both versions take commands on two links, for the same reason: what the
-/// ground needs in a hurry must never be queued behind what it asked for at
-/// leisure. What the second one *is* differs. Version 1 binds a socket per
-/// payload, which is how a command says which payload it is about; version 2
-/// puts the node's id in the message and so needs one socket for every node.
+/// Where every node's commands go, which is the second of the two links.
+///
+/// Commands go on two links, for the reason they always have: what the ground
+/// needs in a hurry must never be queued behind what it asked for at leisure.
+/// One is the spacecraft's own -- `tcs_cmd` -- and this is the other, which
+/// serves every node because a command carries the node's id.
+///
+/// It was an enum of two, the other being version 1's arrangement: a socket
+/// per payload, that being how a command said which payload it was about. One
+/// socket and an id is what there is now.
 #[derive(Debug, Clone)]
-pub enum Commanded {
-    /// Version 1: one link per payload, each named.
-    Payloads(Vec<PayloadLink>),
-    /// Version 2: one link for every node, at `payload_command.dest_base`
-    /// with nothing added to it.
-    Nodes {
-        /// Where the MOC sends node commands from:
-        /// `payload_command.source_base`, which tcspecial checks against.
-        from: HostPort,
-        /// And where they go, which tcspecial binds.
-        to: HostPort,
-    },
+pub struct Commanded {
+    /// Where node commands are sent from, which is
+    /// `payload_command.source_base` and what tcspecial checks against.
+    pub from: HostPort,
+    /// And where they go, which tcspecial binds.
+    pub to: HostPort,
 }
 
 /// What a control says when it is pressed with the link down.
@@ -110,16 +87,6 @@ pub struct CiLink {
 }
 
 impl CiLink {
-    /// A link that is down, sending spacecraft commands from `from` and each
-    /// payload's commands on the link named for it.
-    ///
-    /// `from` is `tcs_cmd.send`, which tcspecial refuses a command from
-    /// anywhere else than -- both ends reading it out of the same file. One
-    /// socket, so one link: the MOC has one sender of commands now that the
-    /// panel poller is gone.
-    pub fn down_from(from: &str, payloads: Vec<PayloadLink>) -> Self {
-        CiLink::down_commanding(from, Commanded::Payloads(payloads))
-    }
 
     /// And one whose second link is whatever `commanded` says.
     ///
@@ -138,15 +105,24 @@ impl CiLink {
         &self.address
     }
 
-    /// Whether there is a connection to send on.
-    pub fn is_connected(&self) -> bool {
-        self.client.is_some()
-    }
 
     /// The client to send with, or `None` if the link is down.
     ///
     /// Asked for one command at a time rather than kept, so that a caller
     /// cannot go on using a client the link no longer has.
+    /// When the last command went out and when its answer came back, if the
+    /// link is up and has carried one.
+    ///
+    /// The client's own account of it: every command goes through one place
+    /// there, so nothing here has to remember at each press. A link that is
+    /// down has nothing to say -- the times belonged to a client that is
+    /// closed, and the next Connect starts a fresh one.
+    pub fn command_times(&self) -> Option<(Option<Timestamp>, Option<Timestamp>)> {
+        self.client
+            .as_ref()
+            .map(|client| (client.last_sent(), client.last_received()))
+    }
+
     pub fn client(&mut self) -> Option<&mut TcsClient> {
         self.client.as_mut()
     }
@@ -166,44 +142,15 @@ impl CiLink {
         self.address = address.to_string();
 
         let connection = UdpConnection::new(&self.from, address)?;
-        self.client = Some(match &self.commanded {
-            Commanded::Payloads(payloads) => {
-                let mut links = Vec::with_capacity(payloads.len());
-                for link in payloads {
-                    let connection =
-                        UdpConnection::new(&link.from.to_string(), &link.to.to_string())?;
-                    links.push((link.name.clone(), Box::new(connection) as _));
-                }
-                TcsClient::new(Box::new(connection), links)
-            }
-            Commanded::Nodes { from, to } => {
-                let nodes = UdpConnection::new(&from.to_string(), &to.to_string())?;
-                TcsClient::of_a_graph(Box::new(connection), Box::new(nodes))
-            }
-        });
+        let Commanded { from, to } = &self.commanded;
+        let nodes = UdpConnection::new(&from.to_string(), &to.to_string())?;
+        self.client = Some(TcsClient::of_a_graph(
+            Box::new(connection),
+            Box::new(nodes),
+        ));
         Ok(())
     }
 
-    /// Where this link sends its second kind of command, as a line for the
-    /// console.
-    ///
-    /// One line however many there are: version 1's are a base counted on by
-    /// each payload's id, so the base and the count say where all of them
-    /// are, and version 2's is one socket that says itself.
-    pub fn payload_addresses(&self) -> String {
-        let payloads = match &self.commanded {
-            Commanded::Nodes { to, .. } => return format!("{to} for every node"),
-            Commanded::Payloads(payloads) => payloads,
-        };
-        match (payloads.first(), payloads.len()) {
-            (None, _) => "no payloads, so no payload links".to_string(),
-            (Some(first), 1) => format!("{} for {}", first.to, first.name.0),
-            (Some(first), count) => format!(
-                "{} counted on by each payload's id, for {count} payloads",
-                first.to
-            ),
-        }
-    }
 
     /// Take the link down.
     ///
@@ -218,18 +165,6 @@ impl CiLink {
         }
     }
 
-    /// When the last command went out and when its answer came back, if the
-    /// link is up and has carried one.
-    ///
-    /// The client's own account of it: every command goes through one place
-    /// there, so nothing here has to remember at each press. A link that is
-    /// down has nothing to say -- the times belonged to a client that is
-    /// closed, and the next Connect starts a fresh one.
-    pub fn command_times(&self) -> Option<(Option<Timestamp>, Option<Timestamp>)> {
-        self.client
-            .as_ref()
-            .map(|client| (client.last_sent(), client.last_received()))
-    }
 
 }
 
@@ -265,7 +200,7 @@ mod tests {
             spacecraft.send_to(&data, from).expect("the answer is sent");
         });
 
-        let mut link = CiLink::down_from(LOCAL_BIND_ANY, a_payload_link());
+        let mut link = CiLink::down_commanding(LOCAL_BIND_ANY, commanding());
         assert_eq!(link.command_times(), None, "a link that is down has no times");
 
         link.connect(&at).expect("the link comes up");
@@ -292,15 +227,14 @@ mod tests {
         assert_eq!(link.command_times(), None);
     }
 
-    /// The one payload link a test's link carries.
+    /// The node link a test's link carries beside the spacecraft's.
     ///
     /// Nothing answers on it in these tests: what they are about is the link
-    /// the operator controls, and a payload's link is opened beside it by the
-    /// same call either way. Both ends are ports of the system's choosing, so
-    /// that two tests running at once do not want one socket.
-    fn a_payload_link() -> Vec<PayloadLink> {
-        vec![PayloadLink {
-            name: DHName::new("auto-send"),
+    /// the operator controls, and the node link is opened beside it by the
+    /// same call. Its own end is a port of the system's choosing, so that two
+    /// tests running at once do not want one socket.
+    fn commanding() -> Commanded {
+        Commanded {
             from: HostPort {
                 address: "127.0.0.1".to_string(),
                 port: 0,
@@ -309,7 +243,7 @@ mod tests {
                 address: "127.0.0.1".to_string(),
                 port: 4200,
             },
-        }]
+        }
     }
 
     /// A link that is down has no client to hand out, and one that is up has.
@@ -319,17 +253,17 @@ mod tests {
     /// having to be there.
     #[test]
     fn a_link_hands_out_a_client_only_while_it_is_up() {
-        let mut link = CiLink::down_from(LOCAL_BIND_ANY, a_payload_link());
-        assert!(!link.is_connected());
+        let mut link = CiLink::down_commanding(LOCAL_BIND_ANY, commanding());
+        assert!(link.client().is_none());
         assert!(link.client().is_none());
 
         link.connect("127.0.0.1:4000").unwrap();
-        assert!(link.is_connected());
+        assert!(link.client().is_some());
         assert!(link.client().is_some());
         assert_eq!(link.address(), "127.0.0.1:4000");
 
         link.disconnect();
-        assert!(!link.is_connected());
+        assert!(link.client().is_none());
         assert!(link.client().is_none());
     }
 
@@ -337,21 +271,21 @@ mod tests {
     /// make, leaves a link that works.
     #[test]
     fn a_link_can_be_brought_back_up() {
-        let mut link = CiLink::down_from(LOCAL_BIND_ANY, a_payload_link());
+        let mut link = CiLink::down_commanding(LOCAL_BIND_ANY, commanding());
         link.connect("127.0.0.1:4000").unwrap();
         link.disconnect();
         link.connect("127.0.0.1:4000").unwrap();
-        assert!(link.is_connected());
+        assert!(link.client().is_some());
     }
 
     /// Connecting somewhere else moves the link rather than adding one.
     #[test]
     fn connecting_elsewhere_moves_the_link() {
-        let mut link = CiLink::down_from(LOCAL_BIND_ANY, a_payload_link());
+        let mut link = CiLink::down_commanding(LOCAL_BIND_ANY, commanding());
         link.connect("127.0.0.1:4000").unwrap();
 
         link.connect("127.0.0.1:4001").unwrap();
-        assert!(link.is_connected());
+        assert!(link.client().is_some());
         assert_eq!(link.address(), "127.0.0.1:4001");
     }
 
@@ -359,52 +293,45 @@ mod tests {
     /// the address that was asked for.
     #[test]
     fn an_address_that_cannot_be_used_leaves_the_link_down() {
-        let mut link = CiLink::down_from(LOCAL_BIND_ANY, a_payload_link());
+        let mut link = CiLink::down_commanding(LOCAL_BIND_ANY, commanding());
         link.connect("127.0.0.1:4000").unwrap();
 
         assert!(link.connect("this is not an address").is_err());
-        assert!(!link.is_connected());
+        assert!(link.client().is_none());
         assert_eq!(link.address(), "this is not an address");
     }
 
-    /// A version 2 link commands every node on one socket, and says so.
+    /// Every node is commanded on one socket, and the link opens it with the
+    /// spacecraft's.
     ///
-    /// Not one per node, which is where it differs from version 1: the node's
-    /// id is in the message, so one socket says which node every command is
-    /// about. The line the console shows says the one socket rather than a
-    /// base and a count.
+    /// One socket and not one per node: the node's id is in the message, so
+    /// one socket says which node every command is about. Version 1 bound one
+    /// per payload, which is the arrangement this replaced.
     #[test]
-    fn a_version_2_link_commands_every_node_on_one_socket() {
+    fn every_node_is_commanded_on_one_socket() {
         let here = |port| HostPort {
             address: "127.0.0.1".to_string(),
             port,
         };
         let mut link = CiLink::down_commanding(
             LOCAL_BIND_ANY,
-            Commanded::Nodes {
+            Commanded {
                 from: here(0),
                 to: here(4200),
             },
         );
-        assert!(link.payload_addresses().contains("127.0.0.1:4200"));
-        assert!(
-            link.payload_addresses().contains("every node"),
-            "{}",
-            link.payload_addresses()
-        );
 
         link.connect("127.0.0.1:4000").expect("the link comes up");
-        assert!(link.is_connected());
         assert!(
             link.client().is_some(),
-            "and it has a client to send node commands with"
+            "a link that is up has a client to send node commands with"
         );
 
         // And down and up again, as Connect and Disconnect do it: the node
         // link is rebuilt from the file each time, so it cannot be left
         // pointing where an earlier connection pointed.
         link.disconnect();
-        assert!(!link.is_connected());
+        assert!(link.client().is_none());
         link.connect("127.0.0.1:4001").expect("it comes up again");
         assert_eq!(link.address(), "127.0.0.1:4001");
     }
@@ -413,10 +340,10 @@ mod tests {
     /// button can be pressed twice.
     #[test]
     fn disconnecting_twice_is_harmless() {
-        let mut link = CiLink::down_from(LOCAL_BIND_ANY, a_payload_link());
+        let mut link = CiLink::down_commanding(LOCAL_BIND_ANY, commanding());
         link.connect("127.0.0.1:4000").unwrap();
         link.disconnect();
         link.disconnect();
-        assert!(!link.is_connected());
+        assert!(link.client().is_none());
     }
 }

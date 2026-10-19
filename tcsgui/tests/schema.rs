@@ -251,11 +251,6 @@ fn every_shipped_xml_file_is_well_formed() {
     let mut files: Vec<String> = [
         "example.xml",
         "tests/manual/thermostat.xml",
-        "tests/manual/tcspecial1.xml",
-        "tests/manual/tcspecial2.xml",
-        "tests/manual/tcspecial3.xml",
-        "tests/manual/tcspecial4.xml",
-        "tcslibgs/tests/actual/tcspecial.xml",
     ]
     .map(str::to_string)
     .to_vec();
@@ -313,22 +308,6 @@ fn every_shipped_configuration_says_which_schema_describes_it() {
         (
             "example-sim.yaml",
             "tcsgui/share/schema/tcspecial-sim.schema.json",
-        ),
-        (
-            "tests/manual/tcspecial1sim.yaml",
-            "../../tcsgui/share/schema/tcspecial-sim.schema.json",
-        ),
-        (
-            "tests/manual/tcspecial2sim.yaml",
-            "../../tcsgui/share/schema/tcspecial-sim.schema.json",
-        ),
-        (
-            "tests/manual/tcspecial3sim.yaml",
-            "../../tcsgui/share/schema/tcspecial-sim.schema.json",
-        ),
-        (
-            "tests/manual/tcspecial4sim.yaml",
-            "../../tcsgui/share/schema/tcspecial-sim.schema.json",
         ),
     ]
     .map(|(file, said)| (file.to_string(), said))

@@ -24,11 +24,9 @@
 //! tcspecial sends to the end this binds, from the first datagram, without
 //! being told where it is. See `tcspecial::endpoint::bind_oc_pair`.
 
-use std::net::UdpSocket;
 use std::sync::{Arc, Mutex};
-use std::thread;
 
-use tcslibgs::{came_from, DHConfig, DHSample, HostPort, Timestamp};
+use tcslibgs::{DHSample, Timestamp};
 
 /// What one payload last sent to the ground, as the ground received it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -61,259 +59,33 @@ impl Arrival {
 /// What every payload last sent to the ground, one slot per panel row.
 pub type Arrivals = Arc<Mutex<Vec<Option<Arrival>>>>;
 
-/// Open the payload data path for every handler that has one.
-///
-/// One socket and one thread per handler, because one handler's data has
-/// nothing to do with another's and a datagram is answered where it arrived.
-/// A handler with no data link gets neither: it cannot be started, so there is
-/// nothing to listen for.
-///
-/// Each socket is bound where the configuration says the ground's end of that
-/// payload's link is -- `payload_telemetry.dest_base` counted on by the payload's id -- and
-/// says hello to where tcspecial's end is. Both ends come out of the one file
-/// both ends read, so neither has to be told the other's.
-///
-/// Nothing is reported from here. A payload data socket that cannot be opened
-/// is not a reason to refuse to command payloads, which is what the MOC is
-/// for; the panel then shows no arrivals, which is the truth about what the
-/// ground received.
-pub fn listen(dh_configs: &[DHConfig]) -> Arrivals {
-    let arrivals: Arrivals = Arc::new(Mutex::new(vec![None; dh_configs.len()]));
 
-    for (row, dh) in dh_configs.iter().enumerate() {
-        let Some(oc) = &dh.oc else { continue };
-
-        // The ground's own end of this payload's data link, where the
-        // configuration says it is: `payload_telemetry.dest_base` counted on
-        // by the payload's id. It was whatever port the system chose, which
-        // worked because the hello told tcspecial where to answer -- and left
-        // the ground's own ports unwritten anywhere, so nothing between the
-        // two ends could be checked or firewalled by a rule anybody could
-        // state.
-        //
-        // A set with no section has no end to bind, as it has none to send
-        // to.
-        let Some(ground) = &dh.ground else { continue };
-        let socket = match UdpSocket::bind(format!("{}:{}", ground.address, ground.port))
-        {
-            Ok(socket) => socket,
-            Err(_) => continue,
-        };
-
-        let slot = arrivals.clone();
-        // Where this payload's telemetry is supposed to come from:
-        // `payload_telemetry.source_base` counted on by the payload's id,
-        // which is the socket tcspecial binds for it.
-        let expected = HostPort {
-            address: oc.address.clone(),
-            port: oc.port,
-        };
-        thread::spawn(move || serve(socket, expected, slot, row));
-    }
-
-    arrivals
-}
-
-/// Keep what arrives from one payload.
-fn serve(socket: UdpSocket, expected: HostPort, arrivals: Arrivals, row: usize) {
-    let mut buffer = vec![0u8; 65535];
-
-    // How many have arrived from this payload. Kept here rather than read
-    // back out of the slot, so that a panel that has not been looked at yet
-    // cannot cost a count.
-    let mut packets = 0u64;
-
-    // Everything that arrives, for as long as the window is up. Each datagram
-    // replaces the one before it: a panel shows the last thing that came, as
-    // it does for the spacecraft's own samples.
-    loop {
-        match socket.recv_from(&mut buffer) {
-                // Only from the payload's own end of this link. A datagram
-                // from anywhere else is another payload's, or another
-                // program's, and showing it in this panel would be reporting
-                // one payload's telemetry as another's.
-                Ok((_, from)) if !came_from(&expected, &from) => {
-                    eprintln!(
-                        "a payload datagram came from {from} and not from \
-                         {expected}, which is where the configuration says this \
-                         payload sends from -- ignored"
-                    );
-                }
-                Ok((size, _from)) if size > 0 => {
-                    let mut data = DHSample::new();
-                    data.record(&buffer[..size]);
-                    packets += 1;
-                    if let Ok(mut slots) = arrivals.lock() {
-                        if let Some(slot) = slots.get_mut(row) {
-                            *slot = Some(Arrival {
-                                at: Timestamp::now(),
-                                data,
-                                packets,
-                            });
-                        }
-                    }
-                }
-            // A datagram of no bytes carries nothing to show. Nothing sends
-            // one now -- the hello that did is gone -- and one that arrives is
-            // not data from a payload.
-            Ok(_) => {}
-            // Nothing to be done about a failed read here, and nothing to
-            // show: the next one is waited for.
-            Err(_) => {}
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::net::SocketAddr;
-    use std::time::Duration;
-    use tcslibgs::{DHMode, DHName, EndpointConfig, NetworkConfig, NetworkProtocol};
 
-    /// A port nothing holds, found by binding one and letting it go.
+    /// A panel's two lines of an arrival: when it came, and what it was.
     ///
-    /// Both ends of a payload's data link are now named by the configuration,
-    /// so a test has to know the ground's port in advance -- the listener
-    /// binds it and the test's stand-in for a handler sends to it. A number
-    /// written here would fail whenever something else on the machine held it.
-    fn a_free_port() -> u16 {
-        let probe = UdpSocket::bind("127.0.0.1:0").expect("a free port");
-        let port = probe.local_addr().expect("where it is").port();
-        drop(probe);
-        port
-    }
-
-    /// A handler as a payload set describes one: both ends of its data link,
-    /// which the two bases of the tcspecial section give it.
-    fn handler(oc: Option<SocketAddr>, ground: Option<SocketAddr>) -> DHConfig {
-        DHConfig {
-            name: DHName::new("auto-send"),
-            endpoint: EndpointConfig::Network(NetworkConfig {
-                protocol: NetworkProtocol::Udp,
-                address: "localhost".to_string(),
-                port: 5000,
-            }),
-            packet_size: 12,
-            oc: oc.map(|addr| NetworkConfig {
-                protocol: NetworkProtocol::Udp,
-                address: addr.ip().to_string(),
-                port: addr.port(),
-            }),
-            ground: ground.map(|addr| NetworkConfig {
-                protocol: NetworkProtocol::Udp,
-                address: addr.ip().to_string(),
-                port: addr.port(),
-            }),
-            mode: DHMode::Periodic,
-            stale_interval: None,
-        }
-    }
-
-    /// The ground keeps what the handler sends, without saying anything
-    /// first.
-    ///
-    /// Both ends of the link are in the configuration, so the handler sends to
-    /// the end this binds from its first datagram. The hello that used to
-    /// teach it where the ground was is gone, and so is the silence that
-    /// followed a START_DH rebinding the handler's socket.
+    /// What the ground received, which is the whole of what this module is
+    /// for now. It used to open a socket per payload and listen on it -- the
+    /// version 1 arrangement, where each payload had a ground endpoint of its
+    /// own -- and a version 2 node's data reaches the ground through
+    /// `tcslib::moc`, which is where the receiving is tested.
     #[test]
-    fn the_ground_keeps_what_arrives() {
-        // Standing in for a handler's OC endpoint, which binds the vehicle's
-        // end and sends to the ground's.
-        let oc = UdpSocket::bind("127.0.0.1:0").expect("a handler's OC socket");
-        let at = oc.local_addr().expect("where it is");
-        let ground: SocketAddr = format!("127.0.0.1:{}", a_free_port())
-            .parse()
-            .expect("the ground's end");
-
-        let arrivals = listen(&[handler(Some(at), Some(ground))]);
-
-        // What a payload sent, as a handler would forward it: straight to
-        // where the configuration says the ground is.
-        oc.send_to(b"from the payload", ground).expect("it is sent");
-
-        let found = (0..50)
-            .find_map(|_| {
-                thread::sleep(Duration::from_millis(20));
-                arrivals.lock().ok().and_then(|slots| slots[0].clone())
-            })
-            .expect("the ground kept what arrived");
-        let (time, data) = found.panel_lines();
-        assert_eq!(time.len(), "00:00:00".len(), "a time of day: {time}");
-        assert!(
-            data.contains("66") && data.contains("72"),
-            "the first bytes of \"from the payload\": {data}"
+    fn an_arrival_says_when_it_came_and_what_it_was() {
+        let at = Timestamp::at(
+            std::time::UNIX_EPOCH + std::time::Duration::from_secs(3661),
         );
-        assert_eq!(found.packets, 1, "one datagram arrived, and it was counted");
+        let mut data = DHSample::new();
+        data.record(b"hello");
+        let arrival = Arrival { at, data, packets: 7 };
 
-        // And a second is counted as a second, which is what the panel shows.
-        oc.send_to(b"again", ground).expect("it is sent");
-        let counted = (0..50)
-            .find_map(|_| {
-                thread::sleep(Duration::from_millis(20));
-                arrivals
-                    .lock()
-                    .ok()
-                    .and_then(|slots| slots[0].clone())
-                    .filter(|arrival| arrival.packets == 2)
-            })
-            .expect("the second arrival was not counted");
-        assert_eq!(counted.packets, 2);
-    }
-
-    /// Only what comes from the payload's own end is kept.
-    ///
-    /// A datagram from somewhere else at this socket is another payload's or
-    /// another program's, and putting it in this panel would be reporting one
-    /// payload's telemetry as another's. The payload's own datagram follows
-    /// the stranger's here, so this says which was kept rather than that
-    /// nothing arrived.
-    #[test]
-    fn a_datagram_from_elsewhere_is_not_this_payloads() {
-        let oc = UdpSocket::bind("127.0.0.1:0").expect("a handler's OC socket");
-        let at = oc.local_addr().expect("where it is");
-        let ground: SocketAddr = format!("127.0.0.1:{}", a_free_port())
-            .parse()
-            .expect("the ground's end");
-
-        let arrivals = listen(&[handler(Some(at), Some(ground))]);
-
-        // A stranger first, then the payload: what the panel ends up with
-        // must be the payload's, and the count must be one.
-        let stranger = UdpSocket::bind("127.0.0.1:0").expect("another socket");
-        stranger.send_to(b"\xff\xff\xff", ground).expect("it is sent");
-        oc.send_to(b"from the payload", ground).expect("it is sent");
-
-        let found = (0..50)
-            .find_map(|_| {
-                thread::sleep(Duration::from_millis(20));
-                arrivals.lock().ok().and_then(|slots| slots[0].clone())
-            })
-            .expect("the ground kept what arrived");
-        let (_, data) = found.panel_lines();
-        assert!(
-            data.contains("66") && data.contains("72"),
-            "the payload's own bytes: {data}"
-        );
-        assert_eq!(
-            found.packets, 1,
-            "the stranger's datagram was counted as the payload's"
-        );
-    }
-
-    /// A handler with no OC address is not listened for.
-    ///
-    /// It cannot be started -- there is nowhere for its data to go -- so
-    /// there is nothing to hear, and a socket opened for it would be a thread
-    /// waiting on nobody.
-    #[test]
-    fn a_handler_with_no_oc_address_is_not_listened_for() {
-        let arrivals = listen(&[handler(None, None)]);
-        assert_eq!(arrivals.lock().expect("the slots").len(), 1);
-        assert!(
-            arrivals.lock().expect("the slots")[0].is_none(),
-            "nothing can have arrived for a handler with nowhere to send"
-        );
+        // The time is the ground's clock, as every time in the window is, and
+        // the data is the head of what arrived in hex -- the same way a
+        // handler's samples are shown, so that the panel's lines read alike.
+        let (when, what) = arrival.panel_lines();
+        assert_eq!(when, at.time_of_day());
+        assert_eq!(what, "68 65 6C 6C 6F", "{what}");
     }
 }

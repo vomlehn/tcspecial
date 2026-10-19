@@ -31,20 +31,21 @@ PREFIX ?= /usr/local
 DESTDIR ?=
 TCSGUI_DATA := $(DESTDIR)$(PREFIX)/share/$(GUI_NAME)
 
-# The payload set to run, named without a suffix.
+# The configuration to run, named without a suffix.
 #
-# One variable rather than two, because the two files of a set are named for
-# each other: TCSPECIAL_CONFIG_FILE is the stem,
-# `$(TCSPECIAL_CONFIG_FILE).yaml` the tcspecial configuration -- in YAML or
-# XML -- and `$(TCSPECIAL_CONFIG_FILE)sim.yaml` the simulator settings beside
-# it. So:
-#   make run     TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial2
-#   make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial2
-#   make runsim  TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial2
+# One variable rather than two, because the files are named for each other:
+# TCSPECIAL_CONFIG_FILE is the stem, `$(TCSPECIAL_CONFIG_FILE).yaml` the
+# configuration -- in YAML or XML -- and `$(TCSPECIAL_CONFIG_FILE)sim.yaml`
+# the simulator settings beside it. So:
+#   make run     TCSPECIAL_CONFIG_FILE=tests/manual/thermostat
+#   make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/thermostat
+#   make runsim  TCSPECIAL_CONFIG_FILE=tests/manual/thermostat
 #
-# Not TCSPECIAL_CONFIG_PATH, which is the environment variable tcspecial and
-# tcsmoc read for the command interpreter's own settings: this names a set to
-# run and is nothing the programs look for.
+# It names a configuration to run and is nothing the programs look for. There
+# was a TCSPECIAL_CONFIG_PATH beside it, naming the command interpreter's own
+# settings: a version 1 payload set did not have to say where commands are
+# taken or where beacons go, so a second file answered for it. A version 2
+# configuration must have a `tcspecial` section, so there is one file.
 #
 # Every program takes the configuration file as a command line argument. The
 # simulator file reaches tcssim through the environment: runmocy passes it
@@ -53,15 +54,15 @@ TCSGUI_DATA := $(DESTDIR)$(PREFIX)/share/$(GUI_NAME)
 # tcssim run on its own needs both, and the two must describe the same set or
 # the names will not match.
 #
-# The sets live under tests/manual because running one is something a person
-# does at a terminal: each opens sockets or device nodes.
-TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial2
+# The fixtures live under tests/manual because running one is something a
+# person does at a terminal: each opens sockets or device nodes.
+TCSPECIAL_CONFIG_FILE=tests/manual/thermostat
 
 # What the programs log, which every run target passes on. A variable rather
 # than a word in each recipe, so that it can be overridden the way the payload
 # set is:
 #   make runmocy RUST_LOG=debug
-#   make run TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial1 RUST_LOG=tcspecial::ci=trace
+#   make run TCSPECIAL_CONFIG_FILE=examples/minimal/minimal RUST_LOG=debug
 RUST_LOG = info
 
 RELEASE = --release
@@ -107,7 +108,7 @@ help:
 	@echo "  make install     - Install tcspecial globally, data and all"
 	@echo "  make install-data - Install tcsgui's descriptions and schemas"
 	@echo ""
-	@echo "Payload set: make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial1"
+	@echo "Configuration: make runmocy TCSPECIAL_CONFIG_FILE=examples/minimal/minimal"
 	@echo "Logging:     make runmocy RUST_LOG=debug"
 
 # Build the project
@@ -249,20 +250,19 @@ runcomparexy:
 	)
 
 # Every configuration shipped in both spellings, with the simulator file each
-# is checked beside: the payload sets, the thermostat fixture, and the
-# examples. A list of stems and simulator files rather than a pattern, because
-# the two directories name their simulator files differently -- tcspecial1sim
-# and minimal-sim -- and the thermostat fixture has none of its own: it is
-# checked beside the example's, which simulates the same payloads.
+# is checked beside: the thermostat fixture and the examples. A list of stems
+# and simulator files rather than a pattern, because the thermostat fixture
+# has no simulator file of its own: it is checked beside the example's, which
+# simulates the same payloads.
+#
+# The four version 1 payload sets were here, each with its own simulator file,
+# and they are gone with version 1.
 SPELLINGS = \
-	tests/manual/tcspecial1:tests/manual/tcspecial1sim.yaml \
-	tests/manual/tcspecial2:tests/manual/tcspecial2sim.yaml \
-	tests/manual/tcspecial3:tests/manual/tcspecial3sim.yaml \
-	tests/manual/tcspecial4:tests/manual/tcspecial4sim.yaml \
 	tests/manual/thermostat:examples/thermostat/thermostat-sim.yaml \
 	examples/minimal/minimal:examples/minimal/minimal-sim.yaml \
 	examples/thermostat/thermostat:examples/thermostat/thermostat-sim.yaml \
-	examples/simple-app/simple-app:examples/simple-app/simple-app-sim.yaml
+	examples/simple-app/simple-app:examples/simple-app/simple-app-sim.yaml \
+	examples/beacon/beacon:examples/beacon/beacon-sim.yaml
 
 # Compare the two spellings of every one of them.
 #
@@ -542,10 +542,10 @@ distclean: clean
 # node types are tested with: a mission's own app is its own program,
 # installed wherever its node's `executable` attribute says.
 #
-# Note that tcspecial finds its configuration by relative path -- tcspecial1.yaml
-# and tcspecial/src/tcspecial.yaml -- so an installed copy run from elsewhere
-# needs PAYLOAD_CONFIG_PATH and TCSPECIAL_CONFIG_PATH set, or a working
-# directory that has those files.
+# Note that tcspecial falls back to a configuration named by relative path --
+# tests/manual/thermostat.yaml -- so an installed copy run from elsewhere
+# needs the file named on its command line, or PAYLOAD_CONFIG_PATH set, or a
+# working directory that has it.
 .PHONY: install
 install: install-data
 	@echo "Installing $(PROJECT_NAME)..."

@@ -19,8 +19,7 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use crate::config::describes_payloads_text;
-use crate::{ConfigFormat, PayloadConfig, TcsError, TcsResult};
+use crate::{TcsError, TcsResult};
 
 /// The version of the software at one end of a link.
 ///
@@ -118,44 +117,13 @@ const END_OF_ENTRY: u8 = 0x1d;
 /// The file may be written in either format; what is digested is the document
 /// it parses into, so the format cannot show through.
 pub fn digest_of_file<P: AsRef<Path>>(path: P) -> TcsResult<ConfigDigest> {
-    let path = path.as_ref();
-    // A version 2 configuration is a graph, possibly across several files:
-    // see digest_of_graph.
-    if crate::graph::is_version_2(path) {
-        return digest_of_graph(&crate::graph::Graph::load(path)?);
-    }
-    let text = std::fs::read_to_string(path)?;
-    digest_of_text(&text, ConfigFormat::of_file(path)?)
+    // A configuration is a graph, possibly across several files: see
+    // digest_of_graph. It was one of two things, and a version 1 payload set
+    // was digested from the file's own text.
+    digest_of_graph(&crate::graph::Graph::load(path.as_ref())?)
 }
 
-/// The digest of a configuration already in hand.
-pub fn digest_of_text(text: &str, format: ConfigFormat) -> TcsResult<ConfigDigest> {
-    // Parsed into its real document and then written back out as a value
-    // tree, which is what makes the three formats agree: a number is a
-    // number by then rather than the text a file spelled it with, a list is
-    // a list rather than XML's repeated siblings, and an attribute nobody
-    // stated is absent rather than missing.
-    describes_payloads_text(text, format)?;
-    digest_of_payload_config(&format.parse(text)?)
-}
 
-/// The digest of a payload configuration already parsed.
-///
-/// Here rather than only behind [`digest_of_text`] because this is where the
-/// payloads are put in order, and a caller with a configuration in hand --
-/// both programs have one -- should get the same answer as one with the file.
-pub fn digest_of_payload_config(config: &PayloadConfig) -> TcsResult<ConfigDigest> {
-    // By sequence number, which is the order the file gave them. A list
-    // straight from a parser is in that order already; ordering it here says
-    // so rather than relying on it, so that two ends agree about which
-    // payload came first whatever either has since done with its own list --
-    // sorted it for a lookup, say. The order means something: it is the order
-    // the file was written in, and two ends that read one file agree about
-    // it.
-    let mut ordered = config.clone();
-    ordered.payloads.sort_by_key(|payload| payload.sequence);
-    digest_of_value(&ordered)
-}
 
 /// The digest of a version 2 configuration: everything the vehicle and the
 /// ground act on, across every file it was read from.
@@ -181,18 +149,9 @@ pub fn digest_of_graph(graph: &crate::graph::Graph) -> TcsResult<ConfigDigest> {
 /// differ where the trees do, which is what a program comparing two spellings
 /// of one configuration needs to say: see `tcsverify`.
 pub fn interpretation_of_file<P: AsRef<Path>>(path: P) -> TcsResult<serde_json::Value> {
-    let path = path.as_ref();
-    if crate::graph::is_version_2(path) {
-        return Ok(interpretation_of_graph(&crate::graph::Graph::load(path)?));
-    }
-    let text = std::fs::read_to_string(path)?;
-    let format = ConfigFormat::of_file(path)?;
-    describes_payloads_text(&text, format)?;
-    let mut ordered: PayloadConfig = format.parse(&text)?;
-    // In the order the file gave them: see digest_of_payload_config.
-    ordered.payloads.sort_by_key(|payload| payload.sequence);
-    serde_json::to_value(&ordered)
-        .map_err(|e| TcsError::Config(format!("cannot read the configuration as a value: {e}")))
+    Ok(interpretation_of_graph(&crate::graph::Graph::load(
+        path.as_ref(),
+    )?))
 }
 
 /// What a version 2 configuration is read as: see [`digest_of_graph`], which
@@ -263,6 +222,7 @@ fn digest_of_value<T: Serialize>(document: &T) -> TcsResult<ConfigDigest> {
     write_canonical(&value, &mut canonical);
     Ok(ConfigDigest(md5::compute(&canonical).0))
 }
+
 
 /// The bytes a value contributes to the digest.
 ///
@@ -401,46 +361,7 @@ mod tests {
         assert_ne!(digest_of_graph(&reordered).expect("it digests"), digest);
     }
 
-    /// A version 2 configuration's version is the language's.
-    #[test]
-    fn a_graph_states_version_2() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let version = crate::config::load_config_version(root.join("examples/minimal/minimal.yaml"))
-            .expect("it states one");
-        assert_eq!((version.major, version.minor, version.patch), (2, 0, 0));
-    }
 
-    const YAML: &str = "\
-version: \"1.0\"
-description: a set
-tcspecial:
-  tcs_cmd:
-    recv: 0.0.0.0:4000
-    send: 127.0.0.1:4100
-  payload_command:
-    source_base: 127.0.0.1:4300
-    dest_base: 0.0.0.0:4200
-  payload_telemetry:
-    source_base: 0.0.0.0:6000
-    dest_base: 127.0.0.1:6100
-  beacon:
-    interval: 5 s
-    send: 0.0.0.0:5550
-    recv: 127.0.0.1:5650
-payloads:
-  - name: DH0
-    type: device-file
-    path: /dev/null
-    packet_size: 1
-  - name: DH1
-    type: device-file
-    path: /dev/zero
-    packet_size: 2
-";
-
-    fn digest(text: &str) -> ConfigDigest {
-        digest_of_text(text, ConfigFormat::Yaml).expect("it digests")
-    }
 
     /// The version is three bytes, and says what this build is.
     #[test]
@@ -460,174 +381,18 @@ payloads:
     /// A digest is sixteen bytes, said as hex.
     #[test]
     fn a_digest_is_sixteen_bytes_of_hex() {
-        let said = format!("{}", digest(YAML));
+        let said = format!(
+            "{}",
+            digest_of_graph(&example_graph("minimal", "yaml")).expect("it digests")
+        );
         assert_eq!(said.len(), 32, "{said}");
         assert!(said.chars().all(|c| c.is_ascii_hexdigit()), "{said}");
     }
 
-    /// The order of the sections does not change the digest.
-    ///
-    /// Which is the point of ordering them: a file is free to put its
-    /// tcspecial section before or after its payloads, and two ends that
-    /// chose differently have still read the same configuration.
-    #[test]
-    fn the_order_of_the_sections_does_not_matter() {
-        let moved = "\
-payloads:
-  - name: DH0
-    type: device-file
-    path: /dev/null
-    packet_size: 1
-  - name: DH1
-    type: device-file
-    path: /dev/zero
-    packet_size: 2
-description: a set
-tcspecial:
-  tcs_cmd:
-    recv: 0.0.0.0:4000
-    send: 127.0.0.1:4100
-  payload_command:
-    source_base: 127.0.0.1:4300
-    dest_base: 0.0.0.0:4200
-  payload_telemetry:
-    source_base: 0.0.0.0:6000
-    dest_base: 127.0.0.1:6100
-  beacon:
-    interval: 5 s
-    send: 0.0.0.0:5550
-    recv: 127.0.0.1:5650
-version: \"1.0\"
-";
-        assert_eq!(digest(moved), digest(YAML));
-    }
 
-    /// Nor does the order of one payload's attributes.
-    #[test]
-    fn the_order_of_attributes_does_not_matter() {
-        let shuffled = YAML.replace(
-            "  - name: DH0\n    type: device-file\n    path: /dev/null\n    packet_size: 1\n",
-            "  - packet_size: 1\n    path: /dev/null\n    type: device-file\n    name: DH0\n",
-        );
-        assert_ne!(shuffled, YAML, "the test did not shuffle anything");
-        assert_eq!(digest(&shuffled), digest(YAML));
-    }
 
-    /// The order of the payloads does, because that order means something:
-    /// ids will be assigned in the order the payloads appear.
-    #[test]
-    fn the_order_of_the_payloads_does_matter() {
-        let swapped = "\
-version: \"1.0\"
-description: a set
-tcspecial:
-  tcs_cmd:
-    recv: 0.0.0.0:4000
-    send: 127.0.0.1:4100
-  payload_command:
-    source_base: 127.0.0.1:4300
-    dest_base: 0.0.0.0:4200
-  payload_telemetry:
-    source_base: 0.0.0.0:6000
-    dest_base: 127.0.0.1:6100
-  beacon:
-    interval: 5 s
-    send: 0.0.0.0:5550
-    recv: 127.0.0.1:5650
-payloads:
-  - name: DH1
-    type: device-file
-    path: /dev/zero
-    packet_size: 2
-  - name: DH0
-    type: device-file
-    path: /dev/null
-    packet_size: 1
-";
-        assert_ne!(digest(swapped), digest(YAML));
-    }
 
-    /// The digest is of the payloads in file order, whatever order the list
-    /// is in.
-    ///
-    /// This is what the sequence number is for. A digest that walked the list
-    /// as it found it would say two ends disagreed as soon as one of them
-    /// sorted its payloads for a lookup; walking by sequence number means the
-    /// two agree when they read the same file and differ when they did not,
-    /// which is the only thing the comparison is asked to tell.
-    #[test]
-    fn the_digest_walks_the_payloads_by_sequence_number() {
-        let mut config: PayloadConfig = ConfigFormat::Yaml.parse(YAML).expect("it parses");
-        let in_file_order = digest(YAML);
 
-        // As code might: the payloads in some order of its own.
-        config.payloads.reverse();
-        assert_eq!(config.payloads[0].name, "DH1", "the reverse did nothing");
 
-        assert_eq!(
-            digest_of_payload_config(&config).expect("it digests"),
-            in_file_order,
-            "a list in another order digested differently"
-        );
-    }
 
-    /// Two files whose payloads are in different orders digest differently,
-    /// which is the other half: the sequence numbers are part of what is
-    /// hashed, so the orders are compared and not merely carried.
-    #[test]
-    fn a_file_in_another_order_digests_differently() {
-        let swapped = "\
-version: \"1.0\"
-description: a set
-tcspecial:
-  tcs_cmd:
-    recv: 0.0.0.0:4000
-    send: 127.0.0.1:4100
-  payload_command:
-    source_base: 127.0.0.1:4300
-    dest_base: 0.0.0.0:4200
-  payload_telemetry:
-    source_base: 0.0.0.0:6000
-    dest_base: 127.0.0.1:6100
-  beacon:
-    interval: 5 s
-    send: 0.0.0.0:5550
-    recv: 127.0.0.1:5650
-payloads:
-  - name: DH1
-    type: device-file
-    path: /dev/zero
-    packet_size: 2
-  - name: DH0
-    type: device-file
-    path: /dev/null
-    packet_size: 1
-";
-        assert_ne!(digest(swapped), digest(YAML));
-    }
-
-    /// A value that changed changes the digest, which is the whole job.
-    #[test]
-    fn a_changed_value_changes_the_digest() {
-        for changed in [
-            YAML.replace("packet_size: 1", "packet_size: 3"),
-            YAML.replace("/dev/null", "/dev/urandom"),
-            YAML.replace("0.0.0.0:4000", "0.0.0.0:4001"),
-            YAML.replace("description: a set", "description: another set"),
-            YAML.replace("name: DH0", "name: DH9"),
-        ] {
-            assert_ne!(
-                digest(&changed),
-                digest(YAML),
-                "a change left the digest alone: {changed}"
-            );
-        }
-    }
-
-    /// Comments and whitespace are spelling, not configuration.
-    #[test]
-    fn comments_and_whitespace_do_not_matter() {
-        let commented = format!("# what this set is for\n{YAML}\n\n");
-        assert_eq!(digest(&commented), digest(YAML));
-    }
 }

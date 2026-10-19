@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config_digest::{ConfigDigest, ConfigVersion};
 use crate::types::{
-    CommandStatus, DHName, DHSample, DHState, NodeCounts, NodeId, Statistics, Timestamp,
+    CommandStatus, DHSample, NodeCounts, NodeId, Timestamp,
 };
 
 /// Telemetry message header
@@ -55,12 +55,7 @@ pub enum TelemetryType {
     Connect,
     RestartArm,
     Restart,
-    StartDH,
-    StopDH,
-    QueryDH,
-    QueryDHSample,
     Config,
-    ConfigDH,
     /// The answer to a START_NODE: see [`NodeTelemetry`].
     StartNode,
     /// And to a STOP_NODE.
@@ -81,12 +76,7 @@ impl TelemetryType {
             TelemetryType::Connect => 0x84,
             TelemetryType::RestartArm => 0x82,
             TelemetryType::Restart => 0x83,
-            TelemetryType::StartDH => 0x90,
-            TelemetryType::StopDH => 0x91,
-            TelemetryType::QueryDH => 0x92,
-            TelemetryType::QueryDHSample => 0x93,
             TelemetryType::Config => 0xA0,
-            TelemetryType::ConfigDH => 0xA1,
             TelemetryType::StartNode => 0x30,
             TelemetryType::StopNode => 0x31,
             TelemetryType::SetNode => 0x32,
@@ -102,12 +92,7 @@ impl TelemetryType {
             0x84 => Some(TelemetryType::Connect),
             0x82 => Some(TelemetryType::RestartArm),
             0x83 => Some(TelemetryType::Restart),
-            0x90 => Some(TelemetryType::StartDH),
-            0x91 => Some(TelemetryType::StopDH),
-            0x92 => Some(TelemetryType::QueryDH),
-            0x93 => Some(TelemetryType::QueryDHSample),
             0xA0 => Some(TelemetryType::Config),
-            0xA1 => Some(TelemetryType::ConfigDH),
             0x30 => Some(TelemetryType::StartNode),
             0x31 => Some(TelemetryType::StopNode),
             0x32 => Some(TelemetryType::SetNode),
@@ -205,103 +190,6 @@ impl ConnectTelemetry {
         }
     }
 }
-
-/// START_DH telemetry
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub struct StartDHTelemetry {
-    pub header: TelemetryHeader,
-}
-
-impl StartDHTelemetry {
-    pub fn new(sequence: u32, status: CommandStatus) -> Self {
-        Self {
-            header: TelemetryHeader::new(sequence, TelemetryType::StartDH, status),
-        }
-    }
-}
-
-/// STOP_DH telemetry response
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub struct StopDHTelemetry {
-    pub header: TelemetryHeader,
-}
-
-impl StopDHTelemetry {
-    pub fn new(sequence: u32, status: CommandStatus) -> Self {
-        Self {
-            header: TelemetryHeader::new(sequence, TelemetryType::StopDH, status),
-        }
-    }
-}
-
-/// QUERY_DH telemetry response
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct QueryDHTelemetry {
-    pub header: TelemetryHeader,
-    pub name: DHName,
-    /// What the handler is doing, which nothing else on the link says.
-    ///
-    /// `None` when there is no such handler, which is the NotFound answer: a
-    /// state would have to be invented for a handler that does not exist, and
-    /// a ground station reading one would show it.
-    ///
-    /// The ground once had only its own commands to go by, so a panel showed
-    /// what the last START_DH or STOP_DH implied and went on showing it --
-    /// through a handler that stopped on the spacecraft, and through a MOC
-    /// attached to a tcspecial serving another payload set.
-    #[serde(default)]
-    pub state: Option<DHState>,
-    pub statistics: Statistics,
-}
-
-impl QueryDHTelemetry {
-    pub fn new(
-        sequence: u32,
-        status: CommandStatus,
-        name: DHName,
-        state: Option<DHState>,
-        statistics: Statistics,
-    ) -> Self {
-        Self {
-            header: TelemetryHeader::new(sequence, TelemetryType::QueryDH, status),
-            name,
-            state,
-            statistics,
-        }
-    }
-}
-
-/// QUERY_DH_SAMPLE telemetry response
-///
-/// Carries what a data handler last sent and last received, each with the time
-/// it happened. Either may be empty, which is what a handler that has moved
-/// nothing in that direction looks like -- distinct from a handler that has
-/// moved zero bytes, which cannot happen.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct QueryDHSampleTelemetry {
-    pub header: TelemetryHeader,
-    pub name: DHName,
-    pub sent: DHSample,
-    pub received: DHSample,
-}
-
-impl QueryDHSampleTelemetry {
-    pub fn new(
-        sequence: u32,
-        status: CommandStatus,
-        name: DHName,
-        sent: DHSample,
-        received: DHSample,
-    ) -> Self {
-        Self {
-            header: TelemetryHeader::new(sequence, TelemetryType::QueryDHSample, status),
-            name,
-            sent,
-            received,
-        }
-    }
-}
-
 /// CONFIG telemetry response
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ConfigTelemetry {
@@ -315,21 +203,6 @@ impl ConfigTelemetry {
         }
     }
 }
-
-/// CONFIG_DH telemetry response
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ConfigDHTelemetry {
-    pub header: TelemetryHeader,
-}
-
-impl ConfigDHTelemetry {
-    pub fn new(sequence: u32, status: CommandStatus) -> Self {
-        Self {
-            header: TelemetryHeader::new(sequence, TelemetryType::ConfigDH, status),
-        }
-    }
-}
-
 /// The answer to a START_NODE or a STOP_NODE
 ///
 /// The status, and the id the command carried. The id is here so that an
@@ -546,24 +419,7 @@ pub fn answer_to(command: &crate::commands::Command, status: CommandStatus) -> T
             Telemetry::RestartArm(RestartArmTelemetry::new(sequence, status))
         }
         Command::Restart(_) => Telemetry::Restart(RestartTelemetry::new(sequence, status)),
-        Command::StartDH(_) => Telemetry::StartDH(StartDHTelemetry::new(sequence, status)),
-        Command::StopDH(_) => Telemetry::StopDH(StopDHTelemetry::new(sequence, status)),
-        Command::QueryDH(cmd) => Telemetry::QueryDH(QueryDHTelemetry::new(
-            sequence,
-            status,
-            cmd.name.clone(),
-            None,
-            Statistics::new(),
-        )),
-        Command::QueryDHSample(cmd) => Telemetry::QueryDHSample(QueryDHSampleTelemetry::new(
-            sequence,
-            status,
-            cmd.name.clone(),
-            DHSample::new(),
-            DHSample::new(),
-        )),
         Command::Config(_) => Telemetry::Config(ConfigTelemetry::new(sequence, status)),
-        Command::ConfigDH(_) => Telemetry::ConfigDH(ConfigDHTelemetry::new(sequence, status)),
         // The id the command carried, refused or not: an answer about a node
         // says which node, and an id out of range is exactly the case where
         // the ground needs to see which one it sent.
@@ -600,12 +456,7 @@ pub enum Telemetry {
     Connect(ConnectTelemetry),
     RestartArm(RestartArmTelemetry),
     Restart(RestartTelemetry),
-    StartDH(StartDHTelemetry),
-    StopDH(StopDHTelemetry),
-    QueryDH(QueryDHTelemetry),
-    QueryDHSample(QueryDHSampleTelemetry),
     Config(ConfigTelemetry),
-    ConfigDH(ConfigDHTelemetry),
     StartNode(NodeTelemetry),
     StopNode(NodeTelemetry),
     SetNode(NodeTelemetry),
@@ -621,12 +472,7 @@ impl Telemetry {
             Telemetry::Connect(tm) => tm.header.sequence,
             Telemetry::RestartArm(tm) => tm.header.sequence,
             Telemetry::Restart(tm) => tm.header.sequence,
-            Telemetry::StartDH(tm) => tm.header.sequence,
-            Telemetry::StopDH(tm) => tm.header.sequence,
-            Telemetry::QueryDH(tm) => tm.header.sequence,
-            Telemetry::QueryDHSample(tm) => tm.header.sequence,
             Telemetry::Config(tm) => tm.header.sequence,
-            Telemetry::ConfigDH(tm) => tm.header.sequence,
             Telemetry::StartNode(tm) | Telemetry::StopNode(tm) | Telemetry::SetNode(tm) => {
                 tm.header.sequence
             }
@@ -642,12 +488,7 @@ impl Telemetry {
             Telemetry::Connect(tm) => tm.header.tm_type,
             Telemetry::RestartArm(tm) => tm.header.tm_type,
             Telemetry::Restart(tm) => tm.header.tm_type,
-            Telemetry::StartDH(tm) => tm.header.tm_type,
-            Telemetry::StopDH(tm) => tm.header.tm_type,
-            Telemetry::QueryDH(tm) => tm.header.tm_type,
-            Telemetry::QueryDHSample(tm) => tm.header.tm_type,
             Telemetry::Config(tm) => tm.header.tm_type,
-            Telemetry::ConfigDH(tm) => tm.header.tm_type,
             Telemetry::StartNode(tm) | Telemetry::StopNode(tm) | Telemetry::SetNode(tm) => {
                 tm.header.tm_type
             }
@@ -663,12 +504,7 @@ impl Telemetry {
             Telemetry::Connect(tm) => tm.header.status,
             Telemetry::RestartArm(tm) => tm.header.status,
             Telemetry::Restart(tm) => tm.header.status,
-            Telemetry::StartDH(tm) => tm.header.status,
-            Telemetry::StopDH(tm) => tm.header.status,
-            Telemetry::QueryDH(tm) => tm.header.status,
-            Telemetry::QueryDHSample(tm) => tm.header.status,
             Telemetry::Config(tm) => tm.header.status,
-            Telemetry::ConfigDH(tm) => tm.header.status,
             Telemetry::StartNode(tm) | Telemetry::StopNode(tm) | Telemetry::SetNode(tm) => {
                 tm.header.status
             }
@@ -687,12 +523,7 @@ impl Telemetry {
             Telemetry::Connect(tm) => tm.header.timestamp,
             Telemetry::RestartArm(tm) => tm.header.timestamp,
             Telemetry::Restart(tm) => tm.header.timestamp,
-            Telemetry::StartDH(tm) => tm.header.timestamp,
-            Telemetry::StopDH(tm) => tm.header.timestamp,
-            Telemetry::QueryDH(tm) => tm.header.timestamp,
-            Telemetry::QueryDHSample(tm) => tm.header.timestamp,
             Telemetry::Config(tm) => tm.header.timestamp,
-            Telemetry::ConfigDH(tm) => tm.header.timestamp,
             Telemetry::StartNode(tm) | Telemetry::StopNode(tm) | Telemetry::SetNode(tm) => {
                 tm.header.timestamp
             }
@@ -751,24 +582,7 @@ mod tests {
             Telemetry::Connect(ConnectTelemetry::new(2, version, version, digest)),
             Telemetry::RestartArm(RestartArmTelemetry::new(3, CommandStatus::Success)),
             Telemetry::Restart(RestartTelemetry::new(4, CommandStatus::Success)),
-            Telemetry::StartDH(StartDHTelemetry::new(5, CommandStatus::Success)),
-            Telemetry::StopDH(StopDHTelemetry::new(6, CommandStatus::Success)),
-            Telemetry::QueryDH(QueryDHTelemetry::new(
-                7,
-                CommandStatus::Success,
-                DHName::new("DH0"),
-                Some(DHState::Active),
-                Statistics::new(),
-            )),
-            Telemetry::QueryDHSample(QueryDHSampleTelemetry::new(
-                8,
-                CommandStatus::Success,
-                DHName::new("DH0"),
-                DHSample::new(),
-                DHSample::new(),
-            )),
             Telemetry::Config(ConfigTelemetry::new(9, CommandStatus::Success)),
-            Telemetry::ConfigDH(ConfigDHTelemetry::new(10, CommandStatus::Success)),
             Telemetry::StartNode(NodeTelemetry::started(
                 11,
                 CommandStatus::Success,

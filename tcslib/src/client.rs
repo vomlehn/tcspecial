@@ -19,11 +19,9 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 use tcslibgs::{
-    ArmKey, BeaconInterval, Command, CommandLink, CommandStatus, ConfigCommand, DHName, DHState,
-    DHSample, DHType, NodeCommand, NodeCounts, NodeId, SetNodeCommand, Timestamp,
-    PingCommand, QueryDHCommand, QueryDHSampleCommand, RestartArmCommand, RestartCommand,
-    ConfigDigest, ConfigVersion, ConnectCommand,
-    StartDHCommand, Statistics, StopDHCommand, TcsError, TcsResult, Telemetry,
+    ArmKey, BeaconInterval, Command, CommandLink, CommandStatus, ConfigCommand, ConfigDigest,
+    ConfigVersion, ConnectCommand, DHSample, NodeCommand, NodeCounts, NodeId, PingCommand,
+    RestartArmCommand, RestartCommand, SetNodeCommand, TcsError, TcsResult, Telemetry, Timestamp,
 };
 
 use crate::connection::Connection;
@@ -35,26 +33,17 @@ const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 pub struct TcsClient {
     /// The spacecraft's own link: ping it, arm it, restart it, configure it.
     connection: Box<dyn Connection>,
-    /// One link per payload: start one, stop one, ask one what it has moved.
-    ///
-    /// By name, because that is what a payload command carries -- see
-    /// [`Command::payload_name`] -- and the spacecraft takes each payload's
-    /// commands on a socket of its own, counted from
-    /// `payload_command.dest_base` by that payload's id. A command about a
-    /// payload this client has no link for is refused here rather than sent
-    /// somewhere it would be refused: the two would mean different things,
-    /// and this one is about the ground's own configuration.
-    payloads: Vec<(DHName, Box<dyn Connection>)>,
-    /// The one link every node of a version 2 graph is commanded on.
+    /// The one link every node is commanded on.
     ///
     /// One socket and not one per node: a node command carries the node's id
     /// -- see [`Command::node_id`] -- so the message says which node, where
-    /// version 1 needed a socket apiece to say it. A graph also has more
-    /// nodes than a payload set has payloads, so a socket each would spend
-    /// ports on computations and logs that nothing addresses from the ground.
+    /// version 1 needed a socket apiece to say it by name. A graph also has
+    /// more nodes than a payload set had payloads, so a socket each would
+    /// spend ports on computations and logs that nothing addresses from the
+    /// ground.
     ///
-    /// `None` for a client built for a version 1 payload set, which has no
-    /// nodes to command.
+    /// `None` for a client that has not been given one, which can command the
+    /// spacecraft and no node of it.
     nodes: Option<Box<dyn Connection>>,
     sequence: AtomicU32,
     timeout: Duration,
@@ -70,21 +59,22 @@ pub struct TcsClient {
 }
 
 impl TcsClient {
-    /// Create a new client with the spacecraft's link and one per payload.
+    /// Create a client: the spacecraft's link, and the one link every node is
+    /// commanded on.
     ///
-    /// All of them, because a client without a payload's link could not send
-    /// anything about that payload: the spacecraft takes each payload's
-    /// commands on its own socket and refuses one that arrives on another's,
-    /// and rightly, since a command on the wrong link means the two ends are
-    /// not reading the same configuration.
-    pub fn new(
-        connection: Box<dyn Connection>,
-        payloads: Vec<(DHName, Box<dyn Connection>)>,
-    ) -> Self {
+    /// Two links, because what the ground needs in a hurry must never be
+    /// queued behind what it asked for at leisure. The second is one socket
+    /// for every node, at `payload_command.dest_base` with nothing added to
+    /// it, because a command carries the node's id.
+    ///
+    /// It was a link per payload, and there was a constructor apiece: version
+    /// 1 bound one socket for each payload, that being how a command said
+    /// which payload it was about, so a client without a payload's link
+    /// could not send anything about that payload.
+    pub fn of_a_graph(connection: Box<dyn Connection>, nodes: Box<dyn Connection>) -> Self {
         Self {
             connection,
-            payloads,
-            nodes: None,
+            nodes: Some(nodes),
             sequence: AtomicU32::new(1),
             timeout: DEFAULT_TIMEOUT,
             last_sent: None,
@@ -92,21 +82,16 @@ impl TcsClient {
         }
     }
 
-    /// A client for a version 2 vehicle: the spacecraft's link and the one
-    /// link every node is commanded on.
+    /// A client with the spacecraft's link and no node link.
     ///
-    /// The two links are version 1's two, for version 1's reason, and the
-    /// second is where they differ: one socket for every node, at
-    /// `payload_command.dest_base` with nothing added to it.
-    ///
-    /// A client built this way has no payload links and sends no version 1
-    /// payload command, which is as it should be -- a graph has nodes, and a
-    /// vehicle flying one refuses a command naming a data handler.
-    pub fn of_a_graph(connection: Box<dyn Connection>, nodes: Box<dyn Connection>) -> Self {
+    /// For a program that commands the vehicle itself and no node of it: a
+    /// PING, a CONNECT, a CONFIGURE. A node command is refused rather than
+    /// sent -- see [`Self::link_for`] -- because there is nowhere for it to
+    /// go.
+    pub fn spacecraft_only(connection: Box<dyn Connection>) -> Self {
         Self {
             connection,
-            payloads: Vec::new(),
-            nodes: Some(nodes),
+            nodes: None,
             sequence: AtomicU32::new(1),
             timeout: DEFAULT_TIMEOUT,
             last_sent: None,
@@ -145,43 +130,19 @@ impl TcsClient {
     /// link here, that being the one every caller has; [`Self::connect`] asks
     /// the other one as well.
     fn link_for(&mut self, command: &Command) -> TcsResult<&mut Box<dyn Connection>> {
-        // A version 2 node command, which names a node rather than a payload:
-        // one link for all of them, the id in the message saying which. Asked
-        // first because it is the narrower question -- a command either
-        // carries a node id or it does not.
-        if command.node_id().is_some() {
-            return self.nodes.as_mut().ok_or_else(|| {
+        match command.link() {
+            // Every node command on the one link, the id in the message
+            // saying which node it is about. It was a link per payload, found
+            // by the name the command carried, which is what version 1's
+            // five payload commands needed.
+            CommandLink::Payload => self.nodes.as_mut().ok_or_else(|| {
                 TcsError::Config(format!(
-                    "{:?} is about a node of a version 2 graph and this client has \
-                     no link for one: it was built for a version 1 payload set",
+                    "{:?} is about a node and this client has no link for one: it \
+                     was given the spacecraft's link and nothing else",
                     command.cmd_type()
                 ))
-            });
-        }
-
-        match (command.link(), command.payload_name()) {
-            (CommandLink::Payload, Some(name)) => {
-                let name = name.clone();
-                self.payloads
-                    .iter_mut()
-                    .find(|(theirs, _)| *theirs == name)
-                    .map(|(_, link)| link)
-                    .ok_or_else(|| {
-                        TcsError::Config(format!(
-                            "there is no link for payload \"{}\": this ground \
-                             software read a payload set that does not describe it",
-                            name.0
-                        ))
-                    })
-            }
-            // A payload command with no payload in it cannot be placed, and
-            // the table says every one of them carries a name: this is the
-            // case that cannot happen, said rather than guessed at.
-            (CommandLink::Payload, None) => Err(TcsError::Protocol(format!(
-                "{:?} is a payload command and names no payload",
-                command.cmd_type()
-            ))),
-            (CommandLink::Spacecraft, _) => Ok(&mut self.connection),
+            }),
+            CommandLink::Spacecraft => Ok(&mut self.connection),
         }
     }
 
@@ -277,29 +238,7 @@ impl TcsClient {
 
     // -- per data handler --------------------------------------------------
 
-    /// Send a START_DH command
-    pub fn start_dh(&mut self, dh_type: DHType, name: DHName) -> TcsResult<CommandStatus> {
-        let seq = self.next_sequence();
-        let cmd = Command::StartDH(StartDHCommand::new(seq, dh_type, name));
-        let response = self.send_command(cmd)?;
 
-        match response {
-            Telemetry::StartDH(tm) => Ok(tm.header.status),
-            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
-        }
-    }
-
-    /// Send a STOP_DH command
-    pub fn stop_dh(&mut self, name: DHName) -> TcsResult<CommandStatus> {
-        let seq = self.next_sequence();
-        let cmd = Command::StopDH(StopDHCommand::new(seq, name));
-        let response = self.send_command(cmd)?;
-
-        match response {
-            Telemetry::StopDH(tm) => Ok(tm.header.status),
-            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
-        }
-    }
 
     // -- a version 2 graph's nodes -----------------------------------------
 
@@ -400,41 +339,7 @@ impl TcsClient {
 
     // -- one payload of a version 1 set ------------------------------------
 
-    /// Send a QUERY_DH command
-    ///
-    /// Three things come back: how the command was answered, what the handler
-    /// is doing, and what it has moved. The state is `None` for a handler the
-    /// spacecraft has not got, which is the NotFound answer.
-    pub fn query_dh(
-        &mut self,
-        name: DHName,
-    ) -> TcsResult<(CommandStatus, Option<DHState>, Statistics)> {
-        let seq = self.next_sequence();
-        let cmd = Command::QueryDH(QueryDHCommand::new(seq, name));
-        let response = self.send_command(cmd)?;
 
-        match response {
-            Telemetry::QueryDH(tm) => Ok((tm.header.status, tm.state, tm.statistics)),
-            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
-        }
-    }
-
-    /// Send a QUERY_DH_SAMPLE command
-    ///
-    /// Returns what the handler last sent and last received, in that order.
-    pub fn query_dh_sample(
-        &mut self,
-        name: DHName,
-    ) -> TcsResult<(CommandStatus, DHSample, DHSample)> {
-        let seq = self.next_sequence();
-        let cmd = Command::QueryDHSample(QueryDHSampleCommand::new(seq, name));
-        let response = self.send_command(cmd)?;
-
-        match response {
-            Telemetry::QueryDHSample(tm) => Ok((tm.header.status, tm.sent, tm.received)),
-            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
-        }
-    }
 
     /// Send a CONFIG command
     pub fn configure(&mut self, beacon_interval: BeaconInterval) -> TcsResult<CommandStatus> {
@@ -472,8 +377,8 @@ impl TcsClient {
     /// error comes back, the sockets go.
     pub fn close(&mut self) -> TcsResult<()> {
         let mut outcome = self.connection.close();
-        for (_, link) in self.payloads.iter_mut() {
-            outcome = outcome.and(link.close());
+        if let Some(nodes) = self.nodes.as_mut() {
+            outcome = outcome.and(nodes.close());
         }
         outcome
     }
@@ -499,9 +404,9 @@ impl TcsClientBuilder {
     pub fn build(
         self,
         connection: Box<dyn Connection>,
-        payloads: Vec<(DHName, Box<dyn Connection>)>,
+        nodes: Box<dyn Connection>,
     ) -> TcsClient {
-        let mut client = TcsClient::new(connection, payloads);
+        let mut client = TcsClient::of_a_graph(connection, nodes);
         client.set_timeout(self.timeout);
         client
     }
@@ -587,12 +492,12 @@ mod tests {
     /// the one it forgot would be the one that hung.
     #[test]
     fn a_client_times_the_commands_it_sends() {
-        let mut client = TcsClient::new(
+        let mut client = TcsClient::of_a_graph(
             Canned::answering(Telemetry::Ping(tcslibgs::PingTelemetry::new(
                 1,
                 CommandStatus::Success,
             ))),
-            vec![(DHName::new("DH0"), Canned::answering(an_answer(a_version(1))))],
+            Canned::answering(an_answer(a_version(1))),
         );
 
         assert_eq!(client.last_sent(), None, "nothing has been sent yet");
@@ -608,25 +513,22 @@ mod tests {
         assert!(received >= sent && received <= after, "answered at {received}");
     }
 
-    /// A CONNECT is asked of the spacecraft's link and of no payload's.
+    /// A CONNECT is asked of the spacecraft's link and of no node's.
     ///
     /// It is about having a connection to the vehicle, which is what that
-    /// link is; a payload's link carries what is asked of a payload, and a
-    /// ground station with no connection has nothing to ask one.
+    /// link is; the other link carries what is asked of a node, and a ground
+    /// station with no connection has nothing to ask one.
     ///
-    /// The payload link here answers with something a CONNECT never gets, so
-    /// a handshake that asked it would fail rather than pass by luck.
+    /// The node link here answers with something a CONNECT never gets, so a
+    /// handshake that asked it would fail rather than pass by luck.
     #[test]
     fn what_each_end_read_is_asked_of_the_spacecraft_alone() {
-        let mut client = TcsClient::new(
+        let mut client = TcsClient::of_a_graph(
             Canned::answering(an_answer(a_version(1))),
-            vec![(
-                DHName::new("DH0"),
-                Canned::answering(Telemetry::Ping(tcslibgs::PingTelemetry::new(
-                    1,
-                    CommandStatus::Success,
-                ))),
-            )],
+            Canned::answering(Telemetry::Ping(tcslibgs::PingTelemetry::new(
+                1,
+                CommandStatus::Success,
+            ))),
         );
 
         let (_, config_version, _) = client

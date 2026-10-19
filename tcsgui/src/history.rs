@@ -90,9 +90,9 @@ pub fn state_dir() -> Option<PathBuf> {
     // would be pointing it there for every other test in the process.
     #[cfg(test)]
     {
-        return Some(
+        Some(
             std::env::temp_dir().join(format!("tcsgui-tests-{}", std::process::id())),
-        );
+        )
     }
 
     #[cfg(not(test))]

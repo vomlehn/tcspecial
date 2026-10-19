@@ -185,13 +185,10 @@ fn run_driven_udp_node(
         // stepped by each, which over the no time between them changes
         // nothing but keeps one rule for how a decision is acted on.
         let mut buf = vec![0u8; 4096];
-        loop {
-            // From whoever sent it. The vehicle's end of this link is a port
-            // it was given rather than one the file names, so there is
-            // nothing to check an address against.
-            let Ok((n, _from)) = socket.recv_from(&mut buf) else {
-                break;
-            };
+        // From whoever sent it. The vehicle's end of this link is a port it
+        // was given rather than one the file names, so there is nothing to
+        // check an address against.
+        while let Ok((n, _from)) = socket.recv_from(&mut buf) {
             if n == 0 {
                 break;
             }

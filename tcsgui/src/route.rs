@@ -970,15 +970,15 @@ mod tests {
         // that is the shape it prefers, and the reason this rule is needed.
         let alone = way(second, &[], &[]);
         assert!(
-            shared(&alone, &[one.clone()]) > 0,
+            shared(&alone, std::slice::from_ref(&one)) > 0,
             "the two would share a run if nothing stopped them: {one:?} and \
              {alone:?}"
         );
 
         // Laid against it, it does not.
-        let two = way(second, &[], &[one.clone()]);
+        let two = way(second, &[], std::slice::from_ref(&one));
         assert_eq!(
-            shared(&two, &[one.clone()]),
+            shared(&two, std::slice::from_ref(&one)),
             0,
             "laid against the first, the second should share no run with it: \
              {one:?} and {two:?}"
@@ -1007,12 +1007,12 @@ mod tests {
         // One across, one down, meeting in the middle: a crossing.
         let across = vec![(100.0, 200.0), (400.0, 200.0)];
         let down = vec![(250.0, 100.0), (250.0, 300.0)];
-        assert_eq!(shared(&down, &[across.clone()]), 0, "a crossing is free");
+        assert_eq!(shared(&down, std::slice::from_ref(&across)), 0, "a crossing is free");
 
         // Two runs on the same line, overlapping by less than a line's own
         // width and a little: what a crossing looks like from close up.
         let brief = vec![(100.0, 200.0), (108.0, 200.0)];
-        assert_eq!(shared(&brief, &[across.clone()]), 0, "a touch is free");
+        assert_eq!(shared(&brief, std::slice::from_ref(&across)), 0, "a touch is free");
 
         // And a real shared run, which is not.
         let along = vec![(150.0, 203.0), (350.0, 203.0)];

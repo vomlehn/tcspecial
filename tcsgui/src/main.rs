@@ -2065,10 +2065,9 @@ fn troubles_of(document: &Document) -> Vec<Trouble> {
                 let line = document
                     .links
                     .iter()
-                    .filter(|link| {
+                    .rfind(|link| {
                         link.to == *node && link.input.as_deref() == Some(input.as_str())
                     })
-                    .next_back()
                     .cloned();
                 match line {
                     Some(line) => (None, String::new(), Fix::Line(line)),

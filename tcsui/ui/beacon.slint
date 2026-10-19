@@ -1,0 +1,81 @@
+// The beacon panel: a light, when the last beacon arrived, and what it said.
+//
+// Shared markup rather than a copy in each window. Two programs show it --
+// tcsmoc, beside its command link, and the `beacon` example, which shows this
+// and nothing else -- and an operator who has read one has read the other:
+// a light in a different place or a label in different words would be two
+// things to learn about one spacecraft.
+//
+// Imported by path, which is what Slint resolves relative to the importing
+// file:
+//
+//     import { BeaconPanel } from "../../tcsui/ui/beacon.slint";
+//
+// Nothing is computed here. What colour the light is and what the two lines
+// say are worked out in Rust, from what `tcslib::beacon` reports, and set as
+// properties: see the crate's `shown`.
+
+export component BeaconPanel inherits Rectangle {
+    // The light's colour, which says how stale the last beacon is. Grey
+    // before any has arrived, and grey again for the dark half of a blink.
+    in property <color> indicator-color: #c0c0c0;
+    // When the last beacon arrived, as a time of day, and the placeholder
+    // until one has.
+    in property <string> last-received: "--:--:--";
+    // What that beacon said: the build flying, the version of the
+    // configuration it is serving, and the digest of the files it read.
+    in property <string> last-message: "<none>";
+
+    // The border says this is not part of whatever sits beside it: the beacon
+    // has a socket of its own and keeps arriving after a disconnect, which is
+    // a window worth being able to read rather than one to be puzzled by.
+    border-width: 1px;
+    border-color: #808080;
+    border-radius: 4px;
+
+    VerticalLayout {
+        padding: 6px;
+        spacing: 2px;
+        // Centred, because this box is often the shorter of a row and the row
+        // is as tall as the other one.
+        alignment: center;
+
+        HorizontalLayout {
+            spacing: 8px;
+
+            Text { text: "Beacon: "; vertical-alignment: center; }
+            Rectangle {
+                width: 20px;
+                height: 20px;
+                border-radius: 10px;
+                background: indicator-color;
+                border-color: #808080;
+                border-width: 1px;
+            }
+        }
+
+        HorizontalLayout {
+            spacing: 8px;
+
+            Text { text: "Last rcvd: "; vertical-alignment: center; }
+            Text {
+                text: last-received;
+                font-size: 10px;
+                vertical-alignment: center;
+            }
+        }
+
+        // What that beacon said, under when it arrived: the two read as one
+        // message, received then and saying this.
+        HorizontalLayout {
+            spacing: 8px;
+
+            Text { text: "Last msg: "; vertical-alignment: center; }
+            Text {
+                text: last-message;
+                font-size: 10px;
+                vertical-alignment: center;
+            }
+        }
+    }
+}

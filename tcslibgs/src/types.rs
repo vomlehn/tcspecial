@@ -1021,6 +1021,43 @@ pub enum NetworkProtocol {
     UnixDgram,
 }
 
+/// The two ends of the beacon link.
+///
+/// Both ends resolve this the same way, out of the same two files, which is
+/// why it is one value: tcspecial makes its sending socket out of `send` and
+/// sends to `recv`, a ground station makes its receiving socket out of `recv`
+/// and accepts beacons from `send` and nowhere else, and a pair that
+/// disagreed would lose every beacon with nothing to show for it.
+///
+/// Here rather than in either program because both of them need it and
+/// neither owns it. It was in tcspecial, which made a ground library wanting
+/// the same two addresses either depend on the flight software or declare a
+/// second type for the same pair -- and two types for one pair is how the two
+/// ends come to disagree about where the link is.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BeaconLink {
+    /// Where beacons originate: the address and port tcspecial binds the
+    /// socket it sends them on to.
+    pub send: HostPort,
+    /// Where they are received: the address and port a ground station binds
+    /// the socket it receives them on to.
+    pub recv: HostPort,
+}
+
+impl BeaconLink {
+    /// The beacon link a command interpreter's configuration states.
+    ///
+    /// What a configuration with no payload set's `tcspecial` section to
+    /// prefer comes to; see `tcspecial::config::beacon` for the pair of
+    /// files.
+    pub fn of(ci: &CIConfig) -> BeaconLink {
+        BeaconLink {
+            send: ci.beacon_send.clone(),
+            recv: ci.beacon_recv.clone(),
+        }
+    }
+}
+
 /// Configuration for a network endpoint
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NetworkConfig {

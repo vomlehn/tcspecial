@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../tcsgui/share/schema/tcspecial.xsd">
+    <version>2.0</version>
+    <description>A beacon, and a ground station that watches it</description>
+    <tcspecial>
+        <!-- What this example is about. tcspecial sends a beacon from send
+             every interval and the ground station receives it at recv, so
+             these two are the whole of the link the example shows.
+
+             The ports are this example's own, a hundred above the ones the
+             others use, so that the beacon watcher can be left running while
+             another example is looked at. -->
+        <beacon>
+            <interval>5 s</interval>
+            <recv>127.0.0.1:5750</recv>
+            <send>0.0.0.0:5650</send>
+        </beacon>
+        <log>
+            <directory>/tmp/telemetry</directory>
+            <segment_size>65536</segment_size>
+        </log>
+        <payload_command>
+            <dest_base>0.0.0.0:4400</dest_base>
+            <source_base>127.0.0.1:4500</source_base>
+        </payload_command>
+        <payload_telemetry>
+            <dest_base>127.0.0.1:6300</dest_base>
+            <source_base>0.0.0.0:6200</source_base>
+        </payload_telemetry>
+        <tcs_cmd>
+            <recv>0.0.0.0:4600</recv>
+            <send>127.0.0.1:4700</send>
+        </tcs_cmd>
+    </tcspecial>
+    <!-- A beacon is sent because tcspecial is running rather than because a
+         payload has anything to say, so this example needs a payload only
+         because a configuration describes a vehicle and a vehicle with
+         nothing aboard is not one. Its readings go to the ground over
+         payload_telemetry, as any payload's do when nothing aboard touches
+         them. -->
+    <payloads>
+        <name>sensor</name>
+        <type>network</type>
+        <protocol>udp</protocol>
+        <address>127.0.0.1</address>
+        <port>5101</port>
+    </payloads>
+    <tcsgui>
+        <nodes><name>sensor</name><x>34</x><y>34</y></nodes>
+    </tcsgui>
+</configuration>

@@ -24,12 +24,13 @@ use tcslibgs::{
 use tcspecial::config::{beacon, load_tcspecial_config, tcspecial_config_path, Beacon};
 use tcsverify::startup::Startup;
 
-use crate::beacon_receive::{BeaconReceive, Contact};
+use crate::beacon_receive::BeaconReceive;
+use tcslib::beacon::Contact;
 use crate::oc_link::Arrivals;
 use tcslibgs::Edge;
 use crate::ci_link::{CiLink, PayloadLink, NOT_CONNECTED};
 use crate::endpoint::endpoint_description;
-use crate::config::constants::{self as constants, BEACON_INDICATOR};
+use crate::config::constants::{self as constants, beacon_schedule};
 use crate::freshness::freshness_of;
 
 slint::include_modules!();
@@ -808,7 +809,7 @@ impl ProcessManager {
     fn start_child(&self, name: &str, payload_path: &str) {
         let child = child_command(name, payload_path)
             .spawn()
-            .expect(&format!("Failed to start {}", name));
+            .unwrap_or_else(|_| panic!("Failed to start {}", name));
 
         *self.child.lock().unwrap() = Some(child);
         *self.name.lock().unwrap() = name.to_string();
@@ -1134,7 +1135,7 @@ fn main() {
             BeaconReceive::new(
                 beacon_ui_weak,
                 beacon,
-                BEACON_INDICATOR.clone(),
+                beacon_schedule(),
                 contact.clone(),
                 digest,
                 Some(ask_whether_to_continue(
@@ -1837,7 +1838,7 @@ fn hear_what_tcspecial_read(
             // function that writes them: the two are read against each other.
             eprintln!(
                 "CONNECT answer: {}",
-                beacon_receive::what_it_read(
+                tcslib::beacon::what_it_read(
                     their_version,
                     their_config_version,
                     their_digest
@@ -3109,16 +3110,20 @@ mod tests {
         assert!(
             shown
                 .iter()
-                .any(|line| line == beacon_receive::NO_BEACON_MESSAGE),
+                .any(|line| line == tcslib::beacon::NO_BEACON_MESSAGE),
             "the beacon box does not say that nothing has been said: {shown:?}"
         );
 
-        // And after one, the time it arrived and what it said.
+        // And after one, the time it arrived and what it said. What to show
+        // is tcsui's to work out, from what the beacon loop reports; what is
+        // checked here is that this window shows it.
         beacon_receive::show_beacon(
             &ui,
-            Some(std::time::UNIX_EPOCH + Duration::from_secs(7322)),
-            slint::Color::from_rgb_u8(0, 255, 0),
-            "version 0.1.0, md5 0123456789abcdef",
+            &tcsui::Shown::at(
+                &tcslib::beacon::Schedule::standard().at(Duration::ZERO),
+                Some(std::time::UNIX_EPOCH + Duration::from_secs(7322)),
+                "version 0.1.0, md5 0123456789abcdef",
+            ),
         );
         let shown = on_screen(&ui);
         assert!(
@@ -3884,7 +3889,7 @@ mod tests {
     /// what lets a panel's row number name a data handler.
     #[test]
     fn a_panel_row_names_the_handler_at_that_index() {
-        let dh_configs = vec![
+        let dh_configs = [
             DHConfig {
                 name: DHName::new("DH7"),
                 endpoint: EndpointConfig::Device(DeviceConfig {

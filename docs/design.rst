@@ -8056,14 +8056,48 @@ Requirement
 
 Requirement
     The beacons also say whether the spacecraft is being heard from at all,
-    which the panels act on. Contact is held for as long as the indicator
-    shows the colour of being heard from -- the leading states of it, blinking
-    or steady, a blinking green being beacons that are arriving and ageing
-    rather than gone -- and is lost when the indicator leaves that colour,
-    when no beacon has ever arrived, and when the system clock has moved so
-    that the last one is in the future. One reading serves both, taken where
-    the colour is taken, so the light and the panels cannot say different
-    things about one beacon.
+    which the panels act on. Contact is held for as long as the last beacon's
+    age is within the leading run of stages that count as being heard from --
+    blinking or steady, a light that has begun to blink being beacons that are
+    arriving and ageing rather than gone -- and is lost past that run, when no
+    beacon has ever arrived, and when the system clock has moved so that the
+    last one is in the future. One reading serves both the light and the
+    panels, so the two cannot say different things about one beacon.
+
+**Where the beacon's code lives**
+
+Not here. A beacon is the one thing a ground station knows without asking, so
+every ground station wants it, and what it means does not depend on the window
+it is shown in.
+
+Requirement
+    What a beacon is and what has become of it is a library's: the socket, the
+    datagram, the digest comparison, the beacons that did not arrive and how
+    stale the last one is. No toolkit is linked into it, because a ground
+    station with no screen -- a logger, a test, a program that only watches --
+    needs the facts and not the look. It is ``tcslib::beacon``.
+
+Requirement
+    How stale the last beacon is, is a named stage and not a colour. A stage
+    is what is true of the spacecraft; a colour is one way of saying it, and
+    the stages are what both the light and the panels are worked out from. The
+    stages and their timings are one schedule, which is the library's, so two
+    ground stations watching one spacecraft cannot differ about how late a
+    beacon is.
+
+Requirement
+    The panel is shared markup, imported by every window that shows it, with
+    what to show on it worked out beside it: ``tcsui``. Two windows show it --
+    this one, beside its command link, and the ``beacon`` example, which shows
+    it and nothing else -- and an operator who has read one has read the
+    other, where a light in a different place or a label in different words
+    would be two things to learn about one spacecraft.
+
+Requirement
+    What is left in a ground program is the wiring: read the configuration to
+    find where the beacons are, run the loop on a thread, put each pass in the
+    window. The ``beacon`` example is that and nothing else, which is what
+    makes it worth reading.
 
 Requirement
     A panel starts unknown and stays unknown until somebody asks. A MOC that

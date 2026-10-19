@@ -1746,6 +1746,53 @@ or later -- builds the vehicle and the ground station, runs them together,
 prints the line, and stops. ``make -C examples check-python3`` makes the check
 on its own.
 
+The beacon example
+------------------
+.. figure:: ../examples/beacon/beacon.svg
+   :alt: The beacon example: tcspecial sending a beacon every five seconds to
+         the ground station beacon_watch, which shows it on the beacon panel
+         -- a light, the time the last one arrived, and what it said.
+   :width: 100%
+
+   ``examples/beacon``: a beacon, and a window watching it.
+
+What a ground station knows about a spacecraft without asking it anything.
+tcspecial sends a beacon from ``beacon.send`` to ``beacon.recv`` every
+``beacon.interval`` for as long as it runs, over a socket of its own and
+whether or not anything has connected to it -- so this example commands
+nothing, and still says whether the vehicle is alive, which build it is, which
+version of a configuration it is serving, and whether that is the
+configuration the ground read.
+
+The ports are the example's own, a hundred above the other examples', so the
+watcher can be left running while another example is looked at. Its one
+payload, ``sensor``, is there because a configuration describes a vehicle and
+a vehicle with nothing aboard is not one; its readings reach the ground over
+``payload_telemetry`` and have nothing to do with the beacon.
+
+It is also the example of how a ground program is put together, because almost
+none of it is the program's own:
+
+* ``tcslib::beacon`` binds the socket, reads each datagram, counts the beacons
+  that did not arrive, compares the digest each one carries with the ground's
+  own, and says how stale the last one is as a stage: heard, ageing, silent.
+  There is no toolkit in it, so a ground station with no screen -- a logger, a
+  test -- uses exactly this.
+* ``tcsui`` holds the panel, as markup other windows import, and works out
+  what to show on it: which colour the light is, and the two lines beside it.
+* ``beacon_watch``, the program in the example, reads the configuration to
+  find where the beacons are, starts the loop on a thread of its own, and puts
+  each pass in the window.
+
+tcsmoc shows that same panel from that same library, in a row beside its
+command link. That is the point of their being apart: what a beacon means is
+one thing wherever it is shown, and an operator who has read one window has
+read the other.
+
+``make -C examples run-beacon`` builds both ends, runs the vehicle in the
+background and the watcher in front of it, and stops the vehicle when the
+window is closed. The watcher opens a window, so it wants a display.
+
 The Simulator Configuration
 ===========================
 What simulating a payload takes, which is not a property of the payload: how

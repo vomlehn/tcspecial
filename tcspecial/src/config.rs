@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use tcslibgs::{
-    host_port_of, load_config_file, CIConfig, CIConfigJson, HostPort, TcsError, TcsResult,
+    host_port_of, load_config_file, CIConfig, CIConfigJson, TcsError, TcsResult,
 };
 
 /// Load tcspecial configuration from a YAML or XML file.
@@ -14,27 +14,19 @@ pub fn load_tcspecial_config<P: AsRef<Path>>(path: P) -> TcsResult<CIConfig> {
     let tcspecial_config_file: CIConfigJson = load_config_file(path)?;
 
     let tcspecial_config = tcspecial_config_file.to_ci_config()
-        .map_err(|e| TcsError::Config(e))?;
+        .map_err(TcsError::Config)?;
 
     Ok(tcspecial_config)
 }
 
-/// The two ends of the beacon link.
+/// The two ends of the beacon link: `tcslibgs::BeaconLink`, under the name
+/// this module has always called it.
 ///
-/// Both ends resolve this the same way, out of the same two files, which is
-/// the whole point of its being a function: tcspecial makes its sending socket
-/// out of `send` and sends to `recv`, tcsmoc makes its receiving socket out of
-/// `recv`, and a pair that disagreed would lose every beacon with nothing to
-/// show for it.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Beacon {
-    /// Where beacons originate: the address and port tcspecial binds the
-    /// socket it sends them on to.
-    pub send: HostPort,
-    /// Where they are received: the address and port tcsmoc binds the socket
-    /// it receives them on to.
-    pub recv: HostPort,
-}
+/// The type is in the shared library because both ends need it and neither
+/// owns it -- tcspecial sends and a ground station listens -- and the name
+/// stays here because this is where a reader of the flight software looks for
+/// it.
+pub use tcslibgs::BeaconLink as Beacon;
 
 /// Where beacons go: what the payload set said, or what the command
 /// interpreter's own file said for a set that said nothing.

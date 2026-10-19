@@ -1235,6 +1235,105 @@ mod tests {
         assert_eq!(read(), b"$GPRMC\n".to_vec());
     }
 
+    /// A serial node on a real line hands over whole reads, however the
+    /// bytes arrive.
+    ///
+    /// End to end: a pseudo-terminal, which is the line tcssim stands in
+    /// with, a node on it as a configuration states one, opened as the vehicle
+    /// opens it. The line is raw, so the kernel hands over whatever bytes have
+    /// arrived; a sentence written in pieces comes out whole only because the
+    /// node's stream rule said where it ends.
+    #[test]
+    fn a_line_on_a_pseudo_terminal_is_read_a_whole_read_at_a_time() {
+        use std::io::Write;
+        use std::os::unix::io::FromRawFd;
+        use tcslibgs::graph::{Destinations, Link, Node};
+
+        let master_fd = unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY) };
+        assert!(
+            master_fd >= 0,
+            "no pty: {}",
+            std::io::Error::last_os_error()
+        );
+        let mut master = unsafe { std::fs::File::from_raw_fd(master_fd) };
+        assert_eq!(unsafe { libc::grantpt(master_fd) }, 0);
+        assert_eq!(unsafe { libc::unlockpt(master_fd) }, 0);
+        let mut name = [0 as libc::c_char; 128];
+        assert_eq!(
+            unsafe { libc::ptsname_r(master_fd, name.as_mut_ptr(), name.len()) },
+            0
+        );
+        let line = unsafe { std::ffi::CStr::from_ptr(name.as_ptr()) }
+            .to_string_lossy()
+            .into_owned();
+
+        let gps = Node {
+            name: "gps".to_string(),
+            node_type: "serial".to_string(),
+            group: None,
+            attributes: [
+                ("path", line.as_str()),
+                ("datarate", "9600"),
+                ("stop_bits", "1"),
+                ("byte_length", "8"),
+                ("max_length", "64"),
+                ("terminators", "0x0A"),
+            ]
+            .into_iter()
+            .map(|(a, v)| (a.to_string(), tcslibgs::Scalar::of(v)))
+            .collect(),
+        };
+        let moc = Node {
+            name: "moc".to_string(),
+            node_type: "moc".to_string(),
+            group: None,
+            attributes: Default::default(),
+        };
+        let graph = Graph {
+            description: None,
+            tcspecial: None,
+            groups: Vec::new(),
+            nodes: vec![gps.clone(), moc],
+            links: vec![Link {
+                from: "gps".to_string(),
+                to: Destinations::of(vec!["moc".to_string()]),
+                comment: None,
+            }],
+            commands: Vec::new(),
+            files: Vec::new(),
+            homes: Default::default(),
+            placed: Default::default(),
+            set_aside: Default::default(),
+        };
+        let mut port = EndpointPort::open(&gps, &Routes::of(&graph), &Abandon::nothing())
+            .expect("the line opens");
+
+        // What the next few passes take, for long enough that a byte written
+        // to the far end has crossed the line.
+        let taken = |port: &mut EndpointPort| -> Vec<u8> {
+            let mut buffer = [0u8; 64];
+            for _ in 0..50 {
+                let n = port.take(&mut buffer).expect("a read").bytes;
+                if n > 0 {
+                    return buffer[..n].to_vec();
+                }
+                std::thread::sleep(Duration::from_millis(2));
+            }
+            Vec::new()
+        };
+
+        master.write_all(b"$GPGGA").expect("written");
+        assert_eq!(
+            taken(&mut port),
+            b"".to_vec(),
+            "half a sentence is nothing yet"
+        );
+        master.write_all(b",1\n$GP").expect("written");
+        assert_eq!(taken(&mut port), b"$GPGGA,1\n".to_vec());
+        master.write_all(b"RMC\n").expect("written");
+        assert_eq!(taken(&mut port), b"$GPRMC\n".to_vec());
+    }
+
     /// The links say which way each node is used.
     #[test]
     fn the_links_say_which_way_a_node_is_used() {

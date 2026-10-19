@@ -5,8 +5,8 @@
 //! formats below are just different spellings of it. Adding a format means
 //! adding a variant here, never a second set of structs.
 //!
-//! The format-level structs (`CIConfigJson`, `DHConfigJson`) are deliberately
-//! flat -- scalars and `Option`s only, no enums. XML has no native sequence or
+//! The format-level structs (`CIConfigJson`, and a node's map of attributes)
+//! are deliberately flat -- scalars and `Option`s only, no enums. XML has no native sequence or
 //! variant type, so a flat shape is the subset both formats agree on.
 //!
 //! There were three. JSON was read as well, and was the format an

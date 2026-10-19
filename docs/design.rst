@@ -5477,11 +5477,11 @@ Link Terms
 Three types of payload are on a link of their own -- a serial line, a device
 on an I2C bus, a peripheral on a SPI bus -- and each has terms that say how
 that link is driven: a data rate, an address on a bus, the shape of a clock.
-A payload states them beside everything else it states, and may take any of
-them from its group as it takes the rest.
+A node states them among its attributes, beside everything else it states.
 
 The rules are in ``tcslibgs::endpoint_config`` and the per-type modules beside
-it, and are asked of a payload by ``types::link_params_of``.
+it, and are asked of a node by ``graph::reach``, through
+``types::kind_of_terms``.
 
 Requirement
     A term that belongs to another type of link is an error rather than
@@ -8244,9 +8244,9 @@ That tcsverify states no rule of its own is what the library's ``verify::Problem
 first thing wrong with a file and nothing else -- it cannot run, and which of
 several mistakes it names changes nothing -- where a reader wants all of them.
 So the rules are stated once and collect their answers:
-``PayloadConfig::to_dh_configs`` and ``SimConfigFile::resolve`` return the
-first problem, which is what they always returned, and
-``PayloadConfig::check`` and ``SimConfigFile::problems`` return the lot.
+``Graph::load`` refuses a file at the first thing in it that does not read and
+``SimConfigFile::resolve`` at the first problem; ``Graph::check`` and
+``SimConfigFile::problems`` return the lot.
 
 **Where a line number comes from**
 

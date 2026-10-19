@@ -1,10 +1,10 @@
 //! The rules of a link: a serial line, an I2C bus, a SPI peripheral.
 //!
 //! What terms each kind of link takes, which of them it must be told, what each
-//! means, and which belong to another kind. A tcspecial configuration states
-//! them
-//! -- see `types::link_params_of`, which is the only caller -- and the rules
-//! are here, once, rather than beside each file format that can state them.
+//! means, and which belong to another kind. A node of a configuration states
+//! them as its attributes -- see `crate::graph::reach`, which gathers them and
+//! asks `types::kind_of_terms`, the only caller -- and the rules are here,
+//! once, rather than beside each file format that can state them.
 //!
 //! There was a second file format that stated them: an endpoint
 //! configuration, with a general section, groups of endpoints, and the
@@ -371,8 +371,8 @@ pub enum EndpointLocation {
 /// It was a wire type once: an endpoint configuration file deserialized
 /// straight into it, which is why every field carried an XML `@` alias and a
 /// hyphenated spelling beside its own. Nothing deserializes into it now -- a
-/// tcspecial configuration has its own shape, and `types::link_params_of` fills
-/// this in from a payload -- so the aliases are gone and so is the name.
+/// configuration has its own shape, and `crate::graph::reach` fills this in
+/// from a node's attributes -- so the aliases are gone and so is the name.
 #[derive(Debug, Default)]
 pub(crate) struct LinkTerms {
     // A line.

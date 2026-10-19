@@ -1467,6 +1467,30 @@ mod tests {
         assert!(said.contains("service"), "the error should name what is missing: {said}");
     }
 
+    /// A network node may be asked, whatever its protocol, datagrams
+    /// included.
+    ///
+    /// A node states where it is, so the vehicle has somewhere to send a
+    /// trigger before the node has said anything: the question goes to the
+    /// address and port the node states, and the answer comes back on the
+    /// same socket.
+    #[test]
+    fn a_datagram_node_may_be_triggered() {
+        for protocol in ["udp", "unix_dgram", "tcp"] {
+            let reach = reached(
+                "network",
+                &[
+                    ("protocol", protocol),
+                    ("address", "127.0.0.1"),
+                    ("port", "5000"),
+                    ("trigger", "\"READ\""),
+                ],
+            )
+            .unwrap_or_else(|e| panic!("{protocol}: {e}"));
+            assert_eq!(reach.trigger.as_deref(), Some(b"READ".as_slice()), "{protocol}");
+        }
+    }
+
     /// An rpmsg node may be asked: the channel carries both directions.
     #[test]
     fn an_rpmsg_node_may_be_triggered() {

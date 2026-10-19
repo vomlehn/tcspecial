@@ -3,15 +3,32 @@
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="tcsgui/share/schema/tcspecial.xsd">
     <version>2.0</version>
-    <description>One payload on a UDP link, its telemetry going to the ground</description>
+    <description>The ground link alone, ready for payloads to be added</description>
     <tcspecial>
         <beacon>
             <interval>1 s</interval>
+            <recv>127.0.0.1:5650</recv>
+            <send>0.0.0.0:5550</send>
         </beacon>
+        <payload_command>
+            <dest_base>0.0.0.0:4200</dest_base>
+            <source_base>127.0.0.1:4300</source_base>
+        </payload_command>
+        <payload_telemetry>
+            <dest_base>127.0.0.1:6100</dest_base>
+            <source_base>0.0.0.0:6000</source_base>
+        </payload_telemetry>
+        <tcs_cmd>
+            <recv>0.0.0.0:4000</recv>
+            <send>127.0.0.1:4100</send>
+        </tcs_cmd>
     </tcspecial>
     <moc>
         <name>moc-1</name>
         <type>moc</type>
+        <address>127.0.0.1</address>
+        <ground_base>127.0.0.1:5100</ground_base>
+        <port>5000</port>
     </moc>
     <tcsgui>
         <nodes><name>moc-1</name><x>469</x><y>34</y></nodes>

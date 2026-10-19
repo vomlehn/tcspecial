@@ -70,9 +70,43 @@ impl ConfigFormat {
     pub fn parse<T: DeserializeOwned>(self, text: &str) -> TcsResult<T> {
         match self {
             ConfigFormat::Yaml => serde_norway::from_str(text).map_err(TcsError::from),
-            ConfigFormat::Xml => quick_xml::de::from_str(text).map_err(TcsError::from),
+            ConfigFormat::Xml => {
+                let mut reader = quick_xml::de::Deserializer::from_str(text);
+                T::deserialize(&mut reader).map_err(|error| {
+                    let (line, column) = xml_position(text, &error, reader.get_ref().get_ref());
+                    TcsError::Xml {
+                        error,
+                        line,
+                        column,
+                    }
+                })
+            }
         }
     }
+}
+
+/// The line and column, counted from one, an XML error is to be reported at.
+///
+/// Markup that does not parse is where its `<` is, which the reader keeps for
+/// just that. Anything else -- an element the type has no field for, a value
+/// that is not one -- is found by the deserializer after it has read the
+/// event, so it is where the reader stopped: just past the tag or the text in
+/// question, and on its line unless the element runs over several.
+fn xml_position(
+    text: &str,
+    error: &quick_xml::DeError,
+    reader: &quick_xml::Reader<&[u8]>,
+) -> (usize, usize) {
+    let offset = match error {
+        quick_xml::DeError::InvalidXml(_) => reader.error_position(),
+        _ => reader.buffer_position(),
+    };
+    let bytes = text.as_bytes();
+    let before = &bytes[..usize::try_from(offset).map_or(bytes.len(), |at| at.min(bytes.len()))];
+    let line_start = before.iter().rposition(|b| *b == b'\n').map_or(0, |at| at + 1);
+    let line = before.iter().filter(|b| **b == b'\n').count() + 1;
+    let column = String::from_utf8_lossy(&before[line_start..]).chars().count() + 1;
+    (line, column)
 }
 
 /// Read and parse a configuration file, choosing the parser from its extension.
@@ -118,5 +152,45 @@ mod tests {
                 "{name}: the refusal does not say what is read: {said}"
             );
         }
+    }
+
+    /// An XML file that does not read says where, as a YAML file does.
+    ///
+    /// quick-xml's own error carries no position, and a file refused for a
+    /// misspelled element was reported on its first line, which is the one
+    /// line it was certainly not wrong on.
+    #[test]
+    fn an_xml_error_says_where_the_reader_stopped() {
+        #[derive(serde::Deserialize, Debug)]
+        #[serde(deny_unknown_fields)]
+        #[allow(dead_code)]
+        struct Doc {
+            #[serde(rename = "@x")]
+            x: Option<String>,
+            a: String,
+            b: Option<String>,
+        }
+        let at = |text: &str| match ConfigFormat::Xml.parse::<Doc>(text) {
+            Err(TcsError::Xml { line, column, .. }) => (line, column),
+            other => panic!("{text:?} was read as {other:?}"),
+        };
+
+        // An element the type has no field for: on its line, the column being
+        // wherever the deserializer had read to before it refused it.
+        assert_eq!(at("<doc>\n  <a>x</a>\n  <c>y</c>\n</doc>\n").0, 3);
+        // A closing tag that is not the open element's: where it starts.
+        assert_eq!(at("<doc>\n  <a>x</b>\n</doc>\n"), (2, 7));
+        // A root over several lines does not throw the count off.
+        assert_eq!(
+            at("<doc\n    x=\"1\">\n  <a>x</a>\n  <c/>\n</doc>\n").0,
+            4
+        );
+
+        // And the message says so, in the words YAML's does.
+        let said = ConfigFormat::Xml
+            .parse::<Doc>("<doc>\n  <c/>\n</doc>\n")
+            .expect_err("c is no field")
+            .to_string();
+        assert!(said.contains("at line 2 column"), "{said}");
     }
 }

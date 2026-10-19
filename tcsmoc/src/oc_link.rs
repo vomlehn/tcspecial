@@ -97,7 +97,7 @@ mod tests {
 
         let arrival = Arrival {
             at,
-            data: data.clone(),
+            data,
             packets: 1,
             sends_values: true,
         };

@@ -98,6 +98,13 @@ pub struct PayloadConfig {
     /// changed while the simulator runs -- a panel may retime a payload --
     /// and an atomic holds a number. They become lengths of time in one
     /// place, [`Pacing::read`], which is what the waiting is done with.
+    /// What this payload is to a thermal mass, where it is attached to one.
+    ///
+    /// `None` for every payload that is not, which is every payload in every
+    /// simulator file that declares no mass: such a payload sends bytes from
+    /// a random number generator, which is what this simulator did for
+    /// everything before there was a mass to read.
+    pub thermal: Option<crate::thermal::Thermal>,
     pub packet_interval_ms: Arc<AtomicU32>,
     pub segment_interval_ms: Arc<AtomicU32>,
 }
@@ -471,6 +478,15 @@ pub(crate) fn a_packet(
 ) -> Produce {
     let faults = &config.faults;
 
+    // A heater sends nothing. What it is for is being driven: the vehicle
+    // writes a decision to it and the thermal mass it warms is told, so a
+    // packet of its own would be bytes nothing reads. Its packet interval is
+    // how often it looks for that decision, which is the one thing its pacing
+    // still means.
+    if matches!(config.thermal, Some(crate::thermal::Thermal::Heats { .. })) {
+        return Produce::Nothing;
+    }
+
     // Gone quiet and still connected: what a wedged instrument looks like
     // from the handler's end, and harder to notice than one that closed.
     if faults.silent_after > 0 && sent >= faults.silent_after {
@@ -481,7 +497,22 @@ pub(crate) fn a_packet(
         return Produce::Nothing;
     }
 
-    let mut packet: Vec<u8> = (0..pacing.packet_size).map(|_| rng.gen()).collect();
+    // A sensor attached to a thermal mass sends what the mass is, in the
+    // encoding its own conversion reads back: see `crate::thermal`. Every
+    // other payload sends bytes from the generator, which is what this
+    // simulator did for everything before there was a mass to read.
+    //
+    // The packet size is not consulted. What a reading of this sensor is, is
+    // the format's business -- two bytes or three -- and a size that
+    // disagreed with it would be a reading the vehicle could not parse. A
+    // payload configuration whose read_size does not match its conversion's
+    // format is a fault in that file, and the vehicle finds it.
+    let mut packet: Vec<u8> = match &config.thermal {
+        Some(crate::thermal::Thermal::Reads { mass, reading }) => {
+            crate::thermal::encode(reading, mass.temperature())
+        }
+        _ => (0..pacing.packet_size).map(|_| rng.gen()).collect(),
+    };
 
     // A packet of one byte is left alone: there is no length that is both
     // shorter than one and not empty, and an empty packet is the dropping
@@ -628,7 +659,8 @@ mod tests {
     /// payload that works has.
     fn with(faults: Faults) -> PayloadConfig {
         PayloadConfig {
-            name: "DH0".to_string(),
+            thermal: None,
+                        name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: "127.0.0.1".to_string(),
             port: 5000,
@@ -987,7 +1019,8 @@ mod tests {
     #[test]
     fn test_payload_config() {
         let config = PayloadConfig {
-            name: "DH0".to_string(),
+            thermal: None,
+                        name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: "127.0.0.1".to_string(),
             port: 5000,

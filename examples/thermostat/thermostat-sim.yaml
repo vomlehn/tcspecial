@@ -3,16 +3,41 @@
 # How tcssim stands in for the payloads of thermostat.yaml.
 #
 # The two files are joined by name, and nothing here names a payload that
-# file does not have. Only the payloads named here are simulated: the heaters
-# are driven and never read, so there is nothing to send in their place, and
-# they are left out.
+# file does not have. Only the payloads named here are simulated.
+#
+# The three sensors report a thermal mass rather than noise, which is what
+# makes the vehicle's half of the loop watchable: three readings of one
+# temperature agree, so the vote produces a temperature and the thermostat
+# decides on it.
+#
+# The heaters are not attached to the mass, and that is the half this file
+# cannot close. They are discrete lines, and a line is a wire: the simulator
+# stands in for one through the kernel's gpio-sim, which it can drive and
+# cannot yet be driven through, so there is nothing here to notice that the
+# vehicle switched the heaters on. What the mass does is cool towards its
+# environment, and what the example shows is the vehicle deciding to heat it.
+# A loop that closes needs heaters of a kind the simulator can be driven
+# through, which today means a socket; the simulator's own tests close one
+# that way.
 description: Simulator settings for the payloads of thermostat.yaml
 
+thermal_mass:
+  # The cabin: ten kelvin below the setpoint of thermostat.yaml, losing the
+  # difference with a fifty second constant -- which at the setpoint is a
+  # fifth of a kelvin a second of cooling.
+  - name: cabin
+    environment: "283.15"
+    time_constant: "50 s"
+
 simulated_payload_groups:
-  # The three sensors are read together, every three seconds, as their
-  # payload group in thermostat.yaml says.
+  # The three sensors are read together, every tenth of a second, as their
+  # payload group in thermostat.yaml says. Each reports the cabin, in the
+  # encoding the to_kelvin node its readings go to expects: this file says
+  # nothing about the format, the scale or the offset, because a scale written
+  # in two files is a scale that can disagree with itself.
   - name: cabin_temps
-    packet_interval: 3 s
+    packet_interval: 100 ms
+    reads: cabin
 
 simulated_payloads:
   - name: temp_1

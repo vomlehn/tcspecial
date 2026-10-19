@@ -118,6 +118,7 @@ mod tests {
     /// A channel the handler would open at `path`.
     fn channel_at(path: &str, triggered: bool, interval_ms: u32) -> PayloadConfig {
         PayloadConfig {
+            thermal: None,
             name: "remote".to_string(),
             protocol: PayloadProtocol::Rpmsg,
             address: path.to_string(),

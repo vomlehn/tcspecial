@@ -66,8 +66,8 @@ use crate::node::vehicle::null::Through;
 use crate::runtime::node_state::Abandon;
 
 use crate::endpoint::{
-    bind_endpoint_pair, connect_endpoint_pair, EndpointReadable, EndpointWritable,
-    WaitResult,
+    bind_endpoint_pair, connect_endpoint_pair, driven_endpoint_pair, EndpointReadable,
+    EndpointWritable, WaitResult,
 };
 use crate::runtime::fabric::{Arriving, Port, Taken};
 use crate::runtime::route::Routes;
@@ -182,6 +182,15 @@ impl EndpointPort {
         Ok(EndpointPort::of(what, reader, writer, uses))
     }
 
+    /// Reach out to a payload that is only driven, as one node.
+    ///
+    /// For a heater or a valve: see [`crate::endpoint::driven_endpoint_pair`]
+    /// for why the ends swap roles when nothing is read.
+    pub fn driving(what: &str, config: &EndpointConfig, uses: Use) -> TcsResult<EndpointPort> {
+        let (reader, writer) = driven_endpoint_pair(what, config)?;
+        Ok(EndpointPort::of(what, reader, writer, uses))
+    }
+
     /// Wait at the address this configuration describes, as one node.
     ///
     /// For a link to the MOC, which sends to an address it was told, so this
@@ -240,6 +249,10 @@ impl EndpointPort {
 
         let opened = if node.node_type == "moc" {
             EndpointPort::bind(&node.name, &reach.endpoint, uses)
+        } else if uses == Use::Driven {
+            // Nothing is read from this one, so there is nobody to learn from:
+            // what the node says is where the device is, and this sends there.
+            EndpointPort::driving(&node.name, &reach.endpoint, uses)
         } else {
             EndpointPort::connect(&node.name, &reach.endpoint, uses)
         };

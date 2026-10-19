@@ -33,6 +33,65 @@ pub const DEFAULT_PACKET_BYTES: usize = 16;
 ///
 /// A name in the simulator file that is not a payload node, or a payload node
 /// the simulator cannot stand in for, is refused, saying which.
+/// How a reading of this payload is encoded, from the conversion it feeds.
+///
+/// A simulated sensor attached to a thermal mass has to send bytes the vehicle
+/// will read back as the mass's temperature, and what those bytes are is not
+/// the sensor's own business: the payload says `read_size` and nothing else,
+/// and the format, the scale and the offset are on the `to_kelvin` node its
+/// readings go to. So the encoding is taken from there.
+///
+/// Taken rather than stated again in the simulator file. The two files are
+/// joined by name and nothing else, and a scale written in both is a scale
+/// that can disagree with itself -- which would show up as a simulated
+/// temperature the vehicle reads back as a different one, with both files
+/// looking right.
+///
+/// Refused where there is not exactly one conversion to take it from: a
+/// sensor feeding none has no encoding to borrow, and one feeding two that
+/// disagree has no single answer.
+pub fn reading_of(
+    graph: &Graph,
+    payload: &str,
+) -> Result<crate::node::vehicle::compute::ToKelvinParams, String> {
+    use crate::node::vehicle::compute::{params_of, Computation};
+
+    let mut found: Vec<(String, crate::node::vehicle::compute::ToKelvinParams)> = Vec::new();
+    for link in graph.links.iter().filter(|l| l.origin().node == payload) {
+        for destination in link.to.each() {
+            let to = Destination::parse(destination).node;
+            let Some(node) = graph.node(&to) else { continue };
+            if node.node_type != "compute" {
+                continue;
+            }
+            if let Ok(Computation::ToKelvin(params)) = params_of(&node.name, &node.attributes) {
+                if !found.iter().any(|(name, _)| name == &to) {
+                    found.push((to, params));
+                }
+            }
+        }
+    }
+
+    match found.len() {
+        1 => Ok(found.remove(0).1),
+        0 => Err(format!(
+            "\"{payload}\" reads a thermal mass, and nothing converts its \
+             readings: a simulated sensor sends the bytes a to_kelvin node \
+             would read back as the temperature, so there has to be one to \
+             take the format, the scale and the offset from"
+        )),
+        _ => {
+            let named: Vec<&str> = found.iter().map(|(name, _)| name.as_str()).collect();
+            Err(format!(
+                "\"{payload}\" reads a thermal mass and its readings go to {} \
+                 conversions ({}): there is no one encoding to send them in",
+                found.len(),
+                named.join(", ")
+            ))
+        }
+    }
+}
+
 pub fn handlers(graph: &Graph, sim_file: &SimConfigFile) -> Result<Vec<DHConfig>, String> {
     for entry in &sim_file.simulated_payloads {
         match graph.node(&entry.name) {
@@ -58,16 +117,39 @@ pub fn handlers(graph: &Graph, sim_file: &SimConfigFile) -> Result<Vec<DHConfig>
         // A payload that is only driven -- a heater, a valve -- is written to
         // and never read, and a stand-in for it would be sending data nothing
         // reads into a device the vehicle is trying to drive.
+        //
+        // Unless it warms a thermal mass. Then being driven is the whole of
+        // what it is for: the stand-in sends nothing and watches what arrives,
+        // so that the mass the sensors read is warmed by what the vehicle
+        // decided. See `crate::sim_config::Attached`.
         let leaves = graph.links.iter().any(|l| l.origin().node == node.name);
         let arrives = graph.links.iter().any(|l| {
             l.to.each()
                 .iter()
                 .any(|d| Destination::parse(d).node == node.name)
         });
-        if arrives && !leaves {
+        let warms = sim_file
+            .simulated_payloads
+            .iter()
+            .filter(|entry| entry.name == node.name)
+            .any(|entry| {
+                entry.settings.heats.is_some()
+                    || entry
+                        .group
+                        .as_ref()
+                        .and_then(|name| {
+                            sim_file
+                                .simulated_payload_groups
+                                .iter()
+                                .find(|group| &group.name == name)
+                        })
+                        .is_some_and(|group| group.settings.heats.is_some())
+            });
+        if arrives && !leaves && !warms {
             return Err(format!(
                 "\"{}\" is driven and never read, so there is nothing for a \
-                 simulator to send in its place: leave it out of the simulator file",
+                 simulator to send in its place: leave it out of the simulator \
+                 file, or say which thermal mass it heats",
                 node.name
             ));
         }

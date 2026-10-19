@@ -38,6 +38,21 @@ use crate::payload::{
 pub fn run_udp_node(config: PayloadConfig, running: Arc<AtomicBool>, stats: Arc<std::sync::Mutex<PayloadStats>>) {
     let handler = format!("{}:{}", config.address, config.port);
 
+    // A heater is the other way round. It sends nothing -- being driven is the
+    // whole of what it is for -- so the vehicle cannot learn where it is from
+    // a packet, and the vehicle's end sends to the address the configuration
+    // gives instead. Then this end is the one that has to be findable, so it
+    // waits at that address rather than reaching out from a port of its own.
+    //
+    // Which is the arrangement every UDP payload had before, and the reason it
+    // was wrong there is the reason it is right here: whichever end speaks
+    // first binds nothing, and for a heater neither end would ever speak if
+    // this one waited to be asked.
+    if matches!(config.thermal, Some(crate::thermal::Thermal::Heats { .. })) {
+        run_driven_udp_node(config, running, stats, &handler);
+        return;
+    }
+
     // What this end answers from. Nothing has to find the device at a
     // particular port -- the handler learns where it is from the first packet
     // it gets -- so a file that says nothing gets any interface and whatever
@@ -80,6 +95,10 @@ pub fn run_udp_node(config: PayloadConfig, running: Arc<AtomicBool>, stats: Arc<
         if let Ok(n) = socket.recv(&mut buf) {
             if n > 0 {
                 asked = n;
+                // A heater is driven by what arrives: the mass is told before
+                // the statistics are, so that nothing holds the stats lock
+                // across the mass's own.
+                crate::thermal::driven(&config.thermal, &config.name, &buf[..n]);
                 let mut guard = stats.lock().unwrap();
                 guard.a_packet_has_come(&buf[..n]);
                 guard.bytes_recv += n as u64;
@@ -124,6 +143,70 @@ pub fn run_udp_node(config: PayloadConfig, running: Arc<AtomicBool>, stats: Arc<
 }
 
 
+/// Stand in for a payload the vehicle drives and never reads.
+///
+/// The loop is the ordinary one with the sending taken out: whatever the
+/// vehicle writes is counted and acted on, and nothing goes the other way.
+/// The pacing is still the file's, and for a device that sends nothing it
+/// means the one thing left -- how often it looks for what the vehicle
+/// decided.
+fn run_driven_udp_node(
+    config: PayloadConfig,
+    running: Arc<AtomicBool>,
+    stats: Arc<std::sync::Mutex<PayloadStats>>,
+    at: &str,
+) {
+    let socket = match UdpSocket::bind(at) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!(
+                "{}: failed to wait for the vehicle at {}: {}",
+                config.name, at, e
+            );
+            return;
+        }
+    };
+    socket.set_nonblocking(true).ok();
+
+    while running.load(Ordering::SeqCst) {
+        let started = Instant::now();
+        let pacing = Pacing::read(&config);
+
+        // Everything that has arrived, and not one datagram a pass. A
+        // decision is not a reading: what the vehicle sends is what the
+        // device should be *now*, so an older one is superseded rather than
+        // queued. Taking one a pass means a vehicle deciding faster than this
+        // device looks fills the socket and the device acts on a decision
+        // that is older every pass -- a heater that goes on when it is told
+        // to and stays on through every later word to the contrary.
+        //
+        // So the queue is drained and the last word wins. Each is applied in
+        // turn because each is a real thing the vehicle said, and the mass is
+        // stepped by each, which over the no time between them changes
+        // nothing but keeps one rule for how a decision is acted on.
+        let mut buf = vec![0u8; 4096];
+        loop {
+            // From whoever sent it. The vehicle's end of this link is a port
+            // it was given rather than one the file names, so there is
+            // nothing to check an address against.
+            let Ok((n, _from)) = socket.recv_from(&mut buf) else {
+                break;
+            };
+            if n == 0 {
+                break;
+            }
+            // The mass is told before the statistics are, so that nothing
+            // holds the stats lock across the mass's own.
+            crate::thermal::driven(&config.thermal, &config.name, &buf[..n]);
+            let mut guard = stats.lock().unwrap();
+            guard.a_packet_has_come(&buf[..n]);
+            guard.bytes_recv += n as u64;
+        }
+
+        wait_out_packet(&pacing, started, &running);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -155,7 +238,8 @@ mod tests {
             .expect("a read timeout");
 
         let mut device = SimulatedPayload::new(PayloadConfig {
-            name: "DH0".to_string(),
+            thermal: None,
+                        name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: at.ip().to_string(),
             port: at.port(),
@@ -227,7 +311,8 @@ mod tests {
         own_port: Option<u16>,
     ) -> SimulatedPayload {
         SimulatedPayload::new(PayloadConfig {
-            name: "DH0".to_string(),
+            thermal: None,
+                        name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: at.ip().to_string(),
             port: at.port(),
@@ -270,6 +355,7 @@ mod tests {
         drop(nowhere);
 
         let config = PayloadConfig {
+            thermal: None,
             name: "serial-line".to_string(),
             protocol: PayloadProtocol::Udp,
             address: at.ip().to_string(),
@@ -559,7 +645,8 @@ mod tests {
             .expect("a read timeout");
 
         let mut device = SimulatedPayload::new(PayloadConfig {
-            name: "DH0".to_string(),
+            thermal: None,
+                        name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: at.ip().to_string(),
             port: at.port(),

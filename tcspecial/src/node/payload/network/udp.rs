@@ -59,6 +59,40 @@ impl UdpEndpoint {
         Self::bound(what, config, None)
     }
 
+    /// An endpoint for a payload that is only driven: a heater, a valve.
+    ///
+    /// Such a payload never speaks, so there is nothing to learn from it, and
+    /// the arrangement every other UDP payload uses cannot work: this end
+    /// would bind the configured address and wait to be told where its device
+    /// is by a device that has nothing to say. It would wait for ever, and
+    /// every write would be refused for want of a peer -- a heater the vehicle
+    /// decided to switch on and could not reach.
+    ///
+    /// So the two ends swap roles. What the node says is where the vehicle
+    /// reaches the payload, which is what the attribute means everywhere else;
+    /// for a payload that is written to and never read, that reading is the
+    /// literal one: the device waits there and this sends to it. The local
+    /// port is whatever is free, because nothing has to find this end.
+    pub fn driving(what: &str, config: &NetworkConfig) -> TcsResult<Self> {
+        let told = format!("{}:{}", config.address, config.port)
+            .parse::<SocketAddr>()
+            .map_err(|e| {
+                TcsError::Config(format!(
+                    "{what}: \"{}:{}\" is where the configuration says the \
+                     device is, and it is not an address: {e}",
+                    config.address, config.port
+                ))
+            })?;
+        // Any interface, any free port. The family follows the device's, so
+        // that a socket bound here can reach it at all.
+        let mine = NetworkConfig {
+            protocol: config.protocol,
+            address: if told.is_ipv6() { "::" } else { "0.0.0.0" }.to_string(),
+            port: 0,
+        };
+        Self::bound(what, &mine, Some(told))
+    }
+
     /// An endpoint that sends where the configuration says, not where it was
     /// last spoken to from.
     ///
@@ -246,6 +280,73 @@ mod tests {
             .recv_from(&mut buffer)
             .expect("the stranger should not have taken the link");
         assert_eq!(&buffer[..size], b"again");
+    }
+
+    /// A payload that is only driven is sent to where the node says it is.
+    ///
+    /// The case the ordinary arrangement cannot serve. A heater never speaks,
+    /// so an endpoint that bound its address and waited to learn where it was
+    /// would wait for ever and refuse every write for want of a peer -- the
+    /// vehicle deciding to switch the heaters on and having nowhere to send
+    /// it. Here the device is the end that waits and the vehicle sends to the
+    /// configured address, which is what that address means.
+    #[test]
+    fn a_driven_payload_is_sent_to_where_the_node_says_it_is() {
+        use std::net::UdpSocket;
+        use std::time::Duration;
+        use tcslibgs::NetworkProtocol;
+
+        // The heater, waiting where the configuration says it is.
+        let heater = UdpSocket::bind("127.0.0.1:0").unwrap();
+        heater
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        let at = heater.local_addr().unwrap();
+
+        let device = NetworkConfig {
+            protocol: NetworkProtocol::Udp,
+            address: at.ip().to_string(),
+            port: at.port(),
+        };
+
+        let reader = UdpEndpoint::driving("heaters_1", &device).unwrap();
+        let mut writer = reader.try_clone().unwrap();
+
+        // Not bound to the device's address: that is the device's, and two
+        // binds of one address is what the old arrangement would have come
+        // to here.
+        assert_ne!(
+            mine_address(&writer),
+            at,
+            "the vehicle bound the address its device is waiting at"
+        );
+
+        // The heater has said nothing, and the decision reaches it anyway.
+        assert_eq!(writer.write(b"1").expect("it knows where to send"), 1);
+        let mut buffer = [0u8; 8];
+        let (size, from) = heater
+            .recv_from(&mut buffer)
+            .expect("a heater should be driven without asking to be");
+        assert_eq!(&buffer[..size], b"1");
+        // By port: this end is bound to any interface, so where it says it is
+        // and where a datagram from it appears to come from differ in the
+        // address and agree in the port.
+        assert_eq!(from.port(), mine_address(&writer).port());
+
+        // And what the node says goes on beating what arrives: a stranger
+        // that speaks to this end does not become the heater.
+        let stranger = UdpSocket::bind("127.0.0.1:0").unwrap();
+        stranger
+            .send_to(b"hello", ("127.0.0.1", mine_address(&writer).port()))
+            .unwrap();
+        let mut reading = reader;
+        let mut into = [0u8; 64];
+        let _ = reading.read(&mut into);
+        writer.write(b"0").expect("it still knows where to send");
+        let (size, _) = heater
+            .recv_from(&mut buffer)
+            .expect("the stranger should not have taken the link");
+        assert_eq!(&buffer[..size], b"0");
     }
 
     /// Where an endpoint's own socket is bound, for a test that has to send

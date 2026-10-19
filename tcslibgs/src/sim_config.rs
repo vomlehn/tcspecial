@@ -41,7 +41,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use serde::de::IgnoredAny;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use crate::verify::About;
 use crate::{
     load_config_file, one_host, DHConfig, DHType, EndpointConfig, NetworkProtocol, TcsResult,
@@ -63,6 +63,11 @@ pub enum SimConfigError {
     UnknownPayload { payload: String },
     /// A data handler has no simulated payload to drive it.
     Unsimulated { handler: String },
+    /// A thermal mass whose figures cannot be read, or that nothing is
+    /// attached to.
+    BadThermalMass { mass: String, why: String },
+    /// A payload whose attachment to a thermal mass is not one.
+    BadAttachment { payload: String, why: String },
     /// A group is defined that no simulated payload names.
     ///
     /// Reported in the wording the endpoint and payload configuration formats
@@ -341,6 +346,12 @@ impl fmt::Display for SimConfigError {
                 what, name, given
             ),
             SimConfigError::CannotSimulate { why, .. } => write!(f, "{why}"),
+            SimConfigError::BadThermalMass { mass, why } => {
+                write!(f, "thermal mass \"{mass}\": {why}")
+            }
+            SimConfigError::BadAttachment { payload, why } => {
+                write!(f, "simulated payload \"{payload}\": {why}")
+            }
             SimConfigError::IntervalForATriggeredPayload { payload, setting } => write!(
                 f,
                 "simulated payload \"{}\" is triggered, so it sends when tcspecial \
@@ -400,9 +411,13 @@ impl SimConfigError {
             | SimConfigError::NotForThisKind { payload, .. }
             | SimConfigError::NoAddressOfItsOwn { payload, .. }
             | SimConfigError::OneSocketForBothEnds { payload, .. }
-            | SimConfigError::CannotSimulate { payload, .. } => {
+            | SimConfigError::CannotSimulate { payload, .. }
+            | SimConfigError::BadAttachment { payload, .. } => {
                 About::SimPayload(payload.clone())
             }
+            // A mass is not a payload and not a group: it is named in a
+            // section of its own, which is where a reader should be sent.
+            SimConfigError::BadThermalMass { .. } => About::File,
         }
     }
 }
@@ -724,7 +739,11 @@ fn what_it_is(
 ///
 /// Every one is optional in the file: a payload states what it does not take
 /// from its group, and a group states what its payloads share.
-#[derive(Debug, Clone, Default, Deserialize, PartialEq, Eq)]
+///
+/// Serialised as well as read, for one test: it is how the names this struct
+/// has are asked for, so that a setting added here and not to [`SETTINGS`] is
+/// found rather than being a field no window offers.
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub struct SimSettings {
     // What payload this is, said again. Neither of these is a setting of the
     // simulation: the payload configuration decides both, and a simulator
@@ -740,6 +759,32 @@ pub struct SimSettings {
     /// kind.
     #[serde(default, deserialize_with = "blank_is_unstated")]
     pub protocol: Option<String>,
+    /// The thermal mass whose temperature this payload reports.
+    ///
+    /// What makes a simulated sensor send a temperature rather than noise:
+    /// the mass is a thing with a state -- see the `thermal_mass` section --
+    /// and a sensor attached to one reports what it is, in the encoding the
+    /// payload configuration says that sensor's readings are in.
+    ///
+    /// Three sensors reading one mass report the same temperature, each in
+    /// its own encoding, which is what lets a configuration's voting be
+    /// exercised: nothing else in a simulator makes two payloads agree.
+    #[serde(default, deserialize_with = "blank_is_unstated")]
+    pub reads: Option<String>,
+    /// And the thermal mass this payload warms, for a heater.
+    ///
+    /// The other half of the loop: the vehicle drives the heater, the
+    /// simulator sees it driven, and the mass warms -- so what the sensors
+    /// report afterwards is a consequence of what the vehicle decided.
+    #[serde(default, deserialize_with = "blank_is_unstated")]
+    pub heats: Option<String>,
+    /// How hard it warms it, in kelvin a second, while it is on.
+    ///
+    /// Each heater's own, so that two heaters of one mass can differ and a
+    /// weak one is a fault worth simulating. Required of a payload that
+    /// heats and refused of one that does not.
+    #[serde(default, deserialize_with = "blank_is_unstated")]
+    pub rate: Option<String>,
     // The socket the simulated payload binds for itself.
     //
     // Not where the payload is -- the tcspecial configuration file says that,
@@ -872,7 +917,8 @@ where
 /// stops.
 ///
 /// In the order the manual introduces them: what the payload is, where it
-/// answers from, how fast it sends, and then what it does wrong.
+/// answers from, how fast it sends, what it does wrong, and what it is
+/// attached to.
 pub const SETTINGS: &[&str] = &[
     "type",
     "protocol",
@@ -888,7 +934,18 @@ pub const SETTINGS: &[&str] = &[
     "silent_after",
     "close_after",
     "ignore_trigger_percent",
+    "reads",
+    "heats",
+    "rate",
 ];
+
+/// Everything a thermal mass states, by the name a file writes, `name` apart.
+///
+/// The second list, for the second kind of entry this file holds. It is here
+/// for the reason [`SETTINGS`] is: the editor keeps a mass a file carried and
+/// writes it back, and a field missing from this list is a field it would
+/// write away.
+pub const MASS_SETTINGS: &[&str] = &["environment", "time_constant"];
 
 impl SimSettings {
     /// This settings' values, falling back to `base` for whatever it does not
@@ -902,6 +959,12 @@ impl SimSettings {
                 .clone()
                 .or_else(|| base.payload_address.clone()),
             payload_port: self.payload_port.or(base.payload_port),
+            // A group may attach every payload in it to one mass, which is
+            // what a trio of sensors read together is: the group says the
+            // mass once and the three entries say nothing.
+            reads: self.reads.clone().or_else(|| base.reads.clone()),
+            heats: self.heats.clone().or_else(|| base.heats.clone()),
+            rate: self.rate.clone().or_else(|| base.rate.clone()),
             packet_interval: self
                 .packet_interval
                 .clone()
@@ -977,8 +1040,60 @@ pub struct SimConfigFile {
     pub description: Option<String>,
     #[serde(default)]
     pub simulated_payload_groups: Vec<SimGroup>,
+    /// The thermal masses the payloads are attached to.
+    ///
+    /// A mass is not a payload. It is a thing the payloads are joined by: the
+    /// sensors report its temperature and the heaters warm it, so what the
+    /// vehicle reads is a consequence of what it drove. Declared once, named
+    /// by each payload attached to it, the way a payload group is.
+    #[serde(default)]
+    pub thermal_mass: Vec<SimThermalMass>,
     #[serde(default)]
     pub simulated_payloads: Vec<SimPayload>,
+}
+
+/// A thermal mass, as a simulator file states it.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SimThermalMass {
+    /// What it is called, which is the name a payload names to attach to it.
+    pub name: String,
+    /// The temperature it tends towards with nothing warming it, in kelvin.
+    ///
+    /// Fixed, and not a figure that follows the vehicle's setpoint: a mass
+    /// whose surroundings tracked the setpoint could never be driven away
+    /// from it, and commanding the setpoint from the ground would then show
+    /// nothing at all.
+    pub environment: String,
+    /// How quickly it loses the difference, as a length of time.
+    ///
+    /// The time constant of Newton's cooling: with nothing warming it, the
+    /// gap between the mass and its surroundings falls to a third of itself
+    /// in this long. A mass ten kelvin above its surroundings with a fifty
+    /// second constant is cooling at a fifth of a kelvin a second.
+    ///
+    /// Stated as a time rather than as that rate because the rate depends on
+    /// how far from its surroundings the mass happens to be, and the constant
+    /// does not: one figure describes the mass at every temperature.
+    pub time_constant: String,
+}
+
+/// What a payload is to its thermal mass.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Attached {
+    /// It reports that mass's temperature.
+    Reads(String),
+    /// It warms that mass, by this many kelvin a second while it is on.
+    Heats { mass: String, rate: f64 },
+}
+
+/// A thermal mass with its figures read.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ResolvedMass {
+    pub name: String,
+    /// Kelvin.
+    pub environment: f64,
+    pub time_constant: Duration,
 }
 
 /// What simulating one data handler takes, with every value settled.
@@ -987,7 +1102,7 @@ pub struct SimConfigFile {
 /// together: no optional values are left, because a payload that reached this
 /// point has a rate and a segmentation whether its own entry stated them, its
 /// group stated them, or they follow from the handler's packet size.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ResolvedSim {
     /// Milliseconds between packets, for a payload that sends on its own.
     ///
@@ -1010,6 +1125,8 @@ pub struct ResolvedSim {
     /// The port it binds, where the file states one. `None` is whichever the
     /// system gives.
     pub payload_port: Option<u16>,
+    /// What this payload is to a thermal mass, where it is attached to one.
+    pub attached: Option<Attached>,
 }
 
 /// The ways a simulated payload is asked to misbehave.
@@ -1050,6 +1167,153 @@ impl SimConfigFile {
     /// tcspecial configuration gave them. Both directions of the join are
     /// checked: a handler nothing simulates is as much an error as a simulated
     /// payload naming no handler.
+    /// The thermal masses this file declares, with their figures read.
+    ///
+    /// A mass nothing is attached to is refused: a model nobody reads and
+    /// nothing warms is arithmetic running for no reason, and the likeliest
+    /// cause is a payload whose `reads` was misspelled -- which is the fault
+    /// this would hide.
+    pub fn masses(&self) -> Result<Vec<ResolvedMass>, SimConfigError> {
+        let mut masses = Vec::new();
+        for mass in &self.thermal_mass {
+            let named = |what: &'static str, said: &str| SimConfigError::BadThermalMass {
+                mass: mass.name.clone(),
+                why: format!("{what}: {said}"),
+            };
+
+            let environment: f64 = mass.environment.trim().parse().map_err(|_| {
+                named(
+                    "environment",
+                    &format!(
+                        "\"{}\" is not a number of kelvin",
+                        mass.environment.trim()
+                    ),
+                )
+            })?;
+
+            let time_constant = crate::graph::parse_interval(mass.time_constant.trim())
+                .map_err(|why| named("time_constant", &why))?;
+
+            if !self.simulated_payloads.iter().any(|payload| {
+                let settings = self.settings_of(payload);
+                settings.reads.as_deref() == Some(mass.name.as_str())
+                    || settings.heats.as_deref() == Some(mass.name.as_str())
+            }) {
+                return Err(SimConfigError::BadThermalMass {
+                    mass: mass.name.clone(),
+                    why: "nothing reads it and nothing warms it: a mass no \
+                          payload is attached to is a model nobody looks at, and \
+                          the likeliest cause is a payload whose reads or heats \
+                          names something else"
+                        .to_string(),
+                });
+            }
+
+            masses.push(ResolvedMass {
+                name: mass.name.clone(),
+                environment,
+                time_constant,
+            });
+        }
+        Ok(masses)
+    }
+
+    /// One payload's settings laid over its group's, where it names one.
+    fn settings_of(&self, payload: &SimPayload) -> SimSettings {
+        match payload
+            .group
+            .as_ref()
+            .and_then(|name| self.simulated_payload_groups.iter().find(|g| &g.name == name))
+        {
+            Some(group) => payload.settings.over(&group.settings),
+            None => payload.settings.clone(),
+        }
+    }
+
+    /// What this payload is to a thermal mass, or what is wrong with what it
+    /// says.
+    fn attachment(
+        &self,
+        payload: &str,
+        settings: &SimSettings,
+    ) -> Result<Option<Attached>, SimConfigError> {
+        let known = |name: &str| self.thermal_mass.iter().any(|m| m.name == name);
+        let bad = |why: String| SimConfigError::BadAttachment {
+            payload: payload.to_string(),
+            why,
+        };
+
+        match (settings.reads.as_deref(), settings.heats.as_deref()) {
+            // A payload cannot be both: a sensor reports what the mass is and
+            // a heater decides it, and one payload doing both would be a
+            // thermometer wired to a heating element.
+            (Some(_), Some(_)) => Err(bad(
+                "it both reads a thermal mass and heats one: a payload is a \
+                 sensor or an actuator, not both"
+                    .to_string(),
+            )),
+            (Some(mass), None) => {
+                if !known(mass) {
+                    return Err(bad(format!(
+                        "it reads \"{mass}\", and no thermal_mass of that name is \
+                         declared"
+                    )));
+                }
+                if settings.rate.is_some() {
+                    return Err(bad(
+                        "rate is how hard a heater warms a mass, and this one \
+                         reads it"
+                            .to_string(),
+                    ));
+                }
+                Ok(Some(Attached::Reads(mass.to_string())))
+            }
+            (None, Some(mass)) => {
+                if !known(mass) {
+                    return Err(bad(format!(
+                        "it heats \"{mass}\", and no thermal_mass of that name is \
+                         declared"
+                    )));
+                }
+                let said = settings.rate.as_deref().ok_or_else(|| {
+                    bad(
+                        "rate is not set: a heater says how hard it warms its \
+                         mass, in kelvin a second, there being no figure to \
+                         assume"
+                            .to_string(),
+                    )
+                })?;
+                let rate: f64 = said.trim().parse().map_err(|_| {
+                    bad(format!(
+                        "rate: \"{}\" is not a number of kelvin a second",
+                        said.trim()
+                    ))
+                })?;
+                if rate <= 0.0 {
+                    return Err(bad(format!(
+                        "rate: {rate} does not warm anything, and a heater that \
+                         warms nothing is one the configuration may as well leave \
+                         out"
+                    )));
+                }
+                Ok(Some(Attached::Heats {
+                    mass: mass.to_string(),
+                    rate,
+                }))
+            }
+            (None, None) => {
+                if settings.rate.is_some() {
+                    return Err(bad(
+                        "rate is how hard a heater warms a mass, and this payload \
+                         is attached to none"
+                            .to_string(),
+                    ));
+                }
+                Ok(None)
+            }
+        }
+    }
+
     pub fn resolve(
         &self,
         handlers: &[DHConfig],
@@ -1269,7 +1533,15 @@ impl SimConfigFile {
                     });
                 }
 
+                // What this payload is to a thermal mass. Refused here and
+                // not ignored: a sensor attached to a mass nothing declares
+                // would send noise while looking as though it reported a
+                // temperature, which is the hardest kind of simulator fault
+                // to notice.
+                let attached = self.attachment(&payload.name, &settings)?;
+
                 Ok(ResolvedSim {
+                    attached,
                     payload_address: settings.payload_address.clone(),
                     payload_port: settings.payload_port,
                     packet_interval,
@@ -1456,6 +1728,7 @@ mod tests {
                     "type" => "network",
                     "protocol" => "udp",
                     "payload_address" => "127.0.0.1",
+                    "reads" | "heats" => "cabin",
                     _ => "1",
                 };
                 format!("    {name}: {value}")
@@ -1474,15 +1747,38 @@ mod tests {
             payload.unknown.keys().collect::<Vec<_>>()
         );
 
-        // And the other way about: the settings the struct has are the
-        // settings the list names. Checked through serde rather than by
-        // counting fields, because serde is what decides which names a file
-        // may use.
+        // A group states the same settings as a payload.
         let text = format!(
             "simulated_payload_groups:\n  - name: g\n{}\n",
             said.join("\n")
         );
         assert!(parse(&text).simulated_payload_groups[0].unknown.is_empty());
+
+        // And the other way about: every setting the reader knows is a
+        // setting the list names. Asked of serde rather than counted by hand,
+        // because serde is what decides which names a file may use -- and it
+        // is the direction the check above cannot make, every line of that
+        // file having come from the list.
+        //
+        // A setting the struct has and the list does not is a setting nobody
+        // can type: the window is built from this list, so the field would
+        // not be there to fill in.
+        let known = SimSettings::default();
+        let mut missing: Vec<String> = Vec::new();
+        for name in serde_json::to_value(&known)
+            .expect("the settings are serialisable")
+            .as_object()
+            .expect("an object")
+            .keys()
+        {
+            if !SETTINGS.contains(&name.as_str()) {
+                missing.push(name.clone());
+            }
+        }
+        assert!(
+            missing.is_empty(),
+            "the reader knows settings the list does not name: {missing:?}"
+        );
     }
 
     #[test]
@@ -1505,6 +1801,7 @@ simulated_payloads:
         assert_eq!(
             resolved[0],
             ResolvedSim {
+                attached: None,
                 packet_interval: Duration::from_millis(1000),
                 segment_interval: Duration::from_millis(250),
                 // Unstated, so a packet is one segment.

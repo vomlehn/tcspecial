@@ -1510,6 +1510,44 @@ Requirement
     to state: a payload that said it originated nothing while sitting on a
     socket would be a file disagreeing with the interface it names.
 
+A payload that is only driven
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A heater, a valve, a relay: a payload the vehicle writes to and never reads.
+The links say which it is -- nothing leaves it and something arrives at it --
+and for every kind of interface but one that changes nothing about how it is
+opened. A device is opened whichever way it is used, and a TCP payload is
+connected to.
+
+UDP is the exception, and the reason is the one that decided the ordinary
+case. A UDP payload is reached by binding its address and waiting for it to
+speak, because a datagram connect sends nothing and a payload produces data
+because it is running; the vehicle learns where its payload is from the first
+packet. A payload that is never read has no first packet. So the vehicle would
+wait at the address for ever, and every write would be refused for want of a
+peer -- the vehicle deciding to switch the heaters on and having nowhere to
+send it.
+
+Requirement
+    For a UDP payload nothing is read from, the ends swap roles: the vehicle
+    sends to the address and port the node states, from a port of its own
+    that nothing has to find, and the payload is the end that waits at the
+    stated address.
+
+That is what the address already means. ``address`` and ``port`` say where the
+vehicle reaches the payload, and for a payload that is written to and never
+read the reading is the literal one.
+
+Requirement
+    What arrives on that socket does not change where it sends. A stranger
+    that speaks to the vehicle's end of a heater link does not become the
+    heater.
+
+A Unix datagram payload has the same shape and is not yet handled: driving one
+would need a path for the vehicle's own end, and a path is a thing for a file
+to state rather than for the software to invent. One used as a heater is bound
+as a UDP payload used to be, so nothing can be written to it.
+
 What each command means
 ~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -7176,6 +7214,116 @@ Requirement
     payload does not state. A group whose payloads are not all reached the
     same way leaves them with the payloads: the shipped ``tcspecial1sim.yaml``
     has two payloads sharing a rate that do not share a transport.
+
+Thermal Masses
+--------------
+Every other simulated payload makes its bytes up. A buffer filled from a
+random number generator exercises a link and nothing at all of a control loop:
+three sensors sending noise never agree, so the vote over them produces
+nothing anybody can check, and a thermostat downstream of it cannot be watched
+holding a band.
+
+A thermal mass is what makes them agree. The sensors attached to one report
+its temperature, each in its own encoding, and the heaters attached to it warm
+it -- so what the vehicle reads is a consequence of what the vehicle drove,
+and the whole loop can be watched closing.
+
+Requirement
+    The simulator file may declare thermal masses. Each has a name, the
+    temperature of the environment it sits in, and a time constant: how long
+    it takes to lose a given fraction of the difference between itself and
+    that environment.
+
+Requirement
+    A simulated payload may be attached to a mass, either as something that
+    reads it or as something that heats it. A heater states what it adds, in
+    kelvin a second.
+
+Requirement
+    A mass nothing is attached to is refused. It would be a state nothing
+    reads and nothing changes, which is a file saying something it cannot
+    mean.
+
+The arithmetic is Newton's cooling with a constant heat,
+
+.. code-block:: text
+
+   dT/dt = -(T - environment) / time_constant + heat
+
+where ``heat`` is the sum of the rates of the heaters that are on. Between two
+changes of that sum it is constant, so the equation has a closed form, and the
+mass is stepped by that rather than integrated:
+
+.. code-block:: text
+
+   T(t + dt) = rest + (T - rest) * exp(-dt / time_constant)
+   rest      = environment + heat * time_constant
+
+Requirement
+    The mass is stepped exactly, whenever it is read and whenever a heater
+    changes. A method whose error grew with the step would make the simulated
+    temperature depend on how often somebody looked at it.
+
+``rest`` is where the mass would settle with that heat on for ever, and it is
+the figure that says whether the heaters can win at all: with a fifty second
+constant and six kelvin a second of heat, it is three hundred kelvin above the
+environment.
+
+Requirement
+    A mass starts at its environment, with its heaters off. A mass that
+    started at the setpoint would hide the one part of the loop worth
+    watching, and a vehicle coming up cold is the case a thermostat exists
+    for.
+
+**What the bytes are**
+
+A sensor has to send bytes the vehicle will read back as the temperature, and
+the format, the scale and the offset are not the sensor's own: they are on the
+``to_kelvin`` node its readings go to.
+
+Requirement
+    The encoding is taken from that node and not stated here. A scale written
+    in both files is a scale that can disagree with itself, which would show
+    up as a simulated temperature the vehicle reads back as a different one,
+    with both files looking right.
+
+Requirement
+    A sensor attached to a mass whose readings reach no conversion is
+    refused, and so is one whose readings reach two. The first has no
+    encoding to borrow and the second has no single answer.
+
+Requirement
+    A temperature the format cannot hold is clamped and not wrapped. A
+    wrapped count is a sensor reporting the other end of its range, which is
+    a fault the vehicle has no way to tell from a reading.
+
+**What a heater is**
+
+Requirement
+    A heater sends nothing. Being driven is the whole of what it is for, so a
+    packet of its own would be bytes nothing reads.
+
+Requirement
+    A heater's packet interval is how often it looks for what the vehicle
+    decided. It is the one thing pacing still means for a payload that sends
+    nothing, and it is part of how promptly the loop responds: the vehicle
+    cannot see a band crossed until its next sample, and the heaters cannot
+    hear about it until they next look, so the overshoot is their rate over
+    the sum of the two.
+
+Requirement
+    A heater acts on the last thing the vehicle said and not on the next
+    thing in the queue. A decision is not a reading -- it says what the
+    device should be now -- so a vehicle deciding faster than the heater
+    looks must not leave it acting on a decision that is older every pass.
+
+Requirement
+    A heater must be a kind of payload the simulator can be driven through,
+    which today means a socket. A heater on discrete lines is driven through
+    ``gpio-sim``, which the simulator drives and cannot yet be driven
+    through, so the shipped thermostat example attaches its sensors to a mass
+    and its heaters to nothing: what that example shows is the vehicle's half
+    of the loop.
 
 Fault Injection
 ---------------

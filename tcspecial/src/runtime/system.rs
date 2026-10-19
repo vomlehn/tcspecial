@@ -1627,11 +1627,20 @@ vehicle:
         let moved = vehicle.system.pass(start);
         assert!(moved.all_delivered(), "{:?}", moved.refused);
 
+        // A temperature on a link is a value, so it is read back as one; a
+        // decision is text, and comes through as it stands. Written the one
+        // way for both so that what the ground received reads as what it
+        // means rather than as eight bytes.
         let to_ground: Vec<String> = vehicle
             .ground
             .lock().expect("the record")
             .iter()
-            .map(|datum| String::from_utf8_lossy(datum).to_string())
+            .map(|datum| {
+                match crate::node::vehicle::compute::from_value(datum, "the ground") {
+                    Ok(number) => format!("{number}"),
+                    Err(_) => String::from_utf8_lossy(datum).to_string(),
+                }
+            })
             .collect();
         assert_eq!(
             to_ground,

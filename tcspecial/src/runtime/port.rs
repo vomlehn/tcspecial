@@ -1547,17 +1547,17 @@ mod tests {
 
         // The first arrival is not a result: a mean of one of two sensors
         // would be an average of a reading and nothing.
-        assert_eq!(port.give(Arriving::named("in0"), b"290.0"), Ok(()));
+        assert_eq!(port.give(Arriving::named("in0"), &compute::as_value(290.0)), Ok(()));
         assert!(!port.ready(), "a mean of one input is not an average");
         assert_eq!(port.take(&mut [0u8; 64]).map(|taken| taken.bytes), Ok(0));
 
         // The second is.
-        assert_eq!(port.give(Arriving::named("in1"), b"292.0"), Ok(()));
+        assert_eq!(port.give(Arriving::named("in1"), &compute::as_value(292.0)), Ok(()));
         assert!(port.ready());
 
         let mut buffer = [0u8; 64];
         let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("the average");
-        assert_eq!(&buffer[..got], b"291");
+        assert_eq!(compute::from_value(&buffer[..got], "the average"), Ok(291.0));
 
         // And it is gone once taken, rather than being handed out again.
         assert!(!port.ready());
@@ -1617,13 +1617,23 @@ mod tests {
             })),
         );
 
-        let said = port
-            .give(Arriving::named("in0"), b"29x.15")
-            .expect_err("a reading that is not a number");
-        assert!(
-            said.contains("cabin_temp") && said.contains("vote"),
-            "the complaint should name the node and the computation: {said}"
-        );
+        // Two ways a datum is not a value, and both are refused here rather
+        // than read as a temperature: text where a value was meant, which is
+        // the wrong width, and eight bytes that hold no number, which a vote
+        // could not sort.
+        for (datum, what) in [
+            (&b"29x.15"[..], "text where a value was meant"),
+            (&f64::NAN.to_le_bytes()[..], "eight bytes that are not a number"),
+        ] {
+            let said = port
+                .give(Arriving::named("in0"), datum)
+                .unwrap_err();
+            assert!(
+                said.contains("cabin_temp") && said.contains("vote"),
+                "the complaint about {what} should name the node and the \
+                 computation: {said}"
+            );
+        }
     }
 
     /// A result that will not fit is reported and kept, not cut down.
@@ -1639,8 +1649,10 @@ mod tests {
                 inputs: vec!["in0".to_string(), "in1".to_string()],
             })),
         );
-        port.give(Arriving::named("in0"), b"293.15").expect("a reading");
-        port.give(Arriving::named("in1"), b"293.15").expect("the other reading");
+        port.give(Arriving::named("in0"), &compute::as_value(293.15))
+            .expect("a reading");
+        port.give(Arriving::named("in1"), &compute::as_value(293.15))
+            .expect("the other reading");
         assert!(port.ready(), "the set is complete");
 
         let said = port.take(&mut [0u8; 2]).expect_err("a buffer too small");
@@ -1653,7 +1665,7 @@ mod tests {
         assert!(port.ready(), "the result should not have been thrown away");
         let mut buffer = [0u8; 64];
         let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("the result");
-        assert_eq!(&buffer[..got], b"293.15");
+        assert_eq!(compute::from_value(&buffer[..got], "the result"), Ok(293.15));
     }
 
     /// Every source of a log writes into the one log, in order.

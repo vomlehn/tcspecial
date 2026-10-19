@@ -293,6 +293,17 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
         }
     };
 
+    // What the interface itself will not do, which is the last thing to ask:
+    // both of these read what the kind settled above.
+    if trigger.is_some() {
+        if let Some(why) = cannot_be_asked(&endpoint) {
+            return Err(format!("\"{what}\" states a trigger, and {why}"));
+        }
+    }
+    if let Some(size) = read_size {
+        fits_one_read(what, size, &endpoint)?;
+    }
+
     let ground = ground_of(what, node)?;
 
     Ok(Reach {
@@ -302,6 +313,71 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
         read_delay,
         ground,
     })
+}
+
+/// Why this interface cannot be asked for a reading, if it cannot.
+///
+/// A trigger is bytes written to a part to make it answer, so an interface
+/// that cannot be written at all cannot carry one. Two cannot, and each for
+/// its own reason:
+///
+/// A set of discrete lines is read or driven and not both. Writing to lines
+/// that are watched would be driving them, which is commanding a device
+/// rather than reading it, and the kernel's request is for one direction.
+///
+/// A sensor's sample buffer is read and never written. What an IIO device is
+/// configured with -- its channels, its sample rate, its trigger in the
+/// kernel's sense -- is in `sysfs` and is written by whoever brought the
+/// sensor up, not by a datum on this link.
+fn cannot_be_asked(endpoint: &EndpointConfig) -> Option<&'static str> {
+    match endpoint {
+        EndpointConfig::Gpio(_) => Some(
+            "a set of discrete lines is read or driven and not both: writing to \
+             lines that are watched would be commanding a device rather than \
+             reading it",
+        ),
+        EndpointConfig::Iio(_) => Some(
+            "a sensor's sample buffer is read and not written: what an IIO device \
+             is configured with is in sysfs, written by whoever brought the sensor \
+             up",
+        ),
+        _ => None,
+    }
+}
+
+/// Whether one read of this size fits what the interface carries at once.
+///
+/// Two interfaces carry a bounded amount and refuse the rest rather than
+/// splitting it, so a `read_size` larger than that is a read that can never
+/// come back whole -- which is a configuration fault and not a thing to find
+/// out in flight.
+///
+/// A CAN frame carries eight bytes, or sixty-four where the file says
+/// `can_fd: true`; an rpmsg message carries what `max_message_bytes` says,
+/// and 496 where it says nothing -- 512-byte buffers less the 16-byte header.
+/// Every other interface is a stream or a register and has nothing to say
+/// here: where one read ends is the `stream` rule's business.
+fn fits_one_read(what: &str, size: u32, endpoint: &EndpointConfig) -> Result<(), String> {
+    let (room, carries) = match endpoint {
+        EndpointConfig::Can(can) => (
+            crate::node::payload::can::frame_bytes(can.fd) as u32,
+            if can.fd { "an FD frame" } else { "a frame" },
+        ),
+        EndpointConfig::Rpmsg(rpmsg) => (
+            crate::node::payload::rpmsg::message_bytes(rpmsg.max_message_bytes),
+            "a message",
+        ),
+        _ => return Ok(()),
+    };
+
+    if size > room {
+        return Err(format!(
+            "\"{what}\": read_size is {size} and {carries} carries {room} bytes: \
+             the rest is refused rather than split, so a read of {size} could \
+             never come back whole"
+        ));
+    }
+    Ok(())
 }
 
 /// What a `moc` node that binds nothing is given as its address: see
@@ -943,6 +1019,102 @@ mod tests {
                 "the complaint should name what is missing ({wanted}): {said}"
             );
         }
+    }
+
+    /// Two kinds of interface cannot be asked, and a trigger on one is
+    /// refused.
+    ///
+    /// A trigger is bytes written to a part to make it answer, and these two
+    /// are not written: a set of discrete lines is read or driven and not
+    /// both, and a sensor's sample buffer is read and never written -- what an
+    /// IIO device is configured with is in `sysfs`. Each says which of the two
+    /// reasons it is, because they are different mistakes: one is a direction
+    /// and the other is a place.
+    #[test]
+    fn an_interface_that_cannot_be_asked_refuses_a_trigger() {
+        let said = reach_of(&node(
+            "asked_lines",
+            "gpio",
+            &[
+                ("path", "/dev/gpiochip0"),
+                ("lines", "0"),
+                ("trigger", "55"),
+            ],
+        ))
+        .expect_err("a set of discrete lines cannot be asked");
+        assert!(
+            said.contains("asked_lines") && said.contains("driven"),
+            "the complaint should say why it cannot be asked: {said}"
+        );
+
+        let said = reach_of(&node(
+            "asked_sensor",
+            "iio",
+            &[("path", "/dev/iio:device0"), ("trigger", "55")],
+        ))
+        .expect_err("a sample buffer cannot be asked");
+        assert!(
+            said.contains("asked_sensor") && said.contains("sysfs"),
+            "the complaint should say where it is configured instead: {said}"
+        );
+
+        // And the kinds that can be asked still are: a register on a bus is
+        // read by asking for it.
+        reach_of(&node(
+            "temp_1",
+            "i2c",
+            &[
+                ("path", "/dev/i2c-1"),
+                ("address", "0x48"),
+                ("read_size", "2"),
+                ("trigger", "55"),
+            ],
+        ))
+        .expect("a register is read by asking for it");
+    }
+
+    /// A read larger than the interface carries at once is refused.
+    ///
+    /// Two interfaces carry a bounded amount and refuse the rest rather than
+    /// splitting it, so such a read could never come back whole. A CAN frame
+    /// carries eight bytes, or sixty-four in an FD frame; an rpmsg message
+    /// carries 496 -- 512-byte buffers less the header -- or what
+    /// `max_message_bytes` says. Both numbers are in the complaint, because
+    /// what a reader has to decide is which of the two to change.
+    #[test]
+    fn a_read_larger_than_the_interface_carries_is_refused() {
+        let frame = |terms: &[(&str, &str)]| {
+            let mut all = vec![("interface", "vcan0"), ("can_id", "1")];
+            all.extend_from_slice(terms);
+            reach_of(&node("big_frame", "can", &all))
+        };
+
+        let said = frame(&[("read_size", "12")]).expect_err("twelve bytes in eight");
+        assert!(said.contains("12") && said.contains('8'), "{said}");
+
+        // Eight fits, and sixty-four fits an FD frame -- which is what the
+        // flag is for.
+        frame(&[("read_size", "8")]).expect("eight bytes of frame");
+        frame(&[("read_size", "12"), ("can_fd", "true")]).expect("an FD frame has room");
+        let said = frame(&[("read_size", "65"), ("can_fd", "true")])
+            .expect_err("sixty-five bytes in sixty-four");
+        assert!(said.contains("65") && said.contains("64"), "{said}");
+
+        let message = |terms: &[(&str, &str)]| {
+            let mut all = vec![("path", "/dev/rpmsg0"), ("service", "payload")];
+            all.extend_from_slice(terms);
+            reach_of(&node("big_message", "rpmsg", &all))
+        };
+
+        let said = message(&[("read_size", "600")]).expect_err("600 bytes in 496");
+        assert!(said.contains("600") && said.contains("496"), "{said}");
+
+        // And a platform with larger buffers says so, which makes it fit.
+        message(&[("read_size", "600"), ("max_message_bytes", "2048")])
+            .expect("a platform with room for it");
+        let said = message(&[("read_size", "2049"), ("max_message_bytes", "2048")])
+            .expect_err("one byte over what it said");
+        assert!(said.contains("2049") && said.contains("2048"), "{said}");
     }
 
     /// A read of no bytes is not a read.

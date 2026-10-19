@@ -1245,17 +1245,17 @@ simulated_payloads:
 payloads:
   - name: first
     type: device-file
-    path: /dev/zero
+    path: /dev/urandom
     payload-out:
       - target: nowhere
   - name: second
     type: device-file
-    path: /dev/zero
+    path: /dev/full
     payload-out:
       - target: elsewhere
   - name: third
     type: device-file
-    path: /dev/zero
+    path: /dev/random
     payload-out:
       - target: anywhere
 # what GOOD's own payloads were:",

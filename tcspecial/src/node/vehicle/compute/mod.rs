@@ -163,26 +163,88 @@ pub fn make(
     }
 }
 
-/// A value as it travels: decimal text.
+/// How wide a value is on a link: a 64-bit float.
+pub(crate) const VALUE_BYTES: usize = 8;
+
+/// A value as it travels: eight bytes of IEEE 754 binary64, little endian.
+///
+/// A temperature in kelvin is what this carries, and it carries the double the
+/// arithmetic produced rather than a rendering of it. It was decimal text
+/// rounded to four places, which cost two things. The rounding was real: three
+/// sensors of one place differ in the fourth and fifth figures, and a vote over
+/// readings rounded to the fourth is a vote over ties the sensors did not
+/// report. And a reading was re-parsed at every hop, so a conversion, a vote
+/// and a thermostat each turned text into a number again -- three places for a
+/// locale, a space or a stray sign to be read differently.
+///
+/// Little endian because every other number this software puts on a wire is:
+/// a timestamp's microseconds, a node's id, a beacon interval. A sensor's own
+/// bytes are the exception and say which way round they are -- `i16_be`,
+/// `u24_be` -- because the part decides that and the file states it.
+///
+/// What it costs is that a value in a telemetry log is eight bytes rather than
+/// a readable number, and so is the datum a panel shows for a source. A
+/// decision is still text, `1` or `0`, because what it drives is a set of
+/// discrete lines and that is the value they take.
 pub(crate) fn as_value(number: f64) -> Vec<u8> {
-    // Enough places for a temperature in kelvin to a hundredth and for the
-    // ratios a scale produces, and few enough that a log stays readable. A
-    // format that printed seventeen significant figures would be honest about
-    // the double and useless to read.
-    format!("{number:.4}")
-        .trim_end_matches('0')
-        .trim_end_matches('.')
-        .as_bytes()
-        .to_vec()
+    number.to_le_bytes().to_vec()
 }
 
 /// A value that arrived, as a number.
+///
+/// Exactly eight bytes, and a finite number in them. Both refusals are the
+/// same kind of thing: a datum that is not a value must not be read as one.
+///
+/// A width that is not eight is a link carrying something that is not a value
+/// -- a sensor's raw bytes delivered where a conversion's output was meant, or
+/// a node whose output is a decision -- and taking eight of them would be a
+/// temperature made of whatever was there.
+///
+/// A NaN or an infinity is a reading nothing can act on, and the one place it
+/// must not reach is a comparison: a vote sorts its readings, and NaN compares
+/// as neither less nor greater, so a sort that met one would order the
+/// readings by where they happened to be and the middle one would be the
+/// middle of nothing. Refused here, where the complaint can name the node that
+/// sent it.
 pub(crate) fn from_value(data: &[u8], what: &str) -> Result<f64, String> {
-    let text = std::str::from_utf8(data)
-        .map_err(|_| format!("{what}: what arrived is not text, so it is not a value"))?;
-    text.trim()
+    let bytes: [u8; VALUE_BYTES] = data.try_into().map_err(|_| {
+        format!(
+            "{what}: a value is {VALUE_BYTES} bytes of a 64-bit float, and {} arrived",
+            data.len()
+        )
+    })?;
+
+    let number = f64::from_le_bytes(bytes);
+    if !number.is_finite() {
+        return Err(format!(
+            "{what}: {number} is not a number anything can be decided on"
+        ));
+    }
+    Ok(number)
+}
+
+/// A value as a program reads and writes one: decimal text.
+///
+/// The one place a value is text, because the far end is a program reading
+/// lines -- see [`process`] -- and a line is text. The shortest decimal that
+/// reads back as the same double, so the trip through a program's pipe loses
+/// nothing either.
+pub(crate) fn as_text(number: f64) -> String {
+    format!("{number}")
+}
+
+/// And a number a program wrote, as a value.
+pub(crate) fn from_text(text: &str, what: &str) -> Result<f64, String> {
+    let said = text.trim();
+    let number: f64 = said
         .parse()
-        .map_err(|_| format!("{what}: \"{}\" is not a number", text.trim()))
+        .map_err(|_| format!("{what}: \"{said}\" is not a number"))?;
+    if !number.is_finite() {
+        return Err(format!(
+            "{what}: {number} is not a number anything can be decided on"
+        ));
+    }
+    Ok(number)
 }
 
 #[cfg(test)]
@@ -204,27 +266,71 @@ mod tests {
         }
     }
 
-    /// A value is written in a form a person can read.
+    /// A value is eight bytes of the double itself, least significant first.
+    ///
+    /// Nothing is rounded on the way: a reading goes on the link as the
+    /// arithmetic left it, which is what lets a vote over three sensors see
+    /// the figures they differ in.
     #[test]
-    fn a_value_is_readable() {
-        assert_eq!(as_value(293.15), b"293.15");
-        assert_eq!(as_value(0.0), b"0");
-        assert_eq!(as_value(-40.0), b"-40");
-        // Not seventeen significant figures: honest about the double and
-        // useless in a log.
-        assert_eq!(as_value(1.0 / 3.0), b"0.3333");
+    fn a_value_is_the_double_itself() {
+        assert_eq!(as_value(293.15), 293.15_f64.to_le_bytes());
+        assert_eq!(as_value(0.0).len(), VALUE_BYTES);
+
+        // A third reads back as a third, which four decimal places could not
+        // say.
+        let third = from_value(&as_value(1.0 / 3.0), "a third").expect("it reads back");
+        assert_eq!(third, 1.0 / 3.0);
+
+        // And the trip is exact for every temperature a vehicle sees, which
+        // is the point of carrying the double.
+        for number in [0.0, 273.15, 293.15, -40.0, 0.0625, 1.0e6, f64::MIN, f64::MAX] {
+            assert_eq!(
+                from_value(&as_value(number), "a value").expect("it reads back"),
+                number
+            );
+        }
     }
 
-    /// What is not a number is reported rather than guessed at.
+    /// What is not a value is reported rather than read as one.
     #[test]
     fn a_datum_that_is_not_a_value_is_reported() {
-        let said = from_value(b"29x.15", "the fore sensor").expect_err("not a number");
+        // A width that is not eight: a sensor's own bytes delivered where a
+        // conversion's output was meant, or a decision, which is text.
+        let said = from_value(b"293.15", "the fore sensor").expect_err("not a value");
         assert!(said.contains("fore sensor"), "{said}");
-        assert!(said.contains("29x.15"), "{said}");
+        assert!(said.contains('6'), "the width is worth saying: {said}");
+        assert!(from_value(b"1", "a decision").is_err());
 
-        // And bytes that are not text at all.
-        let said = from_value(&[0xff, 0xfe], "a sensor").expect_err("not text");
-        assert!(said.contains("not text"), "{said}");
+        // And a NaN, which must not reach a comparison: see `from_value`.
+        for wrong in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let said = from_value(&wrong.to_le_bytes(), "a sensor")
+                .expect_err("nothing can be decided on it");
+            assert!(said.contains("sensor"), "{said}");
+        }
+    }
+
+    /// A program's pipe carries a decimal, and it round-trips.
+    ///
+    /// The one place a value is written out and read back: see
+    /// `super::process`. The shortest decimal that reads back as the same
+    /// double, so a number does not drift by going through a program.
+    #[test]
+    fn a_program_reads_and_writes_a_decimal() {
+        assert_eq!(as_text(293.15), "293.15");
+        assert_eq!(as_text(-40.0), "-40");
+
+        for number in [0.0, 293.15, 1.0 / 3.0, -40.0, 1.0e-9] {
+            assert_eq!(
+                from_text(&as_text(number), "a program").expect("it reads back"),
+                number
+            );
+        }
+
+        assert!(from_text("nearly", "a program").is_err());
+        assert!(
+            from_text("NaN", "a program").is_err(),
+            "a program may not answer with a number nothing can be decided on"
+        );
     }
 
     /// The thermostat, end to end, from counts to a heater decision.

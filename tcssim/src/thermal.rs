@@ -597,42 +597,59 @@ mod tests {
             payloads.push(sensor);
         }
 
-        // And the heaters, which wait to be driven. Their ports are asked for
-        // by binding and letting go, so a port that was free when it was
-        // chosen may have been taken by the time the heater binds it -- which
-        // would leave the loop open at one end, and is checked for below
-        // rather than left to look like a mass that would not warm.
-        let heaters: Vec<u16> = (0..2).map(|_| a_free_port()).collect();
-        for (n, at) in heaters.iter().enumerate() {
-            let mut heater = SimulatedPayload::new(attached(
-                &format!("heaters_{}", n + 1),
-                *at,
-                1,
-                LOOK_MS,
-                Thermal::Heats {
-                    mass: mass.clone(),
-                    rate: HEATER_RATE,
-                },
-            ));
-            heater.start().expect("a heater starts");
-            payloads.push(heater);
-        }
+        // And the heaters, which wait to be driven.
+        //
+        // Their ports are asked for by binding and letting go, so a port that
+        // was free when it was chosen may be taken by the time the heater
+        // binds it -- which would leave the loop open at one end. So the pair
+        // is asked for again: a port that was free a moment ago is not a port
+        // that is free, and a heater that lost one says so in its own words
+        // on the way past.
+        //
+        // Waiting for each to be listening is what tells a lost port from a
+        // slow start. Without it a heater that never bound would show up at
+        // the end of this test as a thermal mass that would not warm, which
+        // says nothing about why.
+        let mut heaters = Vec::new();
+        for attempt in 1..=10 {
+            let ports: Vec<u16> = (0..2).map(|_| a_free_port()).collect();
+            let mut started: Vec<SimulatedPayload> = Vec::new();
+            for (n, at) in ports.iter().enumerate() {
+                let mut heater = SimulatedPayload::new(attached(
+                    &format!("heaters_{}", n + 1),
+                    *at,
+                    1,
+                    LOOK_MS,
+                    Thermal::Heats {
+                        mass: mass.clone(),
+                        rate: HEATER_RATE,
+                    },
+                ));
+                heater.start().expect("a heater starts");
+                started.push(heater);
+            }
 
-        // Each heater is waiting where it was told to wait. A bind that lost
-        // its port is reported by the payload's thread and would otherwise
-        // show up here as a mass that never reached the band, which says
-        // nothing about why.
-        for at in &heaters {
-            let bound = (0..100).any(|_| {
-                if std::net::UdpSocket::bind(("127.0.0.1", *at)).is_err() {
-                    return true;
-                }
-                std::thread::sleep(Duration::from_millis(10));
-                false
+            let listening = ports.iter().all(|at| {
+                (0..100).any(|_| {
+                    if std::net::UdpSocket::bind(("127.0.0.1", *at)).is_err() {
+                        return true;
+                    }
+                    std::thread::sleep(Duration::from_millis(10));
+                    false
+                })
             });
+            if listening {
+                payloads.extend(started);
+                heaters = ports;
+                break;
+            }
+
+            for mut heater in started {
+                heater.stop();
+            }
             assert!(
-                bound,
-                "nothing is waiting at the heater's port {at}: it did not bind"
+                attempt < 10,
+                "ten pairs of ports were taken between being chosen and being bound"
             );
         }
 

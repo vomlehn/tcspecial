@@ -159,7 +159,17 @@ mod tests {
                 }
             })
             .expect("the remote sent a message");
-        assert_eq!(got, 8, "one message of the configured size");
+        // A whole number of messages, rather than exactly one of them. The
+        // stand-in is a pty and a pty keeps no message boundaries: the remote
+        // writes one message every 20 ms and a read that arrives between two
+        // of them returns both, which a real channel would have handed over
+        // one at a time. Asserting one message read this as a failure about
+        // one run in three.
+        assert!(
+            got % 8 == 0,
+            "a read should be whole messages of the configured size, and {got} \
+             bytes is not"
+        );
 
         device.stop();
     }

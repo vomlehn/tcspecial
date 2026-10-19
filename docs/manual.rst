@@ -101,6 +101,19 @@ compute element
     arrivals, which is what makes a control loop possible: an average over
     time, a comparison against a setpoint, a filter that remembers.
 
+value
+    A number on a link: eight bytes of an IEEE-754 binary64, least significant
+    byte first. A temperature is a value in kelvins from the conversion that
+    made it to the computation, the log and the ground, so that comparing two
+    readings is a comparison and not a conversion. Where a value becomes text
+    -- the lines a program reads and writes, or the value typed into a command
+    -- it is converted at that boundary and nowhere else.
+
+decision
+    What a computation sends a device: the text ``1`` or ``0``, one byte. It is
+    not a value, a heater's line not being a number, and it is asserted on
+    every sample rather than only when it changes.
+
 group
     Devices that share one sampling interval, so that a set of sensors is read
     as close to simultaneously as the hardware allows rather than each on a
@@ -483,6 +496,22 @@ arrived. On I\ :superscript:`2`\ C and SPI, where nothing moves unless the bus
 is clocked, a read is itself the bus transaction, so a payload there with no
 trigger is read rather than asked.
 
+Two types cannot be asked at all, and a ``trigger`` on one of them is refused
+with the configuration: a set of discrete lines is read or driven and not
+both, and an IIO device's sample buffer is read and never written -- what such
+a device is configured with is in sysfs, not in the character device. Refused
+on the ground rather than at the first read, because a vehicle that came up
+and asked a question it cannot ask would have a sensor reporting nothing and
+nothing saying why.
+
+A ``read_size`` larger than one read of the interface carries is refused the
+same way, naming both numbers. A CAN frame carries eight bytes, or sixty-four
+on an FD bus, and an rpmsg message carries what the channel's
+``max_message_bytes`` says -- 496 unless the file says otherwise. The rest is
+refused rather than split over two frames: a reading assembled out of two
+frames half arrives when one of them is lost, and nothing in the file says how
+to put the halves back together.
+
 *A program.* An ``app_pl`` is a program that writes its readings when it
 chooses and is never asked; an ``app_all_pl`` answers whatever arrives on its
 MOC interface, so the data that arrives is the question. Neither states a
@@ -605,7 +634,7 @@ transaction on every pass. Give such a payload a group or a rate.
      - One message
    * - ``iio``
      - Yes: samples, at the device's own sampling rate
-     - Yes: bytes
+     - No: the buffer is read; what the device is configured with is in sysfs
      - What is in the buffer
    * - ``device-file``
      - What the file or device gives
@@ -940,10 +969,10 @@ change and a report carries the time it was looked at.
 Two payloads may watch one chip and may not watch one line: the kernel gives a
 line to one request at a time, so the second handler's start would fail.
 
-Driven lines are driven together, to the same state. What arrives is a value
-as everything on a link is -- the text ``1`` to assert and ``0`` to unassert,
-which is what the hysteresis compute element emits -- and anything else is
-refused rather than taken for one of them: the thing on the other end is a
+Driven lines are driven together, to the same state. What arrives is a
+**decision** -- the text ``1`` to assert and ``0`` to unassert, which is what
+the hysteresis compute element emits -- and anything else is refused rather
+than taken for one of them: the thing on the other end is a
 heater, and a datum that cannot be read is not guessed at. The lines are a
 set and not a pattern because there is nothing in the file to say which line
 is which, and because three heater circuits switched one at a time would be
@@ -1320,19 +1349,23 @@ otherwise produces a payload that looks configured and is not:
   exists to prevent: a file stating an interval has said something about the
   payload's timing, and reading it as though it had not is reading a different
   file than the one that was written.
-* **Two payloads wanting the same thing**. Two at one address cannot both be
+* **Two nodes wanting the same thing**. Two at one address cannot both be
   started; two on one device file, serial line or SPI peripheral is worse,
   each taking part of the one stream and reporting it as though it were the
-  whole. A payload's own address and its end of the data link -- the section's
-  ``payload_telemetry.dest_base`` counted on by the payload's id -- are compared
-  together,
-  since a port is a port whatever claims it, and ``localhost``, ``127.0.0.1``
-  and ``::1`` count as one host. A Unix socket collides by its path, its port
-  meaning nothing, and so does a device file opened twice. The exception is a
-  bus: several devices on one I\ :superscript:`2`\ C bus is what a bus is for,
-  so what is claimed there is the bus and the address together.
+  whole. Every node that is opened is compared with every other -- the
+  payloads and the ``moc`` node -- since a port is a port whatever claims it,
+  and ``localhost``, ``127.0.0.1`` and ``::1`` count as one host. A Unix
+  socket collides by its path, its port meaning nothing, and so does a device
+  file opened twice. The exceptions are the things that are shared by design:
+  several devices on one I\ :superscript:`2`\ C bus is what a bus is for, so
+  what is claimed there is the bus and the address together; a CAN interface
+  is shared and an identifier on it is not; and a GPIO chip is shared while a
+  line of it is claimed, the kernel giving a line to one request at a time.
+  The node named is the one whose claim came second, the first being the one
+  that stands. An app node is not compared, having no interface to claim: it
+  is reached by running the program it names.
 
-The rule is over the handlers a file produced rather than the words that
+The rule is over the nodes a file produced rather than the words that
 produced them, so it applies to every type of payload alike.
 
 An Example

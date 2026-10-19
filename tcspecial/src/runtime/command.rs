@@ -480,21 +480,11 @@ impl Serving {
             // see and work around; a command that goes quiet is a link the
             // ground cannot tell from a dead one.
             //
-            // RESTART_ARM and RESTART are next: what a version 2 restart does
-            // -- end the process and leave it to whatever supervises it -- is
-            // a decision about how a vehicle is run and not only about this
+            // RESTART_ARM and RESTART are next: what a restart does -- end
+            // the process and leave it to whatever supervises it -- is a
+            // decision about how a vehicle is run and not only about this
             // module.
-            //
-            // The five DH commands are version 1's, naming a data handler by
-            // name. A graph has nodes, and the commands that answer for one
-            // are the five NODE commands above.
-            Command::RestartArm(_)
-            | Command::Restart(_)
-            | Command::StartDH(_)
-            | Command::StopDH(_)
-            | Command::QueryDH(_)
-            | Command::QueryDHSample(_)
-            | Command::ConfigDH(_) => {
+            Command::RestartArm(_) | Command::Restart(_) => {
                 warn!(
                     "{:?} is not answered by a version 2 vehicle yet",
                     command.cmd_type()

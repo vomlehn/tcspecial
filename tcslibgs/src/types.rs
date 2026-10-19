@@ -8,8 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::node::payload::hdlc::{ClockType, Encoding, FrameCheck};
 use crate::node::payload::serial::{Parity, StopBits};
 use crate::node::payload::spi::{BitOrder, CsActive, SpiMode};
-use crate::verify::Problem;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::net::SocketAddr;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -441,73 +440,6 @@ fn binds_every_interface(address: &str) -> bool {
     address.is_empty() || address == "0.0.0.0" || address == "::" || address == "*"
 }
 
-/// What the command interpreter's own two links take from the handlers.
-///
-/// A handler that binds a port a command link binds takes the commanding with
-/// it: the link that bound second fails at startup, and which of them that is
-/// depends on the order two programs happened to start in. Worth refusing
-/// where the file is read, where it is one line to change.
-///
-/// Only a payload set that states a `tcspecial` section can be asked this.
-/// For a set that states none, the ports are in the command interpreter's own
-/// file and nothing here has seen it.
-fn interpreter_collisions(ci: &CIConfig, handlers: &[DHConfig]) -> Vec<(DHName, String)> {
-    // Every socket the command interpreter binds, where the file says it is:
-    // the spacecraft command link, and one command socket per payload counted
-    // from the base by that payload's own id. All of them, for every payload,
-    // because a payload may collide with another payload's command socket as
-    // easily as with its own.
-    let mut links = vec![(
-        ci.address.clone(),
-        ci.port,
-        "spacecraft command".to_string(),
-    )];
-    // The position in this list is the payload's id: the file's order is what
-    // decides it, and this list is in that order.
-    for (id, _) in handlers.iter().enumerate() {
-        match ci.payload_command_dest_base.at(id) {
-            Ok(at) => links.push((
-                at.address,
-                at.port,
-                format!("command link of payload {id}"),
-            )),
-            // A base that leaves no room for this payload's port is refused
-            // where the bases are read; nothing to add here.
-            Err(_) => continue,
-        }
-    }
-
-    let mut found = Vec::new();
-    for dh in handlers {
-        for (claim, what) in claims_of(dh) {
-            let Claim::Port { host: theirs, port } = &claim else {
-                continue;
-            };
-            for (address, mine, which) in &links {
-                let address = address.as_str();
-                let mine = *mine;
-                let wildcard = binds_every_interface(address);
-                if *port == mine && (wildcard || *theirs == one_host(address)) {
-                    found.push((
-                        dh.name.clone(),
-                        format!(
-                            "{what} and the {which} link both want port {port}{}",
-                            if wildcard {
-                                format!(
-                                    ", which the link takes on every interface ({address})"
-                                )
-                            } else {
-                                String::new()
-                            }
-                        ),
-                    ));
-                }
-            }
-        }
-    }
-
-    found
-}
 
 impl DHType {
     /// The word a configuration file uses for this kind.
@@ -616,20 +548,6 @@ impl NetworkProtocol {
     }
 }
 
-/// What a data handler is doing, as the spacecraft knows it.
-///
-/// In the library rather than in tcspecial because the ground reads it: a
-/// QUERY_DH answer carries it, which is how a panel can say what a handler is
-/// doing rather than what the last command it was sent implied.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub enum DHState {
-    /// Created but not activated
-    Created,
-    /// Active and conduiting data
-    Active,
-    /// Stopped
-    Stopped,
-}
 
 /// Data handler name
 ///
@@ -836,59 +754,6 @@ pub struct NodeCounts {
     /// spoken, and the second has gone quiet.
     pub last_moved: Option<Timestamp>,
 }
-
-/// Statistics for data handler operations
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Statistics {
-    /// Timestamp when statistics were collected
-    pub timestamp: Option<Timestamp>,
-    /// Number of bytes received
-    pub bytes_received: u64,
-    /// Number of successful read operations
-    pub reads_completed: u64,
-    /// Number of failed read operations
-    pub reads_failed: u64,
-    /// Number of bytes sent
-    pub bytes_sent: u64,
-    /// Number of successful write operations
-    pub writes_completed: u64,
-    /// Number of failed write operations
-    pub writes_failed: u64,
-    /// Triggers sent to a triggered payload.
-    ///
-    /// Counted on its own because nothing else counts it. A handler's
-    /// `bytes_received` is the ground's data and its `bytes_sent` is the
-    /// data that went back, so the payload side of each conduit is left out
-    /// of both -- those are the same bytes seen twice. A trigger is a write
-    /// with no read behind it, so without this it would appear in no
-    /// statistic at all, and a payload that had stopped answering would look
-    /// exactly like a handler that had stopped asking.
-    #[serde(default)]
-    pub triggers_sent: u64,
-    /// Triggers a triggered payload would not take.
-    ///
-    /// Apart from `writes_failed` for the reason above, and apart from
-    /// `triggers_sent` because the two say different things: a payload that
-    /// is answering, one that has gone away, and a handler that has given up
-    /// asking are three different states, and one count of attempts could
-    /// not tell them apart. `writes_failed` is data for the ground that did
-    /// not reach it, which is the ground's loss; a trigger that fails is the
-    /// payload's silence, and a handler goes on asking through it.
-    #[serde(default)]
-    pub triggers_failed: u64,
-}
-
-impl Statistics {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_timestamp(mut self) -> Self {
-        self.timestamp = Some(Timestamp::now());
-        self
-    }
-}
-
 /// Bytes of one transfer kept for display.
 ///
 /// A data handler's panel shows what it last sent and last received. Keeping
@@ -1710,270 +1575,6 @@ fn link_terms_of(
 fn as_length_of_time(attribute: &str, said: &str) -> Result<Duration, String> {
     crate::graph::parse_interval(said).map_err(|why| format!("{attribute}: {why}"))
 }
-
-/// Payload configuration file structure
-///
-/// A tcspecial configuration describes payloads and nothing else. It carries no
-/// packet interval: how fast a payload produces packets is a property of a
-/// simulation rather than of a payload, so it belongs to the simulator's own
-/// configuration file, and one stated here is refused rather than ignored.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(deny_unknown_fields)]
-pub struct PayloadConfig {
-    pub version: String,
-    pub description: String,
-    /// What tcspecial itself is configured with for this payload set: the
-    /// same section a `tcspecial.yaml` holds, carried here so that one file
-    /// can describe a whole set, the command interpreter included.
-    ///
-    /// First of the sections, in the files and here, because it is about the
-    /// set as a whole where the two below are about the payloads in it.
-    ///
-    /// Optional. `beacon_send` is read from here -- where a set's beacons
-    /// go is the set's own business, its ground station being what listens
-    /// for them -- and the rest is carried and checked and not yet read,
-    /// tcspecial taking the rest of its configuration from the file
-    /// `TCSPECIAL_CONFIG_PATH` names. A malformed section is refused either
-    /// way, so a file that states one is checked rather than ignored.
-    #[serde(default)]
-    pub tcspecial: Option<CIConfigJson>,
-    /// Named groups of attributes that several payloads share.
-    ///
-    /// Optional: a file whose payloads have nothing in common, or that prefers
-    /// to spell every one of them out, has no groups.
-    #[serde(default)]
-    pub payload_groups: Vec<DHGroupJson>,
-    /// The payloads, each knowing which one of the file it is.
-    #[serde(deserialize_with = "payloads_in_file_order")]
-    pub payloads: Vec<DHConfigJson>,
-}
-
-impl PayloadConfig {
-    /// The version this file states, as the three bytes a beacon carries.
-    ///
-    /// `None` for a file whose version is not one, two or three decimal
-    /// parts, which [`Self::check`] refuses.
-    pub fn config_version(&self) -> Option<crate::ConfigVersion> {
-        crate::ConfigVersion::of_text(&self.version)
-    }
-
-    pub fn len(&self) -> usize {
-        self.payloads.len()
-    }
-
-    /// Look up a data handler group by name.
-    pub fn group(&self, name: &str) -> Option<&DHGroupJson> {
-        self.payload_groups.iter().find(|g| g.name == name)
-    }
-
-    /// Settle every data handler into its runtime configuration.
-    ///
-    /// This is where a handler is laid over the group it names, so it is the
-    /// only way to convert a file that uses groups. A group defined twice,
-    /// named by a handler and defined nowhere, or defined and named by no
-    /// handler is an error here rather than a handler quietly taking the wrong
-    /// attributes or none at all.
-    ///
-    /// The first thing wrong with the file, which is what a program loading
-    /// one can do something about: it cannot run, and which of several
-    /// mistakes it names changes nothing. [`Self::problems`] is the same
-    /// rules asked for all of their answers.
-    pub fn to_dh_configs(&self) -> Result<Vec<DHConfig>, String> {
-        let (configs, problems) = self.check();
-        match problems.into_iter().next() {
-            Some(problem) => Err(problem.message),
-            None => Ok(configs),
-        }
-    }
-
-    /// Everything wrong with this file, in the order the rules are asked.
-    ///
-    /// For a reader checking a file rather than a program running one: see
-    /// [`crate::verify`]. Each problem says which payload or group it is
-    /// about, which is how `tcsverify` finds the line it belongs to.
-    ///
-    /// One mistake can answer two rules, and both are reported. A payload
-    /// that misspells its group's name both names a group that is not defined
-    /// and leaves the group named by nobody; the file has one line to change
-    /// and a reader is told where both ends of it are.
-    pub fn problems(&self) -> Vec<Problem> {
-        self.check().1
-    }
-
-    /// Every handler this file describes, and everything wrong with it.
-    ///
-    /// The handlers are the ones that converted, so a file with a problem still
-    /// yields the payloads that have none -- which is what lets a simulator
-    /// file be checked against a tcspecial configuration that is itself being
-    /// reported on.
-    pub fn check(&self) -> (Vec<DHConfig>, Vec<Problem>) {
-        let mut problems: Vec<Problem> = Vec::new();
-
-        // The version this file states, which every beacon carries as three
-        // bytes: see `crate::BeaconTelemetry`. A file whose version cannot be
-        // read as three decimal parts would be announced as something it is
-        // not, so it is refused here rather than rounded to nought.
-        if self.config_version().is_none() {
-            problems.push(Problem::section(
-                "version",
-                format!(
-                    "version \"{}\" is not one, two or three decimal parts, and a \
-                     payload set says its version in every beacon",
-                    self.version
-                ),
-            ));
-        }
-
-        let mut seen: BTreeSet<&str> = BTreeSet::new();
-        for group in &self.payload_groups {
-            if !seen.insert(group.name.as_str()) {
-                problems.push(Problem::group(
-                    &group.name,
-                    format!("payload group \"{}\" is defined more than once", group.name),
-                ));
-            }
-        }
-
-        // A payload is addressed by its name and found by its name, so a
-        // name has to pick out one payload. A repeat parses cleanly and then
-        // loses one: tcspecial keeps its handlers by name, so a repeated name
-        // has one silently replace the other, and a simulator configuration
-        // is joined to this one by name, so it would drive two payloads from
-        // one entry.
-        let mut by_name: BTreeSet<&str> = BTreeSet::new();
-        for payload in &self.payloads {
-            if !by_name.insert(payload.name.as_str()) {
-                problems.push(Problem::payload(
-                    &payload.name,
-                    format!("payload \"{}\" is defined more than once", payload.name),
-                ));
-            }
-        }
-
-        let mut configs: Vec<DHConfig> = Vec::new();
-        for dh in &self.payloads {
-            let group = match &dh.group {
-                Some(name) => match self.group(name) {
-                    Some(group) => Some(group),
-                    None => {
-                        problems.push(Problem::payload(
-                            &dh.name,
-                            format!(
-                                "data handler \"{}\" names group \"{}\", which is not \
-                                 defined",
-                                dh.name, name
-                            ),
-                        ));
-                        continue;
-                    }
-                },
-                None => None,
-            };
-
-            match dh.to_dh_config_in(group) {
-                Ok(mut config) => {
-                    // Where this payload exchanges data with the ground:
-                    // tcspecial's own base counted on by the payload's id,
-                    // which is the position it has in this file. tcspecial's
-                    // and not the MOC's, because this is the socket tcspecial
-                    // *binds* -- the payload is the end that speaks first over
-                    // UDP, so it is the end that has to be findable, and the
-                    // MOC says hello to it. The MOC's own side is counted the
-                    // same way from `payload_telemetry.dest_base`.
-                    //
-                    // One base and an arithmetic rule rather than an address
-                    // and a port on every payload -- forty payloads were forty
-                    // chances to repeat a port, and a repeated port is two
-                    // payloads whose data arrives interleaved.
-                    //
-                    // A set with no tcspecial section has nowhere to send,
-                    // which is what `oc: None` has always meant: a file
-                    // describing payloads is complete without it, and a
-                    // handler cannot be started without one.
-                    if let Some(Ok(ci)) =
-                        self.tcspecial.as_ref().map(CIConfigJson::to_ci_config)
-                    {
-                        match (
-                            ci.payload_source_base.at(dh.sequence),
-                            ci.payload_dest_base.at(dh.sequence),
-                        ) {
-                            (Ok(oc), Ok(ground)) => {
-                                config.oc = Some(oc);
-                                config.ground = Some(ground);
-                            }
-                            (Err(why), _) | (_, Err(why)) => {
-                                problems.push(Problem::payload(&dh.name, why));
-                                continue;
-                            }
-                        }
-                    }
-                    configs.push(config);
-                }
-                Err(message) => problems.push(Problem::payload(&dh.name, message)),
-            }
-        }
-
-        // Over the handlers that converted. A payload the rules refused is
-        // not a payload claiming anything, so leaving it out is the only way
-        // this stage can say something true.
-        for (name, message) in collisions(&configs) {
-            problems.push(Problem::payload(&name.0, message));
-        }
-
-        // And against the command links, when the file says where they are.
-        // A handler on a command port is the one collision that does not stop
-        // a handler from working: it stops the commanding that would have
-        // started it.
-        if let Some(Ok(ci)) = self.tcspecial.as_ref().map(CIConfigJson::to_ci_config) {
-            for (name, message) in interpreter_collisions(&ci, &configs) {
-                problems.push(Problem::payload(&name.0, message));
-            }
-        }
-
-        // The tcspecial section is checked here whether or not anything reads
-        // the attribute in question.
-        // A section a file states is a section its author meant, and one that
-        // could never be used -- a protocol that is not a protocol, say -- is
-        // better refused by whoever loads the file than discovered by whoever
-        // first tries to use it.
-        if let Some(ci) = &self.tcspecial {
-            if let Err(e) = ci.to_ci_config() {
-                problems.push(Problem::section("tcspecial", format!("tcspecial: {e}")));
-            }
-        }
-
-        // A group no handler names has no effect on the configuration, which
-        // is exactly what a group whose name a handler misspelled looks like.
-        // Checked after the handlers, so that a reader following the problems
-        // in order meets the misspelling at the handler's end first, where
-        // the name actually is.
-        let named: BTreeSet<&str> = self
-            .payloads
-            .iter()
-            .filter_map(|dh| dh.group.as_deref())
-            .collect();
-        for unused in self
-            .payload_groups
-            .iter()
-            .filter(|group| !named.contains(group.name.as_str()))
-        {
-            // Worded exactly as the simulator configuration format words the
-            // same rule, so that one rule reads as one rule wherever it is
-            // met.
-            problems.push(Problem::group(
-                &unused.name,
-                format!(
-                    "data handler group \"{}\" is named by no data handler: name it \
-                     from one, or remove the group",
-                    unused.name
-                ),
-            ));
-        }
-
-        (configs, problems)
-    }
-}
-
 /// A named group of attributes that several data handlers share.
 ///
 /// Every attribute is optional, so a group carries exactly what its handlers
@@ -2422,21 +2023,6 @@ pub struct DHConfigJson {
     pub sequence: usize,
 }
 
-/// Deserialize the payloads, numbering each as it is read.
-///
-/// Here rather than in a pass afterwards, so that nothing can hold a
-/// `PayloadConfig` whose payloads do not know which ones they are. Every
-/// format arrives through this one function.
-fn payloads_in_file_order<'de, D>(d: D) -> Result<Vec<DHConfigJson>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let mut payloads = Vec::<DHConfigJson>::deserialize(d)?;
-    for (sequence, payload) in payloads.iter_mut().enumerate() {
-        payload.sequence = sequence;
-    }
-    Ok(payloads)
-}
 
 impl DHConfigJson {
     /// Convert a handler that states every attribute for itself.
@@ -3516,45 +3102,6 @@ mod tests {
         );
     }
 
-    /// The names that said their own unit are refused by name, each told the
-    /// name it has now.
-    ///
-    /// The value changes with the name -- `500` became `500 ms` -- so a file
-    /// told only that a word is unknown would write the number again under
-    /// the new name and be wrong by a factor nobody would see.
-    #[test]
-    fn a_name_that_said_its_unit_is_told_the_name_it_has_now() {
-        let payload_file = |extra: &str| {
-            format!(
-                "version: \"1.0\"
-description: a payload
-payloads:
-  - name: DH0
-    type: network
-    protocol: tcp
-    payload_interface: localhost:5000
-    packet_size: 12
-{extra}
-"
-            )
-        };
-
-        // The two any payload may state. The three that belong to a line or
-        // to a set of discrete lines -- the two rs485 turnarounds and the
-        // debounce -- go through the same loop, keyed by the same names.
-        for (old, now) in [
-            ("    packet_interval_ms: 500", "packet_interval"),
-            ("    stale_interval_ms: 3000", "stale_interval"),
-        ] {
-            let said = payload(&payload_file(old))
-                .to_dh_configs()
-                .expect_err(&format!("{old} is not a word this file knows"));
-            assert!(
-                said.contains(now) && said.contains("length of time"),
-                "{old}: {said}"
-            );
-        }
-    }
 
     /// The two kinds do not mix, in either direction, and the complaint says
     /// which file the misplaced setting belongs in.
@@ -3886,17 +3433,7 @@ payloads:
         );
     }
 
-    #[test]
-    fn test_statistics_with_timestamp() {
-        let stats = Statistics::new().with_timestamp();
-        assert!(stats.timestamp.is_some());
-    }
 
-    /// A tcspecial configuration as it is really read, so these tests go
-    /// through the same deserialization a file on disk does.
-    fn payload(text: &str) -> PayloadConfig {
-        crate::ConfigFormat::Yaml.parse(text).expect("parses")
-    }
 
     #[test]
     fn a_sample_records_the_head_of_a_transfer() {
@@ -3951,742 +3488,24 @@ payloads:
         assert_eq!(sample.data(), &[] as &[u8]);
     }
 
-    #[test]
-    fn a_handler_takes_its_groups_attributes() {
-        let config = payload(
-            "
-version: \"1.0\"
-description: one group, two handlers in it
-payload_groups:
-  - name: udp_localhost
-    type: network
-    protocol: udp
-payloads:
-  - name: DH1
-    group: udp_localhost
-    payload_interface: localhost:5001
-    packet_size: 11
-  - name: DH3
-    group: udp_localhost
-    payload_interface: localhost:5003
-    packet_size: 15
-",
-        );
 
-        let handlers = config.to_dh_configs().unwrap();
 
-        // Everything shared comes from the group; the port and packet size,
-        // which are what tell the two apart, come from each handler.
-        assert_eq!(
-            handlers[0].endpoint,
-            EndpointConfig::Network(NetworkConfig {
-                protocol: NetworkProtocol::Udp,
-                address: "localhost".to_string(),
-                port: 5001,
-            })
-        );
-        assert_eq!(handlers[0].packet_size, 11);
-        assert_eq!(
-            handlers[1].endpoint,
-            EndpointConfig::Network(NetworkConfig {
-                protocol: NetworkProtocol::Udp,
-                address: "localhost".to_string(),
-                port: 5003,
-            })
-        );
-        assert_eq!(handlers[1].packet_size, 15);
-    }
 
-    #[test]
-    fn a_handler_overrides_its_group() {
-        let config = payload(
-            "
-version: \"1.0\"
-description: a handler differing from the group it is in
-payload_groups:
-  - name: udp_localhost
-    type: network
-    protocol: udp
-    packet_size: 11
-payloads:
-  - name: DH0
-    group: udp_localhost
-    protocol: tcp
-    payload_interface: localhost:5000
-",
-        );
 
-        let handlers = config.to_dh_configs().unwrap();
 
-        assert_eq!(
-            handlers[0].endpoint,
-            EndpointConfig::Network(NetworkConfig {
-                // The handler's own, not the group's udp.
-                protocol: NetworkProtocol::Tcp,
-                address: "localhost".to_string(),
-                port: 5000,
-            })
-        );
-        // Not overridden, so still the group's.
-        assert_eq!(handlers[0].packet_size, 11);
-    }
 
-    #[test]
-    fn a_handler_needs_no_group() {
-        let config = payload(
-            "
-version: \"1.0\"
-description: a handler stating everything for itself
-payloads:
-  - name: DH2
-    type: device-file
-    path: /dev/urandom
-    packet_size: 1
-",
-        );
 
-        let handlers = config.to_dh_configs().unwrap();
-        assert_eq!(
-            handlers[0].endpoint,
-            EndpointConfig::Device(DeviceConfig {
-                path: "/dev/urandom".to_string()
-            })
-        );
-    }
 
-    /// Where a payload exchanges data with the ground is counted from the
-    /// section's base by the payload's own id.
-    ///
-    /// Not written on the payload, which is what it used to be: `oc_address`
-    /// and `oc_port` on every entry were as many chances to repeat a port as
-    /// there were payloads, and a repeated port is two payloads whose data
-    /// arrives interleaved. One base and one arithmetic rule cannot be
-    /// written inconsistently.
-    #[test]
-    fn a_payloads_ground_link_is_counted_from_the_base() {
-        let config = payload(
-            "
-version: \"1.0\"
-description: three payloads counted from one base
-tcspecial:
-  tcs_cmd:
-    recv: 0.0.0.0:4000
-    send: 127.0.0.1:4100
-  payload_command:
-    source_base: 127.0.0.1:4300
-    dest_base: 0.0.0.0:4200
-  payload_telemetry:
-    source_base: 0.0.0.0:6000
-    dest_base: 127.0.0.1:6100
-  beacon:
-    interval: 5 s
-    send: 0.0.0.0:5550
-    recv: 127.0.0.1:5650
-payloads:
-  - name: DH0
-    type: device-file
-    path: /dev/zero
-    packet_size: 1
-  - name: DH1
-    type: device-file
-    path: /dev/urandom
-    packet_size: 1
-  - name: DH2
-    type: device-file
-    path: /dev/null
-    packet_size: 1
-",
-        );
 
-        let handlers = config.to_dh_configs().expect("a sound set");
-        for (id, handler) in handlers.iter().enumerate() {
-            let oc = handler.oc.as_ref().expect("a ground link");
-            assert_eq!(oc.protocol, NetworkProtocol::Udp);
-            // tcspecial's own base: this is the socket tcspecial binds, and
-            // the one the MOC says hello to.
-            assert_eq!(oc.address, "0.0.0.0", "{}", handler.name.0);
-            assert_eq!(oc.port, 6000 + id as u16, "{}", handler.name.0);
-        }
-    }
 
-    /// A set with no tcspecial section has no ground link for its payloads.
-    ///
-    /// Which is what `oc: None` has always meant: a file describing payloads
-    /// is complete without one, and only starting a handler needs it.
-    #[test]
-    fn a_set_with_no_section_has_no_ground_link() {
-        let config = payload(
-            "
-version: \"1.0\"
-description: no section at all
-payloads:
-  - name: DH2
-    type: device-file
-    path: /dev/urandom
-    packet_size: 1
-",
-        );
 
-        assert_eq!(config.to_dh_configs().unwrap()[0].oc, None);
-    }
 
-    /// A base too high for the payloads counted from it is refused.
-    ///
-    /// By name, and while somebody is reading the file: a sum past 65535 is a
-    /// configuration describing something no socket can be, and the useful
-    /// moment to say so is not when the socket is made.
-    #[test]
-    fn a_base_that_leaves_no_room_is_refused() {
-        let config = payload(
-            "
-version: \"1.0\"
-description: a base at the top of the range
-tcspecial:
-  tcs_cmd:
-    recv: 0.0.0.0:4000
-    send: 127.0.0.1:4100
-  payload_command:
-    source_base: 127.0.0.1:4300
-    dest_base: 0.0.0.0:4200
-  payload_telemetry:
-    source_base: 0.0.0.0:65535
-    dest_base: 127.0.0.1:6100
-  beacon:
-    interval: 5 s
-    send: 0.0.0.0:5550
-    recv: 127.0.0.1:5650
-payloads:
-  - name: DH0
-    type: device-file
-    path: /dev/zero
-    packet_size: 1
-  - name: DH1
-    type: device-file
-    path: /dev/urandom
-    packet_size: 1
-",
-        );
 
-        let message = config
-            .to_dh_configs()
-            .expect_err("the second payload has no port to be at");
-        assert!(message.contains("65535") || message.contains("65536"), "{message}");
-    }
 
-    #[test]
-    fn a_payload_file_describes_a_serial_payload() {
-        let yaml = "version: \"1.0\"\ndescription: a line\n\
-                    payloads:\n  - name: line\n    type: serial\n    \
-                    path: /dev/ttyS0\n    datarate: 115200\n    \
-                    stop_bits: 1\n    parity: none\n    byte_length: 8\n    \
-                    packet_size: 12\n    stream:\n      max_length: 12\n      \
-                    timeout: none\n";
-        let config: PayloadConfig = ConfigFormat::Yaml.parse(yaml).expect("it parses");
-        let handlers = config.to_dh_configs().expect("it resolves");
 
-        match &handlers[0].endpoint {
-            crate::EndpointConfig::Serial(line) => {
-                assert_eq!(line.path, "/dev/ttyS0");
-                assert_eq!(line.datarate, 115_200);
-                assert_eq!(line.byte_length, 8);
-                assert_eq!(line.stop_bits, StopBits::One);
-                assert_eq!(line.parity, Parity::None);
-            }
-            other => panic!("a serial payload resolved to {other:?}"),
-        }
-    }
 
-    /// And a payload on an I2C bus, and a SPI peripheral.
-    #[test]
-    fn a_payload_file_describes_a_bus_and_a_peripheral() {
-        let i2c = "version: \"1.0\"\ndescription: a bus\n\
-                   payloads:\n  - name: sensor\n    type: i2c\n    \
-                   path: /dev/i2c-1\n    payload_address: 0x48\n    pec: true\n    \
-                   packet_size: 8\n";
-        let config: PayloadConfig = ConfigFormat::Yaml.parse(i2c).expect("it parses");
-        match &config.to_dh_configs().expect("it resolves")[0].endpoint {
-            crate::EndpointConfig::I2c(bus) => {
-                assert_eq!(bus.bus, "/dev/i2c-1");
-                assert_eq!(bus.address, 0x48);
-                assert!(bus.pec);
-            }
-            other => panic!("an I2C payload resolved to {other:?}"),
-        }
 
-        let spi = "version: \"1.0\"\ndescription: a peripheral\n\
-                   payloads:\n  - name: imu\n    type: spi\n    \
-                   path: /dev/spidev0.0\n    max_speed: 1000000\n    spi_mode: 3\n    \
-                   bits_per_word: 8\n    packet_size: 8\n";
-        let config: PayloadConfig = ConfigFormat::Yaml.parse(spi).expect("it parses");
-        match &config.to_dh_configs().expect("it resolves")[0].endpoint {
-            crate::EndpointConfig::Spi(chip) => {
-                assert_eq!(chip.path, "/dev/spidev0.0");
-                assert_eq!(chip.max_speed, 1_000_000);
-                assert_eq!(chip.bits_per_word, 8);
-            }
-            other => panic!("a SPI payload resolved to {other:?}"),
-        }
-    }
 
-    /// The rules each kind had are the rules it still has.
-    ///
-    /// Three of them, one per kind, checked through the payload language: a
-    /// start-stop line may not state a clocked line's clock, a SPI peripheral
-    /// must say which clock mode it expects, and an I2C address the
-    /// specification reserves is refused.
-    #[test]
-    fn a_links_own_rules_survived_the_move() {
-        let serial = "version: \"1.0\"\ndescription: a line\n\
-                      payloads:\n  - name: line\n    type: serial\n    \
-                      path: /dev/ttyS0\n    datarate: 9600\n    \
-                      stop_bits: 1\n    byte_length: 8\n    clock_type: txint\n    \
-                      packet_size: 1\n    stream:\n      max_length: 1\n      \
-                      timeout: none\n";
-        let said = ConfigFormat::Yaml
-            .parse::<PayloadConfig>(serial)
-            .expect("it parses")
-            .to_dh_configs()
-            .expect_err("a start-stop line has no clock to state");
-        assert!(said.contains("clock_type"), "{said}");
-
-        let spi = "version: \"1.0\"\ndescription: a peripheral\n\
-                   payloads:\n  - name: imu\n    type: spi\n    \
-                   path: /dev/spidev0.0\n    max_speed: 1000000\n    \
-                   bits_per_word: 8\n    packet_size: 8\n";
-        let said = ConfigFormat::Yaml
-            .parse::<PayloadConfig>(spi)
-            .expect("it parses")
-            .to_dh_configs()
-            .expect_err("a peripheral states its mode");
-        assert!(said.contains("mode"), "{said}");
-
-        let reserved = "version: \"1.0\"\ndescription: a bus\n\
-                        payloads:\n  - name: sensor\n    type: i2c\n    \
-                        path: /dev/i2c-1\n    payload_address: 0x00\n    packet_size: 8\n";
-        let said = ConfigFormat::Yaml
-            .parse::<PayloadConfig>(reserved)
-            .expect("it parses")
-            .to_dh_configs()
-            .expect_err("0x00 is reserved");
-        assert!(said.contains("reserved"), "{said}");
-    }
-
-    /// Two payloads, written in each format.
-    fn two_payloads() -> [(ConfigFormat, String); 2] {
-        [
-            (
-                ConfigFormat::Yaml,
-                "version: \"1.0\"\ndescription: two\npayloads:\n  \
-                 - name: first\n    type: device-file\n    path: /dev/null\n    \
-                 packet_size: 1\n  \
-                 - name: second\n    type: device-file\n    path: /dev/zero\n    \
-                 packet_size: 2\n"
-                    .to_string(),
-            ),
-            (
-                ConfigFormat::Xml,
-                "<payload><version>1.0</version><description>two</description>\
-                 <payloads><name>first</name><type>device-file</type>\
-                 <path>/dev/null</path><packet_size>1</packet_size></payloads>\
-                 <payloads><name>second</name><type>device-file</type>\
-                 <path>/dev/zero</path><packet_size>2</packet_size></payloads></payload>"
-                    .to_string(),
-            ),
-        ]
-    }
-
-    /// A payload knows where in the file it stood, in every format.
-    ///
-    /// The position is recorded as the list is read, so it is the same number
-    /// in all three spellings of one set -- which a line number could not be,
-    /// and which is what lets the three digest alike.
-    /// A set states its version in parts a beacon can carry.
-    ///
-    /// The version goes out in every beacon as three bytes, so a file whose
-    /// version is not one, two or three decimal parts is refused rather than
-    /// announced as something it is not.
-    /// A set states both command links, and they are two places.
-    ///
-    /// One socket cannot be two links: a file that put both at the same
-    /// address and port would describe a split it has not made, and the half
-    /// that bound second would fail at startup with the other half's address.
-    /// The whole interface is compared and not only the port, each link saying
-    /// where it is in full -- two links may share a port on two interfaces,
-    /// which is a configuration somebody may mean.
-    #[test]
-    fn a_set_states_two_command_links() {
-        let with = |links: &str| {
-            format!(
-                "\
-version: \"1.0\"
-description: a set
-tcspecial:
-{links}  beacon:
-    interval: 5 s
-    send: 0.0.0.0:5550
-    recv: 127.0.0.1:5650
-payloads:
-  - name: p
-    type: device-file
-    path: /dev/null
-    packet_size: 1
-"
-            )
-        };
-
-        // Both links, each where the file says it is.
-        const BOTH: &str = "  tcs_cmd:
-    recv: 0.0.0.0:4000
-    send: 127.0.0.1:4100
-  payload_command:
-    source_base: 127.0.0.1:4300
-    dest_base: 0.0.0.0:4200
-  payload_telemetry:
-    source_base: 0.0.0.0:6000
-    dest_base: 127.0.0.1:6100
-";
-
-        payload(&with(BOTH))
-            .to_dh_configs()
-            .expect("two bases are two links");
-
-        // The first payload's command socket is the base itself, so a base
-        // equal to the spacecraft link is one socket asked to be two.
-        let one_socket = BOTH.replace("dest_base: 0.0.0.0:4200", "dest_base: 0.0.0.0:4000");
-        let said = payload(&with(&one_socket))
-            .to_dh_configs()
-            .expect_err("one socket cannot be two links");
-        assert!(
-            said.contains("payload_command.dest_base") && said.contains("4000"),
-            "{said}"
-        );
-
-        // And a section that names only one of them has not been asked the
-        // question: the parser refuses it, as it refuses a section with no
-        // beacon.
-        let only_one = BOTH.replace("    dest_base: 0.0.0.0:4200\n", "");
-        assert_ne!(only_one, BOTH, "the test removed nothing");
-        assert!(
-            ConfigFormat::Yaml
-                .parse::<PayloadConfig>(&with(&only_one))
-                .is_err(),
-            "a section with no payload_command.dest_base was accepted"
-        );
-    }
-
-    /// No payload may bind a port the commanding is taken on.
-    ///
-    /// The one collision that does not stop a payload from working: it stops
-    /// the commanding that would have started it, and which of the two fails
-    /// depends on the order they were started in.
-    #[test]
-    fn no_payload_may_bind_a_command_port() {
-        let with = |address: &str, port: u16| {
-            format!(
-                "\
-version: \"1.0\"
-description: a set
-tcspecial:
-  tcs_cmd:
-    recv: {address}:4000
-    send: 127.0.0.1:4100
-  payload_command:
-    source_base: 127.0.0.1:4300
-    dest_base: 0.0.0.0:4200
-  payload_telemetry:
-    source_base: 0.0.0.0:6000
-    dest_base: 127.0.0.1:6100
-  beacon:
-    interval: 5 s
-    send: 0.0.0.0:5550
-    recv: 127.0.0.1:5650
-payloads:
-  - name: p
-    type: network
-    protocol: udp
-    payload_interface: localhost:{port}
-    packet_size: 1
-"
-            )
-        };
-
-        // Either link -- the spacecraft's, or the one payload's own command
-        // socket, which is its base counted on by its id of nought -- and a
-        // wildcard link takes its port on every interface, so a payload on
-        // localhost collides with one on 0.0.0.0 without either naming the
-        // other's host.
-        for port in [4000, 4200] {
-            let said = payload(&with("0.0.0.0", port))
-                .to_dh_configs()
-                .unwrap_err();
-            assert!(
-                said.contains(&port.to_string()) && said.contains("command"),
-                "port {port}: {said}"
-            );
-        }
-
-        // A link bound to one interface takes the port on that one alone, so
-        // a payload on another host may have it.
-        payload(&with("192.0.2.1", 4000))
-            .to_dh_configs()
-            .expect("another interface's port 4000 is not this link's");
-
-        // A port neither link wants is nobody's business. 4201 is the
-        // command socket of payload 1, and this set has only payload 0.
-        payload(&with("0.0.0.0", 4201))
-            .to_dh_configs()
-            .expect("4201 is no payload of this set's command port");
-    }
-
-    #[test]
-    fn a_set_says_its_version_in_parts_a_beacon_can_carry() {
-        let with = |version: &str| {
-            format!(
-                "version: \"{version}\"\ndescription: one payload\npayloads:\n  \
-                 - name: p\n    type: device-file\n    path: /dev/null\n    \
-                 packet_size: 1\n"
-            )
-        };
-
-        for version in ["1.0", "2", "3.4.5"] {
-            payload(&with(version))
-                .to_dh_configs()
-                .unwrap_or_else(|e| panic!("{version}: {e}"));
-        }
-
-        for version in ["one", "1.0-draft", "1.2.3.4", "256.0"] {
-            let said = payload(&with(version))
-                .to_dh_configs()
-                .expect_err(version);
-            assert!(
-                said.contains("version") && said.contains(version),
-                "{version}: {said}"
-            );
-        }
-    }
-
-    #[test]
-    fn a_payload_knows_where_in_the_file_it_stood() {
-        for (format, text) in two_payloads() {
-            let config: PayloadConfig = format.parse(&text).expect("it parses");
-
-            assert_eq!(config.payloads[0].name, "first", "{format:?}");
-            assert_eq!(config.payloads[0].sequence, 0, "{format:?}");
-            assert_eq!(config.payloads[1].name, "second", "{format:?}");
-            assert_eq!(config.payloads[1].sequence, 1, "{format:?}");
-        }
-    }
-
-    /// The file order survives the list being reordered.
-    ///
-    /// This is the whole point of recording it. The order used to live only in
-    /// the order a `Vec` happened to keep, so anything that sorted the
-    /// payloads -- for a lookup, for a display -- would have silently changed
-    /// what the configuration said about which payload came first, and the
-    /// only thing standing in the way was that nothing did it yet.
-    #[test]
-    fn the_file_order_survives_a_reordered_list() {
-        let (format, text) = &two_payloads()[0];
-        let mut config: PayloadConfig = format.parse(text).expect("it parses");
-
-        config.payloads.sort_by(|a, b| a.name.cmp(&b.name));
-        assert_eq!(config.payloads[0].name, "first", "the sort did nothing");
-
-        config.payloads.reverse();
-        assert_eq!(config.payloads[0].name, "second");
-        // And it still knows it was second.
-        assert_eq!(config.payloads[0].sequence, 1);
-        assert_eq!(config.payloads[1].sequence, 0);
-    }
-
-    /// A file stating a position of its own is refused.
-    ///
-    /// The position is this program's record of what it read, not something a
-    /// file gets to assert: one that could would be able to say its payloads
-    /// came in an order they did not.
-    #[test]
-    fn a_file_may_not_state_a_position() {
-        let text = "version: \"1.0\"\ndescription: one\npayloads:\n  \
-                    - name: first\n    type: device-file\n    path: /dev/null\n    \
-                    packet_size: 1\n    sequence: 7\n";
-
-        let message = ConfigFormat::Yaml
-            .parse::<PayloadConfig>(text)
-            .expect_err("sequence is not an attribute")
-            .to_string();
-        assert!(
-            message.contains("sequence"),
-            "the refusal does not name it: {message}"
-        );
-    }
-
-    #[test]
-    fn a_group_no_handler_names_is_an_error() {
-        // A group with no members has no effect on the configuration, so a
-        // file carrying one is more likely wrong than deliberate.
-        let config = payload(
-            "
-version: \"1.0\"
-description: a group nothing is in
-payload_groups:
-  - name: udp_localhost
-    type: network
-    protocol: udp
-payloads:
-  - name: DH0
-    type: network
-    protocol: tcp
-    payload_interface: localhost:5000
-    packet_size: 12
-",
-        );
-
-        let message = config.to_dh_configs().expect_err("must be rejected");
-        assert!(
-            message.contains("udp_localhost"),
-            "the error should name the group nothing is in, but said: {message}"
-        );
-    }
-
-    /// A name and an id each pick out one payload.
-    ///
-    /// Both repeat silently otherwise, and each loses a payload in its own
-    /// way: tcspecial keeps its handlers by id, so a repeated id has one
-    /// replace the other, and a simulator file is joined to this one by name,
-    /// so a repeated name has one entry drive two payloads.
-    #[test]
-    fn a_payload_name_and_a_payload_id_are_each_defined_once() {
-        let two = |second: &str| {
-            format!(
-                "
-version: \"1.0\"
-description: two payloads
-payloads:
-  - name: DH0
-    type: network
-    protocol: udp
-    payload_interface: localhost:5000
-    packet_size: 12
-{second}
-"
-            )
-        };
-
-        let same_name = payload(&two(
-            "  - name: DH0\n    type: network\n    protocol: udp\n    \
-             payload_interface: localhost:5001\n    packet_size: 12",
-        ));
-        let said = same_name
-            .to_dh_configs()
-            .expect_err("two payloads, one name");
-        assert!(
-            said.contains("DH0") && said.contains("more than once"),
-            "the error should name the payload: {said}"
-        );
-
-        // And two payloads that differ in both are fine, which is what the
-        // checks must not get in the way of.
-        let distinct = payload(&two(
-            "  - name: DH1\n    type: network\n    protocol: udp\n    \
-             payload_interface: localhost:5001\n    packet_size: 12",
-        ));
-        assert_eq!(distinct.to_dh_configs().expect("both convert").len(), 2);
-    }
-
-    /// No two handlers want the same thing.
-    ///
-    /// Two at one port is a start that fails at the second; two on one device
-    /// file is worse, each taking part of the one stream and reporting it as
-    /// though it were the whole. Checked for both at once, and for a
-    /// handler's OC address beside its payload address, since a port is a
-    /// port whatever claims it.
-    #[test]
-    fn no_two_handlers_want_one_address_or_one_device() {
-        let pair = |first: &str, second: &str| {
-            format!(
-                "
-version: \"1.0\"
-description: two payloads
-payloads:
-  - name: DH0
-    packet_size: 12
-{first}
-  - name: DH1
-    packet_size: 12
-{second}
-"
-            )
-        };
-
-        let udp = |port: u16| {
-            format!(
-                "    type: network\n    protocol: udp\n    payload_interface: localhost:{port}"
-            )
-        };
-        let device = |path: &str| format!("    type: device-file\n    path: {path}");
-
-        // The same host and port, written two ways: localhost and 127.0.0.1
-        // are one host, so naming it differently does not make it a different
-        // port.
-        let said = payload(&pair(
-            &udp(5000),
-            "    type: network\n    protocol: udp\n    payload_interface: 127.0.0.1:5000",
-        ))
-        .to_dh_configs()
-        .expect_err("two payloads at one port");
-        assert!(
-            said.contains("DH0") && said.contains("DH1") && said.contains("5000"),
-            "the error should name both handlers and what they want: {said}"
-        );
-
-        // The same device file.
-        let said = payload(&pair(&device("/dev/ttyS0"), &device("/dev/ttyS0")))
-            .to_dh_configs()
-            .expect_err("two payloads on one device file");
-        assert!(said.contains("/dev/ttyS0"), "{said}");
-
-        // A payload's ground link is as exclusive as its payload address, and
-        // is compared against it: this one would have to bind the port twice.
-        // The ground link is counted from the section's base now, so the
-        // collision is written there rather than on the payload.
-        let clash = format!(
-            "
-version: \"1.0\"
-description: a ground link on the payload's own port
-tcspecial:
-  tcs_cmd:
-    recv: 0.0.0.0:4000
-    send: 127.0.0.1:4100
-  payload_command:
-    source_base: 127.0.0.1:4300
-    dest_base: 0.0.0.0:4200
-  payload_telemetry:
-    source_base: localhost:5000
-    dest_base: 127.0.0.1:6100
-  beacon:
-    interval: 5 s
-    send: 0.0.0.0:5550
-    recv: 127.0.0.1:5650
-payloads:
-  - name: DH0
-    packet_size: 12
-{}
-",
-            udp(5000)
-        );
-        let said = payload(&clash)
-            .to_dh_configs()
-            .expect_err("one port for the payload and the ground link");
-        assert!(
-            said.contains("payload") && said.contains("OC"),
-            "the error should say which of the two is which: {said}"
-        );
-
-        // And two handlers that want different things convert, which is what
-        // the rule must not get in the way of.
-        let fine = payload(&pair(&udp(5000), &udp(5001)));
-        assert_eq!(fine.to_dh_configs().expect("both convert").len(), 2);
-    }
 
     /// A bus is shared; a place on it is not.
     ///
@@ -4759,390 +3578,12 @@ payloads:
         );
     }
 
-    /// A name is unique within its file and nowhere wider.
-    ///
-    /// Two payload sets are two descriptions of what a mission flies, and a
-    /// set that had to rename its payloads because another set in the same
-    /// directory had used the names would be renaming them for no reason. A
-    /// set is read on its own; nothing compares the names in one file with
-    /// the names in another, and the shipped sets rely on it -- more than one
-    /// of them names a payload DH0.
-    #[test]
-    fn two_files_may_name_their_payloads_alike() {
-        let one_set = |port: u16, packet_size: usize| {
-            format!(
-                "
-version: \"1.0\"
-description: a set of its own
-payload_groups:
-  - name: localhost_udp
-    type: network
-    protocol: udp
-payloads:
-  - name: DH0
-    group: localhost_udp
-    payload_interface: localhost:{port}
-    packet_size: {packet_size}
-"
-            )
-        };
 
-        // The same payload name, the same group name, and the same id, in two
-        // files that know nothing of each other.
-        let first = payload(&one_set(5000, 12))
-            .to_dh_configs()
-            .expect("the first set");
-        let second = payload(&one_set(6000, 8))
-            .to_dh_configs()
-            .expect("the second set");
 
-        assert_eq!(first[0].name.0, second[0].name.0);
-        assert_ne!(
-            first[0].packet_size, second[0].packet_size,
-            "the two sets describe different payloads under the one name"
-        );
-    }
 
-    /// An attribute of another kind of payload is refused.
-    ///
-    /// Ignoring one is how a device payload comes to carry a port nothing
-    /// reads, and how a network payload carrying a path looks configured and
-    /// is not.
-    #[test]
-    fn an_attribute_of_another_kind_does_not_apply() {
-        let device = payload(
-            "
-version: \"1.0\"
-description: a device stating network attributes
-payloads:
-  - name: DH0
-    type: device-file
-    path: /dev/urandom
-    protocol: udp
-    payload_interface: localhost:5000
-    packet_size: 1
-",
-        );
-        let said = device
-            .to_dh_configs()
-            .expect_err("a device has no protocol");
-        assert!(
-            said.contains("device") && said.contains("protocol") && !said.contains("group"),
-            "an attribute the payload states itself is not blamed on a group: {said}"
-        );
 
-        let network = payload(
-            "
-version: \"1.0\"
-description: a network payload stating a path
-payloads:
-  - name: DH0
-    type: network
-    protocol: udp
-    payload_interface: localhost:5000
-    path: /dev/urandom
-    packet_size: 12
-",
-        );
-        let said = network
-            .to_dh_configs()
-            .expect_err("a network payload has no path");
-        assert!(said.contains("network") && said.contains("path"), "{said}");
 
-        // An attribute inherited from a group applies to a payload exactly as
-        // one it states itself, so it is refused exactly as one would be.
-        // This is the case worth catching: the group is written for the
-        // payloads that are reached that way, and a payload of another kind
-        // joining it takes attributes nobody wrote for it.
-        let inherited = payload(
-            "
-version: \"1.0\"
-description: a device in a group of network payloads
-payload_groups:
-  - name: udp_localhost
-    type: network
-    protocol: udp
-payloads:
-  - name: DH0
-    group: udp_localhost
-    type: device-file
-    path: /dev/urandom
-    packet_size: 1
-",
-        );
-        let said = inherited
-            .to_dh_configs()
-            .expect_err("a device takes no address from a group");
-        assert!(said.contains("device") && said.contains("group"), "{said}");
-    }
 
-    /// An attribute this language does not know is refused.
-    ///
-    /// A misspelled attribute is otherwise ignored, which is silence about
-    /// something the file plainly meant: an `oc_prot` is a payload with
-    /// nowhere to send its data, and nothing says so.
-    #[test]
-    fn a_word_that_is_not_an_attribute_is_refused() {
-        for text in [
-            // On a payload.
-            "
-version: \"1.0\"
-description: a misspelled attribute
-payloads:
-  - name: DH0
-    type: network
-    protocol: udp
-    payload_interface: localhost:5000
-    packet_size: 12
-    oc_adress: 127.0.0.1
-",
-            // On a group.
-            "
-version: \"1.0\"
-description: a misspelled group attribute
-payload_groups:
-  - name: g
-    type: network
-    protocl: udp
-payloads:
-  - name: DH0
-    group: g
-    protocol: udp
-    payload_interface: localhost:5000
-    packet_size: 12
-",
-            // And on the file.
-            "
-version: \"1.0\"
-description: a misspelled section
-payload:
-  - name: DH0
-",
-        ] {
-            let e = crate::ConfigFormat::Yaml
-                .parse::<PayloadConfig>(text)
-                .expect_err("a word this language does not know is refused");
-            let said = format!("{e}");
-            assert!(
-                said.contains("unknown field"),
-                "the error should say the word is unknown: {said}"
-            );
-        }
-    }
-
-    /// A trigger of bytes is written without quotes, and a trigger of text
-    /// with them.
-    ///
-    /// Which is a convention for writing the file rather than something the
-    /// parser can enforce: every format hands over the same string whichever
-    /// way the value was written, so the quotes are invisible here. What
-    /// matters is that the unquoted form works -- YAML's core schema does not
-    /// read `0x55AA` as a number, so the digits arrive intact, leading zeros
-    /// and all, which is what makes the quote-free spelling safe to
-    /// recommend.
-    #[test]
-    fn a_trigger_is_a_list_of_values_or_a_quoted_string() {
-        let with = |trigger: &str| {
-            payload(&format!(
-                "
-version: \"1.0\"
-description: a trigger, written one way
-payloads:
-  - name: DH0
-    type: network
-    protocol: tcp
-    payload_interface: localhost:5000
-    packet_size: 12
-    mode: triggered
-    packet_interval: 500 ms
-    trigger: {trigger}
-"
-            ))
-            .to_dh_configs()
-            .map(|c| match &c[0].mode {
-                DHMode::Triggered { trigger, .. } => trigger.clone(),
-                DHMode::Periodic => panic!("this payload is triggered"),
-            })
-        };
-
-        // Several bytes, which is a C string: single-quoted in the YAML so
-        // that its own quotes and escapes reach the trigger reader as
-        // written.
-        assert_eq!(with("'\"\\x55\\xAA\"'").unwrap(), vec![0x55, 0xAA]);
-        // One byte, however it was padded: a leading zero is a zero and not a
-        // notation.
-        assert_eq!(with("0D").unwrap(), vec![0x0D]);
-        assert_eq!(with("d").unwrap(), vec![0x0D]);
-
-        // Several bytes are a C string and nothing else: the list of values
-        // this took is gone, a value's length no longer deciding how many
-        // bytes it meant.
-        for several in ["0D 0A", "55 AA 0F", "55AA"] {
-            assert!(with(several).is_err(), "{several} is not one byte");
-        }
-
-        // And a trigger of text, which is a C string: the quotes are part of
-        // the value, so a YAML file writes them inside its own.
-        assert_eq!(with("'\"READ\\r\"'").unwrap(), b"READ\r".to_vec());
-        assert_eq!(
-            with("'\"\\x52\\x45\\x41\\x44\\r\"'").unwrap(),
-            with("'\"READ\\r\"'").unwrap()
-        );
-
-        // The spelling this replaced, caught by name rather than puzzled
-        // over: a file written for the older rule says 0x.
-        let said = with("0x55AA").expect_err("the older spelling");
-        assert!(said.contains("no longer"), "{said}");
-    }
-
-    /// Which file an interval belongs in follows from the kind of payload.
-    ///
-    /// A periodic payload sends on its own, so how fast a simulated one sends
-    /// is the simulator's business and an interval here is refused. A
-    /// triggered payload sends nothing until it is asked, and the asking is
-    /// tcspecial's: the rate the trigger goes out at is flight behaviour, so
-    /// it is stated here and nowhere else. One name, `packet_interval_ms`, in
-    /// whichever file the payload's kind puts it.
-    #[test]
-    fn which_file_states_an_interval_follows_from_the_kind() {
-        let payload_file = |extra: &str| {
-            format!(
-                "
-version: \"1.0\"
-description: a payload and an interval
-payloads:
-  - name: DH0
-    type: network
-    protocol: tcp
-    payload_interface: localhost:5000
-    packet_size: 12
-{extra}
-"
-            )
-        };
-
-        // Periodic, which is what a file states by saying nothing: the
-        // interval is refused and told which file it belongs in.
-        for stated in [
-            "    packet_interval: 250 ms",
-            "    mode: periodic\n    packet_interval: 250 ms",
-        ] {
-            let said = payload(&payload_file(stated))
-                .to_dh_configs()
-                .expect_err("a periodic payload's rate is the simulator's");
-            assert!(
-                said.contains("simulator configuration") && said.contains("no packet interval"),
-                "{said}"
-            );
-        }
-
-        // Triggered: the interval is this file's, and required.
-        let handlers = payload(&payload_file(
-            "    mode: triggered\n    trigger: '\"READ\\r\"'\n    packet_interval: 500 ms",
-        ))
-        .to_dh_configs()
-        .expect("a triggered payload states its trigger's rate here");
-        assert_eq!(
-            handlers[0].mode,
-            DHMode::Triggered {
-                trigger: b"READ\r".to_vec(),
-                interval: Duration::from_millis(500),
-            }
-        );
-
-        let said = payload(&payload_file(
-            "    mode: triggered\n    trigger: \'\"READ\\r\"\'",
-        ))
-        .to_dh_configs()
-        .expect_err("a triggered payload with no rate for its trigger");
-        assert!(said.contains("packet_interval"), "{said}");
-
-        // And the name that rate used to have is told the name it has now.
-        let said = payload(&payload_file(
-            "    mode: triggered\n    trigger: \'\"READ\\r\"\'\n    trigger_interval_ms: 500",
-        ))
-        .to_dh_configs()
-        .expect_err("trigger_interval_ms is not a word this file knows");
-        assert!(
-            said.contains("trigger_interval_ms") && said.contains("packet_interval now"),
-            "{said}"
-        );
-
-        // A group's interval reaches the payload exactly as its own would.
-        let grouped = "
-version: \"1.0\"
-description: a group with the rate in it
-payload_groups:
-  - name: asked
-    type: network
-    protocol: tcp
-    mode: triggered
-    trigger: \'\"READ\\r\"\'
-    packet_interval: 500 ms
-payloads:
-  - name: DH0
-    group: asked
-    payload_interface: localhost:5000
-    packet_size: 12
-";
-        let handlers = payload(grouped)
-            .to_dh_configs()
-            .expect("the group states it");
-        assert!(matches!(
-            &handlers[0].mode,
-            DHMode::Triggered { interval, .. } if *interval == Duration::from_millis(500)
-        ));
-    }
-
-    #[test]
-    fn a_misspelled_group_is_reported_from_the_handler_not_the_group() {
-        // A typo leaves the group unnamed and the name undefined at once. The
-        // handler's end is where the misspelling actually is, so that is the
-        // error worth giving.
-        let config = payload(
-            "
-version: \"1.0\"
-description: a handler misspelling the one group
-payload_groups:
-  - name: udp_localhost
-    type: network
-    protocol: udp
-payloads:
-  - name: DH0
-    group: udp_localhst
-    payload_interface: localhost:5000
-    packet_size: 12
-",
-        );
-
-        let message = config.to_dh_configs().expect_err("must be rejected");
-        assert!(
-            message.contains("udp_localhst") && message.contains("DH0"),
-            "the error should name the handler and its misspelling, but said: {message}"
-        );
-    }
-
-    #[test]
-    fn a_handler_with_no_packet_size_anywhere_is_an_error() {
-        // A missing packet size would otherwise resolve to zero, and a handler
-        // whose packets are zero bytes long reads nothing forever.
-        let config = payload(
-            "
-version: \"1.0\"
-description: a handler nothing gives a packet size
-payload_groups:
-  - name: udp_localhost
-    type: network
-    protocol: udp
-payloads:
-  - name: DH0
-    group: udp_localhost
-    payload_interface: localhost:5000
-",
-        );
-
-        assert!(config.to_dh_configs().is_err());
-    }
     // -- the rules of a link ------------------------------------------------
     //
     // A line, a bus and a peripheral each have rules of their own: which terms
@@ -5153,13 +3594,20 @@ payloads:
     // tcspecial configuration now, which is the only way to reach them.
 
     /// One payload of the given kind, with `attributes` folded into it.
-    fn link(kind: &str, attributes: &str) -> Result<PayloadConfig, String> {
-        let text = format!(
-            "version: \"1.0\"\ndescription: one payload\npayloads:\n  \
-             - name: p\n    type: {kind}\n{attributes}"
-        );
+    ///
+    /// The attributes are written as a file writes them, indented under a
+    /// payload entry, and an entry read on its own is read at column nought
+    /// -- so four spaces come off each line, which leaves whatever is nested
+    /// inside them nested. The file around the entry is gone: it was a
+    /// version 1 payload set, and these rules are a node's now.
+    fn link(kind: &str, attributes: &str) -> Result<DHConfigJson, String> {
+        let body: String = attributes
+            .lines()
+            .map(|line| format!("{}\n", line.strip_prefix("    ").unwrap_or(line)))
+            .collect();
+        let text = format!("name: p\ntype: {kind}\n{body}");
         ConfigFormat::Yaml
-            .parse::<PayloadConfig>(&text)
+            .parse::<DHConfigJson>(&text)
             .map_err(|e| format!("{e}"))
     }
 
@@ -5173,14 +3621,31 @@ payloads:
         kind: &str,
         attributes: &str,
     ) -> Result<crate::endpoint_config::GroupKind, String> {
-        let config = link(kind, attributes)?;
-        let payload = &config.payloads[0];
-        let group = payload.group.as_deref().and_then(|g| config.group(g));
+        let payload = link(kind, attributes)?;
+        // No group: a group was a payload set's, and a node takes its terms
+        // from its own attributes. The one test that was about a term coming
+        // from a group went with the set.
         link_params_of(
             &payload.name,
             DHType::from_spelling(kind).expect("a kind this knows"),
-            payload,
-            group,
+            &payload,
+            None,
+        )
+    }
+
+    /// The endpoint the rules settle for one payload of the given kind.
+    ///
+    /// What a handler carried: the rules are asked through the same call the
+    /// graph's own `reach_of` makes, so a term read and dropped on the way
+    /// shows up here. It was `PayloadConfig::to_dh_configs`, which settled a
+    /// whole payload set.
+    fn link_endpoint(kind: &str, attributes: &str) -> Result<EndpointConfig, String> {
+        let payload = link(kind, attributes)?;
+        link_of(
+            &payload.name,
+            DHType::from_spelling(kind).expect("a kind this knows"),
+            &payload,
+            None,
         )
     }
 
@@ -5202,12 +3667,9 @@ payloads:
              rs485_delay_after_send: 2 ms\n    packet_size: 8\n    stream:\n      \
              timeout: none\n      max_length: 64\n"
         );
-        let handlers = link("serial", &bus)
-            .expect("a line that is a two-wire bus")
-            .to_dh_configs()
-            .expect("it becomes a handler");
+        let endpoint = link_endpoint("serial", &bus).expect("it becomes a handler");
 
-        match &handlers[0].endpoint {
+        match &endpoint {
             EndpointConfig::Serial(serial) => {
                 let rs485 = serial.rs485.expect("the bus reached the handler");
                 assert!(!rs485.rts_on_send, "RTS is low while sending on this board");
@@ -5223,119 +3685,24 @@ payloads:
             "{A_LINE}    packet_size: 8\n    stream:\n      timeout: none\n      \
              max_length: 64\n"
         );
-        let plain = link("serial", &plain)
-            .expect("a plain line")
-            .to_dh_configs()
-            .expect("it becomes a handler");
-        match &plain[0].endpoint {
+        let plain = link_endpoint("serial", &plain).expect("it becomes a handler");
+        match &plain {
             EndpointConfig::Serial(serial) => assert_eq!(serial.rs485, None),
             other => panic!("expected a serial endpoint, got {other:?}"),
         }
     }
 
-    /// A term of a link is refused on the two kinds that are not on one.
-    ///
-    /// Every other kind refuses what belongs to another kind as its own rules
-    /// are asked, and these two have no rules to ask -- so a term written on
-    /// one of them was read and dropped. A device payload could state a data
-    /// rate, or a sensor's channels, and be read as a device payload that had
-    /// said nothing of the sort: a misspelling that configured nothing and
-    /// reported nothing.
-    #[test]
-    fn a_link_term_is_refused_on_a_kind_that_is_not_on_a_link() {
-        // One term from each kind of link, on each kind that is not one.
-        for term in [
-            "datarate: 9600",
-            "stop_bits: 1",
-            "pec: true",
-            "max_speed: 1000000",
-            "can_fd: true",
-            "service: payload",
-            "lines: 0",
-            "rs485: true",
-        ] {
-            let said = link(
-                "device-file",
-                &format!("    path: /dev/urandom\n    packet_size: 1\n    {term}\n"),
-            )
-            .expect("it parses")
-            .to_dh_configs()
-            .expect_err("a device file is not a link");
-            let field = term.split(':').next().expect("a term");
-            assert!(
-                said.contains(field) && said.contains("device-file payload"),
-                "the error should name the term and the kind: {said}"
-            );
 
-            let said = link(
-                "network",
-                &format!(
-                    "    protocol: udp\n    payload_interface: localhost:5000\n    \
-                     packet_size: 8\n    {term}\n"
-                ),
-            )
-            .expect("it parses")
-            .to_dh_configs()
-            .expect_err("a network address is not a link");
-            assert!(
-                said.contains(field) && said.contains("network payload"),
-                "the error should name the term and the kind: {said}"
-            );
-        }
-    }
 
-    /// A network payload's own transport is not a term of somebody else's
-    /// link.
-    ///
-    /// The one term in that table that belongs to the network kind, so the
-    /// rule above has to let it through: refusing it would refuse every
-    /// network payload there is.
-    #[test]
-    fn a_network_payloads_transport_is_its_own() {
-        let fine = link(
-            "network",
-            "    protocol: udp\n    payload_interface: localhost:5000\n    \
-             packet_size: 8\n",
-        )
-        .expect("it parses")
-        .to_dh_configs()
-        .expect("a network payload states its transport");
-        assert_eq!(fine[0].endpoint.kind(), DHType::Network);
-    }
-
-    /// A term a payload takes from its group is refused as one it states, and
-    /// the error says which.
-    ///
-    /// The two are fixed differently: a line is deleted from the payload, or
-    /// a payload is in a group that was not written for it.
-    #[test]
-    fn a_link_term_from_a_group_names_the_group() {
-        let text = "version: \"1.0\"\ndescription: a device in a serial group\n\
-                    payload_groups:\n  - name: lines\n    datarate: 9600\n\
-                    payloads:\n  - name: p\n    type: device-file\n    group: lines\n    \
-                    path: /dev/urandom\n    packet_size: 1\n";
-        let said = ConfigFormat::Yaml
-            .parse::<PayloadConfig>(text)
-            .expect("it parses")
-            .to_dh_configs()
-            .expect_err("a device payload in a group written for a line");
-        assert!(
-            said.contains("datarate") && said.contains("group \"lines\""),
-            "the error should name the term and where it came from: {said}"
-        );
-    }
 
     /// A GPIO payload reaches a handler with the lines it watches and how.
     #[test]
     fn a_gpio_payload_is_a_chip_and_the_lines_it_watches() {
         let discretes = "    path: /dev/gpiochip0\n    lines: 3, 7\n    edge: rising\n    \
                          bias: pull_up\n    debounce: 5000 us\n    packet_size: 32\n";
-        let handlers = link("gpio", discretes)
-            .expect("a set of discretes")
-            .to_dh_configs()
-            .expect("it becomes a handler");
+        let endpoint = link_endpoint("gpio", discretes).expect("it becomes a handler");
 
-        match &handlers[0].endpoint {
+        match &endpoint {
             EndpointConfig::Gpio(gpio) => {
                 assert_eq!(gpio.path, "/dev/gpiochip0");
                 assert_eq!(gpio.lines, vec![3, 7]);
@@ -5345,99 +3712,20 @@ payloads:
             }
             other => panic!("expected a GPIO endpoint, got {other:?}"),
         }
-        assert_eq!(handlers[0].endpoint.kind(), DHType::Gpio);
+        assert_eq!(endpoint.kind(), DHType::Gpio);
     }
 
-    /// A packet that is not a whole number of events is refused.
-    ///
-    /// What a GPIO payload produces is records this handler makes, each of a
-    /// fixed size, so a packet that was part of one would be a reading nobody
-    /// could use.
-    #[test]
-    fn a_gpio_packet_is_whole_events() {
-        let said = link(
-            "gpio",
-            "    path: /dev/gpiochip0\n    lines: 0\n    packet_size: 12\n",
-        )
-        .expect("it parses")
-        .to_dh_configs()
-        .expect_err("three quarters of an event");
-        assert!(
-            said.contains("16-byte line events"),
-            "the error should say what a packet is made of: {said}"
-        );
 
-        // One event, and several, are both whole numbers of them.
-        for size in [16usize, 160] {
-            let good = link(
-                "gpio",
-                &format!("    path: /dev/gpiochip0\n    lines: 0\n    packet_size: {size}\n"),
-            )
-            .expect("it parses")
-            .to_dh_configs()
-            .expect("a whole number of events");
-            assert_eq!(good[0].packet_size, size);
-        }
-    }
 
-    /// Two payloads may watch one chip and may not watch one line.
-    #[test]
-    fn a_chip_is_shared_and_a_line_is_not() {
-        let two = |first: &str, second: &str| {
-            format!(
-                "version: \"1.0\"\ndescription: two sets of discretes\npayloads:\n  \
-                 - name: a\n    type: gpio\n    path: /dev/gpiochip0\n    lines: {first}\n    \
-                 packet_size: 16\n  - name: b\n    type: gpio\n    path: /dev/gpiochip0\n    \
-                 lines: {second}\n    packet_size: 16\n"
-            )
-        };
-
-        let apart = ConfigFormat::Yaml
-            .parse::<PayloadConfig>(&two("0, 1", "2, 3"))
-            .expect("it parses")
-            .to_dh_configs()
-            .expect("different lines of one chip");
-        no_two_handlers_claim_one_thing(&apart).expect("a chip is shared by design");
-
-        let said = ConfigFormat::Yaml
-            .parse::<PayloadConfig>(&two("0, 1", "1, 2"))
-            .expect("it parses")
-            .to_dh_configs()
-            .expect_err("two payloads watching line 1");
-        assert!(
-            said.contains("line 1") && said.contains("/dev/gpiochip0"),
-            "the error should name the line and the chip: {said}"
-        );
-    }
-
-    /// A GPIO payload cannot be triggered: its lines are inputs.
-    #[test]
-    fn a_gpio_payload_cannot_be_triggered() {
-        let said = link(
-            "gpio",
-            "    path: /dev/gpiochip0\n    lines: 0\n    packet_size: 16\n    \
-             mode: triggered\n    trigger: '\"READ\"'\n    packet_interval: 100 ms\n",
-        )
-        .expect("it parses")
-        .to_dh_configs()
-        .expect_err("a discrete cannot be asked");
-        assert!(
-            said.contains("inputs") && said.contains("commanding"),
-            "the error should say why it cannot be asked: {said}"
-        );
-    }
 
     /// An rpmsg payload reaches a handler with its channel and its service.
     #[test]
     fn an_rpmsg_payload_is_a_node_and_the_service_it_should_be() {
         let channel = "    path: /dev/rpmsg0\n    service: payload-telemetry\n    \
                        packet_size: 64\n";
-        let handlers = link("rpmsg", channel)
-            .expect("a channel")
-            .to_dh_configs()
-            .expect("it becomes a handler");
+        let endpoint = link_endpoint("rpmsg", channel).expect("it becomes a handler");
 
-        match &handlers[0].endpoint {
+        match &endpoint {
             EndpointConfig::Rpmsg(rpmsg) => {
                 assert_eq!(rpmsg.path, "/dev/rpmsg0");
                 assert_eq!(rpmsg.service, "payload-telemetry");
@@ -5445,138 +3733,32 @@ payloads:
             }
             other => panic!("expected an rpmsg endpoint, got {other:?}"),
         }
-        assert_eq!(handlers[0].endpoint.kind(), DHType::Rpmsg);
+        assert_eq!(endpoint.kind(), DHType::Rpmsg);
 
         // The service is what identifies a channel, so a payload without one
         // is refused: a node's number is assigned as channels appear.
-        let said = link("rpmsg", "    path: /dev/rpmsg0\n    packet_size: 8\n")
-            .expect("it parses")
-            .to_dh_configs()
-            .expect_err("a channel with no service");
+        let said = link_endpoint("rpmsg", "    path: /dev/rpmsg0\n    packet_size: 8\n").expect_err("a channel with no service");
         assert!(
             said.contains("service"),
             "the error should name what is missing: {said}"
         );
     }
 
-    /// A packet no message can carry is refused where the file is read.
-    #[test]
-    fn a_packet_larger_than_an_rpmsg_message_is_refused() {
-        let said = link(
-            "rpmsg",
-            "    path: /dev/rpmsg0\n    service: payload\n    packet_size: 600\n",
-        )
-        .expect("it parses")
-        .to_dh_configs()
-        .expect_err("six hundred bytes in a 496-byte message");
-        assert!(
-            said.contains("600") && said.contains("496"),
-            "the error should say the packet and the message: {said}"
-        );
-
-        // And a platform with larger buffers says so, which makes it fit.
-        let larger = link(
-            "rpmsg",
-            "    path: /dev/rpmsg0\n    service: payload\n    \
-             max_message_bytes: 2048\n    packet_size: 600\n",
-        )
-        .expect("it parses")
-        .to_dh_configs()
-        .expect("room for it");
-        assert_eq!(larger[0].packet_size, 600);
-    }
 
     /// An rpmsg payload may be triggered: the channel carries both
     /// directions.
     #[test]
     fn an_rpmsg_payload_may_be_triggered() {
-        let asked = link(
+        let asked = link_endpoint(
             "rpmsg",
             "    path: /dev/rpmsg0\n    service: payload\n    packet_size: 8\n    \
              mode: triggered\n    trigger: '\"READ\"'\n    packet_interval: 100 ms\n",
-        )
-        .expect("it parses")
-        .to_dh_configs()
-        .expect("a channel may be asked");
-        assert!(
-            asked[0].mode.polling().is_some(),
-            "an rpmsg payload that answers requests"
-        );
+        ).expect("a channel may be asked");
+        assert!(matches!(asked, EndpointConfig::Rpmsg(_)), "{asked:?}");
     }
 
-    /// An IIO payload reaches a handler as the buffer it is, and no more.
-    ///
-    /// A path and nothing else. It took two terms once -- how many channels
-    /// were enabled and how fast the device samples -- and neither could be
-    /// applied by a program that opens the character device, so a payload
-    /// states neither and a file that states one is refused.
-    #[test]
-    fn an_iio_payload_is_a_buffer_and_nothing_else() {
-        let handlers = link("iio", "    path: /dev/iio:device0\n    packet_size: 12\n")
-            .expect("a sensor")
-            .to_dh_configs()
-            .expect("it becomes a handler");
 
-        match &handlers[0].endpoint {
-            EndpointConfig::Iio(iio) => assert_eq!(iio.path, "/dev/iio:device0"),
-            other => panic!("expected an IIO endpoint, got {other:?}"),
-        }
-        assert_eq!(handlers[0].endpoint.kind(), DHType::Iio);
 
-        for term in ["channels: 3", "sample_rate: 100"] {
-            let said = link(
-                "iio",
-                &format!("    path: /dev/iio:device0\n    packet_size: 12\n    {term}\n"),
-            )
-            .expect("it parses")
-            .to_dh_configs()
-            .expect_err("a term nothing can apply");
-            let field = term.split(':').next().expect("a term");
-            assert!(
-                said.contains(field) && said.contains("sysfs"),
-                "the complaint should name the term and say why: {said}"
-            );
-        }
-    }
-
-    /// An IIO payload cannot be triggered: there is nowhere to send a
-    /// request.
-    ///
-    /// The refusal belongs here rather than in the simulator, as a datagram
-    /// payload's does: it is not that the stand-in cannot hear a trigger, it
-    /// is that a sample buffer has nothing to write to.
-    #[test]
-    fn an_iio_payload_cannot_be_triggered() {
-        let said = link(
-            "iio",
-            "    path: /dev/iio:device0\n    packet_size: 4\n    mode: triggered\n    \
-             trigger: '\"READ\"'\n    packet_interval: 100 ms\n",
-        )
-        .expect("it parses")
-        .to_dh_configs()
-        .expect_err("a sensor cannot be asked");
-        assert!(
-            said.contains("read and not written") && said.contains("sysfs"),
-            "the error should say why it cannot be asked: {said}"
-        );
-    }
-
-    /// What a sensor says belongs to a sensor and to no other kind of link.
-    #[test]
-    fn iio_terms_are_refused_on_a_kind_that_is_not_a_sensor() {
-        let said = link(
-            "spi",
-            "    path: /dev/spidev0.0\n    max_speed: 1000000\n    spi_mode: 0\n    \
-             packet_size: 4\n    channels: 2\n",
-        )
-        .expect("it parses")
-        .to_dh_configs()
-        .expect_err("a peripheral has no channels");
-        assert!(
-            said.contains("channels"),
-            "the error should name the term: {said}"
-        );
-    }
 
     /// A CAN payload reaches a handler with its interface and identifier.
     ///
@@ -5586,12 +3768,9 @@ payloads:
     #[test]
     fn a_can_payload_is_an_interface_and_an_identifier() {
         let bus = "    interface: vcan0\n    can_id: 0x123\n    packet_size: 8\n";
-        let handlers = link("can", bus)
-            .expect("a payload on a CAN bus")
-            .to_dh_configs()
-            .expect("it becomes a handler");
+        let endpoint = link_endpoint("can", bus).expect("it becomes a handler");
 
-        match &handlers[0].endpoint {
+        match &endpoint {
             EndpointConfig::Can(can) => {
                 assert_eq!(can.interface, "vcan0");
                 assert_eq!(can.can_id, 0x123);
@@ -5600,7 +3779,7 @@ payloads:
             }
             other => panic!("expected a CAN endpoint, got {other:?}"),
         }
-        assert_eq!(handlers[0].endpoint.kind(), DHType::Can);
+        assert_eq!(endpoint.kind(), DHType::Can);
     }
 
     /// A CAN payload needs both halves of where it is.
@@ -5610,10 +3789,7 @@ payloads:
             ("interface", "    can_id: 1\n    packet_size: 8\n"),
             ("can_id", "    interface: vcan0\n    packet_size: 8\n"),
         ] {
-            let said = link("can", stated)
-                .expect("it parses")
-                .to_dh_configs()
-                .expect_err("half of where it is");
+            let said = link_endpoint("can", stated).expect_err("half of where it is");
             assert!(
                 said.contains(missing),
                 "the error should name what is missing: {said}"
@@ -5621,98 +3797,15 @@ payloads:
         }
     }
 
-    /// A packet no frame can carry is refused where the file is read.
-    ///
-    /// There is no fragmentation in CAN: a classic frame carries eight bytes
-    /// and an FD frame sixty-four, so a payload whose packets are larger
-    /// would be a handler that could never send one.
-    #[test]
-    fn a_packet_larger_than_a_frame_is_refused() {
-        let said = link(
-            "can",
-            "    interface: vcan0\n    can_id: 1\n    packet_size: 12\n",
-        )
-        .expect("it parses")
-        .to_dh_configs()
-        .expect_err("twelve bytes in an eight-byte frame");
-        assert!(
-            said.contains("12") && said.contains("8"),
-            "the error should say the packet and the frame: {said}"
-        );
 
-        // And the same payload in FD frames is fine, which is what the flag
-        // is for.
-        let fd = link(
-            "can",
-            "    interface: vcan0\n    can_id: 1\n    can_fd: true\n    packet_size: 12\n",
-        )
-        .expect("it parses")
-        .to_dh_configs()
-        .expect("sixty-four bytes of room");
-        assert_eq!(fd[0].packet_size, 12);
-    }
 
-    /// Two payloads may share a CAN bus and may not share an identifier.
-    ///
-    /// A bus is shared by design -- the reason an I2C payload claims its
-    /// address rather than its bus -- and two handlers filtering on one
-    /// identifier would each read the other's frames.
-    #[test]
-    fn a_can_bus_is_shared_and_an_identifier_is_not() {
-        let two = |first: u32, second: u32| {
-            format!(
-                "version: \"1.0\"\ndescription: two payloads on one bus\npayloads:\n  \
-                 - name: a\n    type: can\n    interface: vcan0\n    can_id: {first}\n    \
-                 packet_size: 8\n  - name: b\n    type: can\n    interface: vcan0\n    \
-                 can_id: {second}\n    packet_size: 8\n"
-            )
-        };
-
-        let apart = ConfigFormat::Yaml
-            .parse::<PayloadConfig>(&two(1, 2))
-            .expect("it parses")
-            .to_dh_configs()
-            .expect("two identifiers on one bus");
-        no_two_handlers_claim_one_thing(&apart).expect("a bus is shared by design");
-
-        // Refused where the file is read, the collision rule being one of the
-        // rules a file is held to.
-        let said = ConfigFormat::Yaml
-            .parse::<PayloadConfig>(&two(1, 1))
-            .expect("it parses")
-            .to_dh_configs()
-            .expect_err("two handlers reading each other's frames");
-        assert!(
-            said.contains("vcan0") && said.contains("0x1"),
-            "the error should name the bus and the identifier: {said}"
-        );
-    }
-
-    /// An interface belongs to a CAN payload and to no other kind.
-    #[test]
-    fn an_interface_is_refused_on_a_kind_that_is_not_a_can_bus() {
-        let said = link(
-            "device-file",
-            "    path: /dev/urandom\n    packet_size: 1\n    interface: vcan0\n",
-        )
-        .expect("it parses")
-        .to_dh_configs()
-        .expect_err("a device file is not a CAN interface");
-        assert!(
-            said.contains("interface"),
-            "the error should name the attribute: {said}"
-        );
-    }
 
     /// The turnaround belongs to a line and to no other kind.
     #[test]
     fn rs485_terms_are_refused_on_a_kind_that_is_not_a_line() {
         let peripheral = "    path: /dev/spidev0.0\n    max_speed: 1000000\n    \
                           spi_mode: 0\n    rs485: true\n";
-        let said = link("spi", peripheral)
-            .expect("it parses")
-            .to_dh_configs()
-            .expect_err("a peripheral is not an RS-485 bus");
+        let said = link_endpoint("spi", peripheral).expect_err("a peripheral is not an RS-485 bus");
         assert!(
             said.contains("rs485"),
             "the error should name the term: {said}"
@@ -5971,29 +4064,6 @@ payloads:
         .expect_err("a UART offers five to eight bits");
         assert!(said.contains("out of range"), "{said}");
     }
-    #[test]
-    fn a_packet_size_of_zero_is_refused() {
-        // A packet of no bytes is not a packet. Every kind of payload is
-        // asked, because the size is one every kind states.
-        for (kind, rest) in [
-            ("device-file", "    path: /dev/null\n"),
-            (
-                "network",
-                "    protocol: udp\n    payload_interface: 127.0.0.1:5000\n",
-            ),
-            ("i2c", "    path: /dev/i2c-1\n    payload_address: 0x40\n"),
-            (
-                "spi",
-                "    path: /dev/spidev0.0\n    max_speed: 1000000\n    spi_mode: 0\n",
-            ),
-        ] {
-            let said = link(kind, &format!("{rest}    packet_size: 0\n"))
-                .expect("it parses")
-                .to_dh_configs()
-                .expect_err(kind);
-            assert!(said.contains("greater than zero"), "{kind}: {said}");
-        }
-    }
 
     // -- a bus and what sits on it ------------------------------------------
 
@@ -6008,8 +4078,7 @@ payloads:
     /// Where a payload on an I2C bus ends up, which is the bus and a place on
     /// it rather than a device node alone.
     fn bus_place(terms: &str) -> Result<EndpointConfig, String> {
-        let handlers = link("i2c", &format!("    packet_size: 8\n{terms}"))?.to_dh_configs()?;
-        Ok(handlers[0].endpoint.clone())
+        link_endpoint("i2c", &format!("    packet_size: 8\n{terms}"))
     }
 
     #[test]
@@ -6124,35 +4193,6 @@ payloads:
         assert!(said.contains("reached through"), "{said}");
     }
 
-    #[test]
-    fn a_payload_that_is_on_no_link_is_given_no_stream_rule() {
-        // The rule says where one read of a line ends. A device read whole
-        // and a datagram that arrives whole have no use for one, so a file
-        // that gives them one is told, rather than having the section read
-        // and dropped.
-        for (kind, rest) in [
-            ("device-file", "    path: /dev/null\n"),
-            (
-                "network",
-                "    protocol: udp\n    payload_interface: 127.0.0.1:5000\n",
-            ),
-        ] {
-            let said = link(
-                kind,
-                &format!(
-                    "{rest}    packet_size: 8\n    stream:\n      max_length: 8\n      \
-                     timeout: none\n"
-                ),
-            )
-            .expect("it parses")
-            .to_dh_configs()
-            .expect_err(kind);
-            assert!(
-                said.contains("stream") && said.contains("does not apply"),
-                "{kind}: {said}"
-            );
-        }
-    }
 
     // -- a peripheral -------------------------------------------------------
 
@@ -6209,20 +4249,6 @@ payloads:
         }
     }
 
-    #[test]
-    fn a_peripheral_is_named_by_its_device_node_alone() {
-        // The node names the bus and the chip select, so an address is not
-        // merely unnecessary but wrong.
-        let said = link(
-            "spi",
-            "    path: /dev/spidev0.0\n    max_speed: 1000000\n    spi_mode: 0\n    \
-             packet_size: 8\n    payload_address: 0x10\n",
-        )
-        .expect("it parses")
-        .to_dh_configs()
-        .expect_err("a peripheral has no address");
-        assert!(said.contains("address"), "{said}");
-    }
 
     #[test]
     fn a_bus_is_given_no_stream_rule() {
@@ -6284,62 +4310,5 @@ payloads:
         }
     }
 
-    #[test]
-    fn a_kind_of_payload_that_is_not_one_is_refused() {
-        let said = link("rs485", "    path: /dev/ttyS0\n    packet_size: 8\n")
-            .expect("it parses")
-            .to_dh_configs()
-            .expect_err("there is no such kind");
-        assert!(
-            said.contains("rs485") && said.contains("serial"),
-            "the refusal says what the kinds are: {said}"
-        );
-    }
 
-    #[test]
-    fn the_links_round_trip_between_yaml_and_xml() {
-        let yaml = "version: \"1.0\"\ndescription: a bus and a peripheral\n\
-                    payloads:\n  \
-                    - name: a\n    type: i2c\n    path: /dev/i2c-0\n    \
-                    payload_address: 0x2A\n    pec: true\n    retries: 2\n    \
-                    packet_size: 8\n  \
-                    - name: b\n    type: spi\n    path: /dev/spidev1.0\n    \
-                    max_speed: 8000000\n    spi_mode: 1\n    bit_order: lsb\n    \
-                    packet_size: 8\n";
-        let xml = r#"<payload-configuration>
-  <version>1.0</version>
-  <description>a bus and a peripheral</description>
-  <payloads>
-    
-    <name>a</name>
-    <type>i2c</type>
-    <path>/dev/i2c-0</path>
-    <payload_address>0x2A</payload_address>
-    <pec>true</pec>
-    <retries>2</retries>
-    <packet_size>8</packet_size>
-  </payloads>
-  <payloads>
-    
-    <name>b</name>
-    <type>spi</type>
-    <path>/dev/spidev1.0</path>
-    <max_speed>8000000</max_speed>
-    <spi_mode>1</spi_mode>
-    <bit_order>lsb</bit_order>
-    <packet_size>8</packet_size>
-  </payloads>
-</payload-configuration>"#;
-        let from_yaml = ConfigFormat::Yaml
-            .parse::<PayloadConfig>(yaml)
-            .expect("the YAML parses");
-        let from_xml = ConfigFormat::Xml
-            .parse::<PayloadConfig>(xml)
-            .expect("the XML parses");
-        assert_eq!(from_yaml, from_xml);
-        assert_eq!(
-            from_yaml.to_dh_configs().expect("the handlers"),
-            from_xml.to_dh_configs().expect("the handlers")
-        );
-    }
 }

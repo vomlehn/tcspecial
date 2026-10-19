@@ -7,14 +7,36 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-/// A configuration with this many errors in it, one per payload: each states
-/// a port a device file cannot have.
+/// A configuration with this many errors in it, one per payload: each sends
+/// to a node that is not there.
 fn with_errors(dir: &Path, count: usize) -> PathBuf {
-    let mut text = "version: \"1.0\"\ndescription: many\npayloads:\n".to_string();
+    let mut text = "\
+version: \"2.0\"
+description: many
+tcspecial:
+  beacon:
+    interval: \"5 s\"
+    recv: \"127.0.0.1:5650\"
+    send: \"0.0.0.0:5550\"
+  log:
+    directory: \"/tmp/telemetry\"
+    segment_size: \"65536\"
+  payload_command:
+    dest_base: \"0.0.0.0:4200\"
+    source_base: \"127.0.0.1:4300\"
+  payload_telemetry:
+    dest_base: \"127.0.0.1:6100\"
+    source_base: \"0.0.0.0:6000\"
+  tcs_cmd:
+    recv: \"0.0.0.0:4000\"
+    send: \"127.0.0.1:4100\"
+payloads:
+"
+    .to_string();
     for id in 0..count {
         text.push_str(&format!(
-            "  - name: DH{id}\n    type: device-file\n    \
-             path: /dev/null{id}\n    payload_port: 1\n    packet_size: 4\n"
+            "  - name: DH{id}\n    type: device-file\n    path: /dev/null{id}\n    \
+             payload-out:\n      - target: nowhere{id}\n"
         ));
     }
     let path = dir.join("set.yaml");

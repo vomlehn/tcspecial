@@ -143,9 +143,6 @@ pub fn panels(links: &[Telemetered], settable: &BTreeMap<String, Vec<String>>) -
                 oc_time: SharedString::from(NO_TRANSFER_TIME),
                 oc_data: SharedString::new(),
                 packets_recv: 0,
-                data_color: crate::config::constants::freshness_color(
-                    crate::freshness::Freshness::Unjudged,
-                ),
                 parameters: SharedString::from(format!(
                     "{} (device id {})\nsends {via}\nthe ground receives at {}:{}",
                     link.source, link.id, link.ground.address, link.ground.port
@@ -202,7 +199,7 @@ fn command_links_of(graph: &Graph) -> Result<Option<(String, String, Commanded)>
     Ok(Some((
         ci.moc_cmd_send.to_string(),
         format!("{}:{}", ci.address, ci.port),
-        Commanded::Nodes {
+        Commanded {
             from: ci.payload_command_source_base,
             to: ci.payload_command_dest_base,
         },
@@ -845,10 +842,7 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
     // connect to and the buttons say so.
     let (link, vehicle_at) = match command_links_of(&graph) {
         Ok(Some((from, to, commanded))) => {
-            eprintln!("Commands from {from} to {to}, nodes on {}", match &commanded {
-                Commanded::Nodes { to, .. } => to.to_string(),
-                Commanded::Payloads(_) => "payload links".to_string(),
-            });
+            eprintln!("Commands from {from} to {to}, nodes on {}", commanded.to);
             (
                 Some(Arc::new(Mutex::new(CiLink::down_commanding(&from, commanded)))),
                 to,
@@ -991,9 +985,26 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
         let model = model.clone();
         let arrivals = arrivals.clone();
         let stopping = (pm_tcssim.clone(), Some(pm_tcspecial.clone()));
+        let times = link.clone();
+        let ui_weak = ui.as_weak();
         timer.start(slint::TimerMode::Repeated, PANEL_REFRESH_INTERVAL, move || {
             crate::stop_if_asked(&stopping.0, stopping.1.as_ref());
             show_arrivals(&model, &arrivals);
+
+            // When the last command went out and when its answer came back,
+            // which the window shows under the link's own status.
+            //
+            // try_lock rather than lock: the link belongs to the buttons, and
+            // a window that waited for it here would stop repainting exactly
+            // while a command was in flight -- which is when an operator is
+            // watching it. A pass that cannot have it leaves the times as
+            // they are, and the next one is a second away.
+            let Some(times) = times.as_ref() else { return };
+            if let (Some(ui), Ok(link)) = (ui_weak.upgrade(), times.try_lock()) {
+                let (sent, received) = link.command_times().unwrap_or((None, None));
+                ui.set_cmd_sent_time(SharedString::from(crate::shown_time(sent)));
+                ui.set_cmd_recv_time(SharedString::from(crate::shown_time(received)));
+            }
         });
     }
 
@@ -1091,13 +1102,9 @@ pub(crate) mod tests {
 
         // And one link for every node, not one per node: the base itself,
         // with nothing added to it, because the id is in the message.
-        match commanded {
-            Commanded::Nodes { from, to } => {
-                assert_eq!(from.to_string(), "127.0.0.1:4300");
-                assert_eq!(to.to_string(), "0.0.0.0:4200");
-            }
-            Commanded::Payloads(_) => panic!("a graph's nodes are not payloads"),
-        }
+        let Commanded { from, to } = commanded;
+        assert_eq!(from.to_string(), "127.0.0.1:4300");
+        assert_eq!(to.to_string(), "0.0.0.0:4200");
     }
 
     /// A panel offers what the configuration says may be set on its node, and
@@ -1287,7 +1294,7 @@ pub(crate) mod tests {
 
         let link = Arc::new(Mutex::new(CiLink::down_commanding(
             "127.0.0.1:0",
-            Commanded::Nodes {
+            Commanded {
                 from: HostPort {
                     address: "127.0.0.1".to_string(),
                     port: 0,

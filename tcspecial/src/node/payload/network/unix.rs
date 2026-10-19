@@ -26,7 +26,7 @@ use log::info;
 use nix::poll::PollFlags;
 use tcslibgs::{NetworkConfig, TcsError, TcsResult};
 
-use crate::ci::bind_failed;
+use crate::endpoint::bind_failed;
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
 use crate::endpoint::{
     wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable, WaitResult,

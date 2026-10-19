@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::config_digest::{ConfigDigest, ConfigVersion};
-use crate::types::{ArmKey, BeaconInterval, DHName, DHType, NodeId};
+use crate::types::{ArmKey, BeaconInterval, DHName, NodeId};
 
 /// Command message header
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -28,32 +28,26 @@ pub enum CommandType {
     Connect,
     RestartArm,
     Restart,
-    StartDH,
-    StopDH,
-    QueryDH,
-    QueryDHSample,
     Config,
-    ConfigDH,
-    /// Enable a node of a version 2 graph: version 1's START_DH, with a node
-    /// in place of a data handler.
+    /// Enable a node.
     ///
-    /// A kind of its own rather than a START_DH carrying a different body.
-    /// The two name their subject differently -- a data handler by name, a
-    /// node by id -- and a vehicle running one version has no use for the
-    /// other's, so a single kind would be one message meaning two things and
-    /// each end guessing which from what else it knows.
+    /// There were five commands beside these naming a data handler by name --
+    /// START_DH, STOP_DH, QUERY_DH, QUERY_DH_SAMPLE and CONFIG_DH -- and they
+    /// went with version 1. The five below are what answer for a node, which
+    /// a command names by id: the opcodes are not reused, so a ground station
+    /// of the older build is told its command is not one rather than having
+    /// it acted on as another.
     StartNode,
-    /// And disable one: version 1's STOP_DH, the same way.
+    /// And disable one.
     StopNode,
-    /// What a node has moved: version 1's QUERY_DH, about a node.
+    /// What a node has moved.
     QueryNode,
-    /// The last datum a node moved each way: version 1's QUERY_DH_SAMPLE.
+    /// The last datum a node moved each way.
     QueryNodeSample,
-    /// Set an attribute of a node: version 1's CONFIG_DH, with something for
-    /// it to do.
+    /// Set an attribute of a node.
     ///
-    /// Version 1's carried a name and nothing to configure with, and was
-    /// refused as unimplemented. A graph's `commands` section already says
+    /// Version 1's CONFIG_DH carried a name and nothing to configure with,
+    /// and was refused as unimplemented. A graph's `commands` section says
     /// which attribute of which node the ground may set, so this is the
     /// command that section was written for.
     SetNode,
@@ -110,12 +104,7 @@ impl CommandType {
             | CommandType::Restart
             | CommandType::Config => CommandLink::Spacecraft,
 
-            CommandType::StartDH
-            | CommandType::StopDH
-            | CommandType::QueryDH
-            | CommandType::QueryDHSample
-            | CommandType::ConfigDH
-            | CommandType::StartNode
+            CommandType::StartNode
             | CommandType::StopNode
             | CommandType::SetNode
             | CommandType::QueryNode
@@ -140,12 +129,7 @@ impl CommandType {
             CommandType::Connect => 0x04,
             CommandType::RestartArm => 0x02,
             CommandType::Restart => 0x03,
-            CommandType::StartDH => 0x10,
-            CommandType::StopDH => 0x11,
-            CommandType::QueryDH => 0x12,
-            CommandType::QueryDHSample => 0x13,
             CommandType::Config => 0x20,
-            CommandType::ConfigDH => 0x21,
             CommandType::StartNode => 0x30,
             CommandType::StopNode => 0x31,
             CommandType::SetNode => 0x32,
@@ -160,12 +144,7 @@ impl CommandType {
             0x04 => Some(CommandType::Connect),
             0x02 => Some(CommandType::RestartArm),
             0x03 => Some(CommandType::Restart),
-            0x10 => Some(CommandType::StartDH),
-            0x11 => Some(CommandType::StopDH),
-            0x12 => Some(CommandType::QueryDH),
-            0x13 => Some(CommandType::QueryDHSample),
             0x20 => Some(CommandType::Config),
-            0x21 => Some(CommandType::ConfigDH),
             0x30 => Some(CommandType::StartNode),
             0x31 => Some(CommandType::StopNode),
             0x32 => Some(CommandType::SetNode),
@@ -356,90 +335,6 @@ impl SetNodeCommand {
         }
     }
 }
-
-/// START_DH command - start a data handler
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct StartDHCommand {
-    pub header: CommandHeader,
-    pub dh_type: DHType,
-    pub name: DHName,
-}
-
-impl StartDHCommand {
-    pub fn new(sequence: u32, dh_type: DHType, name: DHName) -> Self {
-        Self {
-            header: CommandHeader {
-                sequence,
-                cmd_type: CommandType::StartDH,
-            },
-            dh_type,
-            name,
-        }
-    }
-}
-
-/// STOP_DH command - stop a data handler
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct StopDHCommand {
-    pub header: CommandHeader,
-    pub name: DHName,
-}
-
-impl StopDHCommand {
-    pub fn new(sequence: u32, name: DHName) -> Self {
-        Self {
-            header: CommandHeader {
-                sequence,
-                cmd_type: CommandType::StopDH,
-            },
-            name,
-        }
-    }
-}
-
-/// QUERY_DH command - query statistics from a data handler
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct QueryDHCommand {
-    pub header: CommandHeader,
-    pub name: DHName,
-}
-
-impl QueryDHCommand {
-    pub fn new(sequence: u32, name: DHName) -> Self {
-        Self {
-            header: CommandHeader {
-                sequence,
-                cmd_type: CommandType::QueryDH,
-            },
-            name,
-        }
-    }
-}
-
-/// QUERY_DH_SAMPLE command - ask what a data handler last sent and received
-///
-/// Separate from QUERY_DH so that the statistics every poll asks for stay the
-/// size they are. A sample is wanted only while someone is looking at a
-/// panel, and carrying payload bytes in routine telemetry would spend downlink
-/// on data nobody reads.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct QueryDHSampleCommand {
-    pub header: CommandHeader,
-    pub name: DHName,
-}
-
-impl QueryDHSampleCommand {
-    pub fn new(sequence: u32, name: DHName) -> Self {
-        Self {
-            header: CommandHeader {
-                sequence,
-                cmd_type: CommandType::QueryDHSample,
-            },
-            name,
-        }
-    }
-}
-
 /// CONFIG command - configure TCSpecial values
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ConfigCommand {
@@ -458,27 +353,6 @@ impl ConfigCommand {
         }
     }
 }
-
-/// CONFIG_DH command - configure data handler values
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ConfigDHCommand {
-    pub header: CommandHeader,
-    pub name: DHName,
-    // Additional configuration fields can be added here
-}
-
-impl ConfigDHCommand {
-    pub fn new(sequence: u32, name: DHName) -> Self {
-        Self {
-            header: CommandHeader {
-                sequence,
-                cmd_type: CommandType::ConfigDH,
-            },
-            name,
-        }
-    }
-}
-
 /// Union of all command types
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Command {
@@ -486,12 +360,7 @@ pub enum Command {
     Connect(ConnectCommand),
     RestartArm(RestartArmCommand),
     Restart(RestartCommand),
-    StartDH(StartDHCommand),
-    StopDH(StopDHCommand),
-    QueryDH(QueryDHCommand),
-    QueryDHSample(QueryDHSampleCommand),
     Config(ConfigCommand),
-    ConfigDH(ConfigDHCommand),
     StartNode(NodeCommand),
     StopNode(NodeCommand),
     SetNode(SetNodeCommand),
@@ -506,12 +375,7 @@ impl Command {
             Command::Connect(cmd) => cmd.header.sequence,
             Command::RestartArm(cmd) => cmd.header.sequence,
             Command::Restart(cmd) => cmd.header.sequence,
-            Command::StartDH(cmd) => cmd.header.sequence,
-            Command::StopDH(cmd) => cmd.header.sequence,
-            Command::QueryDH(cmd) => cmd.header.sequence,
-            Command::QueryDHSample(cmd) => cmd.header.sequence,
             Command::Config(cmd) => cmd.header.sequence,
-            Command::ConfigDH(cmd) => cmd.header.sequence,
             Command::StartNode(cmd)
             | Command::StopNode(cmd)
             | Command::QueryNode(cmd)
@@ -536,12 +400,7 @@ impl Command {
             | Command::Connect(_)
             | Command::RestartArm(_)
             | Command::Restart(_)
-            | Command::Config(_)
-            | Command::StartDH(_)
-            | Command::StopDH(_)
-            | Command::QueryDH(_)
-            | Command::QueryDHSample(_)
-            | Command::ConfigDH(_) => None,
+            | Command::Config(_) => None,
         }
     }
 
@@ -563,11 +422,6 @@ impl Command {
     /// configuration the far end read rather than about any payload.
     pub fn payload_name(&self) -> Option<&DHName> {
         match self {
-            Command::StartDH(cmd) => Some(&cmd.name),
-            Command::StopDH(cmd) => Some(&cmd.name),
-            Command::QueryDH(cmd) => Some(&cmd.name),
-            Command::QueryDHSample(cmd) => Some(&cmd.name),
-            Command::ConfigDH(cmd) => Some(&cmd.name),
             Command::Ping(_)
             | Command::Connect(_)
             | Command::RestartArm(_)
@@ -589,12 +443,7 @@ impl Command {
             Command::Connect(cmd) => cmd.header.cmd_type,
             Command::RestartArm(cmd) => cmd.header.cmd_type,
             Command::Restart(cmd) => cmd.header.cmd_type,
-            Command::StartDH(cmd) => cmd.header.cmd_type,
-            Command::StopDH(cmd) => cmd.header.cmd_type,
-            Command::QueryDH(cmd) => cmd.header.cmd_type,
-            Command::QueryDHSample(cmd) => cmd.header.cmd_type,
             Command::Config(cmd) => cmd.header.cmd_type,
-            Command::ConfigDH(cmd) => cmd.header.cmd_type,
             Command::StartNode(cmd)
             | Command::StopNode(cmd)
             | Command::QueryNode(cmd)
@@ -624,14 +473,9 @@ mod tests {
             CommandType::Config,
         ];
         let payload = [
-            CommandType::StartDH,
-            CommandType::StopDH,
-            CommandType::QueryDH,
-            CommandType::QueryDHSample,
-            CommandType::ConfigDH,
-            // A version 2 graph's nodes are commanded on this link too, and
-            // for the same reason its payloads were: what the ground needs in
-            // a hurry must not be queued behind what it asked for at leisure.
+            // A node's commands go on this link for the reason version 1's
+            // five payload commands did: what the ground needs in a hurry
+            // must not be queued behind what it asked for at leisure.
             CommandType::StartNode,
             CommandType::StopNode,
             CommandType::SetNode,

@@ -1,15 +1,11 @@
 //! Configuration loading for payloads
 
-use std::fs;
 use std::path::Path;
 
 use serde::de::IgnoredAny;
 use serde::Deserialize;
 
-use crate::{
-    load_config_file, CIConfigJson, ConfigFormat, ConfigVersion, DHConfig, PayloadConfig,
-    TcsError, TcsResult,
-};
+use crate::{ConfigFormat, TcsError};
 
 /// Which environment variable names each program's payload configuration, and
 /// what every one of them reads when its variable is unset.
@@ -33,20 +29,15 @@ pub const PAYLOAD_CONFIG_PATH_VAR: &str = "PAYLOAD_CONFIG_PATH";
 /// tcsmoc never reads it, so there is nothing here to keep in step.
 pub const SIM_PAYLOAD_CONFIG_PATH_VAR: &str = "SIM_PAYLOAD_CONFIG_PATH";
 
-/// The payload configuration read when nothing names one.
-pub const DEFAULT_PAYLOAD_CONFIG_PATH: &str = "tests/manual/tcspecial1.yaml";
-
-/// Load payload configuration from a YAML or XML file.
+/// The configuration read when nothing names one.
 ///
-/// The format is chosen from the file extension; see
-/// [`crate::format::ConfigFormat`]. All formats deserialize into the same
-/// [`PayloadConfig`], whose data handler groups are resolved here so a caller
-/// gets handlers with every attribute settled.
-pub fn load_payload_config<P: AsRef<Path>>(path: P) -> TcsResult<Vec<DHConfig>> {
-    let payload_config: PayloadConfig = load_config_file(path)?;
+/// The shipped fixture, which is a version 2 configuration: it was
+/// `tcspecial1.yaml`, one of the four version 1 payload sets, and those are
+/// gone. A default at all is for running the programs from the repository by
+/// hand -- every one of them takes the path as its argument, and that is what
+/// a real run names.
+pub const DEFAULT_PAYLOAD_CONFIG_PATH: &str = "tests/manual/thermostat.yaml";
 
-    payload_config.to_dh_configs().map_err(TcsError::Config)
-}
 
 /// The simulator file beside a configuration and named for it, where there is
 /// one.
@@ -125,8 +116,6 @@ pub fn payload_path_from_args<I: Iterator<Item = String>>(
 /// which language but whether this is one of these files at all.
 #[derive(Deserialize)]
 struct Sections {
-    #[serde(default)]
-    payloads: Vec<IgnoredAny>,
     /// What the payload section used to be called.
     ///
     /// Asked about only so that a file written to the old spelling is told
@@ -146,24 +135,6 @@ struct Sections {
     endpoints: Vec<IgnoredAny>,
 }
 
-/// Whether `text` describes payloads, and what is wrong with it if not.
-///
-/// Public under a longer name as well -- see [`describes_payloads_text`] --
-/// because the digest of a configuration has to ask the same question before
-/// it can parse one.
-fn describes_payloads(text: &str, format: ConfigFormat) -> TcsResult<()> {
-    let sections: Sections = format.parse(text)?;
-
-    if !sections.payloads.is_empty() {
-        Ok(())
-    } else if let Some(gone) = what_is_gone(&sections) {
-        Err(gone)
-    } else {
-        Err(TcsError::Config(
-            "names no payloads section, so it describes no payloads".to_string(),
-        ))
-    }
-}
 
 /// What a file still written to an older spelling is told, if it is one.
 ///
@@ -202,116 +173,15 @@ fn what_is_gone(sections: &Sections) -> Option<TcsError> {
     }
 }
 
-/// Whether `text` describes payloads, for a caller that has the text.
-pub fn describes_payloads_text(text: &str, format: ConfigFormat) -> TcsResult<()> {
-    describes_payloads(text, format)
-}
 
-/// Whether the file at `path` describes payloads.
-pub fn file_describes_payloads<P: AsRef<Path>>(path: P) -> TcsResult<()> {
-    let path = path.as_ref();
-    let text = fs::read_to_string(path)?;
-    describes_payloads(&text, ConfigFormat::of_file(path)?)
-}
 
-/// What a payload set says about the command interpreter, if it says anything.
-///
-/// The `tcspecial` section of a tcspecial configuration file. `None` for a file
-/// that has no such section, in which case the command interpreter is placed
-/// by its own file alone.
-///
-/// Here rather than in `load_dh_configs` because the two answer different
-/// questions and most callers want only the handlers -- tcsmoc and tcssim have
-/// no use for a command interpreter's configuration. The file is read twice by
-/// the one program that wants both, which is a file read twice at startup.
-pub fn load_tcspecial_section<P: AsRef<Path>>(path: P) -> TcsResult<Option<CIConfigJson>> {
-    let path = path.as_ref();
-    let format = ConfigFormat::of_file(path)?;
-    let text = fs::read_to_string(path)?;
 
-    describes_payloads(&text, format)?;
-    let config: PayloadConfig = format.parse(&text)?;
-    Ok(config.tcspecial)
-}
 
-/// The version a payload set states, as the three bytes a beacon carries.
-///
-/// Here beside the section loader and for the same reason: tcspecial wants one
-/// fact out of the file that the handlers do not carry, and reading the file
-/// again at startup is cheaper than threading the whole document through every
-/// program that only wants the handlers.
-///
-/// A version that is not one, two or three decimal parts is an error rather
-/// than a nought: it goes out in every beacon, where a wrong version is worse
-/// than no program at all.
-pub fn load_config_version<P: AsRef<Path>>(path: P) -> TcsResult<ConfigVersion> {
-    let path = path.as_ref();
-    // A version 2 configuration states the language's version, 2.0, and
-    // that is what its beacons announce.
-    if crate::graph::is_version_2(path) {
-        return crate::graph::version_of(path)
-            .as_deref()
-            .and_then(ConfigVersion::of_text)
-            .ok_or_else(|| {
-                TcsError::Config(format!("{}: its version cannot be read", path.display()))
-            });
-    }
-    let format = ConfigFormat::of_file(path)?;
-    let text = fs::read_to_string(path)?;
-
-    describes_payloads(&text, format)?;
-    let config: PayloadConfig = format.parse(&text)?;
-    config.config_version().ok_or_else(|| {
-        TcsError::Config(format!(
-            "{}: version \"{}\" is not one, two or three decimal parts, and a \
-             payload set says its version in every beacon",
-            path.display(),
-            config.version
-        ))
-    })
-}
-
-/// Load data handlers from a tcspecial configuration file.
-///
-/// Every program that needs data handlers reads them through this, so that all
-/// of them agree about what a given file describes. That matters more than it
-/// sounds: tcsmoc's panels, tcssim's payloads and tcspecial's handlers have to
-/// be the same handlers, and one program reading a file a different way is the
-/// drift the payload set mechanism exists to prevent.
-pub fn load_dh_configs<P: AsRef<Path>>(path: P) -> TcsResult<Vec<DHConfig>> {
-    let path = path.as_ref();
-    let text = fs::read_to_string(path)?;
-    let format = ConfigFormat::of_file(path)?;
-
-    describes_payloads(&text, format)?;
-    let config: PayloadConfig = format.parse(&text)?;
-    config.to_dh_configs().map_err(TcsError::Config)
-}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const PAYLOAD: &str = "
-version: \"1.0\"
-description: a tcspecial configuration
-payloads:
-  - name: DH0
-    type: network
-    protocol: udp
-    payload_interface: localhost:5000
-    packet_size: 12
-";
-
-    /// `text` in a temporary file with `ext`, so the loaders choose their
-    /// parser from the name as they do for a real one.
-    fn write_temp(ext: &str, text: &str) -> tempfile::NamedTempFile {
-        use std::io::Write;
-        let mut file = tempfile::Builder::new().suffix(ext).tempfile().unwrap();
-        file.write_all(text.as_bytes()).unwrap();
-        file.flush().unwrap();
-        file
-    }
 
     /// Arguments as a program really receives them, its own name first.
     fn args(rest: &[&str]) -> std::vec::IntoIter<String> {
@@ -366,127 +236,10 @@ payloads:
         );
     }
 
-    /// An XML file of several payloads is recognised as a tcspecial
-    /// configuration.
-    ///
-    /// A sequence in XML is repeated sibling elements, so a file of two
-    /// payloads names `payloads` twice. Asking about the section with a single
-    /// field made the second one a duplicate-field error, and every XML
-    /// tcspecial configuration of more than one payload was refused -- with a
-    /// complaint about a duplicate field, which says nothing about the file and
-    /// is not even true of it.
-    #[test]
-    fn an_xml_file_of_several_payloads_is_recognised() {
-        let xml = "<payload>\
-             <version>1.0</version>\
-             <description>two of them</description>\
-             <payloads><name>DH0</name><type>device</type>\
-               <path>/dev/null</path><packet_size>1</packet_size></payloads>\
-             <payloads><name>DH1</name><type>device</type>\
-               <path>/dev/zero</path><packet_size>1</packet_size></payloads>\
-             </payload>";
 
-        describes_payloads(xml, ConfigFormat::Xml).expect("an XML tcspecial configuration");
 
-        // And the whole file still loads, which is the thing the sniffer was
-        // standing in the way of.
-        let config: PayloadConfig = ConfigFormat::Xml.parse(xml).expect("it parses");
-        assert_eq!(config.payloads.len(), 2);
-    }
 
-    /// A payload set's tcspecial section is read.
-    ///
-    /// The section used to be carried and checked and nothing more. The
-    /// beacon address is read from it now, so a set states where its own
-    /// ground station listens.
-    /// A whole set, with a tcspecial section as a file writes it.
-    ///
-    /// Written out rather than escaped into one line, because the section is
-    /// mostly subsections now and the indentation is the point: `recv` under
-    /// `tcs_cmd` is a different attribute from `recv` under `beacon`.
-    const A_SET: &str = "\
-version: \"1.0\"
-description: a set
-tcspecial:
-  tcs_cmd:
-    recv: 0.0.0.0:4000
-    send: 127.0.0.1:4100
-  payload_command:
-    source_base: 127.0.0.1:4300
-    dest_base: 0.0.0.0:4200
-  payload_telemetry:
-    source_base: 0.0.0.0:6000
-    dest_base: 127.0.0.1:6100
-  beacon:
-    interval: 5 s
-    send: 0.0.0.0:5550
-    recv: 127.0.0.1:5650
-payloads:
-  - name: DH0
-    type: device
-    path: /dev/null
-    packet_size: 1
-";
 
-    #[test]
-    fn a_payload_sets_tcspecial_section_is_read() {
-        let stated = A_SET.replace("send: 0.0.0.0:5550", "send: 0.0.0.0:7550");
-        let file = write_temp(".yaml", &stated);
-        let section = load_tcspecial_section(file.path())
-            .expect("it loads")
-            .expect("the set states a section");
-        assert_eq!(section.beacon.send, "0.0.0.0:7550");
-        assert_eq!(section.beacon.recv, "127.0.0.1:5650");
-
-        // A payload set with no section at all.
-        let bare = "version: \"1.0\"\ndescription: a set\n\
-                    payloads:\n  - name: DH0\n    type: device\n    \
-                    path: /dev/null\n    packet_size: 1\n";
-        let file = write_temp(".yaml", bare);
-        assert!(load_tcspecial_section(file.path())
-            .expect("it loads")
-            .is_none());
-    }
-
-    /// A tcspecial section states where beacons go and how often, or it is
-    /// refused.
-    ///
-    /// Neither has a default. Beacons are how the ground knows the spacecraft
-    /// is alive, so a section that has not been asked the question has not
-    /// answered it, and a section is not the place to find that out by the
-    /// beacons going somewhere nobody is listening.
-    #[test]
-    fn a_tcspecial_section_states_both_beacon_attributes() {
-        let whole = A_SET;
-        let file = write_temp(".yaml", whole);
-        let section = load_tcspecial_section(file.path())
-            .expect("it loads")
-            .expect("a section");
-        assert_eq!(section.beacon.interval, "5 s");
-        assert_eq!(section.beacon.send, "0.0.0.0:5550");
-        assert_eq!(section.beacon.recv, "127.0.0.1:5650");
-
-        // Each of the three in turn: a subsection that leaves any of them out
-        // is a section that has not said where its beacons go.
-        for missing in [
-            "    interval: 5 s\n",
-            "    send: 0.0.0.0:5550\n",
-            "    recv: 127.0.0.1:5650\n",
-        ] {
-            let without = whole.replace(missing, "");
-            assert_ne!(without, whole, "the test removed nothing");
-            let file = write_temp(".yaml", &without);
-            assert!(
-                load_tcspecial_section(file.path()).is_err(),
-                "a section with no {missing:?} was accepted"
-            );
-        }
-    }
-
-    #[test]
-    fn a_file_is_recognised_by_its_payloads_section() {
-        describes_payloads(PAYLOAD, ConfigFormat::Yaml).expect("a tcspecial configuration");
-    }
 
     /// A file written in the language that is gone is told what became of it.
     ///
@@ -499,8 +252,8 @@ payloads:
         let endpoints = "endpoint_groups:\n  - name: g\n    type: network\n    protocol: udp\n\
                          endpoints:\n  - name: e\n    group: g\n    address: localhost\n    \
                          port: 5000\n";
-        let message = describes_payloads(endpoints, ConfigFormat::Yaml)
-            .expect_err("the language is gone")
+        let message = names_what_is_gone(endpoints, ConfigFormat::Yaml)
+            .expect("the language is gone")
             .to_string();
         assert!(
             message.contains("endpoints") && message.contains("payloads"),
@@ -522,8 +275,8 @@ payloads:
             "data_handler_groups:\n  - name: g\n",
         ] {
             let text = format!("version: \"1.0\"\n{old}");
-            let message = describes_payloads(&text, ConfigFormat::Yaml)
-                .expect_err("the old spelling must be rejected")
+            let message = names_what_is_gone(&text, ConfigFormat::Yaml)
+                .expect("the old spelling is named")
                 .to_string();
             assert!(
                 message.contains("data_handlers")
@@ -535,14 +288,4 @@ payloads:
         }
     }
 
-    #[test]
-    fn a_file_naming_no_payloads_section_is_refused() {
-        let message = describes_payloads("version: \"1.0\"\n", ConfigFormat::Yaml)
-            .expect_err("must be rejected")
-            .to_string();
-        assert!(
-            message.contains("payloads"),
-            "the error should name the section it wanted, but said: {message}"
-        );
-    }
 }

@@ -81,6 +81,27 @@ pub trait Function: Send {
         ))
     }
 
+    /// What a device this function drives should be held at, where it drives
+    /// one.
+    ///
+    /// Asked on every arrival that produced nothing new, and sent again to
+    /// the devices alone: see [`crate::runtime::fabric::Fabric::deliver_on`].
+    /// A thermostat answers with the decision it last made, because a relay
+    /// is held at what it was last told and a decision that went missing on
+    /// the way to it would otherwise stand for ever -- the vehicle believing
+    /// it had switched the heaters off, the mass climbing, and the decision
+    /// that would correct it being the one the vehicle thinks it has already
+    /// sent.
+    ///
+    /// `None` is every other function, and means what it says: there is
+    /// nothing a device should be held at between results. A conversion and a
+    /// vote answer that way because what they produce is a measurement -- a
+    /// reading nobody took is not a reading, where a decision nobody has
+    /// changed is still the decision.
+    fn held(&self) -> Option<Vec<u8>> {
+        None
+    }
+
     /// What this function is called, for a complaint to name.
     fn name(&self) -> &'static str;
 }

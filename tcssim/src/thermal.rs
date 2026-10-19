@@ -535,7 +535,7 @@ mod tests {
     const HEATER_RATE: f64 = 3.0;
 
     /// The loop closes: the mass the sensors report is warmed by what the
-    /// vehicle decided, and the band is held.
+    /// vehicle decided, the band is held, and a lost decision is corrected.
     ///
     /// Everything here is the real thing but the vehicle: three simulated
     /// sensors and two simulated heaters, each a payload thread of its own
@@ -551,7 +551,7 @@ mod tests {
     /// vehicle cannot switch heaters off between two readings, so the most it
     /// can overshoot by is what they add in the interval it did not look.
     #[test]
-    fn the_heaters_hold_the_mass_in_band() {
+    fn the_heaters_hold_the_mass_in_band_through_a_lost_decision() {
         let mass = Arc::new(ThermalMass::new(&cabin(), Instant::now()));
 
         // The two encodings of the example, so that what is voted over is
@@ -629,6 +629,9 @@ mod tests {
         // What the vehicle has heard from each sensor, and what it decided.
         let mut latest: Vec<Option<f64>> = vec![None; 3];
         let mut heating = false;
+        // Whether the one decision this test throws away has been thrown
+        // away yet.
+        let mut lost = false;
         let mut reached: Option<Duration> = None;
         let mut lowest = f64::MAX;
         let mut highest = f64::MIN;
@@ -657,15 +660,23 @@ mod tests {
                 continue;
             }
             if let Some(reported) = latest.iter().copied().collect::<Option<Vec<f64>>>() {
-                // Driven only where the decision changed, which is what the
-                // hysteresis node does: it keeps the last decision and stays
-                // silent while it stands, so that the telemetry log shows
-                // when the heaters actually switched. The loop here is held
-                // to the same bargain, so that what this test exercises is
-                // the heater acting on one word and going on acting on it.
+                // Driven on every sample, which is what the vehicle does:
+                // the hysteresis node asserts its decision each time a
+                // temperature arrives and the devices are held at it. The
+                // transitions are what gets recorded, and nothing here
+                // records anything.
+                //
+                // The first word to switch them off is thrown away, as a lost
+                // datagram throws one away. That is the failure this
+                // arrangement exists for: a decision sent once and left to
+                // stand would leave the heaters on with the vehicle believing
+                // otherwise, and the mass with no bound on where it goes.
                 let want = decide(&reported, heating);
-                if want != heating {
-                    heating = want;
+                let switching_off = heating && !want;
+                heating = want;
+                if switching_off && !lost {
+                    lost = true;
+                } else {
                     drive(heating);
                 }
 
@@ -704,18 +715,28 @@ mod tests {
             "eight kelvin at six a second took {reached:?}"
         );
 
-        // And from then on it is held, within what the loop cannot help. Two
-        // delays make the overshoot: the vehicle does not see the band
-        // crossed until the next sample, and the heaters do not hear about it
-        // until they next look -- so the most they can add past the band is
-        // their rate over the sum of the two intervals. A tenth of a kelvin
-        // on top of that is the scheduler, which is a thirtieth of the
-        // interval and not a trajectory this test is holding anybody to.
+        // The loss has to have happened, or this test is only the band test
+        // under a longer name.
+        assert!(
+            lost,
+            "the heaters were never switched off, so no decision was lost"
+        );
+
+        // And from then on it is held, within what the loop cannot help.
+        // Three delays make the overshoot here: the vehicle does not see the
+        // band crossed until the next sample, the heaters do not hear about it
+        // until they next look, and the first word to switch them off was
+        // thrown away -- so one more sample of heating before the next
+        // assertion corrects it. A tenth of a kelvin on top of that is the
+        // scheduler, which is a thirtieth of the interval and not a
+        // trajectory this test is holding anybody to.
         //
-        // The band is four kelvin wide, so a loop that had lost control --
-        // the decision not arriving, the heaters not acting on it -- would be
-        // out by far more than this.
-        let delay = (SAMPLE_MS + LOOK_MS) as f64 / 1000.0;
+        // That it is a bound at all is the point. Before the decision was
+        // asserted every sample, the thrown-away word would have stood for
+        // ever: the thermostat would have gone on deciding `Off`, found it
+        // had already said so, and said nothing, with the mass climbing three
+        // hundred kelvin towards where two heaters rest it.
+        let delay = (2 * SAMPLE_MS + LOOK_MS) as f64 / 1000.0;
         let slack = 2.0 * HEATER_RATE * delay + 0.1;
         assert!(
             highest <= SETPOINT + HALF_BAND + slack,

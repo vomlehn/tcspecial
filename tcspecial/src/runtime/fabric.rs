@@ -68,6 +68,14 @@ pub struct Taken {
     pub bytes: usize,
     /// Which stream they are on, where the node says.
     pub stream: Option<Stream>,
+    /// Whether this is something said again rather than something new.
+    ///
+    /// A thermostat asserts its decision on every sample, so that a heater is
+    /// held at what the vehicle last decided and a lost datagram costs one
+    /// sample rather than standing for ever. Only the devices are told again:
+    /// a log or a ground link that recorded every repeat would bury the
+    /// moment anything switched. See [`Fabric::deliver_on`].
+    pub again: bool,
 }
 
 impl Taken {
@@ -75,6 +83,7 @@ impl Taken {
     pub const NOTHING: Taken = Taken {
         bytes: 0,
         stream: None,
+        again: false,
     };
 
     /// This many bytes, to go wherever this node's links go.
@@ -82,6 +91,7 @@ impl Taken {
         Taken {
             bytes,
             stream: None,
+            again: false,
         }
     }
 
@@ -90,6 +100,16 @@ impl Taken {
         Taken {
             bytes,
             stream: Some(stream),
+            again: false,
+        }
+    }
+
+    /// This many bytes, which are what was said before, said again.
+    pub fn again(bytes: usize) -> Taken {
+        Taken {
+            bytes,
+            stream: None,
+            again: true,
         }
     }
 }
@@ -184,6 +204,18 @@ pub trait Port: Send {
     /// Whether anything may be handed to this node.
     fn accepts(&self) -> bool {
         true
+    }
+
+    /// Whether this node is a device that is held at what it was last told.
+    ///
+    /// A heater and a valve are: the vehicle writes a decision and the thing
+    /// stays that way until it is written again, so a decision asserted a
+    /// second time is worth sending and the one that went missing is worth
+    /// correcting. Everything else is not -- a log, a ground link, another
+    /// computation -- and a repeat tells it nothing it does not have. Which is
+    /// what decides where a re-assertion goes: see [`Fabric::deliver_on`].
+    fn holds(&self) -> bool {
+        false
     }
 
     /// Whether anything may be taken from it.
@@ -500,6 +532,13 @@ impl Fabric {
         self.deliver_on(from, data, None)
     }
 
+    /// And the same for something said again rather than something new.
+    ///
+    /// Only the devices are told: see [`Taken::again`] and [`Port::holds`].
+    pub fn deliver_again(&mut self, from: &str, data: &[u8]) -> Moved {
+        self.deliver_as(from, data, None, true)
+    }
+
     /// And the same for a node that keeps its two streams apart.
     ///
     /// `stream` is which of them this datum is on, as the node that produced
@@ -513,6 +552,28 @@ impl Fabric {
     /// of it is followed, which is what the fabric did before and what every
     /// device and computation still wants.
     pub fn deliver_on(&mut self, from: &str, data: &[u8], stream: Option<Stream>) -> Moved {
+        self.deliver_as(from, data, stream, false)
+    }
+
+    /// Deliver a datum, saying whether it is new or said again.
+    ///
+    /// A re-assertion goes to the devices this node drives and to nothing
+    /// else. It is not a reading and not a command: it is the vehicle holding
+    /// something at what it last decided, so a log, a ground link or a
+    /// further computation is told nothing -- the first two would bury the
+    /// moment anything switched, and the third would be made to compute again
+    /// over a value that has not changed.
+    ///
+    /// Nothing is counted for a destination passed over. A re-assertion that
+    /// does not go to a log is not a datum dropped: it is a datum that was
+    /// never for the log, which the counters would otherwise report as loss.
+    fn deliver_as(
+        &mut self,
+        from: &str,
+        data: &[u8],
+        stream: Option<Stream>,
+        again: bool,
+    ) -> Moved {
         let mut moved = Moved::default();
 
         // How far a result may be passed on. A path through a graph with no
@@ -524,10 +585,10 @@ impl Fabric {
         // vehicle that stops reading its sensors.
         let most = self.nodes.len().max(1);
 
-        let mut work: VecDeque<(String, Vec<u8>, usize, Option<Stream>)> =
-            VecDeque::from(vec![(from.to_string(), data.to_vec(), 0, stream)]);
+        let mut work: VecDeque<(String, Vec<u8>, usize, Option<Stream>, bool)> =
+            VecDeque::from(vec![(from.to_string(), data.to_vec(), 0, stream, again)]);
 
-        while let Some((from, data, depth, stream)) = work.pop_front() {
+        while let Some((from, data, depth, stream, again)) = work.pop_front() {
             // Cloned because the deliveries are borrowed from the table while
             // the nodes are borrowed mutably from the same struct. A handful
             // of names per datum is not the cost worth restructuring for.
@@ -563,6 +624,12 @@ impl Fabric {
                     ));
                     continue;
                 };
+
+                // Said again, to something that is not held at it: nothing to
+                // do and nothing to report. See `deliver_as`.
+                if again && !node.holds() {
+                    continue;
+                }
 
                 if !node.accepts() {
                     moved.refused.push((
@@ -620,6 +687,7 @@ impl Fabric {
                             buffer,
                             depth + 1,
                             taken.stream,
+                            taken.again,
                         ));
                     }
                     // A node that said it had a result and then did not give
@@ -743,7 +811,7 @@ impl Fabric {
                 let data = buffer[..taken.bytes].to_vec();
                 self.watch.took(name, Outcome::Moved(data.len()));
                 self.watch.sample_taken(name, &data);
-                moved.add(self.deliver_on(name, &data, taken.stream));
+                moved.add(self.deliver_as(name, &data, taken.stream, taken.again));
                 moved
             }
             Err(why) => {
@@ -792,6 +860,8 @@ mod tests {
         refuse: Option<String>,
         accepts: bool,
         produces: bool,
+        /// Whether this stands in for a device held at what it was told.
+        holds: bool,
     }
 
     /// A node that records what it is handed and says what it was told to.
@@ -831,12 +901,30 @@ mod tests {
         fn produces(&self) -> bool {
             self.0.lock().expect("the record").produces
         }
+
+        fn holds(&self) -> bool {
+            self.0.lock().expect("the record").holds
+        }
     }
 
     fn recorder() -> (Arc<TestLock<Record>>, Box<dyn Port>) {
         let record = Arc::new(TestLock::new(Record {
             accepts: true,
             produces: true,
+            ..Record::default()
+        }));
+        (record.clone(), Box::new(Recorder(record)))
+    }
+
+    /// A recorder standing in for a device: a heater, a valve.
+    ///
+    /// The difference is [`Port::holds`], which is what decides whether a
+    /// decision asserted a second time is sent to it.
+    fn device() -> (Arc<TestLock<Record>>, Box<dyn Port>) {
+        let record = Arc::new(TestLock::new(Record {
+            accepts: true,
+            produces: true,
+            holds: true,
             ..Record::default()
         }));
         (record.clone(), Box::new(Recorder(record)))
@@ -1156,6 +1244,103 @@ mod tests {
             // `moc-out`.
             vec![(None, Some(Stream::Vehicleward), b"1".to_vec())],
             "294 is more than two degrees below 300"
+        );
+    }
+
+    /// The decision is asserted on every sample, and only to the heaters.
+    ///
+    /// What holds a heater at what the vehicle last decided. A decision sent
+    /// once and then left to stand is a decision one lost datagram undoes for
+    /// ever: the vehicle believes the heaters are off, the mass climbs, and
+    /// the thermostat decides `Off` again and says nothing because it thinks
+    /// it has already said it. So every sample asserts the decision to the
+    /// devices.
+    ///
+    /// And to nothing else. A log that recorded the decision ten times a
+    /// second would bury the moment the heaters switched, which is the one
+    /// thing a reader of it is looking for, and the ground link would carry
+    /// the same repetition for the same loss.
+    #[test]
+    fn a_decision_is_asserted_every_sample_and_recorded_once() {
+        use crate::runtime::port::ComputePort;
+
+        let graph = drawn();
+        let routes = Routes::of(&graph);
+
+        let mut fabric = Fabric::new(routes.clone(), 64);
+        let thermostat = graph.node("thermostat").expect("the thermostat");
+        fabric.hold(
+            "thermostat",
+            Box::new(ComputePort::make(thermostat, &[], &Abandon::nothing()).expect("it builds")),
+        );
+        let (heaters, heater_port) = device();
+        let (second, second_port) = device();
+        let (log, log_port) = recorder();
+        let (moc, moc_port) = recorder();
+        fabric.hold("heaters_1", heater_port);
+        fabric.hold("heaters_2", second_port);
+        fabric.hold("housekeeping", log_port);
+        fabric.hold("moc", moc_port);
+
+        // Cold: the first decision, which is a change and goes everywhere its
+        // links lead.
+        let moved = fabric.deliver("cabin_temp", b"280.0");
+        assert!(moved.all_delivered(), "{:?}", moved.refused);
+        // The decisions a node was handed, and not the temperatures: the
+        // example logs the voted temperature and reports it to the ground as
+        // well, so both of those hold a reading per sample whatever the
+        // thermostat does.
+        let said = |record: &Arc<TestLock<Record>>| -> Vec<Vec<u8>> {
+            record
+                .lock()
+                .expect("the record")
+                .given
+                .iter()
+                .map(|(_, _, data)| data.clone())
+                .filter(|data| data == b"1" || data == b"0")
+                .collect()
+        };
+        assert_eq!(said(&heaters), vec![b"1".to_vec()]);
+        assert_eq!(said(&log), vec![b"1".to_vec()]);
+        assert_eq!(said(&moc), vec![b"1".to_vec()]);
+
+        // Four more samples, still cold. Each asserts the decision to both
+        // heaters again -- it is what they are to be held at -- and the
+        // record of it stands at the one transition.
+        for _ in 0..4 {
+            let moved = fabric.deliver("cabin_temp", b"280.0");
+            assert!(moved.all_delivered(), "{:?}", moved.refused);
+        }
+        assert_eq!(said(&heaters).len(), 5, "{:?}", said(&heaters));
+        assert_eq!(said(&second).len(), 5, "both heaters are held, not one");
+        assert!(
+            said(&heaters).iter().all(|datum| datum == b"1"),
+            "every assertion is the same decision: {:?}",
+            said(&heaters)
+        );
+        assert_eq!(
+            said(&log),
+            vec![b"1".to_vec()],
+            "the log should hold the transition and not the repetitions"
+        );
+        assert_eq!(said(&moc), vec![b"1".to_vec()], "and so should the ground");
+
+        // A reading inside the band decides nothing new, and the heaters are
+        // still held at what they were told: that is what the band means.
+        let moved = fabric.deliver("cabin_temp", b"294.0");
+        assert!(moved.all_delivered(), "{:?}", moved.refused);
+        assert_eq!(said(&heaters).len(), 6);
+        assert_eq!(said(&log).len(), 1);
+
+        // Warm enough to switch them off: a change, so it is recorded with
+        // the first one and the heaters are driven to it.
+        let moved = fabric.deliver("cabin_temp", b"300.0");
+        assert!(moved.all_delivered(), "{:?}", moved.refused);
+        assert_eq!(said(&heaters).last(), Some(&b"0".to_vec()));
+        assert_eq!(
+            said(&log),
+            vec![b"1".to_vec(), b"0".to_vec()],
+            "a reader of the log sees when the heaters actually switched"
         );
     }
 

@@ -170,6 +170,10 @@ pub struct EndpointPort {
     /// The one wait this port makes that is a wait rather than a look: see
     /// [`Abandon`], and [`EndpointPort::abandoned_for`].
     abandon: Abandon,
+    /// Whether this is a device held at what it was last told.
+    ///
+    /// See [`EndpointPort::is_a_device`] and [`Port::holds`].
+    holds: bool,
 }
 
 impl EndpointPort {
@@ -225,7 +229,20 @@ impl EndpointPort {
             read_delay: None,
             read_size: None,
             abandon: Abandon::nothing(),
+            holds: false,
         }
+    }
+
+    /// Say that this port is a device, which a re-asserted decision is sent
+    /// to again.
+    ///
+    /// Set where the node type is known, which is [`EndpointPort::open`]: a
+    /// payload is a device and a MOC link is not, and the two are the same
+    /// kind of socket otherwise. Off by default, so a port built by hand --
+    /// a test's, a ground link's -- is not one by accident.
+    pub fn is_a_device(mut self) -> EndpointPort {
+        self.holds = true;
+        self
     }
 
     /// Open the node a version 2 configuration describes.
@@ -257,6 +274,13 @@ impl EndpointPort {
             EndpointPort::connect(&node.name, &reach.endpoint, uses)
         };
         let mut port = opened.map_err(|e| format!("{e}"))?;
+
+        // A payload is a thing in the world that stays as it was put: a
+        // decision written to it holds until another one is. A MOC link is
+        // not, so a re-assertion is not sent down it.
+        if node.is_payload() && uses.accepts() {
+            port = port.is_a_device();
+        }
 
         if let Some(size) = reach.read_size {
             port = port.reading(size as usize);
@@ -559,6 +583,10 @@ impl Port for EndpointPort {
         self.uses.accepts()
     }
 
+    fn holds(&self) -> bool {
+        self.holds
+    }
+
     fn produces(&self) -> bool {
         self.uses.produces()
     }
@@ -576,14 +604,19 @@ pub struct ComputePort {
     what: String,
     /// What it computes.
     function: Box<dyn Function>,
-    /// Results waiting to be taken.
+    /// Results waiting to be taken, and whether each is a re-assertion.
     ///
     /// Normally at most one: the fabric takes a result as soon as the node
     /// says it has one. A queue rather than a slot all the same, because the
     /// alternative when a second result arrives before the first is taken is
     /// to overwrite it -- a reading dropped where nothing says so, which is
     /// the one outcome this project will not have.
-    ready: VecDeque<Vec<u8>>,
+    ///
+    /// The flag travels with the bytes rather than being asked for
+    /// afterwards: by the time a result is taken the function has moved on,
+    /// and a question answered about the wrong result is worse than no
+    /// question.
+    ready: VecDeque<(Vec<u8>, bool)>,
 }
 
 impl ComputePort {
@@ -625,7 +658,7 @@ impl Port for ComputePort {
     /// thermostat's answer goes to the heaters and to the ground, and neither
     /// of those is the stream it is "on". See [`Taken`].
     fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
-        let Some(result) = self.ready.pop_front() else {
+        let Some((result, again)) = self.ready.pop_front() else {
             return Ok(Taken::NOTHING);
         };
 
@@ -634,7 +667,7 @@ impl Port for ComputePort {
         // that a caller with a larger buffer can still have it.
         if result.len() > buffer.len() {
             let wanted = result.len();
-            self.ready.push_front(result);
+            self.ready.push_front((result, again));
             return Err(format!(
                 "{}: the result of {} is {wanted} bytes and the buffer holds {}:                  part of a value is not a smaller value",
                 self.what,
@@ -644,19 +677,30 @@ impl Port for ComputePort {
         }
 
         buffer[..result.len()].copy_from_slice(&result);
-        Ok(Taken::of(result.len()))
+        Ok(if again {
+            Taken::again(result.len())
+        } else {
+            Taken::of(result.len())
+        })
     }
 
     fn give(&mut self, arriving: Arriving<'_>, data: &[u8]) -> Result<(), String> {
         match self.function.give(arriving.input, data) {
             Ok(Some(result)) => {
-                self.ready.push_back(result);
+                self.ready.push_back((result, false));
                 Ok(())
             }
-            // Nothing to send yet: a function waiting for the rest of its
-            // inputs, or one that decided nothing needs to change. The
-            // ordinary answer, and not a failure.
-            Ok(None) => Ok(()),
+            // Nothing new. Either there is something the devices this
+            // computation drives are held at -- a thermostat's last decision,
+            // which goes out again so that one lost datagram does not stand
+            // for ever -- or there is not, which is a function waiting for
+            // the rest of its inputs. Neither is a failure.
+            Ok(None) => {
+                if let Some(held) = self.function.held() {
+                    self.ready.push_back((held, true));
+                }
+                Ok(())
+            }
             Err(why) => Err(format!(
                 "{}: {} cannot use what arrived: {why}",
                 self.what,

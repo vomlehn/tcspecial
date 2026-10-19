@@ -1548,6 +1548,67 @@ would need a path for the vehicle's own end, and a path is a thing for a file
 to state rather than for the software to invent. One used as a heater is bound
 as a UDP payload used to be, so nothing can be written to it.
 
+Holding a device at a decision
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A heater is not told a reading; it is told what to be. So the thing that
+decides -- a thermostat -- and the thing that records what was decided want
+opposite treatment, and treating them alike cost this project a failure mode
+worth writing down.
+
+The thermostat used to emit only when its decision *changed*. The argument was
+about the record: a node re-sending the same command fills the telemetry log
+with a decision nobody made and leaves a reader unable to see when the heaters
+actually switched. True, and it was applied to the link as well, where it does
+not hold. A heater's state then lived in one place -- the vehicle's last
+decision -- and was asserted only on a change, with nothing reading back what
+the heater was doing. One lost datagram stood for ever: the vehicle believing
+it had switched the heaters off, the mass climbing past the top of the band,
+and the thermostat deciding ``Off`` again, finding it had already said so, and
+staying silent. The decision that would correct it is the one it thinks it has
+already sent.
+
+Requirement
+    A computation that drives a device asserts its decision on every sample.
+    What the device is held at is asked of the computation on every arrival
+    that produced nothing new, so a lost datagram costs one sample rather than
+    standing until something else changes.
+
+Requirement
+    A re-assertion reaches the devices and nothing else. A log or a ground
+    link told the same decision ten times a second would bury the moment it
+    changed, and a further computation would be made to compute again over a
+    value that has not moved. What is recorded is the transitions, which is
+    what the argument above was really asking for.
+
+Requirement
+    A re-assertion that is not sent to a node is not counted as anything. It
+    is not a datum dropped -- it was never for that node -- and counting it as
+    loss would make every counter on a log climb for ever.
+
+Requirement
+    A computation that produces measurements asserts nothing. A conversion and
+    a vote answer that there is nothing to hold a device at, because a reading
+    nobody took is not a reading, where a decision nobody has changed is still
+    the decision.
+
+Requirement
+    A thermostat that has decided nothing holds nothing. Before the first
+    reading, and for a reading in the band before any decision, nothing is
+    sent at all: asserting ``Off`` because the vehicle had not yet looked
+    would be a decision nobody made.
+
+How often "every sample" is depends on what feeds it. The decision is asserted
+once for every temperature that arrives, and a vote over a trio of sensors
+produces one on every reading -- so a trio read ten times a second is thirty
+assertions a second to each heater. That follows from the vote, not from the
+thermostat, and it is the rate at which a lost decision is corrected.
+
+What it is not is a substitute for reading the device back. Nothing here knows
+what a heater is doing; it knows what it was last told. A payload that can be
+read as well as driven would say more, and the discrete lines of the shipped
+example can be: that is worth having and is not what this is.
+
 What each command means
 ~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -2166,11 +2227,13 @@ Requirement
     A vehicle starts only if every node opens, and the complaint lists every
     reason rather than the first. The configuration was checked on the ground,
     so a failure here is the hardware. Carrying on without one node sounds
-    kinder and is not: a thermostat whose third sensor did not open would hold
-    its last decision for ever, because a mean over three inputs waits for
-    three, and nothing in the telemetry would say that is why. An operator who
-    wants to fly without a sensor changes the configuration, which is
-    checkable, visible in the diagram and recorded in the beacon's digest.
+    kinder and is not: a thermostat whose third sensor did not open would vote
+    over two live readings and one that never arrives, which is a trio that
+    has already spent the redundancy it exists for -- the next sensor to fail
+    takes the decision with it -- and nothing in the telemetry would say that
+    is why. An operator who wants to fly without a sensor changes the
+    configuration, which is checkable, visible in the diagram and recorded in
+    the beacon's digest.
 
 Requirement
     The checks are run again before anything is opened, by the same code the
@@ -8748,16 +8811,17 @@ Requirement
     typed yet.
 
 Requirement
-    Tcsverify stops as soon as it has printed as many errors as its limit:
-    five, unless ``--error-limit=<n>`` asks for another number -- nought
-    included -- or for ``unlimited``. Nothing is looked for after the last one
-    the limit allows. ``--warnings=on``, the default, prints warnings without
+    Tcsverify prints every error it finds unless ``--error-limit=<n>`` asks
+    for a limit -- any whole number, nought included -- and then stops as soon
+    as it has printed that many. ``--error-limit=unlimited`` is the default
+    said aloud. Nothing is looked for after the last one the limit allows. ``--warnings=on``, the default, prints warnings without
     counting them; ``--warnings=off`` prints none; ``--warnings=errors``
     prints them and counts them against the limit as errors are. What is found
     is printed in the order it was found, so that a run stopped by its limit
-    ends on the finding that stopped it. A long report is a report scrolled
-    past, and in a half-built graph most of the later errors are one
-    unfinished node said another way.
+    ends on the finding that stopped it. Every one by default, because a
+    report cut short by a limit nobody asked for hides errors from somebody
+    who believes they have seen them all; a limit is for whoever wants the
+    first few on the screen.
 
 Requirement
     The exit status is about what was printed: failure if an error was, and

@@ -28,7 +28,30 @@ use tcslibgs::ResolvedSim;
 /// the simulator takes the other end of it: the handler's endpoint becomes the
 /// address the simulated payload uses. Everything about how the payload behaves
 /// comes from `sim`, which is what the simulator file settled.
+///
+/// Attached to nothing, which the simulator itself never is any more -- it
+/// asks for the attachment because a payload may have one -- so this is the
+/// form the tests of the pacing, the faults and the addresses use, and saying
+/// `None` in each of them would say nothing to them.
+#[cfg(test)]
 pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadConfig, String> {
+    payload_config_attached(dh, sim, None)
+}
+
+/// And the same, with the thermal mass this payload is attached to.
+///
+/// `thermal` is what [`crate::thermal`] made of the attachment the simulator
+/// file states: `None` for a payload attached to nothing, which is every
+/// payload of a file that declares no mass.
+///
+/// Apart from the function above so that every test of the pacing, the
+/// faults and the addresses goes on saying nothing about thermal masses:
+/// what they are about has not changed.
+pub fn payload_config_attached(
+    dh: &DHConfig,
+    sim: &ResolvedSim,
+    thermal: Option<crate::thermal::Thermal>,
+) -> Result<PayloadConfig, String> {
     // What the simulator cannot be, which is tcslibgs's rule so that tcsverify
     // asks it too: see `tcslibgs::simulable`.
     tcslibgs::simulable(dh)?;
@@ -135,6 +158,7 @@ pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadCo
     };
 
     Ok(PayloadConfig {
+        thermal,
         bus_address,
         can_id,
         can_fd,
@@ -211,6 +235,7 @@ mod tests {
 
     fn sim(packet_interval_ms: u32, segment_interval_ms: u32, segment_size: u32) -> ResolvedSim {
         ResolvedSim {
+            attached: None,
             packet_interval: Duration::from_millis(u64::from(packet_interval_ms)),
             segment_interval: Duration::from_millis(u64::from(segment_interval_ms)),
             segment_size,

@@ -386,7 +386,8 @@ mod tests {
     /// within one test share it, which is how they talk at all.
     fn device_on(interface: &str, can_id: u32, triggered: bool) -> PayloadConfig {
         PayloadConfig {
-            name: "can-device".to_string(),
+            thermal: None,
+                        name: "can-device".to_string(),
             protocol: PayloadProtocol::Can,
             address: interface.to_string(),
             port: 0,

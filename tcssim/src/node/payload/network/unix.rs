@@ -324,7 +324,8 @@ mod tests {
 
     fn device_at(path: &Path, protocol: PayloadProtocol) -> SimulatedPayload {
         SimulatedPayload::new(PayloadConfig {
-            name: "DH0".to_string(),
+            thermal: None,
+                        name: "DH0".to_string(),
             protocol,
             address: path.display().to_string(),
             port: 0,

@@ -20,13 +20,16 @@ use std::sync::{Arc, Mutex};
 use tcslibgs::config::{load_dh_configs, payload_path_from_args, SIM_PAYLOAD_CONFIG_PATH_VAR};
 use tcslibgs::{payload_parameters, DHConfig, DHSample, Edge, NO_TRANSFER_TIME};
 
+use std::collections::BTreeMap;
+
 mod endpoint;
 mod grid;
 mod payload;
 mod node;
 mod pty;
+mod thermal;
 
-use endpoint::{endpoint_description, payload_config_from};
+use endpoint::{endpoint_description, payload_config_attached};
 use payload::{PayloadConfig, PayloadStats, SimulatedPayload};
 use tcslibgs::{ResolvedSim, SimConfigFile};
 use tcsverify::startup::Startup;
@@ -214,6 +217,86 @@ fn update_row(model: &Rc<VecModel<PayloadInfo>>, row: usize, f: impl FnOnce(&mut
     }
 }
 
+/// What each simulated payload is to a thermal mass, by payload name.
+///
+/// One `ThermalMass` per declared mass, shared by every payload attached to
+/// it: the sensors read the state the heaters warm, which is what makes a
+/// simulated control loop a loop rather than three payloads sending noise.
+///
+/// A sensor's encoding comes from the conversion its readings go to -- see
+/// `tcslibgs::graph::simulated::reading_of` -- so the bytes it sends are the
+/// bytes the vehicle reads back as the mass's temperature, and neither file
+/// states the scale twice.
+fn thermal_masses(
+    sim_file: &SimConfigFile,
+    graph: Option<&tcslibgs::graph::Graph>,
+    sims: &[ResolvedSim],
+    dh_configs: &[DHConfig],
+) -> Result<BTreeMap<String, crate::thermal::Thermal>, String> {
+    use tcslibgs::sim_config::Attached;
+
+    let declared = sim_file.masses().map_err(|e| e.to_string())?;
+    if declared.is_empty() {
+        return Ok(BTreeMap::new());
+    }
+
+    // A mass needs a graph to take its sensors' encodings from, and a version
+    // 1 payload set has no conversions at all: the handler reads raw bytes
+    // and whatever turns them into a temperature is somebody else's program.
+    let Some(graph) = graph else {
+        return Err(format!(
+            "a thermal_mass is declared ({}), and this is a version 1 payload \
+             set: a simulated sensor sends the bytes a to_kelvin node reads \
+             back as the temperature, and a version 1 set has no such node",
+            declared
+                .iter()
+                .map(|m| m.name.clone())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    };
+
+    let now = std::time::Instant::now();
+    let built: BTreeMap<String, Arc<crate::thermal::ThermalMass>> = declared
+        .iter()
+        .map(|mass| {
+            (
+                mass.name.clone(),
+                Arc::new(crate::thermal::ThermalMass::new(mass, now)),
+            )
+        })
+        .collect();
+
+    let mut attached = BTreeMap::new();
+    for (dh, sim) in dh_configs.iter().zip(sims) {
+        let name = dh.name.0.clone();
+        match &sim.attached {
+            None => {}
+            Some(Attached::Reads(mass)) => {
+                let reading = tcslibgs::graph::simulated::reading_of(graph, &name)?;
+                attached.insert(
+                    name,
+                    crate::thermal::Thermal::Reads {
+                        // The mass is known: `masses` refused one that is not.
+                        mass: built[mass].clone(),
+                        reading,
+                    },
+                );
+            }
+            Some(Attached::Heats { mass, rate }) => {
+                attached.insert(
+                    name,
+                    crate::thermal::Thermal::Heats {
+                        mass: built[mass].clone(),
+                        rate: *rate,
+                    },
+                );
+            }
+        }
+    }
+    Ok(attached)
+}
+
 /// Read the pair, once tcsverify has found nothing wrong with it, and say in
 /// `startup` whatever stops it being simulated.
 ///
@@ -244,10 +327,18 @@ fn load(
     // simulated are the ones the simulator file names: see
     // tcslibgs::graph::simulated, which makes of each what a version 1 set
     // describes, reached where tcspecial reaches it.
+    // Kept rather than dropped once the handlers are made: a sensor attached
+    // to a thermal mass sends its temperature in the encoding the graph's own
+    // conversion reads, and that is where the encoding is.
+    let mut graph = None;
     let loaded = if version_2 {
         tcslibgs::graph::Graph::load(payload_path)
             .map_err(|e| e.to_string())
-            .and_then(|graph| tcslibgs::graph::simulated::handlers(&graph, &sim_file))
+            .and_then(|read| {
+                let handlers = tcslibgs::graph::simulated::handlers(&read, &sim_file);
+                graph = Some(read);
+                handlers
+            })
     } else {
         load_dh_configs(payload_path).map_err(|e| e.to_string())
     };
@@ -272,10 +363,23 @@ fn load(
         }
     };
 
+    // The thermal masses, built once and shared: the sensors attached to one
+    // read the same state the heaters attached to it warm, which is the whole
+    // point of a mass being a thing rather than a figure per payload.
+    let masses = match thermal_masses(&sim_file, graph.as_ref(), &sims, &dh_configs) {
+        Ok(masses) => masses,
+        Err(e) => {
+            startup.error(format!("Error in {sim_path}: {e}"));
+            return None;
+        }
+    };
+
     let configs: Vec<PayloadConfig> = match dh_configs
         .iter()
         .zip(&sims)
-        .map(|(dh, sim)| payload_config_from(dh, sim))
+        .map(|(dh, sim)| {
+            payload_config_attached(dh, sim, masses.get(&dh.name.0).cloned())
+        })
         .collect()
     {
         Ok(configs) => configs,
@@ -284,6 +388,20 @@ fn load(
             return None;
         }
     };
+
+    for (name, thermal) in &masses {
+        match thermal {
+            crate::thermal::Thermal::Reads { mass, .. } => eprintln!(
+                "{name} reports the thermal mass {}, which starts at {:.2} K",
+                mass.name(),
+                mass.temperature()
+            ),
+            crate::thermal::Thermal::Heats { mass, rate } => eprintln!(
+                "{name} warms the thermal mass {} by {rate} K/s while it is on",
+                mass.name()
+            ),
+        }
+    }
 
     if configs.is_empty() {
         startup.error(format!("{payload_path} describes no payloads to simulate"));
@@ -673,7 +791,9 @@ mod tests {
         // The handler the running program registers, over the payload the
         // files describe.
         let payloads: Arc<Mutex<Vec<SimulatedPayload>>> = Arc::new(Mutex::new(vec![
-            SimulatedPayload::new(payload_config_from(&dh, &settings).expect("a payload")),
+            SimulatedPayload::new(
+                payload_config_attached(&dh, &settings, None).expect("a payload"),
+            ),
         ]));
         handle_config_edits(&ui, payloads, model.clone());
         ui.show().unwrap();
@@ -1334,6 +1454,7 @@ mod tests {
 
     fn sim(packet_interval_ms: u32, segment_interval_ms: u32, segment_size: u32) -> ResolvedSim {
         ResolvedSim {
+            attached: None,
             packet_interval: Duration::from_millis(u64::from(packet_interval_ms)),
             segment_interval: Duration::from_millis(u64::from(segment_interval_ms)),
             segment_size,
@@ -1406,7 +1527,7 @@ mod tests {
             let configs: Vec<PayloadConfig> = dh_configs
                 .iter()
                 .zip(&sims)
-                .map(|(dh, s)| payload_config_from(dh, s))
+                .map(|(dh, s)| payload_config_attached(dh, s, None))
                 .collect::<Result<_, _>>()
                 .unwrap_or_else(|e| panic!("{} is not simulatable: {e}", payload_path.display()));
 

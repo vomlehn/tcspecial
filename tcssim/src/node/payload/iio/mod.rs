@@ -115,6 +115,7 @@ mod tests {
     /// A sensor whose buffer the handler would open at `path`.
     fn sensor_at(path: &str) -> PayloadConfig {
         PayloadConfig {
+            thermal: None,
             name: "sensor".to_string(),
             protocol: PayloadProtocol::Iio,
             address: path.to_string(),

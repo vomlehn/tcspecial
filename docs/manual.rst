@@ -1815,6 +1815,88 @@ which is why the shipped ``tcspecial1sim.yaml`` leaves them with the payloads.
    segment_size           bytes in one segment; defaults to the whole packet,
                           whose size the tcspecial configuration gives
 
+**Thermal masses**
+
+Every simulated payload above sends bytes from a random number generator,
+which exercises a link and no control loop at all: three sensors sending noise
+never agree, so a vote over them says nothing and a thermostat downstream of
+it cannot be seen working.
+
+A thermal mass gives them something to agree about. Declare one, attach the
+sensors that report it and the heaters that warm it, and what the vehicle
+reads becomes a consequence of what the vehicle drove.
+
+.. code-block:: text
+
+   thermal_mass            optional
+     name                 the name payloads attach to
+     environment          the temperature around it, in kelvin
+     time_constant        how fast it loses the difference, as a length
+                          of time
+
+Each mass cools towards its environment with that time constant and is warmed
+by the heaters that are on. It starts at its environment with the heaters off,
+because a vehicle coming up cold is the case a thermostat exists for. A mass
+nothing is attached to is refused: it would be a state nothing reads and
+nothing changes.
+
+The attachments are settings of a payload, and like every other setting they
+may be stated on a group instead:
+
+.. code-block:: text
+
+   reads                  the mass this payload reports
+   heats                  the mass this payload warms
+   rate                   what it adds while it is on, in kelvin a second.
+                          With ``heats`` and refused without it
+
+A sensor sends the bytes the ``to_kelvin`` node its readings go to will read
+back as the temperature. The format, the scale and the offset are taken from
+that node, not stated here -- a scale written in two files is a scale that can
+disagree with itself -- so a sensor whose readings reach no conversion, or
+two, is refused.
+
+A heater sends nothing: being driven is the whole of what it is for. Its
+packet interval is how often it looks for what the vehicle decided, which is
+the one thing pacing still means for a payload that sends nothing, and it
+wants to be shorter than the sample interval: the vehicle cannot see the band
+crossed until its next sample and the heaters cannot hear about it until they
+next look, so the mass overshoots by their rate over the sum of the two.
+
+A heater has to be a payload the simulator can be driven through, which today
+means a socket. The thermostat example's heaters are discrete lines, which the
+simulator drives rather than being driven through, so that file attaches its
+sensors to a mass and its heaters to nothing.
+
+.. code-block:: yaml
+
+   thermal_mass:
+     - name: cabin
+       environment: "283.15"      # ten kelvin below the setpoint
+       time_constant: "50 s"      # a fifth of a kelvin a second at it
+
+   simulated_payload_groups:
+     - name: cabin_temps
+       packet_interval: 100 ms
+       reads: cabin
+
+   simulated_payloads:
+     - { name: temp_1, type: network, protocol: udp, group: cabin_temps }
+     - { name: temp_2, type: network, protocol: udp, group: cabin_temps }
+     - { name: temp_3, type: network, protocol: udp, group: cabin_temps }
+     - name: heaters_1
+       type: network
+       protocol: udp
+       heats: cabin
+       rate: "3.0"
+       packet_interval: 20 ms     # how often it looks for a decision
+     - name: heaters_2
+       type: network
+       protocol: udp
+       heats: cabin
+       rate: "3.0"
+       packet_interval: 20 ms
+
 **Fault injection**
 
 A payload that always works exercises only the path where everything works.

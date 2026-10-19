@@ -8,6 +8,38 @@
     "description": {
       "type": "string"
     },
+    "thermal_mass": {
+      "description": "The thermal masses the simulated payloads are attached to. A mass cools towards its environment and is warmed by the heaters that are on, so that what the vehicle reads is a consequence of what the vehicle drove: three sensors reading one mass agree, where three sending random bytes never do. A mass nothing is attached to is refused.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "environment": {
+            "type": [
+              "string",
+              "number"
+            ],
+            "description": "The temperature around it, in kelvin. A mass starts here, with its heaters off, because a vehicle coming up cold is the case a thermostat exists for."
+          },
+          "time_constant": {
+            "type": [
+              "string",
+              "number"
+            ],
+            "description": "How fast it loses the difference between itself and its environment, as a length of time: after one of these it has lost all but 1/e of it."
+          }
+        },
+        "required": [
+          "name",
+          "environment",
+          "time_constant"
+        ],
+        "additionalProperties": false
+      }
+    },
     "simulated_payload_groups": {
       "description": "Settings shared by the payloads that name them.",
       "type": "array",
@@ -136,6 +168,28 @@
               "null"
             ],
             "description": "How often it does not answer when it is asked."
+          },
+          "reads": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The thermal mass this payload reports. It sends the mass's temperature in the encoding the `to_kelvin` node its readings go to expects, so the format, the scale and the offset are taken from that node and not stated here."
+          },
+          "heats": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The thermal mass this payload warms while the vehicle drives it on. Such a payload sends nothing -- being driven is the whole of what it is for -- and its packet interval is how often it looks for what the vehicle decided."
+          },
+          "rate": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ],
+            "description": "What a heater adds while it is on, in kelvin a second. With `heats` and refused without it."
           }
         },
         "required": [
@@ -279,6 +333,28 @@
               "null"
             ],
             "description": "How often it does not answer when it is asked."
+          },
+          "reads": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The thermal mass this payload reports. It sends the mass's temperature in the encoding the `to_kelvin` node its readings go to expects, so the format, the scale and the offset are taken from that node and not stated here."
+          },
+          "heats": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The thermal mass this payload warms while the vehicle drives it on. Such a payload sends nothing -- being driven is the whole of what it is for -- and its packet interval is how often it looks for what the vehicle decided."
+          },
+          "rate": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ],
+            "description": "What a heater adds while it is on, in kelvin a second. With `heats` and refused without it."
           }
         },
         "required": [

@@ -181,7 +181,9 @@ impl Schedule {
     /// What tcsmoc shows, and what the `beacon` example shows.
     ///
     /// Four seconds steady, four more blinking at the same stage, six at the
-    /// next and silence after that. The figures are read against a beacon
+    /// next and silence after that. Every blink is half a second on and half
+    /// a second off, so a blinking light changes twice a second whatever the
+    /// stage, and the colour alone says which stage it is. The figures are read against a beacon
     /// interval of five seconds: one beacon may be missed without the stage
     /// changing to anything alarming, because one lost datagram is a network
     /// and not a spacecraft, and two missed is worth an operator's attention.
@@ -207,12 +209,12 @@ impl Schedule {
             Step {
                 holds: Duration::from_secs(4),
                 stage: Stage::Heard,
-                blink: blink(1000, 1000),
+                blink: blink(500, 500),
             },
             Step {
                 holds: Duration::from_secs(6),
                 stage: Stage::Ageing,
-                blink: blink(1000, 1000),
+                blink: blink(500, 500),
             },
             Step {
                 holds: Duration::MAX,

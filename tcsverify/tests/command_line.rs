@@ -90,6 +90,102 @@ fn the_options_are_taken_as_options() {
     assert_eq!(status, 1);
 }
 
+/// The digest is printed for the configurations, and for them only.
+///
+/// The first pathname of two and the first two of three: what is left is the
+/// payload simulator file, which has no digest of this kind -- it is not a
+/// graph, and nothing aboard reads it, so there is nothing on the other end
+/// to compare one with.
+///
+/// What the digest *is* is checked in `tcslibgs`, which takes it. Checked
+/// here: that the flag is taken as a flag, which file it is taken of, and
+/// that the two spellings of one configuration come out alike -- that last
+/// being the whole point of digesting what a file says rather than its bytes,
+/// and the one thing a reader of this output relies on.
+#[test]
+fn the_digest_is_printed_for_the_configurations() {
+    let example = |name: &str| {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../examples/thermostat")
+            .join(name)
+            .to_str()
+            .expect("a path")
+            .to_string()
+    };
+    let (yaml, xml, sim) = (
+        example("thermostat.yaml"),
+        example("thermostat.xml"),
+        example("thermostat-sim.yaml"),
+    );
+    let digest = |line: &str| line.split("md5 ").nth(1).map(str::to_string);
+
+    // One configuration: its digest, and the flag was not taken for a file.
+    let (lines, status) = run(&["--digest", &yaml]);
+    assert_eq!(status, 0, "{lines:?}");
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert!(lines[0].starts_with(&yaml), "{lines:?}");
+    let said = digest(&lines[0]).unwrap_or_else(|| panic!("{lines:?}"));
+    assert_eq!(said.len(), 32, "a digest is sixteen bytes of hex: {said}");
+    assert!(said.chars().all(|c| c.is_ascii_hexdigit()), "{said}");
+
+    // A configuration and its simulator file: the first of the two.
+    let (lines, status) = run(&["--digest", &yaml, &sim]);
+    assert_eq!(status, 0, "{lines:?}");
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert_eq!(digest(&lines[0]), Some(said.clone()));
+
+    // Two spellings and their simulator file: both configurations, and the
+    // two digests are one digest.
+    let (lines, status) = run(&["--digest", &xml, &yaml, &sim]);
+    assert_eq!(status, 0, "{lines:?}");
+    assert_eq!(lines.len(), 2, "{lines:?}");
+    assert!(lines[0].starts_with(&xml) && lines[1].starts_with(&yaml), "{lines:?}");
+    assert_eq!(
+        digest(&lines[0]),
+        digest(&lines[1]),
+        "the two spellings of one configuration are one configuration"
+    );
+    assert_eq!(digest(&lines[0]), Some(said));
+}
+
+/// A configuration with problems still has a digest; one that cannot be read
+/// has none, and saying so is a failed run.
+///
+/// The second half is why the status is checked under `--error-limit=0`: that
+/// limit prints no errors and passes, so without this a run that was asked
+/// for a digest and could not take one would end silently and successfully
+/// having answered nothing.
+#[test]
+fn a_digest_that_cannot_be_taken_is_a_failed_run() {
+    let dir = tempfile::tempdir().expect("a directory");
+
+    // Twelve errors in it, and it still parses: a digest is of what a file
+    // says, and this file says something.
+    let set = with_errors(dir.path(), 12);
+    let set = set.to_str().expect("a path");
+    let (lines, status) = run(&["--digest", set]);
+    assert_eq!(status, 1, "{lines:?}");
+    assert_eq!(lines.len(), 13, "the digest and the twelve: {lines:?}");
+    assert!(lines[0].contains(": md5 "), "the digest comes first: {lines:?}");
+
+    // And one that does not parse has nothing to digest.
+    let unreadable = dir.path().join("unreadable.yaml");
+    std::fs::write(&unreadable, "description: nonsense\npayloads: oops\n").expect("written");
+    let unreadable = unreadable.to_str().expect("a path");
+
+    let (lines, status) = run(&["--digest", unreadable]);
+    assert_eq!(status, 1, "{lines:?}");
+    assert!(
+        !lines.iter().any(|line| line.contains("md5")),
+        "there is no digest to print: {lines:?}"
+    );
+
+    // Even where nothing was counted against it.
+    let (lines, status) = run(&["--digest", "--error-limit=0", unreadable]);
+    assert_eq!(status, 1, "a digest was asked for and not given: {lines:?}");
+    assert!(lines.is_empty(), "{lines:?}");
+}
+
 #[test]
 fn a_bad_option_is_a_command_line_of_none_of_the_shapes() {
     let dir = tempfile::tempdir().expect("a directory");

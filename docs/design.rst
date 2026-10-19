@@ -8208,11 +8208,34 @@ Requirement
     first few on the screen.
 
 Requirement
+    ``--digest`` prints each configuration's digest as well, one line per file
+    and before the problems: the same digest tcspecial takes of the graph it
+    loaded, prints as it starts and puts in every beacon, so that the question
+    the digest exists to answer -- is the vehicle flying the configuration on
+    this desk -- can be asked of a file without running anything. It is of the
+    graph a file parses into and not of the file's bytes, so the two spellings
+    of one configuration answer alike.
+
+Requirement
+    The digest is taken of the configurations among the pathnames and of
+    nothing else: the first of two and the first two of three, the last being
+    the payload simulator file. A simulator file has no digest of this kind.
+    It is not a graph to take one over, and it does not fly, so there is
+    nothing at the other end to compare one with.
+
+Requirement
+    A configuration with problems still has a digest, having said something
+    for the digest to be taken of. One that cannot be read has none, and that
+    is a failed run: a digest asked for and not given must not end as a
+    silent success, which it otherwise would under ``--error-limit=0``.
+
+Requirement
     The exit status is about what was printed: failure if an error was, and
     success if none was -- a run stopped before it reached one included, and a
-    run whose only findings are warnings, whatever ``--warnings`` says. The
-    library's ``verify`` takes the same two settings and its report passes and
-    fails as tcsverify does.
+    run whose only findings are warnings, whatever ``--warnings`` says. A
+    digest asked for and not given fails as well, being the one failure that
+    is not about a file's contents. The library's ``verify`` takes the same
+    two settings and its report passes and fails as tcsverify does.
 
 Requirement
     The programs that check a file before running it -- tcspecial, tcsmoc,

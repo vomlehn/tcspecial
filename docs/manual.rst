@@ -2247,6 +2247,33 @@ that::
    $ cargo run --bin tcsverify -- --error-limit=unlimited example.yaml
    $ cargo run --bin tcsverify -- --warnings=off --error-limit=1 example.yaml
 
+``--digest`` asks for each configuration's digest as well, one line per file
+and before the problems::
+
+   $ cargo run --bin tcsverify -- --digest examples/thermostat/thermostat.yaml
+   examples/thermostat/thermostat.yaml: md5 292a329b534cb88156e1a52870469c4a
+
+That is the digest tcspecial prints as it starts and puts in every beacon, and
+the MOC compares with its own: two ends whose digests agree have read one
+configuration, and the one case this was written for is a tcspecial left
+running from an earlier file and attached to rather than replaced. So the
+answer to "is the vehicle flying what is on my desk" is this line and the
+beacon's.
+
+With two files it is the digest of the first, and with three the digests of
+the first two: a payload simulator file has none. It does not fly, so there is
+nothing at the other end to compare one with, and it is not a configuration to
+be digested.
+
+The digest is of what a file **says** and not of its bytes, so ``md5sum`` of
+the same file answers something else. Comments, indentation, the order of the
+sections and the order of a node's attributes are spelling; the two spellings
+of one configuration -- the YAML and the XML -- have the same digest, which is
+what makes a MOC reading one of them and a vehicle reading the other able to
+agree. A configuration with problems in it still has a digest, it having said
+something; one that cannot be read at all has none, and a run asked for a
+digest it could not take says so and fails.
+
 ``--error-limit=<n>`` stops as soon as ``n`` errors have been printed, the
 ``n``\ th being the last line: any whole number, ``0`` included, or
 ``unlimited``, the default. In a half-built configuration most of the later

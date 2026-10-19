@@ -949,7 +949,7 @@ anything is more likely a mistake than an intention.
 Requirement
     A fixed-length log takes only sources whose record length the
     configuration states, which means a device with a ``read_size``. A
-    computation's length is its function's and not the file's -- eight bytes
+    computation's length is its function's and not the file's -- four bytes
     from one built-in and one byte of a decision from another -- and it is
     deliberately not read off the function: a configuration that fitted a log
     only because of what a built-in happens to produce would be made valid or
@@ -1016,21 +1016,54 @@ Compute elements
 
 Two of them, and the difference is where the code lives.
 
-What a computation reads and writes is a **value**: eight bytes of an
-IEEE-754 binary64, least significant byte first. A reading is a value from
+What a computation reads and writes is a **value**: four bytes of a signed
+count of micro-kelvin, least significant byte first. A reading is a value from
 the conversion that made it to the computation that uses it, to the log that
 records it and to the link that carries it to the ground, and it is a value in
 kelvins -- one unit everywhere, so that a comparison between two readings is a
 comparison and not a conversion.
 
-Decimal text was tried first and gave the number up a digit at a time. A
-temperature written to four places and read back is a different number from
-the one the sensor's counts converted to, every hop rounds it again, and a
-vote between three sensors was being decided on the fourth decimal place of
-numbers that had each lost it. Eight bytes carry what the arithmetic
-produced. They are also the width of a timestamp and of a node id, which are
-written the same way round, so there is one byte order in the software rather
-than one for numbers and another for everything else.
+Decimal text was tried first and gave the number up a digit at a time: a
+temperature written to four places is not the number the sensor's counts
+converted to, every hop rounded it again, and a vote between three sensors was
+being decided on the fourth decimal place of numbers that had each lost it.
+What replaced it is a whole number of a unit finer than anything these sensors
+resolve -- the parts the examples use report in sixteenths and hundredths of a
+kelvin -- so nothing a part said is lost in the rounding, and the number on
+the link is then *exact*. That is the property the arithmetic wants. Three
+doubles of one temperature can differ in their last bit, and a comparison
+between them turns on dust; three counts of micro-kelvin are equal or they are
+not. Little endian because every other number this software puts on a wire is:
+a timestamp's microseconds, a node's id, a beacon interval. A sensor's own
+bytes are the exception, and say which way round they are.
+
+Signed, although a temperature in kelvin is not. The arithmetic that produces
+one is signed -- a conversion is ``counts * scale + offset``, and a wrong
+scale produces a negative, which has to arrive as a negative to be seen for
+what it is rather than as a temperature near 4295 K. And a difference of two
+temperatures is a width, which a band is, and that is signed by nature.
+
+The range is what it costs, and it is stated rather than worked around: a
+signed count of micro-kelvin reaches 2147.483647 K either way. That is above
+anything these nodes are pointed at and below a great deal that exists -- a
+thruster's throat is hotter -- so a temperature outside it is refused, and
+refused where the value is made, which is where the number is still in hand to
+name in the complaint. Not wrapped, which would turn 2200 K into a cabin 42 K
+below zero, and not pinned to the end of the range, which would turn a runaway
+into a part that looks hot but surviving: either is a thermostat acting
+confidently on a number nobody produced. A node that must carry more than this
+wants a unit of its own, and that is a change to make deliberately.
+
+Four bytes carry one other consequence worth saying plainly. Every four bytes
+are a value, there being no bit pattern of a 32-bit integer that is not a
+count of micro-kelvin, so a four-character word delivered where a reading was
+meant would be read as a temperature -- where eight bytes of a double at least
+refused a NaN. What catches a datum that is not a reading is its width, and
+almost nothing a link can deliver here is four bytes long: a sensor's raw
+bytes are two or three, a decision is one, a line of text is longer. The one
+that is would not be caught, and nothing downstream could catch it either --
+which is the argument for the conversions being the only nodes that make
+values.
 
 A **decision** is not a value and is still text: ``1`` or ``0``, one byte,
 which is what a thermostat sends a heater. A device driven by a decision is
@@ -1039,12 +1072,12 @@ line is not a number. Where a value becomes text -- a program's pipe, a
 command's value from the ground -- the conversion happens at that boundary and
 nowhere else.
 
-The cost is paid where data is shown rather than used. A log holds eight bytes
-per reading where it held six or seven characters, and a panel showing the head
-of what arrived shows eight bytes of hexadecimal where it showed a number
-somebody could read. The log is read by a program that knows the format; the
-panel is the one place a reader loses something, and it is a reading nobody is
-deciding on.
+The rest of the cost is paid where data is shown rather than used. A log holds
+four bytes per reading where it held six or seven characters, and a panel
+showing the head of what arrived shows four bytes of hexadecimal where it
+showed a number somebody could read. The log is read by a program that knows
+the format; the panel is the one place a reader loses something, and it is a
+reading nobody is deciding on.
 
 A **built-in** names a function compiled into tcspecial: ``to_kelvin``,
 ``mean``, ``hysteresis`` and the rest of a catalogue that grows as flights need
@@ -1097,15 +1130,14 @@ per answer on its standard output:
 
 Requirement
     The program is handed lines and answers in lines, in decimal. A value on a
-    link is eight bytes of a binary64, and tcspecial converts at the pipe in
+    link is four bytes of micro-kelvin, and tcspecial converts at the pipe in
     both directions: a line is what every language reads without a library,
     which is the point of this type of node existing at all, and a program that
-    had to unpack eight bytes of a float in the host's byte order would not be
-    writable in a shell. What a program loses by it is what decimal loses --
-    the shortest text that reads back as the same double is written, so the
-    number a program is handed is the number that arrived, and a program that
-    answers with fewer digits than it was given has answered with fewer
-    digits.
+    had to unpack a little-endian integer and scale it would not be writable in
+    a shell. Nothing is lost by the trip -- a value is a whole number of
+    micro-kelvin, so six decimal places say all of it -- and a program's answer
+    is held to the range a reading is held to, with the complaint naming the
+    program.
 
 Requirement
     An empty line is the program saying "nothing to send yet", and is the same

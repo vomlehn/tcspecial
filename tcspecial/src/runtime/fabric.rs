@@ -945,6 +945,7 @@ mod tests {
     /// `b"0"`.
     fn kelvin(number: f64) -> Vec<u8> {
         crate::node::vehicle::compute::as_value(number)
+            .expect("a temperature a value carries")
     }
 
     /// The example's links, and only its links.
@@ -1088,7 +1089,7 @@ mod tests {
         // What the ground saw: three temperatures, the one voted out of them,
         // and the decision.
         //
-        // A temperature is eight bytes of a double and a decision is text, so
+        // A temperature is four bytes of micro-kelvin and a decision is text, so
         // they are read back differently -- which is what the two are: a
         // reading, and the thing a set of discrete lines is driven to.
         let given: Vec<Vec<u8>> = moc

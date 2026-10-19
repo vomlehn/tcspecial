@@ -102,12 +102,16 @@ compute element
     time, a comparison against a setpoint, a filter that remembers.
 
 value
-    A number on a link: eight bytes of an IEEE-754 binary64, least significant
-    byte first. A temperature is a value in kelvins from the conversion that
-    made it to the computation, the log and the ground, so that comparing two
-    readings is a comparison and not a conversion. Where a value becomes text
-    -- the lines a program reads and writes, or the value typed into a command
-    -- it is converted at that boundary and nowhere else.
+    A number on a link: four bytes of a signed count of micro-kelvin, least
+    significant byte first. A temperature is a value in kelvins from the
+    conversion that made it to the computation, the log and the ground, so
+    that comparing two readings is a comparison and not a conversion. The unit
+    is finer than any sensor here resolves, so the number is exact rather than
+    rounded in practice, and the range it reaches is 2147.483647 K either way
+    -- a temperature outside that is refused where the value is made, naming
+    the number. Where a value becomes text -- the lines a program reads and
+    writes, or the value typed into a command -- it is converted at that
+    boundary and nowhere else.
 
 decision
     What a computation sends a device: the text ``1`` or ``0``, one byte. It is

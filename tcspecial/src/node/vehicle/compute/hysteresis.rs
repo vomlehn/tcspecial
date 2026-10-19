@@ -157,7 +157,7 @@ impl Function for Hysteresis {
     /// anything changes -- so a command that is refused leaves a thermostat
     /// running on what it had.
     fn set(&mut self, attribute: &str, value: &[u8]) -> Result<(), String> {
-        // Text, where a reading is eight bytes of a double: a command's value
+        // Text, where a reading is four bytes of micro-kelvin: a command's value
         // is what an operator typed, and it travels as the characters they
         // typed rather than as a number the ground station assembled. See
         // `super::from_text`.
@@ -206,10 +206,17 @@ impl Function for Hysteresis {
 #[cfg(test)]
 mod tests {
     use super::*;
-    // A temperature as it arrives on a link: eight bytes of a double. The
-    // name beside `Decision::as_value` is the one that makes a value, where
-    // the method makes a decision.
+    // The free function beside `Decision::as_value`: that method makes a
+    // decision, and this makes a temperature.
     use crate::node::vehicle::compute::as_value;
+
+    /// A temperature as it arrives on a link: four bytes of micro-kelvin.
+    ///
+    /// The refusal is `as_value`'s range, which these temperatures are all
+    /// well inside; a test that meant to try the range says so.
+    fn kelvin(number: f64) -> Vec<u8> {
+        as_value(number).expect("a temperature a value carries")
+    }
 
     fn thermostat() -> Hysteresis {
         Hysteresis::of(HysteresisParams {
@@ -224,9 +231,9 @@ mod tests {
         let mut h = thermostat();
 
         // More than two degrees under: on.
-        assert_eq!(h.give(None, &as_value(290_f64)).unwrap(), Some(b"1".to_vec()));
+        assert_eq!(h.give(None, &kelvin(290_f64)).unwrap(), Some(b"1".to_vec()));
         // More than two degrees over: off.
-        assert_eq!(h.give(None, &as_value(296_f64)).unwrap(), Some(b"0".to_vec()));
+        assert_eq!(h.give(None, &kelvin(296_f64)).unwrap(), Some(b"0".to_vec()));
     }
 
     /// Inside the band, nothing happens.
@@ -239,7 +246,7 @@ mod tests {
 
         for wobble in [293.15, 294.0, 292.2, 295.1, 291.2] {
             assert_eq!(
-                h.give(None, &as_value(wobble)).unwrap(),
+                h.give(None, &kelvin(wobble)).unwrap(),
                 None,
                 "{wobble} is inside the band and should decide nothing"
             );
@@ -255,16 +262,16 @@ mod tests {
     fn only_a_change_is_sent() {
         let mut h = thermostat();
 
-        assert_eq!(h.give(None, &as_value(280_f64)).unwrap(), Some(b"1".to_vec()));
+        assert_eq!(h.give(None, &kelvin(280_f64)).unwrap(), Some(b"1".to_vec()));
         // Still cold, and still on: nothing to say.
         for _ in 0..10 {
-            assert_eq!(h.give(None, &as_value(281_f64)).unwrap(), None);
+            assert_eq!(h.give(None, &kelvin(281_f64)).unwrap(), None);
         }
         // Now hot: one command.
-        assert_eq!(h.give(None, &as_value(300_f64)).unwrap(), Some(b"0".to_vec()));
-        assert_eq!(h.give(None, &as_value(301_f64)).unwrap(), None);
+        assert_eq!(h.give(None, &kelvin(300_f64)).unwrap(), Some(b"0".to_vec()));
+        assert_eq!(h.give(None, &kelvin(301_f64)).unwrap(), None);
         // And cold again.
-        assert_eq!(h.give(None, &as_value(280_f64)).unwrap(), Some(b"1".to_vec()));
+        assert_eq!(h.give(None, &kelvin(280_f64)).unwrap(), Some(b"1".to_vec()));
     }
 
     /// A vehicle that comes up cold decides on its first reading.
@@ -276,7 +283,7 @@ mod tests {
     fn a_cold_start_decides_immediately() {
         let mut h = thermostat();
         assert_eq!(
-            h.give(None, &as_value(250_f64)).unwrap(),
+            h.give(None, &kelvin(250_f64)).unwrap(),
             Some(b"1".to_vec()),
             "a cold vehicle should switch the heaters on at once"
         );
@@ -286,13 +293,13 @@ mod tests {
     #[test]
     fn the_setpoint_can_be_moved_from_the_ground() {
         let mut h = thermostat();
-        assert_eq!(h.give(None, &as_value(290_f64)).unwrap(), Some(b"1".to_vec()));
+        assert_eq!(h.give(None, &kelvin(290_f64)).unwrap(), Some(b"1".to_vec()));
 
         // Ask for a much colder cabin: 290 is now too warm.
         h.set_setpoint(280.0);
         assert_eq!(h.setpoint(), 280.0);
         assert_eq!(
-            h.give(None, &as_value(290_f64)).unwrap(),
+            h.give(None, &kelvin(290_f64)).unwrap(),
             Some(b"0".to_vec()),
             "the same temperature should now call for the heaters off"
         );
@@ -306,8 +313,8 @@ mod tests {
     #[test]
     fn moving_the_setpoint_waits_for_a_reading() {
         let mut h = thermostat();
-        h.give(None, &as_value(290_f64)).unwrap();
-        let before = h.give(None, &as_value(291_f64)).unwrap();
+        h.give(None, &kelvin(290_f64)).unwrap();
+        let before = h.give(None, &kelvin(291_f64)).unwrap();
         assert_eq!(before, None);
 
         h.set_setpoint(250.0);
@@ -343,11 +350,18 @@ mod tests {
         }
     }
 
-    /// A temperature that is not a number is refused.
+    /// A datum that is not a temperature is refused.
+    ///
+    /// What makes it refusable is its width: four bytes are a count of
+    /// micro-kelvin whatever they hold, so a four-character word would be
+    /// read as a temperature and decided on. What a link can deliver here
+    /// that is not a reading -- a sensor's own bytes, a decision, a line of
+    /// text -- is almost never four bytes long, and the one that is would be
+    /// caught by nothing. See `super::from_value`.
     #[test]
     fn a_reading_that_is_not_a_temperature_is_refused() {
         let mut h = thermostat();
-        let said = h.give(None, b"cold").expect_err("not a value");
+        let said = h.give(None, b"cold enough").expect_err("not a value");
         assert!(said.contains("temperature"), "{said}");
     }
 
@@ -368,26 +382,26 @@ mod tests {
 
         // In the band, and still nothing decided: there is nothing to hold
         // them at yet, which is the one sample that drives nothing at all.
-        assert_eq!(h.give(None, &as_value(293.0_f64)).unwrap(), None);
+        assert_eq!(h.give(None, &kelvin(293.0_f64)).unwrap(), None);
         assert_eq!(h.held(), None);
 
         // Cold: a decision, and from here on that is what they are held at.
-        assert_eq!(h.give(None, &as_value(290.0_f64)).unwrap(), Some(b"1".to_vec()));
+        assert_eq!(h.give(None, &kelvin(290.0_f64)).unwrap(), Some(b"1".to_vec()));
         assert_eq!(h.held(), Some(b"1".to_vec()));
 
         // Still cold: nothing new to send, and the same thing to hold them
         // at. The two together are what puts the decision on the wire every
         // sample without putting it in the log every sample.
-        assert_eq!(h.give(None, &as_value(290.0_f64)).unwrap(), None);
+        assert_eq!(h.give(None, &kelvin(290.0_f64)).unwrap(), None);
         assert_eq!(h.held(), Some(b"1".to_vec()));
 
         // Back inside the band: the decision stands, because that is what a
         // band is for.
-        assert_eq!(h.give(None, &as_value(293.0_f64)).unwrap(), None);
+        assert_eq!(h.give(None, &kelvin(293.0_f64)).unwrap(), None);
         assert_eq!(h.held(), Some(b"1".to_vec()));
 
         // And over the top of it: a new decision, held from now on.
-        assert_eq!(h.give(None, &as_value(296.0_f64)).unwrap(), Some(b"0".to_vec()));
+        assert_eq!(h.give(None, &kelvin(296.0_f64)).unwrap(), Some(b"0".to_vec()));
         assert_eq!(h.held(), Some(b"0".to_vec()));
     }
 }

@@ -241,32 +241,28 @@ will do so long as it ends in ``.yaml`` or ``.xml``, which is what says how to
 read it; the names used throughout this manual are the shipped examples' and
 are suggestions, nothing more.
 
-the tcspecial configuration file
+the configuration
     Everything tcspecial is configured with. Its ``tcspecial`` section is the
-    command interpreter's own settings -- the address and the two ports it
-    takes commands on, where beacons go and how often, and where the
-    telemetry log goes -- and its payload configuration section says which
-    data handlers there are, how tcspecial reaches each one and how large its
-    packets are. Named on the command line of every program that reads it,
-    which is tcspecial, tcsmoc, tcssim and tcsverify.
+    command interpreter's own settings -- the ports it takes commands on,
+    where beacons go and how often, and where the telemetry log goes -- and
+    its ``moc``, ``vehicle`` and ``payloads`` sections say which nodes there
+    are, what each of them does and how the lines between them run. Named on
+    the command line of every program that reads it, which is tcspecial,
+    tcsmoc, tcssim and tcsverify.
 
 the simulator configuration file
-    How a simulated payload behaves: how often it produces a packet and how
-    it divides one into segments. Read only by tcssim, which takes it from
-    ``PAYLOAD_SIM_YAML``, and by tcsmoc, which shows it and acts on none of
-    it. There is nothing in it about the payloads themselves.
+    How a simulated payload behaves: how often it produces a packet, how it
+    divides one into segments, and what thermal mass it is attached to if it
+    is. Read only by tcssim, which takes it from ``PAYLOAD_SIM_YAML``, and by
+    tcsmoc, which shows it and acts on none of it. There is nothing in it
+    about the payloads themselves.
 
-A file is recognised by what is in it rather than by what it is called: a
-configuration with no ``payloads`` section describes no data handlers and is
-refused.
-
-The command interpreter's own settings are in the one place with the payloads
-today only for the beacons. The ``tcspecial`` section is read for where
-beacons go and how often; the address, the two command ports and the log are
-read from the file ``TCSPECIAL_CONFIG_PATH`` names, which states those same
-attributes at its top level. The section is checked wherever it appears, so
-one that could never place a command interpreter is refused where it is read
-rather than carried.
+tcspecial read a configuration of its own as well, named by
+``TCSPECIAL_CONFIG_PATH``, and it answered what a version 1 payload set did
+not have to say: where commands are taken, where beacons go, where the log is
+written. Every configuration must state those in its ``tcspecial`` section, so
+there is nothing left for a second file to answer and no second file to
+disagree with the one being flown.
 
 The Payload Configuration
 =========================
@@ -312,7 +308,7 @@ About the experimental interfaces
 ---------------------------------
 Some of what follows is marked **experimental, not yet supported**. Each of
 those is written, parses, reaches a handler and has tests; none has been run
-against the hardware it describes, and none is shipped in a payload set. What
+against the hardware it describes, and none is shipped in an example. What
 is marked that way is: RS-485 on a serial line, and the ``can``, ``iio``,
 ``rpmsg``, ``gpio`` and ``hdlc`` types of payload.
 
@@ -471,7 +467,7 @@ This is how a version 2 configuration -- a graph of nodes -- gets data out of
 its payloads. Three things decide it: whether the payload sends on its own or
 has to be asked, whether it is in a payload group, and, for one that is
 asked, how long it takes to answer. The sections above describe the version 1
-payload set, whose rules differ.
+configuration, whose rules differ.
 
 **Three ways data arrives.**
 
@@ -756,7 +752,7 @@ nowhere to send a request until the payload has spoken, which a triggered
 payload does not do.
 
 Tcspecial counts the triggers it sends apart from the data it carries, which
-``QUERY_DH`` reports: a handler whose triggers climb while nothing arrives is
+``QUERY_NODE`` reports: a node whose asks climb while nothing arrives is
 one whose payload is not answering. The triggers that would not go are counted
 apart again, since a payload that has gone away and a handler that has stopped
 asking are different things -- and a handler goes on asking through either.
@@ -1106,7 +1102,7 @@ trigger fills on a timer. There is no simulator side to that one -- a buffer
 is a stream out of the device and an IIO payload cannot be triggered, so the
 dummy *is* the payload and tcspecial reads it, which makes it the more
 faithful of the two stand-ins. ``bin/mkiio`` makes one, prints the node and
-the channel count to name in a payload set, and ``bin/rmiio`` takes it away;
+the channel count to name in a configuration, and ``bin/rmiio`` takes it away;
 a host's own sensors sit in the same numbering and are left alone, which is
 why the scripts go by name and not by number.
 
@@ -1252,7 +1248,7 @@ undoes exactly what it did. Where all of them are wanted,
 
 runs the four, and ``make rmstubs`` runs the four that undo them: the stub
 module unloaded, and the simulated chip and dummy sensor this tree made taken
-down while another program's is left alone. It prints the bus to name in a payload set, which is
+down while another program's is left alone. It prints the bus to name in a configuration, which is
 numbered as adapters appear and so is not the same from one run to the next.
 The stub's chips are fixed when the module is loaded, which is why the address
 is the script's argument rather than something a configuration can choose
@@ -1341,93 +1337,67 @@ produced them, so it applies to every type of payload alike.
 
 An Example
 ----------
-This is the shipped ``tcspecial1.yaml``, without its ``tcspecial`` section.
-``udp-steady`` and ``udp-fast`` are reached the same way, so what they share is
-a group; ``tcp-stream`` and ``random-device`` share nothing and state
-everything for themselves. Each is named for what it is, which is what a panel
-in the MOC shows.
+This is the shipped ``examples/thermostat/thermostat.yaml``, without its
+``tcspecial`` section: three sensors of one place, two on an I\ :superscript:`2`\ C
+bus and one on SPI, read together as a group, and two sets of heater lines
+driven by what the vehicle decides. Each payload is named for what it is,
+which is what a panel in the MOC shows.
 
 .. code-block:: yaml
 
-   version: "1.0"
-   description: TCSpecial payload set 1
+   version: "2.0"
 
    payload_groups:
-     - name: udp_localhost
-       type: network
-       protocol: udp
+     - name: "cabin_temps"
+       interval: "100 ms"
 
    payloads:
-     - name: tcp-stream
-       type: network
-       protocol: tcp
-       payload_interface: localhost:5000
-       packet_size: 12
+     - name: temp_1
+       type: i2c
+       address: "0x48"
+       group: "cabin_temps"
+       path: "/dev/i2c-1"
+       read_size: "2"
+       payload-out:
+         - target: k_1
 
-     - name: udp-steady
-       group: udp_localhost
-       payload_interface: localhost:5001
-       packet_size: 11
+     - name: temp_2
+       type: i2c
+       address: "0x49"
+       group: "cabin_temps"
+       path: "/dev/i2c-1"
+       read_size: "2"
+       payload-out:
+         - target: k_2
 
-     - name: random-device
-       type: device-file
-       path: /dev/urandom
-       packet_size: 1
+     - name: temp_3
+       type: spi
+       group: "cabin_temps"
+       max_speed: "1000000"
+       path: "/dev/spidev0.0"
+       read_size: "3"
+       spi_mode: "0"
+       payload-out:
+         - target: k_3
 
-     - name: udp-fast
-       group: udp_localhost
-       payload_interface: localhost:5003
-       packet_size: 15
+     - name: heaters_1
+       type: gpio
+       direction: "output"
+       lines: "3,4,5"
+       path: "/dev/gpiochip0"
+       moc-in: true
 
-The same set in the other format is the shipped ``tcspecial1.xml``. It
-describes the same four payloads and the same group, by the conventions of
-`Configuration File Formats`_ -- every value a child element, a sequence as
-repeated siblings, an absent optional field simply left out:
+     - name: heaters_2
+       type: gpio
+       direction: "output"
+       lines: "6,7,8"
+       path: "/dev/gpiochip0"
+       moc-in: true
 
-.. code-block:: xml
-
-   <?xml version="1.0" encoding="UTF-8"?>
-   <payload>
-       <version>1.0</version>
-       <description>TCSpecial payload set 1</description>
-       <payload_groups>
-           <name>udp_localhost</name>
-           <type>network</type>
-           <protocol>udp</protocol>
-           <address>localhost</address>
-       </payload_groups>
-       <payloads>
-           <name>tcp-stream</name>
-           <type>network</type>
-           <protocol>tcp</protocol>
-           <address>localhost</address>
-           <port>5000</port>
-           <packet_size>12</packet_size>
-       </payloads>
-       <payloads>
-           <name>udp-steady</name>
-           <group>udp_localhost</group>
-           <port>5001</port>
-           <packet_size>11</packet_size>
-       </payloads>
-       <payloads>
-           <name>random-device</name>
-           <type>device-file</type>
-           <path>/dev/urandom</path>
-           <packet_size>1</packet_size>
-       </payloads>
-       <payloads>
-           <name>udp-fast</name>
-           <group>udp_localhost</group>
-           <port>5003</port>
-           <packet_size>15</packet_size>
-       </payloads>
-   </payload>
-
-Both files are shipped and either may be run. The YAML is the one to read,
-being the one that carries the comments; what the two have in common is
-checked by a test, so an example that drifted in one format would fail the
-build rather than mislead a reader.
+The same configuration in the other spelling is
+``examples/thermostat/thermostat.xml``, which a test holds to saying the same
+thing. What the nodes above feed -- the conversions, the vote and the
+thermostat -- is in the ``vehicle`` section; see `The thermostat example`_.
 
 Not Yet Read
 ------------
@@ -1444,11 +1414,11 @@ parser. A file giving one is refused rather than quietly running without it.
 
 Starting and stopping a payload
 ===============================
-In tcsmoc each panel has a button per command: ``Enable`` sends START_DH and
-``Disable`` sends STOP_DH. Both are pressable whatever the handler is doing --
-tcspecial takes a START_DH for one already running and a STOP_DH for one
-already stopped without harm -- and the status beside the name says which of
-the two has taken effect.
+In tcsmoc each panel has a button per command: ``Enable`` sends
+``START_NODE`` and ``Disable`` sends ``STOP_NODE``. Both are pressable
+whatever the node is doing -- tcspecial takes a ``START_NODE`` for one already
+running and a ``STOP_NODE`` for one already stopped without harm -- and the
+status beside the name says which of the two has taken effect.
 
 In tcssim a payload that is sending offers ``Disable``, which stops it, and
 one that is not offers ``Enable``, which starts it: one button, labelled with
@@ -1486,49 +1456,20 @@ place of the settings.
 
 The shipped examples
 ====================
-Four payload sets are shipped under ``tests/manual``, each a pair: a tcspecial
-configuration and the simulator configuration beside it, named for it. The
-pairing is a convention of these files and not a rule -- a name only has to
-end in ``.yaml`` or ``.xml`` -- but a set added that way needs no change
-anywhere to be run.
+Four payload sets were shipped under ``tests/manual``, each a pair: a
+configuration and the simulator configuration beside it, named for it. They
+were version 1's, and they are gone with it.
 
-Each tcspecial configuration is shipped in both formats -- ``tcspecial2.yaml``
-and ``tcspecial2.xml`` are one set written two ways, and a test holds the two
-to describing the same data handlers. The YAML is the one to read: it carries
-the comments. Which spelling a run reads is the last letter of the MOC's
-target, ``runmocy`` or ``runmocx``; every other target takes the file named in
-``TCSPECIAL_CONFIG_FILE``. The simulator configurations are YAML alone:
-nothing asked
-for them in both spellings, and the pairing convention names them from the
-other file's stem.
+What is shipped now is the examples, under ``examples``, and one fixture:
+``tests/manual/thermostat.yaml``, which the programs fall back to when nothing
+names a file. Each example is a configuration in both spellings -- ``.yaml``
+and ``.xml``, which a test holds to describing the same thing -- and the
+simulator file beside it, which is YAML alone. The YAML is the one to read: it
+carries the comments. See `The Examples`_, which says what each one is for.
 
-``tcspecial1.yaml``
-  Four payloads of three types, which is what exercises the panels and the
-  grid. Every program falls back to this set when nothing names a file.
-
-``tcspecial2.yaml``
-  Two payloads, one of each type: one that sends of its own accord and one
-  that answers a request. The Makefile defaults to this set.
-
-``tcspecial3.yaml``
-  One payload, reached over a stream. It differs from set 2's first payload
-  only in the transport, which is what makes it the set to debug a single link
-  against -- and what the type and transport in a simulator configuration are
-  there to tell apart.
-
-``tcspecial4.yaml``
-  One payload of every supported type -- a socket, a device file, a bus, a
-  clocked link and a serial line -- which makes it both the set that exercises
-  a link's own terms and the set that reaches every type at once.
-
-  Three of the five need nothing: a datagram is a socket, and the device file
-  is ``/dev/urandom``, which is always a source of bytes. The line and the
-  clocked link need nothing either, in the sense that matters -- tcssim stands
-  in for each with a pty and makes the path the file names a link to it while
-  the payload runs. The bus is the one that needs something of the host: the
-  kernel's I\ :superscript:`2`\ C stub, loaded at the address this set names,
-  which ``bin/mki2c`` does -- or ``make mkstubs``, which runs it along with the
-  other three -- and which tcssim says how to do if it is not there.
+Which spelling a run reads is the last letter of the MOC's target, ``runmocy``
+or ``runmocx``; every other target takes the file named in
+``TCSPECIAL_CONFIG_FILE``.
 
 The Examples
 ============
@@ -1888,7 +1829,7 @@ Neither the type nor the transport is taken from this file: the tcspecial
 configuration decides both, and a disagreement about either is an error naming
 the payload and what each file says of it. A group may carry them, like any
 other setting -- though payloads that share a rate need not share a transport,
-which is why the shipped ``tcspecial1sim.yaml`` leaves them with the payloads.
+which is why the thermostat's simulator file leaves them with the payloads.
 
 **Settings**
 
@@ -2054,39 +1995,40 @@ refused outright: a device, which tcspecial opens and reads directly, and a
 device on a bus, where the master's own read is the request and a second master
 cannot see it.
 
-This is the shipped ``tcspecial1sim.yaml``. It states no version, and that is
-deliberate: a configuration says which version it is so that it can be checked
-against the software that will read it on the vehicle, before anything opens a
-device. Nothing aboard reads this file -- the simulator does not fly -- so a
-version here would answer a question nobody is asking, and a field that is
-read, printed and never acted on is a field somebody will one day believe in. A
-file that states one is refused, saying this.
+This is the shipped ``examples/thermostat/thermostat-sim.yaml``. It states no
+version, and that is deliberate: a configuration says which version it is so
+that it can be checked against the software that will read it on the vehicle,
+before anything opens a device. Nothing aboard reads this file -- the simulator
+does not fly -- so a version here would answer a question nobody is asking, and
+a field that is read, printed and never acted on is a field somebody will one
+day believe in. A file that states one is refused, saying this.
 
 .. code-block:: yaml
 
-   description: Simulator settings for the payloads of tcspecial1.yaml
+   description: Simulator settings for the payloads of thermostat.yaml
+
+   thermal_mass:
+     - name: cabin
+       environment: "283.15"
+       time_constant: "50 s"
 
    simulated_payload_groups:
-     - name: steady_1hz
-       packet_interval: 1 s
-
-     - name: continuous
-       packet_interval: continuous
+     - name: cabin_temps
+       packet_interval: 100 ms
+       reads: cabin
 
    simulated_payloads:
-     - name: tcp-stream
-       type: network
-       protocol: tcp
-       group: steady_1hz
+     - name: temp_1
+       type: i2c
+       group: cabin_temps
 
-     - name: udp-steady
-       type: network
-       protocol: udp
-       group: steady_1hz
+     - name: temp_2
+       type: i2c
+       group: cabin_temps
 
-     - name: random-device
-       type: device-file
-       group: continuous
+     - name: temp_3
+       type: spi
+       group: cabin_temps
 
      - name: udp-fast
        type: network
@@ -2095,7 +2037,7 @@ file that states one is refused, saying this.
 
 Running the Programs
 ====================
-The Makefile names a payload set once and gives it to every program that needs
+The Makefile names a configuration once and gives it to every program that needs
 it, which is the point: tcsmoc builds its panels from the tcspecial
 configuration and hands that same file to the tcspecial and tcssim it starts,
 so a program
@@ -2127,15 +2069,14 @@ Everything at once
 .. code-block:: console
 
    $ make runmocy
-   $ make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial1
+   $ make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/thermostat
    $ make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial2
    $ make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial4
 
 The last letter is the spelling of the tcspecial configuration it reads:
 ``runmocy`` the YAML and ``runmocx`` the XML. Both take the same
 ``TCSPECIAL_CONFIG_FILE``, and add the suffix themselves, so the two are one
-payload set
-read two ways rather than two sets. The simulator configuration is not
+configuration read two ways rather than two configurations. The simulator configuration is not
 spelled by it: only tcssim reads that one, and tcsmoc merely passes it on.
 
 Both files are named because tcsmoc passes the tcspecial configuration on to
@@ -2150,7 +2091,7 @@ One it starts itself is started on the address it will send commands to, so
 that half of the question never arises.
 Starting a second never worked: the command interpreter's address can be bound
 once. What it is serving, though, is the configuration it was started with: one
-left over from an earlier payload set goes on serving that set's handlers,
+left over from an earlier configuration goes on serving that one's nodes,
 and a payload the new file plainly contains is then answered ``NotFound``.
 Stopping it and letting tcsmoc start a fresh one is the fix; tcspecial's log
 says which handlers it does serve.
@@ -2162,9 +2103,9 @@ disturbing the others, or watched with its own logging.
 
 .. code-block:: console
 
-   $ make run TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial1
-   $ make runsim TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial1
-   $ make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial1
+   $ make run TCSPECIAL_CONFIG_FILE=tests/manual/thermostat
+   $ make runsim TCSPECIAL_CONFIG_FILE=tests/manual/thermostat
+   $ make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/thermostat
 
 ``make run`` passes only the tcspecial configuration: tcspecial does not
 simulate anything. ``make runsim`` passes both, because tcssim run on its own
@@ -2177,7 +2118,7 @@ tcsmoc finds the tcspecial already running and attaches to it.
 
 .. code-block:: console
 
-   $ make runmocx TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial1
+   $ make runmocx TCSPECIAL_CONFIG_FILE=tests/manual/thermostat
 
 One target per spelling rather than one target and a variable, so that a
 spelling is asked for the way everything else here is asked for -- by name,
@@ -2190,7 +2131,7 @@ spellings the same way.
 
 Checking a set without running it
 ---------------------------------
-``tcsverify`` reads a payload set and says what is wrong with it, without
+``tcsverify`` reads a configuration and says what is wrong with it, without
 opening a socket or a device node. It takes one file, two or three, the
 tcspecial configuration first, and ``-h`` or ``--help`` prints how:
 
@@ -2290,22 +2231,22 @@ What the programs take without the Makefile
 -------------------------------------------
 .. code-block:: console
 
-   $ cargo run --bin tcspecial -- tests/manual/tcspecial1.yaml
-   $ PAYLOAD_SIM_YAML=tests/manual/tcspecial1sim.yaml \
-       cargo run --bin tcssim -- tests/manual/tcspecial1.yaml
-   $ PAYLOAD_SIM_YAML=tests/manual/tcspecial1sim.yaml \
-       cargo run --bin tcsmoc -- tests/manual/tcspecial1.yaml
+   $ cargo run --bin tcspecial -- tests/manual/thermostat.yaml
+   $ PAYLOAD_SIM_YAML=examples/thermostat/thermostat-sim.yaml \
+       cargo run --bin tcssim -- tests/manual/thermostat.yaml
+   $ PAYLOAD_SIM_YAML=examples/thermostat/thermostat-sim.yaml \
+       cargo run --bin tcsmoc -- tests/manual/thermostat.yaml
 
 Every tcspecial configuration above may end in ``.xml`` instead, and the same
 commands then run the same set in the other format:
 
 .. code-block:: console
 
-   $ cargo run --bin tcspecial -- tests/manual/tcspecial1.xml
-   $ PAYLOAD_SIM_YAML=tests/manual/tcspecial1sim.yaml \
-       cargo run --bin tcssim -- tests/manual/tcspecial1.xml
-   $ PAYLOAD_SIM_YAML=tests/manual/tcspecial1sim.yaml \
-       cargo run --bin tcsmoc -- tests/manual/tcspecial1.xml
+   $ cargo run --bin tcspecial -- tests/manual/thermostat.xml
+   $ PAYLOAD_SIM_YAML=examples/thermostat/thermostat-sim.yaml \
+       cargo run --bin tcssim -- tests/manual/thermostat.xml
+   $ PAYLOAD_SIM_YAML=examples/thermostat/thermostat-sim.yaml \
+       cargo run --bin tcsmoc -- tests/manual/thermostat.xml
 
 The extension is what says how to read a file -- see `Configuration File
 Formats`_ -- and it is read rather than guessed at, so a name ending in
@@ -2319,7 +2260,7 @@ An argument naming the configuration file beats any environment variable
 naming one.
 Failing an argument, tcspecial reads ``PAYLOAD_CONFIG_PATH`` and tcssim reads
 ``SIM_PAYLOAD_CONFIG_PATH``; failing that, every program reads
-``tcspecial1.yaml``. Tcsmoc has no variable of its own, because the programs it
+``tests/manual/thermostat.yaml``. Tcsmoc has no variable of its own, because the programs it
 starts inherit its environment: a variable naming tcsmoc's file would name
 theirs as well.
 
@@ -2397,7 +2338,7 @@ what comes back is what that end read, and ``Last Response`` says whether it
 is what this MOC read.
 
 Where its beacons come from, where they are received, and how often belong to
-the payload set -- a set's ground station being what listens for its beacons -- and are
+the configuration -- its ground station being what listens for its beacons -- and are
 stated in the ``tcspecial`` section of the set's own payload configuration
 file:
 
@@ -2539,7 +2480,7 @@ set to:
 
    Commands are taken on 0.0.0.0:4000 and payload commands on 0.0.0.0:4001 as tcspecial/src/tcspecial.yaml asked, and beacons go from 0.0.0.0:5550 to 127.0.0.1:5650
 
-A payload set states its own version, which every beacon carries:
+A configuration states its own version, which every beacon carries:
 
 .. code-block:: yaml
 
@@ -2555,7 +2496,7 @@ announced as a version the set has not got.
 
    $ make runmocy RUST_LOG=debug
    $ RUST_LOG=tcspecial::ci=trace \
-       cargo run --bin tcspecial -- tests/manual/tcspecial1.yaml
+       cargo run --bin tcspecial -- tests/manual/thermostat.yaml
 
 Testing
 =======
@@ -2568,7 +2509,7 @@ read:
 * tcssim - Simulates payloads using various types of communication protocols
   and errors.
 
-* tcsverify - Checks a payload set and prints what is wrong with it, without
+* tcsverify - Checks a configuration and prints what is wrong with it, without
   running any of it: see `Checking a set without running it`_.
 
 tcsmoc
@@ -2609,7 +2550,7 @@ the beacon box
   beacon that was lost on the way reads exactly like one that was never sent.
 
   ``Last msg`` reads ``<none>`` until a beacon arrives. ``v`` is the software
-  flying, ``config v`` the version the payload set states, and ``md5`` the
+  flying, ``config v`` the version the configuration states, and ``md5`` the
   digest of the configuration file tcspecial read, so the line says what is up
   there without anything having to connect first. The answer to a ``CONNECT``
   says the same three in the same words: see `What each end read`_. A datagram the MOC cannot read is shown as

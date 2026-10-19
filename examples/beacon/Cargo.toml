@@ -13,6 +13,8 @@ tcslibgs = { path = "../../tcslibgs" }
 # The panel, and what to show on it.
 tcsui = { path = "../../tcsui" }
 slint = "1.3"
+# The vehicle the window starts is told to die with it, which is a prctl.
+libc = "0.2"
 
 [dev-dependencies]
 # The test sends a beacon of its own, which is the one tcslibgs serialises.

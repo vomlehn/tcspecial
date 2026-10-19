@@ -84,7 +84,8 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
     let mut ground = Command::new("python3")
         .arg(concat!(env!("CARGO_MANIFEST_DIR"), "/ping_moc.py"))
         .arg(&configuration)
-        .args(["--pings", "2"])
+        // This test is the vehicle, so the ground station starts none.
+        .args(["--pings", "2", "--no-vehicle"])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()

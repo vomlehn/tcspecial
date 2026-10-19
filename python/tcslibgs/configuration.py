@@ -252,13 +252,19 @@ def came_from(stated, sender):
     return one_host(stated.address) == one_host(address)
 
 
-def find_tcsverify():
-    """Where tcsverify is: the repository's own build first, then the path."""
+def find_built(program):
+    """Where one of the repository's programs is: its own build first, then
+    the path. ``None`` where it is in neither."""
     root = Path(__file__).resolve().parents[2]
-    for built in ("target/debug/tcsverify", "target/release/tcsverify"):
+    for built in (f"target/debug/{program}", f"target/release/{program}"):
         if (root / built).is_file():
             return str(root / built)
-    return shutil.which("tcsverify")
+    return shutil.which(program)
+
+
+def find_tcsverify():
+    """Where tcsverify is: see :func:`find_built`."""
+    return find_built("tcsverify")
 
 
 def digest(path, tcsverify=None):

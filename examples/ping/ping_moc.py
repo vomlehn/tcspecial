@@ -13,6 +13,13 @@ in Rust:
 * and this program: read the configuration, start the two loops, put what
   they report in the window.
 
+It starts the vehicle as well: tcspecial, from the repository's build, on the
+same configuration, killed when this program exits -- however it exits, the
+kernel being told to see to it where this program is killed or crashes. So a
+vehicle is running exactly while its ground station is. ``--no-vehicle``
+leaves that to somebody else, for a vehicle started in another terminal or
+played by a test.
+
 The window shows the last ping sent and when, the last answer received and
 when, and the three times between them -- the round trip, and the two halves
 of it, up and down. Press Ping to send one.
@@ -22,6 +29,7 @@ Usage, from the repository's root::
     python3 examples/ping/ping_moc.py [configuration.xml]
     python3 examples/ping/ping_moc.py --pings 3        # no window
     python3 examples/ping/ping_moc.py --describe       # what it read
+    python3 examples/ping/ping_moc.py --no-vehicle     # tcspecial runs elsewhere
 
 The configuration is the XML spelling, which the Python standard library can
 read, and defaults to ``examples/ping/ping.xml``. It uses nothing outside the
@@ -29,7 +37,11 @@ standard library, and Python 3.7 or later.
 """
 
 import argparse
+import ctypes
+import os
 import queue
+import signal
+import subprocess
 import sys
 import threading
 import time
@@ -42,6 +54,7 @@ sys.path.insert(0, str(HERE))
 
 from tcslib.beacon import Beacons, Schedule  # noqa: E402
 from tcslibgs import configuration  # noqa: E402
+from tcslibgs.configuration import find_built  # noqa: E402
 from ping_ground import Pinger, interval, precise_time  # noqa: E402
 
 #: The configuration, where nobody says otherwise.
@@ -70,6 +83,14 @@ def arguments(argv):
     )
     parser.add_argument("--tcsverify", help="the tcsverify to digest the configuration with")
     parser.add_argument(
+        "--tcspecial", help="the tcspecial to start (default: the repository's build)"
+    )
+    parser.add_argument(
+        "--no-vehicle",
+        action="store_true",
+        help="start no tcspecial: one is running elsewhere, or a test is playing it",
+    )
+    parser.add_argument(
         "--pings", type=int, metavar="N", help="send N pings, print each, and stop: no window"
     )
     parser.add_argument(
@@ -89,6 +110,78 @@ def the_one(nodes, kind, named):
             f"--{'moc' if kind == 'moc' else 'node'} <name>"
         )
     return names[0]
+
+
+#: prctl's option for the signal a process is sent when its parent dies.
+PR_SET_PDEATHSIG = 1
+
+
+def die_with_this_program(parent):
+    """In the child, before tcspecial runs: be killed when ``parent`` dies.
+
+    A program that exits normally kills its vehicle itself; one that is killed
+    or crashes runs nothing at all, and the vehicle would go on beaconing with
+    no ground station. So the kernel is asked to send SIGKILL when this
+    program goes -- and if it has gone already, between the fork and here, the
+    child goes now rather than never being told.
+    """
+    libc = ctypes.CDLL(None, use_errno=True)
+    if libc.prctl(PR_SET_PDEATHSIG, signal.SIGKILL, 0, 0, 0) != 0:
+        os._exit(127)
+    if os.getppid() != parent:
+        os._exit(1)
+
+
+class Vehicle:
+    """tcspecial, started by this program and killed when it exits.
+
+    Run itself and not through ``cargo run``: the kill is ``kill()``, and
+    killing cargo would leave the tcspecial it started running, holding the
+    example's ports, with nothing left that knows it is there.
+    """
+
+    def __init__(self, program, args):
+        self.program = program
+        self.args = list(args)
+        self.process = None
+        self._stopping = False
+
+    @staticmethod
+    def for_configuration(path, program=None):
+        """tcspecial on this configuration: the one named, or the build's."""
+        program = program or find_built("tcspecial")
+        if program is None:
+            raise ValueError(
+                "tcspecial is not built or on the PATH: build it with "
+                "`cargo build --bin tcspecial`, or say --no-vehicle"
+            )
+        return Vehicle(program, [str(path)])
+
+    def start(self):
+        """Start it, told to die with this program, and say if it stops by
+        itself."""
+        parent = os.getpid()
+        self.process = subprocess.Popen(
+            [self.program, *self.args],
+            preexec_fn=lambda: die_with_this_program(parent),
+        )
+        threading.Thread(target=self._watch, daemon=True).start()
+
+    def _watch(self):
+        status = self.process.wait()
+        if not self._stopping:
+            print(f"tcspecial stopped by itself: exit status {status}", file=sys.stderr, flush=True)
+
+    def stop(self):
+        """Kill it, and wait for it to be gone, so that it is reaped and its
+        ports are free."""
+        if self.process is None:
+            return
+        self._stopping = True
+        if self.process.poll() is None:
+            self.process.kill()
+        self.process.wait()
+        self.process = None
 
 
 class Setup:
@@ -301,9 +394,23 @@ def main(argv):
         flush=True,
     )
 
-    if options.pings is not None:
-        return run_without_a_window(setup, beacons, pinger, options.pings)
-    return run_the_window(setup, beacons, pinger)
+    # The vehicle, once this end is listening: a beacon sent before the ground
+    # has its socket is one nobody reads.
+    vehicle = None
+    if not options.no_vehicle:
+        try:
+            vehicle = Vehicle.for_configuration(options.configuration, options.tcspecial)
+            vehicle.start()
+        except (OSError, ValueError) as why:
+            print(f"the vehicle cannot be started: {why}", file=sys.stderr)
+            return 1
+    try:
+        if options.pings is not None:
+            return run_without_a_window(setup, beacons, pinger, options.pings)
+        return run_the_window(setup, beacons, pinger)
+    finally:
+        if vehicle is not None:
+            vehicle.stop()
 
 
 if __name__ == "__main__":

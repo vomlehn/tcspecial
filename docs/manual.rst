@@ -1775,9 +1775,16 @@ command link. That is the point of their being apart: what a beacon means is
 one thing wherever it is shown, and an operator who has read one window has
 read the other.
 
-``make -C examples run-beacon`` builds both ends, runs the vehicle in the
-background and the watcher in front of it, and stops the vehicle when the
-window is closed. The watcher opens a window, so it wants a display.
+Under the panel is a button that starts and stops tcspecial, so that the light
+can be watched coming on with the first beacon and going out after the last.
+The window opens with it saying **Start tcspecial**, because tcspecial is not
+running. Pressed, it starts tcspecial on the same configuration and says **Stop
+tcspecial**; pressed again, it stops tcspecial with ``kill()`` and says **Start
+tcspecial**, which is where it began. Closing the window stops tcspecial too, and
+a tcspecial that stops by itself puts the button back to **Start tcspecial**.
+
+``make -C examples run-beacon`` builds both programs and opens the window. The
+watcher opens a window, so it wants a display.
 
 The ping example
 ----------------
@@ -1835,11 +1842,17 @@ the Rust -- the ping answered by the function the ``ping`` node answers with,
 the beacon serialized as tcspecial serializes it -- against the ground station.
 ``cargo test`` runs them all.
 
+The ground station starts the vehicle itself -- tcspecial from the build, on
+the same configuration -- and kills it when it exits, however it exits: if the
+ground station is killed or crashes, the kernel kills tcspecial. So a vehicle
+is running exactly while its ground station is. ``--no-vehicle`` starts none,
+for a tcspecial run in another terminal.
+
 ``make -C examples run-ping`` checks for Python 3 and tkinter, builds the
-vehicle and tcsverify, runs the vehicle in the background and the ground
-station in front of it, and stops the vehicle when the window is closed. With
-no display, ``python3 examples/ping/ping_moc.py --pings 3`` sends three pings,
-prints each answer and its times, and stops. Every port the example uses is in
+vehicle and tcsverify, and runs the ground station, which starts the vehicle
+and stops it when the window is closed. With no display, ``python3
+examples/ping/ping_moc.py --pings 3`` starts the vehicle, sends three pings,
+prints each answer and its times, and stops both. Every port the example uses is in
 the seven thousands, which no other example uses.
 
 tcsmoc pings it too. ``make runmocy TCSPECIAL_CONFIG_FILE=examples/ping/ping``
@@ -2879,8 +2892,12 @@ receiving address, having read the same files. Tcsmoc displays the
 following beacon colors:
 
 steady grey
-  Either no beacon message has been received yet or the system time has
-  changed backwards
+  No beacon message has been received yet. The light is grey only then: once
+  a beacon has arrived it is never grey again.
+
+steady white
+  A beacon message was received, and the system time has since changed
+  backwards, so how long ago it arrived cannot be said
 
 steady green
   A beacon message has been received within the expected time
@@ -2894,6 +2911,8 @@ blinking yellow
 
 blinking red
   The number of lost beacon messages indicates a likely issue.
+
+A blinking light alternates between its colour and white.
 
 Beside the indicator is the time the last beacon arrived, shown the way every
 other time in the window is. It is the time the beacon reached the MOC rather

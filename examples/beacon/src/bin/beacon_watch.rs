@@ -17,18 +17,23 @@
 //! * `tcsui` holds the panel and works out what to show on it.
 //!
 //! What is left is this program: read the configuration, start the loop, put
-//! each pass in the window. tcsmoc does the same thing with the same two
+//! each pass in the window. And a button that starts tcspecial on the same
+//! configuration and stops it again, so that the light can be watched coming
+//! on and going out: see [`beacon_example::Vehicle`]. tcsmoc does the same thing with the same two
 //! halves, in a panel beside its command link; an operator who has read one
 //! has read the other.
 //!
 //! Arguments, both optional: the configuration, and nothing else. Run from the
 //! repository's root it needs none.
 
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::thread;
+use std::time::Duration;
 
 use slint::ComponentHandle;
 
-use beacon_example::{show_on, WatchWindow};
+use beacon_example::{notice_exit, show_on, wire, Vehicle, WatchWindow};
 use tcslib::beacon::{Beacons, Schedule};
 use tcslibgs::config_digest::digest_of_file;
 use tcslibgs::graph::parameters::beacon_of;
@@ -96,8 +101,38 @@ fn main() -> Result<(), slint::PlatformError> {
         beacons.link().send
     );
 
+    // The vehicle the button starts, which is not running until it is
+    // pressed. Found before the window opens, so that a tcspecial nobody has
+    // built is said once, here, and not on every press.
+    let vehicle = match Vehicle::beside_this_program(&path) {
+        Ok(vehicle) => vehicle,
+        Err(why) => {
+            eprintln!("{why}");
+            std::process::exit(1);
+        }
+    };
+    let vehicle = Rc::new(RefCell::new(vehicle));
+
     let window = WatchWindow::new()?;
     let weak = window.as_weak();
+    wire(&window, Rc::clone(&vehicle));
+
+    // Twice a second, whether the vehicle has stopped by itself, so that the
+    // button does not go on offering to stop a tcspecial that is gone.
+    let watching = slint::Timer::default();
+    {
+        let weak = window.as_weak();
+        let vehicle = Rc::clone(&vehicle);
+        watching.start(
+            slint::TimerMode::Repeated,
+            Duration::from_millis(500),
+            move || {
+                if let Some(window) = weak.upgrade() {
+                    notice_exit(&window, &mut vehicle.borrow_mut());
+                }
+            },
+        );
+    }
 
     // One thread, for as long as the window is open. A pass waits for a
     // beacon or for the moment the light would change by itself, so the light
@@ -116,5 +151,11 @@ fn main() -> Result<(), slint::PlatformError> {
         show_on(&weak, Shown::of(&pass));
     });
 
-    window.run()
+    let ran = window.run();
+    // The window is closed: stop the vehicle it started, rather than leave
+    // it beaconing with no button to stop it.
+    if let Err(why) = vehicle.borrow_mut().stop() {
+        eprintln!("{why}");
+    }
+    ran
 }

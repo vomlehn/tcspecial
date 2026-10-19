@@ -29,6 +29,10 @@ class palette:
     #: Nothing is known: no beacon has arrived, or the station has stopped
     #: listening.
     UNKNOWN = "#c4c4c4"
+    #: A light that has shown a colour and is not showing one now: the dark
+    #: half of a blink, once a beacon has arrived. White and not grey, so that
+    #: grey means only that nothing has been heard yet.
+    OFF = "#ffffff"
     #: All is well: the spacecraft is being heard from.
     WELL = "#00ff00"
     #: Worth looking at.
@@ -37,18 +41,24 @@ class palette:
     WRONG = "#ff0000"
 
 
-def indicator(showing):
-    """What a light shows for a stage of staleness.
+def indicator(showing, heard):
+    """What a light shows for a stage of staleness, ``heard`` saying whether a
+    beacon has ever arrived.
 
     Green while the spacecraft is being heard from, yellow once it is late
     enough that contact is not claimed, red once nothing is being heard, and
-    grey before anything has arrived. The dark half of a blink is grey too: a
-    blinking light is one colour going dark and back.
+    grey before anything has arrived. Grey is for that and nothing else: once
+    a beacon has arrived the light has shown a colour, and wherever it shows
+    none after that it is white -- the dark half of a blink, a blinking light
+    being one colour going dark and back, and a last beacon a moved clock puts
+    in the future. ``heard`` is a pass's ``at`` having a time in it, which it
+    keeps for good once a beacon arrives.
     """
+    dark = palette.OFF if heard else palette.UNKNOWN
     if not showing.lit:
-        return palette.UNKNOWN
+        return dark
     return {
-        Stage.UNHEARD: palette.UNKNOWN,
+        Stage.UNHEARD: dark,
         Stage.HEARD: palette.WELL,
         Stage.AGEING: palette.WATCH,
         Stage.SILENT: palette.WRONG,
@@ -71,7 +81,7 @@ class Shown:
     def of(beacon_pass):
         """What to show for a pass of the beacon loop."""
         return Shown(
-            indicator=indicator(beacon_pass.showing),
+            indicator=indicator(beacon_pass.showing, beacon_pass.at is not None),
             received=received_at(beacon_pass.at),
             message=beacon_pass.said,
         )

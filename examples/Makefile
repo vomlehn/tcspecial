@@ -25,7 +25,7 @@ help:
 	@echo "  make run-simple      - Run tcsmoc on the minimal example"
 	@echo "  make run-thermostat  - Run tcsmoc on the thermostat example"
 	@echo "  make run-simple-app  - Run the simple-app example, printing its line"
-	@echo "  make run-beacon      - Run the beacon example: a window watching the beacon"
+	@echo "  make run-beacon      - Run the beacon example: a window watching the beacon, with a button that starts and stops tcspecial"
 	@echo "  make run-ping        - Run the ping example: a Python window that pings the vehicle"
 	@echo "  make check-python3   - Check for the Python 3 simple-app's payload needs"
 	@echo "  make check-tkinter   - Check for the tkinter the ping example's window needs"
@@ -107,13 +107,16 @@ run-simple-app: check-python3
 		timeout $(SIMPLE_APP_WAITS) target/debug/lorem_moc \
 	)
 
-# Run the beacon example: tcspecial beaconing, and a window watching it.
+# Run the beacon example: a window watching the beacon, with a button that
+# starts tcspecial and stops it.
 #
 # Both ends again, and no simulator: a beacon comes from tcspecial itself, so
-# nothing has to be standing in for a payload for one to arrive. The vehicle
-# goes in the background and the watcher in the foreground, where it stays
-# until it is closed -- the point of it is a light that goes on changing, so
-# there is nothing for it to finish and no timeout on it.
+# nothing has to be standing in for a payload for one to arrive. Only the
+# watcher is started here. tcspecial is not running until its button is
+# pressed, and the window starts it from the binary built beside it -- not
+# through cargo, so that stopping it with kill() stops tcspecial and not a
+# cargo with tcspecial left behind it. Closing the window stops it too, and
+# so does the watcher dying: the kernel is told to.
 #
 # It opens a window, so it wants a display. Without one Slint says so and the
 # run stops there, which is a thing to know rather than a thing to work
@@ -123,43 +126,38 @@ run-beacon:
 	cd $(ROOT) && cargo build -q --bin tcspecial --bin beacon_watch
 	( \
 		set -eu; \
-		echo "Running $(PROJECT_NAME) on examples/beacon/beacon.yaml..."; \
+		echo "Watching $(PROJECT_NAME)'s beacon from examples/beacon/beacon.yaml..."; \
 		cd $(ROOT); \
 		rm -rf $(TELEMETRY); \
 		mkdir $(TELEMETRY); \
-		RUST_LOG=$(RUST_LOG) target/debug/tcspecial examples/beacon/beacon.yaml & \
-		vehicle=$$!; \
-		trap 'kill -INT $$vehicle 2>/dev/null || true; wait $$vehicle || true' EXIT; \
-		trap 'exit 130' INT TERM; \
-		target/debug/beacon_watch examples/beacon/beacon.yaml \
+		RUST_LOG=$(RUST_LOG) target/debug/beacon_watch examples/beacon/beacon.yaml \
 	)
 
 # Run the ping example: tcspecial answering pings, and a window sending them.
 #
-# Both ends, as run-beacon runs them. The vehicle goes in the background and
-# the ground station in the foreground, where it stays until its window is
-# closed, and then the vehicle is stopped. The ground station is Python 3,
+# Both ends, and only the ground station is started here: it starts the
+# vehicle itself, tcspecial from the build, on the same configuration, and
+# kills it when it exits -- however it exits, the kernel being told to kill
+# tcspecial if the ground station is killed or crashes. It stays until its
+# window is closed. The ground station is Python 3,
 # examples/ping/ping_moc.py, so Python and its tkinter are checked for first;
 # tcsverify is built beside the vehicle because the window asks it for the
 # configuration's digest, which it compares every beacon's with.
 #
 # It opens a window, so it wants a display. Without one,
 #   python3 examples/ping/ping_moc.py --pings 3
-# sends three pings and prints each answer and its times.
+# starts the vehicle, sends three pings, prints each answer and its times,
+# and stops the vehicle.
 .PHONY: run-ping
 run-ping: check-tkinter
 	cd $(ROOT) && cargo build -q --bin tcspecial --bin tcsverify
 	( \
 		set -eu; \
-		echo "Running $(PROJECT_NAME) on examples/ping/ping.yaml..."; \
+		echo "Running $(PROJECT_NAME) on examples/ping/ping.xml..."; \
 		cd $(ROOT); \
 		rm -rf $(TELEMETRY); \
 		mkdir $(TELEMETRY); \
-		RUST_LOG=$(RUST_LOG) target/debug/tcspecial examples/ping/ping.yaml & \
-		vehicle=$$!; \
-		trap 'kill -INT $$vehicle 2>/dev/null || true; wait $$vehicle || true' EXIT; \
-		trap 'exit 130' INT TERM; \
-		python3 examples/ping/ping_moc.py examples/ping/ping.xml \
+		RUST_LOG=$(RUST_LOG) python3 examples/ping/ping_moc.py examples/ping/ping.xml \
 	)
 
 # Whether there is a tkinter for the ping example's window to be drawn with.

@@ -7439,6 +7439,15 @@ Requirement
     last one is in the future. One reading serves both the light and the
     panels, so the two cannot say different things about one beacon.
 
+Requirement
+    The light is grey before any beacon has arrived, and never again after
+    one has. Wherever it shows no colour once a beacon has arrived -- the dark
+    half of a blink, a last beacon a moved clock puts in the future -- it is
+    white. Grey says nothing has been heard; a light that went from green
+    back to grey would say the spacecraft had never been heard from, and look
+    like a window that had just opened. ``tcsui::indicator`` is the rule, and
+    the Python panel says it again with the same tests.
+
 **Where the beacon's code lives**
 
 Not here. A beacon is the one thing a ground station knows without asking, so

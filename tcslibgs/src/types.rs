@@ -1194,6 +1194,16 @@ pub fn default_log_segment_bytes() -> u32 {
     65_536
 }
 
+/// How large a datum may be.
+///
+/// The buffer every read aboard is given, and the most one delivery can carry.
+/// A sensor's reading is a handful of bytes and a line event is sixteen; this
+/// is room for a whole segment of anything the vehicle moves, and a node that
+/// wants less says so with `read_size`. Here rather than in tcspecial so that
+/// a configuration asking for more -- a line whose `max_length` no datum
+/// could carry -- is refused where the file is checked.
+pub const DATUM_BYTES: usize = 4096;
+
 /// A host and a port, as one attribute writes them.
 ///
 /// Four of the tcspecial section's attributes are one of these: where tcspecial

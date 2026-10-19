@@ -42,7 +42,7 @@
 
 use std::collections::VecDeque;
 use std::os::fd::BorrowedFd;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use std::os::unix::io::RawFd;
 
 use nix::poll::{poll, PollFd, PollFlags};
@@ -63,6 +63,7 @@ use crate::node::vehicle::compute::{self, Function};
 use crate::node::vehicle::log::LogNode;
 use crate::node::vehicle::null::Through;
 
+use crate::runtime::frame::Framer;
 use crate::runtime::node_state::Abandon;
 
 use crate::endpoint::{
@@ -165,6 +166,11 @@ pub struct EndpointPort {
     ///
     /// See [`EndpointPort::reading`].
     read_size: Option<usize>,
+    /// Where one read of a line ends, and what has arrived of the read under
+    /// way.
+    ///
+    /// See [`EndpointPort::framed_by`].
+    framer: Option<Framer>,
     /// What the wait between asking and reading is abandoned for.
     ///
     /// The one wait this port makes that is a wait rather than a look: see
@@ -228,6 +234,7 @@ impl EndpointPort {
             trigger: None,
             read_delay: None,
             read_size: None,
+            framer: None,
             abandon: Abandon::nothing(),
             holds: false,
         }
@@ -285,6 +292,9 @@ impl EndpointPort {
         if let Some(size) = reach.read_size {
             port = port.reading(size as usize);
         }
+        if let Some(rule) = reach.stream {
+            port = port.framed_by(rule);
+        }
         if let Some(trigger) = reach.trigger {
             port = port.triggered_by(trigger);
         }
@@ -306,6 +316,18 @@ impl EndpointPort {
     /// wins.
     pub fn reading(mut self, bytes: usize) -> EndpointPort {
         self.read_size = Some(bytes);
+        self
+    }
+
+    /// End each read of this line where the node's stream rule says.
+    ///
+    /// A line delivers bytes with no frame boundaries of its own, so what one
+    /// read of it is -- a sentence ended by a newline, a fixed record of
+    /// twelve bytes -- is the node's to say: see [`crate::runtime::frame`].
+    /// Without this, a pass would take whatever bytes happened to be waiting,
+    /// which is half a sentence as often as a whole one.
+    pub fn framed_by(mut self, rule: tcslibgs::endpoint_config::StreamParams) -> EndpointPort {
+        self.framer = Some(Framer::new(rule));
         self
     }
 
@@ -389,6 +411,37 @@ impl EndpointPort {
     /// there is anything, with no waiting at all, and a node with nothing to
     /// say is a read of no bytes -- which is the ordinary answer from a device
     /// that is not due.
+    /// One read of this node, as far as `want` bytes: what is there, or for a
+    /// line, the next read its stream rule has ended.
+    ///
+    /// A read already ended is handed over before anything more is asked of
+    /// the line, and no more is asked than would fill the read under way:
+    /// see [`crate::runtime::frame`]. Nought bytes is a read still under way,
+    /// which a pass treats as a node with nothing to say yet.
+    fn read_one(&mut self, buffer: &mut [u8], want: usize) -> Result<usize, String> {
+        let Some(mut framer) = self.framer.take() else {
+            return self.read_what_is_there(&mut buffer[..want]);
+        };
+        let read = self.read_framed(&mut framer, buffer, want);
+        self.framer = Some(framer);
+        read
+    }
+
+    fn read_framed(
+        &mut self,
+        framer: &mut Framer,
+        buffer: &mut [u8],
+        want: usize,
+    ) -> Result<usize, String> {
+        if let Some(ended) = framer.frame(Instant::now(), buffer) {
+            return Ok(ended);
+        }
+        let ask = framer.room().min(want);
+        let got = self.read_what_is_there(&mut buffer[..ask])?;
+        framer.took(&buffer[..got], Instant::now());
+        Ok(framer.frame(Instant::now(), buffer).unwrap_or(0))
+    }
+
     fn read_what_is_there(&mut self, buffer: &mut [u8]) -> Result<usize, String> {
         match self.ready_to_read() {
             Ok(true) => self
@@ -501,7 +554,7 @@ impl Port for EndpointPort {
         }
 
 
-        let got = self.read_what_is_there(&mut buffer[..want]);
+        let got = self.read_one(buffer, want);
 
         // Asked after being read, and asked whether or not the read found
         // anything: a device that answered nothing is a device that most
@@ -538,7 +591,7 @@ impl Port for EndpointPort {
         let want = self
             .read_size
             .map_or(buffer.len(), |size| size.min(buffer.len()));
-        self.read_what_is_there(&mut buffer[..want]).map(Taken::of)
+        self.read_one(buffer, want).map(Taken::of)
     }
 
     fn ask(&mut self) -> Result<(), String> {
@@ -1159,6 +1212,35 @@ mod tests {
     fn thermostat() -> Routes {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         Routes::of(&Graph::load(root.join("tests/manual/thermostat.yaml")).expect("it reads"))
+    }
+
+    /// A line's reads end where its stream rule says, not wherever the bytes
+    /// happened to be split.
+    ///
+    /// A sentence that arrives in pieces is held until its terminator, the
+    /// terminator ends it, and what came after is the start of the next one:
+    /// so each datum the pass takes is a whole sentence, which is what a
+    /// node reading the line was told it would get.
+    #[test]
+    fn a_line_is_read_a_whole_read_at_a_time() {
+        let (_script, port) = port_of_script(
+            "gps",
+            Use::Read,
+            vec![Ok(b"$GPGGA".to_vec()), Ok(b",1\n$GP".to_vec()), Ok(b"RMC\n".to_vec())],
+        );
+        let mut port = port.framed_by(tcslibgs::endpoint_config::StreamParams {
+            max_length: 64,
+            timeout: None,
+            terminators: vec![b'\n'],
+        });
+        let mut buffer = [0u8; 64];
+        let mut read = || {
+            let taken = port.take(&mut buffer).expect("a read").bytes;
+            buffer[..taken].to_vec()
+        };
+        assert_eq!(read(), b"".to_vec(), "half a sentence is nothing yet");
+        assert_eq!(read(), b"$GPGGA,1\n".to_vec());
+        assert_eq!(read(), b"$GPRMC\n".to_vec());
     }
 
     /// The links say which way each node is used.

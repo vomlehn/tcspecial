@@ -1036,7 +1036,7 @@ something else is refused. A card may take the call and keep less than it was
 given, and a line whose frame check is not the one the configuration asked for
 is a line checking nothing while the file says it checks every frame.
 
-A frame is its own length, so there is no stream section: a read hands over one
+A frame is its own length, so there is no stream rule: a read hands over one
 frame's payload and a write puts one payload into one frame, as on a CAN bus.
 An HDLC payload may be triggered, both ends being peers on the line.
 
@@ -1076,7 +1076,7 @@ tcspecial reads ``/sys/class/rpmsg/<node>/name`` and refuses a node that is
 not the channel the file asked for. Where the kernel publishes no name --
 and a simulated channel has none to publish -- nothing is refused.
 
-A read hands over one whole message, so there is no stream section. rpmsg does
+A read hands over one whole message, so there is no stream rule. rpmsg does
 not fragment, so a ``packet_size`` larger than one message is refused where
 the file is read.
 
@@ -1106,7 +1106,7 @@ neither. It said both once, as ``channels`` and ``sample_rate``, recorded and
 never applied; a file that still states one is refused by name and told why.
 
 A read hands over whole sample sets, as many as are ready, so there is no
-stream section: nothing has to say where a read ends.
+stream rule: nothing has to say where a read ends.
 
 An IIO payload cannot be triggered. A buffer is a stream out of the sensor --
 there is nothing on that descriptor to write -- so a file asking for one is
@@ -1201,30 +1201,38 @@ started. A simulated line is a pseudo-terminal, which will not take it at all,
 so a set meant to be run against tcssim does not state ``rs485`` -- as it
 states ``parity: none`` for the same type of reason.
 
-**A stream section**
+**Where a read ends**
 
-Where one read of the line ends.
+A line delivers bytes with no frame boundaries of its own, so a node on one
+says where one read of it ends. The vehicle holds what has arrived until the
+read is done, and the read is then one datum: a whole sentence, a whole
+record, never half of one.
 
 .. code-block:: text
 
-   max_length     the longest payload one read may deliver; always required
-   timeout        how long a read waits, or the word none for a read that
-                  does not time out
-   terminators    bytes that each end a read, as a sequence or a delimited
-                  string. Also spelled terminator
+   max_length     the most one read may hold, in bytes; always required,
+                  and at most 4096, which is the most a datum carries
+   read_timeout   how long after its first byte a read ends with what has
+                  arrived, or the word none for a read that does not time out
+   terminators    bytes that each end a read, as a comma-separated list:
+                  "0x0D, 0x0A"
 
-A file gives a timeout, terminators, or both. One that gives neither is
-refused, because it would describe a read with no way to end but filling the
-buffer -- which is a real intent, but one a file states by giving
-``timeout: none``.
+A read ends on whichever comes first: a terminator, which is the read's last
+byte; ``max_length`` bytes; or ``read_timeout``. Whatever arrived after a
+terminator is the start of the next read.
 
-Only a line takes a stream section. A master on a bus clocks exactly as many
-bytes as it asks for, so a transfer is already bounded and needs no rule for
-where a read ends; a network payload's datagram is already a frame.
+A node gives a timeout, terminators, or both. One that gives neither is
+refused, because it would describe a read with no way to end but filling it
+-- which is a real intent, but one a node states by giving
+``read_timeout: none``: a fixed number of bytes at a time.
 
-``tests/manual/tcspecial4.yaml`` is a worked example of a line, with its
-group, its terms and its stream rule, beside one payload of each of the other
-supported types; ``tcspecial4.xml`` is the same set in the other format.
+A pass never waits on a line, so a timeout is noticed by the first pass after
+it: a read that ends by its timeout is late by as much as the interval its
+group is read at.
+
+Only a line has a rule for where a read ends. A master on a bus clocks exactly
+as many bytes as it asks for, so a transfer is already bounded; a network
+node's datagram is already a frame.
 
 An I\ :superscript:`2`\ C Payload
 ---------------------------------

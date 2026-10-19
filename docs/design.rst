@@ -8600,21 +8600,34 @@ Requirement
     typed yet.
 
 Requirement
-    The first few problems are printed and the rest are counted: five of them,
-    and then ``and others (n more)``. Errors are printed before warnings, so
-    that the lines a person reads are the ones saying the configuration is
-    wrong. A twenty-line report is a report scrolled past, and in a half-built
-    graph most of those lines are one unfinished node said a second way.
+    Tcsverify stops as soon as it has printed as many errors as its limit:
+    five, unless ``--error-limit=<n>`` asks for another number -- nought
+    included -- or for ``unlimited``. Nothing is looked for after the last one
+    the limit allows. ``--warnings=on``, the default, prints warnings without
+    counting them; ``--warnings=off`` prints none; ``--warnings=errors``
+    prints them and counts them against the limit as errors are. What is found
+    is printed in the order it was found, so that a run stopped by its limit
+    ends on the finding that stopped it. A long report is a report scrolled
+    past, and in a half-built graph most of the later errors are one
+    unfinished node said another way.
 
 Requirement
-    A hundred problems are looked for at most. The hundred and first stops the
-    run and ``Too many errors, halting`` is printed, which is a different
-    statement from ``and others``: one says more were found than were printed,
-    the other that the looking stopped.
+    The exit status is about what was printed: failure if an error was, and
+    success if none was -- a run stopped before it reached one included, and a
+    run whose only findings are warnings, whatever ``--warnings`` says. The
+    library's ``verify`` takes the same two settings and its report passes and
+    fails as tcsverify does.
 
 Requirement
-    Tcsverify exits with a status of nought when it found no errors and
-    non-nought when it found one, so that a recipe or a shell ``&&`` can be
+    The programs that check a file before running it -- tcspecial, tcsmoc,
+    tcssim and tcsgui -- set no limit and keep warnings on, so they look at
+    everything, and show all of it in the order found, as tcsverify prints
+    it: a configuration is small, and a problem left out of what is shown is
+    a problem somebody has to run something else to find.
+
+Requirement
+    Tcsverify exits with a status of nought when it printed no errors and
+    non-nought when it printed one, so that a recipe or a shell ``&&`` can be
     told by it. Warnings do not change the status: a configuration somebody is
     in the middle of writing must not fail a build it is not part of yet. A
     command line that is neither of the two shapes above is a third status,

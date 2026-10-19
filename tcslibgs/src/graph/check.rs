@@ -56,19 +56,6 @@ impl Severity {
     }
 }
 
-/// How many problems are listed before the rest are summed up.
-///
-/// A person reading a report acts on the first few; the twentieth is scrolled
-/// past, and in a half-built graph most of them are the same unfinished node
-/// said a second way. So the first few are listed and the rest are counted.
-pub const LISTED: usize = 5;
-
-/// What follows the ones that were listed, where there were more.
-///
-/// One phrase, used by the verifier's output and by the editor's refusal to
-/// generate code, so that a person meets the same shape of report in both.
-pub const AND_OTHERS: &str = "and others";
-
 /// Something wrong with a configuration.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Problem {

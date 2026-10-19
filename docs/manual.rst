@@ -2069,7 +2069,7 @@ A **warning** is one that has not finished saying it: a node whose attributes
 are not all in yet, a node nothing is linked to. That is the state every
 configuration is in while it is being drawn, so warnings do not fail the run.
 
-It exits 0 when it found no errors, 1 when it found one -- a difference between
+It exits 0 when it printed no errors, 1 when it printed one -- a difference between
 two spellings is one -- and 2 when the command line is none of those shapes,
 including three files that are not one XML and one YAML configuration and a
 simulator file -- which a script can tell apart from a bad file. ``--help``
@@ -2083,12 +2083,28 @@ person fixing the file wants: a set with three mistakes in it is three runs of
 tcsmoc, each reporting one of them. This asks the same rules -- the library's,
 the ones those programs use -- for all of their answers at once.
 
-It prints the first five problems, errors before warnings, and then ``and
-others (n more)``: a twenty-line report is a report scrolled past, and in a
-half-built configuration most of those lines are one unfinished node said a
-second way. It looks for a hundred at most, and then says ``Too many errors,
-halting`` -- which says the looking stopped, where ``and others`` says more
-were found than were printed.
+It prints what it finds in the order it finds it, and stops as soon as it has
+printed five errors, the fifth being the last line: a long report is a report scrolled past, and in a
+half-built configuration most of the later errors are one unfinished node said
+another way. Two options change that::
+
+   $ cargo run --bin tcsverify -- --error-limit=unlimited example.yaml
+   $ cargo run --bin tcsverify -- --warnings=off --error-limit=1 example.yaml
+
+``--error-limit=<n>`` stops after ``n`` instead: any whole number, ``0``
+included, or ``unlimited`` to look at everything.
+
+``--warnings=<what>`` says what is done with warnings. ``on``, the default,
+prints them and does not count them against the limit, so they are printed for
+as far as the run got. ``off`` prints none. ``errors`` prints them and counts
+them against the limit as errors are -- for the limit only: they still do not
+fail the run.
+
+The exit status is about what was printed: 1 if an error was, 0 if none was.
+So a run that stopped before it reached an error passes, as
+``--error-limit=0`` always does, having been asked for none of the reasons. A
+value either option does not take is a command line of none of the shapes, and
+exits 2.
 
 Both files of the set are checked, and the second against the first: every
 payload simulated, every simulated payload a payload, and every setting one

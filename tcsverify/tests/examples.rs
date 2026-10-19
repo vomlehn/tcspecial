@@ -68,7 +68,7 @@ fn every_example_verifies() {
             sim.display()
         );
 
-        let report = verify(&config, Some(&sim));
+        let report = verify(&config, Some(&sim), tcsverify::Limits::EVERYTHING);
         let findings: Vec<String> = report.findings.iter().map(|f| f.to_string()).collect();
         assert!(
             findings.is_empty(),

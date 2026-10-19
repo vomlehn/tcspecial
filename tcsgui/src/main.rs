@@ -329,8 +329,6 @@ impl Views {
     /// nobody could type past. The red on the node stays, and so does the
     /// sentence in the node's own window; this is the moment it appeared.
     fn alert_faults(&self, editor: &Editor) {
-        use tcslibgs::graph::check::{AND_OTHERS, LISTED};
-
         let faults: Vec<String> = editor
             .faults()
             .iter()
@@ -354,13 +352,8 @@ impl Views {
         }
         drop(alerted);
 
-        let listed: Vec<String> = fresh.iter().take(LISTED).cloned().collect();
-        let rest = fresh.len().saturating_sub(LISTED);
-        let said = if rest > 0 {
-            format!("{}; {AND_OTHERS} ({rest} more)", listed.join("; "))
-        } else {
-            listed.join("; ")
-        };
+        // Every one, in the order the checking found them.
+        let said = fresh.join("; ");
 
         self.say(
             "Something is wrong with the configuration.",
@@ -2138,7 +2131,7 @@ fn verified(editor: &Editor) -> Vec<Trouble> {
         return Vec::new();
     }
     let simulator = simulator.filter(|path| path.exists());
-    let report = tcsverify::verify(config, simulator);
+    let report = tcsverify::verify(config, simulator, tcsverify::Limits::EVERYTHING);
 
     let document = editor.document();
     let faults = document.faults();
@@ -2149,9 +2142,10 @@ fn verified(editor: &Editor) -> Vec<Trouble> {
             .position(|node| Qualified::of(&node.name, &node.home).absolute() == name)
     };
 
+    // In the order found, as tcsverify prints them.
     report
-        .ordered()
-        .into_iter()
+        .findings
+        .iter()
         .filter(|finding| {
             finding
                 .problem
@@ -5647,7 +5641,7 @@ mod tests {
 
         // The unfinished node is the rules' alone, and it is there, said as
         // tcsverify says it and offering the node.
-        let report = tcsverify::verify(&path, None);
+        let report = tcsverify::verify(&path, None, tcsverify::Limits::EVERYTHING);
         let unfinished = report
             .findings
             .iter()

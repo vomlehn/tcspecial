@@ -894,6 +894,7 @@ fn main() {
         &tcsverify::verify(
             Path::new(&payload_path),
             sim_path.as_deref().map(Path::new),
+            tcsverify::Limits::EVERYTHING,
         ),
         // Where a set has no simulator file, the configuration itself is what
         // every problem is reported against: there is no second file for one

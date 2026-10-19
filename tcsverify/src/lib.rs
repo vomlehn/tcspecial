@@ -51,7 +51,7 @@ use std::fmt;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-use tcslibgs::graph::check::{Severity, AND_OTHERS, LISTED};
+use tcslibgs::graph::check::Severity;
 use tcslibgs::{
     describes_payloads_text, ConfigFormat, DHConfig, PayloadConfig, SimConfigFile, TcsError,
 };
@@ -61,16 +61,45 @@ pub mod startup;
 
 use locate::{Where, THE_FILE_ITSELF};
 
-/// How many errors are printed before this stops looking.
-///
-/// A file with more wrong with it than this is a file whose first hundred
-/// problems are what its author should read; the hundred and first is the one
-/// that says there are more, and the rest would be a page nobody scrolls to
-/// the end of. Many of them would also be consequences of the first few.
-pub const ERROR_LIMIT: usize = 100;
+/// What is done with warnings: tcsverify's `--warnings`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Warnings {
+    /// Recorded and printed, and not counted against the limit.
+    #[default]
+    On,
+    /// Not recorded at all.
+    Off,
+    /// Recorded, printed, and counted against the limit as an error is --
+    /// for the limit only: a run whose only findings are warnings still
+    /// passes.
+    Errors,
+}
 
-/// What is printed when the limit is reached.
-pub const TOO_MANY: &str = "Too many errors, halting";
+/// How much a run looks for: tcsverify's `--error-limit` and `--warnings`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    /// How many counted findings are recorded before the run stops, or
+    /// `None` to look at everything. Errors are counted, and warnings too
+    /// under [`Warnings::Errors`].
+    pub error_limit: Option<usize>,
+    pub warnings: Warnings,
+}
+
+impl Limits {
+    /// Everything, warnings included: what the programs that check a file
+    /// before running it ask for. A configuration is small, and each decides
+    /// for itself how much of what was found to show.
+    pub const EVERYTHING: Limits = Limits {
+        error_limit: None,
+        warnings: Warnings::On,
+    };
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Limits::EVERYTHING
+    }
+}
 
 /// One thing wrong with one file.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -114,12 +143,14 @@ impl fmt::Display for Finding {
 /// What a run found.
 #[derive(Debug, Default)]
 pub struct Report {
-    /// The problems, in the order the rules are asked. One more than
-    /// [`ERROR_LIMIT`] at most: the last of them is the one that stopped the
-    /// run, and is counted rather than printed.
+    /// The problems, in the order the rules are asked. No more counted
+    /// findings than [`Report::limits`] allows.
     pub findings: Vec<Finding>,
-    /// Whether the run stopped because there were too many.
+    /// Whether the run reached its limit and stopped there: nothing was
+    /// looked for after the last counted finding was recorded.
     pub halted: bool,
+    /// How much the run looks for. See [`Limits`].
+    pub limits: Limits,
     /// Whether the simulator file was checked against the tcspecial
     /// configuration.
     ///
@@ -136,6 +167,10 @@ impl Report {
     /// are not all in yet is one somebody is in the middle of writing, and a
     /// verifier that failed on it would fail on every save: what the status
     /// is for is telling `make` that the files say something wrong.
+    ///
+    /// The errors recorded, which are the errors printed: a run stopped by
+    /// its limit before it found one passes, as a limit of nought always
+    /// does. Asking for none of the reasons is asking for no verdict.
     pub fn found_errors(&self) -> bool {
         self.findings
             .iter()
@@ -159,14 +194,12 @@ impl Report {
         }
     }
 
-    /// Write the first few findings, then say how many more there were.
+    /// Write every finding, in the order it was found.
     ///
-    /// Errors first and warnings after, so that the lines a person reads are
-    /// the ones saying the configuration is wrong rather than the ones saying
-    /// it is unfinished. [`LISTED`] of them, and then [`AND_OTHERS`] with the
-    /// count: a report twenty lines long is a report scrolled past, and in a
-    /// half-built graph most of those lines are one unfinished node said
-    /// twice.
+    /// All of them: how many is the run's limit, applied while it looked --
+    /// see [`Report::limits`] -- so there is nothing left over to count. And
+    /// errors and warnings as they came rather than errors first, so that a
+    /// run stopped by its limit ends on the finding that stopped it.
     pub fn write(&self, out: &mut impl Write) -> io::Result<()> {
         for line in self.said() {
             writeln!(out, "{line}")?;
@@ -184,28 +217,11 @@ impl Report {
     }
 
     /// The same lines, each with whether it is about an error.
-    ///
-    /// The count of the rest, and the line saying the run halted, are counted
-    /// with the errors when there are any: they stand for more of what was
-    /// listed above them, and errors are listed first.
     pub fn lines(&self) -> Vec<(bool, String)> {
-        let ordered = self.ordered();
-        let mut said: Vec<(bool, String)> = ordered
+        self.findings
             .iter()
-            .take(LISTED)
             .map(|finding| (finding.severity == Severity::Error, finding.to_string()))
-            .collect();
-        let errors = self.found_errors();
-        let rest = ordered.len().saturating_sub(LISTED);
-        if rest > 0 {
-            said.push((errors, format!("{AND_OTHERS} ({rest} more)")));
-        }
-        // And whether there were more than were even looked for, which is a
-        // different thing from more than were printed.
-        if self.halted {
-            said.push((errors, TOO_MANY.to_string()));
-        }
-        said
+            .collect()
     }
 
     /// Whether any of what was found is about this file.
@@ -217,21 +233,6 @@ impl Report {
         self.findings
             .iter()
             .any(|finding| finding.severity == Severity::Error && finding.file == file)
-    }
-
-    /// The findings, errors first. See [`Report::write`].
-    pub fn ordered(&self) -> Vec<&Finding> {
-        let mut ordered: Vec<&Finding> = self
-            .findings
-            .iter()
-            .filter(|finding| finding.severity == Severity::Error)
-            .collect();
-        ordered.extend(
-            self.findings
-                .iter()
-                .filter(|finding| finding.severity == Severity::Warning),
-        );
-        ordered
     }
 
     fn add(&mut self, file: &Path, line: usize, message: impl Into<String>) {
@@ -249,6 +250,9 @@ impl Report {
         if self.halted {
             return;
         }
+        if severity == Severity::Warning && self.limits.warnings == Warnings::Off {
+            return;
+        }
         self.findings.push(Finding {
             file: file.to_path_buf(),
             line,
@@ -256,10 +260,29 @@ impl Report {
             severity,
             problem,
         });
-        // The one past the limit is kept so that the count is honest, and is
-        // what says there were too many.
-        if self.findings.len() > ERROR_LIMIT {
+        // Stopped at once on the last that counts, rather than on the one
+        // after it: nothing is looked for that will not be printed.
+        if self.limits.error_limit.is_some_and(|limit| self.counted() >= limit) {
             self.halted = true;
+        }
+    }
+
+    /// How many of the findings count against the limit.
+    fn counted(&self) -> usize {
+        let errors_only = self.limits.warnings != Warnings::Errors;
+        self.findings
+            .iter()
+            .filter(|finding| !errors_only || finding.severity == Severity::Error)
+            .count()
+    }
+
+    /// An empty report for a run under these limits. A limit of nought is
+    /// reached before anything is looked at.
+    fn under(limits: Limits) -> Report {
+        Report {
+            halted: limits.error_limit == Some(0),
+            limits,
+            ..Report::default()
         }
     }
 
@@ -275,8 +298,12 @@ impl Report {
 /// simulator file beside it, version 2 a graph of nodes -- so there is nothing
 /// to share between the two paths but this function, which reads the version
 /// and takes one.
-pub fn verify(payload_path: &Path, sim_path: Option<&Path>) -> Report {
-    let mut report = Report::default();
+///
+/// `limits` are tcsverify's `--error-limit` and `--warnings`, and the report
+/// passes or fails -- [`Report::status`] -- as tcsverify would under them.
+/// [`Limits::EVERYTHING`] looks at everything.
+pub fn verify(payload_path: &Path, sim_path: Option<&Path>, limits: Limits) -> Report {
+    let mut report = Report::under(limits);
 
     // Asked of the library rather than worked out here: one place knows how
     // to read a version. A file that cannot be read at all answers "not
@@ -323,10 +350,18 @@ pub fn verify(payload_path: &Path, sim_path: Option<&Path>) -> Report {
 /// that differs is written on where it can be found, saying what each file
 /// says. A file that cannot be read at all has nothing to compare, which is
 /// said once and is already among its own findings.
-pub fn verify_pair(first: &Path, second: &Path, sim_path: &Path) -> Report {
-    let mut report = verify(first, Some(sim_path));
-    let then = verify(second, Some(sim_path));
+///
+/// `limits` are the whole run's, both files and the comparison together: a
+/// run that reaches its limit on the first file looks no further.
+pub fn verify_pair(first: &Path, second: &Path, sim_path: &Path, limits: Limits) -> Report {
+    let mut report = verify(first, Some(sim_path), limits);
+    if report.halted {
+        return report;
+    }
+    let then = verify(second, Some(sim_path), limits);
     report.joined = report.joined && then.joined;
+    // Added under this run's limit, which is what stops it once the two
+    // files together have reached it.
     for finding in then.findings {
         if report.halted {
             break;
@@ -339,7 +374,11 @@ pub fn verify_pair(first: &Path, second: &Path, sim_path: &Path) -> Report {
             finding.problem,
         );
     }
-    compare(first, second, &mut report);
+    // Nothing more is looked for once the run has stopped, the comparison
+    // included.
+    if !report.halted {
+        compare(first, second, &mut report);
+    }
     report
 }
 
@@ -818,11 +857,11 @@ mod tests {
     #[test]
     fn two_spellings_of_one_configuration_compare_alike() {
         let (_dir, xml, yaml, sim) = thermostat_pair(|xml| xml);
-        let report = verify_pair(&xml, &yaml, &sim);
+        let report = verify_pair(&xml, &yaml, &sim, Limits::EVERYTHING);
         assert!(report.findings.is_empty(), "{:?}", report.said());
         assert!(report.joined, "both were checked with the simulator file");
         // Either order.
-        assert!(verify_pair(&yaml, &xml, &sim).findings.is_empty());
+        assert!(verify_pair(&yaml, &xml, &sim, Limits::EVERYTHING).findings.is_empty());
     }
 
     /// A value changed in one spelling is reported: where, and what each
@@ -831,7 +870,7 @@ mod tests {
     fn a_value_one_spelling_changes_is_reported() {
         let (_dir, xml, yaml, sim) =
             thermostat_pair(|xml| xml.replacen("<setpoint>293.15", "<setpoint>290", 1));
-        let report = verify_pair(&yaml, &xml, &sim);
+        let report = verify_pair(&yaml, &xml, &sim, Limits::EVERYTHING);
         let said = report.said();
         assert_eq!(report.findings.len(), 1, "{said:?}");
         let finding = &report.findings[0];
@@ -943,7 +982,7 @@ moc:
     #[test]
     fn a_sound_graph_is_accepted() {
         let (_dir, path) = graph_written(".yaml", SOUND_GRAPH);
-        let report = verify(&path, None);
+        let report = verify(&path, None, Limits::EVERYTHING);
         assert!(
             !report.found_errors(),
             "{:?}",
@@ -960,12 +999,12 @@ moc:
     #[test]
     fn the_version_decides_which_checks_run() {
         let (_dir, path) = graph_written(".yaml", SOUND_GRAPH);
-        let report = verify(&path, None);
+        let report = verify(&path, None, Limits::EVERYTHING);
         assert!(!report.found_errors());
 
         // And a version 1 file still goes down version 1's path.
         let set = written(".yaml", GOOD, GOOD_SIM);
-        let report = verify(&set.payload, Some(&set.sim));
+        let report = verify(&set.payload, Some(&set.sim), Limits::EVERYTHING);
         assert!(!report.found_errors(), "{:?}", report.findings);
     }
 
@@ -987,7 +1026,7 @@ vehicle:
 ",
         );
 
-        let report = verify(&path, None);
+        let report = verify(&path, None, Limits::EVERYTHING);
         let said: Vec<String> = report.findings.iter().map(|f| f.to_string()).collect();
         let all = said.join("\n");
 
@@ -1026,7 +1065,7 @@ vehicle:
         )
         .unwrap();
 
-        let report = verify(&top, None);
+        let report = verify(&top, None, Limits::EVERYTHING);
         let lonely = report
             .findings
             .iter()
@@ -1051,7 +1090,7 @@ vehicle:
         let sim = dir.path().join("vehiclesim.yaml");
 
         std::fs::write(&sim, "simulated_payloads:\n  - name: sensor\n").unwrap();
-        let report = verify(&path, Some(&sim));
+        let report = verify(&path, Some(&sim), Limits::EVERYTHING);
         assert!(!report.found_anything(), "{:?}", report.findings);
         assert!(report.joined);
 
@@ -1060,7 +1099,7 @@ vehicle:
             "simulated_payloads:\n  - name: sensor\n  - name: sensr\n    group: none\n",
         )
         .unwrap();
-        let report = verify(&path, Some(&sim));
+        let report = verify(&path, Some(&sim), Limits::EVERYTHING);
         let said: Vec<String> = report.findings.iter().map(|f| f.to_string()).collect();
         let all = said.join("\n");
         assert!(all.contains("\"sensr\" is simulated"), "{all}");
@@ -1079,7 +1118,7 @@ vehicle:
     fn the_shipped_examples_simulator_file_fits_it() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let sim = root.join("example-sim.yaml");
-        let report = verify(&root.join("example.yaml"), Some(&sim));
+        let report = verify(&root.join("example.yaml"), Some(&sim), Limits::EVERYTHING);
         assert!(report.joined);
         let about_sim: Vec<String> = report
             .findings
@@ -1109,7 +1148,7 @@ vehicle:
 ",
         );
 
-        let report = verify(&path, None);
+        let report = verify(&path, None, Limits::EVERYTHING);
         let said = report
             .findings
             .iter()
@@ -1157,7 +1196,7 @@ simulated_payloads:
     #[test]
     fn a_good_set_has_nothing_to_say() {
         let set = written(".yaml", GOOD, GOOD_SIM);
-        let report = verify(&set.payload, Some(&set.sim));
+        let report = verify(&set.payload, Some(&set.sim), Limits::EVERYTHING);
         assert!(
             report.findings.is_empty(),
             "a good set was faulted: {:?}",
@@ -1194,7 +1233,7 @@ payloads:
     packet_size: 4
 ";
         let set = written(".yaml", text, GOOD_SIM);
-        let report = verify(&set.payload, None);
+        let report = verify(&set.payload, None, Limits::EVERYTHING);
 
         assert_eq!(report.findings.len(), 3, "{:?}", report.findings);
         assert_eq!(report.status(), 1);
@@ -1256,7 +1295,7 @@ payloads:
             &GOOD.replace("    path: /dev/zero\n", ""),
             GOOD_SIM,
         );
-        let report = verify(&set.payload, None);
+        let report = verify(&set.payload, None, Limits::EVERYTHING);
         let first = report.findings.first().expect("something is wrong with it");
         assert!(
             first.to_string().starts_with(&format!(
@@ -1278,7 +1317,7 @@ payloads:
     fn a_file_that_does_not_parse_says_where_it_stopped() {
         let text = "version: \"1.0\"\ndescription: x\npayloads:\n  - name: bad\n";
         let set = written(".yaml", text, GOOD_SIM);
-        let report = verify(&set.payload, None);
+        let report = verify(&set.payload, None, Limits::EVERYTHING);
         assert_eq!(report.findings.len(), 1, "{:?}", report.findings);
         assert!(
             report.findings[0].line > 1,
@@ -1294,7 +1333,7 @@ payloads:
                     endpoints:\n  - name: e\n    group: g\n    address: localhost\n    \
                     port: 5000\n";
         let set = written(".yaml", text, GOOD_SIM);
-        let report = verify(&set.payload, None);
+        let report = verify(&set.payload, None, Limits::EVERYTHING);
         assert_eq!(report.findings.len(), 1);
         assert!(
             report.findings[0].message.contains("endpoints"),
@@ -1315,7 +1354,7 @@ payloads:
             &GOOD.replace("version: \"1.0\"", "version: \"draft\""),
             GOOD_SIM,
         );
-        let report = verify(&set.payload, None);
+        let report = verify(&set.payload, None, Limits::EVERYTHING);
 
         assert_eq!(report.findings.len(), 1, "{:?}", report.findings);
         assert_eq!(report.findings[0].line, 1, "the version is the first line");
@@ -1330,7 +1369,7 @@ payloads:
     #[test]
     fn a_file_that_is_not_a_configuration_file_is_refused() {
         let set = written(".conf", GOOD, GOOD_SIM);
-        let report = verify(&set.payload, None);
+        let report = verify(&set.payload, None, Limits::EVERYTHING);
         assert_eq!(report.findings.len(), 1);
         assert!(
             report.findings[0].message.contains(".yaml"),
@@ -1353,7 +1392,7 @@ simulated_payloads:
     packet_interval: 1 s
 ";
         let set = written(".yaml", GOOD, sim);
-        let report = verify(&set.payload, Some(&set.sim));
+        let report = verify(&set.payload, Some(&set.sim), Limits::EVERYTHING);
 
         // DH1 is simulated by nothing, and "nobody" is no payload of the
         // other file: both ends of the join are asked.
@@ -1378,7 +1417,7 @@ simulated_payloads:
     fn a_broken_payload_file_is_not_joined_to() {
         let text = GOOD.replace("    packet_size: 4\n  - name: DH1", "  - name: DH1");
         let set = written(".yaml", &text, GOOD_SIM);
-        let report = verify(&set.payload, Some(&set.sim));
+        let report = verify(&set.payload, Some(&set.sim), Limits::EVERYTHING);
 
         assert!(!report.joined);
         assert!(
@@ -1398,7 +1437,7 @@ simulated_payloads:
             &text,
             "simulated_payloads:\n  - name: DH0\n   type: device-file\n",
         );
-        let report = verify(&set.payload, Some(&set.sim));
+        let report = verify(&set.payload, Some(&set.sim), Limits::EVERYTHING);
         assert!(
             report.findings.iter().any(|f| f.file == set.sim),
             "the simulator file was not read: {:?}",
@@ -1406,68 +1445,151 @@ simulated_payloads:
         );
     }
 
-    /// A hundred and one problems stop the run, and the printed report is the
-    /// first few of them and a count of the rest.
-    #[test]
-    fn too_many_problems_stop_the_run() {
-        // Each payload states a port it cannot have, so each is one problem.
+    /// A configuration with this many errors in it, one per payload: each
+    /// states a port a device file cannot have.
+    fn with_errors(count: usize) -> Set {
         let mut text = "version: \"1.0\"\ndescription: many\npayloads:\n".to_string();
-        for id in 0..150 {
+        for id in 0..count {
             text.push_str(&format!(
                 "  - name: DH{id}\n    type: device-file\n    \
                  path: /dev/null{id}\n    payload_port: 1\n    packet_size: 4\n"
             ));
         }
-        let set = written(".yaml", &text, GOOD_SIM);
-        let report = verify(&set.payload, None);
+        written(".yaml", &text, GOOD_SIM)
+    }
 
-        assert!(report.halted, "the run did not stop");
-        assert_eq!(
-            report.findings.len(),
-            ERROR_LIMIT + 1,
-            "the run kept looking after it had too many"
-        );
+    /// A sound graph with unfinished payloads added: warnings, and no errors.
+    fn with_warnings(spares: usize) -> (tempfile::TempDir, PathBuf) {
+        let mut extra = String::new();
+        for id in 0..spares {
+            // Placed and not yet filled in or linked, as the editor writes a
+            // node the moment it is dropped: see
+            // an_unfinished_graph_warns_and_passes.
+            extra.push_str(&format!("  - {{ name: spare{id}, type: i2c }}\n"));
+        }
+        graph_written(".yaml", &SOUND_GRAPH.replace("moc:\n", &format!("{extra}moc:\n")))
+    }
 
+    fn limited(error_limit: Option<usize>, warnings: Warnings) -> Limits {
+        Limits {
+            error_limit,
+            warnings,
+        }
+    }
+
+    fn printed(report: &Report) -> String {
         let mut printed = Vec::new();
         report.write(&mut printed).expect("written");
-        let printed = String::from_utf8(printed).expect("text");
-        let lines: Vec<&str> = printed.lines().collect();
-        // The first few, then that there were others, then that the run gave
-        // up looking -- which is a different thing from there being more than
-        // were printed.
-        assert_eq!(lines.len(), LISTED + 2, "{printed}");
-        assert!(lines[LISTED].starts_with(AND_OTHERS), "{printed}");
-        assert!(
-            lines[LISTED].contains(&format!("{} more", report.findings.len() - LISTED)),
-            "{printed}"
-        );
-        assert_eq!(lines[LISTED + 1], TOO_MANY);
+        String::from_utf8(printed).expect("text")
+    }
+
+    /// The limit stops the run at once on the last finding it allows:
+    /// that many are printed, and nothing after them.
+    #[test]
+    fn the_error_limit_stops_the_run_on_the_last_it_allows() {
+        let set = with_errors(12);
+        for limit in [1, 3, 12] {
+            let report = verify(&set.payload, None, limited(Some(limit), Warnings::On));
+            assert!(report.halted, "the run did not stop at {limit}");
+            assert_eq!(report.findings.len(), limit, "{:?}", report.findings);
+            assert_eq!(printed(&report).lines().count(), limit);
+            assert_eq!(report.status(), 1);
+        }
+    }
+
+    /// A limit of nought looks at nothing and prints nothing, so the run
+    /// passes: no error was printed, and the status is about what was.
+    #[test]
+    fn a_limit_of_nought_prints_nothing_and_passes() {
+        let set = with_errors(12);
+        let report = verify(&set.payload, None, limited(Some(0), Warnings::On));
+        assert!(report.findings.is_empty(), "{:?}", report.findings);
+        assert_eq!(printed(&report), "");
+        assert_eq!(report.status(), 0);
+    }
+
+    /// No limit looks at everything.
+    #[test]
+    fn no_limit_looks_at_everything() {
+        let set = with_errors(150);
+        let report = verify(&set.payload, None, Limits::EVERYTHING);
+        assert!(!report.halted);
+        assert_eq!(report.findings.len(), 150);
         assert_eq!(report.status(), 1);
     }
 
-    /// Exactly a hundred is not too many: the run did not give up, so the
-    /// message that says it did must not appear.
+    /// What is printed is what was found, in the order found, and a run
+    /// stopped by its limit ends on the finding that stopped it: the first
+    /// lines of the run with no limit, and no more.
     #[test]
-    fn a_hundred_problems_are_all_printed_and_nothing_more_is_said() {
-        let mut text = "version: \"1.0\"\ndescription: many\npayloads:\n".to_string();
-        for id in 0..ERROR_LIMIT {
-            text.push_str(&format!(
-                "  - name: DH{id}\n    type: device-file\n    \
-                 path: /dev/null{id}\n    payload_port: 1\n    packet_size: 4\n"
-            ));
+    fn findings_are_printed_in_the_order_found() {
+        let (_dir, path) = with_warnings(3);
+        let text = std::fs::read_to_string(&path).expect("written");
+        std::fs::write(&path, text.replace("    recv: 0.0.0.0:4000\n", "")).expect("written");
+
+        let every = printed(&verify(&path, None, Limits::EVERYTHING));
+        let every: Vec<&str> = every.lines().collect();
+        let errors = every.iter().filter(|line| line.contains(": error: ")).count();
+        assert!(errors >= 1, "{every:?}");
+        assert!(
+            every.iter().any(|line| line.contains(": warning: ")),
+            "{every:?}"
+        );
+
+        for limit in 1..=errors {
+            let report = verify(&path, None, limited(Some(limit), Warnings::On));
+            let some = printed(&report);
+            let some: Vec<&str> = some.lines().collect();
+            assert_eq!(some, every[..some.len()], "under {limit}");
+            assert!(some.last().unwrap().contains(": error: "), "under {limit}: {some:?}");
         }
-        let set = written(".yaml", &text, GOOD_SIM);
-        let report = verify(&set.payload, None);
+        for limit in 1..=every.len() {
+            let report = verify(&path, None, limited(Some(limit), Warnings::Errors));
+            let some = printed(&report);
+            assert_eq!(some.lines().collect::<Vec<_>>(), every[..limit], "under {limit}");
+        }
+    }
 
-        assert_eq!(report.findings.len(), ERROR_LIMIT);
-        assert!(!report.halted);
+    /// Warnings are printed and not counted, dropped, or counted as errors
+    /// are -- and in none of the three do they fail a run.
+    #[test]
+    fn warnings_are_printed_dropped_or_counted() {
+        let (_dir, path) = with_warnings(4);
+        let every = verify(&path, None, Limits::EVERYTHING);
+        let warned = every.findings.len();
+        assert!(warned >= 4, "too few warnings to tell apart: {:?}", every.findings);
+        assert!(
+            every.findings.iter().all(|f| f.severity == Severity::Warning),
+            "{:?}",
+            every.findings
+        );
+        assert_eq!(every.status(), 0);
 
-        let mut printed = Vec::new();
-        report.write(&mut printed).expect("written");
-        let printed = String::from_utf8(printed).expect("text");
-        assert_eq!(printed.lines().count(), LISTED + 1, "{printed}");
-        assert!(printed.contains(AND_OTHERS), "{printed}");
-        assert!(!printed.contains(TOO_MANY), "{printed}");
+        // On: a limit counts errors, and there are none to count.
+        let on = verify(&path, None, limited(Some(2), Warnings::On));
+        assert_eq!(on.findings.len(), warned);
+        assert!(!on.halted);
+        assert_eq!(on.status(), 0);
+
+        // Off: not one is said.
+        let off = verify(&path, None, limited(None, Warnings::Off));
+        assert!(off.findings.is_empty(), "{:?}", off.findings);
+        assert_eq!(off.status(), 0);
+
+        // Errors: counted, so the limit stops the run on the second, and the
+        // run still passes, warnings being counted for the limit only.
+        let counted = verify(&path, None, limited(Some(2), Warnings::Errors));
+        assert_eq!(counted.findings.len(), 2, "{:?}", counted.findings);
+        assert!(counted.halted);
+        assert_eq!(counted.status(), 0);
+
+        // And errors are not touched by what is done with warnings.
+        let set = with_errors(3);
+        for warnings in [Warnings::On, Warnings::Off, Warnings::Errors] {
+            let report = verify(&set.payload, None, limited(None, warnings));
+            assert_eq!(report.findings.len(), 3, "{warnings:?}");
+            assert_eq!(report.status(), 1, "{warnings:?}");
+        }
     }
 
     /// The shipped sets verify, in both formats, with their simulator files.
@@ -1482,7 +1604,7 @@ simulated_payloads:
             let sim = root.join(format!("tests/manual/tcspecial{set}sim.yaml"));
             for extension in ["yaml", "xml"] {
                 let payload = root.join(format!("tests/manual/tcspecial{set}.{extension}"));
-                let report = verify(&payload, Some(&sim));
+                let report = verify(&payload, Some(&sim), Limits::EVERYTHING);
                 assert!(
                     !report.found_errors(),
                     "set {set}.{extension} was faulted: {:?}",
@@ -1517,25 +1639,25 @@ simulated_payloads:
         for name in ["tests/manual/thermostat"] {
             for extension in ["yaml", "xml"] {
                 let graph = root.join(format!("{name}.{extension}"));
-                let report = verify(&graph, None);
+                let report = verify(&graph, None, Limits::EVERYTHING);
                 assert!(
                     !report.found_errors(),
                     "{name}.{extension} was faulted: {:?}",
-                    report.ordered()
+                    report.findings
                 );
             }
         }
 
         for extension in ["yaml", "xml"] {
             let graph = root.join(format!("example.{extension}"));
-            let report = verify(&graph, None);
+            let report = verify(&graph, None, Limits::EVERYTHING);
             assert!(
                 !report
                     .findings
                     .iter()
                     .any(|finding| finding.message.contains("cannot be read")),
                 "example.{extension} does not read: {:?}",
-                report.ordered()
+                report.findings
             );
         }
 
@@ -1543,11 +1665,11 @@ simulated_payloads:
         // a reader is meant to learn the shape from.
         for extension in ["yaml", "xml"] {
             let graph = root.join(format!("tests/manual/thermostat.{extension}"));
-            let report = verify(&graph, None);
+            let report = verify(&graph, None, Limits::EVERYTHING);
             assert!(
                 !report.found_anything(),
                 "thermostat.{extension}: {:?}",
-                report.ordered()
+                report.findings
             );
         }
     }
@@ -1580,12 +1702,12 @@ simulated_payloads:
         )
         .unwrap();
 
-        let report = verify(&path, None);
+        let report = verify(&path, None, Limits::EVERYTHING);
         assert!(report.found_anything(), "the unfinished node was not noticed");
         assert!(
             !report.found_errors(),
             "an unfinished node is not an error: {:?}",
-            report.ordered()
+            report.findings
         );
         assert_eq!(report.status(), 0, "and must not fail a build");
 

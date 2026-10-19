@@ -1050,6 +1050,12 @@ mod tests {
 
     use crate::endpoint::EndpointWaitable;
 
+    /// A temperature on a link: four bytes of micro-kelvin, which is what a
+    /// conversion produces and what a computation reads.
+    fn kelvin(number: f64) -> Vec<u8> {
+        compute::as_value(number).expect("a temperature a value carries")
+    }
+
     /// What a stand-in endpoint was asked to do, and what it will answer.
     ///
     /// A pair of halves with no kernel behind them. Everything this module
@@ -1547,12 +1553,12 @@ mod tests {
 
         // The first arrival is not a result: a mean of one of two sensors
         // would be an average of a reading and nothing.
-        assert_eq!(port.give(Arriving::named("in0"), &compute::as_value(290.0)), Ok(()));
+        assert_eq!(port.give(Arriving::named("in0"), &kelvin(290.0)), Ok(()));
         assert!(!port.ready(), "a mean of one input is not an average");
         assert_eq!(port.take(&mut [0u8; 64]).map(|taken| taken.bytes), Ok(0));
 
         // The second is.
-        assert_eq!(port.give(Arriving::named("in1"), &compute::as_value(292.0)), Ok(()));
+        assert_eq!(port.give(Arriving::named("in1"), &kelvin(292.0)), Ok(()));
         assert!(port.ready());
 
         let mut buffer = [0u8; 64];
@@ -1649,9 +1655,9 @@ mod tests {
                 inputs: vec!["in0".to_string(), "in1".to_string()],
             })),
         );
-        port.give(Arriving::named("in0"), &compute::as_value(293.15))
+        port.give(Arriving::named("in0"), &kelvin(293.15))
             .expect("a reading");
-        port.give(Arriving::named("in1"), &compute::as_value(293.15))
+        port.give(Arriving::named("in1"), &kelvin(293.15))
             .expect("the other reading");
         assert!(port.ready(), "the set is complete");
 

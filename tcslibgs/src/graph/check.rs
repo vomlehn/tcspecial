@@ -1301,7 +1301,7 @@ impl Graph {
     ///
     /// `read_size` and nothing else. A device read in fixed-size packets says
     /// so and is the case a fixed-length log exists for; a computation's
-    /// result is a value of eight bytes from one function and a decision of
+    /// result is a value of four bytes from one function and a decision of
     /// one byte from another, so its width is a property of the function and
     /// not of the file. It could be read off the function instead, and is
     /// deliberately not: a configuration that fitted a log only because of
@@ -1911,17 +1911,17 @@ mod tests {
             "i2c" => {
                 made.attributes.insert(
                     "address".to_string(),
-                    Scalar::of(&format!("{:#04x}", 0x48 + which)),
+                    Scalar::of(format!("{:#04x}", 0x48 + which)),
                 );
             }
             "network" => {
                 made.attributes
-                    .insert("port".to_string(), Scalar::of(&(5100 + which).to_string()));
+                    .insert("port".to_string(), Scalar::of((5100 + which).to_string()));
             }
             _ => {
                 made.attributes.insert(
                     "path".to_string(),
-                    Scalar::of(&format!("/dev/{node_type}-{which}")),
+                    Scalar::of(format!("/dev/{node_type}-{which}")),
                 );
             }
         }

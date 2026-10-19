@@ -384,7 +384,7 @@ impl Function for Process {
         // What the program reads: the value as a decimal, and the input's name
         // where the link gave one. See the module comment.
         //
-        // The value arrives as eight bytes of a double -- see
+        // The value arrives as four bytes of micro-kelvin -- see
         // `super::as_value` -- and goes to the program as text, because the
         // far end is a program reading lines. This is the one boundary where a
         // value is written out and read back, and both halves of it are here:
@@ -406,7 +406,7 @@ impl Function for Process {
                     )
                 })?;
                 let number = super::from_text(said, &format!("\"{}\"", self.executable))?;
-                Ok(Some(super::as_value(number)))
+                Ok(Some(super::as_value(number)?))
             }
             Ok(None) => Ok(None),
             Err(why) => {
@@ -465,6 +465,15 @@ mod tests {
     // What a program is handed and what it answers with: a value on the link
     // and a decimal in the pipe. See `give`.
     use crate::node::vehicle::compute::{as_value, from_value};
+
+    /// A temperature as it arrives on a link: four bytes of micro-kelvin.
+    ///
+    /// The refusal is `as_value`'s range, which these temperatures are all
+    /// well inside; a test that meant to try the range says so.
+    fn kelvin(number: f64) -> Vec<u8> {
+        as_value(number).expect("a temperature a value carries")
+    }
+
 
     /// A program of these parameters, not started.
     ///
@@ -601,7 +610,7 @@ mod tests {
     /// The value goes in as eight bytes, reaches the program as a decimal,
     /// and its answer comes back as eight bytes again: see `give`.
     fn answered(p: &mut Process, number: f64) -> f64 {
-        let out = p.give(None, &as_value(number)).expect("an answer");
+        let out = p.give(None, &kelvin(number)).expect("an answer");
         from_value(&out.expect("a value"), "the program").expect("a value")
     }
 
@@ -620,7 +629,7 @@ mod tests {
         );
 
         let out = p
-            .give(Some("in1"), &as_value(293.15))
+            .give(Some("in1"), &kelvin(293.15))
             .expect("an answer")
             .expect("a value");
         assert_eq!(
@@ -643,8 +652,8 @@ mod tests {
             Duration::from_secs(2),
         );
 
-        assert_eq!(p.give(None, &as_value(1.0)).expect("a pass"), None);
-        assert_eq!(p.give(None, &as_value(2.0)).expect("a pass"), None);
+        assert_eq!(p.give(None, &kelvin(1.0)).expect("a pass"), None);
+        assert_eq!(p.give(None, &kelvin(2.0)).expect("a pass"), None);
         assert_eq!(
             answered(&mut p, 3.0),
             3.0,
@@ -671,7 +680,7 @@ mod tests {
             Duration::from_millis(200),
         );
 
-        let said = p.give(None, &as_value(1_f64)).expect_err("a program that took too long");
+        let said = p.give(None, &kelvin(1_f64)).expect_err("a program that took too long");
         assert!(
             said.contains("did not answer within") && said.contains("rather than waited for"),
             "{said}"
@@ -681,7 +690,7 @@ mod tests {
         // will read: the next datum is refused with the same reason, so a
         // ground station sees a computation that has stopped.
         assert!(!p.is_running());
-        let again = p.give(None, &as_value(2_f64)).expect_err("a stopped computation");
+        let again = p.give(None, &kelvin(2_f64)).expect_err("a stopped computation");
         assert!(again.contains("is not running"), "{again}");
     }
 
@@ -690,7 +699,7 @@ mod tests {
     fn a_program_that_exits_is_reported() {
         let (_where, mut p) = running("read line\nexit 3\n", Duration::from_secs(2));
 
-        let said = p.give(None, &as_value(1_f64)).expect_err("a program that exited");
+        let said = p.give(None, &kelvin(1_f64)).expect_err("a program that exited");
         assert!(said.contains("exited with status 3"), "{said}");
         assert!(!p.is_running());
     }
@@ -724,7 +733,7 @@ mod tests {
         // The first datum kills it, and it is started again. The datum is
         // refused all the same: it went into a program that died without
         // answering, and saying otherwise would be inventing a result.
-        let said = p.give(None, &as_value(1_f64)).expect_err("the program exited");
+        let said = p.give(None, &kelvin(1_f64)).expect_err("the program exited");
         assert!(
             said.contains("started again") && said.contains("this datum is lost"),
             "{said}"
@@ -733,7 +742,7 @@ mod tests {
 
         // And the second the same way: a program told to come back comes back
         // however often it stops, and every datum that died with it is lost.
-        let said = p.give(None, &as_value(2_f64)).expect_err("the program exited again");
+        let said = p.give(None, &kelvin(2_f64)).expect_err("the program exited again");
         assert!(
             said.contains("started again") && said.contains("this datum is lost"),
             "{said}"

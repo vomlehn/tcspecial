@@ -1630,7 +1630,7 @@ vehicle:
         // A temperature on a link is a value, so it is read back as one; a
         // decision is text, and comes through as it stands. Written the one
         // way for both so that what the ground received reads as what it
-        // means rather than as eight bytes.
+        // means rather than as four bytes.
         let to_ground: Vec<String> = vehicle
             .ground
             .lock().expect("the record")

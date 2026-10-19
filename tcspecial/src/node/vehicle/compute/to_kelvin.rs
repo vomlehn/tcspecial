@@ -66,7 +66,11 @@ impl ToKelvin {
 impl Function for ToKelvin {
     fn give(&mut self, _input: Option<&str>, data: &[u8]) -> Result<Option<Vec<u8>>, String> {
         let counts = read(self.format, data)?;
-        Ok(Some(as_value(counts * self.scale + self.offset)))
+        // A scale and an offset that put the part's counts outside what a
+        // value carries are refused here, naming the temperature: a part
+        // read with somebody else's scale is the likeliest way to get one,
+        // and it is better said than carried.
+        Ok(Some(as_value(counts * self.scale + self.offset)?))
     }
 
     fn name(&self) -> &'static str {
@@ -119,15 +123,20 @@ mod tests {
     }
 
     /// Each format reads the bytes its own way.
+    ///
+    /// Scaled by a thousandth rather than read as kelvin: the counts here are
+    /// what each layout makes of its bytes, and a count of 65 536 read as
+    /// kelvin is outside what a value carries -- which is the right answer to
+    /// a part read with no scale, and not what this test is about.
     #[test]
     fn every_format_reads_its_own_layout() {
         for (format, bytes, expected) in [
-            (Format::I16Be, vec![0x01, 0x40], 320.0),
-            (Format::U16Be, vec![0xff, 0xc0], 65472.0),
-            (Format::I16Le, vec![0x40, 0x01], 320.0),
-            (Format::U24Be, vec![0x01, 0x00, 0x00], 65536.0),
+            (Format::I16Be, vec![0x01, 0x40], 0.320),
+            (Format::U16Be, vec![0xff, 0xc0], 65.472),
+            (Format::I16Le, vec![0x40, 0x01], 0.320),
+            (Format::U24Be, vec![0x01, 0x00, 0x00], 65.536),
         ] {
-            let mut f = conversion(format, 1.0, 0.0);
+            let mut f = conversion(format, 0.001, 0.0);
             let out = f.give(None, &bytes).unwrap().unwrap();
             let got = from_value(&out, "the result").unwrap();
             assert!((got - expected).abs() < 0.001, "{format:?}: {got}");

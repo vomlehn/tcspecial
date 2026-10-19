@@ -274,23 +274,21 @@ the simulator configuration file
     tcsmoc, which shows it and acts on none of it. There is nothing in it
     about the payloads themselves.
 
-tcspecial read a configuration of its own as well, named by
-``TCSPECIAL_CONFIG_PATH``, and it answered what a version 1 payload set did
-not have to say: where commands are taken, where beacons go, where the log is
-written. Every configuration must state those in its ``tcspecial`` section, so
+tcspecial once read a configuration of its own as well, named by
+``TCSPECIAL_CONFIG_PATH``, which said where commands are taken, where beacons
+go and where the log is written. Every configuration must state those in its ``tcspecial`` section, so
 there is nothing left for a second file to answer and no second file to
 disagree with the one being flown.
 
 The Payload Configuration
 =========================
-The payloads are a section of the tcspecial configuration file: a version, a
+The payloads are a section of the tcspecial configuration file: a
 description, the ``tcspecial`` section, an optional section of groups, and the
 data handlers themselves. A handler takes every attribute it does not state
 from the group it names, so a group holds what several handlers share.
 
 .. code-block:: text
 
-   version        "1.0"
    description    free text
 
    tcspecial                       optional
@@ -390,15 +388,6 @@ needs them before it can be started.
 
 The two types of payload
 ------------------------
-.. note::
-   **What runs today.** The rule below is what a payload states; the version 1
-   reader has not caught up with it in three ways. It still accepts a ``mode``,
-   and takes it for the word that says which type a payload is; it takes a
-   triggered payload's rate from the payload itself as readily as from the
-   payload's group; and it is satisfied by a triggered payload in no group, so
-   long as that payload states a rate. A file written to the rule below is the
-   file to write.
-
 A payload either sends of its own accord or answers a request, and which it is
 decides where its timing is written down.
 
@@ -419,8 +408,8 @@ So each type states its timing in one place and the other type's place is
 empty, which is what lets a file be read without deciding anything: the rate a
 payload is asked at is its group's ``packet_interval``, and the rate a
 payload sends at is the simulator configuration's ``packet_interval``. A
-version 2 configuration spells the group's rate ``interval``; every one of
-them is a length of time, as `Lengths of Time`_ says.
+configuration spells the group's rate ``interval``; every one of them is a
+length of time, as `Lengths of Time`_ says.
 
 In a graph, a ``trigger`` is also what allows anything to be sent to a payload
 at all. What is written to a payload that is read is the question it answers,
@@ -480,11 +469,10 @@ YAML one states with the format's own escapes.
 How a Payload's Data Is Read
 ----------------------------
 
-This is how a version 2 configuration -- a graph of nodes -- gets data out of
-its payloads. Three things decide it: whether the payload sends on its own or
-has to be asked, whether it is in a payload group, and, for one that is
-asked, how long it takes to answer. The sections above describe the version 1
-configuration, whose rules differ.
+This is how a configuration -- a graph of nodes -- gets data out of its
+payloads. Three things decide it: whether the payload sends on its own or has
+to be asked, whether it is in a payload group, and, for one that is asked, how
+long it takes to answer.
 
 **Three ways data arrives.**
 
@@ -1390,8 +1378,6 @@ which is what a panel in the MOC shows.
 
 .. code-block:: yaml
 
-   version: "2.0"
-
    payload_groups:
      - name: "cabin_temps"
        interval: "100 ms"
@@ -1501,11 +1487,7 @@ place of the settings.
 
 The shipped examples
 ====================
-Four payload sets were shipped under ``tests/manual``, each a pair: a
-configuration and the simulator configuration beside it, named for it. They
-were version 1's, and they are gone with it.
-
-What is shipped now is the examples, under ``examples``, and one fixture:
+What is shipped is the examples, under ``examples``, and one fixture:
 ``tests/manual/thermostat.yaml``, which the programs fall back to when nothing
 names a file. Each example is a configuration in both spellings -- ``.yaml``
 and ``.xml``, which a test holds to describing the same thing -- and the
@@ -1518,7 +1500,7 @@ or ``runmocx``; every other target takes the file named in
 
 The Examples
 ============
-The ``examples`` directory holds one directory per example, each a version 2
+The ``examples`` directory holds one directory per example, each a
 configuration in both formats -- ``<name>.yaml`` and ``<name>.xml``, which a
 test holds to describing the same configuration -- and the simulator
 configuration beside it, ``<name>-sim.yaml``. Every example is checked by
@@ -1542,7 +1524,7 @@ data then -- process it, display it, log it -- is its own business. A ``moc``
 node that the ground sends commands or other data through also states the
 ``address`` and ``port`` tcspecial binds to receive them.
 
-tcsmoc runs a version 2 configuration as a ground station for that data: one
+tcsmoc runs a configuration as a ground station for that data: one
 panel per source, filled through ``tcslib::moc``, with tcspecial started on
 the same file and tcssim where the simulator file simulates anything. Both
 it and tcspecial digest the configuration files they read, and tcspecial
@@ -1746,9 +1728,8 @@ What a ground station knows about a spacecraft without asking it anything.
 tcspecial sends a beacon from ``beacon.send`` to ``beacon.recv`` every
 ``beacon.interval`` for as long as it runs, over a socket of its own and
 whether or not anything has connected to it -- so this example commands
-nothing, and still says whether the vehicle is alive, which build it is, which
-version of a configuration it is serving, and whether that is the
-configuration the ground read.
+nothing, and still says whether the vehicle is alive, which build it is, and
+whether the configuration it is serving is the one the ground read.
 
 The ports are the example's own, a hundred above the other examples', so the
 watcher can be left running while another example is looked at. Its one
@@ -2040,13 +2021,7 @@ refused outright: a device, which tcspecial opens and reads directly, and a
 device on a bus, where the master's own read is the request and a second master
 cannot see it.
 
-This is the shipped ``examples/thermostat/thermostat-sim.yaml``. It states no
-version, and that is deliberate: a configuration says which version it is so
-that it can be checked against the software that will read it on the vehicle,
-before anything opens a device. Nothing aboard reads this file -- the simulator
-does not fly -- so a version here would answer a question nobody is asking, and
-a field that is read, printed and never acted on is a field somebody will one
-day believe in. A file that states one is refused, saying this.
+This is the shipped ``examples/thermostat/thermostat-sim.yaml``.
 
 .. code-block:: yaml
 
@@ -2552,15 +2527,9 @@ set to:
 
    Commands are taken on 0.0.0.0:4000 and payload commands on 0.0.0.0:4001 as tcspecial/src/tcspecial.yaml asked, and beacons go from 0.0.0.0:5550 to 127.0.0.1:5650
 
-A configuration states its own version, which every beacon carries:
-
-.. code-block:: yaml
-
-   version: "1.0"
-
-One, two or three decimal parts -- ``1.0`` means 1.0.0 -- because it goes out
-as three bytes. Anything else is refused where the file is read rather than
-announced as a version the set has not got.
+Every beacon carries a configuration version, 2.0, which goes out as three
+bytes and prints as 2.0.0. It is the software's: it says which build is
+reading the configuration, not anything the file states.
 
 ``RUST_LOG`` sets the logging, which the Makefile leaves at ``info``.
 
@@ -2607,7 +2576,7 @@ the beacon box
 
      Beacon:    (indicator)
      Last rcvd: 02:02:02
-     Last msg:  tcspecial v0.1.0, config v1.0.0, md5 36999e46a4bf436854442d8f97a2248d
+     Last msg:  tcspecial v0.1.0, config v2.0.0, md5 36999e46a4bf436854442d8f97a2248d
 
   Each beacon also carries its own number, counted from one by the
   spacecraft, and the MOC says on the console what the numbers say about the
@@ -2622,8 +2591,7 @@ the beacon box
   beacon that was lost on the way reads exactly like one that was never sent.
 
   ``Last msg`` reads ``<none>`` until a beacon arrives. ``v`` is the software
-  flying, ``config v`` the version the configuration states, and ``md5`` the
-  digest of the configuration file tcspecial read, so the line says what is up
+  flying, ``config v`` its configuration version, and ``md5`` the digest of the configuration file tcspecial read, so the line says what is up
   there without anything having to connect first. The answer to a ``CONNECT``
   says the same three in the same words: see `What each end read`_. A datagram the MOC cannot read is shown as
   what arrived, cut short, rather than left off the line: something else
@@ -2796,16 +2764,16 @@ What each end read
 ^^^^^^^^^^^^^^^^^^
 When a link comes up, tcsmoc sends its software version and an MD5 of the
 payload configuration it read, and tcspecial answers with its own, and with
-the version its payload set states. Each prints what it read on the terminal
-it was started from before it makes the socket, so they are there to read even
+its configuration version. Each prints what it read on the terminal it was
+started from before it makes the socket, so they are there to read even
 when the link never comes up -- the MOC's first, then tcspecial's, then what
 the answer said:
 
 .. code-block:: console
 
-   tcsmoc v0.1.0, config v1.0.0, md5 36999e46a4bf436854442d8f97a2248d
-   tcspecial v0.1.0, config v1.0.0, md5 36999e46a4bf436854442d8f97a2248d
-   CONNECT answer: tcspecial v0.1.0, config v1.0.0, md5 36999e46a4bf436854442d8f97a2248d
+   tcsmoc v0.1.0, config v2.0.0, md5 36999e46a4bf436854442d8f97a2248d
+   tcspecial v0.1.0, config v2.0.0, md5 36999e46a4bf436854442d8f97a2248d
+   CONNECT answer: tcspecial v0.1.0, config v2.0.0, md5 36999e46a4bf436854442d8f97a2248d
 
 The first two lines are written the same way by the two programs, each naming
 itself, so two ends reading one payload set print the same version,
@@ -2817,12 +2785,11 @@ the link.
 
 .. code-block:: text
 
-   tcspecial agrees: v0.1.0, config v1.0.0 md5: 36999e46a4bf436854442d8f97a2248d
+   tcspecial agrees: v0.1.0, config v2.0.0 md5: 36999e46a4bf436854442d8f97a2248d
 
-The set's version shown there is the one tcspecial sent, which is the version
-of the file it read. The MOC does not send its own, so there is nothing to
-compare it with: what the verdict is reached on is the software version and
-the digest. They are the same payload
+The configuration version shown there is the one tcspecial sent. The MOC does
+not send its own, so there is nothing to compare it with: what the verdict is
+reached on is the software version and the digest. They are the same payload
 set if the digests match: the digest is of what a file says rather than of its
 bytes, so the YAML and the XML of one set digest alike, and so do two files
 differing only in comments, spacing, the order of their sections or the order

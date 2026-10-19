@@ -22,8 +22,8 @@ What there is, in the order a reader meets it:
 
 ``tcslibgs``
     What both ends share: the configuration file formats and the rules about
-    them, the command and telemetry messages, and the digest and version each
-    end says it read. Every rule in this document is stated there once.
+    them, the command and telemetry messages, and the digest each end says it
+    read. Every rule in this document is stated there once.
 
 ``tcslib``
     What a control application on the ground is built on. A mission control
@@ -624,12 +624,12 @@ What a device node says
 -----------------------
 
 A node of an interface type says where it is, what the link is set up as, and
-how it is read. The second of those is unchanged from version 1 -- a data rate,
-a bus address, a clock mode, a set of line numbers -- and is deliberately so:
-those rules are the ones that have been tested against real buses, and a second
-set of them for a second schema would be two statements of every rule drifting
-apart one flight at a time. A version 2 node's attributes are handed to the
-same per-type rules, which refuse in the same words.
+how it is read. The second of those -- a data rate, a bus address, a clock
+mode, a set of line numbers -- is written once, in ``tcslibgs``, per type:
+those rules are the ones that have been tested against real buses, and a
+second statement of them would be two statements of every rule drifting apart
+one flight at a time. A node's attributes are handed to those per-type rules,
+which refuse in the same words wherever the node is written.
 
 What locates a node depends on its type:
 
@@ -647,9 +647,9 @@ And every interface type may say, beyond the terms of its own link:
    group           which group reads it, which the schedule reads
    read_size       how many bytes one read asks for
    trigger         what to write to make it answer
-   max_length      where one read of a line ends: the three attributes a
-   read_timeout    version 1 file nests under "stream". A node's attributes
-   terminators     are flat, so they are written beside the line's terms
+   max_length      where one read of a line ends. A node's attributes are
+   read_timeout    flat, so these are written beside the line's terms
+   terminators     rather than nested
 
 Requirement
     An attribute nothing reads is refused, by name, for the type it is written
@@ -670,8 +670,8 @@ Requirement
 
 Requirement
     A node with a ``trigger`` is a node that is asked, and there is no
-    separate word for the mode. A trigger and nothing else is what made a
-    version 1 payload triggered, so a second word could only disagree with it.
+    separate word for the mode: a trigger and nothing else is what makes a
+    node triggered, so a second word could only disagree with it.
 
 Requirement
     A trigger on an interface that cannot be asked is refused. A set of
@@ -725,14 +725,12 @@ Requirement
     groups, the nodes in the order the files write them with their
     attributes, the links and the command bindings -- across every included
     file, the same for either spelling, and not the editor's layout or the
-    description. A version 2 tcspecial says its digest as it starts and sends
-    it in a beacon every ``beacon.interval``, from ``beacon.send`` to
-    ``beacon.recv``, by the code version 1 beacons with. tcsmoc compares the
-    digest in each beacon with the one it computed itself; when they differ
-    it says so on the beacon line and the console and asks the operator
-    whether to continue anyway, quitting -- and stopping the tcspecial and
-    tcssim it started -- if not. Version 1 does the same, beside the
-    comparison it makes when it connects.
+    description. tcspecial says its digest as it starts and sends it in a
+    beacon every ``beacon.interval``, from ``beacon.send`` to
+    ``beacon.recv``. tcsmoc compares the digest in each beacon with the one it
+    computed itself; when they differ it says so on the beacon line and the
+    console and asks the operator whether to continue anyway, quitting -- and
+    stopping the tcspecial and tcssim it started -- if not.
 
 Requirement
     Ground software gets a ``moc`` node's data with a function call --
@@ -1421,17 +1419,17 @@ waits on it -- ``tcsapp``'s reads answer with what has arrived and keep the
 packet that has half arrived until the rest of it comes -- because a vehicle
 that waited on a program would stop reading its sensors while it waited.
 
-The version 2 architecture
---------------------------
+The architecture
+----------------
 
-A version 2 vehicle is a graph of nodes and the links between them, and the
+A vehicle is a graph of nodes and the links between them, and the
 software that runs one is in two halves that never meet: what the file becomes,
 which opens nothing, and what runs, which opens everything. The first half is
 arithmetic over the configuration and can be exercised with no vehicle present;
 the second is threads, descriptors and bytes.
 
-.. figure:: version-2.svg
-   :alt: The version 2 architecture. At startup tcslibgs::graph reads and
+.. figure:: architecture.svg
+   :alt: The architecture. At startup tcslibgs::graph reads and
          checks the file and four pieces that open nothing -- route, schedule,
          telemetry and parameters -- turn it into tables. Then system opens a
          port per node and holds them in a fabric. Four things run at once: the
@@ -1441,7 +1439,7 @@ the second is threads, descriptors and bytes.
          ground, data arrives as UDP and is taken with tcslib::moc::Moc::receive.
    :width: 100%
 
-   What a version 2 configuration becomes, and what runs at once. The
+   What a configuration becomes, and what runs at once. The
    dash-dotted pieces are the design; what runs today is one thread for the
    whole pass, the command interpreter and the beacons beside it.
 
@@ -1473,9 +1471,8 @@ any one of them from holding up the others.
 the command interpreter
     Its own thread, owning both command links -- the spacecraft's and the
     payloads' -- so that a command is read and answered while the pass is
-    running. The two links are version 1's, kept for version 1's reason: what
-    the ground needs in a hurry must never be queued behind what it asked for
-    at leisure.
+    running. There are two links because what the ground needs in a hurry
+    must never be queued behind what it asked for at leisure.
 
 the conductor
     One thread, running one pass: it asks the schedule which group is due,
@@ -1489,7 +1486,7 @@ the node threads
     and no node operation waits on another node.
 
 the beacons
-    Their own thread, from the first version of the runtime: a beacon every
+    Their own thread: a beacon every
     ``beacon.interval``, carrying the digest of the configuration, from
     ``beacon.send`` to ``beacon.recv``.
 
@@ -1726,8 +1723,7 @@ example can be: that is worth having and is not what this is.
 What each command means
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-Ten commands, and version 2 changes what three of them act on rather than what
-they are. Which link each belongs on is ``CommandType::link``, the one table
+Ten commands. Which link each belongs on is ``CommandType::link``, the one table
 both ends read; what follows is what a vehicle made of nodes does with each.
 
 ``PING``
@@ -1736,13 +1732,13 @@ both ends read; what follows is what a vehicle made of nodes does with each.
     and a PING says this link reaches it.
 
 ``CONNECT``
-    Answers with this build's version, the version the configuration states
-    and the digest of the configuration being flown. Asked as the link comes
-    up, and what licenses every command that carries a node id: see `How a
+    Answers with this build's version, its configuration version, and the
+    digest of the configuration being flown. Asked as the link comes up, and
+    what licenses every command that carries a node id: see `How a
     command names a node`_.
 
 ``RESTART_ARM`` and ``RESTART``
-    Unchanged, and the process is what restarts: a vehicle that comes back
+    The process is what restarts: a vehicle that comes back
     reads the configuration file again, so a RESTART is how a changed
     configuration is flown. The arm key is the interlock, and an unarmed
     RESTART is refused.
@@ -1753,18 +1749,8 @@ both ends read; what follows is what a vehicle made of nodes does with each.
     elapses.
 
 ``START_NODE`` and ``STOP_NODE``
-    Enable and disable a node. This is where version 2 differs most: the unit
-    is a node of the graph rather than a data handler, so a computation, a log
-    and a payload are each something the ground can stop.
-
-    Kinds of their own rather than version 1's ``START_DH`` and ``STOP_DH``
-    carrying a different body. The two name their subject differently -- a
-    data handler by name, a node by id -- and a vehicle flying one version has
-    no use for the other's, so a single kind would be one message meaning two
-    things and each end guessing which from what else it knows. A version 1
-    vehicle refuses these as unimplemented, and a version 2 one refuses
-    version 1's the same way: either is the ground reading a configuration
-    that end has never seen.
+    Enable and disable a node. The unit is a node of the graph, so a
+    computation, a log and a payload are each something the ground can stop.
 
 ``QUERY_NODE``
     What that node has moved, from the node's own counters, and whether it is
@@ -1778,9 +1764,7 @@ both ends read; what follows is what a vehicle made of nodes does with each.
     the bytes rather than a count of them.
 
 ``SET_NODE``
-    Sets an attribute of a node: version 1's ``CONFIG_DH``, with something for
-    it to do. Version 1's carried a name and nothing to configure with and was
-    refused as unimplemented; a graph's ``commands`` section already says which
+    Sets an attribute of a node. A graph's ``commands`` section says which
     attribute of which node the ground may set, so this is the command that
     section was written for -- until there was one, the bindings were checked
     when the file was read and then applied by nothing.
@@ -1818,16 +1802,15 @@ Requirement
     when the vehicle starts and runs until it is stopped, because what a graph
     describes is a system that works as a whole: telemetry reaches the ground
     with no ground station having said anything, which is what a vehicle out
-    of contact has to do. Version 1 came up with its handlers idle and was
-    told which to start, which suited a set of payloads that are separately
-    useful and does not suit a graph whose links describe one machine.
+    of contact has to do. Coming up idle and being told which nodes to start
+    would suit a set of payloads that are separately useful, and does not
+    suit a graph whose links describe one machine.
 
 Requirement
-    A ``START_NODE`` carries no kind. Version 1's ``START_DH`` carried the type
-    of handler it expected and refused a mismatch, which was a check against
-    the two ends reading different configurations; the node id and the digest
-    make that check beforehand and for every command, so a kind in the message
-    would be a second answer to a settled question.
+    A ``START_NODE`` carries no kind. A kind in the message, refused on a
+    mismatch, would be a check against the two ends reading different
+    configurations; the node id and the digest make that check beforehand and
+    for every command, so it would be a second answer to a settled question.
 
 Requirement
     Both carry one thing, the node id, and both are answered with the status
@@ -1973,34 +1956,32 @@ How many links, and what the thread does with one
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Requirement
-    Two links, as version 1 has: one for the spacecraft and one for commands
-    about nodes. The reason is version 1's and has not changed -- what the
-    ground needs in a hurry must never be queued behind what it asked for at
-    leisure, and a ``RESTART`` waiting behind a node's statistics is a vehicle
-    that cannot be rescued while it is busy.
+    Two links: one for the spacecraft and one for commands about nodes. What
+    the ground needs in a hurry must never be queued behind what it asked for
+    at leisure, and a ``RESTART`` waiting behind a node's statistics is a
+    vehicle that cannot be rescued while it is busy.
 
 Requirement
-    One link for every node, and not one per node. Version 1 bound a socket
-    per payload, which did two things: it said which payload a command was
-    about, and it kept a command that takes time from delaying a command about
-    another payload. The node id does the first now, and the thread a node
-    operation runs on does the second. A graph also has more nodes than a payload set had payloads -- a
-    thermostat of four sensors is eleven nodes -- so a socket apiece would
-    spend ports on computations and logs that nothing addresses from the
-    ground.
+    One link for every node, and not one per node. A socket per node would
+    do two things: say which node a command was about, and keep a command
+    that takes time from delaying a command about another node. The node id
+    does the first, and the thread a node operation runs on does the second.
+    A graph also has many more nodes than payloads -- a thermostat of four
+    sensors is eleven nodes -- so a socket apiece would spend ports on
+    computations and logs that nothing addresses from the ground.
 
 Requirement
     That link is bound at ``payload_command.dest_base`` with nothing added to
     it, and commands on it are taken from ``payload_command.source_base``.
-    Version 1 counts a socket off each base by the payload's id; version 2
-    uses the base itself, the id having moved into the message.
+    The base itself, with nothing counted off it: the node id is in the
+    message.
 
 Requirement
     Both links are waited on together, with the descriptor that stops the
     interpreter in the same poll set. The thread therefore wakes when there is
-    a command or a shutdown and for nothing else. Version 1 gives each link a
-    thread and a read timeout, which is a wakeup several times a second per
-    link to ask a question whose answer is almost always no.
+    a command or a shutdown and for nothing else. A thread per link with a
+    read timeout would be a wakeup several times a second per link to ask a
+    question whose answer is almost always no.
 
 Requirement
     A command this vehicle does not implement is refused and not ignored. It
@@ -2029,9 +2010,8 @@ Requirement
     one another are still matched to what was asked.
 
 Requirement
-    An answer goes back to the address the command came from, which is what
-    version 1 does: a datagram's sender is the only statement of where the
-    ground is, and a configuration that stated it as well would be a second
+    An answer goes back to the address the command came from: a datagram's
+    sender is the only statement of where the ground is, and a configuration that stated it as well would be a second
     answer that can disagree.
 
 Requirement
@@ -2040,11 +2020,9 @@ Requirement
     taking one from whoever sent it would be taking the ground's word from a
     stranger.
 
-The check version 1 made by binding a socket per payload -- a command about
-one payload arriving on another's is one end reading a different
-configuration -- is not lost with the sockets. It is made earlier and for
-every command: the ids two ends use are the same ids exactly when their
-digests agree, and ``CONNECT`` is what establishes that.
+That two ends address the same node by the same id is checked before any
+command and for every command: the ids two ends use are the same ids exactly
+when their digests agree, and ``CONNECT`` is what establishes that.
 
 The telemetry log
 ~~~~~~~~~~~~~~~~~
@@ -2088,7 +2066,7 @@ Requirement
    and none that ages them out, so a long flight fills the directory it was
    given. What a vehicle should do when that directory is full -- stop
    recording, overwrite the oldest, or refuse to fly without somewhere to put
-   it -- has not been decided, and version 1 did not decide it either.
+   it -- has not been decided.
 
 Disabling a node that is waiting
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2137,12 +2115,10 @@ Requirement
     reading delivered minutes later is a reading that describes a moment that
     has passed.
 
-This is what version 1's conduits already do, and it is why they can be stopped
-at all: ``Conduit::stop`` sets the running flag down and writes one byte to the
-conduit's command pipe, which is in the poll set beside the endpoint's
-descriptor, so a thread waiting on a silent payload returns at once and is
-joined. The version 2 design is that mechanism per node rather than per
-conduit.
+The mechanism is a descriptor in the poll set beside the endpoint's: stopping
+a node writes one byte to it, so a thread waiting on a silent payload returns
+at once and is joined. There is one per node, so stopping one node wakes that
+node's wait and no other.
 
 .. note::
    **What runs today.** One thread makes the whole pass, in order, with the
@@ -2188,7 +2164,7 @@ conduit.
    RESTART_ARM and RESTART are refused as unimplemented rather than left
    unanswered. A command the vehicle does not implement is something the
    ground can see and work around; a command that goes quiet is a link the
-   ground cannot tell from a dead one. What a version 2 restart should do --
+   ground cannot tell from a dead one. What a restart should do --
    end the process and leave it to whatever supervises it -- is a decision
    about how a vehicle is run and not only about the command.
 
@@ -2370,12 +2346,6 @@ Requirement
     -- would be the hardest lines to find in it.
 
 Requirement
-    Which version a configuration is decides which of the two programs runs,
-    and the file says which. No flag beside it: a flag would be a second
-    statement of the same fact, and the two could disagree. ``tcsverify``
-    already decides the same way on the same evidence.
-
-Requirement
     A command binding counts as a connection at both of its ends. A MOC link
     exists to carry commands as much as telemetry, and a computation whose
     setpoint is the only thing the ground sets is reached by its binding and by
@@ -2470,11 +2440,6 @@ type of data is in it:
    tuning.yaml     setpoints, intervals, thresholds: the values the MOC may
                    also change in flight.
 
-This is version 2 of the payload configuration, and it does not read version 1.
-A clean break rather than two parsers: the two schemas describe different
-things, and a reader that accepted both would be two sets of rules to keep
-correct for as long as the software lives. The shipped sets are converted with
-it.
 
 What is checked before anything runs
 ------------------------------------
@@ -3754,7 +3719,7 @@ being several elements, and XSD 1.0 allows neither repeats nor a mixture inside
 ``xs:all``. A node with two names is refused where the file is read instead.
 
 A schema an editor has to be pointed at by hand is a schema nobody points it
-at, so every version 2 configuration this project writes names its own. In XML
+at, so every configuration this project writes names its own. In XML
 that is the two attributes every XML tool reads::
 
     <configuration
@@ -3796,21 +3761,13 @@ the lists the software itself reads from -- the section's parameters from
 ``sim_config::SETTINGS`` -- rather than against a copy written out there, which
 would be the same problem one step further away. Every shipped XML file is
 validated with ``xmllint``, and every key of every shipped YAML file is looked
-for in the JSON Schema, every shipped version 2 configuration and every
-shipped simulator configuration is checked for the reference to its own schema
-and for that schema being where it says, and
-every shipped XML file -- the version 1 payload sets included, which have no
-schema to be validated against -- is checked for being well formed XML at all.
+for in the JSON Schema, every shipped configuration and every shipped
+simulator configuration is checked for the reference to its own schema and for
+that schema being where it says, and every shipped XML file is checked for
+being well formed XML at all.
 That last check found four files that were not: they said ``--`` inside a
 comment, which XML forbids, and nothing had noticed because ``quick-xml``
 reads them anyway and no other tool had been asked to.
-
-The reference is only on the version 2 configurations. The version 1 payload
-language has no schema -- ``stale_interval``, ``payload_interface`` and
-``packet_size`` are words ``tcspecial.xsd`` has never heard of, and its root
-element is ``payload`` rather than ``configuration`` -- so a file of that
-language pointed at that schema would be a file reported as invalid rather
-than a file validated.
 
 That last test found a real fault the moment it was written: an XML comment may
 not contain two hyphens in a row, and this project writes ``--`` as an em dash
@@ -3874,8 +3831,8 @@ is a menu nobody learns.
 Requirement
     The simulator configuration is written as a form: every payload the
     configuration has gets an entry, and every entry gets every setting,
-    written empty where nobody has filled it in. A file holding nothing but
-    its version said nothing about which payloads there were to configure or
+    written empty where nobody has filled it in. A file holding nothing said
+    nothing about which payloads there were to configure or
     what could be said about them, which is what somebody opening it wanted to
     know.
 
@@ -4081,14 +4038,9 @@ runguix`` open it as YAML and as XML, one target per spelling as the
 variable names.
 
 It prints one line per problem -- the file, the line to look at, and what is
-wrong -- and says nothing at all about a configuration it accepts. Which
-version a file is decides which checks are run: the two describe different
-things, so a version 1 file goes to the payload-set checks and a version 2 one
-to these. A file that states no version goes to neither and is told which line
-to add: read by either set of checks, it would be refused for whatever of it
-the other version has, which is not where it is wrong. A configuration made
-of several files has each problem reported in the file it is in, which is not
-the file that was named on the command line.
+wrong -- and says nothing at all about a configuration it accepts. A
+configuration made of several files has each problem reported in the file it
+is in, which is not the file that was named on the command line.
 
 These are the checks:
 
@@ -4178,7 +4130,6 @@ addresses are its own. What is here is checked as it stands, with a
 
 .. code-block:: yaml
 
-   version: "2.0"
    description: Cabin thermostat
 
    payload_groups:
@@ -4602,9 +4553,9 @@ Beacon
 |                |            |           | the tcspecial build sending it,    |
 |                |            |           | from its ``Cargo.toml``            |
 |                +------------+-----------+------------------------------------+
-|                | config     | 3 bytes   | The version the payload            |
-|                | version    |           | configuration file states, in the  |
-|                |            |           | same three parts                   |
+|                | config     | 3 bytes   | This build's configuration         |
+|                | version    |           | version, in the same three parts   |
+|                |            |           |                                    |
 |                +------------+-----------+------------------------------------+
 |                | digest     | 16 bytes  | MD5 of the configuration file this |
 |                |            |           | tcspecial read                     |
@@ -4619,22 +4570,19 @@ Requirement
     says the spacecraft is alive, when its clock does not.
 
 Requirement
-    A beacon carries the version and the digest a CONNECT is answered with,
-    and the version the configuration states as well. A beacon arrives whether
-    or not anything has connected, so a ground station that is only listening
+    A beacon carries the version, the configuration version and the digest a
+    CONNECT is answered with. A beacon arrives whether or not anything has
+    connected, so a ground station that is only listening
     can see which software is flying and which configuration it is serving
     rather than having to ask first.
 
 Requirement
-    The configuration's version is the three decimal parts its ``version``
-    states: ``1.0`` is 1.0.0, the part it leaves off being nought. A version
-    that cannot be read that way is refused where the file is read, rather
-    than announced as 0.0.0 -- which is a version some other set might really
-    have. ``tcsverify`` reports it from the line that states it.
+    The configuration version is the software's: ``tcslibgs::graph::VERSION``,
+    2.0, announced as 2.0.0.
 
 Requirement
     The MOC shows what the last beacon said as one line, each of the three
-    labelled: ``v0.1.0 config v1.0.0 md5:`` and the digest's sixteen
+    labelled: ``v0.1.0 config v2.0.0 md5:`` and the digest's sixteen
     bytes in hex with nothing between them. The answer to a ``CONNECT`` is
     written the same way; see `What Each End Read`_.
 
@@ -4744,9 +4692,8 @@ its ``tcspecial`` section: where commands are taken, where beacons go, the
 beacon interval, and where the telemetry log is written.
 
 It read two. The second was its own, ``tcspecial/src/tcspecial.yaml``, named
-by ``TCSPECIAL_CONFIG_PATH``, and it answered what a version 1 payload set did
-not have to say. A version 2 configuration must have the section, so a second
-file could only disagree with the one being flown.
+by ``TCSPECIAL_CONFIG_PATH``. A configuration must have the section, so a
+second file could only disagree with the one being flown.
 
 Both choose their parser from their extension, as every configuration file in
 the project does, so either may be written in YAML or XML; see `Configuration
@@ -5093,8 +5040,8 @@ What Each End Read
 Requirement
     A link begins with each end saying what it read. The ground sends a
     ``CONNECT`` carrying its software version and a digest of its
-    configuration, and the spacecraft answers with its own, and with the
-    version the configuration it is serving states.
+    configuration, and the spacecraft answers with its own, and with its
+    configuration version.
 
 Requirement
     Each version is three bytes -- major, minor and patch, each in binary --
@@ -5102,7 +5049,7 @@ Requirement
 
 Requirement
     The answer is shown as one line, each of the three labelled:
-    ``v0.1.0 config v1.0.0 md5:`` and the digest in hex. The same three
+    ``v0.1.0 config v2.0.0 md5:`` and the digest in hex. The same three
     facts a beacon carries, written the same way by the same function, because
     the two are read against each other.
 
@@ -5112,7 +5059,7 @@ Requirement
     answers with what it read and logs a disagreement it can see.
 
 Requirement
-    Each end says its own version, the version of the set it read, and the
+    Each end says its own version, its configuration version, and the
     digest, before it makes the socket the link runs over. A socket that
     cannot be made, or a far end that is not answering, takes the exchange
     with it -- and that is exactly when those facts are wanted. In tcspecial
@@ -5124,13 +5071,13 @@ Requirement
 
     .. code-block:: text
 
-       v0.1.0, configuration tests/manual/tcspecial2.yaml config v1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
+       v0.1.0, configuration tests/manual/thermostat.yaml config v2.0.0 md5: 8d908f54a3d72d0704213113b92d958b
 
     Two ends reading one configuration therefore print the same line twice,
     which is what makes a difference in any part of it worth reading. The
     MOC's line used to be written differently -- ``Version 0.1.0``, a bare
-    ``md5``, and no set version at all -- so the two could only be compared
-    by the one fact they spelled alike.
+    ``md5``, and no configuration version at all -- so the two could only be
+    compared by the one fact they spelled alike.
 
 Nothing else in the protocol makes the two ends prove they are talking about
 the same configuration, and when they were not, the only sign was a command
@@ -5214,10 +5161,8 @@ a set of discrete lines each have terms of their own, and each is checked
 against the rules of its kind. Where those terms are written is in `The Node
 Architecture`_; what they mean is here.
 
-It was a chapter about a file of its own -- a version 1 payload set, four of
-which were shipped, each payload paired with a ground endpoint and commanded
-by name. Version 1 is gone: a payload is a node, and `What a device node
-says`_ is the section a reader of a configuration wants beside this one.
+A payload is a node, and `What a device node says`_ is the section a reader of
+a configuration wants beside this one.
 
 How a Payload Is Made to Send
 -----------------------------
@@ -6431,10 +6376,7 @@ file's is, so a simulator configuration may be written in YAML or XML.
 File Structure
 --------------
 A simulator configuration file has two sections, both optional, and a
-description of its own. It states no version: a configuration says which
-version it is so that it can be checked against the software that will read it
-on the vehicle, and nothing aboard reads this file, so a version here answered
-a question nobody was asking. A file that states one is refused, saying this.
+description of its own.
 
 simulated payload groups
     Named groups of settings. A group carries what several simulated payloads
@@ -7558,9 +7500,8 @@ Requirement
 
 Requirement
     The address and ports the command interpreter binds are in the
-    configuration's ``tcspecial`` section. They were in a configuration file
-    of tcspecial's own, which is what a version 1 payload set needed: a set
-    did not have to say where commands are taken.
+    configuration's ``tcspecial`` section, so one file says where commands are
+    taken and what is flown.
 
 Requirement
     The command interpreter takes commands on two links: one for the
@@ -7574,9 +7515,8 @@ Requirement
     station without one has nothing to ask a node. A ``CONNECT`` that arrives
     on the node link is refused like any other command on the wrong one.
 
-    It was one socket per payload, counted from the base by the payload's id,
-    because a version 1 command said which payload it was about by arriving
-    there. A node command carries the node's id, so one socket says it.
+    One socket for every node: a node command carries the node's id, so the
+    socket does not have to say which node a command is about.
 
 Requirement
     Each payload's link is served by a loop in a thread of its own, and every
@@ -7776,9 +7716,8 @@ Requirement
     ``graph::parameters::beacon_of``. The two programs read one file, so they
     cannot name different addresses.
 
-    There was a second file to resolve against -- the command interpreter's
-    own, which placed a version 1 payload set that stated no section -- and a
-    rule about which won. One file states it now.
+    One file states them, so there is no second answer to resolve against
+    and no rule about which wins.
 
 That is what makes the earlier drift impossible rather than merely unlikely.
 The MOC used to bind a compiled-in address and read neither file, so a mission
@@ -8052,10 +7991,8 @@ last came from that source and the head of it, counted from the moment the MOC
 started. A source that has sent nothing shows ``--:--:--`` and no data, which
 is what a panel says before anything arrives.
 
-It was the spacecraft's account of its data handlers, asked for with
-``QUERY_DH_SAMPLE`` and shown as the last transfer each way. That command was
-version 1's, and what a panel shows now is what reached the ground, which is
-the thing an operator is watching the window for.
+What a panel shows is what reached the ground, which is the thing an operator
+is watching the window for.
 
 Requirement
     A panel says which payload of the configuration it is, beside the name:
@@ -8271,7 +8208,7 @@ Requirement
     it too.
 
     Which of them stops a program is the program's business. tcspecial
-    refuses a version 2 configuration with a warning in it, as above; tcsmoc
+    refuses a configuration with a warning in it, as above; tcsmoc
     reads the simulator file only to show it, so a problem there is said and
     costs the panels their simulator half.
 
@@ -8285,7 +8222,7 @@ Requirement
     finds, warnings included. Everything is said on stderr as well.
 
 Requirement
-    A version 2 configuration's simulator file is checked by name: that it
+    A configuration's simulator file is checked by name: that it
     parses, and that every simulated payload is a payload of the graph, every
     group it names is declared and every group it declares is used, and every
     setting is one. A payload with no entry is not a problem: the one a bench
@@ -8502,9 +8439,9 @@ CI must support the following functions for implementing commands: ping(), exit(
    ``status_dh`` asked for -- and ``QUERY_NODE_SAMPLE``, for the last datum a
    node moved each way. The five commands that named a handler by name
    (``START_DH``, ``STOP_DH``, ``QUERY_DH``, ``QUERY_DH_SAMPLE`` and
-   ``CONFIG_DH``) went with version 1, and their opcodes are not reused: a
-   ground station of the older build is told its command is not one, rather
-   than having it acted on as another. ``exit`` and ``status`` are not
+   ``CONFIG_DH``) are gone, and their opcodes are not reused: a ground
+   station of an older build is told its command is not one, rather than
+   having it acted on as another. ``exit`` and ``status`` are not
    implemented; see below. Three commands this did not ask for were added:
    ``connect``, which is each end saying what configuration it read,
    ``restart_arm`` with ``restart``, and ``SET_NODE``, which sets an attribute
@@ -8517,8 +8454,8 @@ CI must have an element named dh of type BTreeMap
    Implemented as a ``BTreeMap``, of nodes rather than of handlers and under
    another name: ``Fabric::nodes``, a ``BTreeMap<String, Mutex<Box<dyn
    Port>>>``, keyed by the name the configuration gives a node. It was
-   ``Arc<Mutex<BTreeMap<DHName, DataHandler>>>`` and went with version 1. The
-   lock moved inward with it: one mutex per node rather than one over the
+   ``Arc<Mutex<BTreeMap<DHName, DataHandler>>>``. The lock moved inward with
+   the change: one mutex per node rather than one over the
    whole map, so a node held open for a slow read does not hold up a command
    about another.
 
@@ -8546,9 +8483,10 @@ CI must periodically send a Telemetry::Beacon message with a timestamp and uniqu
    the two attributes that took were an address that was nobody's and an
    interface whose being wrong lost every beacon in silence. The number is
    counted by the sender from one, so it starts again when tcspecial does,
-   and the MOC tells a gap from a restart by that. A beacon also carries what a CONNECT is answered with -- the
-   software version, the version the configuration states, and the digest of
-   the configuration file the spacecraft read -- which this did not ask for.
+   and the MOC tells a gap from a restart by that. A beacon also carries
+   what a CONNECT is answered with -- the software version, the configuration
+   version, and the digest of the configuration file the spacecraft read --
+   which this did not ask for.
 
 CI must parse commands from the ground receved via UDP/IP
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

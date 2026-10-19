@@ -27,10 +27,10 @@ the editor is the one the vehicle would have refused the file with.
 ## What is in it
 
 - `commands`, `telemetry`, `protocol`: the command and telemetry protocol.
-- `config_digest`: the configuration version and digest that both ends
-  report, so each can tell whether the other read the same files.
-- `graph`: the version 2 configuration, a graph of nodes, with its checks,
-  and the ports each link to the ground arrives at.
+- `config_digest`: the digest of a configuration, which both ends report, so
+  each can tell whether the other read the same files.
+- `graph`: the configuration, a graph of nodes, with its checks, and the
+  ports each link to the ground arrives at.
 - `node`: one module per node type, giving each type's attributes and how
   they are checked. tcspecial and tcssim have trees of the same shape, one
   for the node aboard and one for the simulator's stand-in for it.

@@ -144,7 +144,7 @@ class Schedule:
 
         Four seconds steady, four more blinking at the same stage, six at the
         next and silence after that, against a beacon interval of five
-        seconds. The last step never ends, and blinks, because a light that
+        seconds. Every blink is half a second on and half a second off. The last step never ends, and blinks, because a light that
         has stopped changing is one an operator stops reading.
         """
         def blink(on, off):
@@ -152,8 +152,8 @@ class Schedule:
 
         return Schedule([
             Step(holds=4 * SECOND, stage=Stage.HEARD),
-            Step(holds=4 * SECOND, stage=Stage.HEARD, blink=blink(1000, 1000)),
-            Step(holds=6 * SECOND, stage=Stage.AGEING, blink=blink(1000, 1000)),
+            Step(holds=4 * SECOND, stage=Stage.HEARD, blink=blink(500, 500)),
+            Step(holds=6 * SECOND, stage=Stage.AGEING, blink=blink(500, 500)),
             Step(holds=FOREVER, stage=Stage.SILENT, blink=blink(500, 500)),
         ])
 

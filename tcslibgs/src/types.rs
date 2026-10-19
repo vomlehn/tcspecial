@@ -1451,17 +1451,18 @@ pub struct CIConfigJson {
     pub tcs_cmd: TcsCmdJson,
     /// Where each payload's telemetry comes from and goes to.
     pub payload_telemetry: PayloadTelemetryJson,
-    /// Where commands about a payload are taken, which is not the link above.
+    /// Where commands about a node are taken, which is not the link above.
     ///
-    /// A command about a payload -- start it, stop it, ask it for its
-    /// statistics -- arrives on that payload's own socket here; a command
-    /// about the spacecraft -- ping it, arm it, restart it -- arrives on
-    /// `tcs_cmd.recv`. See [`crate::CommandType::is_payload_command`], which
-    /// is the one table that says which is which, read by both ends.
+    /// A command about a node -- start it, stop it, set an attribute, ask what
+    /// it has moved -- arrives here, at `dest_base` with nothing added, the
+    /// node's id being in the message; a command about the spacecraft -- ping
+    /// it, arm it, restart it -- arrives on `tcs_cmd.recv`. See
+    /// [`crate::CommandType::link`], which is the one table that says which is
+    /// which, read by both ends.
     ///
     /// Separate links because what the ground needs in a hurry must never be
     /// queued behind what it asked for at leisure: a RESTART waiting behind a
-    /// payload's statistics is a spacecraft that cannot be rescued while it is
+    /// node's statistics is a spacecraft that cannot be rescued while it is
     /// busy. On a space link these become virtual channels, which is where the
     /// priority between them is really decided; here they are ports, which is
     /// what an IP network has to divide traffic with.

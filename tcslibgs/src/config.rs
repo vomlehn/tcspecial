@@ -16,8 +16,8 @@ use crate::{ConfigFormat, TcsError};
 /// its file as a command line argument, for the same reason, and then sets
 /// each child's variable on that child's own command.
 ///
-/// They live here, beside [`load_dh_configs`], rather than in the
-/// programs: the name tcsmoc sets for a child is then the same constant the
+/// They live here, in the library every one of them reads its configuration
+/// through, rather than in the programs: the name tcsmoc sets for a child is then the same constant the
 /// child reads, checked by the compiler rather than by two string literals
 /// being kept equal by hand.
 pub const PAYLOAD_CONFIG_PATH_VAR: &str = "PAYLOAD_CONFIG_PATH";

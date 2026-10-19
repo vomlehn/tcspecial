@@ -698,20 +698,55 @@ impl DHSample {
     /// how it reads. A sample with no time is a direction that has carried
     /// nothing, which is not the same as one that carried no bytes: it shows
     /// [`NO_TRANSFER_TIME`] and no data.
+    ///
+    /// The bytes, as bytes. What came from a node that sends values is better
+    /// shown as the number it is: see [`DHSample::panel_lines_of`], which is
+    /// what a panel with the configuration in hand calls.
     pub fn panel_lines(&self) -> (String, String) {
-        match self.time {
-            Some(time) => {
-                // The sample truncated the transfer when it was recorded, so
-                // bytes_to_hex is never the one doing it here; the ellipsis
-                // comes from how much of the whole the sample kept.
-                let mut data = bytes_to_hex(self.data(), DH_SAMPLE_BYTES);
-                if self.was_truncated() {
-                    data.push_str("...");
-                }
-                (time.time_of_day(), data)
+        self.panel_lines_of(false)
+    }
+
+    /// The same two strings, with the data read as a temperature where the
+    /// node that sent it sends values.
+    ///
+    /// `as_value` is the configuration's answer about that node -- see
+    /// `crate::node::vehicle::compute::node_sends_a_value` -- and not a guess
+    /// from the data: every four bytes are a value, so a datum of four
+    /// characters would otherwise be shown as a temperature.
+    ///
+    /// A reading shows as the shortest decimal that is the number, with the
+    /// unit after it, because what a reader of a panel wants from this line
+    /// is the temperature. Hexadecimal was what every line showed, and for a
+    /// reading it was eight characters of nothing anybody could act on.
+    ///
+    /// Anything that cannot be read as a value falls back to the bytes --
+    /// including a sample of a value that was truncated, which cannot happen
+    /// today, a value being shorter than a sample. A node that sends values
+    /// and sent something else has something wrong with it, and the bytes are
+    /// what says so; a temperature made out of the wrong four bytes would
+    /// hide it.
+    pub fn panel_lines_of(&self, as_value: bool) -> (String, String) {
+        let Some(time) = self.time else {
+            return (NO_TRANSFER_TIME.to_string(), String::new());
+        };
+
+        if as_value && !self.was_truncated() {
+            if let Ok(number) =
+                crate::node::vehicle::compute::from_value(self.data(), "what arrived")
+            {
+                let shown = crate::node::vehicle::compute::as_text(number);
+                return (time.time_of_day(), format!("{shown} K"));
             }
-            None => (NO_TRANSFER_TIME.to_string(), String::new()),
         }
+
+        // The sample truncated the transfer when it was recorded, so
+        // bytes_to_hex is never the one doing it here; the ellipsis comes
+        // from how much of the whole the sample kept.
+        let mut data = bytes_to_hex(self.data(), DH_SAMPLE_BYTES);
+        if self.was_truncated() {
+            data.push_str("...");
+        }
+        (time.time_of_day(), data)
     }
 
     /// Whether the transfer was longer than the bytes kept from it.
@@ -3234,6 +3269,58 @@ mod tests {
         });
         let (_, data) = sample.panel_lines();
         assert_eq!(data, "AB AB AB AB AB AB AB AB...");
+    }
+
+    /// A sample of a value reads as the temperature it is.
+    ///
+    /// What the ground shows for a reading, where it showed four bytes of
+    /// hexadecimal. Asked of the configuration and not of the data: the same
+    /// four bytes are shown as bytes for a node that does not send values,
+    /// because every four bytes are a value and a guess from the width would
+    /// show a four-character decision as a temperature.
+    #[test]
+    fn a_sample_of_a_value_reads_as_a_temperature() {
+        use crate::node::vehicle::compute::as_value;
+
+        let at = |sample: &mut DHSample| {
+            sample.time = Some(Timestamp {
+                micros: 3_661_000_000,
+            })
+        };
+
+        let mut sample = DHSample::new();
+        sample.record(&as_value(293.15).expect("a temperature"));
+        at(&mut sample);
+        assert_eq!(
+            sample.panel_lines_of(true),
+            ("01:01:01".to_string(), "293.15 K".to_string())
+        );
+        // The same sample from a node that sends something else: the bytes.
+        assert_eq!(
+            sample.panel_lines_of(false),
+            ("01:01:01".to_string(), "30 1D 79 11".to_string())
+        );
+
+        // Below zero, which is what the sign on a value is for: a conversion
+        // with the wrong offset reads as what it is and not as 4295 K.
+        let mut sample = DHSample::new();
+        sample.record(&as_value(-40.0).expect("below zero"));
+        at(&mut sample);
+        assert_eq!(sample.panel_lines_of(true).1, "-40 K");
+
+        // A node that sends values and sent something that is not one: the
+        // bytes, because that is what says something is wrong with it.
+        let mut sample = DHSample::new();
+        sample.record(b"293.15");
+        at(&mut sample);
+        assert_eq!(sample.panel_lines_of(true).1, "32 39 33 2E 31 35");
+
+        // And a direction that has carried nothing is still the placeholder,
+        // whichever kind of node it is.
+        assert_eq!(
+            DHSample::new().panel_lines_of(true),
+            (NO_TRANSFER_TIME.to_string(), String::new())
+        );
     }
 
     /// A timestamp reads as the time of day it names.

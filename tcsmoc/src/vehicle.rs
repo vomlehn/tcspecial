@@ -44,10 +44,12 @@ use std::thread;
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
 use tcslib::moc::Moc;
+use tcslib::ping::{Pinger, Uplink};
 use tcslibgs::graph::telemetry::{self, Telemetered, Via};
 use tcslibgs::graph::Graph;
 use tcslibgs::sim_config::SimConfigFile;
 use tcslibgs::{DHSample, Timestamp};
+use tcsui::PingShown;
 use tcsverify::startup::Startup;
 
 use crate::beacon_receive::BeaconReceive;
@@ -55,7 +57,7 @@ use crate::ci_link::{CiLink, Commanded};
 use crate::oc_link::{Arrival, Arrivals};
 use crate::{
     ask_for_the_edge, grid_shape, handle_close, handle_quit, present, show_arrivals, stop,
-    window_size, DHInfo, Edge, MainWindow, MenuAction, ProcessManager, Sizes, CHILDREN,
+    window_size, DHInfo, Edge, MainWindow, MenuAction, PingWindow, ProcessManager, Sizes, CHILDREN,
     CONNECTED_STATUS, DISCONNECTED_STATUS, ERROR_STATUS, NO_TRANSFER_TIME, PANEL_REFRESH_INTERVAL,
 };
 
@@ -754,13 +756,48 @@ fn no_command_link(ui: &MainWindow) {
     });
 }
 
+/// The ping node's answers, on their way to the pinger and its window.
+///
+/// A ping node is a source like any other, so its answers arrive at its `moc`
+/// node with the rest and are shown in its panel. They are also the answers
+/// to the pings sent from the ping window, so the receiver hands each one to
+/// the pinger as well, which matches it to its ping and times it.
+#[derive(Clone)]
+struct PingFeed {
+    node: String,
+    pinger: Arc<Mutex<Pinger>>,
+    window: slint::Weak<PingWindow>,
+}
+
+/// Hand an answer the ping node sent down to the pinger, and say what the
+/// window should show now. `None` where the pinger's lock is poisoned, which
+/// is a pinger nobody can use.
+fn take_answer(feed: &PingFeed, data: &[u8], at: std::time::Duration) -> Option<PingShown> {
+    let mut pinger = feed.pinger.lock().ok()?;
+    pinger.answered(data, at);
+    Some(PingShown::of(pinger.exchange()))
+}
+
+/// Put what the pinger keeps into the ping window.
+fn show_ping(window: &PingWindow, shown: &PingShown) {
+    window.set_sent(shown.sent.clone().into());
+    window.set_sent_time(shown.sent_time.clone().into());
+    window.set_received(shown.received.clone().into());
+    window.set_received_time(shown.received_time.clone().into());
+    window.set_round_trip(shown.round_trip.clone().into());
+    window.set_up(shown.up.clone().into());
+    window.set_down(shown.down.clone().into());
+}
+
 /// Keep what arrives at one `moc` node, in the panel of the source it came
-/// from.
+/// from -- and hand the ping node's answers to the pinger, where this is the
+/// `moc` node they come down through.
 fn serve(
     mut moc: Moc,
     rows: Arc<BTreeMap<String, usize>>,
     sends_values: Arc<BTreeSet<String>>,
     arrivals: Arrivals,
+    pings: Option<PingFeed>,
 ) {
     let mut packets: BTreeMap<String, u64> = BTreeMap::new();
     loop {
@@ -772,6 +809,19 @@ fn serve(
                 continue;
             }
         };
+        if let Some(feed) = pings.as_ref().filter(|feed| feed.node == received.source) {
+            // The ground's clock, now: a datum is timed as it is taken.
+            if let Ok(at) = tcslibgs::node::vehicle::ping::now() {
+                if let Some(shown) = take_answer(feed, &received.data, at) {
+                    let window = feed.window.clone();
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(window) = window.upgrade() {
+                            show_ping(&window, &shown);
+                        }
+                    });
+                }
+            }
+        }
         let Some(&row) = rows.get(&received.source) else {
             continue;
         };
@@ -790,6 +840,69 @@ fn serve(
             }
         }
     }
+}
+
+/// Set the ping window up, where the configuration has a ping node the
+/// ground can reach both ways: the Ping node button that opens it, and its
+/// Send ping, which pings the node through its `moc` node's uplink.
+///
+/// The `moc` node the answers come down through, and what its receiver hands
+/// them on to; `None` where there is nothing to ping, and an error where there
+/// is a ping node and no way to send to it.
+fn ping_node(
+    ui: &MainWindow,
+    ping_window: &PingWindow,
+    graph: &Graph,
+) -> Result<Option<(String, PingFeed)>, String> {
+    let Some(route) = tcslib::ping::route_of(graph) else {
+        return Ok(None);
+    };
+    let uplink = Uplink::open(graph, &route.moc)
+        .map_err(|e| format!("{} cannot be pinged: {e}", route.node))?;
+    eprintln!(
+        "pinging {} through {} at {}",
+        route.node,
+        route.moc,
+        uplink.to()
+    );
+    let pinger = Arc::new(Mutex::new(Pinger::new()));
+    ping_window.set_node(SharedString::from(route.node.as_str()));
+    ui.set_can_ping_node(true);
+    {
+        let window = ping_window.as_weak();
+        ui.on_ping_node_clicked(move || {
+            if let Some(window) = window.upgrade() {
+                let _ = window.show();
+            }
+        });
+    }
+    {
+        let pinger = pinger.clone();
+        let window = ping_window.as_weak();
+        ping_window.on_send_clicked(move || {
+            let Some(window) = window.upgrade() else {
+                return;
+            };
+            let sent = tcslibgs::node::vehicle::ping::now().and_then(|at| {
+                let mut pinger = pinger.lock().map_err(|_| "the pinger".to_string())?;
+                let message = pinger.ping(at)?;
+                uplink.send(message.as_bytes())?;
+                Ok(PingShown::of(pinger.exchange()))
+            });
+            match sent {
+                Ok(shown) => show_ping(&window, &shown),
+                Err(why) => eprintln!("ping: {why}"),
+            }
+        });
+    }
+    Ok(Some((
+        route.moc,
+        PingFeed {
+            node: route.node,
+            pinger,
+            window: ping_window.as_weak(),
+        },
+    )))
 }
 
 /// Run the MOC on a configuration. Does not return.
@@ -964,6 +1077,18 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
     // moc node and one for the payloads that report over payload_telemetry,
     // each on a thread of its own. A port that cannot be bound is said with
     // the rest of what was found, and costs its panels their data.
+    // The ping node, where there is one the ground can reach both ways: a
+    // window of its own, opened by Ping node, that pings it and times the
+    // answer. See `tcslib::ping`.
+    let ping_window = PingWindow::new().unwrap();
+    let pings = match ping_node(&ui, &ping_window, &graph) {
+        Ok(pings) => pings,
+        Err(e) => {
+            startup.warning(e);
+            None
+        }
+    };
+
     let arrivals: Arrivals = Arc::new(Mutex::new(vec![None; count]));
     let mocs: Vec<&str> = graph
         .nodes
@@ -993,7 +1118,11 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
         let rows = rows.clone();
         let sends_values = sends_values.clone();
         let arrivals = arrivals.clone();
-        thread::spawn(move || serve(moc, rows, sends_values, arrivals));
+        let feed = pings
+            .as_ref()
+            .filter(|(through, _)| through == moc.name())
+            .map(|(_, feed)| feed.clone());
+        thread::spawn(move || serve(moc, rows, sends_values, arrivals, feed));
     }
 
     // The panels, kept current -- and the one thing that keeps running on the
@@ -1206,6 +1335,97 @@ pub(crate) mod tests {
 
         *agreed.lock().unwrap() = Some(true);
         assert!(may_command_nodes(&agreed));
+    }
+    /// Send ping, pressed, pings the ping node through its moc node, and the
+    /// node's answer, taken as the receiver takes it, is timed in the window.
+    ///
+    /// Run from `main.rs`'s window test, which owns the testing backend. The
+    /// vehicle is a socket this test holds where the moc node binds, so what
+    /// is checked is the press and the answer and not tcspecial.
+    pub(crate) fn pressing_send_ping_pings_the_node_and_times_its_answer() {
+        use std::net::UdpSocket;
+        use tcslibgs::node::vehicle::ping;
+
+        let vehicle = UdpSocket::bind("127.0.0.1:0").expect("a stub socket");
+        vehicle
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .expect("a timeout");
+        let port = vehicle.local_addr().expect("where it is").port();
+        let dir = tempfile::tempdir().expect("a directory");
+        let path = dir.path().join("ping.yaml");
+        std::fs::write(
+            &path,
+            format!(
+                "moc:\n  - name: moc\n    type: moc\n    address: \"127.0.0.1\"\n    \
+                 port: \"{port}\"\n    ground_base: \"127.0.0.1:9100\"\n    \
+                 payload-in: true\n    moc-out:\n      - target: ping\n\
+                 vehicle:\n  - name: ping\n    type: ping\n    moc-in: true\n    \
+                 payload-out:\n      - target: moc\n"
+            ),
+        )
+        .expect("written");
+        let graph = Graph::load(&path).expect("it reads");
+
+        let ui = MainWindow::new().expect("a window");
+        let ping_window = PingWindow::new().expect("the ping window");
+        let (through, feed) = ping_node(&ui, &ping_window, &graph)
+            .expect("it can be pinged")
+            .expect("there is a ping node");
+        assert_eq!(through, "moc");
+        assert!(ui.get_can_ping_node(), "the Ping node button is there");
+        ui.invoke_ping_node_clicked();
+
+        // The press: a ping goes up, numbered from one, and is shown.
+        ping_window.invoke_send_clicked();
+        let mut buffer = [0u8; ping::REPLY_BYTES];
+        let (got, _) = vehicle.recv_from(&mut buffer).expect("the ping arrived");
+        let sent = std::str::from_utf8(&buffer[..got])
+            .expect("text")
+            .to_string();
+        assert_eq!(
+            ping::read_message(sent.as_bytes()).expect("a ping").count,
+            1
+        );
+        assert_eq!(ping_window.get_sent().as_str(), sent);
+        assert_eq!(
+            ping_window.get_received_time().as_str(),
+            "",
+            "nothing has answered it"
+        );
+
+        // The answer, as the receiver hands it on, with the times filled in.
+        let had = ping::now().expect("a clock");
+        let answer = ping::reply(sent.as_bytes(), had).expect("answered");
+        let shown = take_answer(
+            &feed,
+            answer.as_bytes(),
+            had + std::time::Duration::from_millis(1),
+        )
+        .expect("the pinger");
+        show_ping(&ping_window, &shown);
+        assert_eq!(
+            ping_window.get_received().as_str(),
+            String::from_utf8_lossy(answer.as_bytes())
+        );
+        assert!(!ping_window.get_received_time().is_empty());
+        assert!(
+            ping_window.get_round_trip().ends_with(" ms"),
+            "{}",
+            ping_window.get_round_trip()
+        );
+        assert!(
+            ping_window.get_down().starts_with("1.000000"),
+            "{}",
+            ping_window.get_down()
+        );
+
+        // And a configuration with nothing to ping has no button.
+        let other = MainWindow::new().expect("a window");
+        let other_ping = PingWindow::new().expect("a ping window");
+        assert!(ping_node(&other, &other_ping, &example("beacon"))
+            .expect("nothing wrong")
+            .is_none());
+        assert!(!other.get_can_ping_node());
     }
 
     /// Connect, and then a panel's Enable, reach the vehicle and say what came

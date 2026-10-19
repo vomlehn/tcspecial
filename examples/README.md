@@ -152,3 +152,7 @@ python3 examples/ping/ping_moc.py --pings 3     # no window: three pings, printe
 ```
 
 Its ports are all in the seven thousands, which no other example uses.
+
+tcsmoc pings it too: `make runmocy TCSPECIAL_CONFIG_FILE=examples/ping/ping`,
+then the `Ping node` button beside `Command`. It is the same panel, kept by
+`tcslib::ping`, which `ping_ground.py` is written after.

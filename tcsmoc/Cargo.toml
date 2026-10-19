@@ -25,6 +25,9 @@ libc = "0.2"
 # testing backend; it uses real font metrics unless a component asks for the
 # fixed test font, which none of these do.
 i-slint-backend-testing = "1.18"
+# A directory a test can write a configuration of its own into: the ping
+# window's test, whose moc node binds a socket the test holds.
+tempfile = "3"
 
 [build-dependencies]
 slint-build = "1.3"

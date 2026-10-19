@@ -20,6 +20,10 @@
 //! ```
 //!
 //! The Rust side sets its three properties from [`Shown::of`].
+//!
+//! The ping panel, `ui/ping.slint`, is the same arrangement for
+//! [`tcslib::ping`]: the markup shows seven rows, and [`PingShown::of`] says
+//! what each says.
 
 use std::time::SystemTime;
 
@@ -118,6 +122,39 @@ impl Shown {
     }
 }
 
+/// What the ping panel's rows should say: `ui/ping.slint`'s seven
+/// properties, from what [`tcslib::ping::Pinger`] keeps.
+///
+/// All from one reading of one exchange, for the reason [`Shown`] is: a time
+/// received beside a ping it does not answer would be two accounts of one
+/// moment.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct PingShown {
+    pub sent: String,
+    pub sent_time: String,
+    pub received: String,
+    pub received_time: String,
+    pub round_trip: String,
+    pub up: String,
+    pub down: String,
+}
+
+impl PingShown {
+    /// What to show for this exchange.
+    pub fn of(exchange: &tcslib::ping::Exchange) -> PingShown {
+        use tcslib::ping::{interval, precise_time};
+        PingShown {
+            sent: exchange.sent.clone().unwrap_or_default(),
+            sent_time: precise_time(exchange.sent_at),
+            received: exchange.received.clone().unwrap_or_default(),
+            received_time: precise_time(exchange.received_at),
+            round_trip: interval(exchange.round_trip()),
+            up: interval(exchange.up()),
+            down: interval(exchange.down()),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -198,5 +235,29 @@ mod tests {
         let nothing = Shown::at(&schedule.after(None, SystemTime::now()), None, "<none>");
         assert_eq!(nothing.received, "--:--:--");
         assert_eq!(nothing.indicator, palette::unknown());
+    }
+
+    /// The ping panel's rows, before anything is sent and once an answer has
+    /// come back: empty, and then each in the words the Python shows.
+    #[test]
+    fn the_ping_panel_says_what_the_exchange_is() {
+        use tcslib::ping::{Exchange, Pinger};
+        use tcslib::node::vehicle::ping;
+
+        assert_eq!(PingShown::of(&Exchange::default()), PingShown::default());
+
+        let at = Duration::new(1_760_900_000, 0);
+        let mut pinger = Pinger::new();
+        let message = pinger.ping(at).expect("a ping");
+        let answer = ping::reply(message.as_bytes(), at + Duration::from_millis(3)).expect("an answer");
+        pinger.answered(answer.as_bytes(), at + Duration::from_millis(5));
+
+        let shown = PingShown::of(pinger.exchange());
+        assert_eq!(shown.sent, "ping #1 1760900000.000000000");
+        assert!(shown.received.starts_with("ping #1 "), "{shown:?}");
+        assert_eq!(shown.round_trip, "5.000000 ms");
+        assert_eq!(shown.up, "3.000000 ms");
+        assert_eq!(shown.down, "2.000000 ms");
+        assert!(shown.received_time.ends_with(".005000000"), "{shown:?}");
     }
 }

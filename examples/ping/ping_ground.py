@@ -1,8 +1,10 @@
 """The ground's half of a ping, with no window.
 
-What is specific to this example, between the two halves it borrows: the
-ping format (``python/tcslibgs/ping.py``, after ``tcslibgs``) and the
-configuration (``python/tcslibgs/configuration.py``). A :class:`Pinger`
+The Python spelling of ``tcslib/src/ping.rs``, which is what tcsmoc pings a
+``ping`` node with: the same rules for what is kept and the same three times,
+shown the same way. Here between the two halves it borrows: the ping format
+(``python/tcslibgs/ping.py``, after ``tcslibgs``) and the configuration
+(``python/tcslibgs/configuration.py``). A :class:`Pinger`
 sends each ping up to the ``moc`` node, takes each answer the ``ping`` node
 sends back down, and keeps what a window shows: the last ping sent and when,
 the last answer received and when, and the three times between them.

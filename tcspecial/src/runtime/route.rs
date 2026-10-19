@@ -149,13 +149,14 @@ impl Routes {
     /// a table with holes in it, which is why the order matters and is
     /// written down here.
     pub fn of(graph: &Graph) -> Routes {
-        let mut routes = Routes::default();
-
         // The links to the ground first, because a line into a moc node is
         // delivered to one of them. A configuration whose links to the ground
         // do not work out gives none: `Graph::check` refuses it, saying why,
         // and this is the table for a checked graph.
-        routes.ground_links = telemetry::of(graph).unwrap_or_default();
+        let mut routes = Routes {
+            ground_links: telemetry::of(graph).unwrap_or_default(),
+            ..Routes::default()
+        };
         let to_the_ground: BTreeMap<(String, String), String> = routes
             .ground_links
             .iter()

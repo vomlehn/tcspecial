@@ -550,7 +550,7 @@ impl Running {
     /// what its kind supports -- see `tcspecial::node` -- and here all the
     /// same, because this end of an interface is held in a structure and a
     /// structure cannot refuse at compile time what a type can.
-    fn held<'a>(end: &'a mut Option<End>, interface: Interface) -> Result<&'a mut End, String> {
+    fn held(end: &mut Option<End>, interface: Interface) -> Result<&mut End, String> {
         end.as_mut().ok_or_else(|| {
             format!(
                 "this app does not support {}, on which {}: it was started \

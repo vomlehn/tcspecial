@@ -79,11 +79,14 @@ fn main() -> ExitCode {
 
     // Both, and not the first to finish: one interface ending is not the
     // other's business, and a program that stopped on the first would drop
-    // whatever was still arriving on the second.
-    let carried = [groundward, vehicleward]
+    // whatever was still arriving on the second. Collected before they are
+    // asked about, so that both are joined: `all` stops at the first that did
+    // not carry, and the second would be left running.
+    let joined: Vec<bool> = [groundward, vehicleward]
         .into_iter()
         .map(|stream| stream.join().unwrap_or(false))
-        .fold(true, |all, one| all && one);
+        .collect();
+    let carried = joined.iter().all(|carried| *carried);
 
     if carried {
         ExitCode::SUCCESS

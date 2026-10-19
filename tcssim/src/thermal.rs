@@ -743,12 +743,14 @@ mod tests {
         // It started cold and the heaters brought it to the band. Six kelvin
         // a second over eight kelvin is under two seconds, and the bound here
         // is loose enough for a loaded machine to be slow at it.
-        let reached = reached.expect(&format!(
-            "the mass never reached the band: it is at {} K, and the vehicle \
-             {} driving the heaters",
-            mass.temperature(),
-            if heating { "is" } else { "is not" }
-        ));
+        let reached = reached.unwrap_or_else(|| {
+            panic!(
+                "the mass never reached the band: it is at {} K, and the vehicle \
+                 {} driving the heaters",
+                mass.temperature(),
+                if heating { "is" } else { "is not" }
+            )
+        });
         assert!(
             reached < Duration::from_secs(3),
             "eight kelvin at six a second took {reached:?}"

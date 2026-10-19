@@ -9,6 +9,9 @@ members = [
     "tcssim",
     "tcsverify",
     "tcsgui",
+    # The window pieces the ground programs share: the panels, and what to
+    # show on them. See tcsui.
+    "tcsui",
     # The file interfaces an app node's program is run with, and the five
     # apps that are run over them: see tcsapp. Three are nodes of the
     # vehicle's own and two are payloads.
@@ -20,6 +23,7 @@ members = [
     "app_all_pl",
     # The programs of an example: see examples/README.md.
     "examples/simple-app",
+    "examples/beacon",
 ]
 
 [workspace.package]

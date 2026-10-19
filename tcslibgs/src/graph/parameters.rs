@@ -32,6 +32,7 @@ use serde::de::{self, MapAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::endpoint_config::Scalar;
+use crate::graph::Graph;
 use crate::types::{
     default_log_segment_bytes, BeaconJson, CIConfigJson, LogJson, PayloadCommandJson,
     PayloadTelemetryJson, TcsCmdJson,
@@ -332,6 +333,25 @@ pub fn ci_config_of(said: &BTreeMap<String, Scalar>) -> Result<CIConfigJson, Str
 /// until somebody has a reason would be making a configuration that looks as
 /// answered as one somebody thought about -- which is the argument the schema
 /// itself makes for requiring these at all.
+/// Where a configuration says its beacons are: both ends of the link.
+///
+/// The `tcspecial` section's `beacon.send` and `beacon.recv`. `None` for a
+/// configuration with no section, which sends no beacons -- the section is
+/// where the two addresses are written down.
+///
+/// Here rather than in each ground program because every ground program needs
+/// it and the answer is the file's: tcsmoc reads it to put a beacon panel in
+/// its window, the `beacon` example reads it to show the same panel, and a
+/// station that worked the pair out for itself would be a second reading of
+/// one file.
+pub fn beacon_of(graph: &Graph) -> Result<Option<crate::BeaconLink>, String> {
+    let Some(section) = graph.tcspecial.as_ref() else {
+        return Ok(None);
+    };
+    let ci = ci_config_of(&flatten(section))?.to_ci_config()?;
+    Ok(Some(crate::BeaconLink::of(&ci)))
+}
+
 pub fn blank() -> BTreeMap<String, Scalar> {
     let mut said = BTreeMap::new();
     for (name, _) in ATTRIBUTES {

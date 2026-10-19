@@ -182,23 +182,6 @@ fn anything_simulated(graph: &Graph, sim_path: Option<&str>) -> bool {
         .is_some_and(|handlers| !handlers.is_empty())
 }
 
-/// Where the beacons come from and go to: the `tcspecial` section's
-/// `beacon.send` and `beacon.recv`, which tcspecial sends them by. `None` for
-/// a configuration with no section, which has no beacons.
-fn beacon_of(graph: &Graph) -> Result<Option<tcspecial::config::Beacon>, String> {
-    let Some(section) = graph.tcspecial.as_ref() else {
-        return Ok(None);
-    };
-    let ci = tcslibgs::graph::parameters::ci_config_of(&tcslibgs::graph::parameters::flatten(
-        section,
-    ))?
-    .to_ci_config()?;
-    Ok(Some(tcspecial::config::Beacon {
-        send: ci.beacon_send,
-        recv: ci.beacon_recv,
-    }))
-}
-
 /// The two command links the configuration's `tcspecial` section states.
 ///
 /// The spacecraft's -- where this end sends from, `tcs_cmd.send`, and where
@@ -254,7 +237,7 @@ fn hear_what_the_vehicle_read(
         Ok((theirs, their_config, their_digest)) => {
             eprintln!(
                 "CONNECT answer: {}",
-                crate::beacon_receive::what_it_read(theirs, their_config, their_digest)
+                tcslib::beacon::what_it_read(theirs, their_config, their_digest)
             );
             let same = their_digest == digest;
             if let Ok(mut held) = agreed.lock() {
@@ -938,8 +921,8 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
             None
         }
     };
-    let contact = Arc::new(Mutex::new(crate::Contact::Lost));
-    let _beacon_receive = match beacon_of(&graph) {
+    let contact = Arc::new(Mutex::new(tcslib::beacon::Contact::Lost));
+    let _beacon_receive = match tcslibgs::graph::parameters::beacon_of(&graph) {
         Ok(Some(beacon)) => {
             eprintln!(
                 "Listening for beacons at {}, which {} sends from",
@@ -948,7 +931,7 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
             BeaconReceive::new(
                 ui.as_weak(),
                 beacon,
-                crate::BEACON_INDICATOR.clone(),
+                crate::config::constants::beacon_schedule(),
                 contact,
                 digest,
                 Some(crate::ask_whether_to_continue(

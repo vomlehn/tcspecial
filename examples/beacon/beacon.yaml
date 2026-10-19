@@ -1,0 +1,45 @@
+# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial.schema.json
+
+version: "2.0"
+description: "A beacon, and a ground station that watches it"
+
+tcspecial:
+  # What this example is about. tcspecial sends a beacon from send every
+  # interval and the ground station receives it at recv, so these two are the
+  # whole of the link the example shows.
+  #
+  # The ports are this example's own, a hundred above the ones the others use,
+  # so that the beacon watcher can be left running while another example is
+  # looked at.
+  beacon:
+    interval: "5 s"
+    recv: "127.0.0.1:5750"
+    send: "0.0.0.0:5650"
+  log:
+    directory: "/tmp/telemetry"
+    segment_size: "65536"
+  payload_command:
+    dest_base: "0.0.0.0:4400"
+    source_base: "127.0.0.1:4500"
+  payload_telemetry:
+    dest_base: "127.0.0.1:6300"
+    source_base: "0.0.0.0:6200"
+  tcs_cmd:
+    recv: "0.0.0.0:4600"
+    send: "127.0.0.1:4700"
+
+payloads:
+  # A beacon is sent because tcspecial is running rather than because a
+  # payload has anything to say, so this example needs a payload only because
+  # a configuration describes a vehicle and a vehicle with nothing aboard is
+  # not one. Its readings go to the ground over payload_telemetry, as any
+  # payload's do when nothing aboard touches them.
+  - name: sensor
+    type: network
+    protocol: "udp"
+    address: "127.0.0.1"
+    port: "5101"
+
+tcsgui:
+  nodes:
+    - { name: sensor, x: 34, y: 34 }

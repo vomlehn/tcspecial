@@ -25,6 +25,7 @@ help:
 	@echo "  make run-simple      - Run tcsmoc on the minimal example"
 	@echo "  make run-thermostat  - Run tcsmoc on the thermostat example"
 	@echo "  make run-simple-app  - Run the simple-app example, printing its line"
+	@echo "  make run-beacon      - Run the beacon example: a window watching the beacon"
 	@echo "  make check-python3   - Check for the Python 3 simple-app's payload needs"
 
 # Running tcsmoc on one of the examples.
@@ -102,6 +103,33 @@ run-simple-app: check-python3
 		trap 'pkill -P $$vehicle || true; kill -INT $$vehicle 2>/dev/null || true; wait $$vehicle || true' EXIT; \
 		trap 'exit 130' INT TERM; \
 		timeout $(SIMPLE_APP_WAITS) target/debug/lorem_moc \
+	)
+
+# Run the beacon example: tcspecial beaconing, and a window watching it.
+#
+# Both ends again, and no simulator: a beacon comes from tcspecial itself, so
+# nothing has to be standing in for a payload for one to arrive. The vehicle
+# goes in the background and the watcher in the foreground, where it stays
+# until it is closed -- the point of it is a light that goes on changing, so
+# there is nothing for it to finish and no timeout on it.
+#
+# It opens a window, so it wants a display. Without one Slint says so and the
+# run stops there, which is a thing to know rather than a thing to work
+# around: what the window shows is what the example is.
+.PHONY: run-beacon
+run-beacon:
+	cd $(ROOT) && cargo build -q --bin tcspecial --bin beacon_watch
+	( \
+		set -eu; \
+		echo "Running $(PROJECT_NAME) on examples/beacon/beacon.yaml..."; \
+		cd $(ROOT); \
+		rm -rf $(TELEMETRY); \
+		mkdir $(TELEMETRY); \
+		RUST_LOG=$(RUST_LOG) target/debug/tcspecial examples/beacon/beacon.yaml & \
+		vehicle=$$!; \
+		trap 'kill -INT $$vehicle 2>/dev/null || true; wait $$vehicle || true' EXIT; \
+		trap 'exit 130' INT TERM; \
+		target/debug/beacon_watch examples/beacon/beacon.yaml \
 	)
 
 # Whether there is a Python 3 to run simple-app's payload with.

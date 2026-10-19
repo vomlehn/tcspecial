@@ -1,5 +1,8 @@
 import { Button, GroupBox, LineEdit, ListView, GridBox, StandardListView, ScrollView } from "std-widgets.slint";
 import { Copyable, CopyButton } from "../../tcsverify/ui/copy.slint";
+// The beacon's panel, shared with the other ground programs: see tcsui. What
+// it shows is worked out in Rust, from what tcslib::beacon reports.
+import { BeaconPanel } from "../../tcsui/ui/beacon.slint";
 // What was found wrong as the program started, shown before this window: the
 // one window tcsmoc and tcssim share, beside tcsverify, whose report it shows.
 export { StartupWindow, StartupLine } from "../../tcsverify/ui/startup.slint";
@@ -571,61 +574,15 @@ export component MainWindow inherits Window {
                     // commands, because it says the same kind of thing: what
                     // is arriving from the spacecraft on its own, as against
                     // what the link beside it is asking for. It is not the
-                    // link, and the border is there to say so -- the beacon
-                    // has a socket of its own and keeps arriving after a
-                    // disconnect, which is a window worth being able to read
-                    // rather than one to be puzzled by.
-                    Rectangle {
-                        border-width: 1px;
-                        border-color: #808080;
-                        border-radius: 4px;
-
-                        VerticalLayout {
-                            padding: 6px;
-                            spacing: 2px;
-                            // Centred, because this box is the shorter of the
-                            // two and the row is as tall as the other one.
-                            alignment: center;
-
-                            HorizontalLayout {
-                                spacing: 8px;
-
-                                Text { text: "Beacon: "; vertical-alignment: center; }
-                                Rectangle {
-                                    width: 20px;
-                                    height: 20px;
-                                    border-radius: 10px;
-                                    background: indicator-color;
-                                    border-color: #808080;
-                                    border-width: 1px;
-                                }
-                            }
-
-                            HorizontalLayout {
-                                spacing: 8px;
-
-                                Text { text: "Last rcvd: "; vertical-alignment: center; }
-                                Text {
-                                    text: beacon-last-recv;
-                                    font-size: 10px;
-                                    vertical-alignment: center;
-                                }
-                            }
-
-                            // What that beacon said, under when it arrived:
-                            // the line reads as one message, received then
-                            // and saying this.
-                            HorizontalLayout {
-                                spacing: 8px;
-
-                                Text { text: "Last msg: "; vertical-alignment: center; }
-                                Text {
-                                    text: beacon-last-msg;
-                                    font-size: 10px;
-                                    vertical-alignment: center;
-                                }
-                            }
-                        }
+                    // link, which the panel's own border says.
+                    //
+                    // The panel is tcsui's, so that this window and the
+                    // beacon example show an operator the same thing: see
+                    // ../../tcsui/ui/beacon.slint.
+                    BeaconPanel {
+                        indicator-color: root.indicator-color;
+                        last-received: root.beacon-last-recv;
+                        last-message: root.beacon-last-msg;
                     }
                 }
 

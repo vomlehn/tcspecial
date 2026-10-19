@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial-sim.schema.json
+
+# How tcssim stands in for the one payload of beacon.yaml.
+#
+# Nothing here is about beacons: a beacon comes from tcspecial itself and no
+# simulator has a part in one. The payload is simulated so that the example
+# can be run with tcssim as any other is.
+description: Simulator settings for the payload of beacon.yaml
+
+simulated_payloads:
+  # One packet a second, sent whole.
+  - name: sensor
+    type: network
+    protocol: udp
+    packet_interval: 1 s

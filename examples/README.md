@@ -8,13 +8,16 @@ Each example is a directory holding three files:
 
 An example whose payload is a program of its own holds that program too,
 beside those files: `simple-app` does, with a Python 3 payload and a Rust
-ground station.
+ground station. An example may hold a ground program without holding a
+payload: `beacon` does, its ground station watching something tcspecial sends
+on its own account.
 
 | Directory | Description |
 |---|---|
 | `minimal` | The smallest working configuration: one UDP payload whose telemetry goes straight to the ground (MOC). |
 | `thermostat` | Three temperature sensors (I2C and SPI), converted to kelvin, averaged, and fed to a hysteresis thermostat that drives GPIO heaters. The setpoint is commanded from the ground. |
 | `simple-app` | A payload that is a program rather than a device: an `app_pl` node sending a line of text one word per packet, and a ground station that prints the line. Two programs of its own beside the configuration: the payload in Python 3, the ground station in Rust. |
+| `beacon` | The one thing a ground station knows without asking: a window showing the spacecraft's beacon, built from the two halves any ground station would use -- `tcslib::beacon` to listen and `tcsui`'s panel to show it. |
 
 A configuration and its simulator file are matched by payload name. Every
 data handler in the configuration needs an entry in the simulator file, and
@@ -57,6 +60,40 @@ see what an app node is. Two programs, both in `examples/simple-app`:
 
 ```
 make run-simple-app
+```
+
+## beacon
+
+What a ground station can know about a spacecraft without asking it anything.
+tcspecial sends a beacon every `beacon.interval` for as long as it runs, over
+a socket of its own, whether or not anything has connected to it -- so this
+example commands nothing and still says whether the vehicle is alive, which
+build it is, which version of a configuration it is serving, and whether that
+is the configuration the ground read.
+
+It is also the example of how a ground program is put together, because almost
+nothing in it is its own:
+
+- `tcslib::beacon` binds the socket, reads each datagram, counts the beacons
+  that did not arrive, compares the digest in each one with the ground's own
+  and says how stale the last one is. No window, no toolkit: a ground station
+  with no screen -- a logger, a test -- uses exactly this.
+- `tcsui` holds the panel, as markup other windows import, and works out what
+  to show on it: which colour the light is, and the two lines beside it.
+- `beacon_watch`, the program here, reads the configuration to find where the
+  beacons are, starts the loop on a thread, and puts each pass in the window.
+  That is all of it.
+
+tcsmoc shows the same panel from the same library, in a row beside its command
+link, which is the point of their being apart: an operator who has read one has
+read the other.
+
+The beacon's ports are this example's own -- a hundred above the ones the other
+examples use -- so the watcher can be left running while another example is
+looked at. It opens a window, so it wants a display.
+
+```
+make run-beacon
 ```
 
 That checks for Python 3, builds the vehicle and the ground station, starts

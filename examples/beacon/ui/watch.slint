@@ -1,0 +1,31 @@
+// A window holding the beacon panel and nothing else.
+//
+// The point of the example: the panel is not this program's, and neither is
+// what it shows. The markup comes from tcsui, which tcsmoc shows the same
+// panel from, and what fills it in comes from tcslib::beacon -- so this
+// window is the wiring and nothing more.
+
+import { BeaconPanel } from "../../../tcsui/ui/beacon.slint";
+
+export component WatchWindow inherits Window {
+    title: "Beacon";
+    // Enough for the panel and the longest line it shows, which is what a
+    // beacon says: the build, the configuration version and a sixteen-byte
+    // digest.
+    width: 460px;
+    height: 120px;
+
+    in-out property <color> indicator-color: #c0c0c0;
+    in-out property <string> last-received: "--:--:--";
+    in-out property <string> last-message: "<none>";
+
+    VerticalLayout {
+        padding: 8px;
+
+        BeaconPanel {
+            indicator-color: root.indicator-color;
+            last-received: root.last-received;
+            last-message: root.last-message;
+        }
+    }
+}

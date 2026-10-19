@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="420" viewBox="0 0 900 420" role="img" aria-labelledby="title desc">
+  <title id="title">The beacon example</title>
+  <desc id="desc">tcspecial sends a beacon every five seconds from 0.0.0.0:5650 to the ground station beacon_watch, which receives it at 127.0.0.1:5750 and shows it on the beacon panel: a light saying how stale the last one is, the time it arrived, and what it said. The payload, sensor, is there because a configuration describes a vehicle; its readings go to the ground over its own telemetry link and have nothing to do with the beacon.</desc>
+  <defs>
+    <style>
+      text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
+      .name { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 15px; font-weight: bold; }
+      .kind { font-size: 12.5px; fill: #374151; }
+      .detail { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 11.5px; fill: #4b5563; }
+      .heading { font-size: 13px; font-weight: bold; fill: #475569; letter-spacing: 0.06em; }
+      .label { font-size: 12px; fill: #1f2937; }
+      .note { font-size: 12px; fill: #4b5563; }
+      .payload { fill: #eaf2fb; stroke: #2f6db5; stroke-width: 1.6; }
+      .socket { fill: #ffffff; stroke: #2f6db5; stroke-width: 1.4; stroke-dasharray: 5 3; }
+      .ground { fill: #f3f4f6; stroke: #4b5563; stroke-width: 1.6; }
+      .boundary { fill: #fbfbfd; stroke: #94a3b8; stroke-width: 1.4; stroke-dasharray: 7 5; }
+      .groundward { fill: none; stroke: #2563eb; stroke-width: 2; }
+      .telemetry { fill: none; stroke: #2563eb; stroke-width: 2; stroke-dasharray: 8 5; }
+      .beacon { fill: none; stroke: #15803d; stroke-width: 2.4; }
+      .lamp { stroke: #6b7280; stroke-width: 1; }
+    </style>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#15803d"/>
+    </marker>
+  </defs>
+
+  <rect width="900" height="420" fill="#ffffff"/>
+
+  <!-- Column headings -->
+  <text class="heading" x="45" y="44">PAYLOAD</text>
+  <text class="heading" x="660" y="44">GROUND</text>
+
+  <!-- tcspecial, the vehicle -->
+  <rect class="boundary" x="280" y="58" width="320" height="230" rx="14"/>
+  <text class="heading" x="298" y="84">TCSPECIAL (VEHICLE)</text>
+
+  <!-- The beacon itself, which is tcspecial's own and no payload's -->
+  <rect class="socket" x="330" y="100" width="220" height="80" rx="10"/>
+  <text class="name" x="346" y="127">beacon</text>
+  <text class="kind" x="346" y="148">every 5 s, while it runs</text>
+  <text class="detail" x="346" y="167">sends from 0.0.0.0:5650</text>
+
+  <!-- sensor -->
+  <rect class="payload" x="45" y="208" width="190" height="80" rx="10"/>
+  <text class="name" x="61" y="235">sensor</text>
+  <text class="kind" x="61" y="256">network payload, UDP</text>
+  <text class="detail" x="61" y="275">127.0.0.1:5101</text>
+
+  <!-- sensor's telemetry link, aboard -->
+  <rect class="socket" x="330" y="208" width="220" height="80" rx="10"/>
+  <text class="name" x="346" y="235">sensor telemetry</text>
+  <text class="kind" x="346" y="256">telemetry link, device id 0</text>
+  <text class="detail" x="346" y="275">sends from 0.0.0.0:6200</text>
+
+  <!-- The ground station: the panel and nothing else -->
+  <rect class="ground" x="660" y="90" width="215" height="140" rx="10"/>
+  <text class="name" x="676" y="117">beacon_watch</text>
+  <text class="kind" x="676" y="138">ground station</text>
+  <text class="detail" x="676" y="157">receives on 127.0.0.1:5750</text>
+  <!-- The panel it shows, drawn as it looks -->
+  <rect class="socket" x="676" y="170" width="183" height="46" rx="6"/>
+  <text class="label" x="688" y="190">Beacon:</text>
+  <circle class="lamp" cx="748" cy="185" r="7" fill="#00ff00"/>
+  <text class="detail" x="688" y="208">last rcvd, last msg</text>
+
+  <!-- Links -->
+  <path class="beacon" d="M550,140 L656,140" marker-end="url(#arrow-green)"/>
+  <text class="label" x="560" y="130">beacon</text>
+
+  <path class="groundward" d="M235,248 L326,248" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="249" y="238">reads</text>
+  <path class="telemetry" d="M550,248 L656,248 L770,248 L770,234" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="560" y="238">readings</text>
+
+  <text class="note" x="298" y="262">The beacon is tcspecial's own: it is sent because</text>
+  <text class="note" x="298" y="278">the vehicle is running, not because anything asked.</text>
+
+  <!-- Legend -->
+  <line x1="45" y1="320" x2="860" y2="320" stroke="#e5e7eb" stroke-width="1"/>
+  <path class="beacon" d="M45,352 L95,352" marker-end="url(#arrow-green)"/>
+  <text class="label" x="105" y="356">beacon, from the tcspecial section</text>
+  <path class="telemetry" d="M330,352 L380,352" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="390" y="356">telemetry link, likewise</text>
+  <rect class="payload" x="45" y="376" width="22" height="16" rx="4"/>
+  <text class="label" x="75" y="389">payload</text>
+  <rect class="socket" x="160" y="376" width="22" height="16" rx="4"/>
+  <text class="label" x="190" y="389">opened by tcspecial</text>
+  <rect class="ground" x="340" y="376" width="22" height="16" rx="4"/>
+  <text class="label" x="370" y="389">ground program</text>
+</svg>

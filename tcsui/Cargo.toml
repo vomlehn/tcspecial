@@ -1,0 +1,12 @@
+[package]
+name = "tcsui"
+version = "0.1.0"
+edition = "2021"
+description = "Window pieces shared by the TCSpecial ground programs: the panels, and what to show on them"
+
+[dependencies]
+# What a panel reports is `tcslib::beacon`'s: this crate is how it is shown,
+# not what it means.
+tcslib = { path = "../tcslib" }
+# For Color alone, which is what a stage of staleness is turned into here.
+slint = "1.3"

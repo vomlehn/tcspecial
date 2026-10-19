@@ -53,7 +53,7 @@ use std::path::{Path, PathBuf};
 
 use tcslibgs::graph::check::Severity;
 use tcslibgs::{
-    describes_payloads_text, ConfigFormat, DHConfig, PayloadConfig, SimConfigFile, TcsError,
+    describes_payloads_text, names_what_is_gone, ConfigFormat, DHConfig, PayloadConfig, SimConfigFile, TcsError,
 };
 
 pub mod locate;
@@ -304,6 +304,15 @@ impl Report {
 /// [`Limits::EVERYTHING`] looks at everything.
 pub fn verify(payload_path: &Path, sim_path: Option<&Path>, limits: Limits) -> Report {
     let mut report = Report::under(limits);
+
+    // Neither path for a file that says no version: each would read it as its
+    // own and refuse whatever of it the other version has, which says nothing
+    // about the line that is missing. One written to a spelling that is gone
+    // is told what became of it, which is the more useful of the two.
+    if tcslibgs::graph::states_no_version(payload_path) {
+        report.add(payload_path, THE_FILE_ITSELF, no_version(payload_path));
+        return report;
+    }
 
     // Asked of the library rather than worked out here: one place knows how
     // to read a version. A file that cannot be read at all answers "not
@@ -800,6 +809,32 @@ fn read(path: &Path, report: &mut Report) -> Option<(String, ConfigFormat)> {
             None
         }
     }
+}
+
+/// What is said about a configuration that states no version, in the
+/// spelling of its own format.
+fn no_version(path: &Path) -> String {
+    let text = std::fs::read_to_string(path).unwrap_or_default();
+    if let Some(gone) = ConfigFormat::of_file(path)
+        .ok()
+        .and_then(|format| names_what_is_gone(&text, format))
+    {
+        return gone.to_string();
+    }
+    let say = |version: &str| match ConfigFormat::of_file(path) {
+        Ok(ConfigFormat::Xml) => format!("<version>{version}</version>"),
+        _ => format!("version: \"{version}\""),
+    };
+    // An empty file is told so: that it states no version is true, and is not
+    // the first thing wrong with it.
+    let empty = text.trim().is_empty();
+    format!(
+        "{}, and which version a configuration is decides what it describes: \
+         say {} for a graph of nodes, or {} for a set of payloads",
+        if empty { "is empty" } else { "states no version" },
+        say("2.0"),
+        say("1.0")
+    )
 }
 
 /// The line a message mentions, if it mentions one.
@@ -1360,6 +1395,42 @@ payloads:
                 report.findings[0]
             );
         }
+    }
+
+    /// A configuration that states no version is told so, whichever version it
+    /// was written as and in either format.
+    ///
+    /// It used to be read as version 1, and a graph read so was refused for
+    /// whatever of it version 1 does not know first -- the root's namespace,
+    /// a number written as a string -- which sent a reader to a line that was
+    /// right.
+    #[test]
+    fn a_configuration_that_states_no_version_is_told_so() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        for (file, version) in [
+            ("examples/minimal/minimal.yaml", "version: \"2.0\"\n"),
+            ("examples/minimal/minimal.xml", "<version>2.0</version>"),
+            ("tests/manual/tcspecial2.yaml", "version: \"1.0\"\n"),
+            ("tests/manual/tcspecial2.xml", "<version>1.0</version>"),
+        ] {
+            let text = std::fs::read_to_string(root.join(file)).expect("the file");
+            assert!(text.contains(version), "{file} states {version}");
+            let extension = if file.ends_with(".xml") { ".xml" } else { ".yaml" };
+            let (_dir, path) = graph_written(extension, &text.replacen(version, "", 1));
+
+            let report = verify(&path, None, Limits::EVERYTHING);
+            assert_eq!(report.findings.len(), 1, "{file}: {:?}", report.said());
+            let said = &report.findings[0].message;
+            assert!(said.starts_with("states no version"), "{file}: {said}");
+            // In the file's own spelling.
+            let spelled = if extension == ".xml" { "<version>2.0</version>" } else { "version: \"2.0\"" };
+            assert!(said.contains(spelled), "{file}: {said}");
+            assert_ne!(report.status(), 0, "{file}");
+        }
+
+        let (_dir, path) = graph_written(".yaml", "\n");
+        let report = verify(&path, None, Limits::EVERYTHING);
+        assert!(report.findings[0].message.starts_with("is empty"), "{:?}", report.said());
     }
 
     /// A file written in the language that is gone is told what became of it.

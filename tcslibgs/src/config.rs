@@ -156,12 +156,32 @@ fn describes_payloads(text: &str, format: ConfigFormat) -> TcsResult<()> {
 
     if !sections.payloads.is_empty() {
         Ok(())
-    } else if !sections.data_handlers.is_empty() || !sections.data_handler_groups.is_empty() {
+    } else if let Some(gone) = what_is_gone(&sections) {
+        Err(gone)
+    } else {
+        Err(TcsError::Config(
+            "names no payloads section, so it describes no payloads".to_string(),
+        ))
+    }
+}
+
+/// What a file still written to an older spelling is told, if it is one.
+///
+/// Asked of a file that says no version as well as of one that says version
+/// 1: the older files said none, so a file saying none is likelier to be one
+/// of them than anything, and it is better told what became of its sections
+/// than told only that a line is missing.
+pub fn names_what_is_gone(text: &str, format: ConfigFormat) -> Option<TcsError> {
+    what_is_gone(&format.parse(text).ok()?)
+}
+
+fn what_is_gone(sections: &Sections) -> Option<TcsError> {
+    if !sections.data_handlers.is_empty() || !sections.data_handler_groups.is_empty() {
         // The old spelling, named rather than ignored. A file keeping it would
         // otherwise be read as naming no section at all, and the honest
         // report of that -- it describes no payloads -- would say nothing
         // about the one word that has to change.
-        Err(TcsError::Config(
+        Some(TcsError::Config(
             "names data_handlers, which is what the payload section was called \
              before: payloads is the section now, and payload_groups a group of \
              them"
@@ -171,16 +191,14 @@ fn describes_payloads(text: &str, format: ConfigFormat) -> TcsResult<()> {
         // The language that is gone, named for the same reason. Its files
         // described the same payloads in other words, and a payload states
         // what an endpoint and its group stated between them.
-        Err(TcsError::Config(
+        Some(TcsError::Config(
             "names endpoints, which was a second way to describe payloads and \
              is gone: a payload states what an endpoint and its group stated \
              between them, in the payloads section"
                 .to_string(),
         ))
     } else {
-        Err(TcsError::Config(
-            "names no payloads section, so it describes no payloads".to_string(),
-        ))
+        None
     }
 }
 

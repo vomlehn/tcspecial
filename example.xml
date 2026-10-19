@@ -2,7 +2,6 @@
 <configuration
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="tcsgui/share/schema/tcspecial.xsd">
-    <version>2.0</version>
     <description>The ground link alone, ready for payloads to be added</description>
     <tcspecial>
         <beacon>

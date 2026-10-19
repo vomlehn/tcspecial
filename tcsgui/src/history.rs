@@ -387,7 +387,7 @@ mod tests {
             home: None,
         });
         std::fs::create_dir_all(one.parent().unwrap()).expect("the vehicle's own");
-        std::fs::write(&one, "version: \"2.0\"\n").expect("a configuration");
+        std::fs::write(&one, "").expect("a configuration");
         write_in(&state, &one, &journal).expect("the history is written");
         assert!(named.exists(), "{named:?}");
         assert_eq!(read_in(&state, &one).map(|kept| kept.depth()), Some(1));
@@ -421,7 +421,7 @@ mod tests {
 
         // And pruned when it is old: a crash a fortnight ago is not an undo
         // anybody is waiting for.
-        std::fs::write(&one, "version: \"2.0\"\n").expect("a configuration again");
+        std::fs::write(&one, "").expect("a configuration again");
         write_in(&state, &one, &journal).expect("written again");
         let fortnight = SystemTime::now() + Duration::from_secs(14 * 24 * 60 * 60);
         assert_eq!(prune_in(&state, fortnight), 1);

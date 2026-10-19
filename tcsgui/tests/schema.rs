@@ -103,7 +103,6 @@ fn the_configuration_schema_has_the_sections_the_reader_reads() {
     // The three node sections are the editor's three working panes, and the
     // rest is what a file says about itself and about the whole of it.
     for section in [
-        "version",
         "description",
         "include",
         "tcspecial",
@@ -119,7 +118,10 @@ fn the_configuration_schema_has_the_sections_the_reader_reads() {
     }
     // And nothing else: a section the schema offers and the reader refuses
     // would be a schema telling somebody to write a file that cannot be read.
-    assert_eq!(sections.len(), 10, "{sections:?}");
+    assert_eq!(sections.len(), 9, "{sections:?}");
+    // And no version: a configuration states none, and the reader refuses
+    // one, so a schema offering it would be offering a refusal.
+    assert!(!sections.contains("version"), "{sections:?}");
 
     // The sections that are gone are gone from the schema too. A file written
     // to the earlier shape is refused where it is read, and an editor offering
@@ -188,9 +190,8 @@ fn the_simulator_schema_is_what_the_settings_say() {
         );
     }
 
-    // And no version: a configuration states one so that it can be checked
-    // against the software that will read it on the vehicle, and nothing
-    // aboard reads this file.
+    // And no version, which no file states: the software reading a file is
+    // what says which version of the language it reads.
     assert!(!properties(&schema, &[]).contains("version"));
 }
 

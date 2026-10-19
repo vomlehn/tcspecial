@@ -321,15 +321,6 @@ extern "C" fn stop(_signal: libc::c_int) {
     STOPPING.store(true, Ordering::Relaxed);
 }
 
-/// Whether this file is a version 2 configuration.
-///
-/// What decides which of the two programs runs: the file says which it is, as
-/// it does for the ground tool. A file that is neither is reported by whichever
-/// reader was asked for it, which can say what is wrong with it.
-pub fn is_a_graph(path: &str) -> bool {
-    tcslibgs::graph::is_version_2(std::path::Path::new(path))
-}
-
 /// Run the configuration in `path` and say what to exit with.
 ///
 /// For `main`, which has one more thing to do than report: a vehicle that
@@ -365,8 +356,7 @@ mod tests {
         let path = where_.path().join("wrong.yaml");
         std::fs::write(
             &path,
-            "version: \"2.0\"\n\
-             payloads:\n\
+            "payloads:\n\
              \x20 - { name: a, type: i2c, path: /dev/i2c-1, address: \"0x48\", \
              payload-out: nobody }\n\
              vehicle:\n\
@@ -390,26 +380,6 @@ mod tests {
         );
     }
 
-    /// A file that is not a graph is not run as one.
-    #[test]
-    fn a_file_that_is_not_a_graph_is_not_one() {
-        let where_ = tempfile::tempdir().expect("a directory");
-
-        let v1 = where_.path().join("payloads.yaml");
-        std::fs::write(&v1, "version: \"1.0\"\ndescription: a set\npayloads: []\n")
-            .expect("the file is written");
-        assert!(!is_a_graph(v1.to_str().expect("a path")));
-
-        let v2 = where_.path().join("graph.yaml");
-        std::fs::write(&v2, "version: \"2.0\"\nnodes: []\nlinks: []\n")
-            .expect("the file is written");
-        assert!(is_a_graph(v2.to_str().expect("a path")));
-
-        // And a file that is not there, which is not a graph either: the
-        // reader that is asked for it says what is wrong with it.
-        assert!(!is_a_graph("/nonesuch/nowhere.yaml"));
-    }
-
     /// The shipped example is a graph, and is checked without complaint.
     #[test]
     fn the_shipped_example_is_a_checked_graph() {
@@ -417,7 +387,6 @@ mod tests {
         let path = root.join("tests/manual/thermostat.yaml");
         let path = path.to_str().expect("a path");
 
-        assert!(is_a_graph(path));
         let graph = Graph::load(path).expect("it reads");
         assert!(graph.check().is_empty(), "{:?}", graph.check());
     }

@@ -11,7 +11,6 @@ use std::process::Command;
 /// to a node that is not there.
 fn with_errors(dir: &Path, count: usize) -> PathBuf {
     let mut text = "\
-version: \"2.0\"
 description: many
 tcspecial:
   beacon:

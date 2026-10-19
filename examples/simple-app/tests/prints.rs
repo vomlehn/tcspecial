@@ -26,8 +26,7 @@ fn configuration() -> (tempfile::TempDir, PathBuf, u16) {
     std::fs::write(
         &path,
         format!(
-            "version: \"2.0\"
-moc:
+            "moc:
   - {{ name: moc, type: moc, ground_base: \"127.0.0.1:{}\" }}
 payloads:
   - {{ name: lorem, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7001\", payload-out: moc }}

@@ -952,8 +952,7 @@ mod tests {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("paced.yaml");
         let mut text = String::from(
-            "version: \"2.0\"
-moc:
+            "moc:
   - { name: ground, type: moc, ground_base: \"127.0.0.1:5100\" }
 payloads:
   - { name: exchanged, type: i2c, path: \"/dev/i2c-1\", address: \"0x48\",
@@ -1097,8 +1096,7 @@ payloads:
         let path = where_.path().join("quiet.yaml");
         std::fs::write(
             &path,
-            "version: \"2.0\"
-moc:
+            "moc:
   - { name: ground, type: moc, ground_base: \"127.0.0.1:5100\" }
 payloads:
   - { name: exchanged, type: i2c, path: \"/dev/i2c-1\", address: \"0x48\",
@@ -1160,8 +1158,7 @@ payloads:
         let path = where_.path().join("stopped.yaml");
         std::fs::write(
             &path,
-            "version: \"2.0\"
-payloads:
+            "payloads:
   - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7005\",
       trigger: \"55\", trigger_interval: \"100 ms\", payload-out: average }
 vehicle:
@@ -1260,8 +1257,7 @@ vehicle:
         let path = where_.path().join("counted.yaml");
         std::fs::write(
             &path,
-            "version: \"2.0\"
-payloads:
+            "payloads:
   - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7009\",
       trigger: \"55\", trigger_interval: \"100 ms\", payload-out: average }
 vehicle:
@@ -1366,8 +1362,7 @@ vehicle:
         let path = where_.path().join("released.yaml");
         std::fs::write(
             &path,
-            "version: \"2.0\"
-payloads:
+            "payloads:
   - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7006\",
       poll_interval: \"100 ms\", payload-out: average }
 vehicle:
@@ -1450,8 +1445,7 @@ vehicle:
         let path = where_.path().join("handed.yaml");
         std::fs::write(
             &path,
-            "version: \"2.0\"
-payloads:
+            "payloads:
   - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7007\",
       poll_interval: \"100 ms\", payload-out: average }
 vehicle:

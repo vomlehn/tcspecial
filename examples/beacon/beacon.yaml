@@ -1,6 +1,5 @@
 # yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial.schema.json
 
-version: "2.0"
 description: "A beacon, and a ground station that watches it"
 
 tcspecial:

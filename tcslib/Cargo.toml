@@ -2,7 +2,7 @@
 name = "tcslib"
 version = "0.1.0"
 edition = "2021"
-description = "TCSpecial ground software library for mission control integration"
+description = "The ground side of the TCSpecial link: commands to the vehicle's command interpreter, the vehicle's data from a moc node, and its beacons"
 
 [dependencies]
 tcslibgs = { path = "../tcslibgs" }

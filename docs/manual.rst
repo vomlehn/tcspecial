@@ -1761,7 +1761,7 @@ none of it is the program's own:
 
 * ``tcslib::beacon`` binds the socket, reads each datagram, counts the beacons
   that did not arrive, compares the digest each one carries with the ground's
-  own, and says how stale the last one is as a stage: heard, ageing, silent.
+  own, and says how stale the last one is as a stage: heard, aging, silent.
   There is no toolkit in it, so a ground station with no screen -- a logger, a
   test -- uses exactly this.
 * ``tcsui`` holds the panel, as markup other windows import, and works out
@@ -2907,7 +2907,9 @@ blinking green
   but this is within the acceptable number of lost messages
 
 blinking yellow
-  The number of lost beacon messages indicate a possible issue.
+  The number of lost beacon messages indicate a possible issue. The yellow is
+  a golden one, ``#ffe100``: pure yellow is so nearly as light as white that
+  its blink could hardly be seen.
 
 blinking red
   The number of lost beacon messages indicates a likely issue.

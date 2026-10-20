@@ -88,7 +88,7 @@ class ScheduleTest(unittest.TestCase):
         self.assertEqual(s.at(0).stage, Stage.HEARD)
         self.assertEqual(s.at(6 * SECOND).stage, Stage.HEARD)
         self.assertEqual(s.while_in_contact(), 8 * SECOND)
-        self.assertEqual(s.at(9 * SECOND).stage, Stage.AGEING)
+        self.assertEqual(s.at(9 * SECOND).stage, Stage.AGING)
         self.assertEqual(s.at(20 * SECOND).stage, Stage.SILENT)
         self.assertEqual(s.at(86_400 * SECOND).stage, Stage.SILENT)
 
@@ -156,7 +156,7 @@ class LoopTest(unittest.TestCase):
         later = self.beacons.after(beacon.Arrived.NOTHING, [])
         self.assertEqual(later.at, AT, "a pass that found nothing keeps the beacon before it")
         self.assertEqual(later.said, first.said)
-        self.assertEqual(later.showing.stage, Stage.AGEING)
+        self.assertEqual(later.showing.stage, Stage.AGING)
         self.assertEqual(later.contact, Contact.LOST)
 
         broken = self.beacons.after(beacon.Arrived.BROKEN, [])
@@ -195,9 +195,9 @@ class PanelTest(unittest.TestCase):
         self.assertEqual(indicator(s.after(None, AT), False), palette.UNKNOWN)
         self.assertEqual(indicator(s.at(0), True), palette.WELL)
         self.assertEqual(indicator(s.at(6 * SECOND), True), palette.WELL)
-        ageing = s.at(8_200 * MS)
-        self.assertTrue(ageing.lit)
-        self.assertEqual(indicator(ageing, True), palette.WATCH)
+        aging = s.at(8_200 * MS)
+        self.assertTrue(aging.lit)
+        self.assertEqual(indicator(aging, True), palette.WATCH)
         silent = s.at(30_200 * MS)
         self.assertTrue(silent.lit)
         self.assertEqual(indicator(silent, True), palette.WRONG)
@@ -224,7 +224,7 @@ class PanelTest(unittest.TestCase):
         self.assertEqual(palette.UNKNOWN, "#c4c4c4")
         self.assertEqual(palette.OFF, "#ffffff")
         self.assertEqual(palette.WELL, "#00ff00")
-        self.assertEqual(palette.WATCH, "#ffff00")
+        self.assertEqual(palette.WATCH, "#ffe100")
         self.assertEqual(palette.WRONG, "#ff0000")
 
 

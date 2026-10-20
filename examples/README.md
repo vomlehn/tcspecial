@@ -23,6 +23,12 @@ are quiet unless given `-v` or `--verbose`: they print what they are for and
 any error, and with the flag they also say what they are doing, such as where
 they are listening.
 
+They also take `--yaml` or `--xml`, but not both, saying which of the
+example's two configuration files to read. With neither, `beacon` and
+`lorem_moc` read the YAML and `ping_moc.py` the XML. A file named on the
+command line beside one of the two has to be the spelling it asks for, and a
+vehicle the program starts reads the same file.
+
 Two sets of tests find the examples on their own, so adding one means adding
 its directory here, and a row to the table of its section below; there's no
 list in the tests to update:
@@ -129,7 +135,8 @@ starts when the button is pressed. Without make:
 
 ```
 cargo build --bin tcspecial --bin beacon
-cargo run --bin beacon
+cargo run --bin beacon               # beacon.yaml
+cargo run --bin beacon -- --xml      # beacon.xml
 ```
 
 Languages:
@@ -151,7 +158,9 @@ ping #<count> <seconds>.<nanoseconds> <seconds>.<nanoseconds>   down
 ```
 
 The ground station, `ping_moc.py`, is Python 3 and uses nothing outside the
-standard library. Its window shows the beacon panel, the last ping sent and
+standard library to read its configuration's XML, the default; with `--yaml`
+it reads the YAML instead, which needs PyYAML (`python3-yaml` on Debian and
+Ubuntu). Its window shows the beacon panel, the last ping sent and
 when, the last answer and when, and three times: the round trip, MOC to
 tcspecial, and tcspecial to MOC. The last two are each read across two clocks,
 so each includes their offset and may be negative; their sum is the round
@@ -168,6 +177,7 @@ Python to the Rust; `cargo test` runs them.
 ```
 make run-ping                                   # the vehicle and the window
 python3 examples/ping/ping_moc.py --pings 3     # no window: three pings, printed
+python3 examples/ping/ping_moc.py --yaml        # ping.yaml rather than ping.xml
 ```
 
 `ping_moc.py` starts the vehicle itself: tcspecial from the build, on the same
@@ -273,7 +283,7 @@ terminals instead, in either order:
 
 ```
 cargo build                     # lorem_moc and tcspecial
-cargo run --bin lorem_moc       # in one terminal: the ground
+cargo run --bin lorem_moc       # in one terminal: the ground (--xml for the XML)
 cargo run --bin tcspecial -- examples/simple-app/simple-app.yaml   # in another
 ```
 

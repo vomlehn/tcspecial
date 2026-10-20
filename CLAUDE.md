@@ -100,6 +100,11 @@ killing tcsmoc can leave them running; look for strays afterwards.
 
 ## Style
 
+- No dynamic memory allocation after a program enters its main loop -- the
+  loop it runs in for as long as it runs, and anything called from it.
+  Startup may allocate; the loop reuses what startup set up: fixed-size
+  buffers, arrays, stack storage. Where an allocation in the loop is
+  absolutely unavoidable, say so in a comment at that spot, with why.
 - Comments say why, in full sentences, as the surrounding code does. Match
   the density and voice of the file being edited.
 - Error messages name what is wrong and what to do about it, in the user's

@@ -2705,6 +2705,22 @@ the beacon box
   A beacon says only that the spacecraft is alive, so without the number a
   beacon that was lost on the way reads exactly like one that was never sent.
 
+  A datagram that reaches the beacon address from anywhere but where the
+  configuration says beacons come from is not a beacon, and is ignored. That
+  is a warning, which every program that shows the light says on its console
+  whether or not it was asked to talk -- the ``beacon`` and ``ping``
+  examples included, which are otherwise quiet without ``-v`` -- because it
+  is the one explanation of a light going red while the spacecraft is
+  beaconing:
+
+  .. code-block:: console
+
+     a beacon came from 127.0.0.1:53124 and not from 127.0.0.1:5550, which is where the configuration says they come from -- ignored
+
+  It is said again only when a datagram comes from a different address than
+  the last one warned of, not for every datagram, so that something sending
+  steadily does not bury everything else.
+
   ``Last message`` reads ``<none>`` until a beacon arrives. ``v`` is the software
   flying and ``md5`` the digest of the configuration file tcspecial read, so
   the line says what is up there without anything having to connect first.

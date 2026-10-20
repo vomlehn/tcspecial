@@ -208,6 +208,12 @@ fn main() -> Result<(), slint::PlatformError> {
                 eprintln!("{remark}");
             }
         }
+        // And what is wrong, whether or not it was asked for: a beacon from
+        // where beacons do not come from, which is the one explanation of a
+        // light going red while the spacecraft is beaconing.
+        for warning in &pass.warnings {
+            eprintln!("{warning}");
+        }
 
         // Into the window, on the thread that owns it.
         show_on(&weak, Shown::of(&pass));

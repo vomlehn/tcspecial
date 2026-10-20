@@ -416,8 +416,12 @@ class Pass:
     said: str
     #: Whether the spacecraft is being heard from.
     contact: Contact
-    #: What is worth saying on a console about this pass, in order.
+    #: What is worth saying on a console about this pass, in order: news,
+    #: which a console says when asked to talk.
     remarks: list = field(default_factory=list)
+    #: What is wrong, which a console says whether or not it was asked to
+    #: talk: a beacon from somewhere beacons do not come from.
+    warnings: list = field(default_factory=list)
 
 
 class Beacons:
@@ -438,6 +442,9 @@ class Beacons:
         self._said = NO_BEACON_MESSAGE
         self._sequence = None
         self._differed = False
+        # The last stranger warned of, so that one sending steadily is warned
+        # of once and not on every datagram.
+        self._stranger = None
 
     @staticmethod
     def listening(link, schedule, expected):
@@ -482,12 +489,15 @@ class Beacons:
         remarks = [] if remarks is None else remarks
         # Only from where the configuration says beacons come from.
         if not came_from(self._link.send, sender):
-            remarks.append(
-                f"a beacon came from {sender[0]}:{sender[1]} and not from "
-                f"{self._link.send}, which is where the configuration says they "
-                "come from -- ignored"
-            )
-            return self.after(Arrived.NOTHING, remarks)
+            warnings = []
+            if self._stranger != sender:
+                warnings.append(
+                    f"a beacon came from {sender[0]}:{sender[1]} and not from "
+                    f"{self._link.send}, which is where the configuration says they "
+                    "come from -- ignored"
+                )
+                self._stranger = sender
+            return self.after(Arrived.NOTHING, remarks, warnings=warnings)
 
         heard = hear(datagram, self._expected)
         # A configuration that differs is remarked on when it starts and when
@@ -516,7 +526,7 @@ class Beacons:
 
         return self.after(Arrived.BEACON, remarks, heard.message)
 
-    def after(self, arrived, remarks, message=None):
+    def after(self, arrived, remarks, message=None, warnings=None):
         """Fold what a pass found into what is known, and say what to show. A
         pass that found nothing still has the beacon before it to show, and so
         does a pass whose socket broke."""
@@ -532,6 +542,7 @@ class Beacons:
             said=self._said,
             contact=self._schedule.contact_at(self._at, now),
             remarks=remarks,
+            warnings=[] if warnings is None else warnings,
         )
 
     def close(self):

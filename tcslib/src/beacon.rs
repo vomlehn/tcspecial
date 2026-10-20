@@ -37,7 +37,7 @@
 //! timeout is set to.
 
 use std::io;
-use std::net::UdpSocket;
+use std::net::{SocketAddr, UdpSocket};
 use std::time::{Duration, SystemTime};
 
 use tcslibgs::{came_from, ConfigDigest, ConfigVersion, Telemetry, Timestamp, NO_TRANSFER_TIME};
@@ -593,7 +593,16 @@ pub struct Pass {
     /// two ground stations watching one spacecraft say the same words about
     /// the same thing. Empty on almost every pass: these are the things that
     /// have changed.
+    ///
+    /// News, which a console says when asked to talk: beacons that did not
+    /// arrive, a restart, a configuration that differs or agrees again.
     pub remarks: Vec<String>,
+    /// What is wrong, which a console says whether or not it was asked to
+    /// talk: a beacon from somewhere the configuration does not say they
+    /// come from, which is the one thing that explains a light going red
+    /// while the spacecraft is beaconing, and which nothing in the window
+    /// says.
+    pub warnings: Vec<String>,
 }
 
 /// A ground station's beacon socket and what it has heard.
@@ -620,6 +629,11 @@ pub struct Beacons {
     /// Whether the last beacon announced a different configuration, so that
     /// the change is remarked on and the state is not.
     differed: bool,
+    /// The last place a datagram came from that was not where beacons come
+    /// from, so that one sending steadily is warned of once and not on every
+    /// datagram, which would bury everything else on the console. A stranger
+    /// at another address is warned of again.
+    stranger: Option<SocketAddr>,
 }
 
 impl Beacons {
@@ -645,6 +659,7 @@ impl Beacons {
             said: NO_BEACON_MESSAGE.to_string(),
             sequence: None,
             differed: false,
+            stranger: None,
         })
     }
 
@@ -670,22 +685,22 @@ impl Beacons {
         // failed, which is what it is: the alternative is a pass that waits
         // for ever on a socket the operating system has refused to time out.
         if self.socket.set_read_timeout(waiting.until).is_err() {
-            return self.after(Arrived::Broken, Vec::new());
+            return self.after(Arrived::Broken, Vec::new(), Vec::new());
         }
 
         let mut buffer = [0u8; 65535];
         let mut remarks = Vec::new();
+        let mut warnings = Vec::new();
         let arrived = match self.socket.recv_from(&mut buffer) {
             // Only from where the configuration says beacons come from. A
             // datagram from anywhere else at this address is somebody else's
             // traffic, and treating it as a beacon would be reporting the
             // spacecraft alive on the word of whoever sent it.
             Ok((_, from)) if !came_from(&self.link.send, &from) => {
-                remarks.push(format!(
-                    "a beacon came from {from} and not from {}, which is where the \
-                     configuration says they come from -- ignored",
-                    self.link.send
-                ));
+                if self.stranger != Some(from) {
+                    warnings.push(stranger_warning(from, &self.link.send));
+                    self.stranger = Some(from);
+                }
                 Arrived::Nothing
             }
             Ok((size, _)) => {
@@ -732,7 +747,7 @@ impl Beacons {
             Err(_) => Arrived::Broken,
         };
 
-        self.after(arrived, remarks)
+        self.after(arrived, remarks, warnings)
     }
 
     /// Fold what a pass found into what is known, and say what to show.
@@ -740,7 +755,7 @@ impl Beacons {
     /// Apart from the socket so that it can be exercised without one. What it
     /// keeps is the point: a pass that found nothing still has the beacon
     /// before it to show, and so does a pass whose socket broke.
-    fn after(&mut self, arrived: Arrived, remarks: Vec<String>) -> Pass {
+    fn after(&mut self, arrived: Arrived, remarks: Vec<String>, warnings: Vec<String>) -> Pass {
         let now = SystemTime::now();
 
         if let Arrived::Beacon(message) = &arrived {
@@ -767,8 +782,19 @@ impl Beacons {
             // heard still decides whether it is in contact.
             contact: self.schedule.contact_at(self.at, now),
             remarks,
+            warnings,
         }
     }
+}
+
+/// What to say of a datagram from `from` on the beacon link, which beacons
+/// come to from `send` and nowhere else: one sentence, the same in every
+/// station and in the Python, saying what was ignored and why.
+fn stranger_warning(from: SocketAddr, send: &tcslibgs::HostPort) -> String {
+    format!(
+        "a beacon came from {from} and not from {send}, which is where the \
+         configuration says they come from -- ignored"
+    )
 }
 
 #[cfg(test)]
@@ -1222,7 +1248,7 @@ mod tests {
 
         // Nothing has arrived yet, so there is nothing to show and nothing is
         // being heard from.
-        let nothing = beacons.after(Arrived::Nothing, Vec::new());
+        let nothing = beacons.after(Arrived::Nothing, Vec::new(), Vec::new());
         assert_eq!(nothing.at, None);
         assert_eq!(nothing.showing.stage, Stage::Unheard);
         assert_eq!(nothing.said, NO_BEACON_MESSAGE);
@@ -1235,11 +1261,12 @@ mod tests {
         // A beacon: the time is the time of this pass, and the line says what
         // the beacon said.
         let heard = beacons.after(
-            Arrived::Beacon("tcspecial v9.9.9, config v1.0.0, md5 abc".to_string()),
+            Arrived::Beacon("tcspecial v9.9.9 md5 abc".to_string()),
+            Vec::new(),
             Vec::new(),
         );
         let arrival = heard.at.expect("a pass that received a beacon says when");
-        assert_eq!(heard.said, "tcspecial v9.9.9, config v1.0.0, md5 abc");
+        assert_eq!(heard.said, "tcspecial v9.9.9 md5 abc");
         assert_eq!(heard.showing.stage, Stage::Heard);
         assert_eq!(
             heard.contact,
@@ -1250,14 +1277,14 @@ mod tests {
         // A later pass that finds nothing keeps that time and that message:
         // the beacon did arrive when it arrived and said what it said,
         // whatever the passes after it find.
-        let quiet = beacons.after(Arrived::Nothing, Vec::new());
+        let quiet = beacons.after(Arrived::Nothing, Vec::new(), Vec::new());
         assert_eq!(
             quiet.at,
             Some(arrival),
             "the time of the last beacon was lost"
         );
         assert_eq!(
-            quiet.said, "tcspecial v9.9.9, config v1.0.0, md5 abc",
+            quiet.said, "tcspecial v9.9.9 md5 abc",
             "the last message was lost"
         );
 
@@ -1265,9 +1292,9 @@ mod tests {
         // the message stand, and what is *shown* is that nothing is known --
         // the station has stopped listening, which is not a beacon growing
         // stale.
-        let broken = beacons.after(Arrived::Broken, Vec::new());
+        let broken = beacons.after(Arrived::Broken, Vec::new(), Vec::new());
         assert_eq!(broken.at, Some(arrival));
-        assert_eq!(broken.said, "tcspecial v9.9.9, config v1.0.0, md5 abc");
+        assert_eq!(broken.said, "tcspecial v9.9.9 md5 abc");
         assert_eq!(broken.showing.stage, Stage::Unheard);
         assert_eq!(
             broken.contact,
@@ -1326,10 +1353,35 @@ mod tests {
             "a datagram from the wrong address was taken for a beacon"
         );
         assert_eq!(pass.at, None, "and it must not count as contact");
+        // A warning, which a console says whether or not it was asked to
+        // talk, and not a remark, which it says only when asked.
         assert!(
-            pass.remarks.iter().any(|said| said.contains("ignored")),
-            "the pass should say what it ignored: {:?}",
-            pass.remarks
+            pass.warnings.iter().any(|said| said.contains("ignored")),
+            "the pass should warn of what it ignored: {:?}",
+            pass.warnings
+        );
+        assert!(pass.remarks.is_empty(), "{:?}", pass.remarks);
+
+        // The same stranger again is not warned of again: one sending
+        // steadily would otherwise bury everything else on the console.
+        stranger
+            .send_to(&datagram, recv)
+            .expect("the stranger sends");
+        let again = beacons.pass();
+        assert_eq!(again.arrived, Arrived::Nothing);
+        assert!(again.warnings.is_empty(), "{:?}", again.warnings);
+
+        // A stranger at another address is.
+        let another = UdpSocket::bind("127.0.0.1:0").expect("a socket for another");
+        another
+            .send_to(&datagram, recv)
+            .expect("the other stranger sends");
+        let other = beacons.pass();
+        let address = another.local_addr().expect("its address").to_string();
+        assert!(
+            other.warnings.iter().any(|said| said.contains(&address)),
+            "the other stranger should be warned of: {:?}",
+            other.warnings
         );
     }
 }

@@ -30,6 +30,13 @@ Usage, from the repository's root::
     python3 examples/ping/ping_moc.py --pings 3        # no window
     python3 examples/ping/ping_moc.py --describe       # what it read
     python3 examples/ping/ping_moc.py --no-vehicle     # tcspecial runs elsewhere
+    python3 examples/ping/ping_moc.py -v               # say what it is doing
+
+Quiet unless ``-v`` or ``--verbose`` is given: the console then says where it
+is listening, each remark a beacon pass makes in the window's mode -- beacons
+missed, a vehicle that restarted, a configuration that differs -- and a
+tcspecial that stopped by itself. Errors and warnings are said either way, and
+so is what ``--pings`` and ``--describe`` print, which is what they are for.
 
 The configuration is the XML spelling, which the Python standard library can
 read, and defaults to ``examples/ping/ping.xml``. It uses nothing outside the
@@ -95,6 +102,9 @@ def arguments(argv):
     )
     parser.add_argument(
         "--describe", action="store_true", help="print what the configuration says, and stop"
+    )
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="print status messages on the console"
     )
     return parser.parse_args(argv)
 
@@ -168,9 +178,9 @@ class Vehicle:
         threading.Thread(target=self._watch, daemon=True).start()
 
     def _watch(self):
-        status = self.process.wait()
+        code = self.process.wait()
         if not self._stopping:
-            print(f"tcspecial stopped by itself: exit status {status}", file=sys.stderr, flush=True)
+            status(f"tcspecial stopped by itself: exit status {code}")
 
     def stop(self):
         """Kill it, and wait for it to be gone, so that it is reaped and its
@@ -209,6 +219,17 @@ class Setup:
             f"downlink {self.downlink}",
             f"digest {self.digest}",
         ])
+
+
+#: Whether to print status messages: ``-v`` or ``--verbose``.
+VERBOSE = False
+
+
+def status(text):
+    """Say ``text`` on stderr, if asked to with ``-v``: what the program is
+    doing, as against what has gone wrong, which is said whatever."""
+    if VERBOSE:
+        print(text, file=sys.stderr, flush=True)
 
 
 def run_without_a_window(setup, beacons, pinger, count):
@@ -269,7 +290,7 @@ def run_the_window(setup, beacons, pinger):
         while True:
             beacon_pass = beacons.next_pass()
             for remark in beacon_pass.remarks:
-                print(remark, file=sys.stderr, flush=True)
+                status(remark)
             reports.put(("beacon", Shown.of(beacon_pass)))
 
     def answer_loop():
@@ -367,7 +388,9 @@ def run_the_window(setup, beacons, pinger):
 
 
 def main(argv):
+    global VERBOSE
     options = arguments(argv)
+    VERBOSE = options.verbose
     try:
         setup = Setup(options)
     except (OSError, ValueError) as why:
@@ -392,12 +415,10 @@ def main(argv):
     except OSError as why:
         print(f"cannot listen: {why}", file=sys.stderr)
         return 1
-    print(
+    status(
         f"Listening for beacons at {setup.beacon.recv}, which {setup.beacon.send} "
         f"sends from; pinging {setup.node} through {setup.moc} at {setup.uplink}, "
-        f"answers at {setup.downlink}",
-        file=sys.stderr,
-        flush=True,
+        f"answers at {setup.downlink}"
     )
 
     # The vehicle, once this end is listening: a beacon sent before the ground

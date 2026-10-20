@@ -171,19 +171,23 @@ impl Vehicle {
     /// A vehicle that exits by itself -- a configuration it refuses, a port
     /// already taken -- leaves this as it was before it was started, so the
     /// button does not go on offering to stop something that is not there.
-    pub fn exited(&mut self) -> Option<String> {
+    ///
+    /// `Ok` is the vehicle having stopped, which is news; `Err` is its state
+    /// being unknowable, which is a fault, so that a quiet program can still
+    /// say the one and not the other.
+    pub fn exited(&mut self) -> Option<Result<String, String>> {
         let child = self.running.as_mut()?;
         match child.try_wait() {
             Ok(None) => None,
             Ok(Some(status)) => {
                 self.running = None;
-                Some(format!("tcspecial stopped by itself: {status}"))
+                Some(Ok(format!("tcspecial stopped by itself: {status}")))
             }
             Err(e) => {
                 let _ = self.stop();
-                Some(format!(
+                Some(Err(format!(
                     "tcspecial could not be asked whether it is running, so it was stopped: {e}"
-                ))
+                )))
             }
         }
     }
@@ -220,9 +224,17 @@ pub fn wire(window: &WatchWindow, vehicle: std::rc::Rc<std::cell::RefCell<Vehicl
 
 /// Look whether the vehicle has stopped of its own accord, and put the
 /// button back if it has.
-pub fn notice_exit(window: &WatchWindow, vehicle: &mut Vehicle) {
+///
+/// That it stopped is said only when `verbose`: the button already says so,
+/// and tcspecial says why on its own stderr. That it could not be asked is
+/// said always, being a fault.
+pub fn notice_exit(window: &WatchWindow, vehicle: &mut Vehicle, verbose: bool) {
     if let Some(how) = vehicle.exited() {
-        eprintln!("{how}");
+        match how {
+            Ok(stopped) if verbose => eprintln!("{stopped}"),
+            Ok(_) => {}
+            Err(fault) => eprintln!("{fault}"),
+        }
         window.set_tcspecial_label(vehicle.label().into());
     }
 }

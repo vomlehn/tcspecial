@@ -2227,6 +2227,12 @@ One log for everything the vehicle sends to the ground, where the
 interpreter's answers will when there is one.
 
 Requirement
+    A ``log.directory`` that is not there, or is not a directory, stops
+    tcspecial before it starts, naming the directory and saying to create it
+    or to change the setting. tcspecial makes no directory of its own: one
+    named wrongly would be a log kept where nobody looks.
+
+Requirement
     Every sender records into one log. Beacons go from a thread of their own
     and answers from the command interpreter's, and a log only one of them
     could reach would hold part of what went to the ground -- which is the one

@@ -7382,7 +7382,7 @@ for the columns the payload count calls for, and because it opens it at exactly
 that many panels' width plus the chrome, the window arrives at the same count.
 
 The five sources of the thermostat example give a row of three and a row of two in a
-1062x668 window. The size is the one ``window_size`` gives, which a test reads
+1206x668 window. The size is the one ``window_size`` gives, which a test reads
 out of this document so that the number here cannot quietly stop being the one
 the program opens at.
 
@@ -8047,7 +8047,7 @@ window.
 
 So the shape follows from the count alone: three handlers are one row of three,
 and the five of the shipped thermostat are a row of three and a row of
-one, in a 821x884 window. A test reads that size out of this document and
+one, in a 977x1030 window. A test reads that size out of this document and
 checks it against the one the program opens at, as one does for tcssim.
 
 This replaced a rule that chose the shape nearest square among those at least

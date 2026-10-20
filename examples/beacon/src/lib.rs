@@ -3,7 +3,7 @@
 //! A library beside the binary so that the window can be opened by a test as
 //! well as by a person: what the test checks is the wiring below, which is the
 //! whole of what this example adds to the two halves it is made of -- see
-//! `src/bin/beacon_watch.rs`.
+//! `src/bin/beacon.rs`.
 
 use slint::ComponentHandle;
 use tcsui::Shown;
@@ -203,6 +203,8 @@ impl Drop for Vehicle {
 /// Something that cannot be done is said on stderr, and the button says
 /// what is true afterwards whichever way it went.
 pub fn wire(window: &WatchWindow, vehicle: std::rc::Rc<std::cell::RefCell<Vehicle>>) {
+    window.set_start_label(START.into());
+    window.set_stop_label(STOP.into());
     window.set_tcspecial_label(vehicle.borrow().label().into());
     let weak = window.as_weak();
     window.on_tcspecial_clicked(move || {

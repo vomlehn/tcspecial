@@ -21,6 +21,7 @@ import tkinter as tk
 from dataclasses import dataclass
 
 from tcslib.beacon import NO_BEACON_MESSAGE, NO_TRANSFER_TIME, Stage, received_at
+from tcsui import fonts
 
 
 class palette:
@@ -112,7 +113,9 @@ class BeaconPanel(tk.Frame):
             pady=6,
             **options,
         )
-        small = ("TkDefaultFont", 9)
+        # The two lines of what arrived, in the one size every window is set
+        # in, as the Slint panel's are.
+        small = ("TkDefaultFont", fonts.POINTS)
 
         tk.Label(self, text="Beacon: ").grid(row=0, column=0, sticky="w")
         self._light = tk.Canvas(

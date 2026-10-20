@@ -87,7 +87,7 @@ nothing in it is its own:
   with no screen -- a logger, a test -- uses exactly this.
 - `tcsui` holds the panel, as markup other windows import, and works out what
   to show on it: which colour the light is, and the two lines beside it.
-- `beacon_watch`, the program here, reads the configuration to find where the
+- `beacon`, the program here, reads the configuration to find where the
   beacons are, starts the loop on a thread, and puts each pass in the window.
   That is all of it, but for a button.
 
@@ -96,7 +96,7 @@ the light can be watched coming on with the first beacon and going out after
 the last. The window opens with it saying `Start tcspecial`, because tcspecial
 is not running. Pressed, it starts tcspecial and says `Stop tcspecial`;
 pressed again, it stops tcspecial with `kill()` and says `Start tcspecial`,
-which is where it began. tcspecial is the binary beside `beacon_watch`, run
+which is where it began. tcspecial is the binary beside `beacon`, run
 directly rather than through `cargo run`, so that the kill stops tcspecial
 itself. Closing the window stops it as well, and so does the watcher dying,
 which the kernel is told to see to; and a tcspecial that stops by itself puts
@@ -118,13 +118,13 @@ That builds tcspecial and the watcher and opens the window, and tcspecial
 starts when the button is pressed. Without make:
 
 ```
-cargo build --bin tcspecial --bin beacon_watch
-cargo run --bin beacon_watch
+cargo build --bin tcspecial --bin beacon
+cargo run --bin beacon
 ```
 
 Languages:
 
-- MOC: Rust -- `beacon_watch`, on `tcslib::beacon` and `tcsui`.
+- MOC: Rust -- the `beacon` program, on `tcslib::beacon` and `tcsui`.
 - Vehicle: Rust -- tcspecial.
 - Payload: Rust -- tcssim stands in for `sensor`, a network payload.
 
@@ -148,7 +148,7 @@ so each includes their offset and may be negative; their sum is the round
 trip. Press `Send ping` to send one: it clears the time received until its own
 answer, matched by count, arrives.
 
-It is built the way `beacon_watch` is, from the same two halves written again
+It is built the way the `beacon` program is, from the same two halves written again
 in Python: `python/tcslib/beacon.py` after `tcslib::beacon`,
 `python/tcsui/beacon_panel.py` after `tcsui`, and `python/tcslibgs` for the
 ping format and the configuration. `ping_ground.py` here is the ping's own

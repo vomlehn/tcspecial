@@ -123,14 +123,14 @@ run-simple-app: check-python3
 # around: what the window shows is what the example is.
 .PHONY: run-beacon
 run-beacon:
-	cd $(ROOT) && cargo build -q --bin tcspecial --bin beacon_watch
+	cd $(ROOT) && cargo build -q --bin tcspecial --bin beacon
 	( \
 		set -eu; \
 		echo "Watching $(PROJECT_NAME)'s beacon from examples/beacon/beacon.yaml..."; \
 		cd $(ROOT); \
 		rm -rf $(TELEMETRY); \
 		mkdir $(TELEMETRY); \
-		RUST_LOG=$(RUST_LOG) target/debug/beacon_watch examples/beacon/beacon.yaml \
+		RUST_LOG=$(RUST_LOG) target/debug/beacon examples/beacon/beacon.yaml \
 	)
 
 # Run the ping example: tcspecial answering pings, and a window sending them.

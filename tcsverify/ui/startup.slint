@@ -12,6 +12,7 @@
 
 import { Button, ScrollView } from "std-widgets.slint";
 import { Copyable, CopyButton } from "copy.slint";
+import { Fonts } from "../../tcsui/ui/fonts.slint";
 
 export struct StartupLine {
     // One line of the report, as tcsverify prints it.
@@ -22,6 +23,7 @@ export struct StartupLine {
 }
 
 export component StartupWindow inherits Window {
+    default-font-size: Fonts.window;
     title: root.program;
     background: #fbfbfa;
     min-width: 420px;
@@ -52,7 +54,7 @@ export component StartupWindow inherits Window {
 
         Copyable {
             text: root.heading;
-            font-size: 15px;
+            font-size: Fonts.window;
             font-weight: 700;
         }
 
@@ -63,7 +65,7 @@ export component StartupWindow inherits Window {
                 for line in root.lines: Copyable {
                     text: line.text;
                     color: line.error ? #c0392b : #8a5a00;
-                    font-size: 13px;
+                    font-size: Fonts.window;
                 }
             }
         }
@@ -72,7 +74,7 @@ export component StartupWindow inherits Window {
             text: root.fatal
                 ? "\{root.program} cannot start until this is put right."
                 : "\{root.program} will start with this as it is.";
-            font-size: 12px;
+            font-size: Fonts.window;
             color: #6b7280;
             wrap: word-wrap;
         }

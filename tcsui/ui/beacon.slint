@@ -15,6 +15,8 @@
 // say are worked out in Rust, from what `tcslib::beacon` reports, and set as
 // properties: see the crate's `shown`.
 
+import { Fonts } from "fonts.slint";
+
 export component BeaconPanel inherits Rectangle {
     // The light's colour, which says how stale the last beacon is. Grey
     // before any has arrived and never after: once one has, the dark half of
@@ -61,7 +63,7 @@ export component BeaconPanel inherits Rectangle {
             Text { text: "Last rcvd: "; vertical-alignment: center; }
             Text {
                 text: last-received;
-                font-size: 10px;
+                font-size: Fonts.window;
                 vertical-alignment: center;
             }
         }
@@ -74,7 +76,7 @@ export component BeaconPanel inherits Rectangle {
             Text { text: "Last msg: "; vertical-alignment: center; }
             Text {
                 text: last-message;
-                font-size: 10px;
+                font-size: Fonts.window;
                 vertical-alignment: center;
             }
         }

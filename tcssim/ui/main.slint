@@ -1,5 +1,6 @@
 import { Button, GroupBox, LineEdit, VerticalBox, HorizontalBox, SpinBox, ScrollView, GridBox } from "std-widgets.slint";
 import { Copyable, CopyButton } from "../../tcsverify/ui/copy.slint";
+import { Fonts } from "../../tcsui/ui/fonts.slint";
 // What was found wrong as the program started, shown before this window: the
 // one window tcsmoc and tcssim share, beside tcsverify, whose report it shows.
 export { StartupWindow, StartupLine } from "../../tcsverify/ui/startup.slint";
@@ -105,7 +106,7 @@ component PayloadPanel inherits Rectangle {
                         Copyable {
                             text: payload-name + ": these sizes cannot be sent";
                             font-weight: 700;
-                            font-size: 11px;
+                            font-size: Fonts.window;
                             color: #c00000;
                         }
                         CopyButton {
@@ -114,7 +115,7 @@ component PayloadPanel inherits Rectangle {
                     }
                     Copyable {
                         text: sizes-problem;
-                        font-size: 10px;
+                        font-size: Fonts.window;
                     }
                 }
             }
@@ -142,7 +143,7 @@ component PayloadPanel inherits Rectangle {
                         Copyable {
                             text: payload-name + " parameters";
                             font-weight: 700;
-                            font-size: 11px;
+                            font-size: Fonts.window;
                         }
                         CopyButton {
                             said: payload-name + " parameters\n" + parameters;
@@ -160,7 +161,7 @@ component PayloadPanel inherits Rectangle {
                             // are one width -- and they are not wrapped, a
                             // column broken in two being no column.
                             font-family: "monospace";
-                            font-size: 10px;
+                            font-size: Fonts.window;
                             wrap: no-wrap;
                             text: parameters;
                         }
@@ -181,13 +182,13 @@ component PayloadPanel inherits Rectangle {
             // in both windows.
             Text {
                 text: payload-name + " (dev id " + dev-id + ")";
-                font-size: 11px;
+                font-size: Fonts.window;
                 font-weight: 700;
                 vertical-alignment: top;
             }
             Text {
                 text: payload-status;
-                font-size: 11px;
+                font-size: Fonts.window;
                 font-weight: payload-status == "Running" ? 400 : 700;
                 vertical-alignment: top;
                 color: payload-status == "Running" ? black : red;
@@ -199,7 +200,7 @@ component PayloadPanel inherits Rectangle {
             height: 18px;
             Text {
                 text: "Config: " + payload-config;
-                font-size: 9px;
+                font-size: Fonts.window;
                 vertical-alignment: top;
             }
         }
@@ -214,7 +215,7 @@ component PayloadPanel inherits Rectangle {
         HorizontalLayout {
             min-height: 30px;
             spacing: 6px;
-            Text { text: "Pkt:"; vertical-alignment: center; font-size: 9px; }
+            Text { text: "Pkt:"; vertical-alignment: center; font-size: Fonts.window; }
             SpinBox {
                 value: packet-size;
                 minimum: 1;
@@ -232,7 +233,7 @@ component PayloadPanel inherits Rectangle {
                     }
                 }
             }
-            Text { text: "Seg:"; vertical-alignment: center; font-size: 9px; }
+            Text { text: "Seg:"; vertical-alignment: center; font-size: Fonts.window; }
             SpinBox {
                 value: segment-size;
                 minimum: 1;
@@ -255,14 +256,14 @@ component PayloadPanel inherits Rectangle {
         HorizontalLayout {
             min-height: 30px;
             spacing: 6px;
-            Text { text: "Pkt Int:"; vertical-alignment: center; font-size: 9px; }
+            Text { text: "Pkt Int:"; vertical-alignment: center; font-size: Fonts.window; }
             SpinBox {
                 value: packet-interval;
                 minimum: 0;
                 maximum: 10000;
                 edited(v) => { packet-interval-edited(v); }
             }
-            Text { text: "Seg Int:"; vertical-alignment: center; font-size: 9px; }
+            Text { text: "Seg Int:"; vertical-alignment: center; font-size: Fonts.window; }
             SpinBox {
                 value: segment-interval;
                 minimum: 0;
@@ -328,7 +329,7 @@ component PayloadPanel inherits Rectangle {
         // The three rows of data the panel ends with.
         sent-row := HorizontalLayout {
             height: 14px;
-            Text { text: "Sent: " + last-sent-time + " " + last-sent-data; font-size: 9px; }
+            Text { text: "Sent: " + last-sent-time + " " + last-sent-data; font-size: Fonts.window; }
         }
         // The line stays and its contents go, for a payload that is never
         // spoken to: a payload that sends on its own would read
@@ -340,7 +341,7 @@ component PayloadPanel inherits Rectangle {
             height: 14px;
             if triggered : Text {
                 text: "Recv: " + last-recv-time + " " + last-recv-data;
-                font-size: 9px;
+                font-size: Fonts.window;
             }
         }
         // The received count goes the same way the received line does, and
@@ -351,11 +352,11 @@ component PayloadPanel inherits Rectangle {
             height: 14px;
             if triggered : Text {
                 text: "Pkts: " + packets-sent + " sent / " + packets-recv + " recv";
-                font-size: 9px;
+                font-size: Fonts.window;
             }
             if !triggered : Text {
                 text: "Pkts: " + packets-sent + " sent";
-                font-size: 9px;
+                font-size: Fonts.window;
             }
         }
     }
@@ -372,12 +373,14 @@ component PayloadPanel inherits Rectangle {
 // and the window came up refusing to be resized. Nothing here is ever shown:
 // Rust builds one, reads the two lengths, and drops it.
 export component PanelProbe inherits Window {
+    default-font-size: Fonts.window;
     probe := PayloadPanel { }
     out property <length> panel-width: probe.preferred-width;
     out property <length> panel-height: probe.preferred-height;
 }
 
 export component MainWindow inherits Window {
+    default-font-size: Fonts.window;
     title: "TCSpecial Payload Simulator";
     background: white;
 

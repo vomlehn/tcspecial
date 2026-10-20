@@ -1,0 +1,16 @@
+// The type every window of these programs is set in, where its text names no
+// size of its own.
+//
+// One statement of it, which every window reads as its default-font-size --
+// tcsmoc's, tcssim's, tcsgui's, tcsverify's startup window and the beacon
+// example's -- so that the programs look like one set rather than five. Text
+// that states a size keeps it: a title, fine print, a node's label each say
+// what they are by their size. The Python windows read the same figure from
+// python/tcsui/fonts.py.
+//
+// In points, which is what a type size is said in; Slint turns them into
+// pixels for the screen.
+
+export global Fonts {
+    out property <length> window: 12pt;
+}

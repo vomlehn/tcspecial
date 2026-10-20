@@ -8099,7 +8099,7 @@ mod tests {
         );
         for said in [
             "out property <length> tight: 4px;",
-            "out property <length> small: 10px;",
+            "out property <length> small: Fonts.window;",
         ] {
             assert!(
                 markup.contains(said),
@@ -8110,10 +8110,20 @@ mod tests {
 
         let (top, height) = pane::NAMES;
         assert_eq!(top, 0, "a band is drawn, so it starts at the pane's top");
+        // And Fonts.window is twelve points, which is sixteen pixels: see
+        // tcsui/ui/fonts.slint.
+        let fonts = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../tcsui/ui/fonts.slint"),
+        )
+        .expect("tcsui's fonts read");
         assert!(
-            height >= 13 + 2 * 4,
-            "a ten-pixel line wants thirteen pixels of box, with four above it \
-             and four below, and the band is {height}"
+            fonts.contains("out property <length> window: 12pt;"),
+            "Fonts.window is no longer twelve points, so pane::NAMES is out of date"
+        );
+        assert!(
+            height >= 21 + 2 * 4,
+            "a sixteen-pixel line wants twenty-one pixels of box, with four \
+             above it and four below, and the band is {height}"
         );
 
         // On an empty canvas, scrolled to the top of the sheet, every type

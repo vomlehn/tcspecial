@@ -10,14 +10,24 @@
 
 import { Button } from "std-widgets.slint";
 import { BeaconPanel } from "../../../tcsui/ui/beacon.slint";
+import { Fonts } from "../../../tcsui/ui/fonts.slint";
 
 export component WatchWindow inherits Window {
+    default-font-size: Fonts.window;
     title: "Beacon";
-    // Enough for the panel and the longest line it shows, which is what a
-    // beacon says: the build, the configuration version and a sixteen-byte
-    // digest; and the button below it.
-    width: 460px;
-    height: 160px;
+    // Just large enough for what it holds -- the panel and the button below
+    // it -- and the border round them, `content.padding`. Measured rather
+    // than stated, the text being whatever size Fonts.window makes it, and
+    // measured from what is shown: so the window grows when the first beacon
+    // arrives, a beacon's message being the longest line it shows, and is no
+    // larger than it needs to be before then.
+    width: content.preferred-width;
+    height: content.preferred-height;
+
+    // How large the window is, for a test to hold it to what it holds.
+    out property <length> window-width: root.width;
+    out property <length> window-height: root.height;
+    out property <length> border: content.padding;
 
     in-out property <color> indicator-color: #c0c0c0;
     in-out property <string> last-received: "--:--:--";
@@ -25,21 +35,52 @@ export component WatchWindow inherits Window {
     // What the button says: what a click will do to the vehicle. It opens
     // saying start, tcspecial not being running until somebody starts it.
     in-out property <string> tcspecial-label: "Start tcspecial";
+    // Both things it can say, which Rust gives the window -- the words are
+    // beacon_example::START and STOP -- so that the button can be as wide as
+    // the longer of them, and not change width when it changes words.
+    in property <string> start-label: "Start tcspecial";
+    in property <string> stop-label: "Stop tcspecial";
     callback tcspecial-clicked();
 
-    VerticalLayout {
-        padding: 8px;
+    // The button with each of its labels, never shown: here to be measured.
+    start-probe := Button {
+        visible: false;
+        text: root.start-label;
+    }
+    stop-probe := Button {
+        visible: false;
+        text: root.stop-label;
+    }
+    // How wide the button is, for a test to hold it to its labels.
+    out property <length> button-width: tcspecial-button.width;
+    out property <length> button-needs: max(start-probe.preferred-width, stop-probe.preferred-width);
 
-        BeaconPanel {
+    content := VerticalLayout {
+        // The border, for looks: the panel's edge drawn against the window's
+        // would read as the window cut short.
+        padding: 12px;
+        // The button stands a little apart from the panel, being a control of
+        // the vehicle rather than a line of what the vehicle said.
+        spacing: 12px;
+
+        panel := BeaconPanel {
             indicator-color: root.indicator-color;
             last-received: root.last-received;
             last-message: root.last-message;
         }
 
-        tcspecial-button := Button {
-            text: root.tcspecial-label;
-            clicked => {
-                root.tcspecial-clicked();
+        // In a row of its own and centred in it, so that the button is as
+        // wide as its label and not as the window: a button the width of the
+        // window reads as a bar rather than as a thing to press.
+        HorizontalLayout {
+            alignment: center;
+
+            tcspecial-button := Button {
+                width: root.button-needs;
+                text: root.tcspecial-label;
+                clicked => {
+                    root.tcspecial-clicked();
+                }
             }
         }
     }

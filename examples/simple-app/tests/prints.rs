@@ -47,6 +47,8 @@ fn ground(configuration: &PathBuf) -> Child {
     let mut ground = Command::new(env!("CARGO_BIN_EXE_lorem_moc"))
         .arg(configuration)
         .arg("moc")
+        // To be told when it is listening, which it says only when verbose.
+        .arg("--verbose")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()

@@ -261,6 +261,10 @@ pub fn one_host(address: &str) -> String {
 /// unless the configuration names every interface, in which case the address a
 /// datagram carries is whichever interface the route chose and there is
 /// nothing written down to compare it with.
+///
+/// Asked of every datagram on those links, so it allocates nothing: the
+/// address a datagram came from is written into a buffer on the stack and
+/// compared as text, by the same rule [`one_host`] states.
 pub fn came_from(stated: &HostPort, from: &SocketAddr) -> bool {
     if from.port() != stated.port {
         return false;
@@ -268,7 +272,45 @@ pub fn came_from(stated: &HostPort, from: &SocketAddr) -> bool {
     if binds_every_interface(&stated.address) {
         return true;
     }
-    one_host(&stated.address) == one_host(&from.ip().to_string())
+
+    // The longest an IP address is written: an IPv6 address with an IPv4
+    // tail, which is 45 characters.
+    let mut text = [0u8; 46];
+    let Some(len) = written(&from.ip(), &mut text) else {
+        return false;
+    };
+    let from = std::str::from_utf8(&text[..len]).unwrap_or("");
+    let this_host = |name: &str| matches!(name, "localhost" | "127.0.0.1" | "::1");
+    if this_host(&stated.address) {
+        this_host(from)
+    } else {
+        stated.address == from
+    }
+}
+
+/// `value` written into `out`, as `Display` writes it: the bytes it took, or
+/// `None` where it does not fit.
+fn written(value: &impl std::fmt::Display, out: &mut [u8]) -> Option<usize> {
+    use std::fmt::Write;
+
+    struct Into<'a> {
+        out: &'a mut [u8],
+        at: usize,
+    }
+
+    impl Write for Into<'_> {
+        fn write_str(&mut self, said: &str) -> std::fmt::Result {
+            let end = self.at + said.len();
+            let room = self.out.get_mut(self.at..end).ok_or(std::fmt::Error)?;
+            room.copy_from_slice(said.as_bytes());
+            self.at = end;
+            Ok(())
+        }
+    }
+
+    let mut into = Into { out, at: 0 };
+    write!(into, "{value}").ok()?;
+    Some(into.at)
 }
 
 /// Whether an address binds every interface rather than one of them.

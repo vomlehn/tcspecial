@@ -180,6 +180,7 @@ impl Commands {
             log,
             stopping: stopping.clone(),
             wakeup: wakeup.clone(),
+            answer: Vec::with_capacity(ANSWER_BYTES),
         };
         let thread = std::thread::spawn(move || serving.run(spacecraft, nodes));
 
@@ -250,7 +251,15 @@ struct Serving {
     log: TelemetryLog,
     stopping: Arc<AtomicBool>,
     wakeup: Arc<Wakeup>,
+    /// What an answer is written into before it is sent: made with the
+    /// thread and reused, so that answering allocates nothing of its own.
+    answer: Vec<u8>,
 }
+
+/// Room for an answer as JSON, which the longest -- a node's two samples --
+/// comes well inside. A longer one is still written, the buffer growing once
+/// to hold it and keeping the room after.
+const ANSWER_BYTES: usize = 1024;
 
 impl Serving {
     /// Wait for a command on either link, answer it, and wait again.
@@ -262,17 +271,21 @@ impl Serving {
             // SAFETY: every descriptor here is owned by something that
             // outlives the poll -- the two sockets by `links`, the wakeup by
             // the Arc this holds.
-            let borrowed: Vec<BorrowedFd> = links
-                .iter()
-                .map(|link| unsafe { BorrowedFd::borrow_raw(link.socket.as_raw_fd()) })
-                .chain(std::iter::once(unsafe {
-                    BorrowedFd::borrow_raw(self.wakeup.io_fd())
-                }))
-                .collect();
-            let mut set: Vec<PollFd> = borrowed
-                .iter()
-                .map(|fd| PollFd::new(fd, PollFlags::POLLIN))
-                .collect();
+            //
+            // On the stack, the two links and the wakeup: waiting allocates
+            // nothing.
+            let borrowed: [BorrowedFd; 3] = unsafe {
+                [
+                    BorrowedFd::borrow_raw(links[0].socket.as_raw_fd()),
+                    BorrowedFd::borrow_raw(links[1].socket.as_raw_fd()),
+                    BorrowedFd::borrow_raw(self.wakeup.io_fd()),
+                ]
+            };
+            let mut set: [PollFd; 3] = [
+                PollFd::new(&borrowed[0], PollFlags::POLLIN),
+                PollFd::new(&borrowed[1], PollFlags::POLLIN),
+                PollFd::new(&borrowed[2], PollFlags::POLLIN),
+            ];
 
             // No timeout: the stop is in the set, so there is nothing to wake
             // up for that is not in it. A signal interrupting the wait is not
@@ -330,6 +343,8 @@ impl Serving {
             return;
         }
 
+        // Read without allocating, but for a SET_NODE: its attribute and
+        // value are owned by the command, and are made as it is read.
         let command = match serde_json::from_slice::<Command>(&buffer[..size]) {
             Ok(command) => command,
             // Not a command. Nothing to answer and nobody to answer it to: the
@@ -346,7 +361,11 @@ impl Serving {
         trace!("{}: {command:?}", spelling(link.which));
         let answer = self.answer(link.which, &command);
 
-        if let Ok(data) = serde_json::to_vec(&answer) {
+        // Into the thread's own buffer, taken out while it is written and
+        // put back after.
+        let mut data = std::mem::take(&mut self.answer);
+        data.clear();
+        if serde_json::to_writer(&mut data, &answer).is_ok() {
             // Recorded before it is sent, as a beacon is, so that an answer
             // the send fails on is still known to have been produced.
             self.log.record(&data);
@@ -356,6 +375,7 @@ impl Serving {
             // that can disagree.
             let _ = link.socket.send_to(&data, from);
         }
+        self.answer = data;
     }
 
     /// What this vehicle answers that command with.
@@ -509,6 +529,11 @@ impl Serving {
     /// arrives twice, or whose answer was lost, is the ordinary case on a link
     /// with latency, and an operator who presses Disable twice has asked for a
     /// state and not for an action.
+    ///
+    /// Allocates: the node's name, for the work handed to the pass and for
+    /// what is logged about it, and whatever starting the node again takes
+    /// -- see `System::reopen`. A START_NODE or STOP_NODE is the ground
+    /// changing what the vehicle runs, and not a datum the loop moves.
     fn set_state(&self, node: tcslibgs::NodeId, enabled: bool) -> CommandStatus {
         let Some(state) = self.states.at(node) else {
             self.no_such_node(node);
@@ -575,6 +600,10 @@ impl Serving {
     /// not on the wire: both are the ground asking for something the
     /// configuration does not allow, and the status an operator acts on is
     /// the same.
+    ///
+    /// Allocates: the node's name, the attribute and the value, for the work
+    /// handed to the pass. A SET_NODE carries both as text it owns, and is
+    /// the ground changing a setting, not a datum the loop moves.
     fn set_attribute(
         &self,
         node: tcslibgs::NodeId,

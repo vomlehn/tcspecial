@@ -291,42 +291,45 @@ mod tests {
             .expect("a timeout");
         let at = ground.local_addr().expect("where it is");
 
-        let log = TelemetryLog::open(&CIConfig {
-            address: "127.0.0.1".to_string(),
-            port: 0,
-            payload_command_source_base: tcslibgs::HostPort {
+        let log = TelemetryLog::open(
+            &CIConfig {
                 address: "127.0.0.1".to_string(),
                 port: 0,
+                payload_command_source_base: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 0,
+                },
+                payload_command_dest_base: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 0,
+                },
+                moc_cmd_send: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 4100,
+                },
+                payload_source_base: tcslibgs::HostPort {
+                    address: "0.0.0.0".to_string(),
+                    port: 6000,
+                },
+                payload_dest_base: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 6100,
+                },
+                beacon_interval: Duration::from_millis(50),
+                beacon_send: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 0,
+                },
+                beacon_recv: tcslibgs::HostPort {
+                    address: at.ip().to_string(),
+                    port: at.port(),
+                },
+                // Nothing to write: what is being tested is what goes out.
+                log_dir: None,
+                log_segment_bytes: 65_536,
             },
-            payload_command_dest_base: tcslibgs::HostPort {
-                address: "127.0.0.1".to_string(),
-                port: 0,
-            },
-            moc_cmd_send: tcslibgs::HostPort {
-                address: "127.0.0.1".to_string(),
-                port: 4100,
-            },
-            payload_source_base: tcslibgs::HostPort {
-                address: "0.0.0.0".to_string(),
-                port: 6000,
-            },
-            payload_dest_base: tcslibgs::HostPort {
-                address: "127.0.0.1".to_string(),
-                port: 6100,
-            },
-            beacon_interval: Duration::from_millis(50),
-            beacon_send: tcslibgs::HostPort {
-                address: "127.0.0.1".to_string(),
-                port: 0,
-            },
-            beacon_recv: tcslibgs::HostPort {
-                address: at.ip().to_string(),
-                port: at.port(),
-            },
-            // Nothing to write: what is being tested is what goes out.
-            log_dir: None,
-            log_segment_bytes: 65_536,
-        })
+            &crate::segsend::SegSend::none(),
+        )
         .expect("a log that logs nothing");
 
         let _beacon = BeaconSend::new(

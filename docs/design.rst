@@ -2233,8 +2233,9 @@ The telemetry log
 
 One log for everything the vehicle sends to the ground, where the
 ``tcspecial`` section's ``log.directory`` says and in segments of
-``log.segment_size``. The beacons record into it, and the command
-interpreter's answers will when there is one.
+``log.segment_size``. The beacons record into it, and so do the command
+interpreter's answers. Each segment it fills is handed to ``segsend``: see
+`Filled segments`_.
 
 Requirement
     A ``log.directory`` that is not there, or is not a directory, stops
@@ -2270,13 +2271,59 @@ Requirement
     library, ``tcslog``, which is why a log node was a generalisation of
     something the software already did rather than a mechanism of its own.
 
-.. note::
-   **Needs examination.** Filled segment files stay in the log directory until
-   something clears them: there is no path that hands them down to the ground
-   and none that ages them out, so a long flight fills the directory it was
-   given. What a vehicle should do when that directory is full -- stop
-   recording, overwrite the oldest, or refuse to fly without somewhere to put
-   it -- has not been decided.
+Filled segments
+~~~~~~~~~~~~~~~
+
+A segment that has filled is no longer the log's to keep, and a long flight
+that kept them all would fill the directory it was given. Each one is handed,
+by name, to a program called ``segsend``, which takes it from there:
+downlinks it, compresses it, or -- the one built with tcspecial, which is for
+testing -- deletes it. What a mission does with its segments is the
+mission's own business, and a program of its own is where that can be written
+without changing the flight software.
+
+Requirement
+    Every segment a log fills is handed to ``segsend``, the telemetry log's
+    and every ``log`` node's alike, with the segment's file name as its one
+    argument. So is every segment a log finds in its directory as it opens,
+    which is what an earlier run was writing when it stopped.
+
+Requirement
+    ``segsend`` is the program of that name beside tcspecial's own
+    executable, where a build puts both and where tcsmoc finds tcspecial. A
+    configuration that keeps a log -- a ``log.directory``, or a ``log`` node --
+    does not start without one there that this user may run, and is told
+    where it was looked for. A vehicle that found out at its first full
+    segment that it had nothing to hand it to would fill its log directory
+    without a word. A configuration that keeps no log does not need one.
+
+Requirement
+    A segment leaves the log's name before it is handed over: ``.segsend``
+    is put on the end of it, and it is that name ``segsend`` is given.
+    ``tcslog`` requires that a filled segment leave its naming pattern, and a
+    rename within a directory is cheap enough to do while the log is held. A
+    segment renamed and not yet dealt with -- tcspecial stopped first, or
+    ``segsend`` fell behind -- is found by its suffix at the next start and
+    handed over then, before anything that fills after it.
+
+Requirement
+    ``segsend`` is run on one thread of its own, one segment at a time, in
+    the order they filled, and waited for. Neither the pass nor the command
+    interpreter waits for it. One at a time because the segments of every log
+    go down one link, and two at once would be racing for it.
+
+Requirement
+    Handing a segment over allocates nothing. Its name is copied into a
+    buffer of fixed size, the queue to the thread has its room made at the
+    start, and ``segsend`` is started with ``posix_spawn`` from those
+    buffers. A queue that is full leaves the segment renamed in the
+    directory, said once until the queue has room again, for the next start
+    to hand over.
+
+Requirement
+    A ``segsend`` that ends with a status other than nought is reported,
+    with the segment it was given. What it did with the segment is its own
+    to say; tcspecial does not hand it over again.
 
 Disabling a node that is waiting
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -4939,6 +4986,7 @@ Every address tcspecial uses is in this section and nowhere else: see
 unquoted, ``0.0.0.0`` is a string in YAML only because it happens not to be a
 number, which is a thin reason to rely on. ``log.directory`` holds the telemetry log's
 segment files and must already exist; logging is off when it is absent.
+Each segment that fills is handed to ``segsend``: see `Filled segments`_.
 ``log.segment_size`` is the payload bytes in one segment file, the header
 being added on top of that.
 

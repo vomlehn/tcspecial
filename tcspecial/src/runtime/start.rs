@@ -25,6 +25,7 @@ use crate::beacon_send::BeaconSend;
 use crate::runtime::command::{Commands, Flying};
 use crate::runtime::fabric::Moved;
 use crate::runtime::system::{described, System};
+use crate::segsend::{self, SegSend};
 use crate::telemetry_log::TelemetryLog;
 
 /// Whether something has asked this process to stop.
@@ -92,7 +93,11 @@ pub fn run_graph(path: &str) -> Result<(), Vec<String>> {
         ConfigVersion::of_this_build()
     ));
 
-    let mut system = System::of(&graph, Instant::now())?;
+    // What every log hands its filled segments to, found before any log is
+    // opened: opening one hands over what an earlier run left in it.
+    let segsend = segsend_for(&graph).map_err(|why| vec![format!("{path}: {why}")])?;
+
+    let mut system = System::of(&graph, Instant::now(), segsend.clone())?;
     // What was opened, which the line above already says the shape of: for
     // somebody looking at how the running system is put together.
     debug!("{path}: {system:?}");
@@ -101,7 +106,8 @@ pub fn run_graph(path: &str) -> Result<(), Vec<String>> {
     // says: opened before anything that records into it, so that a log
     // directory that is not there stops the start rather than losing the
     // first beacons to it.
-    let telemetry_log = telemetry_log(&graph).map_err(|why| vec![format!("{path}: {why}")])?;
+    let telemetry_log =
+        telemetry_log(&graph, &segsend).map_err(|why| vec![format!("{path}: {why}")])?;
 
     // Beacons, once everything has opened: a vehicle that will not start has
     // nothing to announce. Held until the vehicle stops.
@@ -193,14 +199,14 @@ fn shape_of(graph: &Graph) -> String {
 ///
 /// A configuration with no `tcspecial` section, or one naming no log
 /// directory, records nothing: see `TelemetryLog::open`.
-fn telemetry_log(graph: &Graph) -> Result<TelemetryLog, String> {
+fn telemetry_log(graph: &Graph, segsend: &SegSend) -> Result<TelemetryLog, String> {
     let Some(section) = graph.tcspecial.as_ref() else {
         return Ok(TelemetryLog::disabled());
     };
     let ci =
         tcslibgs::graph::parameters::ci_config_of(&tcslibgs::graph::parameters::flatten(section))?
             .to_ci_config()?;
-    let log = TelemetryLog::open(&ci).map_err(|e| e.to_string())?;
+    let log = TelemetryLog::open(&ci, segsend).map_err(|e| e.to_string())?;
     if log.is_enabled() {
         summary(format!(
             "telemetry log: {}, {}-byte segments",
@@ -209,6 +215,34 @@ fn telemetry_log(graph: &Graph) -> Result<TelemetryLog, String> {
         ));
     }
     Ok(log)
+}
+
+/// Start the thread that hands every log's filled segments to `segsend`, if
+/// this configuration keeps a log.
+///
+/// A configuration that keeps one -- a `log.directory` in its `tcspecial`
+/// section, or a `log` node -- does not start without a `segsend` beside
+/// tcspecial: a vehicle that found out at its first full segment that it had
+/// nothing to hand it to would fill its log directory without a word. One
+/// that keeps none has nothing to hand over, and does not need one.
+fn segsend_for(graph: &Graph) -> Result<SegSend, String> {
+    let telemetry = match graph.tcspecial.as_ref() {
+        Some(section) => tcslibgs::graph::parameters::ci_config_of(
+            &tcslibgs::graph::parameters::flatten(section),
+        )?
+        .to_ci_config()?
+        .log_dir
+        .is_some(),
+        None => false,
+    };
+    let nodes = graph.nodes.iter().any(|node| node.node_type == "log");
+    if !telemetry && !nodes {
+        return Ok(SegSend::none());
+    }
+    let program = segsend::beside_this_program()?;
+    let started = SegSend::start(&program)?;
+    summary(format!("filled log segments: {}", program.display()));
+    Ok(started)
 }
 
 /// Start sending beacons where the configuration's `tcspecial` section says.

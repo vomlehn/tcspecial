@@ -14,6 +14,7 @@ use tcslibgs::{CIConfig, TcsError, TcsResult};
 use tcslog::{Format, LogWrite, SEGMENT_FILE_HEADER_LEN};
 
 use crate::config::constants::{TELEMETRY_LOG_PREFIX, TELEMETRY_LOG_SUFFIX};
+use crate::segsend::{Handoff, SegSend};
 
 /// A handle on the telemetry log.
 ///
@@ -22,7 +23,7 @@ use crate::config::constants::{TELEMETRY_LOG_PREFIX, TELEMETRY_LOG_SUFFIX};
 /// configuration naming no log directory produces: recording through it does
 /// nothing, so no caller has to ask whether logging is on.
 #[derive(Clone)]
-pub struct TelemetryLog(Option<Arc<Mutex<LogWrite>>>);
+pub struct TelemetryLog(Option<Arc<Mutex<LogWrite<Handoff>>>>);
 
 /// What is wrong with `dir` as the place the log is kept, said in the
 /// configuration's terms, or `None` where there is a directory there.
@@ -56,13 +57,19 @@ impl TelemetryLog {
     /// directory and is the one part of tcslog that allocates; recording a
     /// message afterwards does not, which is what lets the main loop stay
     /// free of allocation.
-    pub fn open(config: &CIConfig) -> TcsResult<Self> {
+    ///
+    /// Each segment it fills is handed to `segsend`, and so are the ones a
+    /// previous run left in the directory.
+    pub fn open(config: &CIConfig, segsend: &SegSend) -> TcsResult<Self> {
         let Some(dir) = config.log_dir.as_deref() else {
             return Ok(TelemetryLog(None));
         };
         if let Some(why) = unusable(dir) {
             return Err(TcsError::Log(why));
         }
+        let handoff = segsend
+            .handoff(std::path::Path::new(dir))
+            .map_err(TcsError::Log)?;
 
         let log = LogWrite::new(
             dir,
@@ -73,10 +80,9 @@ impl TelemetryLog {
             // VariableTsRc header would store a second copy of it. A length
             // is all this log needs to add.
             Format::VariableSimple,
-            // No callbacks: filled segment files stay in the log directory
-            // until something clears them. There is no downlink-of-files
-            // path to hand them to yet.
-            (),
+            // Each filled segment goes to segsend, which is what keeps the
+            // directory from filling over a long flight.
+            handoff,
         )
         .map_err(|e| TcsError::Log(format!("opening telemetry log in {dir}: {e}")))?;
 
@@ -116,7 +122,7 @@ impl TelemetryLog {
     }
 
     /// Run `f` against the log, if there is one and it is still usable.
-    fn with<F: FnOnce(&mut LogWrite)>(&self, f: F) {
+    fn with<F: FnOnce(&mut LogWrite<Handoff>)>(&self, f: F) {
         let Some(log) = self.0.as_ref() else {
             return;
         };

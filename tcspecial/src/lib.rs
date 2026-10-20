@@ -8,6 +8,7 @@ pub mod config;
 pub mod endpoint;
 pub mod node;
 pub mod runtime;
+pub mod segsend;
 pub mod telemetry_log;
 
 pub use beacon_send::*;

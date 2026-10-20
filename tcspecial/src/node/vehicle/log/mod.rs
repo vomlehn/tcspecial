@@ -32,6 +32,8 @@ use tcslibgs::graph::Node;
 use tcslibgs::node::vehicle::log::{params_of, LogFormat, LogParams};
 use tcslog::{Format, LogWrite, SEGMENT_FILE_HEADER_LEN};
 
+use crate::segsend::{Handoff, SegSend};
+
 /// First part of every log segment file's name.
 ///
 /// The node's own name goes after it, so one directory can hold the logs of
@@ -49,7 +51,7 @@ pub struct LogNode {
     /// writing failed.
     directory: String,
     /// The open log.
-    log: LogWrite<()>,
+    log: LogWrite<Handoff>,
     /// What the records look like, which decides what may be written: see
     /// [`format_of`].
     format: Format,
@@ -61,7 +63,10 @@ impl LogNode {
     /// The directory must exist: a log node is not the thing to be creating
     /// directories on a vehicle, where a mistyped path would become a log
     /// nobody is looking in rather than a configuration that was refused.
-    pub fn of(node: &Node) -> Result<LogNode, String> {
+    ///
+    /// Each segment it fills is handed to `segsend`, and so are the ones a
+    /// previous run left in the directory.
+    pub fn of(node: &Node, segsend: &SegSend) -> Result<LogNode, String> {
         let what = node.name.as_str();
 
         // What the file says, by the rules the ground tool checks it against:
@@ -72,6 +77,9 @@ impl LogNode {
             segment_bytes,
         } = params_of(what, &node.attributes)?;
         let format = tcslog_format(format);
+        let handoff = segsend
+            .handoff(std::path::Path::new(&directory))
+            .map_err(|e| format!("\"{what}\": {e}"))?;
 
         let log = LogWrite::new(
             &directory,
@@ -79,10 +87,9 @@ impl LogNode {
             LOG_SUFFIX,
             SEGMENT_FILE_HEADER_LEN.saturating_add(segment_bytes),
             format,
-            // No callbacks: a filled segment file stays in the directory
-            // until something clears it, there being no path that sends files
-            // to the ground yet.
-            (),
+            // Each filled segment goes to segsend, which is what keeps the
+            // directory from filling over a long flight.
+            handoff,
         )
         .map_err(|e| format!("\"{what}\": cannot open a log in {directory}: {e}"))?;
 
@@ -195,13 +202,16 @@ mod tests {
     /// A log node with nowhere to write is refused, saying where it looked.
     #[test]
     fn a_log_with_nowhere_to_write_is_refused() {
-        let said = LogNode::of(&node(
-            "housekeeping",
-            &[
-                ("directory", "/nonesuch/nowhere"),
-                ("format", "variable_simple"),
-            ],
-        ))
+        let said = LogNode::of(
+            &node(
+                "housekeeping",
+                &[
+                    ("directory", "/nonesuch/nowhere"),
+                    ("format", "variable_simple"),
+                ],
+            ),
+            &SegSend::none(),
+        )
         .expect_err("a directory that is not there");
         assert!(
             said.contains("/nonesuch/nowhere") && said.contains("housekeeping"),
@@ -210,8 +220,11 @@ mod tests {
 
         // And a log whose attributes are wrong never gets as far as looking:
         // the rules are the ground tool's, and they are applied here too.
-        let said = LogNode::of(&node("housekeeping", &[("format", "variable_simple")]))
-            .expect_err("a log with no directory");
+        let said = LogNode::of(
+            &node("housekeeping", &[("format", "variable_simple")]),
+            &SegSend::none(),
+        )
+        .expect_err("a log with no directory");
         assert!(said.contains("directory"), "{said}");
     }
 
@@ -219,13 +232,16 @@ mod tests {
     #[test]
     fn what_arrives_is_written() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let mut log = LogNode::of(&node(
-            "housekeeping",
-            &[
-                ("directory", where_.path().to_str().expect("a path")),
-                ("format", "variable_ts_rc"),
-            ],
-        ))
+        let mut log = LogNode::of(
+            &node(
+                "housekeeping",
+                &[
+                    ("directory", where_.path().to_str().expect("a path")),
+                    ("format", "variable_ts_rc"),
+                ],
+            ),
+            &SegSend::none(),
+        )
         .expect("a log");
 
         assert_eq!(log.name(), "housekeeping");
@@ -268,13 +284,16 @@ mod tests {
     #[test]
     fn a_record_the_format_cannot_hold_is_refused() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let mut log = LogNode::of(&node(
-            "fixed_log",
-            &[
-                ("directory", where_.path().to_str().expect("a path")),
-                ("format", "fixed:4"),
-            ],
-        ))
+        let mut log = LogNode::of(
+            &node(
+                "fixed_log",
+                &[
+                    ("directory", where_.path().to_str().expect("a path")),
+                    ("format", "fixed:4"),
+                ],
+            ),
+            &SegSend::none(),
+        )
         .expect("a log");
 
         log.record(b"abcd").expect("a record of exactly four bytes");
@@ -309,7 +328,7 @@ mod tests {
             Scalar::of(where_.path().to_str().expect("a path")),
         );
 
-        let log = LogNode::of(&moved).expect("the example's log opens");
+        let log = LogNode::of(&moved, &SegSend::none()).expect("the example's log opens");
         assert_eq!(log.format(), Format::VariableTsRc);
     }
 }

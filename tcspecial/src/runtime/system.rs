@@ -48,6 +48,7 @@ use crate::runtime::port::{
 };
 use crate::runtime::route::Routes;
 use crate::runtime::schedule::Schedule;
+use crate::segsend::SegSend;
 
 /// How large a datum may be: see [`tcslibgs::DATUM_BYTES`], which is where the
 /// configuration is held to it.
@@ -290,8 +291,16 @@ impl System {
     /// file. Every failure is reported, not the first: an operator holding a
     /// list of what is wrong can fix a vehicle in one pass of the hangar,
     /// where one error at a time is one trip each.
-    pub fn of(graph: &Graph, now: Instant) -> Result<System, Vec<String>> {
-        System::of_opening(graph, now, open, open_ground_link)
+    ///
+    /// Every log is opened with `segsend`, which is what its filled segments
+    /// are handed to.
+    pub fn of(graph: &Graph, now: Instant, segsend: SegSend) -> Result<System, Vec<String>> {
+        System::of_opening(
+            graph,
+            now,
+            move |node, routes, abandon| open(node, routes, abandon, &segsend),
+            open_ground_link,
+        )
     }
 
     /// Open everything, with `opener` deciding what a node becomes and
@@ -814,13 +823,14 @@ pub fn open(
     node: &tcslibgs::graph::Node,
     routes: &Routes,
     abandon: &Abandon,
+    segsend: &SegSend,
 ) -> Result<Box<dyn Port>, String> {
     match node.node_type.as_str() {
         "compute" => {
             let inputs = routes.inputs_of(&node.name);
             Ok(Box::new(ComputePort::make(node, &inputs, abandon)?))
         }
-        "log" => Ok(Box::new(LogPort::of(LogNode::of(node)?))),
+        "log" => Ok(Box::new(LogPort::of(LogNode::of(node, segsend)?))),
         // A node that drops the one stream it takes, and one that sends it on
         // both ways. Nothing is opened for either: neither is an interface.
         "null-moc" | "null-payload" => Ok(Box::new(NullPort::of())),
@@ -1692,7 +1702,7 @@ vehicle:
                     }) as Box<dyn Port>),
                     // And the ones that need nothing but a configuration, which
                     // are opened for real.
-                    _ => open(node, routes, abandon),
+                    _ => open(node, routes, abandon, &SegSend::none()),
                 }
             },
             // What goes to the ground, watched rather than sent: there is no
@@ -1978,7 +1988,7 @@ vehicle:
                 "gpio" | "moc" => Ok(Box::new(Sink {
                     got: Arc::clone(&opening),
                 }) as Box<dyn Port>),
-                _ => open(node, routes, abandon),
+                _ => open(node, routes, abandon, &SegSend::none()),
             },
             move |_: &Telemetered| {
                 Ok(Box::new(Sink {
@@ -2176,7 +2186,7 @@ vehicle:
                         readings: Arc::clone(&pings),
                     }) as Box<dyn Port>)
                 } else {
-                    open(node, routes, abandon)
+                    open(node, routes, abandon, &SegSend::none())
                 }
             },
             |link: &Telemetered| {
@@ -2303,7 +2313,7 @@ vehicle:
                 }
                 match node.node_type.as_str() {
                     "spi" | "gpio" | "moc" => Ok(Box::new(Ground::default()) as Box<dyn Port>),
-                    _ => open(node, routes, abandon),
+                    _ => open(node, routes, abandon, &SegSend::none()),
                 }
             },
             |_link| Ok(Box::new(Ground::default()) as Box<dyn Port>),

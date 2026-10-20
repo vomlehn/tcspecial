@@ -791,8 +791,8 @@ impl LogPort {
     }
 
     /// Open the log this node describes.
-    pub fn open(node: &Node) -> Result<LogPort, String> {
-        Ok(LogPort(LogNode::of(node)?))
+    pub fn open(node: &Node, segsend: &crate::segsend::SegSend) -> Result<LogPort, String> {
+        Ok(LogPort(LogNode::of(node, segsend)?))
     }
 }
 
@@ -2020,20 +2020,23 @@ mod tests {
     #[test]
     fn a_log_takes_what_several_nodes_produced() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let mut port = LogPort::open(&Node {
-            name: "housekeeping".to_string(),
-            node_type: "log".to_string(),
-            group: None,
-            attributes: [
-                (
-                    "directory".to_string(),
-                    tcslibgs::Scalar::of(where_.path().to_str().expect("a path")),
-                ),
-                ("format".to_string(), tcslibgs::Scalar::of("variable_ts_rc")),
-            ]
-            .into_iter()
-            .collect(),
-        })
+        let mut port = LogPort::open(
+            &Node {
+                name: "housekeeping".to_string(),
+                node_type: "log".to_string(),
+                group: None,
+                attributes: [
+                    (
+                        "directory".to_string(),
+                        tcslibgs::Scalar::of(where_.path().to_str().expect("a path")),
+                    ),
+                    ("format".to_string(), tcslibgs::Scalar::of("variable_ts_rc")),
+                ]
+                .into_iter()
+                .collect(),
+            },
+            &crate::segsend::SegSend::none(),
+        )
         .expect("a log");
 
         // Three readings and a decision, arriving as the fabric delivers
@@ -2061,20 +2064,23 @@ mod tests {
     #[test]
     fn a_log_refuses_what_its_format_cannot_hold() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let mut port = LogPort::open(&Node {
-            name: "fixed_log".to_string(),
-            node_type: "log".to_string(),
-            group: None,
-            attributes: [
-                (
-                    "directory".to_string(),
-                    tcslibgs::Scalar::of(where_.path().to_str().expect("a path")),
-                ),
-                ("format".to_string(), tcslibgs::Scalar::of("fixed:4")),
-            ]
-            .into_iter()
-            .collect(),
-        })
+        let mut port = LogPort::open(
+            &Node {
+                name: "fixed_log".to_string(),
+                node_type: "log".to_string(),
+                group: None,
+                attributes: [
+                    (
+                        "directory".to_string(),
+                        tcslibgs::Scalar::of(where_.path().to_str().expect("a path")),
+                    ),
+                    ("format".to_string(), tcslibgs::Scalar::of("fixed:4")),
+                ]
+                .into_iter()
+                .collect(),
+            },
+            &crate::segsend::SegSend::none(),
+        )
         .expect("a log");
 
         assert_eq!(port.give(Arriving::ANYWHERE, b"abcd"), Ok(()));

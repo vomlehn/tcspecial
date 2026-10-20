@@ -784,7 +784,7 @@ mod tests {
             dev_id: i32::try_from(row).unwrap_or(i32::MAX),
             config: SharedString::from(format!("to moc, at 127.0.0.1:{}", 5100 + row)),
             packet_size: 0,
-            status: SharedString::from(crate::vehicle::RECEIVING_STATUS),
+            status: SharedString::from(crate::vehicle::UNKNOWN_STATUS),
             oc_time: SharedString::from(NO_TRANSFER_TIME),
             oc_data: SharedString::new(),
             packets_recv: 0,

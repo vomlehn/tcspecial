@@ -31,6 +31,40 @@ use crate::MainWindow;
 /// Asks the operator, with what differs, whether to continue anyway.
 pub type Ask = Arc<dyn Fn(String) + Send + Sync>;
 
+/// What to do when contact with the spacecraft changes.
+///
+/// Called from the beacon thread, once, on the pass where contact changes --
+/// see [`contact_lost`] and [`contact_made`] -- and not on the passes after
+/// it, which are the same state going on. What it does with the window is
+/// its own business, and it has to take that to the window's thread itself.
+pub type OnContact = Arc<dyn Fn() + Send + Sync>;
+
+/// What the window does as contact is lost and as it is made.
+#[derive(Clone, Default)]
+pub struct Contacts {
+    /// As contact is lost: every node's status goes stale.
+    pub lost: Option<OnContact>,
+    /// As contact is made, on the first beacon and at the end of an outage:
+    /// the spacecraft is asked what each node is doing.
+    pub made: Option<OnContact>,
+}
+
+/// Whether a pass that reads `now` is the one where contact was lost, the
+/// pass before it having read `was`.
+///
+/// Only a contact that was made can be lost. Before the first beacon the
+/// ground has never heard from the spacecraft, so there is nothing for a
+/// node's status to have gone stale from.
+pub fn contact_lost(was: Contact, now: Contact) -> bool {
+    was == Contact::Made && now == Contact::Lost
+}
+
+/// Whether a pass that reads `now` is the one where contact was made: the
+/// first beacon, or the first after an outage.
+pub fn contact_made(was: Contact, now: Contact) -> bool {
+    was == Contact::Lost && now == Contact::Made
+}
+
 /// That this window's beacons are being watched.
 ///
 /// It holds nothing. The thread owns the socket and what it has heard, and the
@@ -53,6 +87,7 @@ impl BeaconReceive {
         contact: Arc<Mutex<Contact>>,
         expected: Option<ConfigDigest>,
         ask: Option<Ask>,
+        contacts: Contacts,
     ) -> Option<BeaconReceive> {
         let mut beacons = match Beacons::listening(link, schedule, expected) {
             Ok(beacons) => beacons,
@@ -87,8 +122,23 @@ impl BeaconReceive {
             // read it. Every pass, not only the ones that received something:
             // contact is lost by nothing arriving, which is what the passes
             // that time out are.
-            if let Ok(mut contact) = held.lock() {
-                *contact = pass.contact;
+            let was = match held.lock() {
+                Ok(mut contact) => std::mem::replace(&mut *contact, pass.contact),
+                Err(_) => pass.contact,
+            };
+            // And what the nodes do about a change, once, as it happens. A
+            // loss: every status a panel shows is what the spacecraft said
+            // while it was being heard from, and none of it can be taken as
+            // true now. Contact made: the spacecraft can be asked again.
+            let then = if contact_lost(was, pass.contact) {
+                contacts.lost.as_ref()
+            } else if contact_made(was, pass.contact) {
+                contacts.made.as_ref()
+            } else {
+                None
+            };
+            if let Some(then) = then {
+                then();
             }
 
             let shown = Shown::of(&pass);
@@ -114,4 +164,30 @@ pub(crate) fn show_beacon(ui: &MainWindow, shown: &Shown) {
     ui.set_indicator_color(shown.indicator);
     ui.set_beacon_last_recv(SharedString::from(shown.received.clone()));
     ui.set_beacon_last_msg(SharedString::from(shown.message.clone()));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Contact is lost on the one pass where it goes from made to lost: not
+    /// before the first beacon, when it was never made, and not on the passes
+    /// after, which are the same loss going on.
+    #[test]
+    fn contact_is_lost_once_and_only_after_it_was_made() {
+        assert!(contact_lost(Contact::Made, Contact::Lost));
+        assert!(!contact_lost(Contact::Lost, Contact::Lost));
+        assert!(!contact_lost(Contact::Made, Contact::Made));
+        assert!(!contact_lost(Contact::Lost, Contact::Made));
+    }
+
+    /// Contact is made on the first beacon and on the first after an
+    /// outage, and on no pass while it simply holds.
+    #[test]
+    fn contact_is_made_once_on_each_return() {
+        assert!(contact_made(Contact::Lost, Contact::Made));
+        assert!(!contact_made(Contact::Made, Contact::Made));
+        assert!(!contact_made(Contact::Lost, Contact::Lost));
+        assert!(!contact_made(Contact::Made, Contact::Lost));
+    }
 }

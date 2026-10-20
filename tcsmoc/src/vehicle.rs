@@ -61,15 +61,65 @@ use crate::{
     CONNECTED_STATUS, DISCONNECTED_STATUS, ERROR_STATUS, NO_TRANSFER_TIME, PANEL_REFRESH_INTERVAL,
 };
 
-/// What a panel's status says: a source the ground receives from.
-pub const RECEIVING_STATUS: &str = "Receiving";
+/// What a panel's status says of a node the spacecraft says is running.
+pub const ACTIVE_STATUS: &str = "Active";
 
-/// What a panel's status says of a node the ground has stopped.
-///
-/// Beside [`RECEIVING_STATUS`], which is what a panel says before anything
-/// has been asked: a panel is a source the ground receives from, and a query
-/// is what turns that into a statement about the node itself.
+/// What a panel's status says of a node the spacecraft says is stopped.
 pub const STOPPED_STATUS: &str = "Stopped";
+
+/// What a panel's status says where nobody can speak for its node.
+///
+/// Where every panel starts: a MOC that has just come up has been told
+/// nothing, and the tcspecial it attached to may have been running nodes for
+/// hours. And what a panel says when the spacecraft answers that it has no
+/// such node, which is a MOC attached to a tcspecial flying another
+/// configuration.
+pub const UNKNOWN_STATUS: &str = "Unknown";
+
+/// What a panel's status says once contact with the spacecraft is lost.
+///
+/// Whatever it said before was what the spacecraft answered while it was
+/// being heard from: a node since stopped, or gone with a process that
+/// restarted, would go on looking as it last did. Stale says that the status
+/// is the last one known and is not known to be true now.
+pub const STALE_STATUS: &str = "Stale";
+
+/// What a node does when contact with the spacecraft is lost: its status is
+/// stale.
+///
+/// One node's, so that the response to a loss is said once for a node and
+/// [`every_node_lost_contact`] is only the asking of each.
+pub fn node_lost_contact(info: &mut DHInfo) {
+    info.status = SharedString::from(STALE_STATUS);
+}
+
+/// Tell every node in the window that contact with the spacecraft is lost.
+pub fn every_node_lost_contact(model: &ModelRc<DHInfo>) {
+    for row in 0..model.row_count() {
+        if let Some(mut info) = model.row_data(row) {
+            node_lost_contact(&mut info);
+            model.set_row_data(row, info);
+        }
+    }
+}
+
+/// Which panels' nodes the operator has stopped, one flag per panel: see
+/// [`crate::Declined`]. Set by Disable and cleared by Enable, from the
+/// spacecraft's answer, so that it says what the operator's last word about
+/// each node was.
+fn declined_for(rows: usize) -> crate::Declined {
+    Arc::new(Mutex::new(vec![false; rows]))
+}
+
+/// Whether the operator's last word about the node of panel `row` was to
+/// stop it.
+fn was_declined(declined: &crate::Declined, row: usize) -> bool {
+    declined
+        .lock()
+        .ok()
+        .and_then(|flags| flags.get(row).copied())
+        .unwrap_or(false)
+}
 
 /// What a node command says when the two ends have not agreed what they read.
 pub const NOT_AGREED: &str = "The vehicle has not agreed which configuration it is flying, so      a node id means nothing yet: press Connect, which sends CONNECT and      compares the digests.";
@@ -139,7 +189,7 @@ pub fn panels(links: &[Telemetered], settable: &BTreeMap<String, Vec<String>>) -
                     link.ground.address, link.ground.port
                 )),
                 packet_size: 0,
-                status: SharedString::from(RECEIVING_STATUS),
+                status: SharedString::from(UNKNOWN_STATUS),
                 oc_time: SharedString::from(NO_TRANSFER_TIME),
                 oc_data: SharedString::new(),
                 packets_recv: 0,
@@ -284,7 +334,44 @@ fn query_every_node(
     ui: &MainWindow,
     link: &Arc<Mutex<CiLink>>,
     agreed: &Agreed,
-    model: &Rc<VecModel<DHInfo>>,
+    model: &impl Model<Data = DHInfo>,
+) {
+    ask_nodes(ui, link, agreed, model, None);
+}
+
+/// Ask the spacecraft what each node is doing, because contact has just been
+/// made: on the first beacon, and at the end of an outage.
+///
+/// Not a poll: nothing is asked while contact simply holds. A node whose last
+/// press was Disable is left out, because the operator said to stop it and
+/// there is nothing to ask. And where nothing may be asked -- the link is
+/// down, or the vehicle has not agreed which configuration it is flying --
+/// nothing is, and nothing is said: the panels keep what they show until
+/// contact is next made or somebody presses Query all.
+fn contact_made(
+    ui: &MainWindow,
+    link: &Arc<Mutex<CiLink>>,
+    agreed: &Agreed,
+    model: &impl Model<Data = DHInfo>,
+    declined: &crate::Declined,
+) {
+    let connected = link
+        .lock()
+        .map(|mut guard| guard.client().is_some())
+        .unwrap_or(false);
+    if connected && may_command_nodes(agreed) {
+        ask_nodes(ui, link, agreed, model, Some(declined));
+    }
+}
+
+/// Ask each panel's node what it is doing and has moved, and show it: every
+/// node, or with `declined`, every node the operator has not stopped.
+fn ask_nodes(
+    ui: &MainWindow,
+    link: &Arc<Mutex<CiLink>>,
+    agreed: &Agreed,
+    model: &impl Model<Data = DHInfo>,
+    declined: Option<&crate::Declined>,
 ) {
     if !may_command_nodes(agreed) {
         ui.set_last_response(SharedString::from(NOT_AGREED));
@@ -293,6 +380,9 @@ fn query_every_node(
 
     let mut said = Vec::new();
     for row in 0..model.row_count() {
+        if declined.is_some_and(|declined| was_declined(declined, row)) {
+            continue;
+        }
         let Some(mut info) = model.row_data(row) else {
             continue;
         };
@@ -309,9 +399,16 @@ fn query_every_node(
         };
 
         match answer {
+            // No such node aboard: a tcspecial flying another configuration,
+            // which nobody here can speak for.
+            Ok((tcslibgs::CommandStatus::NotFound, _, _)) => {
+                info.status = SharedString::from(UNKNOWN_STATUS);
+                said.push(format!("{}: {}", info.name, info.status));
+                model.set_row_data(row, info);
+            }
             Ok((status, enabled, counts)) if status.is_success() => {
                 info.status = SharedString::from(if enabled {
-                    RECEIVING_STATUS
+                    ACTIVE_STATUS
                 } else {
                     STOPPED_STATUS
                 });
@@ -450,11 +547,17 @@ fn set_a_nodes_attribute(
 /// node's position in the configuration, which is the number a command
 /// carries and the number its telemetry port is counted on. One function for
 /// Enable and Disable, because everything but the verb is the same.
+///
+/// An answer of success is the spacecraft saying what the node now is, so the
+/// panel's status takes it, and `declined` keeps the operator's word: Disable
+/// leaves the node out of the asking done when contact is made, and Enable
+/// puts it back.
 fn command_a_node(
     ui: &MainWindow,
     link: &Mutex<CiLink>,
     agreed: &Agreed,
     model: &Rc<VecModel<DHInfo>>,
+    declined: &crate::Declined,
     row: usize,
     enable: bool,
 ) {
@@ -496,6 +599,18 @@ fn command_a_node(
              not reading the same configuration ({status:?})"
         ),
         Ok((status, _)) if status.is_success() => {
+            let mut info = info;
+            info.status = SharedString::from(if enable {
+                ACTIVE_STATUS
+            } else {
+                STOPPED_STATUS
+            });
+            model.set_row_data(row, info);
+            if let Ok(mut flags) = declined.lock() {
+                if let Some(flag) = flags.get_mut(row) {
+                    *flag = !enable;
+                }
+            }
             format!("{verb} {node} ({name}): {status:?}")
         }
         Ok((status, _)) => format!("{verb} {node} ({name}) was refused: {status:?}"),
@@ -523,6 +638,7 @@ pub(crate) fn command_buttons(
     agreed: &Agreed,
     digest: Option<tcslibgs::ConfigDigest>,
     model: &Rc<VecModel<DHInfo>>,
+    declined: &crate::Declined,
 ) {
     // Connect and Disconnect, the one button whose meaning follows the
     // status. Connecting sends a CONNECT at once, because that is what makes
@@ -659,9 +775,10 @@ pub(crate) fn command_buttons(
         let link = link.clone();
         let agreed = agreed.clone();
         let model = model.clone();
+        let declined = declined.clone();
         ui.on_enable_dh(move |row| {
             if let Some(ui) = weak.upgrade() {
-                command_a_node(&ui, &link, &agreed, &model, row as usize, true);
+                command_a_node(&ui, &link, &agreed, &model, &declined, row as usize, true);
             }
         });
     }
@@ -670,9 +787,10 @@ pub(crate) fn command_buttons(
         let link = link.clone();
         let agreed = agreed.clone();
         let model = model.clone();
+        let declined = declined.clone();
         ui.on_disable_dh(move |row| {
             if let Some(ui) = weak.upgrade() {
-                command_a_node(&ui, &link, &agreed, &model, row as usize, false);
+                command_a_node(&ui, &link, &agreed, &model, &declined, row as usize, false);
             }
         });
     }
@@ -1001,6 +1119,9 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
     // Whether the vehicle has agreed which configuration it is flying, which
     // is what licenses a node id: see `Agreed`.
     let agreed: Agreed = Arc::new(Mutex::new(None));
+    // Which nodes the operator has stopped, which the asking done when
+    // contact is made leaves out.
+    let declined = declined_for(rows.len());
 
     // The vehicle, and the simulator where there is anything to simulate.
     // tcspecial has no command interpreter to ask whether it is already
@@ -1076,6 +1197,46 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
                     pm_tcssim.clone(),
                     Some(pm_tcspecial.clone()),
                 )),
+                // What the nodes do as contact changes, each on the window's
+                // thread, which is the only one that may touch the panels.
+                crate::beacon_receive::Contacts {
+                    // Contact lost: every node's status is stale.
+                    lost: Some({
+                        let weak = ui.as_weak();
+                        Arc::new(move || {
+                            let weak = weak.clone();
+                            let _ = slint::invoke_from_event_loop(move || {
+                                if let Some(ui) = weak.upgrade() {
+                                    every_node_lost_contact(&ui.get_dh_model());
+                                }
+                            });
+                        })
+                    }),
+                    // Contact made: the spacecraft is asked about every node
+                    // the operator has not stopped, where it can be asked.
+                    made: link.clone().map(|link| {
+                        let weak = ui.as_weak();
+                        let agreed = agreed.clone();
+                        let declined = declined.clone();
+                        Arc::new(move || {
+                            let weak = weak.clone();
+                            let link = link.clone();
+                            let agreed = agreed.clone();
+                            let declined = declined.clone();
+                            let _ = slint::invoke_from_event_loop(move || {
+                                if let Some(ui) = weak.upgrade() {
+                                    contact_made(
+                                        &ui,
+                                        &link,
+                                        &agreed,
+                                        &ui.get_dh_model(),
+                                        &declined,
+                                    );
+                                }
+                            });
+                        }) as crate::beacon_receive::OnContact
+                    }),
+                },
             )
         }
         Ok(None) => None,
@@ -1187,7 +1348,7 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
         std::process::exit(0);
     };
 
-    command_buttons(&ui, &link, &agreed, digest, &model);
+    command_buttons(&ui, &link, &agreed, digest, &model, &declined);
 
     handle_quit(&ui, pm_tcssim.clone(), Some(pm_tcspecial.clone()));
     handle_close(&ui, pm_tcssim, Some(pm_tcspecial));
@@ -1204,6 +1365,26 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
 pub(crate) mod tests {
     use super::*;
     use std::path::Path;
+
+    /// When contact is lost every node's status is stale, whatever each said
+    /// before: what the spacecraft answered while it was heard from is not
+    /// known to be true now.
+    #[test]
+    fn losing_contact_makes_every_status_stale() {
+        let rows: Vec<DHInfo> = [ACTIVE_STATUS, STOPPED_STATUS, UNKNOWN_STATUS]
+            .into_iter()
+            .map(|status| DHInfo {
+                status: SharedString::from(status),
+                ..Default::default()
+            })
+            .collect();
+        let model = ModelRc::from(Rc::new(VecModel::from(rows)));
+
+        every_node_lost_contact(&model);
+
+        let statuses: Vec<String> = model.iter().map(|info| info.status.to_string()).collect();
+        assert_eq!(statuses, [STALE_STATUS; 3]);
+    }
 
     fn example(name: &str) -> Graph {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
@@ -1491,7 +1672,7 @@ pub(crate) mod tests {
         let answering = std::thread::spawn(move || {
             let mut buffer = [0u8; 65535];
             let mut seen = Vec::new();
-            for _ in 0..4 {
+            for _ in 0..6 {
                 let (size, from) = match vehicle.recv_from(&mut buffer) {
                     Ok(got) => got,
                     Err(_) => return seen,
@@ -1508,6 +1689,11 @@ pub(crate) mod tests {
                         ConfigDigest([0x5Au8; 16]),
                     )),
                     Command::StopNode(cmd) => Telemetry::StopNode(NodeTelemetry::stopped(
+                        seq,
+                        tcslibgs::CommandStatus::Success,
+                        cmd.node,
+                    )),
+                    Command::StartNode(cmd) => Telemetry::StartNode(NodeTelemetry::started(
                         seq,
                         tcslibgs::CommandStatus::Success,
                         cmd.node,
@@ -1578,7 +1764,14 @@ pub(crate) mod tests {
             },
         )));
         let agreed: Agreed = Arc::new(Mutex::new(None));
-        command_buttons(&ui, &link, &agreed, Some(ours), &model);
+        let declined = declined_for(model.row_count());
+        command_buttons(&ui, &link, &agreed, Some(ours), &model, &declined);
+
+        // A panel starts at Unknown: nothing has been asked.
+        assert_eq!(
+            model.row_data(0).expect("the panel").status.as_str(),
+            UNKNOWN_STATUS
+        );
 
         let press = |label: &str| {
             let found: Vec<ElementHandle> =
@@ -1618,6 +1811,16 @@ pub(crate) mod tests {
             said.contains("lorem"),
             "and say which node it was about: {said}"
         );
+        // The panel takes the answer, and the operator's word is kept.
+        assert_eq!(
+            model.row_data(0).expect("the panel").status.as_str(),
+            STOPPED_STATUS
+        );
+        assert!(was_declined(&declined, 0), "Disable is the operator's word");
+
+        // Contact made now asks nothing: the one node is one the operator
+        // stopped. Were it asked, the stand-in's list below would say so.
+        contact_made(&ui, &link, &agreed, model.as_ref(), &declined);
 
         // And the Set button in the panel's popup, which has to be opened
         // first: a popup's contents are not built until it is shown.
@@ -1691,6 +1894,26 @@ pub(crate) mod tests {
             "beside what the popup said already: {shown}"
         );
 
+        // Enable puts the node back: Active, and no longer declined.
+        press("Enable");
+        assert_eq!(
+            model.row_data(0).expect("the panel").status.as_str(),
+            ACTIVE_STATUS
+        );
+        assert!(
+            !was_declined(&declined, 0),
+            "Enable is the operator's word too"
+        );
+
+        // So contact made asks about it, and the panel says what the
+        // spacecraft answered -- stopped, which only asking could tell.
+        contact_made(&ui, &link, &agreed, model.as_ref(), &declined);
+        assert_eq!(
+            model.row_data(0).expect("the panel").status.as_str(),
+            STOPPED_STATUS,
+            "contact made should have asked the spacecraft"
+        );
+
         let sent = answering.join().expect("the stand-in answered");
         assert_eq!(
             sent,
@@ -1698,9 +1921,12 @@ pub(crate) mod tests {
                 tcslibgs::CommandType::Connect,
                 tcslibgs::CommandType::StopNode,
                 tcslibgs::CommandType::SetNode,
+                tcslibgs::CommandType::QueryNode,
+                tcslibgs::CommandType::StartNode,
                 tcslibgs::CommandType::QueryNode
             ],
-            "the four commands the presses should have sent"
+            "the commands the presses and contact made should have sent, and \
+             no query of a node the operator had stopped"
         );
     }
 

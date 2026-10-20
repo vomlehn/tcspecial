@@ -757,7 +757,8 @@ Requirement
     something happens -- a remark on the beacon pass where something
     changed, the answer to a command, a datum that is not an answer to a
     ping -- and says so where it does; ``Moc::receive``, which hands each
-    datum back to be kept, allocates it.
+    datum back to be kept, allocates it, and the ground programs here --
+    tcsmoc and ``lorem_moc`` -- use ``receive_into``.
 
 Requirement
     A ``moc`` node that the ground sends through -- a command binding comes

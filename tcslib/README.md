@@ -42,7 +42,7 @@ uses too. tcslib re-exports all of it, so a ground program needs only tcslib.
 - `tcsmoc`, the test ground station.
 - `tcsui`, the window pieces shared by the ground programs.
 - `examples/simple-app`, whose ground station `lorem_moc` gets its data with
-  one call to `Moc::receive`.
+  one call to `Moc::receive_into`, into a buffer it made beforehand.
 - `examples/beacon`, whose window watches the beacon through `beacon`.
 
 ## Building and testing

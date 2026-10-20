@@ -1735,7 +1735,8 @@ holding the line terminator.
 tcspecial sends the words to the ``moc`` node on the ground, ``moc-1``, at its
 ``ground_base``, ``127.0.0.1:5100``, plus ``lorem``'s device id, 1: port 5101.
 The ground is ``lorem_moc``, the example's second program. It gets the words
-from ``moc-1`` with ``tcslib::moc::Moc::receive``, prints each with one space
+from ``moc-1`` with ``tcslib::moc::Moc::receive_into``, into a buffer it made
+before it started listening, prints each with one space
 between them, and stops at the end of the line. ``moc-1`` states no
 ``address`` or ``port``, because nothing goes back up to the vehicle.
 

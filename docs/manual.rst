@@ -1930,6 +1930,42 @@ button, the ping sent and the answer, and the three times. Both ground stations
 keep them by the same rules, ``tcslib::ping`` in Rust and ``ping_ground.py`` in
 Python.
 
+The tees example
+----------------
+.. figure:: ../examples/tees/tees.svg
+   :alt: The tees example: a command from the ground goes up to the moc node
+         ground and on to echo, a tee-moc, which sends it to the heater and
+         back down to the ground; the sensor's readings go to readings, a
+         tee-payload, which sends them down to the ground and on to dropped,
+         a null-moc; the spare payload's data goes to unheard, a
+         null-payload.
+   :width: 100%
+
+   ``examples/tees``: a command copied back to the ground, a reading copied
+   aboard, and data dropped.
+
+The four nodes that do nothing to what passes, each taking one stream. What
+the ground sends goes up to the ``moc`` node ``ground``, which binds
+``127.0.0.1:8600`` aboard, and leaves it for ``echo``, a ``tee-moc``. The tee
+sends each command on by its ``moc-out`` to the ``heater``, as it was going,
+and again by its ``payload-out`` back to ``ground`` -- so the ground sees what
+the vehicle was told, arriving at ``ground_base`` plus ``echo``'s device id,
+``127.0.0.1:8704``. The ``sensor``'s readings go to ``readings``, a
+``tee-payload``, which sends each down to the ground at ``127.0.0.1:8705`` and
+again by its ``moc-out`` to ``dropped``, a ``null-moc``, standing where
+something aboard that took readings as commands would be. The ``spare``
+payload's data goes to ``unheard``, a ``null-payload``: nobody wants it yet.
+
+A link cannot carry one stream into the other, so the tees are what the
+copies cross by. Each tee has two data sources, so each link out of one is
+written under the source it leaves by.
+
+``make -C examples run-tees`` runs tcsmoc on the example, which starts
+tcspecial and tcssim. ``tcspecial/tests/tees.rs`` flies it, with its sockets
+moved to ports nothing holds: a command sent up reaches the heater and comes
+back down, and a reading reaches the ground. Every port the example uses is in
+the eight thousands, which no other example uses.
+
 The Simulator Configuration
 ===========================
 What simulating a payload takes, which is not a property of the payload: how
@@ -2442,7 +2478,11 @@ exits 2.
 
 Both files of the set are checked, and the second against the first: every
 payload simulated, every simulated payload a payload, and every setting one
-that payload can have. A tcspecial configuration with problems of its own is
+that payload can have. And none simulated that the simulator would not stand
+in for: a payload that is only driven, unless it heats a thermal mass, or one
+that is a program, which tcspecial runs itself. That is the question tcssim
+and tcsmoc ask before a simulator is started, so a set tcsverify passes is one
+they start. A tcspecial configuration with problems of its own is
 not joined to -- there would be nothing to join to, and a join against half of
 a set reports the other half as unsimulated -- and tcsverify says so rather
 than leaving it unsaid.

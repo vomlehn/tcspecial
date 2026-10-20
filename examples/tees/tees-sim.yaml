@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial-sim.schema.json
+
+# How tcssim stands in for the payloads of tees.yaml.
+description: Simulator settings for the payloads of tees.yaml
+
+# The heater is not here: it is driven and never read, so there is nothing for
+# a simulator to send in its place, and what tcspecial sends it goes to a
+# socket nobody holds -- or to whatever ground station is listening there.
+simulated_payloads:
+  # One reading a second, sent whole.
+  - name: sensor
+    type: network
+    protocol: udp
+    packet_interval: 1 s
+  - name: spare
+    type: network
+    protocol: udp
+    packet_interval: 1 s

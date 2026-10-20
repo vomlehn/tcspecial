@@ -5166,11 +5166,38 @@ information is provided to the Rust Socket::new() interface as follows:
    pub fn new(domain: Domain, type_: Type, protocol: Option<Protocol>) -> io::Result<Socket>
 
 
-What a ``network`` node takes today is one of four protocols, named by its
-``protocol`` attribute: ``tcp``, ``udp``, ``unix_stream`` and ``unix_dgram`` --
-``AF_INET`` or ``AF_INET6`` with ``SOCK_STREAM`` or ``SOCK_DGRAM``, and
-``AF_UNIX`` with the same two. Anything else is refused where the
-configuration is read, naming the four (see ``tcslibgs::graph::reach``). The
+What a ``network`` node takes today is one of five protocols, named by its
+``protocol`` attribute: ``tcp``, ``udp``, ``unix_stream``, ``unix_dgram`` and
+``raw`` -- ``AF_INET`` or ``AF_INET6`` with ``SOCK_STREAM`` or ``SOCK_DGRAM``,
+``AF_UNIX`` with the same two, and ``AF_INET`` or ``AF_INET6`` with
+``SOCK_RAW`` and the number the node's ``ip_protocol`` states. Anything else
+is refused where the configuration is read, naming the five (see
+``tcslibgs::graph::reach``).
+
+Requirement
+    A ``raw`` node states an ``address`` and an ``ip_protocol`` from 1 to 254,
+    and no ``port``: an IP datagram has none, and the number and the host are
+    what say which datagrams are the node's. 0 is refused, being no protocol
+    on a raw socket, and so is 255, ``IPPROTO_RAW``, which can only send.
+    ``ip_protocol`` on any other protocol is refused, naming the protocol.
+
+Requirement
+    The raw socket is connected to the node's address, whichever way the node
+    is used: a connected raw socket is handed only its protocol's datagrams
+    from that address and sends to it, and there is no port for either end to
+    wait at. What a read hands on is the payload, the IPv4 header taken off in
+    the buffer it was read into; IPv6 delivers none.
+
+Requirement
+    Two raw nodes reading one protocol from one host are refused as two
+    claims on one thing, each being handed the other's datagrams.
+
+Requirement
+    Without ``CAP_NET_RAW`` the node is refused as it opens, saying that the
+    capability is what is missing and how to give it. The simulator does not
+    stand in for a raw node: on one host every raw socket of a protocol hears
+    every datagram of it, its own included, so a stand-in beside tcspecial
+    would be each end reading its own words back. The
 tables below are what Linux offers beyond them: the families and types a
 network node could be given, and the semantics each would have, so that one
 added later is added knowing which of the two kinds of endpoint above it is.

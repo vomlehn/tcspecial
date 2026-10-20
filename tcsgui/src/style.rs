@@ -984,7 +984,10 @@ impl NodeType {
             NodeType::Network => &[
                 ("protocol", true),
                 ("address", true),
-                ("port", true),
+                // Only with protocol raw, which takes no port and so is why
+                // port is not marked as always wanted.
+                ("ip_protocol", false),
+                ("port", false),
                 ("group", false),
                 ("trigger", false),
                 ("trigger_interval", false),

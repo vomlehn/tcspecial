@@ -153,6 +153,8 @@
            by each source node's device id. -->
       <xs:element name="ground_base" type="xs:string"/>
       <xs:element name="protocol" type="xs:string"/>
+      <!-- The IP protocol number of a raw socket: `protocol` raw. -->
+      <xs:element name="ip_protocol" type="xs:string"/>
       <xs:element name="interface" type="xs:string"/>
       <xs:element name="can_id" type="xs:string"/>
       <!-- How it is read. -->

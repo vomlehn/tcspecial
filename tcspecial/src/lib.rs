@@ -16,6 +16,7 @@ pub use config::*;
 pub use endpoint::*;
 pub use node::payload::device_file::*;
 pub use node::payload::i2c::*;
+pub use node::payload::network::raw::*;
 pub use node::payload::network::tcp::*;
 pub use node::payload::network::udp::*;
 pub use node::payload::network::unix::*;

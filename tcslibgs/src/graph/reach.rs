@@ -231,6 +231,10 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
         // had is.
         DHType::Network => {
             let protocol = match node.attributes.get("protocol") {
+                // A raw socket is a protocol only with its number beside it.
+                Some(stated) if stated.as_str() == crate::types::RAW => {
+                    NetworkProtocol::Raw(ip_protocol_of(what, node)?)
+                }
                 Some(stated) => {
                     NetworkProtocol::from_spelling(stated.as_str()).ok_or_else(|| {
                         format!(
@@ -249,6 +253,8 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
                     ))
                 }
             };
+
+            ip_protocol_misplaced(what, node, protocol)?;
 
             // A ground link that states neither address nor port binds
             // nothing: it only sends, to its ground_base, and the ground has
@@ -275,7 +281,20 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
                     )?
                     .as_str()
                     .to_string(),
-                    port: port_of(what, node)?,
+                    port: match protocol {
+                        // An IP datagram has no port: what tells one
+                        // payload's datagrams from another's is the protocol
+                        // number and the host.
+                        NetworkProtocol::Raw(_) if has("port") => {
+                            return Err(format!(
+                                "\"{what}\" is reached on a raw socket, which has no \
+                                 port: take port out, the ip_protocol and the \
+                                 address being what say which datagrams are its"
+                            ))
+                        }
+                        NetworkProtocol::Raw(_) => 0,
+                        _ => port_of(what, node)?,
+                    },
                 })
             }
         }
@@ -443,13 +462,22 @@ fn ground_of(what: &str, node: &Node) -> Result<Option<HostPort>, String> {
 ///
 /// One list, so that an attribute which locates nothing is an unknown
 /// attribute rather than one silently accepted on every type.
-const LOCATORS: &[&str] = &["path", "address", "port", "protocol", "interface", "can_id"];
+const LOCATORS: &[&str] = &[
+    "path",
+    "address",
+    "port",
+    "protocol",
+    "ip_protocol",
+    "interface",
+    "can_id",
+];
 
 /// What locates a node of this type.
 fn locators(kind: DHType) -> &'static [&'static str] {
     match kind {
-        // A host and a port, and which protocol is spoken to it.
-        DHType::Network => &["address", "port", "protocol"],
+        // A host and a port, and which protocol is spoken to it -- or, on a
+        // raw socket, a host and the IP protocol its datagrams are.
+        DHType::Network => &["address", "port", "protocol", "ip_protocol"],
         // A bus and the address of one device on it.
         DHType::I2c => &["path", "address"],
         // An interface and the identifier the frames carry: a CAN controller
@@ -609,6 +637,43 @@ fn required<'a>(
 /// A whole number an attribute states, in decimal or in hexadecimal.
 fn number(what: &str, attribute: &str, value: &Scalar) -> Result<u32, String> {
     parse_u32(what, attribute, value).map_err(|e| format!("{e}"))
+}
+
+/// The IP protocol a raw network node's datagrams are, from its
+/// `ip_protocol`: a number from 1 to 254, IANA's list being where the numbers
+/// are given out.
+fn ip_protocol_of(what: &str, node: &Node) -> Result<crate::types::IpProtocol, String> {
+    let stated = required(
+        what,
+        node,
+        "ip_protocol",
+        "a node reached on a raw socket",
+        "the IP protocol number its datagrams carry, 1 to 254",
+    )?;
+    let number = number(what, "ip_protocol", stated)?;
+    u8::try_from(number)
+        .ok()
+        .and_then(crate::types::IpProtocol::of)
+        .ok_or_else(|| {
+            format!(
+                "\"{what}\": ip_protocol {number} is not one a raw socket can be \
+                 read with -- it is 1 to 254 (253 and 254 are the two set aside for \
+                 experiments): 0 is no protocol, and 255 can only send"
+            )
+        })
+}
+
+/// An attribute a node of this protocol does not take, said in its terms:
+/// `ip_protocol` names a raw socket's datagrams and nothing else's.
+fn ip_protocol_misplaced(what: &str, node: &Node, protocol: NetworkProtocol) -> Result<(), String> {
+    if node.attributes.contains_key("ip_protocol") && !matches!(protocol, NetworkProtocol::Raw(_)) {
+        return Err(format!(
+            "\"{what}\" is reached over {}, so ip_protocol does not apply to it: it \
+             is for protocol: raw, where it says which IP datagrams are the node's",
+            protocol.spelling()
+        ));
+    }
+    Ok(())
 }
 
 /// The port a network node is at.
@@ -1140,6 +1205,54 @@ mod tests {
         let said = message(&[("read_size", "2049"), ("max_message_bytes", "2048")])
             .expect_err("one byte over what it said");
         assert!(said.contains("2049") && said.contains("2048"), "{said}");
+    }
+
+    /// A raw socket is a protocol with its number beside it: an address, an
+    /// `ip_protocol` from 1 to 254, and no port. And the number belongs to
+    /// a raw socket and to nothing else.
+    #[test]
+    fn a_raw_node_states_its_ip_protocol_and_no_port() {
+        let raw = |extra: &[(&str, &str)]| {
+            let mut all = vec![("address", "10.0.0.7"), ("protocol", "raw")];
+            all.extend_from_slice(extra);
+            reach_of(&node("sounder", "network", &all))
+        };
+
+        match raw(&[("ip_protocol", "253")]).expect("a raw node").endpoint {
+            EndpointConfig::Network(net) => {
+                assert_eq!(
+                    net.protocol,
+                    NetworkProtocol::Raw(crate::IpProtocol::of(253).expect("a protocol"))
+                );
+                assert_eq!(net.address, "10.0.0.7");
+            }
+            other => panic!("expected a network endpoint, got {other:?}"),
+        }
+
+        let said = raw(&[]).expect_err("no number");
+        assert!(said.contains("ip_protocol"), "{said}");
+        for number in ["0", "255", "300"] {
+            let said = raw(&[("ip_protocol", number)]).expect_err(number);
+            assert!(said.contains(number) && said.contains("1 to 254"), "{said}");
+        }
+        let said = raw(&[("ip_protocol", "253"), ("port", "5000")]).expect_err("a port");
+        assert!(said.contains("no port"), "{said}");
+
+        let said = reach_of(&node(
+            "link",
+            "network",
+            &[
+                ("address", "10.0.0.7"),
+                ("port", "5000"),
+                ("protocol", "udp"),
+                ("ip_protocol", "253"),
+            ],
+        ))
+        .expect_err("a number on a udp node");
+        assert!(
+            said.contains("ip_protocol") && said.contains("udp"),
+            "{said}"
+        );
     }
 
     /// A read of no bytes is not a read.

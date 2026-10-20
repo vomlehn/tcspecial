@@ -142,4 +142,11 @@ fn a_beacon_from_the_configured_address_is_heard() {
         Arrived::Nothing,
         "a datagram from the wrong address was taken for a beacon"
     );
+    // And it is warned of, which a console says whether or not it was asked
+    // to talk.
+    assert!(
+        pass.warnings.iter().any(|said| said.contains("ignored")),
+        "the stranger should be warned of: {:?}",
+        pass.warnings
+    );
 }

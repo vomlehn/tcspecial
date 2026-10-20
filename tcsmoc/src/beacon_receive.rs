@@ -69,7 +69,7 @@ impl BeaconReceive {
             // Said on the console: a configuration that differs, beacons that
             // did not arrive, a spacecraft that has restarted. The window has
             // room for what arrived, and these are about what did not.
-            for remark in &pass.remarks {
+            for remark in pass.remarks.iter().chain(&pass.warnings) {
                 eprintln!("{remark}");
             }
             // The one remark an operator must not be left to find in a

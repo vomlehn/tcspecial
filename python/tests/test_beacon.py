@@ -224,7 +224,14 @@ class LoopTest(unittest.TestCase):
         wrong = self.beacons.heard(a_beacon(), ("127.0.0.1", 9999))
         self.assertEqual(wrong.arrived, beacon.Arrived.NOTHING)
         self.assertIsNone(wrong.at)
-        self.assertTrue(any("ignored" in r for r in wrong.remarks), wrong.remarks)
+        # A warning, said whether or not the console was asked to talk.
+        self.assertTrue(any("ignored" in r for r in wrong.warnings), wrong.warnings)
+        self.assertEqual(wrong.remarks, [])
+        # The same stranger is not warned of again; another one is.
+        again = self.beacons.heard(a_beacon(), ("127.0.0.1", 9999))
+        self.assertEqual(again.warnings, [])
+        other = self.beacons.heard(a_beacon(), ("127.0.0.1", 9998))
+        self.assertTrue(any("127.0.0.1:9998" in r for r in other.warnings), other.warnings)
 
 
 def beacon_link():

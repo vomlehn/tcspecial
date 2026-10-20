@@ -246,6 +246,8 @@ def run_without_a_window(setup, beacons, pinger, count):
             beacon_pass = beacons.next_pass()
             for remark in beacon_pass.remarks:
                 print(f"beacon: {remark}", flush=True)
+            for warning in beacon_pass.warnings:
+                print(f"beacon: {warning}", file=sys.stderr, flush=True)
             if beacon_pass.at is not None:
                 print(f"beacon: {beacon_pass.said}", flush=True)
                 heard.set()
@@ -293,6 +295,9 @@ def run_the_window(setup, beacons, pinger):
             beacon_pass = beacons.next_pass()
             for remark in beacon_pass.remarks:
                 status(remark)
+            # What is wrong is said whether or not -v was given.
+            for warning in beacon_pass.warnings:
+                print(warning, file=sys.stderr, flush=True)
             reports.put(("beacon", Shown.of(beacon_pass)))
 
     def answer_loop():

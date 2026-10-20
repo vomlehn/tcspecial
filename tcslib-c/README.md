@@ -108,13 +108,13 @@ The header alone is also compiled as C99 and as C++11.
   - *Once, at startup.* Each `_open` allocates its handle, which has to outlive
     the call and whose size C does not see. `tcs_configuration_open` reads and
     checks a whole configuration, as tcslib does; `tcs_moc_open` makes the
-    names of the node's sources, which every receive then points at; and
-    `tcs_configuration_node_id` asks tcslib for every node's id.
-  - *In tcslib, as a station runs.* A beacon pass holds what the beacon said,
-    and its remarks and warnings, as strings; each datum comes back in a
-    buffer of its own, which this layer keeps rather than copies; each
-    command is written as JSON and its answer read from it; and a ping and
-    what came back are kept as strings, copied here into fixed buffers. Removing these
-    would need tcslib to fill buffers its caller provides.
+    names of the node's sources, which every receive then points at, and the
+    buffer every datum is received in; and `tcs_configuration_node_id` asks
+    tcslib for every node's id.
+  - *In tcslib, as a station runs, only where something happens.* A beacon
+    pass, a datum, a ping and its answer, and a command sent allocate
+    nothing. What does: a remark or warning, on the pass where something
+    changed; an answer to a command, whose strings tcslib reads as its own;
+    and what came down from the ping node that is not an answer, to say why.
 
 `make` in this directory builds `README.html` from this file.

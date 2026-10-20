@@ -17,3 +17,6 @@ pub mod ping;
 pub use client::*;
 pub use connection::*;
 pub use tcslibgs::*;
+
+#[cfg(test)]
+mod running;

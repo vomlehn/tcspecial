@@ -748,6 +748,18 @@ Requirement
     and it counts them as the vehicle does.
 
 Requirement
+    A ground station's loop allocates nothing once it runs: a beacon pass,
+    a datum taken with ``Moc::receive_into`` into a buffer of
+    ``moc::DATUM_BYTES`` made beforehand, a ping and the folding in of its
+    answer, and a command sent each reuse room made when they were opened.
+    A datum longer than the buffer is refused, saying how long it was,
+    rather than cut short. What still allocates does so only where
+    something happens -- a remark on the beacon pass where something
+    changed, the answer to a command, a datum that is not an answer to a
+    ping -- and says so where it does; ``Moc::receive``, which hands each
+    datum back to be kept, allocates it.
+
+Requirement
     A ``moc`` node that the ground sends through -- a command binding comes
     from it, or a line leaves it -- states the ``address`` and ``port``
     tcspecial binds to receive what the ground sends. One that only receives

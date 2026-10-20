@@ -105,7 +105,7 @@ fn a_beacon_from_the_configured_address_is_heard() {
 
     let pass = station.pass();
     assert!(
-        matches!(pass.arrived, Arrived::Beacon(_)),
+        matches!(pass.arrived, Arrived::Beacon),
         "a beacon from the configured address was not heard: {:?}",
         pass.arrived
     );

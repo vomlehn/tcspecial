@@ -141,7 +141,7 @@ impl BeaconReceive {
                 then();
             }
 
-            let shown = Shown::of(&pass);
+            let shown = Shown::of(pass);
             let ui_weak = ui_weak.clone();
             let _ = slint::invoke_from_event_loop(move || {
                 if let Some(ui) = ui_weak.upgrade() {

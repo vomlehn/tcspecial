@@ -226,10 +226,13 @@ impl EndpointWritable for UnixDatagramEndpoint {
         // What the file says, where it says anything: a node that is only
         // driven is sent to at the path it names, without waiting to be
         // written to first. See `UnixDatagramEndpoint::driving`.
-        let learnt;
-        let path: &Path = match &self.told {
-            Some(told) => told.as_path(),
+        //
+        // Sent to an address as it is held, either way: a learnt one is not
+        // made into a path first, so that answering allocates nothing.
+        let sent = match &self.told {
+            Some(told) => self.socket.send_to(data, told),
             None => {
+                // A copy of the address, which holds its path inline.
                 let peer = self
                     .peer
                     .lock()
@@ -247,22 +250,19 @@ impl EndpointWritable for UnixDatagramEndpoint {
                 // that never bound one cannot be written to, which is worth
                 // saying rather than failing as though the write itself had
                 // gone wrong.
-                learnt = peer
-                    .as_pathname()
-                    .ok_or_else(|| {
-                        TcsError::Endpoint(format!(
-                            "{}: the far end of this socket has no path of its own, \
-                             so it cannot be sent to: a datagram device binds a path \
-                             in order to be answered",
-                            self.what
-                        ))
-                    })?
-                    .to_path_buf();
-                learnt.as_path()
+                if peer.as_pathname().is_none() {
+                    return Err(TcsError::Endpoint(format!(
+                        "{}: the far end of this socket has no path of its own, \
+                         so it cannot be sent to: a datagram device binds a path \
+                         in order to be answered",
+                        self.what
+                    )));
+                }
+                self.socket.send_to_addr(data, &peer)
             }
         };
 
-        match self.socket.send_to(data, path) {
+        match sent {
             Ok(n) => Ok(n),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Ok(0),
             Err(e) => Err(TcsError::Io(e)),

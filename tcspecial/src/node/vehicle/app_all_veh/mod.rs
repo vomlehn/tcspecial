@@ -24,7 +24,7 @@
 
 use std::process::ExitStatus;
 
-use tcsapp::parent::{self, Arrived, Running, Supports};
+use tcsapp::parent::{self, Arrived, ReadInto, Running, Supports};
 use tcslibgs::node::app::{AppParams, Kind};
 
 /// The program this node is, running, and this end of its interfaces.
@@ -75,9 +75,19 @@ impl AppAllVeh {
         self.running.read_payload_now()
     }
 
+    /// The same, into the fabric's buffer, allocating nothing.
+    pub fn take_payload_data_now_into(&mut self, out: &mut [u8]) -> Result<ReadInto, String> {
+        self.running.read_payload_now_into(out)
+    }
+
     /// And whatever MOC data, likewise.
     pub fn take_moc_data_now(&mut self) -> Result<Arrived, String> {
         self.running.read_moc_now()
+    }
+
+    /// The same, into the fabric's buffer, allocating nothing.
+    pub fn take_moc_data_now_into(&mut self, out: &mut [u8]) -> Result<ReadInto, String> {
+        self.running.read_moc_now_into(out)
     }
 
     /// And take one back from it, which is what it made of what it was given.

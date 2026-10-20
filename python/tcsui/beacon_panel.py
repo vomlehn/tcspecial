@@ -36,8 +36,9 @@ class palette:
     OFF = "#ffffff"
     #: All is well: the spacecraft is being heard from.
     WELL = "#00ff00"
-    #: Worth looking at.
-    WATCH = "#ffff00"
+    #: Worth looking at. A golden yellow rather than pure yellow, which against
+    #: the white of a blink's dark half could hardly be seen blinking.
+    WATCH = "#ffe100"
     #: Wrong.
     WRONG = "#ff0000"
 
@@ -61,7 +62,7 @@ def indicator(showing, heard):
     return {
         Stage.UNHEARD: dark,
         Stage.HEARD: palette.WELL,
-        Stage.AGEING: palette.WATCH,
+        Stage.AGING: palette.WATCH,
         Stage.SILENT: palette.WRONG,
     }[showing.stage]
 

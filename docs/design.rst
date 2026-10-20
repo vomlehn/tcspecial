@@ -7434,7 +7434,7 @@ Requirement
     which the panels act on. Contact is held for as long as the last beacon's
     age is within the leading run of stages that count as being heard from --
     blinking or steady, a light that has begun to blink being beacons that are
-    arriving and ageing rather than gone -- and is lost past that run, when no
+    arriving and aging rather than gone -- and is lost past that run, when no
     beacon has ever arrived, and when the system clock has moved so that the
     last one is in the future. One reading serves both the light and the
     panels, so the two cannot say different things about one beacon.

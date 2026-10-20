@@ -27,7 +27,7 @@
 //! A beacon is not a request and is not answered, so the only thing that ever
 //! happens is that one fails to arrive. How long ago the last one was is
 //! therefore the whole of the state, and what a ground station shows is how
-//! that age has grown: recently heard, ageing, late, silent. [`Schedule`] is
+//! that age has grown: recently heard, aging, late, silent. [`Schedule`] is
 //! those stages and how long each lasts, with no colours in it -- a stage is
 //! what is true, and which colour says so is the window's business.
 //!
@@ -70,7 +70,7 @@ pub enum Stage {
     /// datagram being a network rather than a spacecraft. The standard
     /// schedule holds this stage for twice the beacon interval, steady at
     /// first and then blinking -- a light that has begun to blink says the
-    /// beacons are ageing, which is worth noticing before it is worth
+    /// beacons are aging, which is worth noticing before it is worth
     /// doubting.
     Heard,
     /// Late enough that contact is not claimed, and not long enough to call
@@ -79,7 +79,7 @@ pub enum Stage {
     /// Several beacons have not arrived. Nothing says whether the spacecraft,
     /// the link or this station is the reason, which is why the stage is
     /// named for what is known.
-    Ageing,
+    Aging,
     /// Long enough that nothing is being heard from the spacecraft.
     Silent,
 }
@@ -90,7 +90,7 @@ impl Stage {
     /// [`Stage::Heard`] and nothing else. It is the one question a program can
     /// act on: a panel may go on showing what a command implied only while the
     /// spacecraft is still being heard from, because a status nobody can
-    /// confirm is a status nobody knows. An ageing beacon is not a confirmed
+    /// confirm is a status nobody knows. An aging beacon is not a confirmed
     /// one, so the line is drawn where the light stops saying all is well.
     pub fn in_contact(self) -> bool {
         matches!(self, Stage::Heard)
@@ -213,7 +213,7 @@ impl Schedule {
             },
             Step {
                 holds: Duration::from_secs(6),
-                stage: Stage::Ageing,
+                stage: Stage::Aging,
                 blink: blink(500, 500),
             },
             Step {
@@ -781,7 +781,7 @@ mod tests {
     ///
     /// The standard schedule holds the heard stage steady for four seconds and
     /// then blinks it for four more: a blinking light says beacons are
-    /// arriving and ageing, not that they have stopped. The run stops at the
+    /// arriving and aging, not that they have stopped. The run stops at the
     /// first stage that is not one of contact, whatever comes after it.
     #[test]
     fn a_blinking_stage_of_contact_is_still_contact() {
@@ -897,7 +897,7 @@ mod tests {
             "one beacon missed at five seconds is still being heard from"
         );
         assert_eq!(schedule.while_in_contact(), Duration::from_secs(8));
-        assert_eq!(schedule.at(Duration::from_secs(9)).stage, Stage::Ageing);
+        assert_eq!(schedule.at(Duration::from_secs(9)).stage, Stage::Aging);
         assert_eq!(schedule.at(Duration::from_secs(20)).stage, Stage::Silent);
         assert_eq!(
             schedule.at(Duration::from_secs(86_400)).stage,

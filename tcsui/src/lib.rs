@@ -58,8 +58,18 @@ pub mod palette {
     }
 
     /// Worth looking at.
+    ///
+    /// A golden yellow, `#ffe100`, rather than pure yellow. A blinking light
+    /// alternates with [`off`], which is white, and pure yellow is so nearly
+    /// as light as white -- a contrast of 1.07 to one -- that its blink could
+    /// hardly be seen, the one stage that asks to be looked at being the
+    /// hardest to see. This is 1.31 to one, enough for the blink to show,
+    /// and is still read as yellow rather than amber: a yellow with more red
+    /// in it, which would blink more plainly, was read as on its way to
+    /// orange, and so to something nearer red. The price is a blink a little
+    /// less plain than green's, at 1.37.
     pub fn watch() -> Color {
-        Color::from_rgb_u8(255, 255, 0)
+        Color::from_rgb_u8(255, 225, 0)
     }
 
     /// Wrong.
@@ -101,7 +111,7 @@ pub fn indicator(showing: &Showing, heard: bool) -> Color {
     match showing.stage {
         Stage::Unheard => dark,
         Stage::Heard => palette::well(),
-        Stage::Ageing => palette::watch(),
+        Stage::Aging => palette::watch(),
         Stage::Silent => palette::wrong(),
     }
 }
@@ -184,6 +194,48 @@ mod tests {
     use std::time::Duration;
     use tcslib::beacon::Schedule;
 
+    /// The contrast between two colours, by WCAG's relative luminance:
+    /// one for the same light, twenty-one for black against white.
+    fn contrast(a: Color, b: Color) -> f64 {
+        let luminance = |c: Color| {
+            let linear = |u: u8| {
+                let v = f64::from(u) / 255.0;
+                if v <= 0.040_45 {
+                    v / 12.92
+                } else {
+                    ((v + 0.055) / 1.055).powf(2.4)
+                }
+            };
+            0.2126 * linear(c.red()) + 0.7152 * linear(c.green()) + 0.0722 * linear(c.blue())
+        };
+        let (light, dark) = {
+            let (x, y) = (luminance(a), luminance(b));
+            if x > y {
+                (x, y)
+            } else {
+                (y, x)
+            }
+        };
+        (light + 0.05) / (dark + 0.05)
+    }
+
+    /// Each lit colour blinks visibly against white: yellow, worth looking
+    /// at, plainly more than pure yellow's 1.07 to one, and red, which is to
+    /// be acted on, plainest of all.
+    #[test]
+    fn each_stage_blinks_visibly_against_white() {
+        let against_off = |c| contrast(c, palette::off());
+        let well = against_off(palette::well());
+        let watch = against_off(palette::watch());
+        let wrong = against_off(palette::wrong());
+        assert!(watch >= 1.25, "watch is {watch:.2} to one against white");
+        assert!(well >= 1.25, "well is {well:.2} to one against white");
+        assert!(
+            wrong >= watch.max(well),
+            "wrong {wrong:.2} against white, watch {watch:.2}, well {well:.2}"
+        );
+    }
+
     /// The standard schedule's light ages green, yellow, red, and blinks
     /// through white; grey is for before anything has arrived.
     ///
@@ -213,9 +265,9 @@ mod tests {
         // Late enough to look at, and long enough to be wrong. Both stages
         // blink, so the instants are chosen in the lit half of a blink --
         // which is what the stage's own colour is shown in.
-        let ageing = schedule.at(Duration::from_millis(8_200));
-        assert!(ageing.lit, "{ageing:?}");
-        assert_eq!(indicator(&ageing, true), palette::watch());
+        let aging = schedule.at(Duration::from_millis(8_200));
+        assert!(aging.lit, "{aging:?}");
+        assert_eq!(indicator(&aging, true), palette::watch());
 
         let silent = schedule.at(Duration::from_millis(30_200));
         assert!(silent.lit, "{silent:?}");
@@ -301,15 +353,16 @@ mod tests {
     /// come back: empty, and then each in the words the Python shows.
     #[test]
     fn the_ping_panel_says_what_the_exchange_is() {
-        use tcslib::ping::{Exchange, Pinger};
         use tcslib::node::vehicle::ping;
+        use tcslib::ping::{Exchange, Pinger};
 
         assert_eq!(PingShown::of(&Exchange::default()), PingShown::default());
 
         let at = Duration::new(1_760_900_000, 0);
         let mut pinger = Pinger::new();
         let message = pinger.ping(at).expect("a ping");
-        let answer = ping::reply(message.as_bytes(), at + Duration::from_millis(3)).expect("an answer");
+        let answer =
+            ping::reply(message.as_bytes(), at + Duration::from_millis(3)).expect("an answer");
         pinger.answered(answer.as_bytes(), at + Duration::from_millis(5));
 
         let shown = PingShown::of(pinger.exchange());

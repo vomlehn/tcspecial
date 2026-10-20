@@ -18,7 +18,7 @@ Staleness
 A beacon is not a request and is not answered, so the only thing that ever
 happens is that one fails to arrive. How long ago the last one was is
 therefore the whole of the state, and what a ground station shows is how that
-age has grown: recently heard, ageing, late, silent. :class:`Schedule` is
+age has grown: recently heard, aging, late, silent. :class:`Schedule` is
 those stages and how long each lasts, with no colours in it -- a stage is what
 is true, and which colour says so is the window's business.
 
@@ -72,7 +72,7 @@ class Stage(enum.Enum):
     HEARD = "heard"
     #: Late enough that contact is not claimed, and not long enough to call it
     #: silence.
-    AGEING = "ageing"
+    AGING = "aging"
     #: Long enough that nothing is being heard from the spacecraft.
     SILENT = "silent"
 
@@ -153,7 +153,7 @@ class Schedule:
         return Schedule([
             Step(holds=4 * SECOND, stage=Stage.HEARD),
             Step(holds=4 * SECOND, stage=Stage.HEARD, blink=blink(500, 500)),
-            Step(holds=6 * SECOND, stage=Stage.AGEING, blink=blink(500, 500)),
+            Step(holds=6 * SECOND, stage=Stage.AGING, blink=blink(500, 500)),
             Step(holds=FOREVER, stage=Stage.SILENT, blink=blink(500, 500)),
         ])
 

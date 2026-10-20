@@ -55,6 +55,9 @@ attributes and checks in `tcslibgs::node`, the flight-side node in
 
 - The link between the MOC and tcspecial is UDP, and will never be TCP.
   (TCP payloads are a different thing and are supported.)
+- C support always means C and C++: every C interface must also work from
+  C++ (headers includable from C++ as they stand, `extern "C"` guards), and
+  is built, tested and documented as C/C++.
 - Configurations are YAML or XML, chosen by the file's extension. The two
   spellings of a configuration must say the same thing, so change both
   together. `tcsverify a.xml a.yaml a-sim.yaml` compares them.

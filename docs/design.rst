@@ -4651,7 +4651,8 @@ Verify that TLSpecial is able to process commands.
 
 RESTART_ARM
 ~~~~~~~~~~~
-Enable a restart of TCSpecial for the next TBD interval.
+Enable a restart of TCSpecial for the next 20 minutes:
+``tcslibgs::commands::RESTART_ARM_LASTS``, which both ends read.
 
 +----------------+-------------------------------------------------------------+
 | Name           | Parameters                                                  |
@@ -4670,9 +4671,9 @@ Enable a restart of TCSpecial for the next TBD interval.
 
 RESTART
 ~~~~~~~
-Restart TCSpecial if the time is within TBD interval from the last RESTART_ARM
-command and arm_key matches the value of arm_key from the last RESTART_ARM
-command
+Restart TCSpecial if the time is within 20 minutes -- ``RESTART_ARM_LASTS`` --
+of the last RESTART_ARM command and arm_key matches the value of arm_key from
+the last RESTART_ARM command
 
 +----------------+-------------------------------------------------------------+
 | Name           | Parameters                                                  |

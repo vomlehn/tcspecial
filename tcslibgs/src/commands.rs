@@ -169,7 +169,18 @@ impl PingCommand {
     }
 }
 
-/// RESTART_ARM command - enable restart for next interval
+/// How long a RESTART_ARM lasts: twenty minutes from when the vehicle takes
+/// it.
+///
+/// A RESTART is refused unless an arm with its key was taken within this long
+/// before it. Long enough for an operator to arm, confirm what the vehicle is
+/// doing and decide, over a link with minutes of latency; short enough that an
+/// arm left behind by a session that ended does not stand ready to restart the
+/// vehicle on the next RESTART anybody sends. Shared by both ends, so that a
+/// ground station saying how long an arm has left says what the vehicle will do.
+pub const RESTART_ARM_LASTS: std::time::Duration = std::time::Duration::from_secs(20 * 60);
+
+/// RESTART_ARM command - enable a restart for the next [`RESTART_ARM_LASTS`]
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RestartArmCommand {
     pub header: CommandHeader,
@@ -661,6 +672,23 @@ impl Command {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// An arm lasts twenty minutes, and the manual says the same: an operator
+    /// deciding whether there is time to restart reads it there.
+    #[test]
+    fn an_arm_lasts_as_long_as_the_manual_says() {
+        assert_eq!(RESTART_ARM_LASTS, std::time::Duration::from_secs(20 * 60));
+        let manual = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs/manual.rst"),
+        )
+        .expect("the manual reads");
+        let said = manual.split_whitespace().collect::<Vec<_>>().join(" ");
+        let minutes = RESTART_ARM_LASTS.as_secs() / 60;
+        assert!(
+            said.contains(&format!("An arm lasts {minutes} minutes")),
+            "the manual should say an arm lasts {minutes} minutes"
+        );
+    }
 
     /// A SET_NODE reads back as it was written, in the JSON a `String` and a
     /// `Vec<u8>` would have made, and refuses what will not fit.

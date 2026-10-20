@@ -3006,10 +3006,17 @@ Ping
   came back within the client's timeout it says when it stopped waiting.
 
 ARM Restart
-  Arms a restart, which a restart will not happen without.
+  Arms a restart, which a restart will not happen without. An arm lasts 20
+  minutes from when the vehicle takes it -- ``RESTART_ARM_LASTS``, in
+  ``tcslibgs::commands``, which both ends read -- and a restart after that is
+  refused until the vehicle is armed again. Long enough to arm, see what the
+  vehicle is doing and decide, over a link with minutes of latency; short
+  enough that an arm left behind does not stand ready for the next restart
+  anybody sends.
 
 Restart
-  Restarts the spacecraft software, which only an armed restart does.
+  Restarts the spacecraft software, which only a restart armed with the same
+  key within the last 20 minutes does.
 
 The remaining four -- ``Query``, ``Query DH``, ``Start DH`` and ``Stop DH`` --
 answer in ``Last Response`` and send nothing. Starting and stopping a handler

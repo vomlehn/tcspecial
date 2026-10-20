@@ -65,7 +65,7 @@ def indicator(showing, heard):
         Stage.UNHEARD: dark,
         Stage.HEARD: palette.WELL,
         Stage.AGING: palette.WATCH,
-        Stage.SILENT: palette.WRONG,
+        Stage.WAITING: palette.WRONG,
     }[showing.stage]
 
 
@@ -80,6 +80,8 @@ class Shown:
     received: str
     #: What that beacon said.
     message: str
+    #: Which stage the light is at, in words: ``Stage.label``.
+    stage: str
 
     @staticmethod
     def of(beacon_pass):
@@ -88,11 +90,17 @@ class Shown:
             indicator=indicator(beacon_pass.showing, beacon_pass.at is not None),
             received=received_at(beacon_pass.at),
             message=beacon_pass.said,
+            stage=beacon_pass.showing.stage.label(),
         )
 
 
 #: What the panel shows before the first pass: ``beacon.slint``'s defaults.
-NOTHING_YET = Shown(indicator="#c0c0c0", received=NO_TRANSFER_TIME, message=NO_BEACON_MESSAGE)
+NOTHING_YET = Shown(
+    indicator="#c0c0c0",
+    received=NO_TRANSFER_TIME,
+    message=NO_BEACON_MESSAGE,
+    stage=Stage.UNHEARD.label(),
+)
 
 
 class BeaconPanel(ttk.LabelFrame):

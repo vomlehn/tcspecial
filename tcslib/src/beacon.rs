@@ -27,8 +27,8 @@
 //! A beacon is not a request and is not answered, so the only thing that ever
 //! happens is that one fails to arrive. How long ago the last one was is
 //! therefore the whole of the state, and what a ground station shows is how
-//! that age has grown: recently heard, aging, late, silent. [`Schedule`] is
-//! those stages and how long each lasts, with no colours in it -- a stage is
+//! that age has grown, through four stages: Unheard, Heard, Aging and
+//! Waiting -- see [`Stage::label`]. [`Schedule`] is those stages and how long each lasts, with no colours in it -- a stage is
 //! what is true, and which colour says so is the window's business.
 //!
 //! The stages also decide how long to wait on the socket. A station whose
@@ -67,8 +67,8 @@ pub const BLINKING_AFTER_MISSED: u32 = 2;
 pub const AGING_AFTER_MISSED: u32 = 4;
 
 /// How many beacons in a row have gone missing when the light turns red,
-/// [`Stage::Silent`]: the spacecraft is not being heard from.
-pub const SILENT_AFTER_MISSED: u32 = 8;
+/// [`Stage::Waiting`]: the spacecraft is not being heard from.
+pub const WAITING_AFTER_MISSED: u32 = 8;
 
 /// How many beacons have gone missing since the last one arrived, `elapsed`
 /// ago, for a vehicle that beacons every `interval`: one for each interval
@@ -105,15 +105,16 @@ pub enum Stage {
     /// beacons are aging, which is worth noticing before it is worth
     /// doubting.
     Heard,
-    /// Late enough that contact is not claimed, and not long enough to call
-    /// it silence.
+    /// Late enough that contact is not claimed, and not so late that it is
+    /// [`Stage::Waiting`].
     ///
     /// Several beacons have not arrived. Nothing says whether the spacecraft,
     /// the link or this station is the reason, which is why the stage is
     /// named for what is known.
     Aging,
-    /// Long enough that nothing is being heard from the spacecraft.
-    Silent,
+    /// Long enough that nothing is being heard from the spacecraft: the
+    /// ground is waiting for it to be heard from again.
+    Waiting,
 }
 
 impl Stage {
@@ -126,6 +127,18 @@ impl Stage {
     /// one, so the line is drawn where the light stops saying all is well.
     pub fn in_contact(self) -> bool {
         matches!(self, Stage::Heard)
+    }
+
+    /// What this stage is called where a person reads it: a window's line, a
+    /// log, the documentation. The one place the four words are written, so
+    /// that every station calls a stage the same thing.
+    pub fn label(self) -> &'static str {
+        match self {
+            Stage::Unheard => "Unheard",
+            Stage::Heard => "Heard",
+            Stage::Aging => "Aging",
+            Stage::Waiting => "Waiting",
+        }
     }
 }
 
@@ -229,10 +242,10 @@ impl Schedule {
     /// | 0 or 1         | [`Stage::Heard`]  | steady green    |
     /// | 2 or 3         | [`Stage::Heard`]  | blinking green  |
     /// | 4 to 7         | [`Stage::Aging`]  | blinking yellow |
-    /// | 8 or more      | [`Stage::Silent`] | blinking red    |
+    /// | 8 or more      | [`Stage::Waiting`] | blinking red    |
     ///
     /// The thresholds are [`BLINKING_AFTER_MISSED`], [`AGING_AFTER_MISSED`]
-    /// and [`SILENT_AFTER_MISSED`]. For a five-second beacon that is ten
+    /// and [`WAITING_AFTER_MISSED`]. For a five-second beacon that is ten
     /// seconds steady, ten more blinking and twenty aging.
     ///
     /// Every blink is half a second on and half a second off, whatever the
@@ -274,13 +287,13 @@ impl Schedule {
                 blink,
             },
             Step {
-                holds: missing(AGING_AFTER_MISSED, SILENT_AFTER_MISSED),
+                holds: missing(AGING_AFTER_MISSED, WAITING_AFTER_MISSED),
                 stage: Stage::Aging,
                 blink,
             },
             Step {
                 holds: Duration::MAX,
-                stage: Stage::Silent,
+                stage: Stage::Waiting,
                 blink,
             },
         ])
@@ -800,6 +813,17 @@ fn stranger_warning(from: SocketAddr, send: &tcslibgs::HostPort) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Each stage has its own word, the first being Unheard and the last
+    /// Waiting.
+    #[test]
+    fn each_stage_is_called_what_it_is() {
+        let said: Vec<&str> = [Stage::Unheard, Stage::Heard, Stage::Aging, Stage::Waiting]
+            .iter()
+            .map(|stage| stage.label())
+            .collect();
+        assert_eq!(said, ["Unheard", "Heard", "Aging", "Waiting"]);
+    }
     use tcslibgs::{BeaconTelemetry, CommandStatus, HostPort, PingTelemetry};
 
     /// A schedule with one stage of contact and one without, so that a test
@@ -813,7 +837,7 @@ mod tests {
             },
             Step {
                 holds: Duration::MAX,
-                stage: Stage::Silent,
+                stage: Stage::Waiting,
                 blink: None,
             },
         ])
@@ -843,7 +867,7 @@ mod tests {
         assert_eq!(
             schedule.contact_at(last, at + Duration::from_millis(4_001)),
             Contact::Lost,
-            "the spacecraft has gone silent, so it is not being heard from"
+            "the beacons have stopped, so the spacecraft is not being heard from"
         );
 
         // Nothing heard at all is the same position as having stopped
@@ -885,7 +909,7 @@ mod tests {
             },
             Step {
                 holds: Duration::from_secs(6),
-                stage: Stage::Silent,
+                stage: Stage::Waiting,
                 blink: None,
             },
             // A stage of contact again, which is not reached: the run ended
@@ -933,7 +957,7 @@ mod tests {
             },
             Step {
                 holds: Duration::MAX,
-                stage: Stage::Silent,
+                stage: Stage::Waiting,
                 blink: Some(Blink {
                     on: Duration::from_millis(500),
                     off: Duration::from_millis(500),
@@ -950,7 +974,7 @@ mod tests {
         // Into the blinking stage: lit for the first half of the cycle, dark
         // for the second, and each says how long is left of it.
         let lit = schedule.at(Duration::from_millis(2_100));
-        assert_eq!(lit.stage, Stage::Silent);
+        assert_eq!(lit.stage, Stage::Waiting);
         assert!(lit.lit);
         assert_eq!(lit.until, Some(Duration::from_millis(400)));
 
@@ -961,7 +985,7 @@ mod tests {
         // And it goes on blinking however old the beacon is, because a light
         // that stopped changing is one an operator stops reading.
         let old = schedule.at(Duration::from_secs(3_600));
-        assert_eq!(old.stage, Stage::Silent);
+        assert_eq!(old.stage, Stage::Waiting);
         assert!(old.until.is_some());
     }
 
@@ -988,10 +1012,10 @@ mod tests {
         );
         assert_eq!(schedule.at(Duration::from_secs(21)).stage, Stage::Aging);
         assert_eq!(schedule.at(Duration::from_secs(39)).stage, Stage::Aging);
-        assert_eq!(schedule.at(Duration::from_secs(41)).stage, Stage::Silent);
+        assert_eq!(schedule.at(Duration::from_secs(41)).stage, Stage::Waiting);
         assert_eq!(
             schedule.at(Duration::from_secs(86_400)).stage,
-            Stage::Silent,
+            Stage::Waiting,
             "the last stage never ends"
         );
     }
@@ -1026,7 +1050,7 @@ mod tests {
         assert_eq!(ten.while_in_contact(), Duration::from_secs(40));
         assert_eq!(ten.at(Duration::from_secs(39)).stage, Stage::Heard);
         assert_eq!(ten.at(Duration::from_secs(41)).stage, Stage::Aging);
-        assert_eq!(ten.at(Duration::from_secs(81)).stage, Stage::Silent);
+        assert_eq!(ten.at(Duration::from_secs(81)).stage, Stage::Waiting);
 
         // Fractions of a second are kept, not rounded to one.
         let quarter = Schedule::for_interval(Duration::from_millis(250));
@@ -1048,7 +1072,7 @@ mod tests {
     #[test]
     fn the_stage_is_the_number_of_beacons_missed() {
         let stage_for = |missed: u128| match missed {
-            n if n >= u128::from(SILENT_AFTER_MISSED) => (Stage::Silent, true),
+            n if n >= u128::from(WAITING_AFTER_MISSED) => (Stage::Waiting, true),
             n if n >= u128::from(AGING_AFTER_MISSED) => (Stage::Aging, true),
             n if n >= u128::from(BLINKING_AFTER_MISSED) => (Stage::Heard, true),
             _ => (Stage::Heard, false),

@@ -42,7 +42,7 @@ use std::time::Duration;
 
 use slint::ComponentHandle;
 
-use beacon_example::{notice_exit, show_on, wire, Vehicle, WatchWindow};
+use beacon_example::{notice_exit, prepare, show_on, wire, Vehicle, WatchWindow};
 use tcslib::beacon::{Beacons, Schedule, STANDARD_INTERVAL};
 use tcslibgs::config_digest::digest_of_file;
 use tcslibgs::graph::parameters::{beacon_interval_of, beacon_of};
@@ -185,6 +185,7 @@ fn main() -> Result<(), slint::PlatformError> {
     let vehicle = Rc::new(RefCell::new(vehicle));
 
     let window = WatchWindow::new()?;
+    prepare(&window);
     let weak = window.as_weak();
     wire(&window, Rc::clone(&vehicle));
 

@@ -42,8 +42,17 @@ def a_beacon(sequence=2, digest=None, version=(0, 1, 0)):
 def schedule():
     return Schedule([
         Step(holds=4 * SECOND, stage=Stage.HEARD),
-        Step(holds=beacon.FOREVER, stage=Stage.SILENT),
+        Step(holds=beacon.FOREVER, stage=Stage.WAITING),
     ])
+
+
+class StageTest(unittest.TestCase):
+    def test_each_stage_is_called_what_it_is(self):
+        # Stage::label in tcslib::beacon, word for word.
+        self.assertEqual(
+            [stage.label() for stage in Stage],
+            ["Unheard", "Heard", "Aging", "Waiting"],
+        )
 
 
 class ScheduleTest(unittest.TestCase):
@@ -59,7 +68,7 @@ class ScheduleTest(unittest.TestCase):
         s = Schedule([
             Step(holds=4 * SECOND, stage=Stage.HEARD),
             Step(holds=4 * SECOND, stage=Stage.HEARD, blink=Blink(on=SECOND, off=SECOND)),
-            Step(holds=6 * SECOND, stage=Stage.SILENT),
+            Step(holds=6 * SECOND, stage=Stage.WAITING),
             Step(holds=beacon.FOREVER, stage=Stage.HEARD),
         ])
         self.assertEqual(s.while_in_contact(), 8 * SECOND)
@@ -70,16 +79,16 @@ class ScheduleTest(unittest.TestCase):
     def test_a_blinking_stage_says_when_it_next_changes(self):
         s = Schedule([
             Step(holds=2 * SECOND, stage=Stage.HEARD),
-            Step(holds=beacon.FOREVER, stage=Stage.SILENT, blink=Blink(on=500 * MS, off=500 * MS)),
+            Step(holds=beacon.FOREVER, stage=Stage.WAITING, blink=Blink(on=500 * MS, off=500 * MS)),
         ])
         fresh = s.at(0)
         self.assertEqual((fresh.stage, fresh.lit, fresh.until), (Stage.HEARD, True, 2 * SECOND))
         lit = s.at(2_100 * MS)
-        self.assertEqual((lit.stage, lit.lit, lit.until), (Stage.SILENT, True, 400 * MS))
+        self.assertEqual((lit.stage, lit.lit, lit.until), (Stage.WAITING, True, 400 * MS))
         dark = s.at(2_600 * MS)
         self.assertEqual((dark.lit, dark.until), (False, 400 * MS))
         old = s.at(3_600 * SECOND)
-        self.assertEqual(old.stage, Stage.SILENT)
+        self.assertEqual(old.stage, Stage.WAITING)
         self.assertIsNotNone(old.until)
 
     def test_the_standard_schedule_holds_contact_through_one_missed_beacon(self):
@@ -90,8 +99,8 @@ class ScheduleTest(unittest.TestCase):
         self.assertEqual(s.at(19 * SECOND).stage, Stage.HEARD)
         self.assertEqual(s.at(21 * SECOND).stage, Stage.AGING)
         self.assertEqual(s.at(39 * SECOND).stage, Stage.AGING)
-        self.assertEqual(s.at(41 * SECOND).stage, Stage.SILENT)
-        self.assertEqual(s.at(86_400 * SECOND).stage, Stage.SILENT)
+        self.assertEqual(s.at(41 * SECOND).stage, Stage.WAITING)
+        self.assertEqual(s.at(86_400 * SECOND).stage, Stage.WAITING)
 
 
     def test_a_schedule_scales_with_the_beacon_interval(self):
@@ -109,22 +118,22 @@ class ScheduleTest(unittest.TestCase):
         self.assertEqual(ten.while_in_contact(), 40 * SECOND)
         self.assertEqual(ten.at(39 * SECOND).stage, Stage.HEARD)
         self.assertEqual(ten.at(41 * SECOND).stage, Stage.AGING)
-        self.assertEqual(ten.at(81 * SECOND).stage, Stage.SILENT)
+        self.assertEqual(ten.at(81 * SECOND).stage, Stage.WAITING)
         self.assertEqual(Schedule.for_interval(250 * MS).steps()[0].holds, 500 * MS)
         self.assertEqual(holds(Schedule.for_interval(0)), holds(standard))
 
 
     def test_the_stage_is_the_number_of_beacons_missed(self):
         def stage_for(count):
-            if count >= beacon.SILENT_AFTER_MISSED:
-                return Stage.SILENT
+            if count >= beacon.WAITING_AFTER_MISSED:
+                return Stage.WAITING
             if count >= beacon.AGING_AFTER_MISSED:
                 return Stage.AGING
             return Stage.HEARD
 
         # tcslib::beacon's thresholds, figure for figure.
         self.assertEqual(
-            (beacon.BLINKING_AFTER_MISSED, beacon.AGING_AFTER_MISSED, beacon.SILENT_AFTER_MISSED),
+            (beacon.BLINKING_AFTER_MISSED, beacon.AGING_AFTER_MISSED, beacon.WAITING_AFTER_MISSED),
             (2, 4, 8),
         )
         for interval in [250 * MS, 5 * SECOND, 60 * SECOND]:
@@ -252,9 +261,9 @@ class PanelTest(unittest.TestCase):
         aging = s.at(20_200 * MS)
         self.assertTrue(aging.lit)
         self.assertEqual(indicator(aging, True), palette.WATCH)
-        silent = s.at(40_200 * MS)
-        self.assertTrue(silent.lit)
-        self.assertEqual(indicator(silent, True), palette.WRONG)
+        waiting = s.at(40_200 * MS)
+        self.assertTrue(waiting.lit)
+        self.assertEqual(indicator(waiting, True), palette.WRONG)
         # The dark half of a blink, once a beacon has arrived: white.
         self.assertEqual(indicator(s.at(20_700 * MS), True), palette.OFF)
         self.assertEqual(indicator(s.at(40_700 * MS), True), palette.OFF)

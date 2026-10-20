@@ -112,7 +112,7 @@ pub fn indicator(showing: &Showing, heard: bool) -> Color {
         Stage::Unheard => dark,
         Stage::Heard => palette::well(),
         Stage::Aging => palette::watch(),
-        Stage::Silent => palette::wrong(),
+        Stage::Waiting => palette::wrong(),
     }
 }
 
@@ -129,6 +129,10 @@ pub struct Shown {
     pub received: String,
     /// What that beacon said.
     pub message: String,
+    /// Which stage the light is at, in words: see
+    /// [`tcslib::beacon::Stage::label`]. Read from the same reading as the
+    /// colour, so the two cannot disagree.
+    pub stage: String,
 }
 
 impl Shown {
@@ -138,6 +142,7 @@ impl Shown {
             indicator: indicator(&pass.showing, pass.at.is_some()),
             received: received_at(pass.at),
             message: pass.said.clone(),
+            stage: pass.showing.stage.label().to_string(),
         }
     }
 
@@ -151,6 +156,7 @@ impl Shown {
             indicator: indicator(showing, at.is_some()),
             received: received_at(at),
             message: said.to_string(),
+            stage: showing.stage.label().to_string(),
         }
     }
 }
@@ -275,9 +281,9 @@ mod tests {
         assert!(aging.lit, "{aging:?}");
         assert_eq!(indicator(&aging, true), palette::watch());
 
-        let silent = schedule.at(Duration::from_millis(40_200));
-        assert!(silent.lit, "{silent:?}");
-        assert_eq!(indicator(&silent, true), palette::wrong());
+        let waiting = schedule.at(Duration::from_millis(40_200));
+        assert!(waiting.lit, "{waiting:?}");
+        assert_eq!(indicator(&waiting, true), palette::wrong());
 
         // And the dark half of either is the same white, whichever stage it
         // is: what the blink says is that time is passing, and what the

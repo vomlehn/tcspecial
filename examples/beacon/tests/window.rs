@@ -90,3 +90,79 @@ fn the_window_shows_what_a_pass_reported() {
         "half a minute with no beacon should not still look well"
     );
 }
+
+/// The stage line says which stage the light is at, in a word, from the
+/// window opening -- Unheard -- through every stage a beacon ages through.
+#[test]
+fn the_stage_line_follows_the_stage() {
+    use tcslib::beacon::Stage;
+
+    i_slint_backend_testing::init_no_event_loop();
+    let window = WatchWindow::new().expect("the window opens");
+    window.show().expect("it is shown");
+
+    // Before any pass: the word the markup opens with, which has to be the
+    // one the library calls the first stage.
+    assert_eq!(window.get_stage(), Stage::Unheard.label());
+    assert!(on_screen(&window).iter().any(|line| line == "Unheard"));
+
+    // Nothing heard, as a pass reports it.
+    let schedule = Schedule::standard();
+    show(
+        &window,
+        &Shown::at(&schedule.after(None, SystemTime::now()), None, "<none>"),
+    );
+    assert_eq!(window.get_stage(), "Unheard");
+
+    // A beacon, then a minute of it ageing: the line goes through the stages
+    // in order, and says each one the light is showing.
+    let at = Some(SystemTime::UNIX_EPOCH + Duration::from_secs(7322));
+    let mut seen: Vec<String> = Vec::new();
+    for ms in (0..60_000).step_by(100) {
+        let showing = schedule.at(Duration::from_millis(ms));
+        show(&window, &Shown::at(&showing, at, "said"));
+        let said = window.get_stage().to_string();
+        assert_eq!(said, showing.stage.label(), "at {ms} ms");
+        if seen.last() != Some(&said) {
+            seen.push(said);
+        }
+    }
+    assert_eq!(seen, ["Heard", "Aging", "Waiting"]);
+    assert!(on_screen(&window).iter().any(|line| line == "Waiting"));
+
+    // Where it is: on the Status row, after the label and before the light,
+    // with no label of its own.
+    assert!(
+        !on_screen(&window)
+            .iter()
+            .any(|line| line.starts_with("Stage")),
+        "the stage has a label of its own: {:?}",
+        on_screen(&window)
+    );
+    let text = |said: &str| {
+        ElementHandle::find_by_element_type_name(&window, "Text")
+            .find(|element| element.accessible_label().as_deref() == Some(said))
+            .unwrap_or_else(|| panic!("no {said:?} on screen"))
+    };
+    let (status, stage) = (text("Status:"), text("Waiting"));
+    let status_right = status.absolute_position().x + status.size().width;
+    assert!(
+        stage.absolute_position().x > status_right,
+        "the stage is not to the right of the Status label"
+    );
+    let middle = |e: &ElementHandle| e.absolute_position().y + e.size().height / 2.0;
+    assert!(
+        (middle(&stage) - middle(&status)).abs() <= 2.0,
+        "the stage is not on the Status row"
+    );
+    // The light is the round thing on that row, after the stage.
+    let light = ElementHandle::find_by_element_type_name(&window, "Rectangle")
+        .filter(|e| (middle(e) - middle(&status)).abs() <= 2.0)
+        .filter(|e| e.size().width > 0.0 && (e.size().width - e.size().height).abs() < 0.5)
+        .max_by(|a, b| a.absolute_position().x.total_cmp(&b.absolute_position().x))
+        .expect("the light");
+    assert!(
+        light.absolute_position().x >= stage.absolute_position().x + stage.size().width,
+        "the light is not after the stage"
+    );
+}

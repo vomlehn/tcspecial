@@ -2757,10 +2757,10 @@ the payload's place in the payload configuration, counted from nought in the
 order the file describes them -- ``auto-send (dev id 0)`` -- and nothing in
 the file states it. Both windows count the same way, so a payload is the same
 number in each. The status is ``Active``,
-``Stopped`` or ``Unknown``, and where each comes from is under `Beaconing`_:
-the spacecraft's answer to the last ``Enable`` or ``Disable``, and ``Unknown``
-for a handler nobody can speak for -- which is what the panels say while no
-beacons are arriving.
+``Stopped``, ``Stale`` or ``Unknown``, and where each comes from is under
+`Beaconing`_: the spacecraft's answer to the last ``Enable`` or ``Disable``,
+``Stale`` for an answer given before contact was lost, and ``Unknown`` for a
+handler nobody can speak for.
 
 ``Last recv``
   When the MOC last received anything from that source, on the port its data
@@ -2984,8 +2984,11 @@ The indicator leaving green is also what the payload panels go by. A panel's
 status is what the spacecraft answered the last ``Enable`` or ``Disable``, and
 that answer is worth as much as the ground's hearing from the spacecraft: a
 handler may since have stopped, or gone with a process that restarted. So when
-the indicator leaves green every panel's status becomes ``Unknown``, whether
-or not the command link is up -- a disconnected MOC cannot find out either.
+the indicator leaves green -- which is contact being lost -- every panel's
+status becomes ``Stale``, whether or not the command link is up: it is the
+last status known, and a disconnected MOC cannot find out either. It happens
+once, as contact is lost, and not before the first beacon, when there was no
+contact to lose.
 
 When the indicator is green again, the MOC asks the spacecraft what each
 handler is doing, and the panels say what it answers: ``Active`` for one that
@@ -2999,9 +3002,11 @@ holds -- and a payload whose last press was ``Disable`` is left out of it: the
 operator said to stop that one, so there is nothing to ask. ``Query all`` asks
 about every payload whenever it is pressed.
 
-If the link is down when contact returns, nothing is asked and nothing is
-owed: the panels keep saying ``Unknown`` until the next time contact is made
-or somebody presses ``Query all``.
+If the link is down when contact returns, or the vehicle has not agreed which
+configuration it is flying, nothing is asked and nothing is said: the panels
+keep what they show -- ``Unknown`` before the first answer, ``Stale`` after an
+outage -- until the next time contact is made or somebody presses
+``Query all``.
 
 Nothing else changes a panel's status. The once-a-second refresh shows what has
 arrived and leaves the status to the commands and to the beacon.

@@ -3043,7 +3043,16 @@ ARM Restart
 
 Restart
   Restarts the spacecraft software, which only a restart armed with the same
-  key within the last 20 minutes does.
+  key within the last 20 minutes does. The arm is used up by it; a restart
+  with the wrong key is refused and leaves the arm standing. tcspecial
+  answers, stops as it does when it is told to -- the pass finished, the
+  links closed, the log flushed -- and runs itself again in the same process,
+  reading its configuration file again: a changed configuration is flown this
+  way. It keeps the descriptors it was started with, such as a socket or pipe
+  a supervisor handed it, and closes everything it opened itself. Its beacons
+  start again at #1. On a system where it cannot do that -- one with neither
+  ``/proc/self/fd`` nor ``/dev/fd`` to say what it was started with -- it says
+  so on its error output and exits.
 
 The remaining four -- ``Query``, ``Query DH``, ``Start DH`` and ``Stop DH`` --
 answer in ``Last Response`` and send nothing. Starting and stopping a handler

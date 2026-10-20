@@ -15,6 +15,10 @@ use tcslibgs::config::{payload_path_from_args, PAYLOAD_CONFIG_PATH_VAR};
 use tcspecial::runtime;
 
 fn main() {
+    // Before anything is opened, so that what a RESTART keeps is what this
+    // process was started with and nothing it opened itself.
+    runtime::restart::note_how_started();
+
     // The one flag, taken out before the configuration is read from what is
     // left, so that it may come before or after the file.
     let (quiet, args): (Vec<String>, Vec<String>) =

@@ -48,6 +48,7 @@ use std::os::unix::io::AsRawFd;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::JoinHandle;
+use std::time::Instant;
 
 use log::{error, trace, warn};
 use nix::poll::{poll, PollFd, PollFlags};
@@ -55,9 +56,9 @@ use std::os::fd::BorrowedFd;
 
 use tcslibgs::config_digest::{ConfigDigest, ConfigVersion};
 use tcslibgs::{
-    answer_to, came_from, CIConfig, Command, CommandLink, CommandStatus, ConfigTelemetry,
+    answer_to, came_from, ArmKey, CIConfig, Command, CommandLink, CommandStatus, ConfigTelemetry,
     ConnectTelemetry, HostPort, NodeTelemetry, PingTelemetry, QueryNodeSampleTelemetry,
-    QueryNodeTelemetry, TcsError, TcsResult, Telemetry,
+    QueryNodeTelemetry, TcsError, TcsResult, Telemetry, RESTART_ARM_LASTS,
 };
 
 use crate::beacon_send::BeaconSend;
@@ -145,6 +146,7 @@ impl Commands {
         flying: Flying,
         beacon: Option<BeaconSend>,
         log: TelemetryLog,
+        restart: fn(),
     ) -> TcsResult<Commands> {
         let spacecraft = Link {
             socket: bound(
@@ -181,6 +183,9 @@ impl Commands {
             stopping: stopping.clone(),
             wakeup: wakeup.clone(),
             answer: Vec::with_capacity(ANSWER_BYTES),
+            armed: None,
+            restart,
+            restarting: false,
         };
         let thread = std::thread::spawn(move || serving.run(spacecraft, nodes));
 
@@ -254,6 +259,15 @@ struct Serving {
     /// What an answer is written into before it is sent: made with the
     /// thread and reused, so that answering allocates nothing of its own.
     answer: Vec<u8>,
+    /// The key of the last RESTART_ARM and when it was taken, until a RESTART
+    /// uses it.
+    armed: Option<(ArmKey, Instant)>,
+    /// What an armed RESTART calls, once it has been answered: asks the
+    /// vehicle to stop and run itself again. See [`crate::runtime::restart`].
+    restart: fn(),
+    /// Whether the command just answered was an armed RESTART, so that the
+    /// restart is asked for once its answer has gone.
+    restarting: bool,
 }
 
 /// Room for an answer as JSON, which the longest -- a node's two samples --
@@ -376,6 +390,13 @@ impl Serving {
             let _ = link.socket.send_to(&data, from);
         }
         self.answer = data;
+
+        // After the answer has gone, so that the ground hears the RESTART was
+        // taken before the links close under it.
+        if self.restarting {
+            self.restarting = false;
+            (self.restart)();
+        }
     }
 
     /// What this vehicle answers that command with.
@@ -485,22 +506,37 @@ impl Serving {
                 }
             },
 
-            // Not answered yet, and refused rather than left unanswered. A
-            // command the vehicle does not implement is a thing the ground can
-            // see and work around; a command that goes quiet is a link the
-            // ground cannot tell from a dead one.
-            //
-            // RESTART_ARM and RESTART are next: what a restart does -- end
-            // the process and leave it to whatever supervises it -- is a
-            // decision about how a vehicle is run and not only about this
-            // module.
-            Command::RestartArm(_) | Command::Restart(_) => {
-                warn!(
-                    "{:?} is not answered by this vehicle yet",
-                    command.cmd_type()
-                );
-                answer_to(command, CommandStatus::InvalidCommand)
+            // Armed for the next RESTART_ARM_LASTS, with this key. A second
+            // arm replaces the first, so the arm that counts is the one the
+            // operator gave last.
+            Command::RestartArm(cmd) => {
+                self.armed = Some((cmd.arm_key, Instant::now()));
+                answer_to(command, CommandStatus::Success)
             }
+
+            // Only with the key of an arm taken within RESTART_ARM_LASTS, and
+            // the arm is used up: one lost or repeated datagram must not be
+            // able to restart the flight software. A key that does not match
+            // leaves the arm as it was, so an operator who mistyped it can
+            // send the RESTART again without arming again.
+            Command::Restart(cmd) => match self.armed {
+                Some((key, taken)) if key == cmd.arm_key && taken.elapsed() < RESTART_ARM_LASTS => {
+                    self.armed = None;
+                    self.restarting = true;
+                    answer_to(command, CommandStatus::Success)
+                }
+                Some((key, _)) if key != cmd.arm_key => {
+                    warn!("a RESTART came with a key that is not the arm's: refused");
+                    answer_to(command, CommandStatus::NotArmed)
+                }
+                _ => {
+                    warn!(
+                        "a RESTART came with no RESTART_ARM in the last {} minutes: refused",
+                        RESTART_ARM_LASTS.as_secs() / 60
+                    );
+                    answer_to(command, CommandStatus::NotArmed)
+                }
+            },
         }
     }
 
@@ -747,6 +783,7 @@ mod tests {
             flying(),
             None,
             TelemetryLog::disabled(),
+            || {},
         )
         .expect("both links bind");
         (ground, commands)
@@ -1161,5 +1198,110 @@ mod tests {
             states.is_enabled("inside"),
             "and the command is not acted on"
         );
+    }
+
+    /// A RESTART is taken with the key of the last RESTART_ARM, and only
+    /// with it, and is asked for only once its answer has gone.
+    ///
+    /// Through the links, as the ground sends them, with a restart that
+    /// counts rather than restarts: what is tested is when the interpreter
+    /// asks for one, and running a test binary again is not that.
+    #[test]
+    fn a_restart_is_taken_only_with_the_arms_key() {
+        static ASKED: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        fn counted() {
+            ASKED.fetch_add(1, Ordering::SeqCst);
+        }
+
+        let graph = two_nodes();
+        let states = Arc::new(NodeStates::of(&graph).expect("states"));
+        let ground = UdpSocket::bind("127.0.0.1:0").expect("a ground socket");
+        ground
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .expect("a timeout");
+        let (bench, _) = a_pass_answering(|_| Ok(()));
+        let commands = Commands::start(
+            &links_for(&ground),
+            states,
+            bench,
+            flying(),
+            None,
+            TelemetryLog::disabled(),
+            counted,
+        )
+        .expect("both links bind");
+        let at = commands.spacecraft_address();
+        let restart = |sequence, key| match ask(
+            &ground,
+            at,
+            &Command::Restart(tcslibgs::RestartCommand::new(sequence, ArmKey(key))),
+        ) {
+            Some(Telemetry::Restart(tm)) => tm.header.status,
+            other => panic!("expected a restart answer, got {other:?}"),
+        };
+
+        // Not armed.
+        assert_eq!(restart(1, 42), CommandStatus::NotArmed);
+
+        match ask(
+            &ground,
+            at,
+            &Command::RestartArm(tcslibgs::RestartArmCommand::new(2, ArmKey(42))),
+        ) {
+            Some(Telemetry::RestartArm(tm)) => assert_eq!(tm.header.status, CommandStatus::Success),
+            other => panic!("expected an arm answer, got {other:?}"),
+        }
+
+        // Armed, and the wrong key: refused, and the arm stands.
+        assert_eq!(restart(3, 41), CommandStatus::NotArmed);
+        assert_eq!(
+            ASKED.load(Ordering::SeqCst),
+            0,
+            "a refused RESTART restarts nothing"
+        );
+
+        // The right key: taken, once.
+        assert_eq!(restart(4, 42), CommandStatus::Success);
+        assert_eq!(ASKED.load(Ordering::SeqCst), 1, "the restart was asked for");
+
+        // And the arm is used up.
+        assert_eq!(restart(5, 42), CommandStatus::NotArmed);
+        assert_eq!(ASKED.load(Ordering::SeqCst), 1);
+    }
+
+    /// An arm older than RESTART_ARM_LASTS does not license a RESTART.
+    ///
+    /// Asked of the interpreter directly, with an arm taken in the past: a
+    /// test that waited twenty minutes would not be run.
+    #[test]
+    fn an_arm_that_has_lapsed_does_not_license_a_restart() {
+        let graph = two_nodes();
+        let (bench, _) = a_pass_answering(|_| Ok(()));
+        let mut serving = Serving {
+            states: Arc::new(NodeStates::of(&graph).expect("states")),
+            bench,
+            flying: flying(),
+            beacon: None,
+            log: TelemetryLog::disabled(),
+            stopping: Arc::new(AtomicBool::new(false)),
+            wakeup: Arc::new(Wakeup::new().expect("a wakeup")),
+            answer: Vec::new(),
+            armed: None,
+            restart: || panic!("a lapsed arm restarted the vehicle"),
+            restarting: false,
+        };
+        let Some(lapsed) = Instant::now().checked_sub(RESTART_ARM_LASTS + Duration::from_secs(1))
+        else {
+            // A machine up for less than twenty minutes has no such instant
+            // to stand for the past, and nothing to test with.
+            return;
+        };
+        serving.armed = Some((ArmKey(7), lapsed));
+        let answer = serving.answer(
+            CommandLink::Spacecraft,
+            &Command::Restart(tcslibgs::RestartCommand::new(1, ArmKey(7))),
+        );
+        assert_eq!(answer.status(), CommandStatus::NotArmed);
+        assert!(!serving.restarting, "nothing is to be restarted");
     }
 }

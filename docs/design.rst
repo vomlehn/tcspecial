@@ -1932,7 +1932,7 @@ both ends read; what follows is what a vehicle made of nodes does with each.
     The process is what restarts: a vehicle that comes back
     reads the configuration file again, so a RESTART is how a changed
     configuration is flown. The arm key is the interlock, and an unarmed
-    RESTART is refused.
+    RESTART is refused. See `Restarting`_.
 
 ``CONFIG``
     Sets the beacon interval. The beacon thread is retimed where it waits, so
@@ -2418,12 +2418,50 @@ node's wait and no other.
    answered on the interpreter's own thread and hand nothing over: the counts
    are atomics and the samples are taken only if the lock is free.
 
-   RESTART_ARM and RESTART are refused as unimplemented rather than left
-   unanswered. A command the vehicle does not implement is something the
-   ground can see and work around; a command that goes quiet is a link the
-   ground cannot tell from a dead one. What a restart should do --
-   end the process and leave it to whatever supervises it -- is a decision
-   about how a vehicle is run and not only about the command.
+   RESTART_ARM and RESTART are answered: see `Restarting`_.
+
+Restarting
+~~~~~~~~~~
+
+A RESTART runs tcspecial again, in the process it is already running in.
+
+Requirement
+    A RESTART_ARM is taken, with its key, and answered ``Success``. A second
+    arm replaces the first, so the arm that counts is the one the operator
+    gave last.
+
+Requirement
+    A RESTART is taken only with the key of an arm taken within
+    ``RESTART_ARM_LASTS``, and uses the arm up: one lost or repeated datagram
+    must not be able to restart the flight software. Anything else is
+    answered ``NotArmed``. A key that does not match leaves the arm standing,
+    so an operator who mistyped it sends the RESTART again without arming
+    again.
+
+Requirement
+    A RESTART that is taken is answered before anything stops, so the ground
+    hears that it was taken before the links close under it. The vehicle then
+    stops as it does on a signal -- the pass finished, the command links
+    closed, the telemetry log flushed, every node released -- because a
+    restart that left a log part way through a record would lose what the
+    restart was meant to keep going.
+
+Requirement
+    Then every descriptor tcspecial opened is closed, and it ``exec``\ s its own
+    executable with the arguments it was started with, keeping the
+    descriptors it was started with and only those: the standard three and
+    whatever a supervisor handed it. Which those were is asked as the process
+    starts, before anything is opened, from ``/proc/self/fd`` or ``/dev/fd``.
+    The process id stays the same, so a supervisor sees one process
+    throughout, and the beacons start again at #1, which is how the ground
+    tells a restart from a gap.
+
+Requirement
+    Where that cannot be done -- neither directory could be read as the
+    process started, or the ``exec`` fails -- tcspecial says why on its error
+    output and exits. A restart that cannot keep what it was handed is not
+    one, and a process that carried on after being told to restart would be
+    flying something the ground believes has gone.
 
 Running a graph
 ---------------
@@ -4730,7 +4768,8 @@ RESTART
 ~~~~~~~
 Restart TCSpecial if the time is within 20 minutes -- ``RESTART_ARM_LASTS`` --
 of the last RESTART_ARM command and arm_key matches the value of arm_key from
-the last RESTART_ARM command
+the last RESTART_ARM command. Otherwise it is answered ``NotArmed``. See
+`Restarting`_ for what a restart does.
 
 +----------------+-------------------------------------------------------------+
 | Name           | Parameters                                                  |

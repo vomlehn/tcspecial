@@ -6,11 +6,14 @@ node is bound aboard, which port a source's data reaches the ground at
 (``graph::order`` and ``graph::telemetry``), whether a datagram came from where
 the configuration says (``types::came_from``), and the configuration's digest.
 
-It reads the XML spelling, because that is the one the Python standard library
-can read: there is no YAML in it. The two spellings say the same thing, which
-``make comparespellings`` and tcsverify hold them to, so either answers the
-same questions; ``examples/ping/tests/agrees.rs`` holds what this reads out of
-``ping.xml`` to what the Rust reads out of ``ping.yaml``.
+It reads either spelling, chosen by the file's extension as the Rust's
+``format::ConfigFormat`` chooses it. The XML with the standard library alone;
+the YAML with PyYAML, which is imported only when a YAML file is read, so that
+a station reading XML needs nothing outside the standard library. Both are
+read into the same :class:`Configuration`, and the two spellings say the same
+thing, which ``make comparespellings`` and tcsverify hold them to;
+``examples/ping/tests/agrees.rs`` holds what this reads to what the Rust
+reads.
 
 The digest is not worked out here. It is taken over what a configuration says
 rather than over its bytes -- see ``tcslibgs::config_digest`` -- and a second
@@ -220,8 +223,37 @@ def parse_interval(text):
     return micros * 1_000
 
 
+#: The two spellings, by the flag that asks for each and the extension it is
+#: written with: ``format::ConfigFormat`` in ``tcslibgs``.
+SPELLINGS = {"yaml": ".yaml", "xml": ".xml"}
+
+
+def choose(named, stem, default, chosen=None):
+    """The configuration to read: ``tcslibgs::format::Spelling::configuration``.
+
+    ``named`` where one was named, and then ``chosen`` -- ``"yaml"`` or
+    ``"xml"``, from ``--yaml`` or ``--xml`` -- has to agree with its
+    extension, a file named ``.xml`` read as asked for in YAML being a command
+    line that cannot both be right. Otherwise ``stem``, the example's path
+    without an extension, in the spelling chosen, or in ``default`` where
+    neither flag was given. The two flags together are refused before this,
+    by the parser that reads them.
+    """
+    if named is not None:
+        named = str(named)
+        suffix = Path(named).suffix.lower()
+        spelled = "yaml" if suffix in (".yaml", ".yml") else "xml" if suffix == ".xml" else None
+        if chosen is not None and spelled is not None and spelled != chosen:
+            raise ValueError(
+                f"{named} is {spelled.upper()} and --{chosen} asks for "
+                f"{chosen.upper()}: name the other file, or leave the flag off"
+            )
+        return named
+    return f"{stem}{SPELLINGS[chosen or default]}"
+
+
 def load(path):
-    """Read the configuration at ``path``, which is the XML spelling.
+    """Read the configuration at ``path``, YAML or XML by its extension.
 
     A file that names others in an ``include`` is refused rather than read in
     part: its nodes' device ids depend on the files it includes, and a station
@@ -229,17 +261,28 @@ def load(path):
     nothing about why.
     """
     path = Path(path)
-    if path.suffix.lower() != ".xml":
-        raise ValueError(
-            f"{path}: this reads the XML spelling of a configuration, which the "
-            "Python standard library can read; there is no YAML in it"
-        )
+    suffix = path.suffix.lower()
+    if suffix == ".xml":
+        return _load_xml(path)
+    if suffix in (".yaml", ".yml"):
+        return _load_yaml(path)
+    raise ValueError(
+        f"{path}: a configuration file is named .yaml, .yml or .xml, and this is "
+        "none of those"
+    )
+
+
+def _includes(path):
+    return ValueError(
+        f"{path} includes other files, which this does not read: their nodes' "
+        "device ids would be counted wrong"
+    )
+
+
+def _load_xml(path):
     root = ElementTree.parse(path).getroot()
     if root.find("include") is not None:
-        raise ValueError(
-            f"{path} includes other files, which this does not read: their "
-            "nodes' device ids would be counted wrong"
-        )
+        raise _includes(path)
 
     tcspecial = {}
     section = root.find("tcspecial")
@@ -270,6 +313,62 @@ def load(path):
             else:
                 node.attributes[child.tag] = (child.text or "").strip()
         nodes.append(node)
+
+    return Configuration(path=path, tcspecial=tcspecial, nodes=nodes)
+
+
+def _scalar(value):
+    """A YAML scalar as the XML spelling writes it: the text of an element.
+    YAML's own true and false are the words, as the XML has them."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value).strip()
+
+
+def _load_yaml(path):
+    try:
+        import yaml
+    except ImportError as why:
+        raise ValueError(
+            f"{path} is YAML, which is read with PyYAML, and this Python has none "
+            f"({why}): install it (python3-yaml on Debian and Ubuntu, or pip "
+            "install pyyaml), or read the XML spelling"
+        ) from why
+
+    with open(path, encoding="utf-8") as text:
+        document = yaml.safe_load(text) or {}
+    if not isinstance(document, dict):
+        raise ValueError(f"{path} is not a configuration: it is not a map of sections")
+    if "include" in document:
+        raise _includes(path)
+
+    tcspecial = {}
+    for part, value in (document.get("tcspecial") or {}).items():
+        if isinstance(value, dict):
+            for leaf, scalar in value.items():
+                tcspecial[f"{part}.{leaf}"] = _scalar(scalar)
+        else:
+            tcspecial[part] = _scalar(value)
+
+    # The node sections in the order the file writes them, and each one's
+    # nodes in order: a node's device id is its place among them all.
+    nodes = []
+    for section, entries in document.items():
+        if section not in NODE_SECTIONS:
+            continue
+        for entry in entries or []:
+            node = Node(name=_scalar(entry.get("name", "")),
+                        node_type=_scalar(entry.get("type", "")))
+            for key, value in entry.items():
+                if key in ("name", "type"):
+                    continue
+                if isinstance(value, list):
+                    node.links.setdefault(key, []).extend(
+                        _scalar(link.get("target", "")) for link in value
+                    )
+                else:
+                    node.attributes[key] = _scalar(value)
+            nodes.append(node)
 
     return Configuration(path=path, tcspecial=tcspecial, nodes=nodes)
 

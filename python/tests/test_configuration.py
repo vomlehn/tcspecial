@@ -76,9 +76,20 @@ class ConfigurationTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "includes other files"):
                 configuration.load(path)
 
-    def test_the_yaml_spelling_is_refused_with_the_reason(self):
-        with self.assertRaisesRegex(ValueError, "no YAML"):
-            configuration.load(ROOT / "examples" / "ping" / "ping.yaml")
+    def test_the_two_spellings_read_alike(self):
+        # The YAML and the XML of one example say the same thing, so they are
+        # read into the same configuration: every node in the same order, with
+        # the same attributes and links, and the same tcspecial section.
+        for example in ["ping", "beacon", "minimal", "thermostat", "simple-app"]:
+            stem = ROOT / "examples" / example / example
+            xml = configuration.load(stem.with_suffix(".xml"))
+            yaml = configuration.load(stem.with_suffix(".yaml"))
+            self.assertEqual(xml.tcspecial, yaml.tcspecial, example)
+            self.assertEqual(xml.nodes, yaml.nodes, example)
+
+    def test_a_file_that_is_neither_spelling_is_refused(self):
+        with self.assertRaisesRegex(ValueError, ".yaml, .yml or .xml"):
+            configuration.load(ROOT / "examples" / "ping" / "ping.svg")
 
     def test_a_datagram_is_taken_only_from_where_the_configuration_says(self):
         # types.rs's own cases.

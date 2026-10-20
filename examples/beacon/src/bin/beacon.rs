@@ -23,8 +23,10 @@
 //! halves, in a panel beside its command link; an operator who has read one
 //! has read the other.
 //!
-//! Arguments, all optional: the configuration, and `-v` or `--verbose`. Run
-//! from the repository's root it needs none.
+//! Arguments, all optional: the configuration; `--yaml` or `--xml`, but not
+//! both, saying which of the example's two files to read, YAML where neither
+//! is given; and `-v` or `--verbose`. Run from the repository's root it needs
+//! none.
 //!
 //! Quiet unless `-v` or `--verbose` is given: the console then says where it
 //! is listening, each remark a beacon pass makes -- beacons missed, a vehicle
@@ -45,10 +47,15 @@ use tcslib::beacon::{Beacons, Schedule, STANDARD_INTERVAL};
 use tcslibgs::config_digest::digest_of_file;
 use tcslibgs::graph::parameters::{beacon_interval_of, beacon_of};
 use tcslibgs::graph::Graph;
+use tcslibgs::{ConfigFormat, Spelling};
 use tcsui::Shown;
 
-/// The configuration, where nobody says otherwise.
-const CONFIGURATION: &str = "examples/beacon/beacon.yaml";
+/// The example's configuration, without its extension: `.yaml` or `.xml`,
+/// the two saying the same thing.
+const CONFIGURATION: &str = "examples/beacon/beacon";
+
+/// The spelling read where neither `--yaml` nor `--xml` is given.
+const SPELLING: ConfigFormat = ConfigFormat::Yaml;
 
 /// What the command line says: the configuration, and whether to talk.
 struct Arguments {
@@ -62,12 +69,17 @@ impl Arguments {
     fn of(args: impl Iterator<Item = String>) -> Result<Arguments, String> {
         let mut path = None;
         let mut verbose = false;
+        let mut spelling = Spelling::default();
         for arg in args {
+            if spelling.take(&arg)? {
+                continue;
+            }
             match arg.as_str() {
                 "-v" | "--verbose" => verbose = true,
                 flag if flag.starts_with('-') => {
                     return Err(format!(
-                        "{flag} is not an option: the options are -v and --verbose"
+                        "{flag} is not an option: the options are --yaml, --xml, -v \
+                         and --verbose"
                     ))
                 }
                 _ if path.is_some() => {
@@ -79,7 +91,7 @@ impl Arguments {
             }
         }
         Ok(Arguments {
-            path: path.unwrap_or_else(|| CONFIGURATION.to_string()),
+            path: spelling.configuration(path, CONFIGURATION, SPELLING)?,
             verbose,
         })
     }
@@ -90,7 +102,7 @@ fn main() -> Result<(), slint::PlatformError> {
         Ok(arguments) => arguments,
         Err(why) => {
             eprintln!("{why}");
-            eprintln!("usage: beacon [-v | --verbose] [configuration]");
+            eprintln!("usage: beacon [--yaml | --xml] [-v | --verbose] [configuration]");
             std::process::exit(2);
         }
     };
@@ -242,7 +254,7 @@ mod tests {
     fn verbose_is_asked_for() {
         let quiet = of(&[]).expect("no arguments are arguments");
         assert!(!quiet.verbose);
-        assert_eq!(quiet.path, CONFIGURATION);
+        assert_eq!(quiet.path, "examples/beacon/beacon.yaml");
 
         for args in [
             &["-v"][..],
@@ -261,5 +273,20 @@ mod tests {
     fn what_is_not_understood_is_refused() {
         assert!(of(&["-q"]).is_err());
         assert!(of(&["a.yaml", "b.yaml"]).is_err());
+    }
+
+    /// YAML where nobody says, XML with --xml, and not both.
+    #[test]
+    fn the_spelling_is_yaml_unless_xml_is_asked_for() {
+        assert_eq!(
+            of(&["--xml"]).expect("it reads").path,
+            "examples/beacon/beacon.xml"
+        );
+        assert_eq!(
+            of(&["--yaml", "-v"]).expect("it reads").path,
+            "examples/beacon/beacon.yaml"
+        );
+        assert!(of(&["--yaml", "--xml"]).is_err());
+        assert!(of(&["--yaml", "a.xml"]).is_err());
     }
 }

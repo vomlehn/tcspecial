@@ -364,6 +364,35 @@ fn contact_made(
     }
 }
 
+/// After a Connect, ask what [`contact_made`] would have asked, where contact
+/// was made before the link was up.
+///
+/// The first beacon usually arrives before anybody has pressed Connect, and
+/// then nothing could be asked: the panels would say Unknown until an outage
+/// ended or somebody pressed Query all. A Connect the vehicle agrees to, with
+/// the spacecraft being heard from, is the moment the asking was owed. What
+/// the Connect said stays in Last Response, with what the asking found after
+/// it.
+fn connected_in_contact(
+    ui: &MainWindow,
+    link: &Arc<Mutex<CiLink>>,
+    agreed: &Agreed,
+    model: &impl Model<Data = DHInfo>,
+    declined: &crate::Declined,
+    contact: &Mutex<tcslib::beacon::Contact>,
+) {
+    let heard = matches!(contact.lock().as_deref(), Ok(tcslib::beacon::Contact::Made));
+    if !heard || !may_command_nodes(agreed) {
+        return;
+    }
+    let connect_said = ui.get_last_response();
+    contact_made(ui, link, agreed, model, declined);
+    let asked = ui.get_last_response();
+    if asked != connect_said {
+        ui.set_last_response(SharedString::from(format!("{connect_said}; {asked}")));
+    }
+}
+
 /// Ask each panel's node what it is doing and has moved, and show it: every
 /// node, or with `declined`, every node the operator has not stopped.
 fn ask_nodes(
@@ -632,6 +661,9 @@ fn command_a_node(
 /// `digest` is this end's, or `None` for a configuration that could not be
 /// digested -- which leaves nothing to check the vehicle's answer against,
 /// and so nothing that may be commanded by id.
+///
+/// `contact` is the beacon thread's reading of whether the spacecraft is
+/// being heard from, which a Connect reads: see [`connected_in_contact`].
 pub(crate) fn command_buttons(
     ui: &MainWindow,
     link: &Arc<Mutex<CiLink>>,
@@ -639,6 +671,7 @@ pub(crate) fn command_buttons(
     digest: Option<tcslibgs::ConfigDigest>,
     model: &Rc<VecModel<DHInfo>>,
     declined: &crate::Declined,
+    contact: &Arc<Mutex<tcslib::beacon::Contact>>,
 ) {
     // Connect and Disconnect, the one button whose meaning follows the
     // status. Connecting sends a CONNECT at once, because that is what makes
@@ -647,6 +680,9 @@ pub(crate) fn command_buttons(
         let weak = ui.as_weak();
         let link = link.clone();
         let agreed = agreed.clone();
+        let model = model.clone();
+        let declined = declined.clone();
+        let contact = contact.clone();
         let ours = tcslibgs::config_digest::ConfigVersion::of_this_build();
         ui.on_link_clicked(move || {
             let ui = weak.unwrap();
@@ -687,7 +723,10 @@ pub(crate) fn command_buttons(
             ui.set_ci_status(SharedString::from(CONNECTED_STATUS));
 
             match digest {
-                Some(digest) => hear_what_the_vehicle_read(&ui, &link, &agreed, ours, digest),
+                Some(digest) => {
+                    hear_what_the_vehicle_read(&ui, &link, &agreed, ours, digest);
+                    connected_in_contact(&ui, &link, &agreed, model.as_ref(), &declined, &contact);
+                }
                 // Nothing to compare with, so nothing may be commanded by id:
                 // the warning at startup said why.
                 None => ui.set_last_response(SharedString::from(
@@ -1191,7 +1230,7 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
                 ui.as_weak(),
                 beacon,
                 crate::config::constants::beacon_schedule(interval),
-                contact,
+                contact.clone(),
                 digest,
                 Some(crate::ask_whether_to_continue(
                     pm_tcssim.clone(),
@@ -1348,7 +1387,7 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
         std::process::exit(0);
     };
 
-    command_buttons(&ui, &link, &agreed, digest, &model, &declined);
+    command_buttons(&ui, &link, &agreed, digest, &model, &declined, &contact);
 
     handle_quit(&ui, pm_tcssim.clone(), Some(pm_tcspecial.clone()));
     handle_close(&ui, pm_tcssim, Some(pm_tcspecial));
@@ -1672,7 +1711,7 @@ pub(crate) mod tests {
         let answering = std::thread::spawn(move || {
             let mut buffer = [0u8; 65535];
             let mut seen = Vec::new();
-            for _ in 0..6 {
+            for _ in 0..7 {
                 let (size, from) = match vehicle.recv_from(&mut buffer) {
                     Ok(got) => got,
                     Err(_) => return seen,
@@ -1765,7 +1804,10 @@ pub(crate) mod tests {
         )));
         let agreed: Agreed = Arc::new(Mutex::new(None));
         let declined = declined_for(model.row_count());
-        command_buttons(&ui, &link, &agreed, Some(ours), &model, &declined);
+        // The spacecraft being heard from, as the beacon thread would say: so
+        // a Connect is the moment to ask what each node is doing.
+        let contact = Arc::new(Mutex::new(tcslib::beacon::Contact::Made));
+        command_buttons(&ui, &link, &agreed, Some(ours), &model, &declined, &contact);
 
         // A panel starts at Unknown: nothing has been asked.
         assert_eq!(
@@ -1798,6 +1840,29 @@ pub(crate) mod tests {
             ui.get_last_response()
         );
         assert!(may_command_nodes(&agreed), "and remember that it did");
+        // And, contact having been made before the link was up, the Connect
+        // asked what the node is doing: stopped, which only asking could tell.
+        assert_eq!(
+            model.row_data(0).expect("the panel").status.as_str(),
+            STOPPED_STATUS,
+            "a Connect in contact should have asked the spacecraft"
+        );
+        assert!(
+            ui.get_last_response().as_str().contains("agrees"),
+            "what the Connect said should still be there: {}",
+            ui.get_last_response()
+        );
+        // Out of contact, a Connect asks nothing: were it to, the stand-in's
+        // list below would say so.
+        let out_of_contact = Mutex::new(tcslib::beacon::Contact::Lost);
+        connected_in_contact(
+            &ui,
+            &link,
+            &agreed,
+            model.as_ref(),
+            &declined,
+            &out_of_contact,
+        );
 
         // And now a panel's Disable reaches the vehicle, which answers about
         // the node the panel is for.
@@ -1919,6 +1984,7 @@ pub(crate) mod tests {
             sent,
             vec![
                 tcslibgs::CommandType::Connect,
+                tcslibgs::CommandType::QueryNode,
                 tcslibgs::CommandType::StopNode,
                 tcslibgs::CommandType::SetNode,
                 tcslibgs::CommandType::QueryNode,

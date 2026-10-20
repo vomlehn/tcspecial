@@ -359,19 +359,20 @@ mod tests {
         use std::net::UdpSocket;
         use tcslibgs::NetworkProtocol;
 
-        // Port 0, so the test takes whatever is free and cannot collide with
-        // another test or a running tcspecial.
-        let bound = UdpSocket::bind("127.0.0.1:0").unwrap();
-        let addr = bound.local_addr().unwrap();
-        drop(bound);
-
+        // Port 0, bound by the endpoint itself, so the test takes whatever is
+        // free and cannot collide with another test or a running tcspecial.
+        // The port is read back from the endpoint's own socket. It used to be
+        // found by binding a socket of the test's, reading its port and
+        // dropping it, and then bound again here -- and between the drop and
+        // the bind another test could take it.
         let config = NetworkConfig {
             protocol: NetworkProtocol::Udp,
-            address: addr.ip().to_string(),
-            port: addr.port(),
+            address: "127.0.0.1".to_string(),
+            port: 0,
         };
 
         let mut reader = UdpEndpoint::new("beacon", &config).unwrap();
+        let addr = reader.socket.local_addr().unwrap();
         let mut writer = reader.try_clone().unwrap();
 
         // Nothing has arrived, so there is nowhere to answer.

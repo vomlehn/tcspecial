@@ -33,6 +33,15 @@ configuration file at startup, which is the whole of the architecture: the
 program is a set of node types and a machine for moving data along declared
 links, and what a particular vehicle does is a file.
 
+**C/C++, Rust and Python are all supported.** A program that runs aboard --
+the program of an app node, or a payload that is a program rather than a
+device -- is talked to through file descriptors it inherits, which a program
+in any of the three already knows how to read and write, so it may be written
+in C, C++, Rust or Python. On the ground, a station is built on ``tcslib`` in
+Rust or on its Python spelling under ``python/``. Every interface offered to
+C is offered to C++ as well: a C header can be included from C++ as it
+stands, and nothing in it is C that C++ will not compile.
+
 What that buys
 --------------
 

@@ -2976,9 +2976,9 @@ beacon did arrive when it arrived.
 
 Panels start at ``Unknown``: a MOC that has just come up has been told
 nothing, and the tcspecial it attached to may have been running handlers for
-hours. The first beacon is what fills them in -- the MOC then asks the
-spacecraft what each handler is doing -- and until it arrives the data
-indicator is what says whether a payload is delivering.
+hours. They are filled in when the first beacon is received -- the MOC then
+asks the spacecraft what each handler is doing -- and until it arrives the
+data indicator is what says whether a payload is delivering.
 
 The indicator leaving green is also what the payload panels go by. A panel's
 status is what the spacecraft answered the last ``Enable`` or ``Disable``, and

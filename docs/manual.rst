@@ -16,16 +16,16 @@ Introduction
 
 TCSpecial is **telemetry and control, special**, and it is flight software. It
 connects the devices aboard a vehicle -- sensors, actuators, and whatever else
-arrives on an I\ :superscript:`2`\ C bus, a SPI link, a serial line, a CAN
-bus, a set of discrete lines, a sensor buffer, a channel to another processor
-core, a socket or a device file -- to the places their data has to reach. Some of those places
-are on the ground: a network link carries telemetry to the mission operations
-center, the **MOC**, and commands back. Others are aboard: software that takes
-what a device produces, computes something from it, remembers what it needs to
-remember, and sends the result on to the original device, to a different
-device, or to the MOC. Others again keep what they are given -- a log node
-records what reaches it, however many sources send to it, so that what happened
-can be reconstructed later rather than only watched as it goes past.
+arrives on an I\ :superscript:`2`\ C bus, a SPI link, a serial line, a CAN bus,
+a set of discrete lines, a sensor buffer, a channel to another processor core,
+a socket or a device file -- to the places their data has to reach. Some of
+those places are on the ground: a network link carries telemetry to the mission
+operations center, the **MOC**, and commands back. Others are aboard: software
+that takes what a device produces, computes something from it, remembers what
+it needs to remember, and sends the result on to the original device, to a
+different device, or to the MOC. Others again keep what they are given -- a log
+node records what reaches it, however many sources send to it, so that what
+happened can be reconstructed later rather than only watched as it goes past.
 
 Everything in that picture is a **node**, and what joins one node to another is
 a **link**. Neither is written in the software. Both are read from a
@@ -43,6 +43,16 @@ Rust, on ``tcslib-c`` in C or C++ -- the same library behind one header,
 Every interface offered to C is offered to C++ as well: a C header can be
 included from C++ as it stands, and nothing in it is C that C++ will not
 compile.
+
+**cFS and F´.** Work is under way on using TCSpecial, its telemetry log tcslog
+and its packet compiler tcsxtce with the two flight software frameworks most
+missions are built on, NASA's core Flight System and JPL's F´. What each
+project brings to them, what has to change to fit, and in what order, is in
+``third-party.rst``, beside this manual.
+
+.. note::
+   Integration with cFS and F´ is a work in progress. None of it is built
+   yet, and nothing else in this manual depends on it.
 
 What that buys
 --------------
@@ -3289,10 +3299,12 @@ crates they depend on in turn are not listed: ``cargo tree`` shows the whole
 graph, and ``Cargo.lock`` says which version of each is built.
 
 Every one is fetched from `crates.io <https://crates.io>`_, the Rust package
-registry, which is where ``cargo build`` downloads it from; none is taken from
-a git repository or a local path. Each name below links to its page there, the
-version links to its documentation on `docs.rs <https://docs.rs>`_, and the
-last column to the repository its source is developed in.
+registry, which is where ``cargo build`` downloads it from, but one: ``xtce``,
+tcsxtce's runtime, which packs and unpacks the beacon, is taken from a copy in
+``vendor/tcsxtce`` until tcsxtce is published, and is not listed below. Each
+name below links to its page there, the version links to its documentation on
+`docs.rs <https://docs.rs>`_, and the last column to the repository its source
+is developed in.
 
 *Asked* is the version the manifests ask for -- ``1.18`` admits any 1.x from
 1.18 on -- and *locked* is the one ``Cargo.lock`` builds. Two figures under

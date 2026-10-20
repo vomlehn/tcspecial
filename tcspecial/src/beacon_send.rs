@@ -15,7 +15,7 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::time::{Duration, SystemTime};
 
-use log::trace;
+use log::{error, info, trace};
 use tcslibgs::{BeaconTelemetry, ConfigDigest, ConfigVersion, TcsResult, Telemetry};
 
 use crate::telemetry_log::TelemetryLog;
@@ -63,6 +63,16 @@ pub struct BeaconSend {
 const BEACON_BYTES: usize = 512;
 
 impl BeaconSend {
+    /// Bind where beacons come from, find where they go, and start sending.
+    ///
+    /// The socket is bound and the destination resolved here, on the caller's
+    /// thread, and not on the thread that sends: a `beacon.send` some other
+    /// program holds, or a `beacon.recv` that names no address, is then a
+    /// vehicle that will not start, said to whoever started it. Found on the
+    /// thread, it was a thread that ended in silence and a vehicle that flew
+    /// on without beacons -- which the ground cannot tell from a dead one.
+    ///
+    /// An interval of nought sends none, and is `Ok(None)`.
     pub fn new(
         interval: Duration,
         from_addr: tcslibgs::HostPort,
@@ -70,10 +80,39 @@ impl BeaconSend {
         log: TelemetryLog,
         version: ConfigVersion,
         digest: ConfigDigest,
-    ) -> Option<BeaconSend> {
+    ) -> TcsResult<Option<BeaconSend>> {
         if interval == Duration::from_secs(0) {
-            return None;
+            return Ok(None);
         }
+
+        // Bound where the configuration says beacons come from, port and all.
+        // A port the system chose would work -- the datagram carries its
+        // source, so the ground could answer it -- and would leave the link
+        // describable from one end only: nothing could be filtered, captured
+        // or firewalled by a rule somebody could write down beforehand.
+        let socket = UdpSocket::bind(from_addr.to_string()).map_err(|e| {
+            tcslibgs::TcsError::Config(format!(
+                "beacons cannot be sent from {from_addr} ({e}): change beacon.send \
+                 in the configuration's tcspecial section to an address this \
+                 machine has and a port nothing else is using"
+            ))
+        })?;
+
+        // Where they go, resolved once, before the loop: so that sending a
+        // beacon allocates nothing. Resolving a name is a lookup that
+        // allocates, and the destination does not move.
+        let unresolved = || {
+            tcslibgs::TcsError::Config(format!(
+                "beacons cannot be sent to {dest_addr}, which does not resolve to \
+                 an address: change beacon.recv in the configuration's tcspecial \
+                 section to the address the ground listens for beacons on"
+            ))
+        };
+        let dest: SocketAddr = (dest_addr.address.as_str(), dest_addr.port)
+            .to_socket_addrs()
+            .map_err(|_| unresolved())?
+            .next()
+            .ok_or_else(unresolved)?;
 
         let expiration_time = SystemTime::now() + interval;
         let pair = Arc::new(CondPair {
@@ -93,40 +132,26 @@ impl BeaconSend {
         };
 
         let b_clone = b.clone();
-        thread::spawn(move || {
-            // FIXME: add check for error
-            let _ = b_clone.beacon_send();
-        });
+        thread::spawn(move || b_clone.beacon_send(socket, dest));
 
-        Some(b)
+        Ok(Some(b))
     }
 
-    // FIXME: check result type
-    fn beacon_send(&self) -> TcsResult<()> {
-        // Bound where the configuration says beacons come from, port and all.
-        // A port the system chose would work -- the datagram carries its
-        // source, so the ground could answer it -- and would leave the link
-        // describable from one end only: nothing could be filtered, captured
-        // or firewalled by a rule somebody could write down beforehand.
-        let socket = UdpSocket::bind(self.from_addr.to_string())?;
-
-        // Where they go, resolved once, before the loop, and the buffer each
-        // is written into, made once: so that sending a beacon allocates
-        // nothing. Resolving a name is a lookup that allocates, and the
-        // destination does not move.
-        let dest: SocketAddr = (self.dest_addr.address.as_str(), self.dest_addr.port)
-            .to_socket_addrs()?
-            .next()
-            .ok_or_else(|| {
-                tcslibgs::TcsError::Config(format!(
-                    "{} does not resolve to an address beacons can be sent to",
-                    self.dest_addr
-                ))
-            })?;
+    /// Send a beacon now, and then one every interval, for as long as the
+    /// process runs.
+    ///
+    /// Nothing here can end it: everything that could stop beacons for good
+    /// was found by `new`. A send that fails -- a route gone, a buffer full --
+    /// is said once, when the beacons stop going, and once when they go again,
+    /// rather than every interval: a vehicle that cannot reach the ground for
+    /// an hour should leave a log that says so in two lines.
+    fn beacon_send(&self, socket: UdpSocket, dest: SocketAddr) {
+        // The buffer each beacon is written into, made once.
         let mut data = Vec::with_capacity(BEACON_BYTES);
+        let mut failing = Failing::default();
 
-        // FIXME: add check for error
-        let _ = self.send_beacon(&socket, dest, &mut data);
+        let outcome = self.send_beacon(&socket, dest, &mut data);
+        failing.after(outcome, &self.from_addr, &self.dest_addr);
 
         loop {
             let mut expiration = self.pair.lock.lock().unwrap();
@@ -145,11 +170,10 @@ impl BeaconSend {
                 }
             }
 
-            // Send the beacon
-            // FIXME: add check for error
-            let _ = self.send_beacon(&socket, dest, &mut data);
+            let outcome = self.send_beacon(&socket, dest, &mut data);
+            failing.after(outcome, &self.from_addr, &self.dest_addr);
 
-            // Calculate next expiration time1G
+            // Calculate next expiration time
             let interval = *self.interval.lock().unwrap();
             let now = SystemTime::now();
             *expiration = now + interval;
@@ -201,6 +225,45 @@ type ArcCondPair<T> = Arc<CondPair<T>>;
 struct CondPair<T> {
     lock: Mutex<T>,
     cvar: Condvar,
+}
+
+/// How many beacons in a row have failed to go, so that a run of failures is
+/// reported when it starts and when it ends, and not at every beacon.
+#[derive(Default)]
+struct Failing {
+    since: u32,
+}
+
+impl Failing {
+    /// Take account of one beacon's send, saying what has changed.
+    fn after(
+        &mut self,
+        outcome: TcsResult<()>,
+        from: &tcslibgs::HostPort,
+        to: &tcslibgs::HostPort,
+    ) {
+        match outcome {
+            Ok(()) => {
+                if self.since > 0 {
+                    info!(
+                        "beacons are going from {from} to {to} again, after {} \
+                         that could not be sent",
+                        self.since
+                    );
+                }
+                self.since = 0;
+            }
+            Err(e) => {
+                if self.since == 0 {
+                    error!(
+                        "a beacon could not be sent from {from} to {to} ({e}); \
+                         this is said again only when one is"
+                    );
+                }
+                self.since = self.since.saturating_add(1);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -282,7 +345,8 @@ mod tests {
             ConfigVersion::of_this_build(),
             ConfigDigest([0u8; 16]),
         )
-        .expect("a sender");
+        .expect("a sender")
+        .expect("an interval that sends");
 
         let mut buffer = [0u8; 65535];
         for expected in 1..=3u32 {
@@ -306,5 +370,59 @@ mod tests {
                 other => panic!("expected a beacon, got {other:?}"),
             }
         }
+    }
+
+    /// A `beacon.send` something else holds is refused when the sender is
+    /// made, naming the setting, and is not left to a thread that would end
+    /// without a word.
+    #[test]
+    fn a_beacon_address_that_cannot_be_bound_is_refused_at_the_start() {
+        let held = std::net::UdpSocket::bind("127.0.0.1:0").expect("a socket");
+        let at = held.local_addr().expect("where it is");
+
+        let refused = BeaconSend::new(
+            Duration::from_millis(50),
+            tcslibgs::HostPort {
+                address: at.ip().to_string(),
+                port: at.port(),
+            },
+            tcslibgs::HostPort {
+                address: "127.0.0.1".to_string(),
+                port: 9,
+            },
+            TelemetryLog::disabled(),
+            ConfigVersion::of_this_build(),
+            ConfigDigest([0u8; 16]),
+        );
+        let said = match refused {
+            Err(e) => e.to_string(),
+            Ok(_) => panic!("{at} is held, and a sender was made from it"),
+        };
+        assert!(said.contains("beacon.send"), "{said}");
+        assert!(said.contains(&at.to_string()), "{said}");
+    }
+
+    /// A `beacon.recv` that resolves to nothing is refused the same way.
+    #[test]
+    fn a_beacon_destination_that_does_not_resolve_is_refused_at_the_start() {
+        let refused = BeaconSend::new(
+            Duration::from_millis(50),
+            tcslibgs::HostPort {
+                address: "127.0.0.1".to_string(),
+                port: 0,
+            },
+            tcslibgs::HostPort {
+                address: "no-such-host.invalid".to_string(),
+                port: 5550,
+            },
+            TelemetryLog::disabled(),
+            ConfigVersion::of_this_build(),
+            ConfigDigest([0u8; 16]),
+        );
+        let said = match refused {
+            Err(e) => e.to_string(),
+            Ok(_) => panic!("a sender was made to nowhere"),
+        };
+        assert!(said.contains("beacon.recv"), "{said}");
     }
 }

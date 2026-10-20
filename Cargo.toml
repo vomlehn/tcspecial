@@ -12,6 +12,9 @@ members = [
     # The window pieces the ground programs share: the panels, and what to
     # show on them. See tcsui.
     "tcsui",
+    # tcslib for C and C++: the ground station's library behind one header.
+    # See tcslib-c.
+    "tcslib-c",
     # The file interfaces an app node's program is run with, and the five
     # apps that are run over them: see tcsapp. Three are nodes of the
     # vehicle's own and two are payloads.

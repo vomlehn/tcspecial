@@ -1,0 +1,19 @@
+[package]
+name = "tcslib-c"
+version = "0.1.0"
+edition = "2021"
+description = "tcslib for C and C++: a ground station's beacons, the vehicle's data from a moc node, and commands to the vehicle, behind one header"
+
+[lib]
+# libtcs.a and libtcs.so, which a C or C++ program links with
+# include/tcs.h; and the rlib, for this crate's own tests.
+name = "tcs"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[dependencies]
+tcslib = { path = "../tcslib" }
+tcslibgs = { path = "../tcslibgs" }
+
+[dev-dependencies]
+tempfile = "3"
+serde_json = "1.0"

@@ -20,6 +20,8 @@
 //!   the descriptor through which a disable reaches a node that is waiting.
 //! * [`command`] is the ground's two command links, answered on a thread of
 //!   their own so that a command never waits for the pass.
+//! * [`restart`] is what an armed RESTART does: tcspecial runs itself again,
+//!   keeping only the descriptors it was started with.
 //!
 //! The first two open nothing. They are the arithmetic of the graph, and they
 //! are separate from the moving of bytes on purpose: both can be tested
@@ -31,6 +33,7 @@ pub mod fabric;
 pub mod frame;
 pub mod node_state;
 pub mod port;
+pub mod restart;
 pub mod route;
 pub mod schedule;
 pub mod start;

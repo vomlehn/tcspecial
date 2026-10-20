@@ -24,6 +24,7 @@ use tcslibgs::graph::Graph;
 use crate::beacon_send::BeaconSend;
 use crate::runtime::command::{Commands, Flying};
 use crate::runtime::fabric::Moved;
+use crate::runtime::restart;
 use crate::runtime::system::{described, System};
 use crate::segsend::{self, SegSend};
 use crate::telemetry_log::TelemetryLog;
@@ -312,8 +313,16 @@ fn command_links(
         tcslibgs::graph::parameters::ci_config_of(&tcslibgs::graph::parameters::flatten(section))?
             .to_ci_config()?;
 
-    let commands = Commands::start(&ci, states, bench, flying, beacon, telemetry_log)
-        .map_err(|e| e.to_string())?;
+    let commands = Commands::start(
+        &ci,
+        states,
+        bench,
+        flying,
+        beacon,
+        telemetry_log,
+        restart_when_stopped,
+    )
+    .map_err(|e| e.to_string())?;
     // Where they are taken, as the sockets were bound: a configuration may ask
     // for port 0, and then the socket is the only statement of which port that
     // is. On stderr as the beacon line is, because it is what somebody
@@ -329,6 +338,17 @@ fn command_links(
 /// Whether the loop should stop.
 pub fn asked_to_stop() -> bool {
     STOPPING.load(Ordering::Relaxed)
+}
+
+/// Stop, as a signal stops the vehicle, and then run again.
+///
+/// What an armed RESTART asks for. The vehicle stops the way it always does
+/// -- the pass finished, the links closed, the log flushed -- because a
+/// restart that left a log part way through a record would lose the record
+/// the restart was meant to keep going; [`run_or_report`] then runs it again.
+fn restart_when_stopped() {
+    restart::ask();
+    STOPPING.store(true, Ordering::Relaxed);
 }
 
 /// What a pass did, where anything went wrong with it.
@@ -382,7 +402,11 @@ extern "C" fn stop(_signal: libc::c_int) {
 /// could not start must not look as though it is running.
 pub fn run_or_report(path: &str) -> i32 {
     match run_graph(path) {
-        Ok(()) => 0,
+        Ok(()) => {
+            // Does not return where a RESTART asked for one.
+            restart::if_asked();
+            0
+        }
         Err(problems) => {
             for problem in &problems {
                 error!("{problem}");

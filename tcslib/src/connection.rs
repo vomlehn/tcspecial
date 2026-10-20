@@ -27,8 +27,17 @@ pub trait Connection: Send {
 pub struct UdpConnection {
     socket: UdpSocket,
     remote_addr: SocketAddr,
+    /// `remote_addr` as [`came_from`] reads it, worked out once.
+    expected: HostPort,
     recv_buffer: Vec<u8>,
+    /// What a command is written into to be sent, kept from one to the next
+    /// so that it grows to the longest once.
+    send_buffer: Vec<u8>,
 }
+
+/// The room a connection starts with for a command, which is more than most
+/// need: a SET_NODE's value may be longer, and the buffer grows to it once.
+const COMMAND_BYTES: usize = 1024;
 
 impl UdpConnection {
     /// Create a new UDP connection
@@ -43,7 +52,12 @@ impl UdpConnection {
         Ok(Self {
             socket,
             remote_addr: remote,
+            expected: HostPort {
+                address: remote.ip().to_string(),
+                port: remote.port(),
+            },
             recv_buffer: vec![0u8; 65535],
+            send_buffer: Vec::with_capacity(COMMAND_BYTES),
         })
     }
 
@@ -78,14 +92,15 @@ impl UdpConnection {
     /// there is one: a flood of them must not buy more time than the caller
     /// asked for, or a command would hang on traffic that has nothing to do
     /// with it.
+    ///
+    /// Allocates what the answer holds -- a telemetry's strings and lists are
+    /// its own -- once for each command answered. A ground station's commands
+    /// are an operator's, not its loop's, and the answer is handed back to be
+    /// kept.
     fn answer(&mut self, deadline: Option<Instant>) -> TcsResult<Telemetry> {
         loop {
             let (size, from) = self.socket.recv_from(&mut self.recv_buffer)?;
-            let expected = HostPort {
-                address: self.remote_addr.ip().to_string(),
-                port: self.remote_addr.port(),
-            };
-            if came_from(&expected, &from) {
+            if came_from(&self.expected, &from) {
                 let telemetry: Telemetry = serde_json::from_slice(&self.recv_buffer[..size])?;
                 return Ok(telemetry);
             }
@@ -115,8 +130,9 @@ impl UdpConnection {
 
 impl Connection for UdpConnection {
     fn send(&mut self, command: &Command) -> TcsResult<()> {
-        let data = serde_json::to_vec(command)?;
-        self.socket.send_to(&data, self.remote_addr)?;
+        self.send_buffer.clear();
+        serde_json::to_writer(&mut self.send_buffer, command)?;
+        self.socket.send_to(&self.send_buffer, self.remote_addr)?;
         Ok(())
     }
 

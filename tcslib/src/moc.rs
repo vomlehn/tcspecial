@@ -25,8 +25,9 @@ use tcslibgs::graph::Graph;
 /// What the ground's end of the `payload_telemetry` links is called.
 pub const PAYLOAD_TELEMETRY: &str = "payload_telemetry";
 
-/// The largest datum one receive returns: room for a whole datagram.
-const DATUM_BYTES: usize = 65_536;
+/// The largest datum one receive returns: room for a whole datagram, and
+/// the size of a buffer that [`Moc::receive_into`] can always fill.
+pub const DATUM_BYTES: usize = 65_536;
 
 /// One datum from the vehicle, and the node that produced it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,6 +38,16 @@ pub struct Received {
     pub data: Vec<u8>,
 }
 
+/// Where [`Moc::receive_into`] put a datum.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Arrival {
+    /// Which source sent it, as its place in [`Moc::sources`]: see
+    /// [`Moc::source`].
+    pub source: usize,
+    /// How many bytes of the buffer it filled.
+    pub length: usize,
+}
+
 /// A `moc` node, open on the ground: a port for each node drawn into it.
 #[derive(Debug)]
 pub struct Moc {
@@ -44,6 +55,9 @@ pub struct Moc {
     /// Each source and the socket its data arrives at, in the order the
     /// configuration draws them.
     ports: Vec<(String, UdpSocket)>,
+    /// What a receive waits on, one for each port and in the same order:
+    /// made once, when the node is opened.
+    fds: Vec<libc::pollfd>,
     /// Which port the next receive looks at first, so that one busy source
     /// cannot keep the others waiting.
     next: usize,
@@ -121,9 +135,18 @@ impl Moc {
             })?;
             ports.push((link.source, socket));
         }
+        let fds = ports
+            .iter()
+            .map(|(_, socket)| libc::pollfd {
+                fd: socket.as_raw_fd(),
+                events: libc::POLLIN,
+                revents: 0,
+            })
+            .collect();
         Ok(Moc {
             name: name.to_string(),
             ports,
+            fds,
             next: 0,
         })
     }
@@ -141,27 +164,58 @@ impl Moc {
             .collect()
     }
 
+    /// The source at this place in [`Moc::sources`], which is what an
+    /// [`Arrival`] names.
+    pub fn source(&self, index: usize) -> Option<&str> {
+        self.ports.get(index).map(|(source, _)| source.as_str())
+    }
+
     /// The next datum to arrive from any source, and which source it is from.
     ///
     /// Waits up to `wait` for one, or for ever where `wait` is `None`; `None`
     /// back is the wait running out with nothing arrived.
+    ///
+    /// Allocates the datum and its source's name, each time: for a caller
+    /// that keeps what it receives. A loop that does not, [`Moc::receive_into`]
+    /// a buffer it made before it started.
     pub fn receive(&mut self, wait: Option<Duration>) -> Result<Option<Received>, String> {
-        let mut fds: Vec<libc::pollfd> = self
-            .ports
-            .iter()
-            .map(|(_, socket)| libc::pollfd {
-                fd: socket.as_raw_fd(),
-                events: libc::POLLIN,
-                revents: 0,
-            })
-            .collect();
+        let mut datum = vec![0u8; DATUM_BYTES];
+        let Some(arrival) = self.receive_into(wait, &mut datum)? else {
+            return Ok(None);
+        };
+        datum.truncate(arrival.length);
+        Ok(Some(Received {
+            source: self.ports[arrival.source].0.clone(),
+            data: datum,
+        }))
+    }
+
+    /// [`Moc::receive`], into `out`, allocating nothing: where the datum was
+    /// put, and which source sent it.
+    ///
+    /// A datum longer than `out` is refused, saying how long it was, rather
+    /// than cut short: a buffer of [`DATUM_BYTES`] holds any.
+    pub fn receive_into(
+        &mut self,
+        wait: Option<Duration>,
+        out: &mut [u8],
+    ) -> Result<Option<Arrival>, String> {
+        for fd in &mut self.fds {
+            fd.revents = 0;
+        }
         let timeout = match wait {
             None => -1,
             Some(wait) => i32::try_from(wait.as_millis()).unwrap_or(i32::MAX),
         };
 
         let ready = loop {
-            let ready = unsafe { libc::poll(fds.as_mut_ptr(), fds.len() as libc::nfds_t, timeout) };
+            let ready = unsafe {
+                libc::poll(
+                    self.fds.as_mut_ptr(),
+                    self.fds.len() as libc::nfds_t,
+                    timeout,
+                )
+            };
             if ready >= 0 {
                 break ready;
             }
@@ -181,23 +235,38 @@ impl Moc {
         let count = self.ports.len();
         for step in 0..count {
             let at = (self.next + step) % count;
-            if fds[at].revents & libc::POLLIN == 0 {
+            if self.fds[at].revents & libc::POLLIN == 0 {
                 continue;
             }
             let (source, socket) = &self.ports[at];
-            let mut datum = vec![0u8; DATUM_BYTES];
-            let got = socket.recv(&mut datum).map_err(|e| {
-                format!(
-                    "\"{}\": reading what \"{source}\" sent failed: {e}",
-                    self.name
+            // MSG_TRUNC, so that what comes back is the datagram's length
+            // and not what fitted: one cut short is told from one that
+            // happened to fill the buffer.
+            let got = unsafe {
+                libc::recv(
+                    socket.as_raw_fd(),
+                    out.as_mut_ptr().cast(),
+                    out.len(),
+                    libc::MSG_TRUNC,
                 )
-            })?;
-            datum.truncate(got);
+            };
             self.next = (at + 1) % count;
-            return Ok(Some(Received {
-                source: source.clone(),
-                data: datum,
-            }));
+            let Ok(length) = usize::try_from(got) else {
+                return Err(format!(
+                    "\"{}\": reading what \"{source}\" sent failed: {}",
+                    self.name,
+                    std::io::Error::last_os_error()
+                ));
+            };
+            if length > out.len() {
+                return Err(format!(
+                    "\"{}\": \"{source}\" sent {length} bytes, which is more than the \
+                     {} there was room for: receive into a buffer of DATUM_BYTES",
+                    self.name,
+                    out.len()
+                ));
+            }
+            return Ok(Some(Arrival { source: at, length }));
         }
         Ok(None)
     }

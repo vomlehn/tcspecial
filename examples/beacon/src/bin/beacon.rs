@@ -229,7 +229,7 @@ fn main() -> Result<(), slint::PlatformError> {
         }
 
         // Into the window, on the thread that owns it.
-        show_on(&weak, Shown::of(&pass));
+        show_on(&weak, Shown::of(pass));
     });
 
     let ran = window.run();

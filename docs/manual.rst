@@ -1549,8 +1549,10 @@ the ``moc`` node's ``ground_base``, at its port plus the source node's device
 id, so each source arrives on a port of its own. Ground software does not open
 those ports itself: it gets the data from the ``moc`` node with a function
 call, ``tcslib::moc::Moc::receive``, which works the ports out from the same
-configuration and says which node each datum came from. What it does with the
-data then -- process it, display it, log it -- is its own business. A ``moc``
+configuration and says which node each datum came from. A loop that does not
+keep each datum takes it with ``Moc::receive_into``, into a buffer of
+``tcslib::moc::DATUM_BYTES`` it made before it started, and allocates nothing.
+What it does with the data then -- process it, display it, log it -- is its own business. A ``moc``
 node that the ground sends commands or other data through also states the
 ``address`` and ``port`` tcspecial binds to receive them.
 

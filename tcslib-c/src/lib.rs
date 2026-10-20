@@ -43,7 +43,7 @@ use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use tcslib::beacon::{Beacons, Contact, Schedule, Stage, STANDARD_INTERVAL};
-use tcslib::moc::Moc;
+use tcslib::moc::{Moc, DATUM_BYTES};
 use tcslib::ping::{route_of, Pinger, Uplink, NO_MESSAGE};
 use tcslib::{command_links_of, CommandStatus, TcsClient};
 use tcslibgs::config_digest::{digest_of_graph, ConfigDigest, ConfigVersion};
@@ -478,10 +478,9 @@ pub unsafe extern "C" fn tcs_beacons_pass(beacons: *mut tcs_beacons, pass: *mut 
     guard(-1, || {
         let watch = handle_of_mut(beacons, "the beacons")?;
         let out = out_of(pass, "the pass")?;
-        // Allocates, in tcslib: a pass holds what the beacon said, and its
-        // remarks and warnings, as strings. Not this layer's to change; it
-        // copies them into the handle's fixed buffers and allocates nothing
-        // of its own.
+        // Allocates nothing but what tcslib does: a remark or warning, on
+        // the pass where something changed. What the pass holds is copied
+        // into the handle's fixed buffers.
         let found = watch.beacons.pass();
         let at = found
             .at
@@ -595,12 +594,12 @@ pub unsafe extern "C" fn tcs_beacons_close(beacons: *mut tcs_beacons) {
 /// A `moc` node, open, and the last datum it received.
 pub struct tcs_moc {
     moc: Moc,
-    /// Each source's name, as tcslib gives it and as C reads it, made once
-    /// when the node is opened: a datum's source is one of these, so a
-    /// receive points at one rather than copying a name.
-    names: Vec<(String, CString)>,
-    /// The last datum, as tcslib returned it: held, not copied, until the
-    /// next receive.
+    /// Each source's name as C reads it, in the order tcslib numbers them,
+    /// made once when the node is opened: a datum's source is one of these,
+    /// so a receive points at one rather than copying a name.
+    names: Vec<CString>,
+    /// Where each datum is received, made once when the node is opened and
+    /// room for any: it holds the last until the next receive.
     data: Vec<u8>,
 }
 
@@ -628,21 +627,18 @@ pub unsafe extern "C" fn tcs_moc_open(
         let name = text_of(moc, "the moc node's name")?;
         let moc = Moc::open(&configuration.graph, name)
             .map_err(|e| fail(format_args!("{}: {e}", configuration.path.display())))?;
-        // Allocates, once, at startup: the handle, which outlives this call,
-        // and the names of the node's sources, which are known now and read
-        // by every receive after.
+        // Allocates, once, at startup: the handle, which outlives this call;
+        // the names of the node's sources, which are known now and read by
+        // every receive after; and the buffer every datum is received in.
         let names = moc
             .sources()
             .iter()
-            .map(|source| {
-                let shown = CString::new(source.replace('\0', " ")).unwrap_or_default();
-                (source.to_string(), shown)
-            })
+            .map(|source| CString::new(source.replace('\0', " ")).unwrap_or_default())
             .collect();
         Ok(Box::into_raw(Box::new(tcs_moc {
             moc,
             names,
-            data: Vec::new(),
+            data: vec![0; DATUM_BYTES],
         })))
     })
 }
@@ -663,24 +659,19 @@ pub unsafe extern "C" fn tcs_moc_receive(
         let node = handle_of_mut(moc, "the moc node")?;
         let out = out_of(datum, "the datum")?;
         let wait = u64::try_from(wait_ms).ok().map(Duration::from_millis);
-        // Allocates, in tcslib: each datum comes back in a buffer of its own,
-        // with its source's name. Not this layer's to change; it keeps the
-        // buffer rather than copying it, and points at a name made when the
-        // node was opened.
-        let Some(received) = node.moc.receive(wait).map_err(fail)? else {
+        let Some(arrival) = node.moc.receive_into(wait, &mut node.data).map_err(fail)? else {
             return Ok(0);
         };
-        let Some((_, source)) = node.names.iter().find(|(name, _)| *name == received.source) else {
+        let Some(source) = node.names.get(arrival.source) else {
             return Err(fail(format_args!(
-                "a datum came from \"{}\", which this moc node does not draw",
-                received.source
+                "a datum came from source {}, which this moc node does not draw",
+                arrival.source
             )));
         };
-        node.data = received.data;
         *out = tcs_datum {
             source: source.as_ptr(),
             data: node.data.as_ptr(),
-            length: node.data.len(),
+            length: arrival.length,
         };
         Ok(1)
     })
@@ -1191,12 +1182,9 @@ pub unsafe extern "C" fn tcs_pinger_moc(pinger: *const tcs_pinger) -> *const c_c
 pub unsafe extern "C" fn tcs_pinger_ping(pinger: *mut tcs_pinger) -> c_int {
     guard(-1, || {
         let ping = handle_of_mut(pinger, "the pinger")?;
-        // Allocates, in tcslib: the ping is written as a string, and kept as
-        // the last one sent. Not this layer's to change; it copies the text
-        // into a fixed buffer.
         let message = ping.pinger.ping(now()?).map_err(fail)?;
         ping.uplink.send(message.as_bytes()).map_err(fail)?;
-        ping.sent.set(&message);
+        ping.sent.set(message);
         Ok(0)
     })
 }
@@ -1222,8 +1210,8 @@ pub unsafe extern "C" fn tcs_pinger_answered(
         } else {
             std::slice::from_raw_parts(data, length)
         };
-        // Allocates, in tcslib: what arrived is kept as a string. Copied here
-        // into a fixed buffer.
+        // Allocates, in tcslib, only where what arrived is not an answer, to
+        // say why. Copied here into a fixed buffer.
         ping.pinger.answered(data, now()?);
         ping.received.set(
             ping.pinger

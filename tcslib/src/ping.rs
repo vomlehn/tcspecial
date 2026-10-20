@@ -200,16 +200,42 @@ impl Exchange {
 }
 
 /// The ground's count of pings and what came of the last.
-#[derive(Debug, Default)]
+///
+/// The text of the last ping and of the last answer is written each time
+/// into room kept from the time before, so that pinging and folding in the
+/// answers allocates nothing once the first of each has been made.
+#[derive(Debug)]
 pub struct Pinger {
     count: u64,
     exchange: Exchange,
+    /// The room the next ping is written in, which changes places with the
+    /// last one sent; the room the first ping sent is kept in; and the room
+    /// for an answer before one has arrived. All made with the pinger.
+    room_sent: String,
+    room_first: String,
+    room_received: String,
 }
+
+impl Default for Pinger {
+    fn default() -> Pinger {
+        Pinger::new()
+    }
+}
+
+/// The room a pinger keeps for what it was sent, which is more than an
+/// answer and enough for most of what is not one.
+const RECEIVED_BYTES: usize = 256;
 
 impl Pinger {
     /// No ping sent yet.
     pub fn new() -> Pinger {
-        Pinger::default()
+        Pinger {
+            count: 0,
+            exchange: Exchange::default(),
+            room_sent: String::with_capacity(ping::MESSAGE_BYTES),
+            room_first: String::with_capacity(ping::MESSAGE_BYTES),
+            room_received: String::with_capacity(RECEIVED_BYTES),
+        }
     }
 
     /// What there is to show now.
@@ -219,38 +245,62 @@ impl Pinger {
 
     /// The next ping, sent at `at`: the count goes up by one, from one, and
     /// the time received is cleared. What was received last is kept.
-    pub fn ping(&mut self, at: Duration) -> Result<String, String> {
+    ///
+    /// What comes back is the ping to send, which is the exchange's `sent`.
+    pub fn ping(&mut self, at: Duration) -> Result<&str, String> {
         let count = self
             .count
             .checked_add(1)
             .ok_or("the count of pings has run out")?;
-        let message = ping::message(count, at)?;
+        // Written into the room the ping before last was in, and the last
+        // ping's room kept for the next: a refused ping leaves the last one
+        // as it was sent.
+        let room = &mut self.room_sent;
+        room.clear();
+        ping::write_message(count, at, room)?;
+        match &mut self.exchange.sent {
+            Some(last) => std::mem::swap(last, room),
+            None => {
+                let first = std::mem::take(&mut self.room_first);
+                self.exchange.sent = Some(std::mem::replace(room, first));
+            }
+        }
         self.count = count;
-        self.exchange = Exchange {
-            sent: Some(message.clone()),
-            sent_at: Some(at),
-            received: self.exchange.received.take(),
-            received_at: None,
-            answered_at: None,
-        };
-        Ok(message)
+        self.exchange.sent_at = Some(at);
+        self.exchange.received_at = None;
+        self.exchange.answered_at = None;
+        Ok(self.exchange.sent.as_deref().unwrap_or_default())
     }
 
     /// Fold in what the `ping` node sent down, which arrived at `at`.
     ///
     /// Shown whatever it is, because something arrived and an operator should
     /// see what; timed only where it is the answer to the last ping sent.
+    ///
+    /// Allocates where what arrived is not an answer, to say why: something
+    /// is sending the ground what the ping node would not.
     pub fn answered(&mut self, data: &[u8], at: Duration) {
+        use std::fmt::Write;
+
+        let mut received = self
+            .exchange
+            .received
+            .take()
+            .unwrap_or_else(|| std::mem::take(&mut self.room_received));
+        received.clear();
         match ping::read_reply(data) {
             Ok(pong) => {
-                self.exchange.received = Some(String::from_utf8_lossy(data).into_owned());
+                received.push_str(&String::from_utf8_lossy(data));
                 if pong.ping.count == self.count {
                     self.exchange.received_at = Some(at);
                     self.exchange.answered_at = Some(pong.answered);
                 }
             }
-            Err(why) => self.exchange.received = Some(format!("not an answer: {why}")),
+            Err(why) => {
+                let _ = write!(received, "not an answer: {why}");
+            }
         }
+        self.exchange.received = Some(received);
     }
 }
 
@@ -312,10 +362,7 @@ mod tests {
     #[test]
     fn a_ping_is_numbered_and_timed() {
         let mut pinger = Pinger::new();
-        assert_eq!(
-            pinger.ping(AT),
-            Ok("ping #1 1760900000.000000000".to_string())
-        );
+        assert_eq!(pinger.ping(AT), Ok("ping #1 1760900000.000000000"));
         let second = pinger.ping(after(1)).expect("the second");
         assert_eq!(
             ping::read_message(second.as_bytes()).expect("a ping").count,
@@ -349,7 +396,7 @@ mod tests {
     #[test]
     fn a_ping_clears_the_time_received_and_keeps_what_was() {
         let mut pinger = Pinger::new();
-        let first = pinger.ping(AT).expect("a ping");
+        let first = pinger.ping(AT).expect("a ping").to_string();
         pinger.answered(
             ping::reply(first.as_bytes(), after(1))
                 .expect("answered")
@@ -372,7 +419,7 @@ mod tests {
     #[test]
     fn what_does_not_answer_the_last_ping_is_shown_and_not_timed() {
         let mut pinger = Pinger::new();
-        let first = pinger.ping(AT).expect("a ping");
+        let first = pinger.ping(AT).expect("a ping").to_string();
         pinger.ping(after(1_000)).expect("another");
         pinger.answered(
             ping::reply(first.as_bytes(), after(7))

@@ -157,10 +157,24 @@ pub fn time(since_epoch: Duration) -> String {
 /// The count starts at one, so nought is refused: an answer numbered nought
 /// would be an answer to a ping nobody sent.
 pub fn message(count: u64, sent: Duration) -> Result<String, String> {
+    let mut message = String::new();
+    write_message(count, sent, &mut message)?;
+    Ok(message)
+}
+
+/// [`message`], written onto the end of `out`: how a ground station that
+/// keeps the room for one pings without allocating.
+pub fn write_message(count: u64, sent: Duration, out: &mut String) -> Result<(), String> {
+    use std::fmt::Write;
+
     if count == 0 {
         return Err("a ping's count starts at one, and this one is nought".to_string());
     }
-    Ok(format!("{PREFIX}{count} {}", time(sent)))
+    let mut stamp = [0u8; TIME_BYTES];
+    let len = write_time(sent, &mut stamp).unwrap_or(0);
+    let stamp = std::str::from_utf8(&stamp[..len]).unwrap_or_default();
+    let _ = write!(out, "{PREFIX}{count} {stamp}");
+    Ok(())
 }
 
 /// What a ping says, or why it is not one.

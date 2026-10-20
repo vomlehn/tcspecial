@@ -36,6 +36,7 @@
 //! [`Showing::until`] is how long until the next change and is what the read
 //! timeout is set to.
 
+use std::fmt::Write as _;
 use std::io;
 use std::net::{SocketAddr, UdpSocket};
 use std::time::{Duration, SystemTime};
@@ -460,8 +461,28 @@ pub fn received_at(at: Option<SystemTime>) -> String {
 /// other, and two format strings would eventually disagree about how to write
 /// one of them.
 pub fn what_it_read(version: ConfigVersion, digest: ConfigDigest) -> String {
-    format!("tcspecial v{version} md5 {digest}")
+    let mut said = String::new();
+    write_what_it_read(version, digest, &mut said);
+    said
 }
+
+/// [`what_it_read`], written onto the end of `out`: how a pass says it
+/// without allocating.
+fn write_what_it_read(version: ConfigVersion, digest: ConfigDigest, out: &mut String) {
+    let _ = write!(out, "tcspecial v{version} md5 {digest}");
+}
+
+/// The room a pass keeps for what a beacon said, which is what any of them
+/// says: two digests and a version where the configuration differs, and
+/// forty characters of what could not be read, each up to four bytes, where
+/// it is not a beacon at all.
+const SAID_BYTES: usize = 256;
+
+/// How many remarks, and how many warnings, a pass has room for before it
+/// allocates. A pass makes at most two remarks -- a configuration that
+/// differs or agrees again, and beacons missed or a restart -- and one
+/// warning.
+const REMARKS_AT_ONCE: usize = 4;
 
 /// What a datagram on the beacon link turned out to be.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -478,22 +499,46 @@ pub struct Heard {
 /// Read a datagram from the beacon link, comparing the digest it carries with
 /// `expected`, this station's own.
 pub fn hear(datagram: &[u8], expected: Option<ConfigDigest>) -> Heard {
-    let beacon = match serde_json::from_slice::<Telemetry>(datagram) {
+    let mut message = String::new();
+    let reading = read_into(datagram, expected, &mut message);
+    Heard {
+        message,
+        sequence: reading.sequence,
+        differs: reading
+            .digests
+            .and_then(|(theirs, ours)| differs(theirs, ours)),
+    }
+}
+
+/// What [`hear`] finds in a datagram, but for the message, which it writes.
+struct Reading {
+    /// The beacon's own number, if it was a beacon this build can read.
+    sequence: Option<u32>,
+    /// The digest it announced and this station's, where the two differ.
+    digests: Option<(ConfigDigest, ConfigDigest)>,
+}
+
+/// [`hear`], with the message written into `message` in place of what it
+/// held: how a pass hears a beacon without allocating.
+fn read_into(datagram: &[u8], expected: Option<ConfigDigest>, message: &mut String) -> Reading {
+    message.clear();
+    let read = serde_json::from_slice::<Telemetry>(datagram);
+    let beacon = match &read {
         Ok(Telemetry::Beacon(beacon)) => Some(beacon),
         _ => None,
     };
-    let differs = match (&beacon, expected) {
-        (Some(beacon), Some(ours)) => differs(beacon.digest, ours),
+    let digests = match (beacon, expected) {
+        (Some(beacon), Some(ours)) if beacon.digest != ours => Some((beacon.digest, ours)),
         _ => None,
     };
-    let message = message_of(datagram);
-    Heard {
-        message: match &differs {
-            Some(why) => format!("{why} -- {message}"),
-            None => message,
-        },
+    if let Some((theirs, ours)) = digests {
+        write_differs(theirs, ours, message);
+        message.push_str(" -- ");
+    }
+    write_message(datagram, &read, message);
+    Reading {
         sequence: beacon.map(|beacon| beacon.header.sequence),
-        differs,
+        digests,
     }
 }
 
@@ -507,11 +552,19 @@ pub fn hear(datagram: &[u8], expected: Option<ConfigDigest>) -> Heard {
 /// when they agree.
 pub fn differs(theirs: ConfigDigest, ours: ConfigDigest) -> Option<String> {
     (theirs != ours).then(|| {
-        format!(
-            "CONFIGURATION DIFFERS: tcspecial is serving md5 {theirs}, and this MOC \
-             read md5 {ours}"
-        )
+        let mut why = String::new();
+        write_differs(theirs, ours, &mut why);
+        why
     })
+}
+
+/// What [`differs`] says, written onto the end of `out`.
+fn write_differs(theirs: ConfigDigest, ours: ConfigDigest, out: &mut String) {
+    let _ = write!(
+        out,
+        "CONFIGURATION DIFFERS: tcspecial is serving md5 {theirs}, and this MOC \
+         read md5 {ours}"
+    );
 }
 
 /// What a beacon said, as a window shows it.
@@ -521,16 +574,41 @@ pub fn differs(theirs: ConfigDigest, ours: ConfigDigest) -> Option<String> {
 /// build does not understand, and either is worth seeing on the line rather
 /// than hidden behind a green light.
 pub fn message_of(datagram: &[u8]) -> String {
-    match serde_json::from_slice::<Telemetry>(datagram) {
-        Ok(Telemetry::Beacon(beacon)) => what_it_read(beacon.version, beacon.digest),
-        Ok(other) => format!("not a beacon: {:?}", other.tm_type()),
+    let mut said = String::new();
+    write_message(
+        datagram,
+        &serde_json::from_slice::<Telemetry>(datagram),
+        &mut said,
+    );
+    said
+}
+
+/// How many characters of a datagram that cannot be read are shown.
+const UNREADABLE_SHOWN: usize = 40;
+
+/// [`message_of`], for a datagram already read as `read`, written onto the
+/// end of `out`.
+///
+/// What cannot be read is shown as `String::from_utf8_lossy` would show it,
+/// a replacement character for each stretch that is not UTF-8, but a
+/// character at a time, so that nothing is made to show it.
+fn write_message(datagram: &[u8], read: &Result<Telemetry, serde_json::Error>, out: &mut String) {
+    match read {
+        Ok(Telemetry::Beacon(beacon)) => write_what_it_read(beacon.version, beacon.digest, out),
+        Ok(other) => {
+            let _ = write!(out, "not a beacon: {:?}", other.tm_type());
+        }
         Err(_) => {
-            let text = String::from_utf8_lossy(datagram);
-            let head: String = text.chars().take(40).collect();
-            if head.len() < text.len() {
-                format!("unreadable: {head}...")
-            } else {
-                format!("unreadable: {head}")
+            out.push_str("unreadable: ");
+            let mut text = datagram.utf8_chunks().flat_map(|chunk| {
+                let bad = (!chunk.invalid().is_empty()).then_some(char::REPLACEMENT_CHARACTER);
+                chunk.valid().chars().chain(bad)
+            });
+            for c in text.by_ref().take(UNREADABLE_SHOWN) {
+                out.push(c);
+            }
+            if text.next().is_some() {
+                out.push_str("...");
             }
         }
     }
@@ -572,8 +650,8 @@ pub fn counted(last: Option<u32>, now: u32) -> Counted {
 /// What a pass of the loop found.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Arrived {
-    /// A beacon, and what it said.
-    Beacon(String),
+    /// A beacon, which said what the pass's [`Pass::said`] says.
+    Beacon,
     /// Nothing, for as long as the pass waited.
     Nothing,
     /// The socket failed, which says nothing about the spacecraft.
@@ -634,8 +712,11 @@ pub struct Beacons {
     expected: Option<ConfigDigest>,
     /// When the last beacon arrived.
     at: Option<SystemTime>,
-    /// What it said.
-    said: String,
+    /// The last pass, which the next is made in: its message, remarks and
+    /// warnings keep their room from one pass to the next, so that a pass
+    /// allocates nothing but the remark or warning it makes, on the pass
+    /// where something changed.
+    last: Pass,
     /// The number of the last beacon, so the next can say what happened in
     /// between.
     sequence: Option<u32>,
@@ -663,13 +744,24 @@ impl Beacons {
         expected: Option<ConfigDigest>,
     ) -> io::Result<Beacons> {
         let socket = UdpSocket::bind(link.recv.to_string())?;
+        let mut said = String::with_capacity(SAID_BYTES);
+        said.push_str(NO_BEACON_MESSAGE);
+        let last = Pass {
+            arrived: Arrived::Nothing,
+            showing: Showing::UNHEARD,
+            at: None,
+            said,
+            contact: Contact::Lost,
+            remarks: Vec::with_capacity(REMARKS_AT_ONCE),
+            warnings: Vec::with_capacity(REMARKS_AT_ONCE),
+        };
         Ok(Beacons {
             socket,
             link,
             schedule,
             expected,
             at: None,
-            said: NO_BEACON_MESSAGE.to_string(),
+            last,
             sequence: None,
             differed: false,
             stranger: None,
@@ -692,18 +784,21 @@ impl Beacons {
     /// timeout -- which is [`Showing::until`], so that a light blinks whether
     /// or not anything arrives -- or on a failure of the socket, which is
     /// reported as [`Arrived::Broken`] and says nothing about the spacecraft.
-    pub fn pass(&mut self) -> Pass {
+    ///
+    /// The pass is the watcher's, kept from one pass to the next and made
+    /// again in its place; a caller that wants one to keep clones it.
+    pub fn pass(&mut self) -> &Pass {
+        self.last.remarks.clear();
+        self.last.warnings.clear();
         let waiting = self.schedule.after(self.at, SystemTime::now());
         // A failure to set the timeout is treated as the socket having
         // failed, which is what it is: the alternative is a pass that waits
         // for ever on a socket the operating system has refused to time out.
         if self.socket.set_read_timeout(waiting.until).is_err() {
-            return self.after(Arrived::Broken, Vec::new(), Vec::new());
+            return self.after(Arrived::Broken);
         }
 
         let mut buffer = [0u8; 65535];
-        let mut remarks = Vec::new();
-        let mut warnings = Vec::new();
         let arrived = match self.socket.recv_from(&mut buffer) {
             // Only from where the configuration says beacons come from. A
             // datagram from anywhere else at this address is somebody else's
@@ -711,27 +806,36 @@ impl Beacons {
             // spacecraft alive on the word of whoever sent it.
             Ok((_, from)) if !came_from(&self.link.send, &from) => {
                 if self.stranger != Some(from) {
-                    warnings.push(stranger_warning(from, &self.link.send));
+                    self.last
+                        .warnings
+                        .push(stranger_warning(from, &self.link.send));
                     self.stranger = Some(from);
                 }
                 Arrived::Nothing
             }
             Ok((size, _)) => {
-                let heard = hear(&buffer[..size], self.expected);
+                // Written over what the last beacon said: this one is what
+                // a beacon says now.
+                let heard = read_into(&buffer[..size], self.expected, &mut self.last.said);
+                let remarks = &mut self.last.remarks;
 
                 // A configuration that differs is the one thing a beacon can
                 // say that makes every panel suspect, so it is remarked on
                 // when it starts and when it stops -- and not on every beacon
-                // in between, which would bury it.
-                if heard.differs.is_some() != self.differed {
-                    match &heard.differs {
-                        Some(why) => remarks.push(why.clone()),
+                // in between, which would bury it. Each remark allocates, on
+                // the pass where it is made.
+                if heard.digests.is_some() != self.differed {
+                    match heard
+                        .digests
+                        .and_then(|(theirs, ours)| differs(theirs, ours))
+                    {
+                        Some(why) => remarks.push(why),
                         None => remarks.push(
                             "tcspecial is serving the configuration this MOC read again"
                                 .to_string(),
                         ),
                     }
-                    self.differed = heard.differs.is_some();
+                    self.differed = heard.digests.is_some();
                 }
 
                 if let Some(sequence) = heard.sequence {
@@ -750,7 +854,7 @@ impl Beacons {
                     self.sequence = Some(sequence);
                 }
 
-                Arrived::Beacon(heard.message)
+                Arrived::Beacon
             }
             Err(ref e)
                 if e.kind() == io::ErrorKind::WouldBlock || e.kind() == io::ErrorKind::TimedOut =>
@@ -760,20 +864,21 @@ impl Beacons {
             Err(_) => Arrived::Broken,
         };
 
-        self.after(arrived, remarks, warnings)
+        self.after(arrived)
     }
 
-    /// Fold what a pass found into what is known, and say what to show.
+    /// Fold what a pass found into what is known, and say what to show:
+    /// the pass's remarks and warnings are made, and where a beacon arrived
+    /// what it said is written, before this.
     ///
     /// Apart from the socket so that it can be exercised without one. What it
     /// keeps is the point: a pass that found nothing still has the beacon
     /// before it to show, and so does a pass whose socket broke.
-    fn after(&mut self, arrived: Arrived, remarks: Vec<String>, warnings: Vec<String>) -> Pass {
+    fn after(&mut self, arrived: Arrived) -> &Pass {
         let now = SystemTime::now();
 
-        if let Arrived::Beacon(message) = &arrived {
+        if arrived == Arrived::Beacon {
             self.at = Some(now);
-            self.said = message.clone();
         }
 
         // A broken socket is not an age: the station has stopped listening,
@@ -784,19 +889,15 @@ impl Beacons {
             _ => self.schedule.after(self.at, now),
         };
 
-        Pass {
-            arrived,
-            showing,
-            at: self.at,
-            said: self.said.clone(),
-            // From the same reading of the same beacon as the stage, and from
-            // the beacon rather than from the socket: a station whose socket
-            // failed knows nothing new about the spacecraft, so what it last
-            // heard still decides whether it is in contact.
-            contact: self.schedule.contact_at(self.at, now),
-            remarks,
-            warnings,
-        }
+        self.last.arrived = arrived;
+        self.last.showing = showing;
+        self.last.at = self.at;
+        // From the same reading of the same beacon as the stage, and from
+        // the beacon rather than from the socket: a station whose socket
+        // failed knows nothing new about the spacecraft, so what it last
+        // heard still decides whether it is in contact.
+        self.last.contact = self.schedule.contact_at(self.at, now);
+        &self.last
     }
 }
 
@@ -1272,7 +1373,7 @@ mod tests {
 
         // Nothing has arrived yet, so there is nothing to show and nothing is
         // being heard from.
-        let nothing = beacons.after(Arrived::Nothing, Vec::new(), Vec::new());
+        let nothing = beacons.after(Arrived::Nothing).clone();
         assert_eq!(nothing.at, None);
         assert_eq!(nothing.showing.stage, Stage::Unheard);
         assert_eq!(nothing.said, NO_BEACON_MESSAGE);
@@ -1284,11 +1385,9 @@ mod tests {
 
         // A beacon: the time is the time of this pass, and the line says what
         // the beacon said.
-        let heard = beacons.after(
-            Arrived::Beacon("tcspecial v9.9.9 md5 abc".to_string()),
-            Vec::new(),
-            Vec::new(),
-        );
+        beacons.last.said.clear();
+        beacons.last.said.push_str("tcspecial v9.9.9 md5 abc");
+        let heard = beacons.after(Arrived::Beacon).clone();
         let arrival = heard.at.expect("a pass that received a beacon says when");
         assert_eq!(heard.said, "tcspecial v9.9.9 md5 abc");
         assert_eq!(heard.showing.stage, Stage::Heard);
@@ -1301,7 +1400,7 @@ mod tests {
         // A later pass that finds nothing keeps that time and that message:
         // the beacon did arrive when it arrived and said what it said,
         // whatever the passes after it find.
-        let quiet = beacons.after(Arrived::Nothing, Vec::new(), Vec::new());
+        let quiet = beacons.after(Arrived::Nothing).clone();
         assert_eq!(
             quiet.at,
             Some(arrival),
@@ -1316,7 +1415,7 @@ mod tests {
         // the message stand, and what is *shown* is that nothing is known --
         // the station has stopped listening, which is not a beacon growing
         // stale.
-        let broken = beacons.after(Arrived::Broken, Vec::new(), Vec::new());
+        let broken = beacons.after(Arrived::Broken).clone();
         assert_eq!(broken.at, Some(arrival));
         assert_eq!(broken.said, "tcspecial v9.9.9 md5 abc");
         assert_eq!(broken.showing.stage, Stage::Unheard);

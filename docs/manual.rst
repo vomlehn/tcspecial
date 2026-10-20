@@ -3024,9 +3024,14 @@ is running, ``Stopped`` for one that is not, and ``Unknown`` for a handler
 this tcspecial has not got -- which is what an operator sees when the MOC has
 attached to a tcspecial left running for another payload set.
 
-That asking happens at two moments and no others: the first beacon, and the
-end of an outage. It is not a poll -- nothing is asked while contact simply
-holds -- and a payload whose last press was ``Disable`` is left out of it: the
+That asking happens at three moments and no others: the first beacon, the end
+of an outage, and a ``Connect`` the vehicle agrees to while the spacecraft is
+being heard from. The last is there because the first beacon usually arrives
+before anybody has pressed ``Connect``, when nothing can be asked; the
+``Connect`` is then when the asking is owed, and ``Last Response`` says what
+the ``Connect`` found and what the asking found after it. It is not a poll --
+nothing is asked while contact simply holds -- and a payload whose last press
+was ``Disable`` is left out of it: the
 operator said to stop that one, so there is nothing to ask. ``Query all`` asks
 about every payload whenever it is pressed.
 

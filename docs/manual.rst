@@ -1351,15 +1351,52 @@ record, never half of one.
                   arrived, or the word none for a read that does not time out
    terminators    bytes that each end a read, as a comma-separated list:
                   "0x0D, 0x0A"
+   length_prefix  what a read's first bytes say its length is: u8 for one
+                  byte, u16be or u16le for two with the more or the less
+                  significant first
 
 A read ends on whichever comes first: a terminator, which is the read's last
 byte; ``max_length`` bytes; or ``read_timeout``. Whatever arrived after a
 terminator is the start of the next read.
 
-A node gives a timeout, terminators, or both. One that gives neither is
-refused, because it would describe a read with no way to end but filling it
--- which is a real intent, but one a node states by giving
-``read_timeout: none``: a fixed number of bytes at a time.
+A node gives a timeout, terminators, a length prefix, or a timeout beside
+either of the others. One that gives none of them is refused, because it
+would describe a read with no way to end but filling it -- which is a real
+intent, but one a node states by giving ``read_timeout: none``: a fixed
+number of bytes at a time.
+
+A **length prefix** is for a payload that starts each frame with its length.
+The length counts the bytes after the prefix, and the read ends when they
+have all arrived; it is delivered whole, prefix and all, as a read ended by a
+terminator keeps its terminator. So with ``length_prefix: u8`` the bytes
+``03 41 42 43`` are one read of four bytes.
+
+.. code-block:: yaml
+
+   - name: imu
+     type: serial
+     path: /dev/ttyS2
+     datarate: 115200
+     byte_length: 8
+     stop_bits: 1
+     max_length: 260
+     length_prefix: u16be
+     read_timeout: 50 ms
+
+A prefixed line says ``read_timeout`` too, if only as ``none``. A byte lost on
+the line puts every later prefix in the wrong place, and nothing in the bytes
+says so; the timeout is what ends a frame that never finishes, so that the
+next byte is read as a prefix again and the reads come back into step. On a
+prefixed line, then, the timeout does not deliver what has arrived: a frame
+shorter than its own prefix says is broken, and is let go. Set the timeout
+longer than a whole frame takes to arrive. A frame whose prefix gives more
+than ``max_length`` holds is let go too, as it arrives, and the frame after it
+is read from its own prefix. tcspecial logs a warning for each, naming the
+node.
+
+A length prefix and terminators are not given together: a terminator's byte
+can appear anywhere in the body of a frame whose length was given, and would
+end the read in the middle of it.
 
 A pass never waits on a line, so a timeout is noticed by the first pass after
 it: a read that ends by its timeout is late by as much as the interval its
@@ -1580,8 +1617,6 @@ parser. A file giving one is refused rather than quietly running without it.
 
 .. code-block:: text
 
-   length-prefixed framing a read whose length is in its first one or two
-                           bytes
    max_interbyte_interval  a read ended by a gap between bytes
    bidirectional           whether a handler carries data both ways; every
                            handler does at present

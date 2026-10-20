@@ -445,10 +445,51 @@ impl EndpointPort {
         if let Some(ended) = framer.frame(Instant::now(), buffer) {
             return Ok(ended);
         }
-        let ask = framer.room().min(want);
-        let got = self.read_what_is_there(&mut buffer[..ask])?;
-        framer.took(&buffer[..got], Instant::now());
-        Ok(framer.frame(Instant::now(), buffer).unwrap_or(0))
+        // A prefixed frame is asked for twice: its prefix, and then as much
+        // as the prefix gives. Both in one pass, or every frame would wait a
+        // group's interval between the two. A read with no prefix is asked
+        // for once, since an ask that is answered in full fills it.
+        let mut ended = None;
+        for _ in 0..2 {
+            let ask = framer.room().min(want);
+            if ask == 0 {
+                break;
+            }
+            let got = self.read_what_is_there(&mut buffer[..ask])?;
+            framer.took(&buffer[..got], Instant::now());
+            ended = framer.frame(Instant::now(), buffer);
+            if ended.is_some() || got < ask {
+                break;
+            }
+        }
+        self.say_what_was_let_go(framer);
+        Ok(ended.unwrap_or(0))
+    }
+
+    /// Say that prefixed frames were let go, which is a line out of step or
+    /// a payload sending what its configuration does not expect: either way
+    /// readings that never reach the ground, and nothing else would say so.
+    /// At most a frame's worth of warnings a timeout or a max_length apart,
+    /// so a line that is wrong is heard without drowning the log.
+    fn say_what_was_let_go(&self, framer: &mut Framer) {
+        let let_go = framer.let_go();
+        if let_go.too_long > 0 {
+            log::warn!(
+                "{}: a frame's length_prefix gave more than max_length holds, so \
+                 the frame was let go. Raise max_length, or check the prefix the \
+                 payload sends against length_prefix",
+                self.what
+            );
+        }
+        if let_go.cut_short > 0 {
+            log::warn!(
+                "{}: a frame was still short of the length its prefix gave when \
+                 read_timeout ran out, so it was let go and the next byte is read as \
+                 a prefix. Check that read_timeout is longer than a frame takes to \
+                 arrive",
+                self.what
+            );
+        }
     }
 
     fn read_what_is_there(&mut self, buffer: &mut [u8]) -> Result<usize, String> {
@@ -1322,6 +1363,7 @@ mod tests {
             max_length: 64,
             timeout: None,
             terminators: vec![b'\n'],
+            length_prefix: None,
         });
         let mut buffer = [0u8; 64];
         let mut read = || {
@@ -1331,6 +1373,36 @@ mod tests {
         assert_eq!(read(), b"".to_vec(), "half a sentence is nothing yet");
         assert_eq!(read(), b"$GPGGA,1\n".to_vec());
         assert_eq!(read(), b"$GPRMC\n".to_vec());
+    }
+
+    /// A prefixed frame waiting on the line is taken in one pass: its
+    /// prefix, and then the rest the prefix gives, rather than the prefix in
+    /// one pass and the rest a group's interval later.
+    #[test]
+    fn a_prefixed_frame_is_read_in_one_pass() {
+        let (_script, port) = port_of_script(
+            "imu",
+            Use::Read,
+            vec![
+                Ok(vec![3]),
+                Ok(b"abc".to_vec()),
+                Ok(vec![1]),
+                Ok(b"d".to_vec()),
+            ],
+        );
+        let mut port = port.framed_by(tcslibgs::endpoint_config::StreamParams {
+            max_length: 64,
+            timeout: None,
+            terminators: Vec::new(),
+            length_prefix: Some(tcslibgs::endpoint_config::LengthPrefix::U8),
+        });
+        let mut buffer = [0u8; 64];
+        let mut read = || {
+            let taken = port.take(&mut buffer).expect("a read").bytes;
+            buffer[..taken].to_vec()
+        };
+        assert_eq!(read(), b"\x03abc".to_vec());
+        assert_eq!(read(), b"\x01d".to_vec());
     }
 
     /// A serial node on a real line hands over whole reads, however the

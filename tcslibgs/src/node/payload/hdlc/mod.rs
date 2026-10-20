@@ -596,6 +596,7 @@ mod tests {
             max_length: Some(Scalar::of("512")),
             timeout: None,
             terminators: None,
+            length_prefix: None,
         });
         let said = group_kind_of("link", g).expect_err("a stream rule on frames");
         assert!(format!("{said}").contains("stream"), "{said}");

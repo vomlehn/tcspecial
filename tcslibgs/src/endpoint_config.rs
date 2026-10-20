@@ -79,10 +79,24 @@ pub enum EndpointConfigError {
     StreamMissingMaxLength(String),
 
     #[error(
-        "payload \"{0}\": a stream section must give a timeout or a terminator list, or \
-         both. To read a fixed number of bytes with neither, say timeout: none explicitly"
+        "payload \"{0}\": a line must say where a read of it ends: give read_timeout, \
+         terminators or length_prefix. To read max_length bytes at a time with none \
+         of them, say read_timeout: none"
     )]
     StreamNeedsTimeoutOrTerminators(String),
+
+    #[error(
+        "payload \"{0}\": length_prefix and terminators cannot both end a read: a \
+         terminator byte can be part of a frame whose length was given. Remove one"
+    )]
+    StreamPrefixAndTerminators(String),
+
+    #[error(
+        "payload \"{0}\": a line with a length_prefix must also say read_timeout, as a \
+         length of time or as none. A timeout is what puts the reads back in step after \
+         a byte is lost; none says there is to be no such recovery"
+    )]
+    StreamPrefixNeedsTimeout(String),
 
     #[error(
         "payload \"{0}\": an empty terminator list is not a terminator list; omit it or \
@@ -286,10 +300,10 @@ impl GroupKind {
 /// Where one read of a stream payload protocol ends.
 ///
 /// `max_length` always bounds a read. A read also ends on whichever of the
-/// other two conditions the file supplied, and at least one of them was
-/// supplied: a file giving neither is rejected, because it would describe a
+/// other conditions the file supplied, and at least one of them was
+/// supplied: a file giving none is rejected, because it would describe a
 /// read with no way to end but filling the buffer -- which is a real intent,
-/// but one a file must state by giving `timeout: none`.
+/// but one a file must state by giving `read_timeout: none`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct StreamParams {
     /// Longest payload one read may deliver, in bytes. Always present.
@@ -298,15 +312,74 @@ pub struct StreamParams {
     pub timeout: Option<Duration>,
     /// Bytes that each end a read. Empty when the file gave no terminators.
     pub terminators: Vec<u8>,
+    /// The length a read's first bytes give it, or `None` for a line whose
+    /// reads say nothing of their own length. Never beside terminators.
+    pub length_prefix: Option<LengthPrefix>,
 }
 
 impl StreamParams {
     /// Whether a read of this stream ends only on filling `max_length`.
     ///
-    /// True exactly for the file that said `timeout: none` and gave no
-    /// terminators -- the "hand me this many bytes at a time" case.
+    /// True exactly for the file that said `read_timeout: none` and gave
+    /// nothing else -- the "hand me this many bytes at a time" case.
     pub fn is_fixed_length(&self) -> bool {
-        self.timeout.is_none() && self.terminators.is_empty()
+        self.timeout.is_none() && self.terminators.is_empty() && self.length_prefix.is_none()
+    }
+}
+
+/// How a read's first bytes give its length.
+///
+/// The length counts the bytes after the prefix, not the prefix itself, and
+/// the read that is delivered is the whole of it, prefix and all -- as a
+/// read ended by a terminator keeps its terminator. Three shapes and no
+/// more: a fixed list a file names one of is a list a reader can check,
+/// where a width, an order and an offset stated separately would be three
+/// things to get wrong together.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub enum LengthPrefix {
+    /// One byte.
+    U8,
+    /// Two bytes, the more significant first.
+    U16Be,
+    /// Two bytes, the less significant first.
+    U16Le,
+}
+
+impl LengthPrefix {
+    /// Every prefix, in the order the documentation gives them.
+    pub const ALL: [LengthPrefix; 3] = [LengthPrefix::U8, LengthPrefix::U16Be, LengthPrefix::U16Le];
+
+    /// How this prefix is spelled in a configuration file.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            LengthPrefix::U8 => "u8",
+            LengthPrefix::U16Be => "u16be",
+            LengthPrefix::U16Le => "u16le",
+        }
+    }
+
+    /// How many bytes the prefix is.
+    pub fn width(self) -> usize {
+        match self {
+            LengthPrefix::U8 => 1,
+            LengthPrefix::U16Be | LengthPrefix::U16Le => 2,
+        }
+    }
+
+    /// The length a prefix gives, read from the first [`LengthPrefix::width`]
+    /// bytes of `bytes`, which must hold at least that many.
+    pub fn length(self, bytes: &[u8]) -> usize {
+        match self {
+            LengthPrefix::U8 => bytes[0] as usize,
+            LengthPrefix::U16Be => u16::from_be_bytes([bytes[0], bytes[1]]) as usize,
+            LengthPrefix::U16Le => u16::from_le_bytes([bytes[0], bytes[1]]) as usize,
+        }
+    }
+}
+
+impl fmt::Display for LengthPrefix {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 
@@ -446,6 +519,7 @@ pub(crate) struct StreamTerms {
     pub(crate) max_length: Option<Scalar>,
     pub(crate) timeout: Option<Scalar>,
     pub(crate) terminators: Option<ByteList>,
+    pub(crate) length_prefix: Option<Scalar>,
 }
 
 // ---------------------------------------------------------------------------
@@ -706,7 +780,7 @@ fn split_list(text: &str) -> Vec<String> {
 // Validation -- wire types to domain types
 // ---------------------------------------------------------------------------
 
-/// Apply the three rules governing a stream section.
+/// Apply the rules governing a stream section.
 pub(crate) fn validate_stream(group: &str, s: StreamTerms) -> EndpointConfigResult<StreamParams> {
     // 1. max_length is required.
     let max_length = s
@@ -742,11 +816,50 @@ pub(crate) fn validate_stream(group: &str, s: StreamTerms) -> EndpointConfigResu
         None => None,
     };
 
-    // At least one of the two end conditions must have been supplied. Note
-    // that `timeout: none` counts: it is how a file asks for a read that ends
-    // only on max_length, and saying so is what distinguishes that intent
-    // from having forgotten to say anything.
-    if timeout.is_none() && terminators.is_none() {
+    // 4. A length prefix is one of the shapes there are, and fits in a read
+    //    with room to spare for nothing: max_length below the prefix's width
+    //    could never hold even the prefix of a frame.
+    let length_prefix = match s.length_prefix.as_ref() {
+        Some(p) => Some(parse_length_prefix(group, p)?),
+        None => None,
+    };
+    if let Some(prefix) = length_prefix {
+        // Terminators are looked for in every byte, and a frame whose
+        // length was given carries any byte in its body: the two would end
+        // a read in different places, and which one won would depend on the
+        // data.
+        if terminators.is_some() {
+            return Err(EndpointConfigError::StreamPrefixAndTerminators(
+                group.to_string(),
+            ));
+        }
+        // One lost byte puts every later prefix in the wrong place, and
+        // nothing in the bytes says so. A timeout is what ends a frame that
+        // never finishes and starts the next one afresh; a file that wants
+        // no such recovery says read_timeout: none, so that leaving it out
+        // is not taken for saying so.
+        if timeout.is_none() {
+            return Err(EndpointConfigError::StreamPrefixNeedsTimeout(
+                group.to_string(),
+            ));
+        }
+        if (max_length as usize) < prefix.width() {
+            return Err(bad(
+                group,
+                &format!(
+                    "max_length {max_length} cannot hold a length_prefix of {prefix}, \
+                     which is {} bytes on its own",
+                    prefix.width()
+                ),
+            ));
+        }
+    }
+
+    // At least one end condition must have been supplied. Note that
+    // `read_timeout: none` counts: it is how a file asks for a read that
+    // ends only on max_length, and saying so is what distinguishes that
+    // intent from having forgotten to say anything.
+    if timeout.is_none() && terminators.is_none() && length_prefix.is_none() {
         return Err(EndpointConfigError::StreamNeedsTimeoutOrTerminators(
             group.to_string(),
         ));
@@ -759,7 +872,26 @@ pub(crate) fn validate_stream(group: &str, s: StreamTerms) -> EndpointConfigResu
         // satisfy the rule above, which has already been checked.
         timeout: timeout.flatten(),
         terminators: terminators.unwrap_or_default(),
+        length_prefix,
     })
+}
+
+/// Which length prefix a file's word names.
+fn parse_length_prefix(group: &str, s: &Scalar) -> EndpointConfigResult<LengthPrefix> {
+    let said = s.as_str().trim().to_ascii_lowercase();
+    LengthPrefix::ALL
+        .into_iter()
+        .find(|p| p.as_str() == said)
+        .ok_or_else(|| {
+            bad(
+                group,
+                &format!(
+                    "length_prefix: \"{}\" is not one of u8, u16be or u16le -- one \
+                     byte, or two with the more or the less significant first",
+                    s.as_str()
+                ),
+            )
+        })
 }
 
 // ---------------------------------------------------------------------------

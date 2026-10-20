@@ -1822,7 +1822,17 @@ three times:
 The last two are each read across two clocks, so each includes how far apart
 those clocks are, and either may come out negative; their sum is the round
 trip whatever the offset, which is how to tell a clock that is out from a link
-that is slow. Pressing ``Send ping`` clears the time received and the three
+that is slow.
+
+The window is in two boxes, ``Beacon`` and one titled with the node being
+pinged. In the second, ``Sent`` and ``Received`` each show a message and its
+time on one row, and ``Times`` shows the round trip large with the two one-way
+times smaller beneath it. Before there is anything to show, each field shows
+the shape of what will be there -- ``<none>``, ``--:--:--.---------``,
+``--.------ ms`` -- as the beacon box does. tcsmoc's ping window is the same
+box. ``Send ping`` is the default button: Enter or Space presses it.
+
+Pressing ``Send ping`` clears the time received and the three
 times until that ping's own answer arrives -- an answer is matched to its ping
 by the count. An answer to an earlier ping is still shown as the last thing
 received, and changes none of the times.
@@ -2679,9 +2689,14 @@ the beacon box
 
   .. code-block:: text
 
-     Beacon:    (indicator)
-     Last rcvd: 02:02:02
-     Last msg:  tcspecial v0.1.0, config v2.0.0, md5 36999e46a4bf436854442d8f97a2248d
+     Beacon
+       Status:         (indicator)
+       Last received:  02:02:02
+       Last message:   tcspecial v0.1.0, config v2.0.0,
+                       md5 36999e46a4bf436854442d8f97a2248d
+
+  The message wraps at its spaces where the window is too narrow for it on
+  one line, as it is beside the command link.
 
   Each beacon also carries its own number, counted from one by the
   spacecraft, and the MOC says on the console what the numbers say about the
@@ -2695,7 +2710,7 @@ the beacon box
   A beacon says only that the spacecraft is alive, so without the number a
   beacon that was lost on the way reads exactly like one that was never sent.
 
-  ``Last msg`` reads ``<none>`` until a beacon arrives. ``v`` is the software
+  ``Last message`` reads ``<none>`` until a beacon arrives. ``v`` is the software
   flying, ``config v`` its configuration version, and ``md5`` the digest of the configuration file tcspecial read, so the line says what is up
   there without anything having to connect first. The answer to a ``CONNECT``
   says the same three in the same words: see `What each end read`_. A datagram the MOC cannot read is shown as

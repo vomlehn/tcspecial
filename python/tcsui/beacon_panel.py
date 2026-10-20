@@ -18,10 +18,12 @@ on it.
 """
 
 import tkinter as tk
+import tkinter.font
+from tkinter import ttk
 from dataclasses import dataclass
 
 from tcslib.beacon import NO_BEACON_MESSAGE, NO_TRANSFER_TIME, Stage, received_at
-from tcsui import fonts
+from tcsui import theme
 
 
 class palette:
@@ -93,47 +95,44 @@ class Shown:
 NOTHING_YET = Shown(indicator="#c0c0c0", received=NO_TRANSFER_TIME, message=NO_BEACON_MESSAGE)
 
 
-class BeaconPanel(tk.Frame):
+class BeaconPanel(ttk.LabelFrame):
     """A light, when the last beacon arrived, and what it said.
 
-    Laid out as ``BeaconPanel`` in ``beacon.slint``: a border, because the
-    beacon has a socket of its own and keeps arriving after a disconnect, and
-    three rows -- the light, then the time, then what that beacon said under
-    it, the two reading as one message received then and saying this.
+    Laid out as ``BeaconPanel`` in ``beacon.slint``: a box titled ``Beacon``,
+    because the beacon has a socket of its own and keeps arriving after a
+    disconnect, and three rows -- the light, then the time, then what that
+    beacon said under it, the two reading as one message received then and
+    saying this. Drawn in ttk, so that it takes the window's theme: see
+    :mod:`tcsui.theme`.
     """
 
-    #: The light's size, as the Slint panel draws it.
-    LIGHT = 20
-
     def __init__(self, parent, **options):
-        super().__init__(
-            parent,
-            highlightbackground="#808080",
-            highlightthickness=1,
-            padx=6,
-            pady=6,
-            **options,
-        )
-        # The two lines of what arrived, in the one size every window is set
-        # in, as the Slint panel's are.
-        small = ("TkDefaultFont", fonts.POINTS)
+        super().__init__(parent, text="Beacon", padding=(10, 6), **options)
+        self.columnconfigure(1, weight=1)
 
-        tk.Label(self, text="Beacon: ").grid(row=0, column=0, sticky="w")
+        ttk.Label(self, text="Status:").grid(row=0, column=0, sticky="w", pady=2)
+        # As tall as the line beside it, measured from the type rather than
+        # stated in pixels, as the Slint light is sized from Fonts.window.
+        light = round(tkinter.font.nametofont("TkDefaultFont").metrics("linespace") * 1.1)
         self._light = tk.Canvas(
-            self, width=self.LIGHT, height=self.LIGHT, highlightthickness=0
+            self,
+            width=light,
+            height=light,
+            highlightthickness=0,
+            background=theme.background(self),
         )
         self._lamp = self._light.create_oval(
-            1, 1, self.LIGHT - 1, self.LIGHT - 1, fill=NOTHING_YET.indicator, outline="#808080"
+            1, 1, light - 1, light - 1, fill=NOTHING_YET.indicator, outline="#808080"
         )
-        self._light.grid(row=0, column=1, sticky="w", padx=8)
+        self._light.grid(row=0, column=1, sticky="w", padx=12, pady=2)
 
-        tk.Label(self, text="Last rcvd: ").grid(row=1, column=0, sticky="w")
-        self._received = tk.Label(self, text=NOTHING_YET.received, font=small)
-        self._received.grid(row=1, column=1, sticky="w", padx=8)
+        ttk.Label(self, text="Last received:").grid(row=1, column=0, sticky="w", pady=2)
+        self._received = ttk.Label(self, text=NOTHING_YET.received)
+        self._received.grid(row=1, column=1, sticky="w", padx=12, pady=2)
 
-        tk.Label(self, text="Last msg: ").grid(row=2, column=0, sticky="w")
-        self._message = tk.Label(self, text=NOTHING_YET.message, font=small)
-        self._message.grid(row=2, column=1, sticky="w", padx=8)
+        ttk.Label(self, text="Last message:").grid(row=2, column=0, sticky="w", pady=2)
+        self._message = ttk.Label(self, text=NOTHING_YET.message)
+        self._message.grid(row=2, column=1, sticky="w", padx=12, pady=2)
 
     def show(self, shown):
         """Put what a pass of the beacon loop reported on the panel: all three

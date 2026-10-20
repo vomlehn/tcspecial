@@ -62,7 +62,7 @@ sys.path.insert(0, str(HERE))
 from tcslib.beacon import Beacons, Schedule  # noqa: E402
 from tcslibgs import configuration  # noqa: E402
 from tcslibgs.configuration import find_built  # noqa: E402
-from ping_ground import Pinger, interval, precise_time  # noqa: E402
+from ping_ground import NO_MESSAGE, Pinger, interval, precise_time  # noqa: E402
 
 #: The configuration, where nobody says otherwise.
 CONFIGURATION = HERE / "ping.xml"
@@ -279,7 +279,9 @@ def run_the_window(setup, beacons, pinger):
     """The window, and the two loops that feed it."""
     import tkinter as tk
 
-    from tcsui import fonts
+    from tkinter import ttk
+
+    from tcsui import fonts, theme
     from tcsui.beacon_panel import BeaconPanel, Shown
 
     reports = queue.Queue()
@@ -304,69 +306,101 @@ def run_the_window(setup, beacons, pinger):
 
     window = tk.Tk()
     fonts.use_in(window)
+    theme.use_in(window)
     window.title("tcspecial ping")
     window.resizable(False, False)
 
     beacon = BeaconPanel(window)
-    beacon.pack(fill="x", padx=8, pady=(8, 4))
+    beacon.pack(fill="x", padx=10, pady=(10, 5))
 
-    panel = tk.Frame(window, highlightbackground="#808080", highlightthickness=1, padx=6, pady=6)
-    panel.pack(fill="x", padx=8, pady=(4, 8))
+    # Laid out as PingPanel in tcsui/ui/ping.slint, which tcsmoc shows: a box
+    # titled Ping, sent and received each a message and when on one row, the
+    # round trip large and its two halves under it, and a line about them
+    # beside the button.
+    # Titled with the node, as tcsmoc's is, so that the box says what it is
+    # pinging.
+    panel = ttk.LabelFrame(
+        window, text=f"Pinging {setup.node}" if setup else "Ping", padding=(10, 6)
+    )
+    panel.pack(fill="x", padx=10, pady=(5, 10))
 
-    shown = {}
+    def heading(row, text):
+        ttk.Label(panel, text=text, style="Heading.TLabel").grid(
+            row=row, column=0, columnspan=2, sticky="w", pady=(6 if row else 0, 2)
+        )
 
-    def row(at, label):
-        tk.Label(panel, text=label).grid(row=at, column=0, sticky="w")
-        value = tk.Label(panel, text="", font=("TkFixedFont", fonts.POINTS), anchor="w", width=60)
-        value.grid(row=at, column=1, sticky="w", padx=8)
-        shown[label] = value
+    def value(row, column, width=None, style="Value.TLabel"):
+        label = ttk.Label(panel, style=style, width=width)
+        label.grid(row=row, column=column, sticky="w", padx=(0, 12))
+        return label
+
+    # The message column is as wide as an answer will be, so that the window
+    # is the width of what it will show and does not grow when the first
+    # answer arrives.
+    widest = len("ping #000000 0000000000.000000000 0000000000.000000000")
+
+    heading(0, "Sent")
+    sent = value(1, 0, widest)
+    sent_time = value(1, 1)
+    heading(2, "Received")
+    received = value(3, 0, widest)
+    received_time = value(3, 1)
+    heading(4, "Times")
+
+    # The round trip is what a ping is for, so it is the large figure; the
+    # two halves are under it, smaller, because each is read across two
+    # clocks and means less alone.
+    trip = ttk.Frame(panel)
+    trip.grid(row=5, column=0, columnspan=2, sticky="w")
+    ttk.Label(trip, text="Round trip").pack(side="left", padx=(0, 12))
+    round_trip = ttk.Label(trip, style="Figure.TLabel")
+    round_trip.pack(side="left")
+
+    halves = ttk.Frame(panel)
+    halves.grid(row=6, column=0, columnspan=2, sticky="w", pady=(2, 0))
+    ttk.Label(halves, text="MOC to tcspecial").pack(side="left", padx=(0, 12))
+    up = ttk.Label(halves, style="Value.TLabel")
+    up.pack(side="left", padx=(0, 24))
+    ttk.Label(halves, text="tcspecial to MOC").pack(side="left", padx=(0, 12))
+    down = ttk.Label(halves, style="Value.TLabel")
+    down.pack(side="left")
 
     def show():
         exchange = pinger.exchange()
-        for label, text in [
-            ("Sent:", exchange.sent or ""),
-            ("Time sent:", precise_time(exchange.sent_at)),
-            ("Last received:", exchange.received or ""),
-            ("Time received:", precise_time(exchange.received_at)),
-            ("Round trip:", interval(exchange.round_trip())),
-            ("MOC to tcspecial:", interval(exchange.up())),
-            ("tcspecial to MOC:", interval(exchange.down())),
-        ]:
-            shown[label].configure(text=text)
+        sent.configure(text=exchange.sent or NO_MESSAGE)
+        sent_time.configure(text=precise_time(exchange.sent_at))
+        received.configure(text=exchange.received or NO_MESSAGE)
+        received_time.configure(text=precise_time(exchange.received_at))
+        round_trip.configure(text=interval(exchange.round_trip()))
+        up.configure(text=interval(exchange.up()))
+        down.configure(text=interval(exchange.down()))
 
-    def send():
+    def send(_event=None):
         pinger.ping()
         show()
 
-    tk.Button(panel, text="Send ping", command=send).grid(
-        row=0, column=0, columnspan=2, sticky="w", pady=(0, 6)
+    # What the two one-way times are, which is the thing about them a reader
+    # would otherwise get wrong -- in a line, beside the button that starts
+    # it all.
+    foot = ttk.Frame(panel)
+    foot.grid(row=7, column=0, columnspan=2, sticky="ew", pady=(10, 0))
+    foot.columnconfigure(0, weight=1)
+    ttk.Label(
+        foot,
+        text="Times are UTC. Each one-way time spans two clocks; "
+        "the two add up to the round trip.",
+        style="Note.TLabel",
+    ).grid(row=0, column=0, sticky="w")
+    # The default button, which Enter or Space presses wherever the focus
+    # is. It never takes the focus itself, so that Space on it is not a
+    # second ping.
+    ttk.Button(foot, text="Send ping", command=send, default="active", takefocus=False).grid(
+        row=0, column=1, sticky="e", padx=(12, 0)
     )
-    for at, label in enumerate(
-        [
-            "Sent:",
-            "Time sent:",
-            "Last received:",
-            "Time received:",
-            "Round trip:",
-            "MOC to tcspecial:",
-            "tcspecial to MOC:",
-        ],
-        start=1,
-    ):
-        row(at, label)
-    # As wide as the rows above it, measured before it is added: a note that
-    # wrapped to the panel as the panel grew would widen the panel it wraps
-    # to, and the window with it, for ever.
-    panel.update_idletasks()
-    tk.Label(
-        panel,
-        text="Times are UTC. The two one-way times are each read across two "
-        "clocks, the MOC's and tcspecial's, so each includes how far apart "
-        "they are; their sum is the round trip.",
-        justify="left",
-        fg="#4b5563",
-        wraplength=panel.winfo_reqwidth() - 16,
-    ).grid(row=8, column=0, columnspan=2, sticky="w", pady=(6, 0))
+    for key in ("<Return>", "<KP_Enter>", "<space>"):
+        window.bind(key, send)
+
+    show()
 
     def take_in():
         while True:

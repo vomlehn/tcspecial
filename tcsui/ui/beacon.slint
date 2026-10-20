@@ -16,8 +16,9 @@
 // properties: see the crate's `shown`.
 
 import { Fonts } from "fonts.slint";
+import { TitledBox } from "titled.slint";
 
-export component BeaconPanel inherits Rectangle {
+export component BeaconPanel inherits TitledBox {
     // The light's colour, which says how stale the last beacon is. Grey
     // before any has arrived and never after: once one has, the dark half of
     // a blink is white. See `tcsui::indicator`.
@@ -29,55 +30,49 @@ export component BeaconPanel inherits Rectangle {
     // configuration it is serving, and the digest of the files it read.
     in property <string> last-message: "<none>";
 
-    // The border says this is not part of whatever sits beside it: the beacon
-    // has a socket of its own and keeps arriving after a disconnect, which is
-    // a window worth being able to read rather than one to be puzzled by.
-    border-width: 1px;
-    border-color: #808080;
-    border-radius: 4px;
+    // Titled and boxed, because this is not part of whatever sits beside it:
+    // the beacon has a socket of its own and keeps arriving after a
+    // disconnect, which is a window worth being able to read rather than one
+    // to be puzzled by. The title says what the box is, so the rows need not.
+    title: "Beacon";
 
-    VerticalLayout {
-        padding: 6px;
-        spacing: 2px;
-        // Centred, because this box is often the shorter of a row and the row
-        // is as tall as the other one.
-        alignment: center;
+    GridLayout {
+        spacing-horizontal: 12px;
+        spacing-vertical: 4px;
 
-        HorizontalLayout {
-            spacing: 8px;
-
-            Text { text: "Beacon: "; vertical-alignment: center; }
-            Rectangle {
-                width: 20px;
-                height: 20px;
-                border-radius: 10px;
-                background: indicator-color;
-                border-color: #808080;
-                border-width: 1px;
+        Row {
+            Text { text: "Status:"; vertical-alignment: center; }
+            // Sized from the type rather than in pixels, so that the light
+            // stands as tall as the line beside it at any type size.
+            HorizontalLayout {
+                alignment: start;
+                Rectangle {
+                    width: Fonts.window * 1.5;
+                    height: self.width;
+                    border-radius: self.width / 2;
+                    background: indicator-color;
+                    border-color: #808080;
+                    border-width: 1px;
+                }
             }
         }
 
-        HorizontalLayout {
-            spacing: 8px;
-
-            Text { text: "Last rcvd: "; vertical-alignment: center; }
-            Text {
-                text: last-received;
-                font-size: Fonts.window;
-                vertical-alignment: center;
-            }
+        Row {
+            Text { text: "Last received:"; vertical-alignment: center; }
+            Text { text: last-received; vertical-alignment: center; }
         }
 
         // What that beacon said, under when it arrived: the two read as one
         // message, received then and saying this.
-        HorizontalLayout {
-            spacing: 8px;
-
-            Text { text: "Last msg: "; vertical-alignment: center; }
+        Row {
+            Text { text: "Last message:"; vertical-alignment: center; }
+            // Wrapped at its spaces where the box is narrower than the line,
+            // as it is beside tcsmoc's command link: the digest goes to a
+            // line of its own rather than off the edge of the window.
             Text {
                 text: last-message;
-                font-size: Fonts.window;
                 vertical-alignment: center;
+                wrap: word-wrap;
             }
         }
     }

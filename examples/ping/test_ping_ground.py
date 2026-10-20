@@ -122,13 +122,13 @@ class PingerTest(unittest.TestCase):
 class ShowingTest(unittest.TestCase):
     def test_a_time_is_shown_to_the_nanosecond_and_utc(self):
         self.assertEqual(precise_time((3600 + 120 + 3) * SECOND + 4), "01:02:03.000000004")
-        self.assertEqual(precise_time(None), "")
+        self.assertEqual(precise_time(None), "--:--:--.---------")
 
     def test_an_interval_is_milliseconds_with_its_sign(self):
         self.assertEqual(interval(16_441_799), "16.441799 ms")
         self.assertEqual(interval(-250_000), "-0.250000 ms")
         self.assertEqual(interval(0), "0.000000 ms")
-        self.assertEqual(interval(None), "")
+        self.assertEqual(interval(None), "--.------ ms")
 
 
 @unittest.skipUnless(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"), "no display")
@@ -138,6 +138,7 @@ class WindowTest(unittest.TestCase):
 
     def test_pressing_ping_shows_the_ping_and_the_answer_fills_in_the_times(self):
         import tkinter as tk
+        from tkinter import ttk
 
         import ping_moc
 
@@ -162,14 +163,14 @@ class WindowTest(unittest.TestCase):
 
         def mainloop(window, n=0):
             def press():
-                button = next(w for w in labels(window) if isinstance(w, tk.Button))
+                button = next(w for w in labels(window) if isinstance(w, ttk.Button))
                 button.invoke()
                 message = vehicle.recvfrom(256)[0]
                 vehicle.sendto(ping.reply(message, ping.now()), ("127.0.0.1", down))
                 window.after(600, read)
 
             def read():
-                texts = [w.cget("text") for w in labels(window) if isinstance(w, tk.Label)]
+                texts = [w.cget("text") for w in labels(window) if isinstance(w, ttk.Label)]
                 shown["texts"] = texts
                 window.destroy()
 

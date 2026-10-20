@@ -13,4 +13,14 @@
 
 export global Fonts {
     out property <length> window: 12pt;
+
+    // The face text is set in where its characters must all be one width:
+    // columns of names and values, and the labels of the node types whose
+    // attributes are addresses. Named, because Slint does not resolve the
+    // generic "monospace" -- text asking for it was set in the ordinary face
+    // -- and named once, so that every window asks for the same one. DejaVu
+    // Sans Mono is what a Linux desktop's fontconfig resolves "monospace" to;
+    // where it is not installed, Slint sets the text in its default face,
+    // which is what happened before, and nothing fails.
+    out property <string> mono: "DejaVu Sans Mono";
 }

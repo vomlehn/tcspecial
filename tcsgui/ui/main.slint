@@ -583,7 +583,7 @@ component NodeShape inherits Rectangle {
             Text {
                 text: node.name;
                 color: mark;
-                font-family: node.face == "mono" ? "monospace" : "";
+                font-family: node.face == "mono" ? Fonts.mono : "";
                 font-size: node.label-size;
                 font-weight: node.label-weight;
                 font-italic: node.label-italic;
@@ -593,7 +593,7 @@ component NodeShape inherits Rectangle {
             Text {
                 text: node.node-type;
                 color: mark;
-                font-family: node.face == "mono" ? "monospace" : "";
+                font-family: node.face == "mono" ? Fonts.mono : "";
                 font-size: Type.small;
                 horizontal-alignment: center;
                 overflow: elide;

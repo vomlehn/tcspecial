@@ -76,3 +76,12 @@ attributes:
     kind: timeout
     about: >
       How long a transfer is given before it is a failure, in milliseconds.
+  - name: init
+    required: false
+    kind: bytes
+    about: >
+      What to write to it as the vehicle opens it -- at startup, and whenever
+      the ground starts it again -- written as a trigger is: hex for one
+      byte, a C string for several. A heater that must start off, a register
+      to set before the part reads sensibly. A write that fails stops the
+      node from starting.

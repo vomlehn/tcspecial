@@ -50,3 +50,12 @@ attributes:
       changed and this says what it is now, so a set of lines may ask for
       either or both -- and a line that has not changed since the vehicle
       started tells the ground nothing until this is stated. Inputs only.
+  - name: init
+    required: false
+    kind: bytes
+    about: >
+      What to write to it as the vehicle opens it -- at startup, and whenever
+      the ground starts it again -- written as a trigger is: hex for one
+      byte, a C string for several. A heater that must start off, a register
+      to set before the part reads sensibly. A write that fails stops the
+      node from starting. Only for lines that are driven.

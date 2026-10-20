@@ -160,6 +160,9 @@
       <!-- How it is read. -->
       <xs:element name="read_size" type="xs:string"/>
       <xs:element name="trigger" type="xs:string"/>
+      <!-- What a payload is set to as the vehicle opens it, written as a
+           trigger is. -->
+      <xs:element name="init" type="xs:string"/>
       <!-- How a node that is asked is driven, and how one that is not.
            `trigger_interval` is how often the trigger goes out and
            `read_delay` how long the part takes to answer, both of which go

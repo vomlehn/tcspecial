@@ -4485,60 +4485,58 @@ High-Level View of TCSpecial
 ----------------------------
 Tcspecial fits into the ground and space portions of the command and telemetry
 systems as follows:
-FIXME: tweak diagram as necessary):
 
 **High-Level View of TCSpecial**
 
 .. code-block:: text
 
-          GROUND              :                     SPACE
-   ===========================:===================================================
+          GROUND              :                   SPACE
+   ===========================:==================================================
                               :
-   +=======================+  :    +=========================+     +=================+
-   ||  Ground Ops         ||  :    ||  Flight Software      ||     ||  Payload Bay  ||
-   +=======================+  :    +=========================+     +=================+
-   |  +---------+          |  :    |    +=================+  |     |                 |
-   |  | Mission |          |  :  ----+->| tcspecial      |  |     |                 |
-   |  | Control |          |  : |  | |  | (tcslibgs)      |  |     |                 |
-   |  | S/W     |          |  : |  | |  +-----------------+  |     |                 |
-   |  +---------+          |  : |  | |  | Command         |  |     |                 |
-   |       ^               |  : |  | +->| Interpreter     |  |     |                 |
-   |       |               |  : |  | |  +-----------------+  |     |  +-----------+  |
-   |       v               |  : |  | |  | Data            |<-------|->| Payload 0 |  |
-   |  +-----------------+  |  : |  | +->| Handler 0       |  |     |  +-----------+  |
-   |  | tcslib          |<------   | |  +-----------------+  |     |  +-----------+  |
-   |  | (tcslibgs)      |  |  :    | |  | Data            |<--------->| Payload 1 |  |
-   |  +-----------------+  |  :    | |  | Handler 1       |  |     |  +-----------+  |
-   |  |  configuration  |  |  :    | |  |      .          |  |     |                 |
-   |  +-----------------+  |  :    |           .             |     |                 |
-   +-----------------------+  :    | |  |      .          |  |     |                 |
-                              :    | |  +-----------------+  |     |  +-----------+  |
-                              :    | +->| Data            |<--------->| Payload n |  |
-                              :    |    | Handler n       |  |     |  +-----------+  |
-                              :    |    +-----------------+  |     |                 |
-                              :    |    |  configuration  |  |     |                 |
-                              :    |    +-----------------+  |     |                 |
-                              :    +-------------------------+     +-----------------+
+   +=======================+  :   +===========================+   +=============+
+   ||  Ground Ops         ||  :   ||  Flight Software        ||   || Payload Bay||
+   +=======================+  :   +===========================+   +=============+
+   |  +---------+          |  :   |  tcspecial (tcslibgs)     |   |             |
+   |  | Mission |          |  :   |  +---------------------+  |   |             |
+   |  | Control |          |  :   |  | Command interpreter |  |   |             |
+   |  | S/W     |          |  :   |  +---------------------+  |   |             |
+   |  +---------+          |  :   |  | Beacon              |  |   |             |
+   |       ^               |  :   |  +---------------------+  |   |             |
+   |       |               |  :   |  | The graph           |  |   | +---------+ |
+   |       v               |  :   |  |  moc nodes          |  |   | |Payload 0| |
+   |  +-----------------+  |  :   |  |  vehicle nodes:     |  |   | +---------+ |
+   |  | tcslib          |<------->|  |   compute, log,     |  |   | +---------+ |
+   |  | tcslib-c        |  |  :   |  |   tee, null, ping,  |  |   | |Payload 1| |
+   |  | python/tcslib   |  |  :   |  |   apps              |  |   | +---------+ |
+   |  | (tcslibgs)      |  |  :   |  |  payload nodes  <------------->   .     | |
+   |  +-----------------+  |  :   |  +---------------------+  |   | +---------+ |
+   |  |  configuration  |  |  :   |  |  configuration      |  |   | |Payload n| |
+   |  +-----------------+  |  :   |  +---------------------+  |   | +---------+ |
+   +-----------------------+  :   +---------------------------+   +-------------+
 
-On the ground, the tcslib library is used by the mission control software (such as YAMCS
-or MCT) to issue commands and receive telemetry. These are transmitted over
-what is shown as a single communications link, though these could be using
-multiple frequencies or channels.
+On the ground, a mission's control software (such as YAMCS or MCT) is built on
+tcslib -- or on tcslib-c from C and C++, or on the Python ``tcslib`` -- to send
+commands, receive the vehicle's data and listen for its beacons. These are
+shown as a single communications link, though they could be using multiple
+frequencies or channels. Both ends read the same configuration, and a beacon
+carries its digest, so each can tell when the other is reading another one.
 
-Commands sent through tcslib go to the tcspecial process, directed as
-appropriate to either the command interpreter or the various data handlers.
-This is shown as a multiplexed link, and over IP it is one: the command
-interpreter takes commands about the spacecraft on one port and commands about
-a payload on another -- see `Where the Addresses Are`_ -- and each data
-handler exchanges payload data with the ground on an address of its own. On a
-space link the same division is by virtual channel.
+Over IP the link is several sockets, each saying by the port it is on what it
+carries -- see `Where the Addresses Are`_. Commands about the spacecraft go to
+the command interpreter on one port and commands about a payload on another;
+the command interpreter answers each. The beacon is sent on a link of its own.
+What the ground sends into the graph arrives at a ``moc`` node, and what leaves
+the graph for the ground goes from each source to the ``moc`` node's
+``ground_base``, at a port of its own. On a space link the same division is by
+virtual channel.
 
-Telemetry from the command interpreter and the
-data handlers could also be transmitted in various ways. Each data handler
-will generally communicate to a single payload, though payloads may use
-multiple data handlers for various communication links. Data handlers all run
-in the same address space, so any need for data handlers to communicate with
-each other is straight forward to implement.
+Inside tcspecial the payloads are nodes of a graph the configuration draws: a
+payload node is the vehicle's end of an interface to one payload, a vehicle
+node is something the vehicle itself does -- a computation, a log, a tee or a
+null node, a ping, a program of its own -- and the links between them say
+where each datum goes. Every node runs in the one process, so a reading
+reaching two places is a link with two destinations rather than two programs
+talking to each other. See `The four concepts`_.
 
 The tcslibgs library contains definitions shared between the ground portion of the
 software, tcslib, and the space portion, tcspecial.
@@ -5051,10 +5049,22 @@ information is provided to the Rust Socket::new() interface as follows:
    pub fn new(domain: Domain, type_: Type, protocol: Option<Protocol>) -> io::Result<Socket>
 
 
-In the following table, all socket types except for SOCK_STREAM have datagram
-semantics. SOCK_STREAM types have stream semantics.
+What a ``network`` node takes today is one of four protocols, named by its
+``protocol`` attribute: ``tcp``, ``udp``, ``unix_stream`` and ``unix_dgram`` --
+``AF_INET`` or ``AF_INET6`` with ``SOCK_STREAM`` or ``SOCK_DGRAM``, and
+``AF_UNIX`` with the same two. Anything else is refused where the
+configuration is read, naming the four (see ``tcslibgs::graph::reach``). The
+tables below are what Linux offers beyond them: the families and types a
+network node could be given, and the semantics each would have, so that one
+added later is added knowing which of the two kinds of endpoint above it is.
 
-FIXME: What are the semantics of those items marked TBD?
+In the tables, every socket type but ``SOCK_STREAM`` has datagram semantics --
+``SOCK_SEQPACKET`` and ``SOCK_RDM`` keep each message's boundaries, which is
+what makes them datagrams here, though both are connection-oriented or
+reliable as well. ``SOCK_STREAM`` has stream semantics. "yes" under protocol
+is a family whose sockets must be told one -- an ``IPPROTO_``, ``ETH_P_``,
+``NETLINK_``, ``CAN_`` or ``BTPROTO_`` number -- and 0 one where the default
+will do.
 
 **Linux Networking Families and Types**
 
@@ -5074,9 +5084,11 @@ FIXME: What are the semantics of those items marked TBD?
 |              +----------------+-----------+-----------+
 |              | SOCK_RAW       | yes       | datagram  |
 +--------------+----------------+-----------+-----------+
-| AF_AX25      | TBD            | TBD       | TBD       |
-+--------------+----------------+-----------+-----------+
-| AF_IPX       | TBD            | TBD       | TBD       |
+| AF_AX25      | SOCK_SEQPACKET | 0         | datagram  |
+|              +----------------+-----------+-----------+
+|              | SOCK_DGRAM     | 0         | datagram  |
+|              +----------------+-----------+-----------+
+|              | SOCK_RAW       | yes       | datagram  |
 +--------------+----------------+-----------+-----------+
 | AF_APPLETALK | SOCK_DGRAM     | yes       | datagram  |
 |              +----------------+-----------+-----------+
@@ -5084,15 +5096,11 @@ FIXME: What are the semantics of those items marked TBD?
 +--------------+----------------+-----------+-----------+
 | AF_X25       | SOCK_SEQPACKET | 0         | datagram  |
 +--------------+----------------+-----------+-----------+
-| AF_INET6     | SOCK_STREAM    | yes       | stream    |
+| AF_INET6     | SOCK_STREAM    | 0         | stream    |
 |              +----------------+-----------+-----------+
-|              | SOCK_DGRAM     | yes       | datagram  |
+|              | SOCK_DGRAM     | 0         | datagram  |
 |              +----------------+-----------+-----------+
 |              | SOCK_RAW       | yes       | datagram  |
-+--------------+----------------+-----------+-----------+
-| AF_DECnet    | TBD            | TBD       | TBD       |
-+--------------+----------------+-----------+-----------+
-| AF_KEY       | TBD            | TBD       | TBD       |
 +--------------+----------------+-----------+-----------+
 | AF_NETLINK   | SOCK_DGRAM     | yes       | datagram  |
 |              +----------------+-----------+-----------+
@@ -5102,42 +5110,79 @@ FIXME: What are the semantics of those items marked TBD?
 |              +----------------+-----------+-----------+
 |              | SOCK_RAW       | yes       | datagram  |
 +--------------+----------------+-----------+-----------+
-| AF_RDS       | TBD            | TBD       | TBD       |
+| AF_RDS       | SOCK_SEQPACKET | 0         | datagram  |
 +--------------+----------------+-----------+-----------+
-| AF_PPPOX     | TBD            | TBD       | TBD       |
+| AF_LLC       | SOCK_STREAM    | 0         | stream    |
+|              +----------------+-----------+-----------+
+|              | SOCK_DGRAM     | 0         | datagram  |
 +--------------+----------------+-----------+-----------+
-| AF_LLC       | TBD            | TBD       | TBD       |
+| AF_CAN       | SOCK_RAW       | yes       | datagram  |
+|              +----------------+-----------+-----------+
+|              | SOCK_DGRAM     | yes       | datagram  |
 +--------------+----------------+-----------+-----------+
-| AF_IB        | TBD            | TBD       | TBD       |
+| AF_TIPC      | SOCK_STREAM    | 0         | stream    |
+|              +----------------+-----------+-----------+
+|              | SOCK_SEQPACKET | 0         | datagram  |
+|              +----------------+-----------+-----------+
+|              | SOCK_RDM       | 0         | datagram  |
+|              +----------------+-----------+-----------+
+|              | SOCK_DGRAM     | 0         | datagram  |
 +--------------+----------------+-----------+-----------+
-| AF_MPLS      | TBD            | TBD       | TBD       |
-+--------------+----------------+-----------+-----------+
-| AF_CAN       | TBD            | TBD       | TBD       |
-+--------------+----------------+-----------+-----------+
-| AF_TIPC      | TBD            | TBD       | TBD       |
-+--------------+----------------+-----------+-----------+
-| AF_BLUETOOTH | TBD            | TBD       | TBD       |
-+--------------+----------------+-----------+-----------+
-| AF_ALG       | TBD            | TBD       | TBD       |
-+--------------+----------------+-----------+-----------+
-| AF_VSOCK     | SOCK_DGRAM     | yes       | datagram  |
+| AF_BLUETOOTH | SOCK_STREAM    | yes       | stream    |
+|              +----------------+-----------+-----------+
+|              | SOCK_SEQPACKET | yes       | datagram  |
+|              +----------------+-----------+-----------+
+|              | SOCK_DGRAM     | yes       | datagram  |
 |              +----------------+-----------+-----------+
 |              | SOCK_RAW       | yes       | datagram  |
 +--------------+----------------+-----------+-----------+
-| AF_XDP       | TBD            | TBD       | TBD       |
+| AF_VSOCK     | SOCK_STREAM    | 0         | stream    |
+|              +----------------+-----------+-----------+
+|              | SOCK_DGRAM     | 0         | datagram  |
+|              +----------------+-----------+-----------+
+|              | SOCK_SEQPACKET | 0         | datagram  |
 +--------------+----------------+-----------+-----------+
 
-.. note::
-   The AF_KCM domain is not suported:
+Which protocol a type is given where the family needs one: ``AF_CAN``'s
+``SOCK_RAW`` is ``CAN_RAW`` and its ``SOCK_DGRAM`` is ``CAN_BCM``,
+``CAN_ISOTP`` or ``CAN_J1939`` -- though a CAN bus has a node type of its own,
+``can``, and is reached through that; ``AF_BLUETOOTH``'s ``SOCK_STREAM`` is
+RFCOMM, its ``SOCK_SEQPACKET`` L2CAP, SCO or ISO, its ``SOCK_DGRAM``
+connectionless L2CAP and its ``SOCK_RAW`` HCI.
 
 **Unsupported Domains**
 
-+--------------+----------------+-----------+-----------+
-| domain       | type           | protocol  | Stream or |
-|              |                |           | Datagram  |
-+==============+================+===========+===========+
-| AF_KCM       | TBD            | TBD       | TBD       |
-+--------------+----------------+-----------+-----------+
+Families that carry nothing a payload could send, or are gone from Linux, and
+which a network node will not be given.
+
++--------------+-----------------------------------------------------------+
+| domain       | why                                                       |
++==============+===========================================================+
+| AF_IPX       | removed from Linux in 4.18                                |
++--------------+-----------------------------------------------------------+
+| AF_DECnet    | removed from Linux in 6.1                                 |
++--------------+-----------------------------------------------------------+
+| AF_KEY       | ``SOCK_RAW`` with ``PF_KEY_V2``: IPsec key management, not|
+|              | a channel for data                                        |
++--------------+-----------------------------------------------------------+
+| AF_PPPOX     | sets up a PPP channel -- PPPoE, L2TP -- whose data then   |
+|              | moves through ``/dev/ppp``, not the socket                |
++--------------+-----------------------------------------------------------+
+| AF_IB        | an address family for the RDMA connection manager; Linux  |
+|              | makes no socket of it                                     |
++--------------+-----------------------------------------------------------+
+| AF_MPLS      | configured over netlink; Linux makes no socket of it      |
++--------------+-----------------------------------------------------------+
+| AF_ALG       | ``SOCK_SEQPACKET``: the kernel's cryptography, not a      |
+|              | channel for data                                          |
++--------------+-----------------------------------------------------------+
+| AF_XDP       | ``SOCK_RAW``: packets pass through rings shared with the  |
+|              | kernel, not through reads and writes                      |
++--------------+-----------------------------------------------------------+
+| AF_KCM       | ``SOCK_DGRAM`` or ``SOCK_SEQPACKET``: messages framed by  |
+|              | a BPF program over TCP connections it is handed, which is |
+|              | framing this software does itself                         |
++--------------+-----------------------------------------------------------+
 
 
 Protocol support may require configuring the Linux kernel

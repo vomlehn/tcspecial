@@ -11,7 +11,7 @@ use beacon_example::WatchWindow;
 
 /// What a beacon says, at the length tcspecial says it: the build, the
 /// configuration's version and a sixteen-byte digest.
-const A_BEACON: &str = "tcspecial v0.1.0, config v2.0.0, md5 e2dd2b9ec2b0b8b0a8607777639ceac1";
+const A_BEACON: &str = "tcspecial v0.1.0 md5 e2dd2b9ec2b0b8b0a8607777639ceac1";
 
 /// The window's contents reach to within one border of its right and bottom
 /// edges: no less, which would cut them off, and no more, which would be a

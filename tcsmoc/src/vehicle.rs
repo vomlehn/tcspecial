@@ -207,7 +207,7 @@ fn command_links_of(graph: &Graph) -> Result<Option<(String, String, Commanded)>
 
 /// Say what the vehicle answered a CONNECT with, and whether it agrees.
 ///
-/// The three facts said the way a beacon says them, so the two can be read
+/// What it read, said the way a beacon says it, so the two can be read
 /// against each other, and the verdict kept: a node id means nothing until
 /// the two ends have agreed which configuration they are talking about.
 fn hear_what_the_vehicle_read(
@@ -229,10 +229,10 @@ fn hear_what_the_vehicle_read(
     };
 
     match answer {
-        Ok((theirs, their_config, their_digest)) => {
+        Ok((theirs, their_digest)) => {
             eprintln!(
                 "CONNECT answer: {}",
-                tcslib::beacon::what_it_read(theirs, their_config, their_digest)
+                tcslib::beacon::what_it_read(theirs, their_digest)
             );
             let same = their_digest == digest;
             if let Ok(mut held) = agreed.lock() {
@@ -240,19 +240,18 @@ fn hear_what_the_vehicle_read(
             }
             let said = if !same {
                 format!(
-                    "tcspecial is flying a different configuration: config \
-                     v{their_config}, md5 {their_digest}, not {digest} -- so a node \
+                    "tcspecial is flying a different configuration: md5 \
+                     {their_digest}, not {digest} -- so a node \
                      id would name a node of a graph this window has not read, and \
                      Enable and Disable will not send one"
                 )
             } else if theirs != version {
                 format!(
                     "tcspecial is version {theirs}, this is {version}; it is flying \
-                     the configuration this window read, config v{their_config}, \
-                     md5 {digest}"
+                     the configuration this window read, md5 {digest}"
                 )
             } else {
-                format!("tcspecial agrees: v{version}, config v{their_config}, md5 {digest}")
+                format!("tcspecial agrees: v{version} md5 {digest}")
             };
             if !same || theirs != version {
                 eprintln!("{said}");
@@ -1033,9 +1032,8 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
     let digest = match tcslibgs::config_digest::digest_of_graph(&graph) {
         Ok(digest) => {
             eprintln!(
-                "tcsmoc v{}, config v{}, md5 {digest}",
-                tcslibgs::config_digest::ConfigVersion::of_this_build(),
-                tcslibgs::graph::VERSION
+                "tcsmoc v{} md5 {digest}",
+                tcslibgs::config_digest::ConfigVersion::of_this_build()
             );
             Some(digest)
         }
@@ -1505,7 +1503,6 @@ pub(crate) mod tests {
                     Command::Connect(_) => Telemetry::Connect(ConnectTelemetry::new(
                         seq,
                         ConfigVersion::of_this_build(),
-                        ConfigVersion::of_text("2.0").expect("a version"),
                         // The same digest the window read: a vehicle flying
                         // the configuration this window is showing.
                         ConfigDigest([0x5Au8; 16]),

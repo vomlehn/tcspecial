@@ -67,10 +67,11 @@ use crate::format::ConfigFormat;
 
 /// The version of the configuration language this software reads.
 ///
-/// Said by the software and never by a file: tcspecial announces it in every
-/// beacon and answer to CONNECT, and the digest of a configuration is taken
-/// with it, so two builds reading the language differently are told apart.
-/// A file states nothing about it.
+/// Said by the software and never by a file. It goes nowhere on the link of
+/// its own: the digest of a configuration is taken with it, so two builds
+/// reading the language differently announce different digests, and the
+/// digest is what a beacon and an answer to CONNECT carry. A file states
+/// nothing about it.
 pub const VERSION: &str = "2.0";
 
 /// One file of a configuration, as it is written.

@@ -56,18 +56,12 @@ pub fn run_graph(path: &str) -> Result<(), Vec<String>> {
         eprintln!("  {name}: {what}");
     }
 
-    // What this vehicle is serving: the build, the configuration's version
-    // and its digest. The ground compares the
-    // digest in every beacon with its own, which is how it knows the vehicle
+    // What this vehicle is serving: the build and the configuration's
+    // digest. The ground compares the digest in every beacon with its own, which is how it knows the vehicle
     // is running the configuration it is reading -- the same ports, the same
     // device ids, the same nodes.
     let digest = digest_of_graph(&graph).map_err(|why| vec![format!("{path}: {why}")])?;
-    let config_version =
-        ConfigVersion::of_text(tcslibgs::graph::VERSION).expect("the language's own version reads");
-    eprintln!(
-        "tcspecial v{}, config v{config_version}, md5 {digest}",
-        ConfigVersion::of_this_build()
-    );
+    eprintln!("tcspecial v{} md5 {digest}", ConfigVersion::of_this_build());
 
     let mut system = System::of(&graph, Instant::now())?;
     // What was opened, which the line above already says the shape of: for
@@ -82,7 +76,7 @@ pub fn run_graph(path: &str) -> Result<(), Vec<String>> {
 
     // Beacons, once everything has opened: a vehicle that will not start has
     // nothing to announce. Held until the vehicle stops.
-    let beacon = beacons(&graph, config_version, digest, telemetry_log.clone())
+    let beacon = beacons(&graph, digest, telemetry_log.clone())
         .map_err(|why| vec![format!("{path}: {why}")])?;
 
     // And the ground's commands, on a thread of their own. After the beacons
@@ -92,7 +86,6 @@ pub fn run_graph(path: &str) -> Result<(), Vec<String>> {
     // yet.
     let flying = Flying {
         version: ConfigVersion::of_this_build(),
-        config_version,
         digest,
     };
     let mut commands = command_links(
@@ -192,12 +185,11 @@ fn telemetry_log(graph: &Graph) -> Result<TelemetryLog, String> {
 /// Start sending beacons where the configuration's `tcspecial` section says.
 ///
 /// From `beacon.send` to `beacon.recv`, every `beacon.interval`, carrying
-/// this build's version, the configuration's and the configuration's digest.
+/// this build's version and the configuration's digest.
 /// An interval of nought sends none. Recorded in the telemetry log, which is
 /// the vehicle's own account of what it sent.
 fn beacons(
     graph: &Graph,
-    config_version: ConfigVersion,
     digest: ConfigDigest,
     telemetry_log: TelemetryLog,
 ) -> Result<Option<BeaconSend>, String> {
@@ -213,7 +205,6 @@ fn beacons(
         ci.beacon_recv.clone(),
         telemetry_log,
         ConfigVersion::of_this_build(),
-        config_version,
         digest,
     );
     if sending.is_some() {

@@ -341,11 +341,11 @@ mod tests {
         let shown = Shown::at(
             &schedule.at(Duration::ZERO),
             Some(at),
-            "tcspecial v0.1.0, config v2.0.0, md5 abc",
+            "tcspecial v0.1.0 md5 abc",
         );
         assert_eq!(shown.indicator, palette::well());
         assert_eq!(shown.received, "01:01:01");
-        assert_eq!(shown.message, "tcspecial v0.1.0, config v2.0.0, md5 abc");
+        assert_eq!(shown.message, "tcspecial v0.1.0 md5 abc");
 
         // Before anything has arrived, the time says so rather than being
         // left empty: an empty line next to a label reads as a line the

@@ -198,7 +198,7 @@ impl TcsClient {
         &mut self,
         version: ConfigVersion,
         digest: ConfigDigest,
-    ) -> TcsResult<(ConfigVersion, ConfigVersion, ConfigDigest)> {
+    ) -> TcsResult<(ConfigVersion, ConfigDigest)> {
         let seq = self.next_sequence();
         let command = Command::Connect(ConnectCommand::new(seq, version, digest));
         let timeout = self.timeout;
@@ -215,7 +215,7 @@ impl TcsClient {
         self.last_received = Some(Timestamp::now());
 
         match answer {
-            Telemetry::Connect(tm) => Ok((tm.version, tm.config_version, tm.digest)),
+            Telemetry::Connect(tm) => Ok((tm.version, tm.digest)),
             _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
         }
     }
@@ -450,11 +450,10 @@ mod tests {
         }
     }
 
-    fn an_answer(config_version: ConfigVersion) -> Telemetry {
+    fn an_answer(version: ConfigVersion) -> Telemetry {
         Telemetry::Connect(tcslibgs::ConnectTelemetry::new(
             1,
-            ConfigVersion::of_this_build(),
-            config_version,
+            version,
             ConfigDigest([0x5A; 16]),
         ))
     }
@@ -516,9 +515,9 @@ mod tests {
             ))),
         );
 
-        let (_, config_version, _) = client
+        let (version, _) = client
             .connect(ConfigVersion::of_this_build(), ConfigDigest([0x5A; 16]))
             .expect("the spacecraft's link is the one that answers it");
-        assert_eq!(config_version, a_version(1));
+        assert_eq!(version, a_version(1));
     }
 }

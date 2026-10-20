@@ -47,15 +47,14 @@ pub struct BeaconSend {
     /// sends them holds one: two counters would both say "the third beacon"
     /// about different beacons.
     sent: Arc<AtomicU32>,
-    /// What this build is, what the configuration says it is, and what it
-    /// read, carried in every beacon.
+    /// What this build is and the digest of the configuration it read,
+    /// carried in every beacon.
     ///
     /// Settled once, here, rather than read when a beacon goes out: the
     /// digest is of the file this process read, and a file edited since would
     /// otherwise have the beacons claiming a configuration nothing is
     /// serving.
     version: ConfigVersion,
-    config_version: ConfigVersion,
     digest: ConfigDigest,
 }
 
@@ -66,7 +65,6 @@ impl BeaconSend {
         dest_addr: tcslibgs::HostPort,
         log: TelemetryLog,
         version: ConfigVersion,
-        config_version: ConfigVersion,
         digest: ConfigDigest,
     ) -> Option<BeaconSend> {
         if interval == Duration::from_secs(0) {
@@ -87,7 +85,6 @@ impl BeaconSend {
             from_addr,
             log,
             version,
-            config_version,
             digest,
         };
 
@@ -144,12 +141,7 @@ impl BeaconSend {
         // From one: the first beacon is the first beacon, and nought is what
         // every beacon used to carry.
         let sequence = self.sent.fetch_add(1, Ordering::Relaxed).wrapping_add(1);
-        let beacon = Telemetry::Beacon(BeaconTelemetry::new(
-            sequence,
-            self.version,
-            self.config_version,
-            self.digest,
-        ));
+        let beacon = Telemetry::Beacon(BeaconTelemetry::new(sequence, self.version, self.digest));
         let data = serde_json::to_vec(&beacon)?;
         trace!("send_beacon: sending to {:?}", dest_addr);
         // Recorded before it is sent, as a command response is, so that a
@@ -261,7 +253,6 @@ mod tests {
             },
             log,
             ConfigVersion::of_this_build(),
-            ConfigVersion::of_text("1.0").expect("a version"),
             ConfigDigest([0u8; 16]),
         )
         .expect("a sender");

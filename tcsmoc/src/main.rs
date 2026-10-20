@@ -1033,7 +1033,7 @@ mod tests {
             // have room for it, and not only for the `<none>` the window
             // opens with.
             ui.set_beacon_last_msg(SharedString::from(format!(
-                "tcspecial v0.1.0, config v2.0.0, md5 {}",
+                "tcspecial v0.1.0 md5 {}",
                 "e".repeat(32)
             )));
 
@@ -1464,7 +1464,7 @@ mod tests {
             &tcsui::Shown::at(
                 &tcslib::beacon::Schedule::standard().at(Duration::ZERO),
                 Some(std::time::UNIX_EPOCH + Duration::from_secs(7322)),
-                "version 0.1.0, md5 0123456789abcdef",
+                "tcspecial v0.1.0 md5 0123456789abcdef",
             ),
         );
         let shown = on_screen(&ui);
@@ -1475,7 +1475,7 @@ mod tests {
         assert!(
             shown
                 .iter()
-                .any(|line| line == "version 0.1.0, md5 0123456789abcdef"),
+                .any(|line| line == "tcspecial v0.1.0 md5 0123456789abcdef"),
             "what the beacon said is not on screen: {shown:?}"
         );
     }

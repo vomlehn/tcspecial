@@ -1815,8 +1815,8 @@ both ends read; what follows is what a vehicle made of nodes does with each.
     and a PING says this link reaches it.
 
 ``CONNECT``
-    Answers with this build's version, its configuration version, and the
-    digest of the configuration being flown. Asked as the link comes up, and
+    Answers with this build's version and the digest of the configuration
+    being flown. Asked as the link comes up, and
     what licenses every command that carries a node id: see `How a
     command names a node`_.
 
@@ -4638,10 +4638,6 @@ Beacon
 |                |            |           | the tcspecial build sending it,    |
 |                |            |           | from its ``Cargo.toml``            |
 |                +------------+-----------+------------------------------------+
-|                | config     | 3 bytes   | This build's configuration         |
-|                | version    |           | version, in the same three parts   |
-|                |            |           |                                    |
-|                +------------+-----------+------------------------------------+
 |                | digest     | 16 bytes  | MD5 of the configuration file this |
 |                |            |           | tcspecial read                     |
 +----------------+------------+-----------+------------------------------------+
@@ -4655,20 +4651,22 @@ Requirement
     says the spacecraft is alive, when its clock does not.
 
 Requirement
-    A beacon carries the version, the configuration version and the digest a
-    CONNECT is answered with. A beacon arrives whether or not anything has
+    A beacon carries the version and the digest a CONNECT is answered with. A beacon arrives whether or not anything has
     connected, so a ground station that is only listening
     can see which software is flying and which configuration it is serving
     rather than having to ask first.
 
 Requirement
-    The configuration version is the software's: ``tcslibgs::graph::VERSION``,
-    2.0, announced as 2.0.0.
+    Neither a beacon nor the answer to a CONNECT carries a configuration
+    version. A configuration states none, and the version of the language
+    this software reads, ``tcslibgs::graph::VERSION``, is taken into the
+    digest: two builds that read the language differently announce different
+    digests, which is the difference a version would have told.
 
 Requirement
-    The MOC shows what the last beacon said as one line, each of the three
-    labelled: ``v0.1.0 config v2.0.0 md5:`` and the digest's sixteen
-    bytes in hex with nothing between them. The answer to a ``CONNECT`` is
+    The MOC shows what the last beacon said as one line, each of the two
+    labelled: ``tcspecial v0.1.0 md5`` and the digest's sixteen bytes in
+    hex with nothing between them. The answer to a ``CONNECT`` is
     written the same way; see `What Each End Read`_.
 
 Requirement
@@ -5126,17 +5124,16 @@ What Each End Read
 Requirement
     A link begins with each end saying what it read. The ground sends a
     ``CONNECT`` carrying its software version and a digest of its
-    configuration, and the spacecraft answers with its own, and with its
-    configuration version.
+    configuration, and the spacecraft answers with its own.
 
 Requirement
-    Each version is three bytes -- major, minor and patch, each in binary --
+    The version is three bytes -- major, minor and patch, each in binary --
     and the digest is an MD5.
 
 Requirement
-    The answer is shown as one line, each of the three labelled:
-    ``v0.1.0 config v2.0.0 md5:`` and the digest in hex. The same three
-    facts a beacon carries, written the same way by the same function, because
+    The answer is shown as one line, each of the two labelled:
+    ``tcspecial v0.1.0 md5`` and the digest in hex. The same two facts a
+    beacon carries, written the same way by the same function, because
     the two are read against each other.
 
 Requirement
@@ -5145,25 +5142,24 @@ Requirement
     answers with what it read and logs a disagreement it can see.
 
 Requirement
-    Each end says its own version, its configuration version, and the
-    digest, before it makes the socket the link runs over. A socket that
+    Each end says its own version and the digest before it makes the socket the link runs over. A socket that
     cannot be made, or a far end that is not answering, takes the exchange
     with it -- and that is exactly when those facts are wanted. In tcspecial
     this also puts an address already in use under the configuration it was
     going to serve rather than instead of it.
 
 Requirement
-    The two ends write that line the same way, naming the file each read:
+    The two ends write that line the same way, each naming itself:
 
     .. code-block:: text
 
-       v0.1.0, configuration tests/manual/thermostat.yaml config v2.0.0 md5: 8d908f54a3d72d0704213113b92d958b
+       tcspecial v0.1.0 md5 8d908f54a3d72d0704213113b92d958b
 
     Two ends reading one configuration therefore print the same line twice,
     which is what makes a difference in any part of it worth reading. The
-    MOC's line used to be written differently -- ``Version 0.1.0``, a bare
-    ``md5``, and no configuration version at all -- so the two could only be
-    compared by the one fact they spelled alike.
+    MOC's line used to be written differently -- ``Version 0.1.0`` and a bare
+    ``md5`` -- so the two could only be compared by the one fact they spelled
+    alike.
 
 Nothing else in the protocol makes the two ends prove they are talking about
 the same configuration, and when they were not, the only sign was a command

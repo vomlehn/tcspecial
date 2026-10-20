@@ -453,29 +453,32 @@ impl Described {
     pub fn asked(&self) -> Vec<(String, bool)> {
         self.fields()
             .into_iter()
-            .map(|(name, required, _)| (name, required))
+            .map(|field| (field.name, field.required))
             .collect()
     }
 
-    /// The same, with what each one takes.
+    /// The same, with what each one takes and what is said about it.
     ///
     /// For the window, which offers a control per kind: see [`KINDS`]. An
     /// attribute the description sets rather than asks for is text, like any
     /// other it says nothing about -- it is not offered at all, the editor
     /// having filled it in.
-    pub fn fields(&self) -> Vec<(String, bool, String)> {
-        let mut asked: Vec<(String, bool, String)> = self
+    pub fn fields(&self) -> Vec<Attribute> {
+        let mut asked: Vec<Attribute> = self
             .sets
             .keys()
-            .map(|name| (name.clone(), true, TEXT.to_string()))
+            .map(|name| Attribute {
+                name: name.clone(),
+                required: true,
+                // Nothing is said about one: the description fills it in,
+                // and what it means is what the node as a whole is about.
+                about: String::new(),
+                kind: TEXT.to_string(),
+            })
             .collect();
         for attribute in &self.attributes {
-            if !asked.iter().any(|(named, _, _)| named == &attribute.name) {
-                asked.push((
-                    attribute.name.clone(),
-                    attribute.required,
-                    attribute.kind.clone(),
-                ));
+            if !asked.iter().any(|named| named.name == attribute.name) {
+                asked.push(attribute.clone());
             }
         }
         asked

@@ -225,6 +225,11 @@ export struct PaletteEntry {
 export struct FieldView {
     name: string,
     value: string,
+    // What the description tree says about this attribute: one line, shown at
+    // the foot of a node's window while its field has the focus. Empty where
+    // nothing describes it -- a section parameter, a simulator setting, an
+    // attribute this build does not know.
+    about: string,
     // Whether the configuration must state this one, which the panel says
     // with a mark beside the name.
     //
@@ -2578,10 +2583,23 @@ export component NodeWindow inherits Window {
     in property <string> node-type: "";
     in property <string> comment: "";
     in property <[FieldView]> fields: [];
+    // What the description tree says about this kind of node, shown at the
+    // foot of the window while no field with something said about it has the
+    // focus.
+    in property <string> about: "";
     // What is wrong with what this node says, if anything. The one red text
     // here, as on the canvas.
     in property <string> fault: "";
     in property <string> trouble: "";
+
+    // Which field has the focus, and what is said about it. The name as well
+    // as the sentence, so that a field losing the focus clears only what it
+    // put there: when the focus moves from one field to the next, the order
+    // the two hear of it in is not something to depend on.
+    property <string> focused: "";
+    property <string> focused-about: "";
+    out property <string> about-shown:
+        root.focused-about != "" ? root.focused-about : root.about;
 
     callback attribute-set(string, string);
     callback sim-attribute-set(string, string);
@@ -2670,6 +2688,15 @@ export component NodeWindow inherits Window {
                         enabled: !Session.read-only;
                         text: f.value == "true" ? "true" : "false";
                         checked: f.value == "true";
+                        changed has-focus => {
+                            if (self.has-focus) {
+                                root.focused = f.name;
+                                root.focused-about = f.about;
+                            } else if (root.focused == f.name) {
+                                root.focused = "";
+                                root.focused-about = "";
+                            }
+                        }
                         toggled => {
                             if (f.simulated) {
                                 root.sim-attribute-set(f.name, self.checked ? "true" : "false");
@@ -2682,6 +2709,15 @@ export component NodeWindow inherits Window {
                         read-only: Session.read-only;
                         text: f.value;
                         font-size: Type.body;
+                        changed has-focus => {
+                            if (self.has-focus) {
+                                root.focused = f.name;
+                                root.focused-about = f.about;
+                            } else if (root.focused == f.name) {
+                                root.focused = "";
+                                root.focused-about = "";
+                            }
+                        }
                         edited => {
                             // Two files, two edits: a node's attribute goes to
                             // the configuration and a simulated payload's
@@ -2726,6 +2762,25 @@ export component NodeWindow inherits Window {
             font-size: Fonts.window;
             wrap: word-wrap;
             edited => { root.comment-set(self.text); }
+        }
+
+        // What the description tree says: about the field being typed into,
+        // or about the node while no field is. At the foot of the window, and
+        // not beside each field, so that the rows stay a row each however
+        // long a sentence is; read-only, because it is the tree's to say and
+        // not this node's.
+        Text {
+            text: "about";
+            font-size: Type.small;
+            color: #6b7280;
+            height: 14px;
+        }
+        TextEdit {
+            read-only: true;
+            height: 48px;
+            text: root.about-shown;
+            font-size: Type.small;
+            wrap: word-wrap;
         }
 
         if root.trouble != "": Text {

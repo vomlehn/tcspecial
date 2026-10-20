@@ -55,25 +55,59 @@ pub trait Triggered {
 /// something, and nought bytes asks nothing. The error is the sentence shown
 /// to whoever wrote the file, so it says which notation was being read.
 pub fn trigger_bytes(written: &str) -> Result<Vec<u8>, String> {
+    bytes_of(&TRIGGER, written)
+}
+
+/// Which attribute a run of bytes is written in, for what is said about it.
+///
+/// A trigger and an init are written the same way -- see [`bytes_of`] -- and
+/// a mistake in either is told in the words of the one it was made in.
+pub struct Named {
+    /// The attribute: `trigger`.
+    pub word: &'static str,
+    /// And with its article: `a trigger`.
+    pub a: &'static str,
+    /// Why nought bytes is refused.
+    pub empty: &'static str,
+}
+
+/// A trigger: the bytes that make a payload answer.
+pub const TRIGGER: Named = Named {
+    word: "trigger",
+    a: "a trigger",
+    empty: "a payload that answers requests has to be asked something",
+};
+
+/// An init: the bytes a payload is set to as the vehicle opens it.
+pub const INIT: Named = Named {
+    word: "init",
+    a: "an init",
+    empty: "an init sets a payload to something, and one that sets nothing is \
+            left out",
+};
+
+/// The bytes a file wrote in the attribute `named`, or what is wrong with
+/// them: see [`trigger_bytes`] for the two notations.
+pub fn bytes_of(named: &Named, written: &str) -> Result<Vec<u8>, String> {
+    let Named { word, a, empty } = named;
     let written = written.trim();
 
     let bytes = match written.strip_prefix('"') {
         Some(rest) => {
             let text = rest.strip_suffix('"').ok_or_else(|| {
                 format!(
-                    "the trigger {written:?} opens with a quote and does not close: a \
-                     trigger that is text is a C string, quotes and all"
+                    "the {word} {written:?} opens with a quote and does not close: \
+                     {a} that is text is a C string, quotes and all"
                 )
             })?;
-            c_string_bytes(text)?
+            c_string_bytes(named, text)?
         }
-        None => one_byte(written)?,
+        None => one_byte(named, written)?,
     };
 
     if bytes.is_empty() {
         return Err(format!(
-            "the trigger {written:?} is no bytes at all: a payload that answers \
-             requests has to be asked something"
+            "the {word} {written:?} is no bytes at all: {empty}"
         ));
     }
 
@@ -92,27 +126,28 @@ pub fn trigger_bytes(written: &str) -> Result<Vec<u8>, String> {
 /// hexadecimal and nothing else, so a prefix saying so would be saying it for
 /// a notation that has no alternative -- and a file that writes one is told
 /// what to write instead rather than having `0x55` read as something.
-fn one_byte(written: &str) -> Result<Vec<u8>, String> {
+fn one_byte(named: &Named, written: &str) -> Result<Vec<u8>, String> {
+    let Named { word, a, empty } = named;
     // The spellings this replaced, each caught by name: a file written for an
     // older rule is told what to say rather than being refused for a
     // character it was right to write.
     if written.starts_with("0x") || written.starts_with("0X") {
         return Err(format!(
-            "the trigger {written:?} is written after 0x, and a trigger is no longer: \
+            "the {word} {written:?} is written after 0x, and {a} is no longer: \
              a byte stands on its own, as in 55"
         ));
     }
     if written.split_whitespace().count() > 1 {
         return Err(format!(
-            "the trigger {written:?} is more than one value: a trigger is one byte in \
-             hexadecimal, as in 55, or text as a C string -- a trigger of several \
+            "the {word} {written:?} is more than one value: {a} is one byte in \
+             hexadecimal, as in 55, or text as a C string -- {a} of several \
              bytes is written \"\\x55\\xAA\""
         ));
     }
 
     if let Some(bad) = written.chars().find(|c| !c.is_ascii_hexdigit()) {
         return Err(format!(
-            "{bad:?} in {written:?} is not a hexadecimal digit: a trigger is one byte \
+            "{bad:?} in {written:?} is not a hexadecimal digit: {a} is one byte \
              in 0-9, a-f or A-F -- or a C string in quotes"
         ));
     }
@@ -122,13 +157,9 @@ fn one_byte(written: &str) -> Result<Vec<u8>, String> {
         1 | 2 => Ok(vec![
             u8::from_str_radix(written, 16).expect("checked digits")
         ]),
-        0 => Err(
-            "a trigger names a byte: a payload that answers requests has to be asked \
-             something"
-                .to_string(),
-        ),
+        0 => Err(format!("{a} names a byte: {empty}")),
         length => Err(format!(
-            "{written:?} is {length} digits, which is more than one byte: a trigger of \
+            "{written:?} is {length} digits, which is more than one byte: {a} of \
              several bytes is text, as in \"\\x55\\xAA\""
         )),
     }
@@ -144,7 +175,8 @@ fn one_byte(written: &str) -> Result<Vec<u8>, String> {
 ///
 /// What the characters themselves become is their UTF-8, so a trigger of
 /// plain text is the bytes that text is.
-fn c_string_bytes(written: &str) -> Result<Vec<u8>, String> {
+fn c_string_bytes(named: &Named, written: &str) -> Result<Vec<u8>, String> {
+    let Named { a, .. } = named;
     let mut bytes = Vec::with_capacity(written.len());
     let mut chars = written.chars();
 
@@ -156,9 +188,10 @@ fn c_string_bytes(written: &str) -> Result<Vec<u8>, String> {
         }
 
         let escaped = chars.next().ok_or_else(|| {
-            "a trigger ends in a backslash, which escapes nothing: write \\\\ for a \
-             backslash"
-                .to_string()
+            format!(
+                "{a} ends in a backslash, which escapes nothing: write \\\\ for a \
+                 backslash"
+            )
         })?;
 
         match escaped {
@@ -192,7 +225,7 @@ fn c_string_bytes(written: &str) -> Result<Vec<u8>, String> {
             }
             other => {
                 return Err(format!(
-                    "\\{other} is not an escape: a trigger takes C's own -- \\\\ \\\" \
+                    "\\{other} is not an escape: {a} takes C's own -- \\\\ \\\" \
                      \\' \\n \\r \\t \\0 \\a \\b \\f \\v and \\xNN -- and a list of \
                      byte values is written without quotes instead"
                 ))

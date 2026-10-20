@@ -59,6 +59,15 @@ pub struct Reach {
     /// none, a pass reads what the last ask produced and asks again, so the
     /// reading is one interval old and nothing waits.
     pub read_delay: Option<std::time::Duration>,
+    /// What to write to this node when the vehicle opens it, where anything.
+    ///
+    /// For a payload whose state matters before the vehicle's first word to
+    /// it: a heater that must start off rather than in whatever state the
+    /// hardware came up in, a sensor with a register to set before it reads
+    /// sensibly. Written as the node is opened -- as the vehicle starts, and
+    /// again whenever the ground starts it after stopping it -- and a write
+    /// that fails is a node that did not open.
+    pub init: Option<Vec<u8>>,
     /// Where a ground link's data goes: the `moc` node's `ground_base`.
     ///
     /// For a `moc` node, and only for one. What each node linked into the
@@ -94,6 +103,7 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
     let mut stream_stated = false;
     let mut read_size = None;
     let mut trigger = None;
+    let mut init = None;
     let mut read_delay = None;
 
     for (attribute, value) in &node.attributes {
@@ -159,6 +169,21 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
                 trigger = Some(
                     crate::trigger::trigger_bytes(value.as_str())
                         .map_err(|why| format!("\"{what}\": trigger: {why}"))?,
+                );
+            }
+            // Written the way a trigger is, because it is bytes written the
+            // way a trigger is: only once, as the node opens.
+            "init" if node.node_type == "moc" => {
+                return Err(format!(
+                    "\"{what}\" is a link to the ground, and init is what a payload \
+                     is set to as the vehicle opens it: a ground link has no state \
+                     to start in"
+                ))
+            }
+            "init" => {
+                init = Some(
+                    crate::trigger::bytes_of(&crate::trigger::INIT, value.as_str())
+                        .map_err(|why| format!("\"{what}\": {why}"))?,
                 );
             }
             // Where one read of a stream ends. Three attributes rather than a
@@ -342,6 +367,11 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
             return Err(format!("\"{what}\" states a trigger, and {why}"));
         }
     }
+    if init.is_some() {
+        if let Some(why) = cannot_be_written(&endpoint) {
+            return Err(format!("\"{what}\" states an init, and {why}"));
+        }
+    }
     if let Some(size) = read_size {
         fits_one_read(what, size, &endpoint)?;
     }
@@ -352,6 +382,7 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
         endpoint,
         read_size,
         trigger,
+        init,
         read_delay,
         ground,
         stream: framing,
@@ -383,6 +414,27 @@ fn cannot_be_asked(endpoint: &EndpointConfig) -> Option<&'static str> {
             "a sensor's sample buffer is read and not written: what an IIO device \
              is configured with is in sysfs, written by whoever brought the sensor \
              up",
+        ),
+        _ => None,
+    }
+}
+
+/// Why nothing can be written to this interface as it opens, if nothing can.
+///
+/// The two a trigger cannot be written to, less the one a setting can: a set
+/// of discrete lines that is driven is the very thing an init is for -- a
+/// heater that starts off -- where one that is watched is read and not
+/// written, and a sensor's sample buffer is never written at all.
+fn cannot_be_written(endpoint: &EndpointConfig) -> Option<&'static str> {
+    match endpoint {
+        EndpointConfig::Gpio(gpio) if !gpio.direction.is_output() => Some(
+            "these lines are watched and not driven: an init is written, and \
+             writing to lines that are watched would be driving them. Say \
+             direction: output if they are driven",
+        ),
+        EndpointConfig::Iio(_) => Some(
+            "a sensor's sample buffer is read and not written: what an IIO device \
+             starts with is in sysfs, written by whoever brought the sensor up",
         ),
         _ => None,
     }
@@ -1161,6 +1213,74 @@ mod tests {
             ],
         ))
         .expect("a register is read by asking for it");
+    }
+
+    /// An init is bytes written the way a trigger is, as the node opens, and
+    /// is refused where nothing can be written: lines that are watched, a
+    /// sensor's sample buffer, and a link to the ground, which has no state to
+    /// start in. Driven lines take one: a heater that starts off is what it is
+    /// for.
+    #[test]
+    fn an_init_is_taken_where_the_payload_can_be_written() {
+        let heaters = reach_of(&node(
+            "heaters",
+            "gpio",
+            &[
+                ("path", "/dev/gpiochip0"),
+                ("lines", "4,5"),
+                ("direction", "output"),
+                ("init", "\"0\""),
+            ],
+        ))
+        .expect("driven lines take an init");
+        assert_eq!(heaters.init.as_deref(), Some(&b"0"[..]));
+
+        let sensor = reach_of(&node(
+            "temp_1",
+            "i2c",
+            &[
+                ("path", "/dev/i2c-1"),
+                ("address", "0x48"),
+                ("init", "\"\\x01\\x60\""),
+            ],
+        ))
+        .expect("a register set before the part reads sensibly");
+        assert_eq!(sensor.init.as_deref(), Some(&[0x01, 0x60][..]));
+
+        let said = reach_of(&node(
+            "switches",
+            "gpio",
+            &[("path", "/dev/gpiochip0"), ("lines", "0"), ("init", "01")],
+        ))
+        .expect_err("watched lines are not written");
+        assert!(
+            said.contains("switches") && said.contains("direction: output"),
+            "{said}"
+        );
+
+        let said = reach_of(&node(
+            "accel",
+            "iio",
+            &[("path", "/dev/iio:device0"), ("init", "01")],
+        ))
+        .expect_err("a sample buffer is not written");
+        assert!(said.contains("accel") && said.contains("sysfs"), "{said}");
+
+        let said = reach_of(&node(
+            "link",
+            "moc",
+            &[("address", "10.0.0.1"), ("port", "5000"), ("init", "01")],
+        ))
+        .expect_err("a ground link has no state to start in");
+        assert!(said.contains("link") && said.contains("init"), "{said}");
+
+        let said = reach_of(&node(
+            "temp_1",
+            "i2c",
+            &[("path", "/dev/i2c-1"), ("address", "0x48"), ("init", "zz")],
+        ))
+        .expect_err("bytes that are not bytes");
+        assert!(said.contains("init") && !said.contains("trigger"), "{said}");
     }
 
     /// A read larger than the interface carries at once is refused.

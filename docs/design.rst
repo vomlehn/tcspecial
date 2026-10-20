@@ -1882,6 +1882,47 @@ Requirement
     simulator's stand-in binds it, as the vehicle's end used to, and the
     dead-socket rule applies to it like any other path this software binds.
 
+What a payload starts in
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+A payload the vehicle drives is in whatever state its hardware came up in
+until the vehicle first decides something about it, and that may be a while:
+a thermostat decides when its group has been read, and a heater that came up
+on warms the cabin until then. A payload's ``init`` says what it starts in
+instead.
+
+Requirement
+    ``init`` is bytes, written in the notation a ``trigger`` is -- one byte
+    in hexadecimal, or text as a C string -- and read by the same code, which
+    says what is wrong with one in the words of the attribute it is in.
+
+Requirement
+    The init is written as the node is opened, before anything else is
+    written to it or read from it: as the vehicle starts, and again whenever
+    the ground starts the node after stopping it, opening being the same work
+    by the same function both times.
+
+Requirement
+    A write of the init that fails is a node that did not open. The vehicle
+    does not start, or the ``START_NODE`` is answered with the failure, and
+    either way the message names the node and the init. A payload whose
+    starting state nobody knows is what ``init`` exists to prevent, so it is
+    not flown without one.
+
+Requirement
+    ``init`` is refused, where the configuration is read, wherever nothing
+    can be written as the node opens: a set of discrete lines that is watched
+    rather than driven, a sensor's sample buffer, a link to the ground, and a
+    ``udp`` or ``unix_dgram`` payload that is read. The last is the payload
+    that speaks first -- the vehicle learns where it is from what arrives --
+    and as the node opens nothing has, so the write would fail every time. A
+    datagram payload that is only driven is told where it is, and takes one.
+
+Requirement
+    It is not only for what is driven. A part that must have a register set
+    before it reads sensibly states that write as its init, and is read as
+    any other.
+
 Holding a device at a decision
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

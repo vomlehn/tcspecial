@@ -907,6 +907,7 @@ impl NodeType {
                 ("pec", false),
                 ("retries", false),
                 ("timeout", false),
+                ("init", false),
             ],
             NodeType::Spi => &[
                 ("path", true),
@@ -921,6 +922,7 @@ impl NodeType {
                 ("bits_per_word", false),
                 ("bit_order", false),
                 ("cs_active", false),
+                ("init", false),
             ],
             NodeType::Serial => &[
                 ("path", true),
@@ -933,6 +935,7 @@ impl NodeType {
                 ("trigger_interval", false),
                 ("read_delay", false),
                 ("poll_interval", false),
+                ("init", false),
             ],
             // An interface, not a path: see tcslibgs::node::payload::hdlc. The
             // standard and the clock are required because a line carries no
@@ -952,6 +955,7 @@ impl NodeType {
                 ("trigger_interval", false),
                 ("read_delay", false),
                 ("poll_interval", false),
+                ("init", false),
             ],
             NodeType::Can => &[
                 ("interface", true),
@@ -963,6 +967,7 @@ impl NodeType {
                 ("trigger_interval", false),
                 ("read_delay", false),
                 ("poll_interval", false),
+                ("init", false),
             ],
             NodeType::Iio => &[
                 ("path", true),
@@ -980,6 +985,7 @@ impl NodeType {
                 ("trigger_interval", false),
                 ("read_delay", false),
                 ("poll_interval", false),
+                ("init", false),
             ],
             NodeType::Network => &[
                 ("protocol", true),
@@ -993,6 +999,7 @@ impl NodeType {
                 ("trigger_interval", false),
                 ("read_delay", false),
                 ("poll_interval", false),
+                ("init", false),
             ],
             NodeType::DeviceFile => &[
                 ("path", true),
@@ -1001,6 +1008,7 @@ impl NodeType {
                 ("trigger_interval", false),
                 ("read_delay", false),
                 ("poll_interval", false),
+                ("init", false),
             ],
             // A set of discrete lines is neither asked nor polled: it is
             // watched, by its edges or by a report of what it is, which is
@@ -1016,6 +1024,7 @@ impl NodeType {
                 ("debounce", false),
                 ("group", false),
                 ("state_interval", false),
+                ("init", false),
             ],
             // Every term any computation takes, which is what this list is
             // for: the function itself is required of all of them, and each of

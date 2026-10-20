@@ -528,6 +528,57 @@ refused: a payload that answers requests has to be asked something. Writing
 the escapes yourself is also how an XML configuration states a trigger that a
 YAML one states with the format's own escapes.
 
+What a payload starts in
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: text
+
+   init           what to write to the payload as the vehicle opens it, in
+                  the notation a trigger is written in. Optional
+
+A payload the vehicle drives is in whatever state its hardware came up in
+until the vehicle first decides something about it, which may be a while: a
+thermostat decides when its group has been read, and a heater circuit that
+came up on is warming the cabin until then. ``init`` is what it is set to
+instead, written as the node is opened -- as the vehicle starts, and again
+whenever the ground starts the node after stopping it:
+
+.. code-block:: yaml
+
+   - name: heaters_1
+     type: gpio
+     path: /dev/gpiochip0
+     lines: "4"
+     direction: output
+     init: '"0"'
+
+It is not only for what is driven. A sensor whose register has to be set
+before it reads sensibly states that register's write here, and is then read
+as any other:
+
+.. code-block:: yaml
+
+   - name: temp_1
+     type: i2c
+     path: /dev/i2c-1
+     address: "0x48"
+     init: '"\x01\x60"'
+
+A write that fails is a node that did not open: the vehicle does not start,
+or a ``START_NODE`` is answered with the failure, saying which node and that
+the init would not go. A payload whose starting state nobody knows is the
+thing ``init`` exists to prevent, so it is not flown without one.
+
+``init`` is refused where nothing can be written as the node opens: lines that
+are watched rather than driven, a sensor's sample buffer (``iio``), a link to
+the ground, and a ``udp`` or ``unix_dgram`` payload that is read. That last is
+the payload that speaks first: the vehicle learns where it is from what
+arrives, and as the node opens nothing has.
+
+tcssim takes an init as something received. A stand-in that is asked answers
+it as it would any request, which a real part would not: the vehicle then
+reads one reading more than it asked for, on the pass after the node opened.
+
 How a Payload's Data Is Read
 ----------------------------
 

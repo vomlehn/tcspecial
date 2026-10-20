@@ -355,6 +355,15 @@
               "null"
             ]
           },
+          "init": {
+            "description": "What to write to this payload as the vehicle opens it -- at startup, and whenever the ground starts it again -- written as a trigger is: one byte in hexadecimal (00) or text as a C string ('\"\\x01\\x60\"'). A write that fails stops the node from starting. Not on lines that are watched, a sensor's sample buffer, or a datagram payload that speaks first.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
           "trigger": {
             "description": "What to write to make this payload answer, as one byte in hexadecimal (55) or text as a C string ('\"READ\\r\"'). A payload that states one is asked and is read at the interval of the payload group it is in; one that states none is only read, and a line delivering into it is refused. A payload says what asks it or that it sends on its own, never both, and there is no mode attribute: which it is follows from whether it has a trigger.",
             "type": [
@@ -937,6 +946,15 @@
           },
           "read_delay": {
             "description": "How long to wait between sending the trigger and reading the answer, as a length of time: what the part's interface document says it takes to answer. With one, a pass asks, waits and reads the answer to the question it just asked; with none, a pass reads what the last ask produced and asks again, so the reading is one interval old. Only beside a `trigger`.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "init": {
+            "description": "What to write to this payload as the vehicle opens it -- at startup, and whenever the ground starts it again -- written as a trigger is: one byte in hexadecimal (00) or text as a C string ('\"\\x01\\x60\"'). A write that fails stops the node from starting. Not on lines that are watched, a sensor's sample buffer, or a datagram payload that speaks first.",
             "type": [
               "string",
               "number",
@@ -1546,6 +1564,15 @@
           },
           "read_delay": {
             "description": "How long to wait between sending the trigger and reading the answer, as a length of time: what the part's interface document says it takes to answer. With one, a pass asks, waits and reads the answer to the question it just asked; with none, a pass reads what the last ask produced and asks again, so the reading is one interval old. Only beside a `trigger`.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "init": {
+            "description": "What to write to this payload as the vehicle opens it -- at startup, and whenever the ground starts it again -- written as a trigger is: one byte in hexadecimal (00) or text as a C string ('\"\\x01\\x60\"'). A write that fails stops the node from starting. Not on lines that are watched, a sensor's sample buffer, or a datagram payload that speaks first.",
             "type": [
               "string",
               "number",

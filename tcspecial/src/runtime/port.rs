@@ -300,6 +300,18 @@ impl EndpointPort {
         }
         port = port.abandoned_for(abandon.clone());
 
+        // What the payload starts in, written before anything else is: a
+        // heater the vehicle has not yet decided about is off rather than in
+        // whatever state the hardware came up in. A write that fails is a
+        // node that did not open -- at startup the vehicle is refused, and on
+        // a START_NODE the ground is told why -- because a payload whose
+        // starting state nobody knows is the thing an init exists to prevent.
+        if let Some(init) = reach.init {
+            port.write_all(&init, "init").map_err(|why| {
+                format!("{why}; the node is not started without what init says to set it to")
+            })?;
+        }
+
         Ok(port)
     }
 
@@ -1685,6 +1697,76 @@ mod tests {
         let got = port.take(&mut [0u8; 1]).expect("a reading");
         assert_eq!(got.bytes, 1);
         assert!(script.lock().expect("the script").to_read.is_empty());
+    }
+
+    /// A payload is written its init as it opens, before anything else is,
+    /// and one the init cannot be written to does not open.
+    ///
+    /// A device file, driven: the heater the vehicle has not decided about
+    /// yet, which init says starts off. `/dev/full` is a device every write to
+    /// fails, which is the payload that would come up in a state nobody knows.
+    #[test]
+    fn a_payload_is_written_its_init_as_it_opens() {
+        use tcslibgs::graph::{Destinations, Link};
+
+        let heater = |path: &str| Node {
+            name: "heater".to_string(),
+            node_type: "device-file".to_string(),
+            group: None,
+            attributes: [("path", path), ("init", "\"0\"")]
+                .into_iter()
+                .map(|(a, v)| (a.to_string(), tcslibgs::Scalar::of(v)))
+                .collect(),
+        };
+        let routes = |heater: &Node| {
+            Routes::of(&Graph {
+                description: None,
+                tcspecial: None,
+                groups: Vec::new(),
+                nodes: vec![
+                    heater.clone(),
+                    Node {
+                        name: "decide".to_string(),
+                        node_type: "compute".to_string(),
+                        group: None,
+                        attributes: Default::default(),
+                    },
+                ],
+                links: vec![Link {
+                    from: "decide".to_string(),
+                    to: Destinations::of(vec!["heater".to_string()]),
+                    comment: None,
+                }],
+                commands: Vec::new(),
+                files: Vec::new(),
+                homes: Default::default(),
+                placed: Default::default(),
+                set_aside: Default::default(),
+            })
+        };
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("heater");
+        std::fs::write(&path, b"").expect("the device");
+        let node = heater(path.to_str().expect("a path"));
+        let port = EndpointPort::open(&node, &routes(&node), &Abandon::nothing())
+            .expect("the heater opens");
+        drop(port);
+        assert_eq!(
+            std::fs::read(&path).expect("what was written"),
+            b"0",
+            "the heater should have been set to what init says as it opened"
+        );
+
+        let node = heater("/dev/full");
+        let said = match EndpointPort::open(&node, &routes(&node), &Abandon::nothing()) {
+            Err(why) => why,
+            Ok(_) => panic!("a payload its init could not be written to was opened"),
+        };
+        assert!(
+            said.contains("heater") && said.contains("init"),
+            "the complaint should name the node and the init: {said}"
+        );
     }
 
     /// A node of the shipped example is opened from its configuration.

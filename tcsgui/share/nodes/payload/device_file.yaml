@@ -50,3 +50,12 @@ attributes:
       nothing asks: 1 s, 500 ms. A floor rather than a rate -- nothing says
       how soon there will be anything to read -- said by a payload with no
       trigger that is in no group, and never beside a trigger.
+  - name: init
+    required: false
+    kind: bytes
+    about: >
+      What to write to it as the vehicle opens it -- at startup, and whenever
+      the ground starts it again -- written as a trigger is: hex for one
+      byte, a C string for several. A heater that must start off, a register
+      to set before the part reads sensibly. A write that fails stops the
+      node from starting.

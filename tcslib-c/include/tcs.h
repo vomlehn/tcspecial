@@ -193,7 +193,88 @@ int tcs_client_stop_node(tcs_client *client, uint32_t node, tcs_status *status);
  * running. */
 int tcs_client_query_node(tcs_client *client, uint32_t node, tcs_status *status, int *enabled);
 
+/* Arm a restart with key, which the RESTART that follows must carry. */
+int tcs_client_restart_arm(tcs_client *client, uint64_t key, tcs_status *status);
+
+/* Restart the vehicle, which the last RESTART_ARM must have armed with the
+ * same key: the process restarts, and the beacons start again at #1. */
+int tcs_client_restart(tcs_client *client, uint64_t key, tcs_status *status);
+
+/* Change how often the vehicle beacons, in microseconds. A station's beacon
+ * watch goes on aging beacons against the configuration's interval: see the
+ * README's known limits. */
+int tcs_client_configure(tcs_client *client, uint64_t beacon_interval_us, tcs_status *status);
+
+/* Set attribute of the node whose id is node to the length bytes at value,
+ * which the configuration must let the ground set. */
+int tcs_client_set_node(tcs_client *client, uint32_t node, const char *attribute,
+                        const uint8_t *value, size_t length, tcs_status *status);
+
+/* How many bytes of a transfer a sample holds: the head of it. */
+#define TCS_SAMPLE_BYTES 8
+
+/* The last datum a node moved one way. */
+typedef struct tcs_sample {
+    int moved;          /* whether one has moved at all */
+    int64_t at_micros;  /* when, in microseconds since 1970; 0 where none has */
+    uint32_t total;     /* bytes in the whole transfer, */
+    uint8_t length;     /* of which bytes holds the first length */
+    uint8_t bytes[TCS_SAMPLE_BYTES];
+} tcs_sample;
+
+/* The last datum the node whose id is node took, and the last it gave. */
+int tcs_client_query_node_sample(tcs_client *client, uint32_t node, tcs_status *status,
+                                 tcs_sample *taken, tcs_sample *given);
+
 void tcs_client_close(tcs_client *client);
+
+/* ---- Pinging a ping node --------------------------------------------------- */
+
+/* A ping goes up to a moc node, which hands it to the vehicle's ping node;
+ * the answer, with the vehicle's time on the end, comes down as that ping
+ * node's data from the same moc node, which a station takes with
+ * tcs_moc_receive and hands back here. */
+typedef struct tcs_pinger tcs_pinger;
+
+/* What there is to know of the pings, at one moment. Times are nanoseconds
+ * since 1970; the three lengths of time are nanoseconds, and the two one-way
+ * ones are each read across the ground's clock and the vehicle's, so either
+ * may be negative -- their sum is the round trip. */
+typedef struct tcs_exchange {
+    int sent;              /* whether a ping has been sent */
+    int64_t sent_at;       /* when the last went, by the ground's clock */
+    int answered;          /* whether the last ping's own answer has arrived */
+    int64_t received_at;   /* when it arrived, by the ground's clock */
+    int64_t answered_at;   /* when the vehicle had the ping, by its clock */
+    int64_t round_trip;    /* ground sent to ground received */
+    int64_t up;            /* ground sent to vehicle had */
+    int64_t down;          /* vehicle had to ground received */
+} tcs_exchange;
+
+/* Ping the first ping node the configuration lets the ground reach both
+ * ways, through its moc node. */
+tcs_pinger *tcs_pinger_open(const tcs_configuration *configuration);
+
+/* The ping node's name, which a datum from tcs_moc_receive is an answer
+ * from; and the moc node's, which is the one to receive it from. */
+const char *tcs_pinger_node(const tcs_pinger *pinger);
+const char *tcs_pinger_moc(const tcs_pinger *pinger);
+
+/* Send the next ping, numbered from one. */
+int tcs_pinger_ping(tcs_pinger *pinger);
+
+/* Fold in a datum the ping node sent down, which has just arrived. */
+int tcs_pinger_answered(tcs_pinger *pinger, const uint8_t *data, size_t length);
+
+/* What there is to know now. */
+int tcs_pinger_exchange(const tcs_pinger *pinger, tcs_exchange *exchange);
+
+/* The last ping sent, and the last thing received, as text: "<none>" before
+ * there is one. */
+const char *tcs_pinger_sent(const tcs_pinger *pinger);
+const char *tcs_pinger_received(const tcs_pinger *pinger);
+
+void tcs_pinger_close(tcs_pinger *pinger);
 
 #ifdef __cplusplus
 }

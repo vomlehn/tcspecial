@@ -2663,7 +2663,19 @@ Tcspecial says both as it starts, on the terminal:
 
    5000 ms beacon: 0.0.0.0:5550 to 127.0.0.1:5650
 
-``RUST_LOG`` sets the logging, which the Makefile leaves at ``info``.
+``-q`` or ``--quiet`` leaves that startup summary unsaid -- the file, the
+nodes, the build and digest, the log, the beacon and the command addresses --
+and logs warnings and worse rather than information. It is for a program that
+starts tcspecial to show something else: the examples' ground stations start
+it quiet unless they are given ``-v`` themselves. What stops a start is said
+either way.
+
+.. code-block:: console
+
+   $ tcspecial --quiet examples/ping/ping.xml
+
+``RUST_LOG`` sets the logging, which the Makefile leaves at ``info``; it
+overrides the quieter default as well.
 
 .. code-block:: console
 

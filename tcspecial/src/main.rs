@@ -2,6 +2,10 @@
 //!
 //! Reads the configuration it is given, says what it read, and runs the graph
 //! that configuration describes: see [`tcspecial::runtime::start`].
+//!
+//! `-q` or `--quiet` leaves the startup summary unsaid and logs warnings and
+//! worse rather than information, for a program that starts tcspecial to
+//! show something else. What stops a start is said either way.
 
 use std::env;
 use std::process;
@@ -11,10 +15,21 @@ use tcslibgs::config::{payload_path_from_args, PAYLOAD_CONFIG_PATH_VAR};
 use tcspecial::runtime;
 
 fn main() {
+    // The one flag, taken out before the configuration is read from what is
+    // left, so that it may come before or after the file.
+    let (quiet, args): (Vec<String>, Vec<String>) =
+        env::args().partition(|arg| arg == "-q" || arg == "--quiet");
+    let quiet = !quiet.is_empty();
+    if quiet {
+        runtime::start::be_quiet();
+    }
+
     // Default to info so that the startup messages below, which used to
-    // be printed unconditionally, still appear. RUST_LOG overrides it;
-    // RUST_LOG=trace adds the per-datagram tracing in the main loop.
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    // be printed unconditionally, still appear; warn where quiet. RUST_LOG
+    // overrides either; RUST_LOG=trace adds the per-datagram tracing in the
+    // main loop.
+    let level = if quiet { "warn" } else { "info" };
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(level)).init();
 
     trace!("main: entered");
 
@@ -34,14 +49,15 @@ fn main() {
     // It is the one thing the command line
     // says: where commands are taken and where beacons go are both the
     // configuration file's, so each address is written in one place.
-    let payload_path = match payload_path_from_args(env::args(), Some(PAYLOAD_CONFIG_PATH_VAR)) {
+    let payload_path = match payload_path_from_args(args.into_iter(), Some(PAYLOAD_CONFIG_PATH_VAR))
+    {
         Ok(payload_path) => payload_path,
         Err(e) => {
             error!("{}", e);
             process::exit(1);
         }
     };
-    eprintln!("payload configuration: {}", payload_path);
+    runtime::start::summary(format!("payload configuration: {payload_path}"));
 
     // What tcsverify says about this file, asked before anything else is read
     // from it and said in tcsverify's own words: every problem at once, each

@@ -30,6 +30,32 @@ use crate::telemetry_log::TelemetryLog;
 /// Whether something has asked this process to stop.
 static STOPPING: AtomicBool = AtomicBool::new(false);
 
+/// Whether the startup summary is left unsaid: `-q` or `--quiet`.
+static QUIET: AtomicBool = AtomicBool::new(false);
+
+/// Leave the startup summary unsaid, for the rest of this process.
+///
+/// For `main`, once, before anything starts: a program that starts tcspecial
+/// to show something else -- the examples' ground stations -- has its own
+/// console to keep, and the summary is for somebody watching the vehicle
+/// itself start. What stops a start is said whatever this says: a vehicle
+/// that will not run must say why to whoever started it.
+pub fn be_quiet() {
+    QUIET.store(true, Ordering::Relaxed);
+}
+
+/// Say one line of the startup summary on stderr, unless told to be quiet.
+///
+/// The summary is what somebody watching a vehicle start compares against
+/// the file they think is flying: the shape of the graph, the build and the
+/// digest, the log, the beacon and the command addresses. One place that
+/// says them, so that quiet means all of them.
+pub fn summary(line: impl std::fmt::Display) {
+    if !QUIET.load(Ordering::Relaxed) {
+        eprintln!("{line}");
+    }
+}
+
 /// Read, check and run the configuration in `path`, until asked to stop.
 ///
 /// Every reason it could not start, rather than the first: a file with three
@@ -51,9 +77,9 @@ pub fn run_graph(path: &str) -> Result<(), Vec<String>> {
     // What is about to run, before anything is opened: on stderr as the
     // command addresses are, because it is what somebody watching a vehicle
     // start compares against the file they think is flying.
-    eprintln!("{path}: {}", shape_of(&graph));
+    summary(format!("{path}: {}", shape_of(&graph)));
     for (name, what) in described(&graph) {
-        eprintln!("  {name}: {what}");
+        summary(format!("  {name}: {what}"));
     }
 
     // What this vehicle is serving: the build and the configuration's
@@ -61,7 +87,10 @@ pub fn run_graph(path: &str) -> Result<(), Vec<String>> {
     // is running the configuration it is reading -- the same ports, the same
     // device ids, the same nodes.
     let digest = digest_of_graph(&graph).map_err(|why| vec![format!("{path}: {why}")])?;
-    eprintln!("tcspecial v{} md5 {digest}", ConfigVersion::of_this_build());
+    summary(format!(
+        "tcspecial v{} md5 {digest}",
+        ConfigVersion::of_this_build()
+    ));
 
     let mut system = System::of(&graph, Instant::now())?;
     // What was opened, which the line above already says the shape of: for
@@ -173,11 +202,11 @@ fn telemetry_log(graph: &Graph) -> Result<TelemetryLog, String> {
             .to_ci_config()?;
     let log = TelemetryLog::open(&ci).map_err(|e| e.to_string())?;
     if log.is_enabled() {
-        eprintln!(
+        summary(format!(
             "telemetry log: {}, {}-byte segments",
             ci.log_dir.as_deref().unwrap_or("?"),
             ci.log_segment_bytes
-        );
+        ));
     }
     Ok(log)
 }
@@ -208,12 +237,12 @@ fn beacons(
         digest,
     );
     if sending.is_some() {
-        eprintln!(
+        summary(format!(
             "{} ms beacon: {} to {}",
             ci.beacon_interval.as_millis(),
             ci.beacon_send,
             ci.beacon_recv
-        );
+        ));
     }
     Ok(sending)
 }
@@ -250,11 +279,11 @@ fn command_links(
     // for port 0, and then the socket is the only statement of which port that
     // is. On stderr as the beacon line is, because it is what somebody
     // standing at a console reads to find out where to send.
-    eprintln!(
+    summary(format!(
         "commands: spacecraft on {}, nodes on {}",
         commands.spacecraft_address(),
         commands.node_address()
-    );
+    ));
     Ok(Some(commands))
 }
 

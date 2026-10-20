@@ -95,7 +95,11 @@ impl Vehicle {
 
     /// tcspecial on this configuration, being the `tcspecial` beside this
     /// program: `cargo build` puts the two in one directory.
-    pub fn beside_this_program(configuration: &str) -> Result<Vehicle, String> {
+    ///
+    /// Told `--quiet` unless `verbose`, so that the console is this
+    /// program's: tcspecial's startup summary is for somebody watching the
+    /// vehicle start, and what stops it starting it says either way.
+    pub fn beside_this_program(configuration: &str, verbose: bool) -> Result<Vehicle, String> {
         let here = std::env::current_exe()
             .map_err(|e| format!("cannot tell where this program is, to find tcspecial: {e}"))?;
         let program = here.with_file_name("tcspecial");
@@ -105,7 +109,12 @@ impl Vehicle {
                 program.display()
             ));
         }
-        Ok(Vehicle::new(program, &[configuration]))
+        let args: &[&str] = if verbose {
+            &[configuration]
+        } else {
+            &["--quiet", configuration]
+        };
+        Ok(Vehicle::new(program, args))
     }
 
     /// Whether it is running, as far as this window knows.

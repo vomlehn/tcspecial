@@ -41,7 +41,7 @@ use std::sync::Arc;
 
 use crate::endpoint::bind_oc_pair;
 use crate::node::vehicle::log::LogNode;
-use crate::runtime::fabric::{Fabric, Moved, Port};
+use crate::runtime::fabric::{Fabric, Moved, Port, Read};
 use crate::runtime::node_state::{Abandon, NodeStates, Nudge};
 use crate::runtime::port::{
     AppPort, ComputePort, EndpointPort, LogPort, NullPort, PingPort, TeePort, Use,
@@ -398,11 +398,12 @@ impl System {
 
     /// One pass: what is due, then what is polled, then the logs.
     ///
-    /// Every group that is due is read in full and in order before the next
-    /// is started, which is what a group is for. Each reading is delivered as
-    /// it is taken, so everything downstream of a group -- a conversion, a
-    /// mean, a decision, a command to a heater -- happens inside the pass that
-    /// read it.
+    /// Every group that is due is read in full before the next is started,
+    /// its members all at once, each on its node's own thread, which is what a
+    /// group is for. Its readings are all taken before any is delivered, and
+    /// then delivered a wave at a time, so everything downstream of a group --
+    /// a conversion, a mean, a decision, a command to a heater -- happens
+    /// inside the pass that read it. See [`Fabric::read_stage`].
     pub fn pass(&mut self, now: Instant) -> Moved {
         let mut moved = Moved::default();
 
@@ -422,40 +423,32 @@ impl System {
         // The nodes in no group, which are read as they become readable: a
         // read of no bytes is the ordinary answer and costs a system call.
         // One that states how often is read, or asked, as its `Pace` says.
-        // Borrowed, as the groups' members are: the fabric and the paces are
-        // other fields.
-        for node in &self.polled {
-            let Some((pace, due)) = self.paced.get(node).copied() else {
-                moved.add(self.fabric.pump(node));
-                continue;
+        // All of them at once, as one stage, and what they read delivered
+        // after: see `Fabric::read_stage`. Borrowed, as the groups' members
+        // are: the fabric and the paces are other fields.
+        let paced = &mut self.paced;
+        let reads = self.polled.iter().filter_map(|node| {
+            let Some((pace, due)) = paced.get(node).copied() else {
+                return Some((node.as_str(), Read::Take));
             };
             let is_due = now >= due;
             if is_due {
                 // In place: the entry is there, and replacing it would make
                 // its name again.
-                if let Some(entry) = self.paced.get_mut(node) {
+                if let Some(entry) = paced.get_mut(node) {
                     *entry = (pace, pace.next(due, now));
                 }
             }
             match pace {
                 // Read, and asked if it is asked, only when due.
-                Pace::Exchange(_) | Pace::Floor(_) => {
-                    if is_due {
-                        moved.add(self.fabric.pump(node));
-                    }
-                }
+                Pace::Exchange(_) | Pace::Floor(_) => is_due.then_some((node.as_str(), Read::Take)),
                 // Read on every pass, taking what has arrived; asked only
                 // when due.
-                Pace::Ask(_) => {
-                    moved.add(self.fabric.pump_unasked(node));
-                    if is_due {
-                        if let Some(why) = self.fabric.ask(node) {
-                            moved.refused.push((node.clone(), why));
-                        }
-                    }
-                }
+                Pace::Ask(_) if is_due => Some((node.as_str(), Read::UnaskedThenAsk)),
+                Pace::Ask(_) => Some((node.as_str(), Read::Unasked)),
             }
-        }
+        });
+        moved.add(self.fabric.read_stage(reads));
 
         self.take_the_work();
 
@@ -2076,16 +2069,28 @@ vehicle:
                 },
             )
             .collect();
+        // The three readings, the one temperature voted out of them, and the
+        // decision. The vote is 289.15 and not the mean's 288.5396: sorted,
+        // the readings are 287.3188, 289.15 and 289.15, so the median is
+        // 289.15 and the low one is left out -- which is what a trio is for.
+        //
+        // The readings in any order among themselves: each goes to the ground
+        // on a link of its own, and the three are sent at once, in one wave,
+        // where the order three sockets are written in is nobody's. What is
+        // ordered is the waves: every reading is on its way before the vote
+        // over them, and the vote before the decision taken from it.
+        assert_eq!(to_ground.len(), 5, "{to_ground:?}");
+        let mut readings = to_ground[..3].to_vec();
+        readings.sort();
         assert_eq!(
-            to_ground,
-            // The three readings, the one temperature voted out of them, and
-            // the decision. The vote is 289.15 and not the mean's 288.5396:
-            // sorted, the readings are 287.3188, 289.15 and 289.15, so the
-            // median is 289.15 and the low one is left out -- which is what
-            // a trio is for.
-            vec!["289.15", "289.15", "287.3188", "289.15", "1"],
-            "the ground should have three readings, the vote over them, and \
-             the decision"
+            readings,
+            ["287.3188", "289.15", "289.15"],
+            "the ground should have the three readings first: {to_ground:?}"
+        );
+        assert_eq!(
+            to_ground[3..],
+            ["289.15", "1"],
+            "and then the vote over them, and the decision"
         );
         assert_eq!(
             vehicle.heaters.lock().expect("the record").clone(),

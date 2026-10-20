@@ -327,6 +327,7 @@ mod tests {
                 // Nothing to write: what is being tested is what goes out.
                 log_dir: None,
                 log_segment_bytes: 65_536,
+                restart_arm_valid: tcslibgs::RESTART_ARM_VALID_DEFAULT,
             },
             &crate::segsend::SegSend::none(),
         )

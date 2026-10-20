@@ -1565,6 +1565,33 @@ pub struct CIConfigJson {
     /// Where the telemetry log is written, and in what sized pieces.
     #[serde(default)]
     pub log: LogJson,
+    /// How long a RESTART_ARM licenses a RESTART for, as a length of time:
+    /// `20 min`, `90 s`. Absent is [`crate::RESTART_ARM_VALID_DEFAULT`].
+    #[serde(
+        default,
+        rename = "restart-arm-valid",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub restart_arm_valid: Option<String>,
+}
+
+/// How long an arm lasts, from what `restart-arm-valid` says.
+///
+/// Nought is refused: an arm that lapsed as it was taken would be a vehicle
+/// that could never be restarted, which is a configuration nobody means and
+/// would find out about only when they needed it.
+pub fn restart_arm_valid_of(said: &str) -> Result<Duration, String> {
+    let valid =
+        crate::graph::parse_interval(said).map_err(|why| format!("restart-arm-valid: {why}"))?;
+    if valid.is_zero() {
+        return Err(
+            "restart-arm-valid is nought, which is an arm that lapses as it is \
+             taken and a vehicle that can never be restarted: give it a length \
+             of time, as 20 min"
+                .to_string(),
+        );
+    }
+    Ok(valid)
 }
 
 /// Command interpreter configuration
@@ -1603,6 +1630,8 @@ pub struct CIConfig {
     pub log_dir: Option<String>,
     /// Payload bytes per segment file, not counting the segment file header.
     pub log_segment_bytes: u32,
+    /// How long after a RESTART_ARM a RESTART with its key is taken.
+    pub restart_arm_valid: Duration,
 }
 
 impl CIConfigJson {
@@ -1686,6 +1715,10 @@ impl CIConfigJson {
             beacon_recv,
             log_dir: self.log.directory.clone(),
             log_segment_bytes: self.log.segment_size,
+            restart_arm_valid: match &self.restart_arm_valid {
+                Some(said) => restart_arm_valid_of(said)?,
+                None => crate::RESTART_ARM_VALID_DEFAULT,
+            },
         })
     }
 }

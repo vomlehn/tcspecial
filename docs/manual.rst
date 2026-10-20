@@ -3056,16 +3056,17 @@ Ping
 
 ARM Restart
   Arms a restart, which a restart will not happen without. An arm lasts 20
-  minutes from when the vehicle takes it -- ``RESTART_ARM_LASTS``, in
-  ``tcslibgs::commands``, which both ends read -- and a restart after that is
-  refused until the vehicle is armed again. Long enough to arm, see what the
+  minutes from when the vehicle takes it unless the ``tcspecial`` section's
+  ``restart-arm-valid`` says otherwise, as a length of time --
+  ``restart-arm-valid: "45 min"`` -- and a restart after that is refused until
+  the vehicle is armed again. Long enough to arm, see what the
   vehicle is doing and decide, over a link with minutes of latency; short
   enough that an arm left behind does not stand ready for the next restart
   anybody sends.
 
 Restart
   Restarts the spacecraft software, which only a restart armed with the same
-  key within the last 20 minutes does. The arm is used up by it; a restart
+  key within the time an arm lasts does. The arm is used up by it; a restart
   with the wrong key is refused and leaves the arm standing. tcspecial
   answers, stops as it does when it is told to -- the pass finished, the
   links closed, the log flushed -- and runs itself again in the same process,

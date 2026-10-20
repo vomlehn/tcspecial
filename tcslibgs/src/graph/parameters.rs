@@ -188,6 +188,7 @@ pub const ATTRIBUTES: &[(&str, bool)] = &[
     ("beacon.recv", true),
     ("log.directory", false),
     ("log.segment_size", false),
+    ("restart-arm-valid", false),
 ];
 
 /// What a new configuration is given, where anything.
@@ -312,6 +313,17 @@ pub fn ci_config_of(said: &BTreeMap<String, Scalar>) -> Result<CIConfigJson, Str
             send: text("beacon.send")?,
             recv: text("beacon.recv")?,
         },
+        // Absent is the twenty minutes an arm has always lasted. Read here
+        // all the same, as the beacon's interval is, so that a length of time
+        // that is not one is refused where the section is.
+        restart_arm_valid: match said.get("restart-arm-valid") {
+            Some(value) if !value.as_str().trim().is_empty() => {
+                let said = value.as_str().trim().to_string();
+                crate::types::restart_arm_valid_of(&said)?;
+                Some(said)
+            }
+            _ => None,
+        },
         log: LogJson {
             // Absent is "run without a telemetry log", which is a
             // configuration somebody may mean: a vehicle with no writable
@@ -433,6 +445,39 @@ mod tests {
         // And the bases, which are counted on by a payload's own id.
         assert_eq!(settled.payload_source_base.at(0).unwrap().port, 6000);
         assert_eq!(settled.payload_dest_base.at(3).unwrap().port, 6103);
+    }
+
+    /// How long an arm lasts is the section's `restart-arm-valid`, a length
+    /// of time, and twenty minutes where it says nothing; nought, and what is
+    /// not a length of time, are refused naming it.
+    #[test]
+    fn restart_arm_valid_is_a_length_of_time_with_a_default() {
+        let settled = |extra: &[(&'static str, &'static str)]| {
+            let mut all = whole();
+            all.extend_from_slice(extra);
+            ci_config_of(&said(&all)).and_then(|config| config.to_ci_config())
+        };
+
+        assert_eq!(
+            settled(&[]).expect("left out").restart_arm_valid,
+            crate::RESTART_ARM_VALID_DEFAULT
+        );
+        assert_eq!(
+            settled(&[("restart-arm-valid", "")])
+                .expect("left empty")
+                .restart_arm_valid,
+            crate::RESTART_ARM_VALID_DEFAULT
+        );
+        assert_eq!(
+            settled(&[("restart-arm-valid", "90 s")])
+                .expect("stated")
+                .restart_arm_valid,
+            std::time::Duration::from_secs(90)
+        );
+        for wrong in ["0 s", "20", "soon"] {
+            let why = settled(&[("restart-arm-valid", wrong)]).expect_err(wrong);
+            assert!(why.contains("restart-arm-valid"), "{wrong}: {why}");
+        }
     }
 
     /// Every attribute that must be stated is complained about by name.

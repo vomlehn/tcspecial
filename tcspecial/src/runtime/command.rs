@@ -48,7 +48,7 @@ use std::os::unix::io::AsRawFd;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::JoinHandle;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use log::{error, trace, warn};
 use nix::poll::{poll, PollFd, PollFlags};
@@ -58,7 +58,7 @@ use tcslibgs::config_digest::{ConfigDigest, ConfigVersion};
 use tcslibgs::{
     answer_to, came_from, ArmKey, CIConfig, Command, CommandLink, CommandStatus, ConfigTelemetry,
     ConnectTelemetry, HostPort, NodeTelemetry, PingTelemetry, QueryNodeSampleTelemetry,
-    QueryNodeTelemetry, TcsError, TcsResult, Telemetry, RESTART_ARM_LASTS,
+    QueryNodeTelemetry, TcsError, TcsResult, Telemetry,
 };
 
 use crate::beacon_send::BeaconSend;
@@ -184,6 +184,7 @@ impl Commands {
             wakeup: wakeup.clone(),
             answer: Vec::with_capacity(ANSWER_BYTES),
             armed: None,
+            arm_valid: ci.restart_arm_valid,
             restart,
             restarting: false,
         };
@@ -262,6 +263,9 @@ struct Serving {
     /// The key of the last RESTART_ARM and when it was taken, until a RESTART
     /// uses it.
     armed: Option<(ArmKey, Instant)>,
+    /// How long an arm licenses a RESTART for: the configuration's
+    /// `restart-arm-valid`.
+    arm_valid: Duration,
     /// What an armed RESTART calls, once it has been answered: asks the
     /// vehicle to stop and run itself again. See [`crate::runtime::restart`].
     restart: fn(),
@@ -506,7 +510,7 @@ impl Serving {
                 }
             },
 
-            // Armed for the next RESTART_ARM_LASTS, with this key. A second
+            // Armed for the next restart-arm-valid, with this key. A second
             // arm replaces the first, so the arm that counts is the one the
             // operator gave last.
             Command::RestartArm(cmd) => {
@@ -514,13 +518,13 @@ impl Serving {
                 answer_to(command, CommandStatus::Success)
             }
 
-            // Only with the key of an arm taken within RESTART_ARM_LASTS, and
+            // Only with the key of an arm taken within restart-arm-valid, and
             // the arm is used up: one lost or repeated datagram must not be
             // able to restart the flight software. A key that does not match
             // leaves the arm as it was, so an operator who mistyped it can
             // send the RESTART again without arming again.
             Command::Restart(cmd) => match self.armed {
-                Some((key, taken)) if key == cmd.arm_key && taken.elapsed() < RESTART_ARM_LASTS => {
+                Some((key, taken)) if key == cmd.arm_key && taken.elapsed() < self.arm_valid => {
                     self.armed = None;
                     self.restarting = true;
                     answer_to(command, CommandStatus::Success)
@@ -531,8 +535,9 @@ impl Serving {
                 }
                 _ => {
                     warn!(
-                        "a RESTART came with no RESTART_ARM in the last {} minutes: refused",
-                        RESTART_ARM_LASTS.as_secs() / 60
+                        "a RESTART came with no RESTART_ARM in the last {:?}, which is \
+                         how long restart-arm-valid says an arm lasts: refused",
+                        self.arm_valid
                     );
                     answer_to(command, CommandStatus::NotArmed)
                 }
@@ -667,7 +672,6 @@ impl Serving {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
     use tcslibgs::graph::Graph;
     use tcslibgs::{Command, NodeCommand, NodeId};
 
@@ -698,6 +702,7 @@ mod tests {
             // Nothing to write: what is being tested is what goes out.
             log_dir: None,
             log_segment_bytes: 65_536,
+            restart_arm_valid: tcslibgs::RESTART_ARM_VALID_DEFAULT,
         }
     }
 
@@ -1269,39 +1274,59 @@ mod tests {
         assert_eq!(ASKED.load(Ordering::SeqCst), 1);
     }
 
-    /// An arm older than RESTART_ARM_LASTS does not license a RESTART.
+    /// An arm lasts as long as the configuration's `restart-arm-valid` and
+    /// no longer: within it a RESTART is taken, after it refused.
     ///
-    /// Asked of the interpreter directly, with an arm taken in the past: a
-    /// test that waited twenty minutes would not be run.
+    /// Asked of the interpreter directly, with arms taken a known while ago,
+    /// against a length the test chooses: a test that waited twenty minutes
+    /// would not be run.
     #[test]
-    fn an_arm_that_has_lapsed_does_not_license_a_restart() {
+    fn an_arm_lasts_as_long_as_the_configuration_says() {
         let graph = two_nodes();
-        let (bench, _) = a_pass_answering(|_| Ok(()));
-        let mut serving = Serving {
-            states: Arc::new(NodeStates::of(&graph).expect("states")),
-            bench,
-            flying: flying(),
-            beacon: None,
-            log: TelemetryLog::disabled(),
-            stopping: Arc::new(AtomicBool::new(false)),
-            wakeup: Arc::new(Wakeup::new().expect("a wakeup")),
-            answer: Vec::new(),
-            armed: None,
-            restart: || panic!("a lapsed arm restarted the vehicle"),
-            restarting: false,
+        let serving = |valid: Duration| {
+            let (bench, _) = a_pass_answering(|_| Ok(()));
+            Serving {
+                states: Arc::new(NodeStates::of(&graph).expect("states")),
+                bench,
+                flying: flying(),
+                beacon: None,
+                log: TelemetryLog::disabled(),
+                stopping: Arc::new(AtomicBool::new(false)),
+                wakeup: Arc::new(Wakeup::new().expect("a wakeup")),
+                answer: Vec::new(),
+                armed: None,
+                arm_valid: valid,
+                restart: || {},
+                restarting: false,
+            }
         };
-        let Some(lapsed) = Instant::now().checked_sub(RESTART_ARM_LASTS + Duration::from_secs(1))
-        else {
-            // A machine up for less than twenty minutes has no such instant
-            // to stand for the past, and nothing to test with.
-            return;
+        let restart = |serving: &mut Serving, ago: Duration| {
+            let taken = Instant::now()
+                .checked_sub(ago)
+                .expect("a machine up longer than a few seconds");
+            serving.armed = Some((ArmKey(7), taken));
+            serving
+                .answer(
+                    CommandLink::Spacecraft,
+                    &Command::Restart(tcslibgs::RestartCommand::new(1, ArmKey(7))),
+                )
+                .status()
         };
-        serving.armed = Some((ArmKey(7), lapsed));
-        let answer = serving.answer(
-            CommandLink::Spacecraft,
-            &Command::Restart(tcslibgs::RestartCommand::new(1, ArmKey(7))),
+
+        // Two seconds ago, against an arm that lasts one: lapsed.
+        let mut short = serving(Duration::from_secs(1));
+        assert_eq!(
+            restart(&mut short, Duration::from_secs(2)),
+            CommandStatus::NotArmed
         );
-        assert_eq!(answer.status(), CommandStatus::NotArmed);
-        assert!(!serving.restarting, "nothing is to be restarted");
+        assert!(!short.restarting, "a lapsed arm restarts nothing");
+
+        // The same two seconds, against one that lasts a minute: taken.
+        let mut long = serving(Duration::from_secs(60));
+        assert_eq!(
+            restart(&mut long, Duration::from_secs(2)),
+            CommandStatus::Success
+        );
+        assert!(long.restarting, "an arm within its time restarts");
     }
 }

@@ -38,9 +38,11 @@ the program of an app node, or a payload that is a program rather than a
 device -- is talked to through file descriptors it inherits, which a program
 in any of the three already knows how to read and write, so it may be written
 in C, C++, Rust or Python. On the ground, a station is built on ``tcslib`` in
-Rust or on its Python spelling under ``python/``. Every interface offered to
-C is offered to C++ as well: a C header can be included from C++ as it
-stands, and nothing in it is C that C++ will not compile.
+Rust, on ``tcslib-c`` in C or C++ -- the same library behind one header,
+``tcslib-c/include/tcs.h`` -- or on its Python spelling under ``python/``.
+Every interface offered to C is offered to C++ as well: a C header can be
+included from C++ as it stands, and nothing in it is C that C++ will not
+compile.
 
 What that buys
 --------------
@@ -3131,7 +3133,7 @@ both are shown the same way.
 Crates Used
 ===========
 These are the crates the workspace's ``Cargo.toml`` files name directly --
-every one of the eighteen manifests, the root and each crate under it. The
+every one of the nineteen manifests, the root and each crate under it. The
 crates they depend on in turn are not listed: ``cargo tree`` shows the whole
 graph, and ``Cargo.lock`` says which version of each is built.
 
@@ -3213,7 +3215,7 @@ that satisfies both.
    * - `serde_json <https://crates.io/crates/serde_json>`__
      - 1.0
      - `1.0.151 <https://docs.rs/serde_json/1.0.151>`__
-     - tcsgui, tcslib, tcslibgs, tcsmoc, tcspecial, tcssim, tcsverify, examples/beacon, examples/ping
+     - tcsgui, tcslib, tcslib-c (tests only), tcslibgs, tcsmoc, tcspecial, tcssim, tcsverify, examples/beacon, examples/ping
      - The JSON the command link carries between the ground and the vehicle.
      - `repository <https://github.com/serde-rs/json>`__
    * - `serde_norway <https://crates.io/crates/serde_norway>`__

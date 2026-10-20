@@ -22,6 +22,9 @@ argue from this order and say so.
   A rule about what a configuration may say belongs here, and nowhere else.
 - `tcslib` -- what a ground station is built on: `TcsClient` for commands,
   `moc::Moc` for the vehicle's data, `beacon` for its beacons.
+- `tcslib-c` -- tcslib for C and C++: beacons, data and commands behind one
+  hand-written header, `include/tcs.h`, which `tests/c_and_cpp.rs` holds to
+  the library by compiling a ground station against it with gcc and g++.
 - `tcspecial` -- the flight software.
 - `tcsmoc` -- the test ground station (GUI).
 - `tcssim` -- the payload simulator (GUI).
@@ -72,7 +75,7 @@ cargo run -q --bin tcsverify -- <configuration> [simulator file]
 ```
 
 `make help` lists the Makefile's targets. `make` in `docs/`, `examples/`,
-`tcslib/` and `tcslibgs/` builds their HTML pages.
+`tcslib/`, `tcslib-c/` and `tcslibgs/` builds their HTML pages.
 
 The GUIs and tcspecial may be launched when what is being checked can only be
 seen by running them, but `cargo test` comes first. They bind fixed ports:

@@ -25,8 +25,9 @@
 //!
 //! # Which types this knows
 //!
-//! The types whose terminals are fixed: a payload kind, a `moc`, the `null`
-//! and `ping` vehicle nodes, and the five app node types. A computation's sinks are the inputs it declares and a
+//! The types whose terminals are fixed: a payload kind, a `moc`, the two
+//! `null-` and two `tee-` vehicle nodes, the `ping` vehicle node, and the
+//! five app node types. A computation's sinks are the inputs it declares and a
 //! log's are whatever is written to it, so their terminals are their own rules'
 //! business -- see [`crate::graph::check`] -- and [`terminals_of`] says so by
 //! answering `None`.
@@ -167,11 +168,35 @@ pub fn terminals_of(node_type: &str) -> Option<Terminals> {
         // id its socket carries: see the field.
         merges: true,
     };
-    const NULL: Terminals = Terminals {
-        // The simplest vehicle node: one terminal at each end of each stream,
-        // and nothing done to what passes through. It is what says what a
-        // vehicle node *is*, which is why it is the one with all four.
-        sinks: &["payload-in", "moc-in"],
+    // The simplest vehicle nodes: one stream arrives, and it goes nowhere or
+    // everywhere. Each takes one stream and no other, so that what arrives
+    // at one is never two streams interleaved: a node that took both and
+    // passed both on would hand a command to the ground and a reading to a
+    // payload, and nothing downstream could tell which it had been given.
+    const NULL_MOC: Terminals = Terminals {
+        // What the ground sends, taken and dropped.
+        sinks: &["moc-in"],
+        sources: &[],
+        merges: false,
+    };
+    const NULL_PAYLOAD: Terminals = Terminals {
+        // A payload's readings, taken and dropped.
+        sinks: &["payload-in"],
+        sources: &[],
+        merges: false,
+    };
+    const TEE_MOC: Terminals = Terminals {
+        // What the ground sends, passed on as it was going and copied the
+        // other way: a link cannot carry one stream into the other, so this
+        // is the node that does. See `crate::graph::check`'s CrossedStreams.
+        sinks: &["moc-in"],
+        sources: &["moc-out", "payload-out"],
+        merges: false,
+    };
+    const TEE_PAYLOAD: Terminals = Terminals {
+        // And the mirror of it: a payload's readings, passed on groundward
+        // and copied vehicleward.
+        sinks: &["payload-in"],
         sources: &["payload-out", "moc-out"],
         merges: false,
     };
@@ -199,9 +224,8 @@ pub fn terminals_of(node_type: &str) -> Option<Terminals> {
         merges: false,
     };
     const APP_ALL: Terminals = Terminals {
-        // Both interfaces, so all four terminals -- which is a `null` node's
-        // shape, and an app of this kind is what a `null` node is when
-        // somebody wants to do something to what passes through.
+        // Both interfaces, so all four terminals: the one type with them all,
+        // each stream passing through it on its own interface.
         sinks: &["payload-in", "moc-in"],
         sources: &["payload-out", "moc-out"],
         merges: false,
@@ -220,7 +244,10 @@ pub fn terminals_of(node_type: &str) -> Option<Terminals> {
         "i2c" | "spi" | "serial" | "hdlc" | "can" | "iio" | "rpmsg" | "network" | "device-file"
         | "gpio" => Some(PAYLOAD),
         "moc" => Some(MOC),
-        "null" => Some(NULL),
+        "null-moc" => Some(NULL_MOC),
+        "null-payload" => Some(NULL_PAYLOAD),
+        "tee-moc" => Some(TEE_MOC),
+        "tee-payload" => Some(TEE_PAYLOAD),
         "app_payload_veh" => Some(APP_PAYLOAD),
         // A node that answers the ground's pings takes what the ground sends
         // and sends its answer groundward, which is an `app_moc_veh`'s shape:
@@ -407,20 +434,28 @@ mod tests {
         assert_eq!(payload.sinks, &["moc-in"]);
     }
 
-    /// The null vehicle node has all four, which is what makes it the one
-    /// that says what a vehicle node is.
+    /// A null node takes one stream and sends nothing on; a tee takes one
+    /// stream and sends it on both.
     #[test]
-    fn the_null_node_has_both_ends_of_both_streams() {
-        let null = terminals_of("null").expect("the null node");
-        for name in ["payload-in", "moc-in"] {
-            assert!(null.sinks.contains(&name), "{name} is not a sink of null");
+    fn a_null_node_ends_one_stream_and_a_tee_sends_it_both_ways() {
+        let null_moc = terminals_of("null-moc").expect("the null-moc node");
+        assert_eq!(null_moc.sinks, &["moc-in"]);
+        assert!(null_moc.sources.is_empty());
+        let null_payload = terminals_of("null-payload").expect("the null-payload node");
+        assert_eq!(null_payload.sinks, &["payload-in"]);
+        assert!(null_payload.sources.is_empty());
+
+        let tee_moc = terminals_of("tee-moc").expect("the tee-moc node");
+        assert_eq!(tee_moc.sinks, &["moc-in"]);
+        let tee_payload = terminals_of("tee-payload").expect("the tee-payload node");
+        assert_eq!(tee_payload.sinks, &["payload-in"]);
+        for tee in [tee_moc, tee_payload] {
+            for name in ["payload-out", "moc-out"] {
+                assert!(tee.sources.contains(&name), "{name} is not a source");
+            }
+            assert!(!tee.merges);
         }
-        for name in ["payload-out", "moc-out"] {
-            assert!(
-                null.sources.contains(&name),
-                "{name} is not a source of null"
-            );
-        }
+        assert_eq!(terminals_of("null"), None, "there is no null node now");
     }
 
     /// A ping node hears the ground and answers it: what the ground sends
@@ -453,7 +488,9 @@ mod tests {
             terminals_of("i2c"),
             "a node that is asked and answers wears a payload's shape"
         );
-        assert_eq!(terminals_of("app_all_veh"), terminals_of("null"));
+        let all_veh = terminals_of("app_all_veh").expect("a kind of app");
+        assert_eq!(all_veh.sinks, &["payload-in", "moc-in"]);
+        assert_eq!(all_veh.sources, &["payload-out", "moc-out"]);
 
         // And the two that are payloads. The asked one is a payload, down to
         // the table it reads from; the one that is never asked is a payload
@@ -535,11 +572,11 @@ mod tests {
             "the ground receives on its only sink"
         );
 
-        // And a node with two of them has to be told which: the null node is
-        // both ends of both streams, so an unnamed link to it could be either.
-        let said = terminal_at("null", None, true).expect_err("ambiguous");
+        // And a node with two of them has to be told which: a tee sends on
+        // both streams, so an unnamed link from it could be either.
+        let said = terminal_at("tee-moc", None, false).expect_err("ambiguous");
         assert!(
-            said.contains("payload-in") && said.contains("moc-in"),
+            said.contains("payload-out") && said.contains("moc-out"),
             "{said}"
         );
     }
@@ -562,7 +599,7 @@ mod tests {
             said.contains("moc-out") && said.contains("leaves"),
             "{said}"
         );
-        let said = terminal_at("null", Some("moc-in"), false).expect_err("wrong end");
+        let said = terminal_at("tee-moc", Some("moc-in"), false).expect_err("wrong end");
         assert!(
             said.contains("moc-in") && said.contains("arrives"),
             "{said}"

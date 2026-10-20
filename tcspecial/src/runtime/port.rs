@@ -61,8 +61,8 @@ use crate::node::vehicle::app_moc_veh::AppMocVeh;
 use crate::node::vehicle::app_payload_veh::AppPayloadVeh;
 use crate::node::vehicle::compute::{self, Function, Out};
 use crate::node::vehicle::log::LogNode;
-use crate::node::vehicle::null::Through;
 use crate::node::vehicle::ping::Answers;
+use crate::node::vehicle::tee_moc::Through;
 
 use crate::runtime::frame::Framer;
 use crate::runtime::node_state::Abandon;
@@ -824,38 +824,72 @@ impl Port for LogPort {
     }
 }
 
-/// A `null` node, as a node of the graph.
+/// A `null-moc` or `null-payload` node, as a node of the graph: what
+/// arrives is taken and dropped.
 ///
-/// The thinnest adapter of the four, because the node itself holds what there
-/// is to hold: see [`crate::node::vehicle::null::Through`], which is where the queue and
-/// the rule about a datum that will not fit live. Here for the reason the log's
-/// adapter and the computation's are here -- the questions a port answers are
-/// the same whatever is behind it, and answers kept together stay the same.
-pub struct NullPort {
+/// For a configuration that has to send a stream somewhere and has nowhere
+/// for it to go -- a payload's reading nobody is listening to yet, the
+/// ground's commands to a payload not yet fitted. Which stream it takes is its
+/// terminal's business, in `tcslibgs::graph::terminals`; here, either is
+/// dropped alike, and is counted as delivered, because it was.
+///
+/// Also what a `moc` node is held as where nothing is read from it and it
+/// binds nothing: what is sent to the ground goes by each source's own link
+/// (see `crate::runtime::system::open_ground_link`), so nothing handed to the
+/// node itself has anywhere to go.
+pub struct NullPort;
+
+impl NullPort {
+    /// A node that drops what it is given.
+    pub fn of() -> NullPort {
+        NullPort
+    }
+}
+
+impl Port for NullPort {
+    /// Nothing, ever: nothing is kept to hand back.
+    fn take(&mut self, _buffer: &mut [u8]) -> Result<Taken, String> {
+        Ok(Taken::NOTHING)
+    }
+
+    fn give(&mut self, _arriving: Arriving<'_>, _data: &[u8]) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn produces(&self) -> bool {
+        false
+    }
+}
+
+/// A `tee-moc` or `tee-payload` node, as a node of the graph.
+///
+/// The thinnest adapter there is, because the node itself holds what there
+/// is to hold: see [`crate::node::vehicle::tee_moc::Through`], which is where the
+/// queue and the rule about a datum that will not fit live. Here for the
+/// reason the log's adapter and the computation's are here -- the questions a
+/// port answers are the same whatever is behind it, and answers kept together
+/// stay the same.
+pub struct TeePort {
     /// The node's name in the configuration, which every complaint names.
     what: String,
     through: Through,
 }
 
-impl NullPort {
-    /// A pass-through for this node.
-    pub fn of(what: &str) -> NullPort {
-        NullPort {
+impl TeePort {
+    /// A tee for this node.
+    pub fn of(what: &str) -> TeePort {
+        TeePort {
             what: what.to_string(),
             through: Through::new(),
         }
     }
 }
 
-impl Port for NullPort {
-    /// What arrived, on no stream in particular.
-    ///
-    /// Which is the one thing a `null` node cannot be asked to get right, and
-    /// it is written down where the queue is: both streams pass through the
-    /// one node and nothing here keeps them apart, so what it hands back goes
-    /// wherever its links go. A configuration that needs the two kept apart
-    /// has `app_all_veh` for it, whose two interfaces are two streams -- see
-    /// [`crate::node::vehicle::app_all_veh`].
+impl Port for TeePort {
+    /// What arrived, on no stream in particular: so that it goes down every
+    /// link leaving the node, the `moc-out` ones and the `payload-out` ones
+    /// alike, which is what a tee is for. One stream arrives at a tee, so no
+    /// other is mixed into it.
     fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
         self.through.take(&self.what, buffer).map(Taken::of)
     }
@@ -867,10 +901,10 @@ impl Port for NullPort {
 
     /// It has something to pass on as a consequence of what arrived.
     ///
-    /// A `null` node produces because something came in, as a computation
-    /// does, and never on a schedule of its own: a pass that ended with the
-    /// delivery would leave the datum here until something else happened to
-    /// read the node.
+    /// A tee produces because something came in, as a computation does, and
+    /// never on a schedule of its own: a pass that ended with the delivery
+    /// would leave the datum here until something else happened to read the
+    /// node.
     fn ready(&self) -> bool {
         self.through.waiting()
     }
@@ -1859,36 +1893,26 @@ mod tests {
         assert!(!port.ready(), "and nothing is answered");
     }
 
-    /// A null node passes what arrives through, in order and unchanged.
-    ///
-    /// Both streams through the one node: what came from the payload side and
-    /// what came from the ground are both passed on, in the order they
-    /// arrived. Which is also why the arrivals are not labelled here -- a
-    /// terminal is resolved where the routing table is built and never reaches
-    /// a port, so a null node is handed data and not a name.
+    /// A tee hands on what arrives, in order and unchanged, on no stream in
+    /// particular: so that the fabric sends it down every link the node has.
     #[test]
-    fn a_null_node_carries_what_arrives_through() {
-        let mut port = NullPort::of("through");
+    fn a_tee_hands_on_what_arrives() {
+        let mut port = TeePort::of("through");
 
         assert!(!port.ready(), "nothing has arrived");
-        assert_eq!(port.take(&mut [0u8; 64]).map(|taken| taken.bytes), Ok(0));
+        assert_eq!(port.take(&mut [0u8; 64]), Ok(Taken::NOTHING));
 
         assert_eq!(port.give(Arriving::ANYWHERE, b"290.0"), Ok(()));
         assert_eq!(port.give(Arriving::ANYWHERE, b"go\n"), Ok(()));
         assert!(port.ready());
 
-        // In order, and whole.
+        // In order, whole, and on no stream, so that it goes both ways.
         let mut buffer = [0u8; 64];
-        let got = port
-            .take(&mut buffer)
-            .map(|taken| taken.bytes)
-            .expect("the first");
-        assert_eq!(&buffer[..got], b"290.0");
-        let got = port
-            .take(&mut buffer)
-            .map(|taken| taken.bytes)
-            .expect("the second");
-        assert_eq!(&buffer[..got], b"go\n");
+        let taken = port.take(&mut buffer).expect("the first");
+        assert_eq!(&buffer[..taken.bytes], b"290.0");
+        assert_eq!(taken.stream, None);
+        let taken = port.take(&mut buffer).expect("the second");
+        assert_eq!(&buffer[..taken.bytes], b"go\n");
 
         // And gone once taken, rather than handed out again.
         assert!(!port.ready());
@@ -1908,6 +1932,16 @@ mod tests {
             .map(|taken| taken.bytes)
             .expect("with room");
         assert_eq!(&buffer[..got], b"2901234");
+    }
+
+    /// A null node takes what it is given and has nothing to hand back.
+    #[test]
+    fn a_null_node_drops_what_arrives() {
+        let mut port = NullPort::of();
+        assert!(port.accepts() && !port.produces());
+        assert_eq!(port.give(Arriving::ANYWHERE, b"290.0"), Ok(()));
+        assert!(!port.ready());
+        assert_eq!(port.take(&mut [0u8; 64]), Ok(Taken::NOTHING));
     }
 
     /// A datum a computation cannot use is refused, naming both.

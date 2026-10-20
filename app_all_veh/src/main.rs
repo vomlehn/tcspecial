@@ -3,8 +3,8 @@
 //! The node type `app_all_veh`. Having both, it is the one kind that can carry
 //! a stream *through*: payload data read on the first interface is written as
 //! payload data on the second, and MOC data read on the second is written as
-//! MOC data on the first. Which makes it what a `null` node is, written as a
-//! program -- and that is what makes it the one to test with, because a packet
+//! MOC data on the first. Which makes it a pass-through for both streams,
+//! written as a program -- and that is what makes it the one to test with, because a packet
 //! put in at either end comes out at the other and nothing else does. An app
 //! that crossed the two streams would pass an echo test and fail this one.
 //!

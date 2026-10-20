@@ -41,7 +41,9 @@ use crate::endpoint::bind_oc_pair;
 use crate::node::vehicle::log::LogNode;
 use crate::runtime::fabric::{Fabric, Moved, Port};
 use crate::runtime::node_state::{Abandon, NodeStates, Nudge};
-use crate::runtime::port::{AppPort, ComputePort, EndpointPort, LogPort, NullPort, PingPort, Use};
+use crate::runtime::port::{
+    AppPort, ComputePort, EndpointPort, LogPort, NullPort, PingPort, TeePort, Use,
+};
 use crate::runtime::route::Routes;
 use crate::runtime::schedule::Schedule;
 
@@ -701,11 +703,14 @@ fn is_polled(node: &tcslibgs::graph::Node, routes: &Routes, port: &dyn Port) -> 
     node.group.is_none()
         && port.produces()
         && routes.fan_out(&node.name) > 0
-        // A computation, a `null` node and a `ping` node produce because
-        // something arrived, which `Port::ready` has already said and the pass
-        // has already taken: polling one would be asking a question whose
-        // answer is gone.
-        && !matches!(node.node_type.as_str(), "compute" | "log" | "null" | "ping")
+        // A computation, a tee and a `ping` node produce because something
+        // arrived, which `Port::ready` has already said and the pass has
+        // already taken: polling one would be asking a question whose answer
+        // is gone. (A null node produces nothing, and says so.)
+        && !matches!(
+            node.node_type.as_str(),
+            "compute" | "log" | "tee-moc" | "tee-payload" | "ping"
+        )
 }
 
 /// One source's link to the ground: bound at tcspecial's end and sending to
@@ -746,9 +751,10 @@ pub fn open(
             Ok(Box::new(ComputePort::make(node, &inputs, abandon)?))
         }
         "log" => Ok(Box::new(LogPort::of(LogNode::of(node)?))),
-        // A node that carries both streams through and does nothing to what
-        // passes. Nothing is opened for it: it is not an interface.
-        "null" => Ok(Box::new(NullPort::of(&node.name))),
+        // A node that drops the one stream it takes, and one that sends it on
+        // both ways. Nothing is opened for either: neither is an interface.
+        "null-moc" | "null-payload" => Ok(Box::new(NullPort::of())),
+        "tee-moc" | "tee-payload" => Ok(Box::new(TeePort::of(&node.name))),
         // A node that answers the ground's pings. Nothing is opened for it
         // either: what it hears and where its answers go are its links.
         "ping" => Ok(Box::new(PingPort::of(&node.name))),
@@ -758,7 +764,7 @@ pub fn open(
         // see `open_ground_link`. So one that binds nothing, or that nothing
         // is read from, is held as a node that is never asked anything.
         "moc" if !tcslibgs::graph::reach::binds(node) || Use::of(routes, &node.name).is_err() => {
-            Ok(Box::new(NullPort::of(&node.name)))
+            Ok(Box::new(NullPort::of()))
         }
         // A node whose work is a program, started here and talked to over the
         // file interfaces `tcsapp` describes. Three of the five kinds are the
@@ -787,7 +793,8 @@ pub fn described(graph: &Graph) -> BTreeMap<String, String> {
         .map(|node| {
             let how = match node.node_type.as_str() {
                 "compute" | "log" => String::new(),
-                "null" => "passes through".to_string(),
+                "null-moc" | "null-payload" => "drops what arrives".to_string(),
+                "tee-moc" | "tee-payload" => "sends what arrives both ways".to_string(),
                 "ping" => "answers pings".to_string(),
                 // An app node is a program of its own, and what it does with
                 // what arrives is in that program: nothing here can say more

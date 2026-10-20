@@ -1,22 +1,22 @@
-//! The node that carries both streams through and does nothing to what passes.
+//! The node that takes what the ground sends and sends it on both ways: a
+//! `tee-moc`.
 //!
-//! The simplest vehicle node there is, and it is here for two reasons: it is
-//! the one type with all four terminals, so it is what says what a vehicle
-//! node *is* -- see `tcslibgs::graph::terminals` -- and it is what a
-//! configuration reaches for when a stream has to pass through the vehicle on
-//! its way somewhere, with nothing yet to do to it.
+//! A link carries one stream and may not carry it into the other -- a
+//! `moc-out` goes to a `moc-in` and nowhere else -- so where what the ground
+//! sends has to reach a `payload-in` as well, a tee is what does it. A
+//! `tee-moc` takes each datum the ground sends at its `moc-in` and sends it on
+//! by its `moc-out`, as it was going, and again by its `payload-out`. Its
+//! mirror is the `tee-payload`, in `super::tee_payload`, which holds what
+//! arrives in the same [`Through`].
 //!
-//! What a `null` node is told is nothing. It has no attributes, and the
+//! What a tee is told is nothing. It has no attributes, and the
 //! configuration check refuses any written on one: its name and its type are
 //! the whole of it.
 //!
-//! Both streams through the one node, and nothing here keeps them apart. A
-//! datum arriving from the payload side and one arriving from the ground are
-//! both handed on, in the order they arrived, to wherever the node's data
-//! sources go. That is the one thing a `null` node cannot be asked to get
-//! right, and it is why a data sink is held to a single data source: a node
-//! with one source into it and one sink out of it per stream carries each
-//! stream to where it was going.
+//! One stream in, so nothing here has to keep two apart: each datum is handed
+//! back once, on no stream in particular, and the fabric delivers it down
+//! every link leaving the node -- one copy for each, which is the
+//! duplication. See `crate::runtime::fabric::Taken`.
 
 use std::collections::VecDeque;
 
@@ -35,7 +35,7 @@ pub struct Through {
     spare: Vec<Vec<u8>>,
 }
 
-/// How many data a null node has room for before it would grow: normally one
+/// How many data a tee has room for before it would grow: normally one
 /// is waiting at most, the fabric taking it at once.
 const WAITING_AT_ONCE: usize = 4;
 

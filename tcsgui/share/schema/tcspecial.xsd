@@ -100,7 +100,10 @@
     <xs:restriction base="xs:token">
       <xs:enumeration value="compute"/>
       <xs:enumeration value="log"/>
-      <xs:enumeration value="null"/>
+      <xs:enumeration value="null-moc"/>
+      <xs:enumeration value="null-payload"/>
+      <xs:enumeration value="tee-moc"/>
+      <xs:enumeration value="tee-payload"/>
       <xs:enumeration value="ping"/>
       <xs:enumeration value="app_payload_veh"/>
       <xs:enumeration value="app_moc_veh"/>

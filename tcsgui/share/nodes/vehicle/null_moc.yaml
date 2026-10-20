@@ -1,0 +1,8 @@
+# A vehicle node that takes what the ground sends and drops it.
+#
+# For a stream that has to go somewhere and has nowhere to go yet. Its Rust is
+# tcspecial/src/node/vehicle/null_moc/.
+node: null-moc
+type: null-moc
+about: Takes what the ground sends and drops it.
+moc-sink: true

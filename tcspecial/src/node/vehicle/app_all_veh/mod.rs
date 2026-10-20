@@ -10,8 +10,8 @@
 //! Both interfaces, so all four directions: payload data written to it at
 //! descriptor 0 and read back from it at descriptor 1, and MOC data written at
 //! descriptor 1 and read back at descriptor 0. Which makes this the one kind
-//! that can carry a stream through, and so the one kind that can stand where a
-//! `null` node stands -- with something done to what passes.
+//! that can carry both streams through, each kept apart from the other, with
+//! something done to what passes.
 //!
 //! # Where it sits
 //!

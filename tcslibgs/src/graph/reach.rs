@@ -507,8 +507,8 @@ fn kind_of(node: &Node) -> Result<DHType, String> {
             "\"{}\": there is no node type called \"{other}\". The interfaces are \
              i2c, spi, serial, hdlc, can, iio, rpmsg, gpio, device-file and \
              network; a \
-             ground link is moc; and compute, log, null, ping and the app nodes \
-             are the rest",
+             ground link is moc; and compute, log, null-moc, null-payload, \
+             tee-moc, tee-payload, ping and the app nodes are the rest",
             node.name
         )),
     }

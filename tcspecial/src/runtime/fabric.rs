@@ -1122,6 +1122,85 @@ mod tests {
         );
     }
 
+    /// A tee sends each datum on both ways, and a null node takes what it is
+    /// sent: each one stream in.
+    ///
+    /// The ground's command reaches the valve, as it was going, and comes
+    /// back to the ground as payload data; the valve's reading reaches the
+    /// ground and goes again vehicleward, to a node that drops it.
+    #[test]
+    fn a_tee_sends_each_datum_both_ways() {
+        use crate::runtime::port::{NullPort, TeePort};
+
+        let dir = tempfile::tempdir().expect("a directory");
+        let path = dir.path().join("tees.yaml");
+        std::fs::write(
+            &path,
+            "moc:
+  - name: ground
+    type: moc
+    moc-out: [commands]
+payloads:
+  - name: valve
+    type: network
+    protocol: udp
+    address: \"127.0.0.1\"
+    port: \"7001\"
+    payload-out: [readings]
+vehicle:
+  - name: commands
+    type: tee-moc
+    moc-out: [valve]
+    payload-out: [ground]
+  - name: readings
+    type: tee-payload
+    payload-out: [ground]
+    moc-out: [dropped]
+  - name: dropped
+    type: null-moc
+",
+        )
+        .expect("written");
+        let graph = Graph::load(&path).expect("it reads");
+        let mut fabric = Fabric::new(Routes::of(&graph), 64);
+        let (ground, ground_port) = recorder();
+        let (valve, valve_port) = device();
+        fabric.hold("ground", ground_port);
+        fabric.hold("valve", valve_port);
+        fabric.hold("commands", Box::new(TeePort::of("commands")));
+        fabric.hold("readings", Box::new(TeePort::of("readings")));
+        fabric.hold("dropped", Box::new(NullPort::of()));
+
+        // A command: to the tee, then from it to the valve and the ground.
+        let moved = fabric.deliver("ground", b"open");
+        assert!(moved.all_delivered(), "{:?}", moved.refused);
+        assert_eq!(moved.delivered, 3, "the tee, the valve and the ground");
+        assert_eq!(
+            valve.lock().expect("the record").given,
+            vec![(None, Some(Stream::Vehicleward), b"open".to_vec())]
+        );
+        assert_eq!(
+            ground.lock().expect("the record").given,
+            vec![(None, Some(Stream::Groundward), b"open".to_vec())],
+            "the command should come back to the ground as payload data"
+        );
+
+        // A reading: to the tee, then the ground and the node that drops it.
+        ground.lock().expect("the record").given.clear();
+        let moved = fabric.deliver("valve", b"293.15");
+        assert!(moved.all_delivered(), "{:?}", moved.refused);
+        assert_eq!(moved.delivered, 3, "the tee, the ground and the null node");
+        assert_eq!(
+            ground.lock().expect("the record").given,
+            vec![(None, Some(Stream::Groundward), b"293.15".to_vec())]
+        );
+        assert_eq!(
+            valve.lock().expect("the record").given.len(),
+            1,
+            "unchanged"
+        );
+    }
+
     /// Three sources fill three named inputs of one node.
     #[test]
     fn a_fan_in_arrives_as_named_inputs() {

@@ -751,12 +751,15 @@
             "type": "string"
           },
           "type": {
-            "description": "What it is: the configuration's own word for the type. One of the vehicle's own: a computation, a log, a pass-through, a node that answers pings, or a program of the vehicle's.",
+            "description": "What it is: the configuration's own word for the type. One of the vehicle's own: a computation, a log, a node that drops one stream, a tee that sends one stream on both ways, a node that answers pings, or a program of the vehicle's.",
             "type": "string",
             "enum": [
               "compute",
               "log",
-              "null",
+              "null-moc",
+              "null-payload",
+              "tee-moc",
+              "tee-payload",
               "ping",
               "app_payload_veh",
               "app_moc_veh",

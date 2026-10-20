@@ -260,15 +260,15 @@ payloads:
         );
 
         // And on a node that does have the sink, with nothing arriving at it:
-        // a null node carries both streams, and this one is sent neither.
+        // a null node takes the ground's data, and this one is sent none.
         let said = format!(
             "{}",
             pair(
                 "    payload-in: true",
-                "    moc-in: true\nvehicle:\n  - name: through\n    type: null\n    \
+                "    moc-in: true\nvehicle:\n  - name: through\n    type: null-moc\n    \
                  moc-in: true",
             )
-            .expect_err("nothing sends the null node anything")
+            .expect_err("nothing sends the null-moc node anything")
         );
         assert!(said.contains("none does"), "{said}");
         assert!(said.contains("\"through\""), "{said}");

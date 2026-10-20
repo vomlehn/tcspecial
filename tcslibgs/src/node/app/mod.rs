@@ -18,7 +18,8 @@
 //! * `app_moc_veh` is the mirror of it: MOC data in, payload data out.
 //! * `app_all_veh` has both, which makes it the one kind that can carry a
 //!   stream *through* -- payload data in at the one interface and out at the
-//!   other -- and so the one kind that can stand where a `null` node stands.
+//!   other -- and so the one type of any kind that carries both streams
+//!   through, each kept apart.
 //!
 //! And two are payloads: what the vehicle carries this flight, where what it
 //! carries is a program rather than a device on a bus. A payload sends its
@@ -468,7 +469,15 @@ mod tests {
             assert_eq!(Kind::of(kind.node_type()), Some(kind));
         }
         for other in [
-            "compute", "log", "null", "i2c", "moc", "app", "app_", "app_pl_",
+            "compute",
+            "log",
+            "null-moc",
+            "tee-payload",
+            "i2c",
+            "moc",
+            "app",
+            "app_",
+            "app_pl_",
         ] {
             assert_eq!(Kind::of(other), None, "{other}");
         }

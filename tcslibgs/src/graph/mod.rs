@@ -277,7 +277,15 @@ pub fn section_of(node_type: &str) -> Section {
 /// The app kinds are the rest of the vehicle's, and which of those are the
 /// vehicle's and which are payloads is `crate::node::app`'s to say: see
 /// [`types_in`], which puts the two together.
-const VEHICLE_TYPES: &[&str] = &["compute", "log", "null", "ping"];
+const VEHICLE_TYPES: &[&str] = &[
+    "compute",
+    "log",
+    "null-moc",
+    "null-payload",
+    "tee-moc",
+    "tee-payload",
+    "ping",
+];
 
 /// Every node type a section may hold, as a file spells them.
 ///

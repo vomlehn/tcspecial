@@ -1,0 +1,12 @@
+# A vehicle node that takes a payload's data and sends each datum on both
+# ways: as payload data by its payload-out, and again as MOC data by its
+# moc-out.
+#
+# A link cannot carry one stream into the other, so this is how a payload's
+# data reaches a moc-in. Its Rust is tcspecial/src/node/vehicle/tee_payload/.
+node: tee-payload
+type: tee-payload
+about: Sends a payload's data on as payload data and again as MOC data.
+payload-sink: true
+payload-source: true
+moc-source: true

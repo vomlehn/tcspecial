@@ -438,9 +438,9 @@ mod tests {
 
     /// A link that names its terminals is written and read back as one.
     ///
-    /// The `null` node's case, and the reason a terminal is written into a
-    /// file at all: a node with two data sources and two data sinks has to say
-    /// which stream a link carries. Both spellings, because the terminal goes
+    /// A tee's case, and the reason a terminal is written into a file at all:
+    /// a node with two data sources has to say which stream a link out of it
+    /// carries. Both spellings, because the terminal goes
     /// into the `from` of the link and each format writes that its own way --
     /// and a terminal that survived the YAML and not the XML would be a file
     /// that changed meaning by being saved under another name.
@@ -450,22 +450,23 @@ mod tests {
 
         let where_ = tempfile::tempdir().expect("a directory");
         let mut document = Document::new();
-        for (name, node_type) in [("sensor", "i2c"), ("through", "null"), ("ground", "moc")] {
+        for (name, node_type) in [
+            ("sensor", "i2c"),
+            ("through", "tee-payload"),
+            ("ground", "moc"),
+        ] {
             document.apply(&Edit::AddNode {
                 name: name.into(),
                 node_type: node_type.into(),
                 home: None,
             });
         }
-        // Both streams through the null node, each saying which terminal it
-        // leaves by and which it arrives at.
-        // Every link names the data source it leaves by, that being the
-        // attribute it is written under -- and the sink it arrives at where
-        // the type has more than one, which is what the null node is for.
+        // The sensor's readings through the tee, which sends them on both
+        // ways: each link names the data source it leaves by, that being the
+        // attribute it is written under.
         for link in [
-            Link::joining("sensor", Some("payload-out"), "through", Some("payload-in")),
+            Link::joining("sensor", Some("payload-out"), "through", None),
             Link::joining("through", Some("payload-out"), "ground", None),
-            Link::joining("ground", Some("moc-out"), "through", Some("moc-in")),
             Link::joining("through", Some("moc-out"), "sensor", None),
         ] {
             document.apply(&Edit::AddLink { link });

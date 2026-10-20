@@ -52,7 +52,7 @@ pub enum Outline {
     /// its name is padded away from.
     Parallelogram,
     /// Rounded corners. A part of the vehicle, every one: a computation, a
-    /// log, a null node, a page of its own, an app aboard.
+    /// log, a null node, a tee, a page of its own, an app aboard.
     ///
     /// The process of a data-flow diagram, which is what the vehicle's own
     /// graph is made of. Drawn as a path, with each corner an arc of
@@ -594,8 +594,8 @@ pub fn room_at(outline: Outline, (width, height): (u32, u32), corner: Corner) ->
 /// Twice the area, and both ways about, so the hand has room in whichever
 /// direction it is short.
 ///
-/// What bounds it is the smallest node, which is the `null` one at 40 tall and
-/// the one with all four: two rows of terminals and their insets have to fit
+/// What bounds it is the smallest node, which is every one at 40 tall, and
+/// the type with all four, `app_all_veh`: two rows of terminals and their insets have to fit
 /// inside that height and leave the rows apart, and the two columns have to
 /// fit inside [`WIDTH`] -- see
 /// `tests::the_terminals_of_every_type_fit_inside_it`, which is what says so
@@ -783,10 +783,16 @@ pub enum NodeType {
     DeviceFile,
     Gpio,
     Compute,
-    /// A vehicle node that carries both streams through and does nothing to
-    /// what passes. The one type with all four terminals, which is what makes
-    /// it the statement of what a vehicle node is.
-    Null,
+    /// A vehicle node that takes what the ground sends and drops it.
+    NullMoc,
+    /// A vehicle node that takes a payload's data and drops it.
+    NullPayload,
+    /// A vehicle node that takes what the ground sends and sends it on both
+    /// ways: as MOC data, and again as payload data.
+    TeeMoc,
+    /// A vehicle node that takes a payload's data and sends it on both ways:
+    /// as payload data, and again as MOC data.
+    TeePayload,
     /// A vehicle node that answers each ping from the ground with the
     /// vehicle's time. See `tcslibgs::node::vehicle::ping`.
     Ping,
@@ -811,7 +817,7 @@ pub enum NodeType {
 
 impl NodeType {
     /// Every type, for the palette and for the tests.
-    pub const ALL: [NodeType; 21] = [
+    pub const ALL: [NodeType; 24] = [
         NodeType::I2c,
         NodeType::Spi,
         NodeType::Serial,
@@ -823,9 +829,12 @@ impl NodeType {
         NodeType::DeviceFile,
         NodeType::Gpio,
         NodeType::Compute,
-        NodeType::Null,
+        NodeType::TeeMoc,
+        NodeType::TeePayload,
         NodeType::Ping,
         NodeType::Log,
+        NodeType::NullMoc,
+        NodeType::NullPayload,
         NodeType::AppPayloadVeh,
         NodeType::AppMocVeh,
         NodeType::AppAllVeh,
@@ -851,7 +860,10 @@ impl NodeType {
             NodeType::DeviceFile => "device-file",
             NodeType::Gpio => "gpio",
             NodeType::Compute => "compute",
-            NodeType::Null => "null",
+            NodeType::NullMoc => "null-moc",
+            NodeType::NullPayload => "null-payload",
+            NodeType::TeeMoc => "tee-moc",
+            NodeType::TeePayload => "tee-payload",
             NodeType::Ping => "ping",
             NodeType::Log => "log",
             NodeType::AppPayloadVeh => "app_payload_veh",
@@ -1029,11 +1041,13 @@ impl NodeType {
                 ("timeout", false),
                 ("restart", false),
             ],
-            // Nothing at all, and it is the one type with nothing. A null
-            // node carries what arrives through: its name and its type are
-            // the whole of what there is to say, and the configuration check
-            // refuses any attribute written on one.
-            NodeType::Null => &[],
+            // Nothing at all. A null node drops what arrives and a tee sends
+            // it on both ways: a name and a type are the whole of what there
+            // is to say, and the configuration check refuses any attribute
+            // written on one.
+            NodeType::NullMoc | NodeType::NullPayload | NodeType::TeeMoc | NodeType::TeePayload => {
+                &[]
+            }
             // Nothing either, for the same reason: what a ping node does is
             // fixed by the format of a ping, and the check refuses an
             // attribute on one as it does on a null node.
@@ -1060,7 +1074,7 @@ impl NodeType {
     ///
     /// The four names and what each one is belong to
     /// [`tcslibgs::graph::terminals`], and for every type that module has an
-    /// answer for -- a payload kind, the ground link, a `null` vehicle node --
+    /// answer for -- a payload kind, the ground link, a tee --
     /// this reads it rather than repeating it: a terminal added there appears
     /// on the canvas without this file being touched, and the two cannot
     /// disagree about what a payload has.
@@ -1153,7 +1167,9 @@ impl NodeType {
             | NodeType::DeviceFile => "Devices",
             NodeType::Gpio => "Driven",
             NodeType::Compute => "Computation",
-            NodeType::Null => "Pass-through",
+            // Where a stream goes both ways, and where one stops.
+            NodeType::TeeMoc | NodeType::TeePayload => "Pass-through",
+            NodeType::NullMoc | NodeType::NullPayload => "Ends of the graph",
             NodeType::Ping => "Link checks",
             // Two families of one, because they are two kinds of end and now
             // two shapes: the log is where the data stops on board and the
@@ -1216,7 +1232,10 @@ impl NodeType {
             | NodeType::AppPl
             | NodeType::AppAllPl => true,
             NodeType::Compute
-            | NodeType::Null
+            | NodeType::NullMoc
+            | NodeType::NullPayload
+            | NodeType::TeeMoc
+            | NodeType::TeePayload
             | NodeType::Ping
             | NodeType::Log
             | NodeType::AppPayloadVeh
@@ -1351,12 +1370,13 @@ impl NodeType {
                 size: (WIDTH, HEIGHT),
             },
             // Software aboard.
-            // The one node that does nothing to what passes: rounded, because
-            // it is software aboard, and then open, narrow and set in the
-            // smallest type. A shape with the least in it for the node with
-            // the least in it -- and the narrow line and the small label are
-            // what tell it from the computation without colour.
-            NodeType::Null => Appearance {
+            // The node that sends a payload's data on both ways and does
+            // nothing else to it: rounded, because it is software aboard, and
+            // then open, narrow and set in the smallest type. A shape with
+            // the least in it for a node with the least in it -- and the
+            // narrow line and the small label are what tell it from the
+            // computation without colour.
+            NodeType::TeePayload => Appearance {
                 face: Face::Plain,
                 label_size: 10,
                 label_weight: 400,
@@ -1364,6 +1384,43 @@ impl NodeType {
                 outline: Rounded,
                 edge: Single,
                 weight: Narrow,
+                size: (WIDTH, HEIGHT),
+            },
+            // And the one that sends the ground's data on both ways: the line
+            // doubled and broken, being two ways at once, and the label
+            // italic, which is what a node the ground drives is set in.
+            NodeType::TeeMoc => Appearance {
+                face: Face::Plain,
+                label_size: 10,
+                label_weight: 700,
+                label_italic: true,
+                outline: Rounded,
+                edge: DashedDouble,
+                weight: Narrow,
+                size: (WIDTH, HEIGHT),
+            },
+            // The nodes where a stream stops: the dotted line doubled, the
+            // one rounded edge nothing else has, a line that runs out. The
+            // one that takes the ground's data italic, as above, and narrow;
+            // the one that takes a payload's upright and wide.
+            NodeType::NullMoc => Appearance {
+                face: Face::Plain,
+                label_size: 12,
+                label_weight: 400,
+                label_italic: true,
+                outline: Rounded,
+                edge: DottedDouble,
+                weight: Narrow,
+                size: (WIDTH, HEIGHT),
+            },
+            NodeType::NullPayload => Appearance {
+                face: Face::Plain,
+                label_size: 10,
+                label_weight: 400,
+                label_italic: false,
+                outline: Rounded,
+                edge: DottedDouble,
+                weight: Wide,
                 size: (WIDTH, HEIGHT),
             },
             // The node that answers the ground: rounded, being software aboard,
@@ -1779,8 +1836,8 @@ mod tests {
 
     /// Every terminal a type has fits inside it, clear of the others.
     ///
-    /// What bounds [`TERMINAL`]. The `null` node is 40 pixels tall and carries
-    /// all four, so growing a terminal is growing it against that: two rows
+    /// What bounds [`TERMINAL`]. An `app_all_veh` is 40 pixels tall and
+    /// carries all four, so growing a terminal is growing it against that: two rows
     /// have to fit inside the height with daylight between them, and two
     /// columns inside the width. A box that overran would be a box hanging
     /// outside its node -- pressable where nothing is drawn -- or two boxes
@@ -1986,8 +2043,8 @@ mod tests {
     ///
     /// Which is where the type has two of that kind, so that the file says
     /// which of them a link means. A payload and the ground link have one of
-    /// each and their links name neither; a `null` node, a computation and a
-    /// page have two of each, and theirs do.
+    /// each and their links name neither; a tee has two sources, and a
+    /// computation and a page two of each, and theirs do.
     ///
     /// Asked of the table the canvas draws from, because the question is about
     /// a gesture: what somebody dragged a line to is one of the boxes on the
@@ -1995,8 +2052,14 @@ mod tests {
     /// them drawn.
     #[test]
     fn a_terminal_is_written_only_where_it_says_which() {
-        for t in [NodeType::Null, NodeType::Compute, NodeType::Subdiagram] {
+        for t in [NodeType::AppAllVeh, NodeType::Compute, NodeType::Subdiagram] {
             assert!(t.must_name(true), "{}", t.spelling());
+            assert!(t.must_name(false), "{}", t.spelling());
+        }
+        // A tee has one sink, which needs no naming, and two sources, which
+        // do.
+        for t in [NodeType::TeeMoc, NodeType::TeePayload] {
+            assert!(!t.must_name(true), "{}", t.spelling());
             assert!(t.must_name(false), "{}", t.spelling());
         }
         // One data sink and one data source: nothing to say which.
@@ -2015,7 +2078,10 @@ mod tests {
     #[test]
     fn a_line_is_drawn_to_the_terminal_the_link_means() {
         // Named, and the type has it.
-        assert_eq!(terminal_for("null", Some("moc-in"), true), Some("moc-in"));
+        assert_eq!(
+            terminal_for("app_all_veh", Some("moc-in"), true),
+            Some("moc-in")
+        );
         // Named, and the type has not: a computation's own input, which is
         // not a terminal. The groundward sink is where readings arrive.
         assert_eq!(
@@ -2028,8 +2094,11 @@ mod tests {
         // Nothing named and two of that kind: the groundward one, which is
         // what a node does unless the file says otherwise. The checking
         // refuses such a file; the canvas still has to draw it.
-        assert_eq!(terminal_for("null", None, false), Some("payload-out"));
-        assert_eq!(terminal_for("null", None, true), Some("payload-in"));
+        assert_eq!(
+            terminal_for("app_all_veh", None, false),
+            Some("payload-out")
+        );
+        assert_eq!(terminal_for("app_all_veh", None, true), Some("payload-in"));
         // Nothing to read from a log, and nothing known about a type this
         // build does not have.
         assert_eq!(terminal_for("log", None, false), None);
@@ -2190,12 +2259,20 @@ mod tests {
     fn every_type_states_what_it_requires() {
         for t in NodeType::ALL {
             let attributes = t.attributes();
-            // A null node and a ping node are the two types with nothing to
-            // say: one carries what arrives through and the other answers
-            // pings, so a name and a type are the whole of either, and the
-            // configuration check refuses any attribute written on one. Every
-            // other type that said nothing would be a node that means nothing.
-            if matches!(t, NodeType::Null | NodeType::Ping) {
+            // The null nodes, the tees and a ping node are the types with
+            // nothing to say: one drops what arrives, one sends it on both
+            // ways and the last answers pings, so a name and a type are the
+            // whole of any of them, and the configuration check refuses any
+            // attribute written on one. Every other type that said nothing
+            // would be a node that means nothing.
+            if matches!(
+                t,
+                NodeType::NullMoc
+                    | NodeType::NullPayload
+                    | NodeType::TeeMoc
+                    | NodeType::TeePayload
+                    | NodeType::Ping
+            ) {
                 assert!(attributes.is_empty(), "{} says nothing", t.spelling());
                 continue;
             }

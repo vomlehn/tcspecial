@@ -1660,6 +1660,16 @@ the beacons
     ``beacon.send`` to ``beacon.recv``.
 
 Requirement
+    The beacon socket is bound and ``beacon.recv`` resolved before the beacon
+    thread starts, and either failing stops tcspecial before it starts, naming
+    the setting to change. Found on the thread, the failure ended the thread
+    in silence and the vehicle flew on without beacons -- which the ground
+    cannot tell from a vehicle that is not there. Once beacons are going,
+    nothing ends them: a send that fails is reported once when the beacons
+    stop going and once when they go again, so an hour without a route is two
+    lines in the log rather than one per beacon.
+
+Requirement
     Commands are read and answered on a thread of their own, and never on the
     thread that runs the pass. A command interpreter that took its turn inside
     a pass would answer at the rate of the slowest group in the configuration,

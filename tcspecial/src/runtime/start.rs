@@ -217,6 +217,10 @@ fn telemetry_log(graph: &Graph) -> Result<TelemetryLog, String> {
 /// this build's version and the configuration's digest.
 /// An interval of nought sends none. Recorded in the telemetry log, which is
 /// the vehicle's own account of what it sent.
+///
+/// A `beacon.send` that cannot be bound, or a `beacon.recv` that does not
+/// resolve, stops the start: a vehicle flying without beacons is one the
+/// ground cannot tell from a dead one.
 fn beacons(
     graph: &Graph,
     digest: ConfigDigest,
@@ -235,7 +239,8 @@ fn beacons(
         telemetry_log,
         ConfigVersion::of_this_build(),
         digest,
-    );
+    )
+    .map_err(|e| e.to_string())?;
     if sending.is_some() {
         summary(format!(
             "{} ms beacon: {} to {}",

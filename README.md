@@ -8,11 +8,20 @@ which has influenced the design to work with non-reliable communication links.
 However, it will work find over any distance and is extensible to use reliable links
 and.
 
+Work is under way on integrating TCSpecial, with its telemetry log
+[tcslog](https://github.com/vomlehn/tcslog) and its packet compiler
+[tcsxtce](https://github.com/vomlehn/tcsxtce), with NASA's core Flight System
+(cFS) and JPL's F´ (F Prime): see docs/third-party.rst.
+
+> **Note:** integration with cFS and F´ is a work in progress. None of it is
+> built yet, and the plan may change as it is.
+
 # To Run
 
 This is a pre-pre-pre-alpha release that mostly displays the GUI. There is a
-design document in docs/design.rst. The docs/Makefile will build design.html
-for viewing.
+design document in docs/design.rst, a manual in docs/manual.rst, and a plan
+for integration with cFS and F´ in docs/third-party.rst. The docs/Makefile
+will build HTML pages of each for viewing.
 
 * Clone the source
 

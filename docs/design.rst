@@ -6890,8 +6890,14 @@ Requirement
     ``"0x48"``. Both formats accept either spelling and both mean the same
     value.
 
-Attribute names may be spelled with either underscores or hyphens, so
-``max_length`` and ``max-length`` are the same attribute.
+Requirement
+    An attribute has one spelling. A file that writes another -- hyphens
+    where the name has underscores, or underscores where it has hyphens -- is
+    refused like any word nothing reads, and is told the spelling:
+    ``max-length`` is answered *it is spelled max_length*. Two spellings would
+    be twice the words for the editor, the XML and the YAML to agree about,
+    and a node that wrote both would say one thing twice with nothing to
+    choose between them. See ``tcslibgs::graph::spelled``.
 
 Simulator Configuration Files
 =============================

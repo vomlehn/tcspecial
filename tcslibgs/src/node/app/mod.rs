@@ -390,11 +390,21 @@ pub fn params_of(
 
     for attribute in attributes.keys() {
         if !known.iter().any(|(name, _)| name == attribute) {
-            return Err(named(format!(
-                "there is nothing called \"{attribute}\" on an {node_type} node. \
-                 It takes {}",
-                listed(known)
-            )));
+            let hint = crate::graph::spelled(attribute, |other| {
+                known.iter().any(|(name, _)| *name == other)
+            });
+            return Err(named(match hint {
+                Some(hint) => {
+                    format!(
+                        "there is nothing called \"{attribute}\" on an {node_type} node: {hint}"
+                    )
+                }
+                None => format!(
+                    "there is nothing called \"{attribute}\" on an {node_type} node. \
+                     It takes {}",
+                    listed(known)
+                ),
+            }));
         }
     }
 
@@ -956,6 +966,25 @@ mod tests {
         assert!(why.contains("progam"), "{why}");
         assert!(
             why.contains("executable, app-payload-arg, restart"),
+            "{why}"
+        );
+    }
+
+    /// An attribute written with underscores where it has hyphens is told
+    /// the one spelling it has, rather than handed the list to find it in.
+    #[test]
+    fn an_attribute_with_its_hyphens_swapped_is_told_its_spelling() {
+        let why = params_of(
+            "fore",
+            "app_payload_veh",
+            &said(&[
+                ("executable", "/bin/true"),
+                ("app_payload_arg", "--readings"),
+            ]),
+        )
+        .expect_err("one spelling");
+        assert!(
+            why.contains("\"app_payload_arg\"") && why.contains("it is spelled app-payload-arg"),
             "{why}"
         );
     }

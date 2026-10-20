@@ -321,6 +321,27 @@ pub fn is_node_type(node_type: &str) -> bool {
         .any(|section| types_in(section).contains(&node_type))
 }
 
+/// What to tell a file that wrote an attribute with hyphens where it has
+/// underscores, or the other way round, if that is what it did.
+///
+/// An attribute has the one spelling. Two would be twice the words for the
+/// editor, the XML and the YAML to agree about, and a file that said both
+/// would say one thing twice with nothing to choose between them. So
+/// `max-length` is refused like any word nothing reads -- but a reader who
+/// wrote it meant something real, and is told its spelling rather than left
+/// to find it. `known` is whether a name is an attribute where `said` was
+/// written; the answer is `it is spelled max_length`, or `None` when the
+/// other spelling is not one either.
+///
+/// The one statement of the hint, for every node type's refusal of a word it
+/// does not know.
+pub fn spelled(said: &str, known: impl Fn(&str) -> bool) -> Option<String> {
+    [said.replace('-', "_"), said.replace('_', "-")]
+        .into_iter()
+        .find(|other| other != said && known(other))
+        .map(|other| format!("it is spelled {other}"))
+}
+
 /// Whether the ground may start and stop a node of this type.
 ///
 /// Every type but `ping`. A ping node is how the ground learns that the link
@@ -1356,6 +1377,24 @@ fn whole_micros(text: &str, digits: &str, unit: &str, micros: f64) -> Result<u64
 mod tests {
     use super::*;
     use std::path::Path;
+
+    /// The hint is the other spelling, either way round, and only when that
+    /// spelling is a word where it was written.
+    #[test]
+    fn spelled_offers_the_other_spelling_only_where_it_is_real() {
+        let known = |name: &str| ["max_length", "app-moc-arg"].contains(&name);
+        assert_eq!(
+            spelled("max-length", known).as_deref(),
+            Some("it is spelled max_length")
+        );
+        assert_eq!(
+            spelled("app_moc_arg", known).as_deref(),
+            Some("it is spelled app-moc-arg")
+        );
+        assert_eq!(spelled("max-lenght", known), None, "a misspelling");
+        assert_eq!(spelled("max_length", known), None, "itself is no hint");
+        assert_eq!(spelled("datarate", known), None, "nothing to swap");
+    }
 
     /// Each type is in one section, the one [`section_of`] says, and the
     /// payloads' list is [`Node::is_payload_type`]'s.

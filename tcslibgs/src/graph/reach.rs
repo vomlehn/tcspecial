@@ -94,137 +94,39 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
     let what = node.name.as_str();
     let kind = kind_of(node)?;
 
-    let mut terms = LinkTerms::default();
-    let mut stream = StreamTerms {
-        max_length: None,
-        timeout: None,
-        terminators: None,
-        length_prefix: None,
-    };
-    let mut stream_stated = false;
-    let mut read_size = None;
-    let mut trigger = None;
-    let mut init = None;
-    let mut read_delay = None;
-
+    let mut said = Said::default();
     for (attribute, value) in &node.attributes {
-        // The terms of a link go to the rules for the type, whichever type
-        // they belong to: one on the wrong type is refused by that type's own
-        // rules, in the words it has always used.
-        if put_term(&mut terms, attribute, value) {
-            continue;
-        }
-
-        match attribute.as_str() {
-            // Where it is. Which attributes locate a node depends on its
-            // type, and one that locates another type is refused rather than
-            // ignored: a port on a node reached through a device file is a
-            // file that looks configured and is not.
-            other if LOCATORS.contains(&other) => {
-                if !locators(kind).contains(&other) {
-                    return Err(format!(
-                        "\"{what}\" is {} {} node, so {other} does not locate it: \
-                         it is located by {}",
-                        kind.article(),
-                        node.node_type,
-                        locators(kind).join(" and ")
-                    ));
-                }
-            }
-            // When it is read, which is the schedule's business and not
-            // this one's: the group it is read with, or the rate it states
-            // for itself -- `trigger_interval` where it is asked and
-            // `poll_interval` where it is simply read.
-            "group" | "interval" | "trigger_interval" | "poll_interval" => {}
-            // How long to wait between asking and reading, which is this
-            // one's: it belongs to the part rather than to the schedule.
-            "read_delay" => {
-                read_delay = Some(
-                    crate::graph::parse_interval(value.as_str())
-                        .map_err(|why| format!("\"{what}\": read_delay: {why}"))?,
-                );
-            }
-            // Where a ground link's data goes, which only a ground link has:
-            // read below.
-            "ground_base" if node.node_type == "moc" => {}
-            "ground_base" => {
-                return Err(format!(
-                    "\"{what}\" is {} {} node, and ground_base says where a ground \
-                     link's data goes: only a moc node has one",
-                    kind.article(),
+        if !take(&mut said, node, kind, attribute, value)? {
+            // A retired word is not one to point a reader at: see
+            // `retired_term`.
+            let known = |name: &str| {
+                retired_term(name).is_none()
+                    && take(&mut Said::default(), node, kind, name, &Scalar::of("")) != Ok(false)
+            };
+            return Err(match crate::graph::spelled(attribute, known) {
+                Some(hint) => format!(
+                    "\"{what}\": there is nothing called \"{attribute}\" on a {} node: \
+                     {hint}",
                     node.node_type
-                ))
-            }
-            "read_size" => {
-                let size = number(what, "read_size", value)?;
-                if size == 0 {
-                    return Err(format!(
-                        "\"{what}\": read_size must be more than nought -- a read of no \
-                         bytes is not a read, and a node that is not read says nothing \
-                         about it"
-                    ));
-                }
-                read_size = Some(size);
-            }
-            "trigger" => {
-                trigger = Some(
-                    crate::trigger::trigger_bytes(value.as_str())
-                        .map_err(|why| format!("\"{what}\": trigger: {why}"))?,
-                );
-            }
-            // Written the way a trigger is, because it is bytes written the
-            // way a trigger is: only once, as the node opens.
-            "init" if node.node_type == "moc" => {
-                return Err(format!(
-                    "\"{what}\" is a link to the ground, and init is what a payload \
-                     is set to as the vehicle opens it: a ground link has no state \
-                     to start in"
-                ))
-            }
-            "init" => {
-                init = Some(
-                    crate::trigger::bytes_of(&crate::trigger::INIT, value.as_str())
-                        .map_err(|why| format!("\"{what}\": {why}"))?,
-                );
-            }
-            // Where one read of a stream ends. Four attributes rather than a
-            // section of its own, because a node's attributes are flat and
-            // there is nowhere to nest them.
-            "max_length" => {
-                stream.max_length = Some(value.clone());
-                stream_stated = true;
-            }
-            "read_timeout" => {
-                stream.timeout = Some(value.clone());
-                stream_stated = true;
-            }
-            "terminators" => {
-                stream.terminators = Some(ByteList::of(value.as_str()));
-                stream_stated = true;
-            }
-            "length_prefix" => {
-                stream.length_prefix = Some(value.clone());
-                stream_stated = true;
-            }
-            // One a configuration used to write, told what to say instead:
-            // see `retired_term`, and the note there about why it is not a
-            // misspelling.
-            other if retired_term(other).is_some() => {
-                return Err(format!(
-                    "\"{what}\": \"{other}\" is no longer an attribute: {}",
-                    retired_term(other).expect("just asked")
-                ))
-            }
-            other => {
-                return Err(format!(
-                    "\"{what}\": there is nothing called \"{other}\" on a \
+                ),
+                None => format!(
+                    "\"{what}\": there is nothing called \"{attribute}\" on a \
                      {} node. An attribute nothing reads is worse than one that \
                      is refused: it looks like something that was set",
                     node.node_type
-                ))
-            }
+                ),
+            });
         }
     }
+    let Said {
+        mut terms,
+        stream,
+        stream_stated,
+        read_size,
+        trigger,
+        init,
+        read_delay,
+    } = said;
 
     if stream_stated {
         terms.stream = Some(stream);
@@ -393,6 +295,162 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
         ground,
         stream: framing,
     })
+}
+
+/// What a node's attributes have said so far, as [`take`] sorts them.
+struct Said {
+    terms: LinkTerms,
+    stream: StreamTerms,
+    stream_stated: bool,
+    read_size: Option<u32>,
+    trigger: Option<Vec<u8>>,
+    init: Option<Vec<u8>>,
+    read_delay: Option<std::time::Duration>,
+}
+
+impl Default for Said {
+    fn default() -> Said {
+        Said {
+            terms: LinkTerms::default(),
+            stream: StreamTerms {
+                max_length: None,
+                timeout: None,
+                terminators: None,
+                length_prefix: None,
+            },
+            stream_stated: false,
+            read_size: None,
+            trigger: None,
+            init: None,
+            read_delay: None,
+        }
+    }
+}
+
+/// Put one attribute where it belongs: `Ok(false)` for a word nothing here
+/// reads, which the caller refuses.
+///
+/// Apart from [`reach_of`] so that a refusal can ask whether the word with
+/// its hyphens and underscores swapped is one this reads -- by asking this,
+/// rather than a second list of the words that would drift from the first.
+fn take(
+    said: &mut Said,
+    node: &Node,
+    kind: DHType,
+    attribute: &str,
+    value: &Scalar,
+) -> Result<bool, String> {
+    let what = node.name.as_str();
+    // The terms of a link go to the rules for the type, whichever type
+    // they belong to: one on the wrong type is refused by that type's own
+    // rules, in the words it has always used.
+    if put_term(&mut said.terms, attribute, value) {
+        return Ok(true);
+    }
+
+    match attribute {
+        // Where it is. Which attributes locate a node depends on its
+        // type, and one that locates another type is refused rather than
+        // ignored: a port on a node reached through a device file is a
+        // file that looks configured and is not.
+        other if LOCATORS.contains(&other) => {
+            if !locators(kind).contains(&other) {
+                return Err(format!(
+                    "\"{what}\" is {} {} node, so {other} does not locate it: \
+                     it is located by {}",
+                    kind.article(),
+                    node.node_type,
+                    locators(kind).join(" and ")
+                ));
+            }
+        }
+        // When it is read, which is the schedule's business and not
+        // this one's: the group it is read with, or the rate it states
+        // for itself -- `trigger_interval` where it is asked and
+        // `poll_interval` where it is simply read.
+        "group" | "interval" | "trigger_interval" | "poll_interval" => {}
+        // How long to wait between asking and reading, which is this
+        // one's: it belongs to the part rather than to the schedule.
+        "read_delay" => {
+            said.read_delay = Some(
+                crate::graph::parse_interval(value.as_str())
+                    .map_err(|why| format!("\"{what}\": read_delay: {why}"))?,
+            );
+        }
+        // Where a ground link's data goes, which only a ground link has:
+        // read below.
+        "ground_base" if node.node_type == "moc" => {}
+        "ground_base" => {
+            return Err(format!(
+                "\"{what}\" is {} {} node, and ground_base says where a ground \
+                 link's data goes: only a moc node has one",
+                kind.article(),
+                node.node_type
+            ))
+        }
+        "read_size" => {
+            let size = number(what, "read_size", value)?;
+            if size == 0 {
+                return Err(format!(
+                    "\"{what}\": read_size must be more than nought -- a read of no \
+                     bytes is not a read, and a node that is not read says nothing \
+                     about it"
+                ));
+            }
+            said.read_size = Some(size);
+        }
+        "trigger" => {
+            said.trigger = Some(
+                crate::trigger::trigger_bytes(value.as_str())
+                    .map_err(|why| format!("\"{what}\": trigger: {why}"))?,
+            );
+        }
+        // Written the way a trigger is, because it is bytes written the
+        // way a trigger is: only once, as the node opens.
+        "init" if node.node_type == "moc" => {
+            return Err(format!(
+                "\"{what}\" is a link to the ground, and init is what a payload \
+                 is set to as the vehicle opens it: a ground link has no state \
+                 to start in"
+            ))
+        }
+        "init" => {
+            said.init = Some(
+                crate::trigger::bytes_of(&crate::trigger::INIT, value.as_str())
+                    .map_err(|why| format!("\"{what}\": {why}"))?,
+            );
+        }
+        // Where one read of a stream ends. Four attributes rather than a
+        // section of its own, because a node's attributes are flat and
+        // there is nowhere to nest them.
+        "max_length" => {
+            said.stream.max_length = Some(value.clone());
+            said.stream_stated = true;
+        }
+        "read_timeout" => {
+            said.stream.timeout = Some(value.clone());
+            said.stream_stated = true;
+        }
+        "terminators" => {
+            said.stream.terminators = Some(ByteList::of(value.as_str()));
+            said.stream_stated = true;
+        }
+        "length_prefix" => {
+            said.stream.length_prefix = Some(value.clone());
+            said.stream_stated = true;
+        }
+        // One a configuration used to write, told what to say instead:
+        // see `retired_term`, and the note there about why it is not a
+        // misspelling.
+        other if retired_term(other).is_some() => {
+            return Err(format!(
+                "\"{what}\": \"{other}\" is no longer an attribute: {}",
+                retired_term(other).expect("just asked")
+            ))
+        }
+        _ => return Ok(false),
+    }
+    Ok(true)
 }
 
 /// Why this interface cannot be asked for a reading, if it cannot.
@@ -2031,6 +2089,37 @@ mod tests {
             ("read_timeout", "1 s"),
         ])
         .expect("a prefix alone fits");
+    }
+
+    /// An attribute written with hyphens for its underscores is refused,
+    /// and told its spelling: an attribute has the one.
+    #[test]
+    fn an_attribute_with_hyphens_is_told_its_spelling() {
+        for (written, spelled) in [
+            ("max-length", "max_length"),
+            ("read-timeout", "read_timeout"),
+            ("stop-bits", "stop_bits"),
+            ("ip-protocol", "ip_protocol"),
+        ] {
+            let said = reached("serial", &line_with(&[(written, "1")])).expect_err("one spelling");
+            assert!(
+                said.contains(&format!("\"{written}\""))
+                    && said.contains(&format!("it is spelled {spelled}")),
+                "{written}: {said}"
+            );
+        }
+    }
+
+    /// A word that is not an attribute either way is refused as before, with
+    /// no spelling to offer -- and so is one whose other spelling is retired.
+    #[test]
+    fn a_word_with_no_other_spelling_gets_no_hint() {
+        let said = reached("serial", &line_with(&[("max-lenght", "1")])).expect_err("nothing");
+        assert!(!said.contains("spelled"), "{said}");
+        assert!(said.contains("looks like something that was set"), "{said}");
+
+        let said = reached("serial", &line_with(&[("debounce-us", "1")])).expect_err("nothing");
+        assert!(!said.contains("spelled"), "{said}");
     }
 
     #[test]

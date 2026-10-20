@@ -435,11 +435,20 @@ pub fn params_of(what: &str, attributes: &BTreeMap<String, Scalar>) -> Result<Co
     };
     for attribute in attributes.keys() {
         if !own.contains(&attribute.as_str()) {
-            return Err(named(format!(
-                "there is nothing called \"{attribute}\" on this computation. It \
-                 takes {}",
-                own.join(", ")
-            )));
+            return Err(named(
+                match crate::graph::spelled(attribute, |other| own.contains(&other)) {
+                    Some(hint) => {
+                        format!(
+                            "there is nothing called \"{attribute}\" on this computation: {hint}"
+                        )
+                    }
+                    None => format!(
+                        "there is nothing called \"{attribute}\" on this computation. It \
+                         takes {}",
+                        own.join(", ")
+                    ),
+                },
+            ));
         }
     }
 
@@ -1125,6 +1134,15 @@ mod tests {
             said.contains("setpiont") && said.contains("setpoint, half_band"),
             "{said}"
         );
+
+        // A parameter written with a hyphen for its underscore is told the
+        // spelling it has.
+        let said = refused(&[
+            ("function", "hysteresis"),
+            ("setpoint", "293.15"),
+            ("half-band", "2"),
+        ]);
+        assert!(said.contains("it is spelled half_band"), "{said}");
 
         // And one that belongs to another computation, which is the same
         // mistake from the other direction.

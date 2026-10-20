@@ -114,16 +114,24 @@ pub struct LogParams {
 /// was misspelled would be opened in whichever format the default happens to
 /// be and would look exactly like a configured log.
 pub fn params_of(what: &str, attributes: &BTreeMap<String, Scalar>) -> Result<LogParams, String> {
+    const OWN: [&str; 3] = ["directory", "format", "segment_bytes"];
     for attribute in attributes.keys() {
-        match attribute.as_str() {
-            "directory" | "format" | "segment_bytes" => {}
-            other => {
-                return Err(format!(
-                    "\"{what}\": there is nothing called \"{other}\" on a log node. It \
-                     takes directory, format and segment_bytes"
-                ))
-            }
+        if OWN.contains(&attribute.as_str()) {
+            continue;
         }
+        return Err(
+            match crate::graph::spelled(attribute, |other| OWN.contains(&other)) {
+                Some(hint) => {
+                    format!(
+                        "\"{what}\": there is nothing called \"{attribute}\" on a log node: {hint}"
+                    )
+                }
+                None => format!(
+                    "\"{what}\": there is nothing called \"{attribute}\" on a log node. It \
+                     takes directory, format and segment_bytes"
+                ),
+            },
+        );
     }
 
     let directory = attributes
@@ -257,6 +265,24 @@ mod tests {
             .segment_bytes,
             4096
         );
+    }
+
+    /// A log's attribute written with hyphens is told its spelling.
+    #[test]
+    fn segment_bytes_with_a_hyphen_is_told_its_spelling() {
+        let said = params_of(
+            "log",
+            &[
+                ("directory", "/tmp"),
+                ("format", "variable_simple"),
+                ("segment-bytes", "4096"),
+            ]
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), Scalar::of(v)))
+            .collect(),
+        )
+        .expect_err("one spelling");
+        assert!(said.contains("it is spelled segment_bytes"), "{said}");
     }
 
     /// What a log cannot do without, and what it cannot have.

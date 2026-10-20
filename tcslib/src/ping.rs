@@ -254,11 +254,24 @@ impl Pinger {
     }
 }
 
+/// What a panel shows for a ping or an answer before there is one: the
+/// beacon panel's placeholder, so that the two say "nothing yet" alike.
+pub const NO_MESSAGE: &str = crate::beacon::NO_BEACON_MESSAGE;
+
+/// What [`precise_time`] shows for no time: the beacon panel's `--:--:--`,
+/// with the fraction, so that a field keeps its width when one arrives.
+pub const NO_PRECISE_TIME: &str = "--:--:--.---------";
+
+/// What [`interval`] shows for no length of time: the shape of one, as
+/// [`NO_PRECISE_TIME`] is the shape of a time.
+pub const NO_INTERVAL: &str = "--.------ ms";
+
 /// A time of day to the nanosecond, UTC, as a ping is timed: the panels'
-/// `HH:MM:SS` with the fraction a ping is about. Empty for no time.
+/// `HH:MM:SS` with the fraction a ping is about. [`NO_PRECISE_TIME`] for no
+/// time.
 pub fn precise_time(since_epoch: Option<Duration>) -> String {
     let Some(at) = since_epoch else {
-        return String::new();
+        return NO_PRECISE_TIME.to_string();
     };
     let within_a_day = at.as_secs() % 86_400;
     format!(
@@ -271,10 +284,10 @@ pub fn precise_time(since_epoch: Option<Duration>) -> String {
 }
 
 /// A length of time between two of a ping's times, in milliseconds to the
-/// nanosecond, with its sign. Empty for none.
+/// nanosecond, with its sign. [`NO_INTERVAL`] for none.
 pub fn interval(nanoseconds: Option<i128>) -> String {
     let Some(nanoseconds) = nanoseconds else {
-        return String::new();
+        return NO_INTERVAL.to_string();
     };
     let sign = if nanoseconds < 0 { "-" } else { "" };
     let magnitude = nanoseconds.unsigned_abs();
@@ -397,11 +410,12 @@ mod tests {
             precise_time(Some(Duration::new(3600 + 120 + 3, 4))),
             "01:02:03.000000004"
         );
-        assert_eq!(precise_time(None), "");
+        assert_eq!(precise_time(None), "--:--:--.---------");
         assert_eq!(interval(Some(16_441_799)), "16.441799 ms");
         assert_eq!(interval(Some(-250_000)), "-0.250000 ms");
         assert_eq!(interval(Some(0)), "0.000000 ms");
-        assert_eq!(interval(None), "");
+        assert_eq!(interval(None), "--.------ ms");
+        assert_eq!(NO_MESSAGE, "<none>");
     }
 
     /// The shipped example's ping node is found, through its moc node, and a

@@ -140,7 +140,7 @@ impl Sizes {
             panel_height: 204.0,
             grid_spacing: 10.0,
             chrome_width: 36.0,
-            chrome_height: 398.0,
+            chrome_height: 436.0,
         }
     }
 
@@ -1028,6 +1028,14 @@ mod tests {
 
             let _ = Sizes::settle(&ui);
             ui.set_dh_model(ModelRc::from(Rc::new(VecModel::from(rows))));
+            // A beacon as long as one is, which is the longest line above the
+            // grid and wraps where the window is narrow: the chrome has to
+            // have room for it, and not only for the `<none>` the window
+            // opens with.
+            ui.set_beacon_last_msg(SharedString::from(format!(
+                "tcspecial v0.1.0, config v2.0.0, md5 {}",
+                "e".repeat(32)
+            )));
 
             // Opened as main() opens it, room rule and all.
             let sizes = Sizes::of(&ui);

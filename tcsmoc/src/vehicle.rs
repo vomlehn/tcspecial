@@ -1389,8 +1389,19 @@ pub(crate) mod tests {
         assert!(ui.get_can_ping_node(), "the Ping node button is there");
         ui.invoke_ping_node_clicked();
 
-        // The press: a ping goes up, numbered from one, and is shown.
-        ping_window.invoke_send_clicked();
+        // The press -- Enter, which the window takes from the moment it
+        // opens, as it does a click on Send ping: a ping goes up, numbered
+        // from one, and is shown.
+        for event in [
+            slint::platform::WindowEvent::KeyPressed {
+                text: slint::platform::Key::Return.into(),
+            },
+            slint::platform::WindowEvent::KeyReleased {
+                text: slint::platform::Key::Return.into(),
+            },
+        ] {
+            ping_window.window().dispatch_event(event);
+        }
         let mut buffer = [0u8; ping::REPLY_BYTES];
         let (got, _) = vehicle.recv_from(&mut buffer).expect("the ping arrived");
         let sent = std::str::from_utf8(&buffer[..got])
@@ -1403,7 +1414,7 @@ pub(crate) mod tests {
         assert_eq!(ping_window.get_sent().as_str(), sent);
         assert_eq!(
             ping_window.get_received_time().as_str(),
-            "",
+            tcslib::ping::NO_PRECISE_TIME,
             "nothing has answered it"
         );
 

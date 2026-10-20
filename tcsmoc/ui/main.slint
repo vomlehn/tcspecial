@@ -342,7 +342,7 @@ export component MainWindow inherits Window {
     // only the floors, below which the command interpreter's controls stop
     // fitting side by side and the grid stops having room for a row of
     // panels. The height is one row of panels and the chrome below:
-    // panel-height as PanelProbe measures it, 204, and chrome-height, 398.
+    // panel-height as PanelProbe measures it, 204, and chrome-height, 436.
     // A window of only this, which is what the panel tests open, that is
     // short of a row cuts a panel's last line off, and
     // every_panel_shows_what_arrived_from_its_payload is what notices.
@@ -350,7 +350,7 @@ export component MainWindow inherits Window {
     // One row of panels and the chrome, which is the least the window is ever
     // opened at -- a tcspecial configuration of one handler. How much more it
     // opens at is Rust's to say: see rows_of_room() in main.rs.
-    min-height: 602px;
+    min-height: 640px;
     background: white;
 
     // Whether this window takes no presses: true while a question in a window
@@ -441,14 +441,16 @@ export component MainWindow inherits Window {
     // Height: everything above and below the grid -- both group box
     // headings, the command interpreter's controls, the row holding Quit, the
     // padding round them all, and the grid's own padding inside the scrolling
-    // area. Width: the padding of the scrolling area and of the grid inside
+    // area. 436 since the beacon's box took a title and its message took a
+    // second line where the window is too narrow for it in one, which
+    // together are 38 more than the row above the grid had been. Width: the padding of the scrolling area and of the grid inside
     // it. The width was 30 in main.rs and wanted 36, and the column gaps were
     // left out of the window's width altogether, so a three-column grid stood
     // twenty-six pixels wider than the area it scrolled in and the last
     // column was cut off.
     out property <length> grid-spacing: 10px;
     out property <length> chrome-width: 36px;
-    out property <length> chrome-height: 398px;
+    out property <length> chrome-height: 436px;
 
     // Rows follow from the panel count and the column count.
     property <int> grid-rows: Math.max(1, Math.ceil(dh-model.length / Math.max(1, columns)));
@@ -530,6 +532,12 @@ export component MainWindow inherits Window {
                             // CHROME_HEIGHT in main.rs.
                             padding: 6px;
                             spacing: 2px;
+                            // Centred, because the beacon's box beside this
+                            // one is the taller and the row is as tall as it:
+                            // the surplus goes above and below, rather than
+                            // into the rows, where it would stretch the
+                            // Connect button.
+                            alignment: center;
 
                             Text {
                                 text: "tcspecial link";
@@ -832,13 +840,15 @@ export component PingWindow inherits Window {
     in property <string> down;
     callback send-clicked();
 
-    preferred-width: 560px;
+    // Enter or Space sends a ping from the moment the window opens.
+    forward-focus: panel;
 
     VerticalLayout {
         padding: 10px;
         spacing: 6px;
-        Text { text: "Pinging " + node; font-italic: true; }
-        PingPanel {
+        // Titled with the node, so that the box says what it is pinging.
+        panel := PingPanel {
+            title: "Pinging " + root.node;
             sent: root.sent;
             sent-time: root.sent-time;
             received: root.received;

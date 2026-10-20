@@ -8,6 +8,7 @@ written after, and each module after the Rust it says again:
 |---|---|---|
 | `tcslib/beacon.py` | `tcslib/src/beacon.rs` | Listening for beacons: the socket loop, how stale the last one is, the beacons that did not arrive, and whether the configuration it announces is the one this station read. No window. |
 | `tcsui/beacon_panel.py` | `tcsui/src/lib.rs`, `tcsui/ui/beacon.slint` | The beacon panel -- the light, when the last beacon arrived, and what it said -- in tkinter, with the same colours, labels and placeholders. |
+| `tcsui/theme.py` | `tcsui/ui/titled.slint`, the Slint windows' style | The ttk theme every Tk window is drawn in, and the kinds of text a panel holds: a heading, a value, the figure it is read for, a note. |
 | `tcslibgs/ping.py` | `tcslibgs/src/node/vehicle/ping/mod.rs` | What a ping and its answer say. |
 | `tcslibgs/configuration.py` | `tcslibgs::graph::parameters`, `graph::order`, `graph::telemetry`, `types::came_from` | What a ground station reads out of a configuration: where the beacons are, where a `moc` node is bound, and which port a source's data arrives at. |
 

@@ -43,9 +43,18 @@ import socket
 import time
 from dataclasses import dataclass
 
+from tcslib.beacon import NO_BEACON_MESSAGE
 from tcslibgs import ping
 
 NANOS = 1_000_000_000
+
+#: What a panel shows for a ping or an answer before there is one:
+#: ``tcslib::ping::NO_MESSAGE``, the beacon panel's placeholder.
+NO_MESSAGE = NO_BEACON_MESSAGE
+#: What :func:`precise_time` shows for no time: ``NO_PRECISE_TIME``.
+NO_PRECISE_TIME = "--:--:--.---------"
+#: What :func:`interval` shows for no length of time: ``NO_INTERVAL``.
+NO_INTERVAL = "--.------ ms"
 
 
 @dataclass(frozen=True)
@@ -164,9 +173,10 @@ class Pinger:
 
 def precise_time(since_epoch):
     """A time of day to the nanosecond, UTC, as a ping is timed: the beacon
-    panel's ``HH:MM:SS`` with the fraction a ping is about."""
+    panel's ``HH:MM:SS`` with the fraction a ping is about;
+    :data:`NO_PRECISE_TIME` for none."""
     if since_epoch is None:
-        return ""
+        return NO_PRECISE_TIME
     seconds, nanoseconds = divmod(since_epoch, NANOS)
     within_a_day = seconds % 86_400
     return (
@@ -177,9 +187,10 @@ def precise_time(since_epoch):
 
 def interval(nanoseconds):
     """A length of time between two of a ping's times, in milliseconds to the
-    nanosecond, with its sign: either one-way time may be negative."""
+    nanosecond, with its sign: either one-way time may be negative;
+    :data:`NO_INTERVAL` for none."""
     if nanoseconds is None:
-        return ""
+        return NO_INTERVAL
     sign = "-" if nanoseconds < 0 else ""
     whole, part = divmod(abs(nanoseconds), 1_000_000)
     return f"{sign}{whole}.{part:06d} ms"

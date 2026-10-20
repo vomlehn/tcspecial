@@ -175,11 +175,17 @@ pub struct PingShown {
 impl PingShown {
     /// What to show for this exchange.
     pub fn of(exchange: &tcslib::ping::Exchange) -> PingShown {
-        use tcslib::ping::{interval, precise_time};
+        use tcslib::ping::{interval, precise_time, NO_MESSAGE};
         PingShown {
-            sent: exchange.sent.clone().unwrap_or_default(),
+            sent: exchange
+                .sent
+                .clone()
+                .unwrap_or_else(|| NO_MESSAGE.to_string()),
             sent_time: precise_time(exchange.sent_at),
-            received: exchange.received.clone().unwrap_or_default(),
+            received: exchange
+                .received
+                .clone()
+                .unwrap_or_else(|| NO_MESSAGE.to_string()),
             received_time: precise_time(exchange.received_at),
             round_trip: interval(exchange.round_trip()),
             up: interval(exchange.up()),
@@ -356,7 +362,16 @@ mod tests {
         use tcslib::node::vehicle::ping;
         use tcslib::ping::{Exchange, Pinger};
 
-        assert_eq!(PingShown::of(&Exchange::default()), PingShown::default());
+        // Before anything, each field shows its placeholder, in the shape of
+        // what will be there: the markup's own defaults.
+        let nothing = PingShown::of(&Exchange::default());
+        assert_eq!(nothing.sent, "<none>");
+        assert_eq!(nothing.received, "<none>");
+        assert_eq!(nothing.sent_time, "--:--:--.---------");
+        assert_eq!(nothing.received_time, "--:--:--.---------");
+        for time in [&nothing.round_trip, &nothing.up, &nothing.down] {
+            assert_eq!(time, "--.------ ms");
+        }
 
         let at = Duration::new(1_760_900_000, 0);
         let mut pinger = Pinger::new();

@@ -14,77 +14,137 @@
 // what `tcslib::ping` keeps, and set as properties: see the crate's
 // `PingShown`.
 import { Button } from "std-widgets.slint";
+import { TitledBox } from "titled.slint";
 
-export component PingPanel inherits Rectangle {
-    // The last ping sent, as it went, and when, to the nanosecond.
-    in property <string> sent: "";
-    in property <string> sent-time: "";
+// A heading over one part of the panel: what the rows under it are about.
+component Heading inherits Text {
+    font-weight: 700;
+}
+
+// A value that changes as pings come and go. In the window's own face, whose
+// digits are all one width, so that a field does not shift as they change.
+component Value inherits Text {
+    vertical-alignment: center;
+}
+
+export component PingPanel inherits TitledBox {
+    // The last ping sent, as it went, and when, to the nanosecond. Each says
+    // what tcslib::ping says for nothing yet until there is something.
+    in property <string> sent: "<none>";
+    in property <string> sent-time: "--:--:--.---------";
     // The last thing received from the ping node, and when the answer to the
-    // last ping arrived: empty from the moment a ping is sent until its own
-    // answer does.
-    in property <string> received: "";
-    in property <string> received-time: "";
+    // last ping arrived: no time from the moment a ping is sent until its own
+    // answer arrives.
+    in property <string> received: "<none>";
+    in property <string> received-time: "--:--:--.---------";
     // The three times: the round trip, and the two halves of it.
-    in property <string> round-trip: "";
-    in property <string> up: "";
-    in property <string> down: "";
+    in property <string> round-trip: "--.------ ms";
+    in property <string> up: "--.------ ms";
+    in property <string> down: "--.------ ms";
 
     callback send-clicked();
 
-    border-width: 1px;
-    border-color: #808080;
-    border-radius: 4px;
+    // Ping, or whatever the window says is being pinged.
+    title: "Ping";
+    // Enter or Space sends a ping, wherever the window's focus is, as the
+    // default button of a dialog does.
+    forward-focus: keys;
 
-    VerticalLayout {
-        padding: 6px;
-        spacing: 4px;
-
-        HorizontalLayout {
-            alignment: start;
-            Button {
-                text: "Send ping";
-                clicked => { send-clicked(); }
+    keys := FocusScope {
+        key-pressed(event) => {
+            if (event.text == Key.Return || event.text == " ") {
+                root.send-clicked();
+                return accept;
             }
+            return reject;
         }
 
-        GridLayout {
-            spacing: 4px;
-            Row {
-                Text { text: "Sent:"; }
-                Text { text: sent; }
-            }
-            Row {
-                Text { text: "Time sent:"; }
-                Text { text: sent-time; }
-            }
-            Row {
-                Text { text: "Last received:"; }
-                Text { text: received; }
-            }
-            Row {
-                Text { text: "Time received:"; }
-                Text { text: received-time; }
-            }
-            Row {
-                Text { text: "Round trip:"; }
-                Text { text: round-trip; }
-            }
-            Row {
-                Text { text: "MOC to tcspecial:"; }
-                Text { text: up; }
-            }
-            Row {
-                Text { text: "tcspecial to MOC:"; }
-                Text { text: down; }
-            }
+        // The widest an answer can be, which the message column is held to
+        // so that the panel is the width of what it will show and does not
+        // grow when the first answer arrives. Outside the layout and never
+        // drawn: only measured.
+        widest := Value {
+            visible: false;
+            text: "ping #000000 0000000000.000000000 0000000000.000000000";
         }
 
-        // What the two one-way times are, which is the thing about them a
-        // reader would otherwise get wrong.
-        Text {
-            text: "Times are UTC. The two one-way times are each read across two clocks, the MOC's and tcspecial's, so each includes how far apart they are; their sum is the round trip.";
-            wrap: word-wrap;
-            color: #4b5563;
+        VerticalLayout {
+            spacing: 6px;
+
+            // Sent and received, each a message and when, on one row: the
+            // two read as one thing, sent then and saying this.
+            GridLayout {
+                spacing-horizontal: 12px;
+                spacing-vertical: 4px;
+
+                Row {
+                    Heading { text: "Sent"; }
+                }
+                Row {
+                    Value { text: root.sent; min-width: widest.preferred-width; }
+                    Value { text: root.sent-time; }
+                }
+                Row {
+                    Heading { text: "Received"; }
+                }
+                Row {
+                    Value { text: root.received; min-width: widest.preferred-width; }
+                    Value { text: root.received-time; }
+                }
+                Row {
+                    Heading { text: "Times"; }
+                }
+            }
+
+            // The round trip is what a ping is for, so it is the large figure;
+            // the two halves are under it, smaller, because each is read
+            // across two clocks and means less alone.
+            HorizontalLayout {
+                spacing: 12px;
+                alignment: start;
+                Text {
+                    text: "Round trip";
+                    vertical-alignment: center;
+                }
+                // Half as large again as Fonts.window, the one size every
+                // window is set in, and stated as a size of its own because
+                // a size is stated in points or by name: see
+                // tcsui/tests/fonts.rs.
+                Value {
+                    text: root.round-trip;
+                    font-size: 18pt;
+                }
+            }
+            HorizontalLayout {
+                spacing: 12px;
+                alignment: start;
+                Text { text: "MOC to tcspecial"; vertical-alignment: center; }
+                Value { text: root.up; }
+                Rectangle { width: 12px; }
+                Text { text: "tcspecial to MOC"; vertical-alignment: center; }
+                Value { text: root.down; }
+            }
+
+            // What the two one-way times are, which is the thing about them a
+            // reader would otherwise get wrong -- in a line, beside the
+            // button that starts it all.
+            HorizontalLayout {
+                spacing: 12px;
+                Text {
+                    text: "Times are UTC. Each one-way time spans two clocks; the two add up to the round trip.";
+                    color: #4b5563;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+                Button {
+                    text: "Send ping";
+                    primary: true;
+                    clicked => {
+                        root.send-clicked();
+                        keys.focus();
+                    }
+                }
+            }
         }
     }
 }

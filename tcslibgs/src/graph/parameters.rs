@@ -354,6 +354,26 @@ pub fn beacon_of(graph: &Graph) -> Result<Option<crate::BeaconLink>, String> {
     Ok(Some(crate::BeaconLink::of(&ci)))
 }
 
+/// How often tcspecial beacons: the `tcspecial` section's `beacon.interval`,
+/// as a length of time. `None` for a configuration with no section, as
+/// [`beacon_of`] is.
+///
+/// What a ground station ages each beacon against -- see
+/// `tcslib::beacon::Schedule::for_interval` -- so it is read here, from the
+/// same section the link is, rather than assumed: a station that took every
+/// vehicle to beacon every five seconds would call a ten-second beacon late
+/// when it was on time.
+pub fn beacon_interval_of(graph: &Graph) -> Result<Option<std::time::Duration>, String> {
+    let Some(section) = graph.tcspecial.as_ref() else {
+        return Ok(None);
+    };
+    Ok(Some(
+        ci_config_of(&flatten(section))?
+            .to_ci_config()?
+            .beacon_interval,
+    ))
+}
+
 pub fn blank() -> BTreeMap<String, Scalar> {
     let mut said = BTreeMap::new();
     for (name, _) in ATTRIBUTES {
@@ -576,5 +596,21 @@ mod tests {
         // Which means a blank one is refused, naming the first thing to fill
         // in.
         assert!(ci_config_of(&blank).is_err());
+    }
+
+    /// The interval a ground station ages beacons against is the one the
+    /// section states, and a configuration with no section states none.
+    #[test]
+    fn the_beacon_interval_is_the_sections() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let mut graph =
+            Graph::load(root.join("examples/ping/ping.yaml")).expect("the example reads");
+        assert_eq!(
+            beacon_interval_of(&graph),
+            Ok(Some(std::time::Duration::from_secs(5)))
+        );
+
+        graph.tcspecial = None;
+        assert_eq!(beacon_interval_of(&graph), Ok(None));
     }
 }

@@ -22,6 +22,7 @@ whether a configuration is sound, and a ground station should run on one it
 has passed.
 """
 
+import re
 import shutil
 import subprocess
 import xml.etree.ElementTree as ElementTree
@@ -118,6 +119,12 @@ class Configuration:
             recv=HostPort.of("beacon.recv", self._said("beacon.recv")),
         )
 
+    def beacon_interval(self):
+        """How often tcspecial beacons, in nanoseconds: ``beacon.interval``,
+        read as :func:`parse_interval` reads it. What the beacon light ages
+        against -- see ``tcslib.beacon.Schedule.for_interval``."""
+        return parse_interval(self._said("beacon.interval"))
+
     def moc_nodes(self):
         """The ground links, in the order written."""
         return [node for node in self.nodes if node.node_type == "moc"]
@@ -168,6 +175,49 @@ class Configuration:
         if value is None:
             raise ValueError(f"{self.path}: tcspecial states no {attribute}")
         return value
+
+
+#: The units of a length of time, in microseconds: ``graph::parse_interval``'s.
+INTERVAL_UNITS = {
+    "us": 1,
+    "ms": 1_000,
+    "s": 1_000_000,
+    "min": 60 * 1_000_000,
+    "h": 3_600 * 1_000_000,
+    "d": 24 * 3_600 * 1_000_000,
+    "w": 7 * 24 * 3_600 * 1_000_000,
+}
+
+
+def parse_interval(text):
+    """A length of time as a configuration writes one -- a number, a space and
+    a unit, as ``500 ms`` or ``1.5 s`` -- in nanoseconds, or a ``ValueError``.
+
+    The Python spelling of ``tcslibgs::graph::parse_interval``: the same units,
+    underscores among the digits meaning nothing, a decimal fraction kept to
+    the nearest whole microsecond, and nought refused. Its messages are
+    shorter; what it takes and refuses is the same.
+    """
+    said = text.strip()
+    parts = said.split()
+    if len(parts) != 2:
+        raise ValueError(
+            f'"{text}" is a number and a unit with a space between them, and '
+            "nothing else: 500 ms, 1.5 s, 15 min"
+        )
+    digits, unit = parts
+    if unit not in INTERVAL_UNITS:
+        raise ValueError(
+            f'"{text}": "{unit}" is not a unit of time: us, ms, s, min, h, d or w'
+        )
+    bare = digits.replace("_", "")
+    # Digits, at most one point, digits: no sign, no exponent.
+    if not re.fullmatch(r"[0-9]*\.?[0-9]*", bare, re.ASCII) or bare in ("", "."):
+        raise ValueError(f'"{text}" is not a number of {unit}')
+    micros = round(float(bare) * INTERVAL_UNITS[unit])
+    if micros == 0:
+        raise ValueError(f'"{text}" is no interval at all')
+    return micros * 1_000
 
 
 def load(path):

@@ -38,6 +38,19 @@ class ConfigurationTest(unittest.TestCase):
         self.assertEqual(config.device_id("ping"), 1)
         self.assertEqual(config.downlink("moc", "ping"), HostPort("127.0.0.1", 7701))
 
+    def test_the_beacon_interval_is_read_as_the_rust_reads_one(self):
+        self.assertEqual(configuration.load(PING).beacon_interval(), 5_000_000_000)
+        parse = configuration.parse_interval
+        self.assertEqual(parse("500 ms"), 500_000_000)
+        self.assertEqual(parse("1.5 s"), parse("1_500 ms"))
+        self.assertEqual(parse("0.5 d"), 12 * 3_600 * 1_000_000_000)
+        self.assertEqual(parse(" 2 min "), 120_000_000_000)
+        self.assertEqual(parse("1.0000004 s"), 1_000_000_000)
+        for refused in ["5s", "5", "5 m", "5 mon", "-5 s", "1e3 s", "0 s",
+                        "0.0000001 s", ". s", "1.2.3 s", "5 s extra", "5 µs"]:
+            with self.assertRaises(ValueError, msg=refused):
+                parse(refused)
+
     def test_a_device_id_counts_every_node_in_the_order_written(self):
         # Sections interleave in XML, and the id is the position among all of
         # them, not within a section.

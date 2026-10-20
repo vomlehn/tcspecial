@@ -33,11 +33,11 @@ depend on rounding.
 """
 
 import enum
-import json
 import socket
 import time
 from dataclasses import dataclass, field
 
+from tcslibgs.beacon import Beacon, BeaconError
 from tcslibgs.configuration import came_from
 
 #: A step that never ends, which is how the standard schedule's last one holds
@@ -297,8 +297,9 @@ def received_at(at):
 
 
 def version_text(version):
-    """A version as it goes on the link, three decimal parts."""
-    return f"{version['major']}.{version['minor']}.{version['patch']}"
+    """A version as it goes on the link, three decimal parts: ``version`` is
+    major, minor and patch."""
+    return ".".join(str(part) for part in version)
 
 
 def digest_text(digest):
@@ -325,30 +326,22 @@ class Heard:
 
 
 def _beacon_of(datagram):
-    """The beacon in a datagram, as the JSON tcspecial sends, or ``None``."""
+    """The beacon in a datagram, as tcspecial packs it, or ``None``."""
     try:
-        telemetry = json.loads(datagram)
-    except (ValueError, UnicodeDecodeError):
-        return None, None
-    if not isinstance(telemetry, dict) or len(telemetry) != 1:
-        return None, None
-    (kind, body), = telemetry.items()
-    if kind != "Beacon":
-        return None, kind
-    try:
-        return {
-            "sequence": body["header"]["sequence"],
-            "version": version_text(body["version"]),
-            "digest": digest_text(body["digest"]),
-        }, kind
-    except (KeyError, TypeError):
-        return None, None
+        beacon = Beacon.read(datagram)
+    except BeaconError:
+        return None
+    return {
+        "sequence": beacon.sequence,
+        "version": version_text(beacon.version),
+        "digest": digest_text(beacon.digest),
+    }
 
 
 def hear(datagram, expected):
     """Read a datagram from the beacon link, comparing the digest it carries
     with ``expected``, this station's own, as thirty-two hex digits."""
-    beacon, _ = _beacon_of(datagram)
+    beacon = _beacon_of(datagram)
     why = None
     if beacon is not None and expected is not None:
         why = differs(beacon["digest"], expected)
@@ -374,11 +367,9 @@ def differs(theirs, ours):
 def message_of(datagram):
     """What a beacon said, as a window shows it. A datagram this cannot read
     is shown as what arrived, cut short."""
-    beacon, kind = _beacon_of(datagram)
+    beacon = _beacon_of(datagram)
     if beacon is not None:
         return what_it_read(beacon["version"], beacon["digest"])
-    if kind is not None:
-        return f"not a beacon: {kind}"
     text = datagram.decode("utf-8", errors="replace")
     head = text[:40]
     return f"unreadable: {head}..." if len(head) < len(text) else f"unreadable: {head}"

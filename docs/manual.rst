@@ -14,11 +14,11 @@ Introduction
    such as submersibles, drones, etc. Simply translate "spacecraft" to your
    device type.
 
-TCSpecial is **telemetry and control, special**. It connects the devices aboard
-a vehicle -- sensors, actuators, and whatever else arrives on an
-I\ :superscript:`2`\ C bus, a SPI link, a serial line, a CAN bus, a set of
-discrete lines, a sensor buffer, a channel to another processor core, a socket
-or a device file -- to the places their data has to reach. Some of those places
+TCSpecial is **telemetry and control, special**, and it is flight software. It
+connects the devices aboard a vehicle -- sensors, actuators, and whatever else
+arrives on an I\ :superscript:`2`\ C bus, a SPI link, a serial line, a CAN
+bus, a set of discrete lines, a sensor buffer, a channel to another processor
+core, a socket or a device file -- to the places their data has to reach. Some of those places
 are on the ground: a network link carries telemetry to the mission operations
 center, the **MOC**, and commands back. Others are aboard: software that takes
 what a device produces, computes something from it, remembers what it needs to
@@ -1836,6 +1836,16 @@ none of it is the program's own:
   find where the beacons are, starts the loop on a thread of its own, and puts
   each pass in the window.
 
+A beacon is 34 bytes in a fixed layout: ``tcspecial`` and a space, the
+version's major, minor and patch a byte each, a space, the sixteen bytes of
+the configuration's MD5 digest, and the beacon's number in four bytes, most
+significant first. The layout is described in XTCE, in
+``tcslibgs/xtce/beacon.xml``, and tcspecial packs each beacon, and
+``tcslib::beacon`` unpacks it, with the code tcsxtce generates from that file:
+``tcslibgs::Beacon``. The example's test packs the beacon it sends the same
+way. Nothing about the layout is written by hand, so to change it, change the
+XML and run ``make beacon-packet`` in ``tcslibgs/``.
+
 tcsmoc shows that same panel from that same library, in a row beside its
 command link. That is the point of their being apart: what a beacon means is
 one thing wherever it is shown, and an operator who has read one window has
@@ -1880,7 +1890,9 @@ device id. Each time is seconds since the UNIX epoch to the nanosecond:
 
 The ground station is a Python 3 program, ``ping_moc.py``, that uses nothing
 outside the standard library to read the XML spelling of its configuration --
-its window is tkinter -- and PyYAML to read the YAML one. It shows the beacon
+its window is tkinter -- and PyYAML to read the YAML one. It unpacks beacons
+with tcsxtce's Python runtime, which is in this tree, in ``vendor/tcsxtce``,
+and found from there. It shows the beacon
 panel, the last ping sent and when, the last answer received and when, and
 three times:
 
@@ -1920,7 +1932,7 @@ example's tests hold them to one another: the Python's own tests use the Rust
 tests' examples, one test checks that the Python reads the same ports from
 ``ping.xml`` as the Rust does from ``ping.yaml``, and one plays the vehicle with
 the Rust -- the ping answered by the function the ``ping`` node answers with,
-the beacon serialized as tcspecial serializes it -- against the ground station.
+the beacon packed as tcspecial packs it -- against the ground station.
 ``cargo test`` runs them all.
 
 The ground station starts the vehicle itself -- tcspecial from the build, on

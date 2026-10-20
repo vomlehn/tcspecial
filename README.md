@@ -1,7 +1,7 @@
 # TCSpecial
-TCSpecial: Relays commands and telemetry between an operation center and payloads
+TCSpecial: flight software that relays commands and telemetry between an operation center and payloads
 
-This is TCSpecial, a utility for running on devices that relay data from set of
+This is TCSpecial, flight software for running on devices that relay data from set of
 payloads to a remote operations center (OC). It has been designed within the context
 of spacecraft operating at distances of several light seconds, such as the Moon, 
 which has influenced the design to work with non-reliable communication links.

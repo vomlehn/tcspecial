@@ -1,7 +1,7 @@
 //! TCSpecial - Spacecraft Command Interpreter and Data Handler Manager
 //!
-//! TCSpecial runs on the spacecraft and manages communication between
-//! ground operations and payloads.
+//! TCSpecial is flight software: it runs on the spacecraft and manages
+//! communication between ground operations and payloads.
 
 pub mod beacon_send;
 pub mod config;

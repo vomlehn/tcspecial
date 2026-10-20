@@ -7,8 +7,7 @@ description = "The tests of the ping example, whose ground station is Python 3: 
 # Nothing is built for the example itself: its ground station is ping_moc.py
 # beside this. What is here is the tests, which need the Rust to hold the
 # Python to -- the configuration's facts, the ping format and the beacon's
-# JSON.
+# layout.
 [dev-dependencies]
 tcslibgs = { path = "../../tcslibgs" }
-serde_json = "1.0"
 tempfile = "3"

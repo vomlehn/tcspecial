@@ -1,6 +1,7 @@
 //! That a ground station's loop, once running, allocates nothing: a beacon
 //! pass, a datum from a `moc` node, a ping and its answer, and a command
-//! sent.
+//! sent. A beacon pass allocates only what unpacking the beacon does, which
+//! `tcslibgs::Beacon::read` says, and why.
 //!
 //! One test binary has one allocator, so these are together, under the one
 //! that counts.
@@ -10,9 +11,7 @@ use std::net::UdpSocket;
 use std::time::Duration;
 
 use tcslibgs::graph::Graph;
-use tcslibgs::{
-    BeaconTelemetry, Command, ConfigDigest, ConfigVersion, HostPort, PingCommand, Telemetry,
-};
+use tcslibgs::{Beacon, Command, ConfigDigest, ConfigVersion, HostPort, PingCommand};
 
 use crate::beacon::{Arrived, Beacons, Link, Schedule};
 use crate::connection::{Connection, UdpConnection};
@@ -78,10 +77,17 @@ fn a_free_port() -> u16 {
         .port()
 }
 
-/// Once the first has been heard, a beacon pass allocates nothing: not for
-/// what the beacon said, nor for the pass it hands back.
+/// How many allocations unpacking one beacon makes: tcsxtce's Rust decoder
+/// reads the name and the space as Strings and the digest as a Vec. See
+/// `tcslibgs::Beacon::read`. Should tcsxtce come to decode into fixed
+/// storage, as its C decoder does, this is nought and the test below says so.
+const UNPACKING_ALLOCATES: usize = 3;
+
+/// Once the first has been heard, a beacon pass allocates nothing but what
+/// unpacking the beacon does: not for what the beacon said, nor for the pass
+/// it hands back.
 #[test]
-fn a_beacon_pass_allocates_nothing() {
+fn a_beacon_pass_allocates_nothing_but_the_unpacking() {
     let vehicle = UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
     let from = vehicle.local_addr().expect("its address");
     let port = a_free_port();
@@ -100,14 +106,8 @@ fn a_beacon_pass_allocates_nothing() {
         // The port was taken between being chosen and being bound.
         return;
     };
-    let beacon = |sequence: u32| {
-        serde_json::to_vec(&Telemetry::Beacon(BeaconTelemetry::new(
-            sequence,
-            ConfigVersion::of_this_build(),
-            digest,
-        )))
-        .expect("it serializes")
-    };
+    let beacon =
+        |sequence: u32| Beacon::new(sequence, ConfigVersion::of_this_build(), digest).to_bytes();
     let datagrams: Vec<Vec<u8>> = (1..=23).map(beacon).collect();
 
     // Where to, worked out once: a name and a port is looked up each time
@@ -130,7 +130,13 @@ fn a_beacon_pass_allocates_nothing() {
             heard(&mut beacons);
         }
     });
-    assert_eq!(made, 0, "twenty beacon passes allocated {made} times");
+    assert_eq!(
+        made,
+        20 * UNPACKING_ALLOCATES,
+        "twenty beacon passes allocated {made} times, where unpacking twenty \
+         beacons allocates {}",
+        20 * UNPACKING_ALLOCATES
+    );
 }
 
 /// A datum received into a buffer made beforehand allocates nothing.

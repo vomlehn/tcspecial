@@ -2,7 +2,7 @@
 name = "tcspecial"
 version = "0.1.0"
 edition = "2021"
-description = "TCSpecial spacecraft command interpreter and data handler manager"
+description = "TCSpecial flight software: the spacecraft's command interpreter and data handler manager"
 
 [dependencies]
 tcslibgs = { path = "../tcslibgs" }

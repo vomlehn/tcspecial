@@ -11,7 +11,7 @@ use std::net::UdpSocket;
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
-use tcslibgs::{ArmKey, CommandStatus, RestartArmCommand, RestartCommand, Telemetry};
+use tcslibgs::{ArmKey, Beacon, CommandStatus, RestartArmCommand, RestartCommand, Telemetry};
 
 /// A socket on a port nothing else holds, kept so that it stays that way.
 fn socket() -> UdpSocket {
@@ -53,9 +53,9 @@ fn beacon(ground: &UdpSocket) -> u32 {
     let mut buffer = [0u8; 65535];
     loop {
         match ground.recv_from(&mut buffer) {
-            Ok((size, _)) => match serde_json::from_slice::<Telemetry>(&buffer[..size]) {
-                Ok(Telemetry::Beacon(beacon)) => return beacon.header.sequence,
-                other => panic!("expected a beacon, got {other:?}"),
+            Ok((size, _)) => match Beacon::read(&buffer[..size]) {
+                Ok(beacon) => return beacon.sequence,
+                Err(why) => panic!("expected a beacon: {why}"),
             },
             Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
             Err(e) => panic!("no beacon: {e}"),

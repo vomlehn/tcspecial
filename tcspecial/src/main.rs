@@ -1,4 +1,4 @@
-//! TCSpecial main entry point
+//! TCSpecial main entry point: the flight software, as a program.
 //!
 //! Reads the configuration it is given, says what it read, and runs the graph
 //! that configuration describes: see [`tcspecial::runtime::start`].

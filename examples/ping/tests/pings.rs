@@ -5,7 +5,7 @@
 //! configuration says they come from, and it answers each ping with
 //! `tcslibgs::node::vehicle::ping::reply`, the function the `ping` node
 //! answers with. So what the ground station prints is what it makes of the
-//! vehicle's own bytes, and a change to either -- the beacon's JSON, the ping
+//! vehicle's own bytes, and a change to either -- the beacon's layout, the ping
 //! format -- that the Python has not followed fails here.
 //!
 //! The ports are free ones, found as the test starts, so this runs beside
@@ -20,7 +20,7 @@ use std::time::Duration;
 
 use tcslibgs::config_digest::{digest_of_file, ConfigVersion};
 use tcslibgs::node::vehicle::ping;
-use tcslibgs::{BeaconTelemetry, Telemetry};
+use tcslibgs::Beacon;
 
 /// A socket on a port nothing holds.
 fn bound() -> UdpSocket {
@@ -110,8 +110,7 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
             let mut sequence = 0;
             while !stop.load(Ordering::Relaxed) {
                 sequence += 1;
-                let sent = Telemetry::Beacon(BeaconTelemetry::new(sequence, version, digest));
-                let datagram = serde_json::to_vec(&sent).expect("it serializes");
+                let datagram = Beacon::new(sequence, version, digest).to_bytes();
                 let _ = beacon.send_to(&datagram, ("127.0.0.1", beacons));
                 std::thread::sleep(Duration::from_millis(100));
             }
@@ -143,7 +142,7 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
     beaconing.join().expect("the beacons stop");
 
     assert!(status.success(), "{printed}");
-    // The beacon, read from the vehicle's own JSON.
+    // The beacon, read from the vehicle's own bytes.
     assert!(
         printed.contains(&format!(
             "beacon: tcspecial v{0} md5 {digest}",

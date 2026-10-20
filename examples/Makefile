@@ -36,8 +36,10 @@ help:
 # starts tcspecial on the same file, and tcssim where the simulator file
 # beside it -- $(1)-sim.yaml, found by name -- simulates anything; its panels
 # show what each source sends to the ground. A payload on a device -- the
-# thermostat's I2C, SPI and GPIO -- needs that device, which `make mkstubs` in
-# the top-level directory provides where there is no hardware.
+# thermostat's I2C, SPI and GPIO -- needs that device. `make mkstubs` in the
+# top-level directory makes stand-ins for I2C, GPIO, IIO and CAN where there
+# is no hardware; there is no stand-in for SPI, so the thermostat's SPI
+# sensor needs a real /dev/spidev0.0.
 #
 # The examples log to $(TELEMETRY), which is deleted before each run so that
 # what is in it afterwards is that run's alone. It is made again because a log

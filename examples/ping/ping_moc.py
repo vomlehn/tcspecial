@@ -177,15 +177,19 @@ class Vehicle:
         self._stopping = False
 
     @staticmethod
-    def for_configuration(path, program=None):
-        """tcspecial on this configuration: the one named, or the build's."""
+    def for_configuration(path, program=None, verbose=False):
+        """tcspecial on this configuration: the one named, or the build's.
+
+        Told ``--quiet`` unless ``verbose``, so that the console is this
+        program's: tcspecial's startup summary is for somebody watching the
+        vehicle start, and what stops it starting it says either way."""
         program = program or find_built("tcspecial")
         if program is None:
             raise ValueError(
                 "tcspecial is not built or on the PATH: build it with "
                 "`cargo build --bin tcspecial`, or say --no-vehicle"
             )
-        return Vehicle(program, [str(path)])
+        return Vehicle(program, ([] if verbose else ["--quiet"]) + [str(path)])
 
     def start(self):
         """Start it, told to die with this program, and say if it stops by
@@ -485,7 +489,9 @@ def main(argv):
     vehicle = None
     if not options.no_vehicle:
         try:
-            vehicle = Vehicle.for_configuration(options.configuration, options.tcspecial)
+            vehicle = Vehicle.for_configuration(
+                options.configuration, options.tcspecial, verbose=options.verbose
+            )
             vehicle.start()
         except (OSError, ValueError) as why:
             print(f"the vehicle cannot be started: {why}", file=sys.stderr)

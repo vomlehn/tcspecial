@@ -90,7 +90,9 @@ run-thermostat:
 # tcspecial does not yet end an app node's program when it stops, and a
 # lorem_pl.py left behind would sit there until somebody killed it. The ground
 # is given $(SIMPLE_APP_WAITS) seconds, which is several times what the line
-# takes, so a vehicle that never answers is a failed run and not a hang.
+# takes, so a vehicle that never answers is a failed run and not a hang. The
+# vehicle is --quiet, so that what the run prints is the line; what stops it
+# starting it says either way.
 SIMPLE_APP_WAITS = 30
 
 .PHONY: run-simple-app
@@ -102,7 +104,7 @@ run-simple-app: check-python3
 		cd $(ROOT); \
 		rm -rf $(TELEMETRY); \
 		mkdir $(TELEMETRY); \
-		RUST_LOG=$(RUST_LOG) target/debug/tcspecial examples/simple-app/simple-app.yaml & \
+		RUST_LOG=$(RUST_LOG) target/debug/tcspecial --quiet examples/simple-app/simple-app.yaml & \
 		vehicle=$$!; \
 		trap 'pkill -P $$vehicle || true; kill -INT $$vehicle 2>/dev/null || true; wait $$vehicle || true' EXIT; \
 		trap 'exit 130' INT TERM; \

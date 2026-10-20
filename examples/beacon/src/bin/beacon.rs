@@ -175,7 +175,7 @@ fn main() -> Result<(), slint::PlatformError> {
     // The vehicle the button starts, which is not running until it is
     // pressed. Found before the window opens, so that a tcspecial nobody has
     // built is said once, here, and not on every press.
-    let vehicle = match Vehicle::beside_this_program(&path) {
+    let vehicle = match Vehicle::beside_this_program(&path, verbose) {
         Ok(vehicle) => vehicle,
         Err(why) => {
             eprintln!("{why}");

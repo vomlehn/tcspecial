@@ -21,7 +21,9 @@ The YAML and XML files must say the same thing, so change both together.
 The examples' programs -- `beacon`, `lorem_moc` and `ping_moc.py` --
 are quiet unless given `-v` or `--verbose`: they print what they are for and
 any error, and with the flag they also say what they are doing, such as where
-they are listening.
+they are listening. A tcspecial one of them starts is started `--quiet`, so
+that its startup summary does not fill the console, unless the program was
+given `-v` itself; whatever stops tcspecial starting is said either way.
 
 They also take `--yaml` or `--xml`, but not both, saying which of the
 example's two configuration files to read. With neither, `beacon` and

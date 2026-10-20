@@ -343,8 +343,8 @@ impl Serving {
             return;
         }
 
-        // Read without allocating, but for a SET_NODE: its attribute and
-        // value are owned by the command, and are made as it is read.
+        // Read without allocating, a SET_NODE's attribute and value
+        // included: they are read into room the command holds.
         let command = match serde_json::from_slice::<Command>(&buffer[..size]) {
             Ok(command) => command,
             // Not a command. Nothing to answer and nobody to answer it to: the
@@ -435,7 +435,7 @@ impl Serving {
             }
 
             Command::SetNode(cmd) => {
-                let status = self.set_attribute(cmd.node, &cmd.attribute, &cmd.value);
+                let status = self.set_attribute(cmd.node, cmd.attribute, cmd.value);
                 Telemetry::SetNode(NodeTelemetry::set(sequence, status, cmd.node))
             }
 
@@ -530,16 +530,15 @@ impl Serving {
     /// with latency, and an operator who presses Disable twice has asked for a
     /// state and not for an action.
     ///
-    /// Allocates: the node's name, for the work handed to the pass and for
-    /// what is logged about it, and whatever starting the node again takes
-    /// -- see `System::reopen`. A START_NODE or STOP_NODE is the ground
-    /// changing what the vehicle runs, and not a datum the loop moves.
+    /// Allocates nothing of its own: the work is handed over by the node's
+    /// shared name. What starting the node again takes is the pass's -- see
+    /// `System::reopen` -- and a failure is logged in words, which are made.
     fn set_state(&self, node: tcslibgs::NodeId, enabled: bool) -> CommandStatus {
         let Some(state) = self.states.at(node) else {
             self.no_such_node(node);
             return CommandStatus::NotFound;
         };
-        let name = state.name().to_string();
+        let name = state.shared_name();
 
         // A node the ground may not start or stop -- a ping node, which is
         // how the ground knows the vehicle is there -- is refused and left as
@@ -567,9 +566,9 @@ impl Serving {
         // which is what a ground station about to hand the device to something
         // else needs to know.
         let work = if enabled {
-            Work::Enable(name.clone())
+            Work::Enable(Arc::clone(&name))
         } else {
-            Work::Disable(name.clone())
+            Work::Disable(Arc::clone(&name))
         };
         match self.bench.ask(work) {
             Ok(()) => CommandStatus::Success,
@@ -601,25 +600,24 @@ impl Serving {
     /// configuration does not allow, and the status an operator acts on is
     /// the same.
     ///
-    /// Allocates: the node's name, the attribute and the value, for the work
-    /// handed to the pass. A SET_NODE carries both as text it owns, and is
-    /// the ground changing a setting, not a datum the loop moves.
+    /// Allocates nothing of its own: the node goes by its shared name, and
+    /// the attribute and the value in the room the SET_NODE was read into.
     fn set_attribute(
         &self,
         node: tcslibgs::NodeId,
-        attribute: &str,
-        value: &[u8],
+        attribute: tcslibgs::Attribute,
+        value: tcslibgs::Value,
     ) -> CommandStatus {
         let Some(state) = self.states.at(node) else {
             self.no_such_node(node);
             return CommandStatus::NotFound;
         };
-        let name = state.name().to_string();
+        let name = state.shared_name();
 
         match self.bench.ask(Work::Set {
-            node: name.clone(),
-            attribute: attribute.to_string(),
-            value: value.to_vec(),
+            node: Arc::clone(&name),
+            attribute,
+            value,
         }) {
             Ok(()) => CommandStatus::Success,
             Err(why) => {
@@ -720,13 +718,13 @@ mod tests {
     fn a_pass_answering(
         how: impl Fn(&Work) -> Result<(), String> + Send + 'static,
     ) -> (Workbench, Arc<std::sync::Mutex<Vec<Work>>>) {
-        let (bench, jobs) = Workbench::in_two().expect("a workbench");
+        let (bench, desk) = Workbench::in_two().expect("a workbench");
         let done = Arc::new(std::sync::Mutex::new(Vec::new()));
         let kept = done.clone();
         std::thread::spawn(move || {
-            while let Ok(job) = jobs.recv() {
+            while let Some(job) = desk.wait() {
                 kept.lock().expect("the record").push(job.work.clone());
-                let _ = job.reply.send(how(&job.work));
+                desk.answer(&job, how(&job.work));
             }
         });
         (bench, done)
@@ -833,7 +831,7 @@ mod tests {
         assert!(states.is_enabled("average"), "and only the one named");
         assert_eq!(
             handed_over(),
-            vec![Work::Disable("inside".to_string())],
+            vec![Work::Disable("inside".into())],
             "and the pass is asked to release what it held"
         );
 
@@ -862,7 +860,7 @@ mod tests {
         }
         assert_eq!(
             handed_over().last(),
-            Some(&Work::Enable("inside".to_string())),
+            Some(&Work::Enable("inside".into())),
             "opening a node is the pass's work, and the flag goes up with it"
         );
     }
@@ -959,7 +957,9 @@ mod tests {
         let at = commands.node_address();
 
         let set = |sequence, attribute: &str, value: &[u8]| {
-            Command::SetNode(SetNodeCommand::new(sequence, average, attribute, value))
+            Command::SetNode(
+                SetNodeCommand::new(sequence, average, attribute, value).expect("it fits"),
+            )
         };
 
         match ask(&ground, at, &set(1, "setpoint", b"295.0")) {
@@ -972,9 +972,9 @@ mod tests {
         assert_eq!(
             done.lock().expect("the record").last(),
             Some(&Work::Set {
-                node: "average".to_string(),
-                attribute: "setpoint".to_string(),
-                value: b"295.0".to_vec(),
+                node: "average".into(),
+                attribute: tcslibgs::Attribute::of("setpoint").expect("a name"),
+                value: tcslibgs::Value::of(b"295.0").expect("a value"),
             }),
             "the pass is asked to set it, and told what to"
         );
@@ -997,7 +997,9 @@ mod tests {
         match ask(
             &ground,
             at,
-            &Command::SetNode(SetNodeCommand::new(3, nowhere, "setpoint", b"295.0")),
+            &Command::SetNode(
+                SetNodeCommand::new(3, nowhere, "setpoint", b"295.0").expect("it fits"),
+            ),
         ) {
             Some(Telemetry::SetNode(tm)) => {
                 assert_eq!(tm.header.status, CommandStatus::NotFound);

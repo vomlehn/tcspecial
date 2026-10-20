@@ -327,6 +327,10 @@ impl TcsClient {
     /// The value is bytes because what an attribute takes is the node's
     /// business: a setpoint is a temperature and a band is a width, and the
     /// node is what reads them.
+    ///
+    /// An attribute longer than `ATTRIBUTE_BYTES` or a value longer than
+    /// `VALUE_BYTES` is a `TcsError::Command` and is not sent: the vehicle
+    /// would refuse it unanswered.
     pub fn set_node(
         &mut self,
         node: NodeId,
@@ -334,7 +338,9 @@ impl TcsClient {
         value: &[u8],
     ) -> TcsResult<(CommandStatus, NodeId)> {
         let seq = self.next_sequence();
-        let cmd = Command::SetNode(SetNodeCommand::new(seq, node, attribute, value));
+        let cmd = Command::SetNode(
+            SetNodeCommand::new(seq, node, attribute, value).map_err(TcsError::Command)?,
+        );
         match self.send_command(cmd)? {
             Telemetry::SetNode(tm) => Ok((tm.header.status, tm.node)),
             _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),

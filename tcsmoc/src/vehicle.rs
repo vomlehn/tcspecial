@@ -38,6 +38,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -916,20 +917,60 @@ fn no_command_link(ui: &MainWindow) {
 /// node with the rest and are shown in its panel. They are also the answers
 /// to the pings sent from the ping window, so the receiver hands each one to
 /// the pinger as well, which matches it to its ping and times it.
+///
+/// The receiver does no more than that and say so: the window is shown what
+/// the pinger keeps from the window's own thread, on its own timer -- see
+/// `show_answers`.
 #[derive(Clone)]
 struct PingFeed {
     node: String,
     pinger: Arc<Mutex<Pinger>>,
     window: slint::Weak<PingWindow>,
+    /// Whether something has arrived from the ping node that the window has
+    /// not yet been shown.
+    fresh: Arc<AtomicBool>,
 }
 
-/// Hand an answer the ping node sent down to the pinger, and say what the
-/// window should show now. `None` where the pinger's lock is poisoned, which
-/// is a pinger nobody can use.
-fn take_answer(feed: &PingFeed, data: &[u8], at: std::time::Duration) -> Option<PingShown> {
-    let mut pinger = feed.pinger.lock().ok()?;
-    pinger.answered(data, at);
-    Some(PingShown::of(pinger.exchange()))
+/// Hand what the ping node sent down to the pinger, and say the window has
+/// something to show. Allocates nothing: see `tcslib::ping::Pinger`.
+fn take_answer(feed: &PingFeed, data: &[u8], at: std::time::Duration) {
+    // A poisoned lock is a pinger nobody can use, and this answer goes with
+    // it.
+    if let Ok(mut pinger) = feed.pinger.lock() {
+        pinger.answered(data, at);
+        feed.fresh.store(true, Ordering::Release);
+    }
+}
+
+/// How often the ping window looks for an answer to show. Short, because the
+/// answer to a ping somebody has just sent is what they are watching for;
+/// cheap, because most looks find nothing and do nothing.
+const PING_REFRESH_INTERVAL: std::time::Duration = std::time::Duration::from_millis(100);
+
+/// Show the ping window what the pinger keeps, whenever something new has
+/// arrived, from a timer on the window's thread.
+///
+/// Allocates, for each answer shown: a window shows text, and what it is
+/// shown is made on its thread. The receiver, which is the loop that runs for
+/// as long as the MOC does, makes none of it.
+fn show_answers(feed: PingFeed) -> slint::Timer {
+    let timer = slint::Timer::default();
+    timer.start(
+        slint::TimerMode::Repeated,
+        PING_REFRESH_INTERVAL,
+        move || {
+            if !feed.fresh.swap(false, Ordering::Acquire) {
+                return;
+            }
+            let Some(window) = feed.window.upgrade() else {
+                return;
+            };
+            if let Ok(pinger) = feed.pinger.lock() {
+                show_ping(&window, &PingShown::of(pinger.exchange()));
+            }
+        },
+    );
+    timer
 }
 
 /// Put what the pinger keeps into the ping window.
@@ -992,18 +1033,7 @@ fn serve(
         if let Some(feed) = pings.as_ref().filter(|_| source.pings) {
             // The ground's clock, now: a datum is timed as it is taken.
             if let Ok(at) = tcslibgs::node::vehicle::ping::now() {
-                // Allocates, once for each answer: what the ping window
-                // shows is text, and it is handed to the window's thread in
-                // a closure of its own. An answer comes for each ping an
-                // operator sends, not for each pass of this loop.
-                if let Some(shown) = take_answer(feed, data, at) {
-                    let window = feed.window.clone();
-                    let _ = slint::invoke_from_event_loop(move || {
-                        if let Some(window) = window.upgrade() {
-                            show_ping(&window, &shown);
-                        }
-                    });
-                }
+                take_answer(feed, data, at);
             }
         }
         let Some(row) = source.row else {
@@ -1084,6 +1114,7 @@ fn ping_node(
             node: route.node,
             pinger,
             window: ping_window.as_weak(),
+            fresh: Arc::new(AtomicBool::new(false)),
         },
     )))
 }
@@ -1328,6 +1359,10 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
         }
     };
 
+    // Kept for as long as the window runs: a timer dropped is a timer
+    // stopped.
+    let _answers = pings.as_ref().map(|(_, feed)| show_answers(feed.clone()));
+
     let arrivals: Arrivals = Arc::new(Mutex::new(vec![None; count]));
     let mocs: Vec<&str> = graph
         .nodes
@@ -1431,6 +1466,80 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
 pub(crate) mod tests {
     use super::*;
     use std::path::Path;
+
+    /// An answer from the ping node reaches the pinger, timed, and the
+    /// window is told there is something to show -- by a flag, the receiver
+    /// making nothing for the window itself.
+    #[test]
+    fn a_ping_answer_reaches_the_pinger_and_the_window_is_told() {
+        use tcslibgs::node::vehicle::ping;
+
+        let port = std::net::UdpSocket::bind("127.0.0.1:0")
+            .and_then(|socket| socket.local_addr())
+            .expect("a free port")
+            .port();
+        let dir = tempfile::tempdir().expect("a directory");
+        let path = dir.path().join("vehicle.yaml");
+        // The ping node is the second node written, device id 1, so its
+        // answers arrive at ground_base plus one: `port`.
+        std::fs::write(
+            &path,
+            format!(
+                "moc:
+  - {{ name: ground, type: moc, ground_base: \"127.0.0.1:{}\" }}
+vehicle:
+  - {{ name: pinger, type: ping, payload-out: ground }}
+",
+                port - 1
+            ),
+        )
+        .expect("written");
+        let graph = Graph::load(&path).expect("it reads");
+        let Ok(moc) = Moc::open(&graph, "ground") else {
+            // The port was taken between being chosen and being bound.
+            return;
+        };
+
+        let pinger = Arc::new(Mutex::new(Pinger::new()));
+        let at = std::time::Duration::new(1_760_900_000, 0);
+        let sent = pinger
+            .lock()
+            .expect("the pinger")
+            .ping(at)
+            .expect("a ping")
+            .to_string();
+        let feed = PingFeed {
+            node: "pinger".to_string(),
+            pinger: Arc::clone(&pinger),
+            window: slint::Weak::default(),
+            fresh: Arc::new(AtomicBool::new(false)),
+        };
+        let fresh = Arc::clone(&feed.fresh);
+        let rows = Arc::new(BTreeMap::from([("pinger".to_string(), 0)]));
+        let arrivals: Arrivals = Arc::new(Mutex::new(vec![None]));
+        thread::spawn(move || serve(moc, rows, Arc::new(BTreeSet::new()), arrivals, Some(feed)));
+
+        let answer = ping::reply(sent.as_bytes(), at).expect("answered");
+        let vehicle = std::net::UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
+        vehicle
+            .send_to(answer.as_bytes(), ("127.0.0.1", port))
+            .expect("sent");
+
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !fresh.load(Ordering::Acquire) {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "the window was never told of the answer"
+            );
+            thread::sleep(std::time::Duration::from_millis(10));
+        }
+        let pinger = pinger.lock().expect("the pinger");
+        assert!(
+            pinger.exchange().received_at.is_some(),
+            "the answer should be timed: {:?}",
+            pinger.exchange()
+        );
+    }
 
     /// What arrives at a moc node is put in the panel of the source that
     /// sent it, counted, and marked as values where that source sends them;
@@ -1732,16 +1841,20 @@ payloads:
             "nothing has answered it"
         );
 
-        // The answer, as the receiver hands it on, with the times filled in.
+        // The answer, as the receiver hands it on, with the times filled in:
+        // the window is told there is one, and shown it as its timer is.
         let had = ping::now().expect("a clock");
         let answer = ping::reply(sent.as_bytes(), had).expect("answered");
-        let shown = take_answer(
+        take_answer(
             &feed,
             answer.as_bytes(),
             had + std::time::Duration::from_millis(1),
-        )
-        .expect("the pinger");
-        show_ping(&ping_window, &shown);
+        );
+        assert!(feed.fresh.load(Ordering::Acquire), "the window is told");
+        show_ping(
+            &ping_window,
+            &PingShown::of(feed.pinger.lock().expect("the pinger").exchange()),
+        );
         assert_eq!(
             ping_window.get_received().as_str(),
             String::from_utf8_lossy(answer.as_bytes())
@@ -1835,7 +1948,7 @@ payloads:
                     )),
                     Command::SetNode(cmd) => {
                         *setting.lock().expect("the record") =
-                            Some((cmd.attribute.clone(), cmd.value.clone()));
+                            Some((cmd.attribute.to_string(), cmd.value.to_vec()));
                         Telemetry::SetNode(tcslibgs::NodeTelemetry::set(
                             seq,
                             tcslibgs::CommandStatus::Success,

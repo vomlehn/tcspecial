@@ -1404,6 +1404,8 @@ mod tests {
             ("TCS_TEXT_BYTES", TEXT_BYTES),
             ("TCS_MAX_REMARKS", MAX_REMARKS),
             ("TCS_SAMPLE_BYTES", DH_SAMPLE_BYTES),
+            ("TCS_ATTRIBUTE_BYTES", tcslibgs::ATTRIBUTE_BYTES),
+            ("TCS_VALUE_BYTES", tcslibgs::VALUE_BYTES),
         ] {
             let line = format!("#define {name} {size}");
             assert!(header.contains(&line), "the header has no \"{line}\"");

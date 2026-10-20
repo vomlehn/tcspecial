@@ -153,6 +153,9 @@ pub enum Problem {
     NoSuchTarget { sets: String },
     /// A command binding that does not name an attribute.
     NoAttributeNamed { sets: String },
+    /// A command binding naming an attribute longer than a SET_NODE carries:
+    /// see [`crate::ATTRIBUTE_BYTES`].
+    AttributeTooLong { sets: String },
     /// A command binding arriving on something that is not a MOC link.
     NotAMocLink { from: String },
     /// A log node whose attributes are not a log's.
@@ -294,9 +297,9 @@ impl Problem {
             Problem::CrossedStreams { from, .. } => About::Node(from.clone()),
             Problem::DuplicateLink { from, .. } => About::Node(from.clone()),
             Problem::NodeOnNoLink { node, .. } => About::Node(node.clone()),
-            Problem::NoSuchTarget { .. } | Problem::NoAttributeNamed { .. } => {
-                About::Section("commands")
-            }
+            Problem::NoSuchTarget { .. }
+            | Problem::NoAttributeNamed { .. }
+            | Problem::AttributeTooLong { .. } => About::Section("commands"),
             Problem::NotAMocLink { from } => About::Node(from.clone()),
             Problem::Unconnected { node } => About::Node(node.clone()),
             // On the payload and not on the source: the source is right
@@ -448,6 +451,12 @@ impl Problem {
             Problem::NoAttributeNamed { sets } => format!(
                 "a command sets \"{sets}\", which names no attribute: a binding \
                  is written node.attribute"
+            ),
+            Problem::AttributeTooLong { sets } => format!(
+                "a command sets \"{sets}\", whose attribute is longer than the {} \
+                 bytes a SET_NODE carries, so the ground could never name it: give \
+                 the attribute a shorter name",
+                crate::ATTRIBUTE_BYTES
             ),
             Problem::NotAMocLink { from } => format!(
                 "a command arrives on \"{from}\", which is not a moc node -- \
@@ -982,6 +991,15 @@ impl Graph {
             }
             if self.node(&target.node).is_none() {
                 problems.push(Problem::NoSuchTarget {
+                    sets: binding.sets.clone(),
+                });
+            }
+            if target
+                .input
+                .as_deref()
+                .is_some_and(|attribute| crate::Attribute::of(attribute).is_err())
+            {
+                problems.push(Problem::AttributeTooLong {
                     sets: binding.sets.clone(),
                 });
             }
@@ -2719,6 +2737,19 @@ mod tests {
             .check()
             .iter()
             .any(|p| matches!(p, Problem::NoAttributeNamed { .. })));
+
+        // Naming one too long for a SET_NODE to carry, which the ground could
+        // never set.
+        g.commands[0].sets = format!("t.{}", "s".repeat(crate::ATTRIBUTE_BYTES + 1));
+        assert!(g
+            .check()
+            .iter()
+            .any(|p| matches!(p, Problem::AttributeTooLong { .. })));
+        g.commands[0].sets = format!("t.{}", "s".repeat(crate::ATTRIBUTE_BYTES));
+        assert!(!g
+            .check()
+            .iter()
+            .any(|p| matches!(p, Problem::AttributeTooLong { .. })));
 
         // Naming a node that is not there.
         g.commands[0].sets = "nobody.setpoint".to_string();

@@ -101,7 +101,9 @@ The header alone is also compiled as C99 and as C++11.
   `tcs_last_error()`, `TCS_TEXT_BYTES` (256) for what a beacon said and each
   remark and warning, and at most `TCS_MAX_REMARKS` (8) remarks and as many
   warnings a pass. Text too long is cut short at a character and ends "...";
-  a pass with more to say keeps seven and says how many more there were.
+  a pass with more to say keeps seven and says how many more there were. A
+  SET_NODE carries an attribute of at most `TCS_ATTRIBUTE_BYTES` (64) and a
+  value of at most `TCS_VALUE_BYTES` (256); longer is refused, and not sent.
 - **Where it still allocates.** Avoiding dynamic allocation is a rule of this
   repository. This layer allocates nothing of its own as a station runs; what
   remains is said in the source where it happens, and is:

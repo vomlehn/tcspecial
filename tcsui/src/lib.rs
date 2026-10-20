@@ -265,11 +265,11 @@ mod tests {
         // Late enough to look at, and long enough to be wrong. Both stages
         // blink, so the instants are chosen in the lit half of a blink --
         // which is what the stage's own colour is shown in.
-        let aging = schedule.at(Duration::from_millis(8_200));
+        let aging = schedule.at(Duration::from_millis(20_200));
         assert!(aging.lit, "{aging:?}");
         assert_eq!(indicator(&aging, true), palette::watch());
 
-        let silent = schedule.at(Duration::from_millis(30_200));
+        let silent = schedule.at(Duration::from_millis(40_200));
         assert!(silent.lit, "{silent:?}");
         assert_eq!(indicator(&silent, true), palette::wrong());
 
@@ -277,19 +277,19 @@ mod tests {
         // is: what the blink says is that time is passing, and what the
         // colour says is how much.
         assert_eq!(
-            indicator(&schedule.at(Duration::from_millis(8_700)), true),
+            indicator(&schedule.at(Duration::from_millis(20_700)), true),
             palette::off()
         );
         assert_eq!(
-            indicator(&schedule.at(Duration::from_millis(30_700)), true),
+            indicator(&schedule.at(Duration::from_millis(40_700)), true),
             palette::off()
         );
 
         // The dark half of a blink is white rather than a second colour: the
         // light is one colour going dark and back. And not grey, a beacon
         // having arrived: grey would say nothing had been heard.
-        let blinking = schedule.at(Duration::from_millis(5_500));
-        assert!(!blinking.lit, "four to eight seconds is the blinking stage");
+        let blinking = schedule.at(Duration::from_millis(11_500));
+        assert!(!blinking.lit, "ten to twenty seconds is the blinking stage");
         assert_eq!(indicator(&blinking, true), palette::off());
         assert_ne!(palette::off(), palette::unknown());
     }

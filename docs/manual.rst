@@ -2914,7 +2914,29 @@ blinking yellow
 blinking red
   The number of lost beacon messages indicates a likely issue.
 
-A blinking light alternates between its colour and white.
+A blinking light alternates between its colour and white, half a second of
+each.
+
+Which colour the light shows is decided by how many beacons have gone missing
+since the last one arrived. A beacon is missed once the configuration's
+``beacon.interval`` has passed without it, so the count goes up by one each
+interval, and a new beacon puts it back to nought:
+
+================  ===============
+Beacons missed    Light
+================  ===============
+0 or 1            steady green
+2 or 3            blinking green
+4 to 7            blinking yellow
+8 or more         blinking red
+================  ===============
+
+One beacon may be missed with the light still steady, because one lost
+datagram is a network and not a spacecraft. For a five-second interval the
+light is steady for ten seconds, blinks green for ten more, is yellow for
+twenty and red after that. The interval is the one the configuration states: a
+``Config`` command that retimes the beacon aboard is not followed by the
+light, which goes on aging beacons against the configured interval.
 
 Beside the indicator is the time the last beacon arrived, shown the way every
 other time in the window is. It is the time the beacon reached the MOC rather

@@ -87,10 +87,58 @@ class ScheduleTest(unittest.TestCase):
         s = Schedule.standard()
         self.assertEqual(s.at(0).stage, Stage.HEARD)
         self.assertEqual(s.at(6 * SECOND).stage, Stage.HEARD)
-        self.assertEqual(s.while_in_contact(), 8 * SECOND)
-        self.assertEqual(s.at(9 * SECOND).stage, Stage.AGING)
-        self.assertEqual(s.at(20 * SECOND).stage, Stage.SILENT)
+        self.assertEqual(s.while_in_contact(), 20 * SECOND)
+        self.assertEqual(s.at(19 * SECOND).stage, Stage.HEARD)
+        self.assertEqual(s.at(21 * SECOND).stage, Stage.AGING)
+        self.assertEqual(s.at(39 * SECOND).stage, Stage.AGING)
+        self.assertEqual(s.at(41 * SECOND).stage, Stage.SILENT)
         self.assertEqual(s.at(86_400 * SECOND).stage, Stage.SILENT)
+
+
+    def test_a_schedule_scales_with_the_beacon_interval(self):
+        def holds(schedule):
+            return [step.holds for step in schedule.steps()]
+
+        def blinks(schedule):
+            return [step.blink for step in schedule.steps()]
+
+        standard = Schedule.standard()
+        ten = Schedule.for_interval(10 * SECOND)
+        self.assertEqual(holds(Schedule.for_interval(5 * SECOND)), holds(standard))
+        self.assertEqual(holds(ten), [20 * SECOND, 20 * SECOND, 40 * SECOND, None])
+        self.assertEqual(blinks(ten), blinks(standard))
+        self.assertEqual(ten.while_in_contact(), 40 * SECOND)
+        self.assertEqual(ten.at(39 * SECOND).stage, Stage.HEARD)
+        self.assertEqual(ten.at(41 * SECOND).stage, Stage.AGING)
+        self.assertEqual(ten.at(81 * SECOND).stage, Stage.SILENT)
+        self.assertEqual(Schedule.for_interval(250 * MS).steps()[0].holds, 500 * MS)
+        self.assertEqual(holds(Schedule.for_interval(0)), holds(standard))
+
+
+    def test_the_stage_is_the_number_of_beacons_missed(self):
+        def stage_for(count):
+            if count >= beacon.SILENT_AFTER_MISSED:
+                return Stage.SILENT
+            if count >= beacon.AGING_AFTER_MISSED:
+                return Stage.AGING
+            return Stage.HEARD
+
+        # tcslib::beacon's thresholds, figure for figure.
+        self.assertEqual(
+            (beacon.BLINKING_AFTER_MISSED, beacon.AGING_AFTER_MISSED, beacon.SILENT_AFTER_MISSED),
+            (2, 4, 8),
+        )
+        for interval in [250 * MS, 5 * SECOND, 60 * SECOND]:
+            s = Schedule.for_interval(interval)
+            for count in range(12):
+                for elapsed in [interval * count, interval * count + interval // 2,
+                                interval * (count + 1) - 1]:
+                    self.assertEqual(s.at(elapsed).stage,
+                                     stage_for(beacon.missed(elapsed, interval)),
+                                     (elapsed, interval))
+        self.assertEqual(beacon.missed(9 * SECOND, 5 * SECOND), 1)
+        self.assertEqual(beacon.missed(10 * SECOND, 5 * SECOND), 2)
+        self.assertEqual(beacon.missed(10 * SECOND, 0), 0)
 
 
 class HearingTest(unittest.TestCase):
@@ -152,7 +200,7 @@ class LoopTest(unittest.TestCase):
         self.assertEqual(first.at, AT)
         self.assertEqual(first.contact, Contact.MADE)
 
-        self.now = AT + 10 * SECOND
+        self.now = AT + 25 * SECOND
         later = self.beacons.after(beacon.Arrived.NOTHING, [])
         self.assertEqual(later.at, AT, "a pass that found nothing keeps the beacon before it")
         self.assertEqual(later.said, first.said)
@@ -195,16 +243,16 @@ class PanelTest(unittest.TestCase):
         self.assertEqual(indicator(s.after(None, AT), False), palette.UNKNOWN)
         self.assertEqual(indicator(s.at(0), True), palette.WELL)
         self.assertEqual(indicator(s.at(6 * SECOND), True), palette.WELL)
-        aging = s.at(8_200 * MS)
+        aging = s.at(20_200 * MS)
         self.assertTrue(aging.lit)
         self.assertEqual(indicator(aging, True), palette.WATCH)
-        silent = s.at(30_200 * MS)
+        silent = s.at(40_200 * MS)
         self.assertTrue(silent.lit)
         self.assertEqual(indicator(silent, True), palette.WRONG)
         # The dark half of a blink, once a beacon has arrived: white.
-        self.assertEqual(indicator(s.at(8_700 * MS), True), palette.OFF)
-        self.assertEqual(indicator(s.at(30_700 * MS), True), palette.OFF)
-        self.assertEqual(indicator(s.at(5_500 * MS), True), palette.OFF)
+        self.assertEqual(indicator(s.at(20_700 * MS), True), palette.OFF)
+        self.assertEqual(indicator(s.at(40_700 * MS), True), palette.OFF)
+        self.assertEqual(indicator(s.at(11_500 * MS), True), palette.OFF)
 
     def test_once_heard_the_light_is_never_grey_again(self):
         from tcsui.beacon_panel import indicator, palette

@@ -194,6 +194,7 @@ class Setup:
         self.uplink = self.config.uplink(self.moc)
         self.downlink = self.config.downlink(self.moc, self.node)
         self.beacon = self.config.beacon_link()
+        self.beacon_interval = self.config.beacon_interval()
         self.digest, self.why_no_digest = configuration.digest(
             options.configuration, options.tcsverify
         )
@@ -203,6 +204,7 @@ class Setup:
         return "\n".join([
             f"beacon.send {self.beacon.send}",
             f"beacon.recv {self.beacon.recv}",
+            f"beacon.interval {self.beacon_interval}",
             f"uplink {self.uplink}",
             f"downlink {self.downlink}",
             f"digest {self.digest}",
@@ -383,7 +385,9 @@ def main(argv):
             file=sys.stderr,
         )
     try:
-        beacons = Beacons.listening(setup.beacon, Schedule.standard(), setup.digest)
+        beacons = Beacons.listening(
+            setup.beacon, Schedule.for_interval(setup.beacon_interval), setup.digest
+        )
         pinger = Pinger(setup.uplink, setup.downlink)
     except OSError as why:
         print(f"cannot listen: {why}", file=sys.stderr)

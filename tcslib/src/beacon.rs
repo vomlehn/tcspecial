@@ -52,6 +52,38 @@ use tcslibgs::{came_from, ConfigDigest, ConfigVersion, Telemetry, Timestamp, NO_
 /// says nothing about why.
 pub use tcslibgs::BeaconLink as Link;
 
+/// The beacon interval the standard schedule is for: see
+/// [`Schedule::for_interval`].
+pub const STANDARD_INTERVAL: Duration = Duration::from_secs(5);
+
+/// How many beacons in a row have gone missing when the steady green light
+/// starts to blink. One missed leaves it steady: one lost datagram is a
+/// network and not a spacecraft.
+pub const BLINKING_AFTER_MISSED: u32 = 2;
+
+/// How many beacons in a row have gone missing when the light turns yellow,
+/// [`Stage::Aging`]: too many to be a network, and worth an operator's
+/// attention.
+pub const AGING_AFTER_MISSED: u32 = 4;
+
+/// How many beacons in a row have gone missing when the light turns red,
+/// [`Stage::Silent`]: the spacecraft is not being heard from.
+pub const SILENT_AFTER_MISSED: u32 = 8;
+
+/// How many beacons have gone missing since the last one arrived, `elapsed`
+/// ago, for a vehicle that beacons every `interval`: one for each interval
+/// that has passed in full, a beacon being missed once the next one is due
+/// and has not come.
+///
+/// What [`Schedule::for_interval`] counts in. Nought for an interval of
+/// nought, which is no interval to count in.
+pub fn missed(elapsed: Duration, interval: Duration) -> u128 {
+    if interval.is_zero() {
+        return 0;
+    }
+    elapsed.as_nanos() / interval.as_nanos()
+}
+
 /// How stale the last beacon is.
 ///
 /// Named by what is true of the spacecraft rather than by what the window
@@ -178,48 +210,78 @@ impl Schedule {
         Schedule { steps }
     }
 
-    /// What tcsmoc shows, and what the `beacon` example shows.
+    /// The schedule for a vehicle that beacons every five seconds:
+    /// [`Schedule::for_interval`] of [`STANDARD_INTERVAL`].
+    pub fn standard() -> Schedule {
+        Schedule::for_interval(STANDARD_INTERVAL)
+    }
+
+    /// What tcsmoc shows, and what the `beacon` and `ping` examples show, for
+    /// a vehicle that beacons every `interval`.
     ///
-    /// Four seconds steady, four more blinking at the same stage, six at the
-    /// next and silence after that. Every blink is half a second on and half
-    /// a second off, so a blinking light changes twice a second whatever the
-    /// stage, and the colour alone says which stage it is. The figures are read against a beacon
-    /// interval of five seconds: one beacon may be missed without the stage
-    /// changing to anything alarming, because one lost datagram is a network
-    /// and not a spacecraft, and two missed is worth an operator's attention.
+    /// Counted in beacons missed -- see [`missed`] -- because that is what
+    /// the light says: a second late means one thing for a vehicle that
+    /// beacons every second and another for one that beacons every minute,
+    /// and a number of beacons means the same for both.
+    ///
+    /// | Beacons missed | Stage            | Light           |
+    /// |----------------|------------------|-----------------|
+    /// | 0 or 1         | [`Stage::Heard`]  | steady green    |
+    /// | 2 or 3         | [`Stage::Heard`]  | blinking green  |
+    /// | 4 to 7         | [`Stage::Aging`]  | blinking yellow |
+    /// | 8 or more      | [`Stage::Silent`] | blinking red    |
+    ///
+    /// The thresholds are [`BLINKING_AFTER_MISSED`], [`AGING_AFTER_MISSED`]
+    /// and [`SILENT_AFTER_MISSED`]. For a five-second beacon that is ten
+    /// seconds steady, ten more blinking and twenty aging.
+    ///
+    /// Every blink is half a second on and half a second off, whatever the
+    /// interval: how fast a light flashes is for the eye, not for the beacon,
+    /// so a blinking light changes twice a second at every stage and the
+    /// colour alone says which stage it is.
+    ///
+    /// An interval of nought is no interval to count in, and gets the
+    /// standard schedule.
     ///
     /// The last step never ends. A schedule whose steps ran out would leave
     /// the oldest reading looking like the newest -- see [`Schedule::at`] --
     /// so the last one holds for ever, and blinks, because a light that has
     /// stopped changing is one an operator stops reading.
-    pub fn standard() -> Schedule {
-        let blink = |on: u64, off: u64| {
-            Some(Blink {
-                on: Duration::from_millis(on),
-                off: Duration::from_millis(off),
-            })
+    pub fn for_interval(interval: Duration) -> Schedule {
+        let interval = if interval.is_zero() {
+            STANDARD_INTERVAL
+        } else {
+            interval
         };
+        // A step lasts from one count of missed beacons to the next: so many
+        // whole intervals, held at the longest a step can be rather than
+        // wrapping for an interval too long to multiply.
+        let missing = |from: u32, to: u32| interval.checked_mul(to - from).unwrap_or(Duration::MAX);
+        let blink = Some(Blink {
+            on: Duration::from_millis(500),
+            off: Duration::from_millis(500),
+        });
 
         Schedule::of(vec![
             Step {
-                holds: Duration::from_secs(4),
+                holds: missing(0, BLINKING_AFTER_MISSED),
                 stage: Stage::Heard,
                 blink: None,
             },
             Step {
-                holds: Duration::from_secs(4),
+                holds: missing(BLINKING_AFTER_MISSED, AGING_AFTER_MISSED),
                 stage: Stage::Heard,
-                blink: blink(500, 500),
+                blink,
             },
             Step {
-                holds: Duration::from_secs(6),
+                holds: missing(AGING_AFTER_MISSED, SILENT_AFTER_MISSED),
                 stage: Stage::Aging,
-                blink: blink(500, 500),
+                blink,
             },
             Step {
                 holds: Duration::MAX,
                 stage: Stage::Silent,
-                blink: blink(500, 500),
+                blink,
             },
         ])
     }
@@ -779,9 +841,10 @@ mod tests {
     /// A blinking stage of contact is still contact, and only the leading run
     /// of stages counts.
     ///
-    /// The standard schedule holds the heard stage steady for four seconds and
-    /// then blinks it for four more: a blinking light says beacons are
-    /// arriving and aging, not that they have stopped. The run stops at the
+    /// The standard schedule holds the heard stage steady for two intervals
+    /// and then blinks it for two more: a blinking light says beacons are
+    /// arriving and aging, not that they have stopped. The schedule here is
+    /// shaped the same way, with figures of its own. The run stops at the
     /// first stage that is not one of contact, whatever comes after it.
     #[test]
     fn a_blinking_stage_of_contact_is_still_contact() {
@@ -883,9 +946,9 @@ mod tests {
 
     /// The standard schedule is what the figures in it are for.
     ///
-    /// Read against a beacon interval of five seconds: one may be missed
-    /// without the stage saying anything alarming, because one lost datagram
-    /// is a network and not a spacecraft.
+    /// Read against a beacon interval of five seconds: up to three may be
+    /// missed without the stage saying anything alarming, because a lost
+    /// datagram or two is a network and not a spacecraft.
     #[test]
     fn the_standard_schedule_holds_contact_through_one_missed_beacon() {
         let schedule = Schedule::standard();
@@ -896,14 +959,105 @@ mod tests {
             Stage::Heard,
             "one beacon missed at five seconds is still being heard from"
         );
-        assert_eq!(schedule.while_in_contact(), Duration::from_secs(8));
-        assert_eq!(schedule.at(Duration::from_secs(9)).stage, Stage::Aging);
-        assert_eq!(schedule.at(Duration::from_secs(20)).stage, Stage::Silent);
+        assert_eq!(schedule.while_in_contact(), Duration::from_secs(20));
+        assert_eq!(
+            schedule.at(Duration::from_secs(19)).stage,
+            Stage::Heard,
+            "three beacons missed is still being heard from"
+        );
+        assert_eq!(schedule.at(Duration::from_secs(21)).stage, Stage::Aging);
+        assert_eq!(schedule.at(Duration::from_secs(39)).stage, Stage::Aging);
+        assert_eq!(schedule.at(Duration::from_secs(41)).stage, Stage::Silent);
         assert_eq!(
             schedule.at(Duration::from_secs(86_400)).stage,
             Stage::Silent,
             "the last stage never ends"
         );
+    }
+
+    /// A schedule is in intervals: the standard one is the schedule for five
+    /// seconds, one for ten seconds holds each stage twice as long, and the
+    /// blink is the same at both. Nought is no interval, and gets the
+    /// standard schedule.
+    #[test]
+    fn a_schedule_scales_with_the_beacon_interval() {
+        let holds = |schedule: &Schedule| -> Vec<Duration> {
+            schedule.steps.iter().map(|step| step.holds).collect()
+        };
+        let blinks = |schedule: &Schedule| -> Vec<Option<Blink>> {
+            schedule.steps.iter().map(|step| step.blink).collect()
+        };
+        let standard = Schedule::standard();
+        let five = Schedule::for_interval(Duration::from_secs(5));
+        let ten = Schedule::for_interval(Duration::from_secs(10));
+
+        assert_eq!(holds(&five), holds(&standard));
+        assert_eq!(
+            holds(&ten),
+            vec![
+                Duration::from_secs(20),
+                Duration::from_secs(20),
+                Duration::from_secs(40),
+                Duration::MAX
+            ]
+        );
+        assert_eq!(blinks(&ten), blinks(&standard));
+        assert_eq!(ten.while_in_contact(), Duration::from_secs(40));
+        assert_eq!(ten.at(Duration::from_secs(39)).stage, Stage::Heard);
+        assert_eq!(ten.at(Duration::from_secs(41)).stage, Stage::Aging);
+        assert_eq!(ten.at(Duration::from_secs(81)).stage, Stage::Silent);
+
+        // Fractions of a second are kept, not rounded to one.
+        let quarter = Schedule::for_interval(Duration::from_millis(250));
+        assert_eq!(quarter.steps[0].holds, Duration::from_millis(500));
+
+        // An interval too long to multiply holds as long as a step can.
+        let longest = Schedule::for_interval(Duration::MAX);
+        assert_eq!(longest.steps[0].holds, Duration::MAX);
+
+        assert_eq!(
+            holds(&Schedule::for_interval(Duration::ZERO)),
+            holds(&standard)
+        );
+    }
+
+    /// What the light shows is decided by the number of beacons missed and
+    /// nothing else: at every interval, a moment either side of each
+    /// threshold falls on the side the count says.
+    #[test]
+    fn the_stage_is_the_number_of_beacons_missed() {
+        let stage_for = |missed: u128| match missed {
+            n if n >= u128::from(SILENT_AFTER_MISSED) => (Stage::Silent, true),
+            n if n >= u128::from(AGING_AFTER_MISSED) => (Stage::Aging, true),
+            n if n >= u128::from(BLINKING_AFTER_MISSED) => (Stage::Heard, true),
+            _ => (Stage::Heard, false),
+        };
+        for interval in [
+            Duration::from_millis(250),
+            Duration::from_secs(5),
+            Duration::from_secs(60),
+        ] {
+            let schedule = Schedule::for_interval(interval);
+            for count in 0..12u32 {
+                for elapsed in [
+                    interval * count,
+                    interval * count + interval / 2,
+                    (interval * (count + 1)).saturating_sub(Duration::from_nanos(1)),
+                ] {
+                    let showing = schedule.at(elapsed);
+                    let (stage, blinks) = stage_for(missed(elapsed, interval));
+                    assert_eq!(showing.stage, stage, "{elapsed:?} at {interval:?}");
+                    // A blinking step's light is dark for half of every
+                    // second, which a steady one never is.
+                    if !blinks {
+                        assert!(showing.lit, "{elapsed:?} at {interval:?}");
+                    }
+                }
+            }
+        }
+        assert_eq!(missed(Duration::from_secs(9), Duration::from_secs(5)), 1);
+        assert_eq!(missed(Duration::from_secs(10), Duration::from_secs(5)), 2);
+        assert_eq!(missed(Duration::from_secs(10), Duration::ZERO), 0);
     }
 
     /// The digest tcspecial sent is compared with the one this station

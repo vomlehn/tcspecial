@@ -1048,6 +1048,20 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
         }
     };
     let contact = Arc::new(Mutex::new(tcslib::beacon::Contact::Lost));
+    // The interval the configuration sends beacons at, which is what says how
+    // late one is; a configuration whose interval cannot be read gets the
+    // standard schedule, and says so.
+    let interval = match tcslibgs::graph::parameters::beacon_interval_of(&graph) {
+        Ok(interval) => interval.unwrap_or(tcslib::beacon::STANDARD_INTERVAL),
+        Err(e) => {
+            startup.warning(format!(
+                "The beacon interval cannot be read, so the beacon light ages as \
+                 though it were {:?}: {e}",
+                tcslib::beacon::STANDARD_INTERVAL
+            ));
+            tcslib::beacon::STANDARD_INTERVAL
+        }
+    };
     let _beacon_receive = match tcslibgs::graph::parameters::beacon_of(&graph) {
         Ok(Some(beacon)) => {
             eprintln!(
@@ -1057,7 +1071,7 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
             BeaconReceive::new(
                 ui.as_weak(),
                 beacon,
-                crate::config::constants::beacon_schedule(),
+                crate::config::constants::beacon_schedule(interval),
                 contact,
                 digest,
                 Some(crate::ask_whether_to_continue(

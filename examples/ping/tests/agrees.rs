@@ -2,16 +2,16 @@
 //!
 //! The ground station is Python and reads the XML spelling, the standard
 //! library having no YAML; the vehicle and every Rust ground program read
-//! through `tcslibgs`. Where the beacons are, where a ping goes up and where
-//! its answer comes down are worked out on both sides, so this holds the
-//! Python's answers for `ping.xml` to the Rust's for `ping.yaml` -- which is
-//! also the two spellings being held to one another.
+//! through `tcslibgs`. Where the beacons are and how often they come, where a
+//! ping goes up and where its answer comes down are worked out on both sides,
+//! so this holds the Python's answers for `ping.xml` to the Rust's for
+//! `ping.yaml` -- which is also the two spellings being held to one another.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use tcslibgs::config_digest::digest_of_file;
-use tcslibgs::graph::parameters::beacon_of;
+use tcslibgs::graph::parameters::{beacon_interval_of, beacon_of};
 use tcslibgs::graph::reach::reach_of;
 use tcslibgs::graph::telemetry::{self, Via};
 use tcslibgs::graph::Graph;
@@ -53,6 +53,12 @@ fn worked_out() -> Vec<(String, String)> {
         .expect("its section reads")
         .expect("it has one");
 
+    // In nanoseconds, as the Python keeps it.
+    let interval = beacon_interval_of(&graph)
+        .expect("its section reads")
+        .expect("it has one")
+        .as_nanos();
+
     let moc = graph
         .nodes
         .iter()
@@ -73,6 +79,7 @@ fn worked_out() -> Vec<(String, String)> {
     vec![
         ("beacon.send".to_string(), link.send.to_string()),
         ("beacon.recv".to_string(), link.recv.to_string()),
+        ("beacon.interval".to_string(), interval.to_string()),
         ("uplink".to_string(), uplink),
         ("downlink".to_string(), downlink),
         (

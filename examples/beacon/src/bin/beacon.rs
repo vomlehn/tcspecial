@@ -34,9 +34,9 @@ use std::time::Duration;
 use slint::ComponentHandle;
 
 use beacon_example::{notice_exit, show_on, wire, Vehicle, WatchWindow};
-use tcslib::beacon::{Beacons, Schedule};
+use tcslib::beacon::{Beacons, Schedule, STANDARD_INTERVAL};
 use tcslibgs::config_digest::digest_of_file;
-use tcslibgs::graph::parameters::beacon_of;
+use tcslibgs::graph::parameters::{beacon_interval_of, beacon_of};
 use tcslibgs::graph::Graph;
 use tcsui::Shown;
 
@@ -88,7 +88,17 @@ fn main() -> Result<(), slint::PlatformError> {
         }
     };
 
-    let mut beacons = match Beacons::listening(link, Schedule::standard(), expected) {
+    // How late a beacon is depends on how often they are sent, which is the
+    // configuration's to say. The section was read for the link just now, so
+    // it can be read for this; the standard interval is only for the
+    // configuration that has neither.
+    let interval = beacon_interval_of(&graph)
+        .ok()
+        .flatten()
+        .unwrap_or(STANDARD_INTERVAL);
+
+    let schedule = Schedule::for_interval(interval);
+    let mut beacons = match Beacons::listening(link, schedule, expected) {
         Ok(beacons) => beacons,
         Err(e) => {
             eprintln!("beacons cannot be received: {e}");

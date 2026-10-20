@@ -47,6 +47,27 @@ FOREVER = None
 MS = 1_000_000
 SECOND = 1_000_000_000
 
+#: The beacon interval the standard schedule is for, in nanoseconds: see
+#: :meth:`Schedule.for_interval`.
+STANDARD_INTERVAL = 5 * SECOND
+
+#: How many beacons in a row have gone missing when the steady green light
+#: starts to blink, when it turns yellow, and when it turns red:
+#: ``BLINKING_AFTER_MISSED``, ``AGING_AFTER_MISSED`` and
+#: ``SILENT_AFTER_MISSED`` in ``tcslib::beacon``.
+BLINKING_AFTER_MISSED = 2
+AGING_AFTER_MISSED = 4
+SILENT_AFTER_MISSED = 8
+
+
+def missed(elapsed, interval):
+    """How many beacons have gone missing since the last one arrived,
+    ``elapsed`` nanoseconds ago, for a vehicle that beacons every ``interval``:
+    one for each interval passed in full. Nought for an interval of nought."""
+    if not interval:
+        return 0
+    return elapsed // interval
+
 #: What the message line says before any beacon has arrived.
 #:
 #: Said rather than left empty, because an empty line next to a label reads as
@@ -140,21 +161,45 @@ class Schedule:
 
     @staticmethod
     def standard():
-        """What tcsmoc shows, and what the beacon and ping examples show.
+        """The schedule for a vehicle that beacons every five seconds:
+        :meth:`for_interval` of :data:`STANDARD_INTERVAL`."""
+        return Schedule.for_interval(STANDARD_INTERVAL)
 
-        Four seconds steady, four more blinking at the same stage, six at the
-        next and silence after that, against a beacon interval of five
-        seconds. Every blink is half a second on and half a second off. The last step never ends, and blinks, because a light that
-        has stopped changing is one an operator stops reading.
+    @staticmethod
+    def for_interval(interval):
+        """What tcsmoc shows, and what the beacon and ping examples show, for
+        a vehicle that beacons every ``interval`` nanoseconds.
+
+        Counted in beacons missed -- see :func:`missed` -- because that is
+        what the light says: nought or one missed is steady green, two or
+        three blinking green, four to seven blinking yellow, eight or more
+        blinking red. For a five-second beacon that is ten seconds steady,
+        ten more blinking and twenty aging. Every blink is half a
+        second on and half a second off, whatever the interval. An interval of
+        nought gets the standard schedule. The last step never ends, and
+        blinks, because a light that has stopped changing is one an operator
+        stops reading.
         """
-        def blink(on, off):
-            return Blink(on=on * MS, off=off * MS)
+        if not interval:
+            interval = STANDARD_INTERVAL
 
+        def missing(start, end):
+            return interval * (end - start)
+
+        blink = Blink(on=500 * MS, off=500 * MS)
         return Schedule([
-            Step(holds=4 * SECOND, stage=Stage.HEARD),
-            Step(holds=4 * SECOND, stage=Stage.HEARD, blink=blink(500, 500)),
-            Step(holds=6 * SECOND, stage=Stage.AGING, blink=blink(500, 500)),
-            Step(holds=FOREVER, stage=Stage.SILENT, blink=blink(500, 500)),
+            Step(holds=missing(0, BLINKING_AFTER_MISSED), stage=Stage.HEARD),
+            Step(
+                holds=missing(BLINKING_AFTER_MISSED, AGING_AFTER_MISSED),
+                stage=Stage.HEARD,
+                blink=blink,
+            ),
+            Step(
+                holds=missing(AGING_AFTER_MISSED, SILENT_AFTER_MISSED),
+                stage=Stage.AGING,
+                blink=blink,
+            ),
+            Step(holds=FOREVER, stage=Stage.SILENT, blink=blink),
         ])
 
     def steps(self):

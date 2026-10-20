@@ -1354,7 +1354,7 @@ fn put_sub(
 /// -- the settings the simulator file gives it. See [`panel_of`], which builds
 /// the rows; this is what hands them to a window.
 fn put_node(window: &NodeWindow, editor: &Editor, node: &str) {
-    let (name, node_type, comment, fields) = panel_of(
+    let (name, node_type, comment, fields, about) = panel_of(
         editor,
         &Qualified::parse(node).in_,
         Some(&Qualified::parse(node).node),
@@ -1372,6 +1372,7 @@ fn put_node(window: &NodeWindow, editor: &Editor, node: &str) {
     window.set_node(name.into());
     window.set_node_type(node_type.into());
     window.set_comment(comment.into());
+    window.set_about(about.into());
     if !refilled(&window.get_fields(), &fields) {
         window.set_fields(ModelRc::from(Rc::new(VecModel::from(fields))));
     }
@@ -3050,6 +3051,7 @@ fn put_parameters(window: &ParametersWindow, editor: &Editor) {
         .map(|(attribute, required)| {
             let value = said.get(*attribute).cloned().unwrap_or_default();
             FieldView {
+                about: Default::default(),
                 name: (*attribute).into(),
                 value: value.clone().into(),
                 required: *required,
@@ -3137,6 +3139,7 @@ fn settings_of(fields: &[&'static str], said: &BTreeMap<String, String>) -> Vec<
     let mut shown: Vec<FieldView> = fields
         .iter()
         .map(|setting| FieldView {
+            about: Default::default(),
             name: (*setting).into(),
             value: said.get(*setting).cloned().unwrap_or_default().into(),
             required: false,
@@ -3157,6 +3160,7 @@ fn settings_of(fields: &[&'static str], said: &BTreeMap<String, String>) -> Vec<
             continue;
         }
         shown.push(FieldView {
+            about: Default::default(),
             name: setting.clone().into(),
             value: value.clone().into(),
             required: false,
@@ -3610,8 +3614,14 @@ fn panel_of(
     editor: &Editor,
     home: &Home,
     chosen: Option<&str>,
-) -> (String, String, String, Vec<FieldView>) {
-    let empty = (String::new(), String::new(), String::new(), Vec::new());
+) -> (String, String, String, Vec<FieldView>, String) {
+    let empty = (
+        String::new(),
+        String::new(),
+        String::new(),
+        Vec::new(),
+        String::new(),
+    );
     let chosen = match chosen {
         Some(chosen) if !chosen.is_empty() => chosen,
         _ => return empty,
@@ -3636,34 +3646,42 @@ fn panel_of(
     // own list, which says what is asked for and not what kind it is, so
     // those are text -- and every type has a description, which is what
     // `nodes::tests::every_description_has_its_rust` is for.
-    let declared: Vec<(String, bool, String)> =
-        match nodes::matching(descriptions(), &node.node_type, &node.attributes) {
-            Some(described) => described.fields(),
-            None => NodeType::ALL
-                .iter()
-                .find(|t| t.spelling() == node.node_type)
-                .map(|t| {
-                    t.attributes()
-                        .iter()
-                        .map(|(name, required)| {
-                            ((*name).to_string(), *required, nodes::TEXT.to_string())
-                        })
-                        .collect()
-                })
-                .unwrap_or_default(),
-        };
+    let described = nodes::matching(descriptions(), &node.node_type, &node.attributes);
+    let declared: Vec<nodes::Attribute> = match described {
+        Some(described) => described.fields(),
+        None => NodeType::ALL
+            .iter()
+            .find(|t| t.spelling() == node.node_type)
+            .map(|t| {
+                t.attributes()
+                    .iter()
+                    .map(|(name, required)| nodes::Attribute {
+                        name: (*name).to_string(),
+                        required: *required,
+                        about: String::new(),
+                        kind: nodes::TEXT.to_string(),
+                    })
+                    .collect()
+            })
+            .unwrap_or_default(),
+    };
 
     let mut fields: Vec<FieldView> = declared
         .iter()
-        .map(|(name, required, kind)| {
-            let value = node.attributes.get(name).cloned().unwrap_or_default();
+        .map(|attribute| {
+            let value = node
+                .attributes
+                .get(&attribute.name)
+                .cloned()
+                .unwrap_or_default();
             FieldView {
-                name: name.clone().into(),
+                about: attribute.about.clone().into(),
+                name: attribute.name.clone().into(),
                 value: value.clone().into(),
-                required: *required,
+                required: attribute.required,
                 is_heading: false,
                 simulated: false,
-                kind: kind.clone().into(),
+                kind: attribute.kind.clone().into(),
             }
         })
         .collect();
@@ -3673,10 +3691,11 @@ fn panel_of(
     // nobody can see is one that gets written back out without anybody
     // knowing it is there.
     for (name, value) in &node.attributes {
-        if declared.iter().any(|(declared, _, _)| declared == name) {
+        if declared.iter().any(|declared| &declared.name == name) {
             continue;
         }
         fields.push(FieldView {
+            about: Default::default(),
             name: name.clone().into(),
             value: value.clone().into(),
             required: false,
@@ -3703,6 +3722,7 @@ fn panel_of(
             let empty = BTreeMap::new();
             let said = simulator.payloads.get(&absolute).unwrap_or(&empty);
             fields.push(FieldView {
+                about: Default::default(),
                 name: "simulated payload".into(),
                 value: String::new().into(),
                 required: false,
@@ -3728,6 +3748,9 @@ fn panel_of(
         node.node_type.clone(),
         node.comment.clone().unwrap_or_default(),
         fields,
+        described
+            .map(|described| described.about.clone())
+            .unwrap_or_default(),
     )
 }
 
@@ -6507,7 +6530,7 @@ mod tests {
             home: None,
         });
 
-        let (name, node_type, _, fields) = panel_of(&editor, &None, Some("temp_1"));
+        let (name, node_type, _, fields, _) = panel_of(&editor, &None, Some("temp_1"));
         assert_eq!(name, "temp_1");
         assert_eq!(node_type, "i2c");
 
@@ -6549,7 +6572,7 @@ mod tests {
             now: Some("/dev/i2c-1".into()),
         });
 
-        let (_, _, _, fields) = panel_of(&editor, &None, Some("temp_1"));
+        let (_, _, _, fields, _) = panel_of(&editor, &None, Some("temp_1"));
         let path = fields.iter().find(|f| f.name == "path").unwrap();
         assert_eq!(path.value, "/dev/i2c-1");
         assert!(path.required, "the bus is one the configuration must state");
@@ -6580,7 +6603,7 @@ mod tests {
             now: Some("7".into()),
         });
 
-        let (_, _, _, fields) = panel_of(&editor, &None, Some("temp_1"));
+        let (_, _, _, fields, _) = panel_of(&editor, &None, Some("temp_1"));
         let extra = fields
             .iter()
             .find(|f| f.name == "future_thing")
@@ -6615,7 +6638,7 @@ mod tests {
             links: Vec::new(),
             home: None,
         });
-        let (name, _, _, fields) = panel_of(&editor, &None, Some("a"));
+        let (name, _, _, fields, _) = panel_of(&editor, &None, Some("a"));
         assert!(name.is_empty(), "the panel showed a node that is not there");
         assert!(fields.is_empty());
     }
@@ -6626,7 +6649,7 @@ mod tests {
         let where_ = tempfile::tempdir().expect("a directory");
         let editor = Editor::new(&where_.path().join("v.yaml"));
         for chosen in [None, Some(""), Some("nothing-here")] {
-            let (name, _, _, fields) = panel_of(&editor, &None, chosen);
+            let (name, _, _, fields, _) = panel_of(&editor, &None, chosen);
             assert!(name.is_empty(), "{chosen:?}");
             assert!(fields.is_empty(), "{chosen:?}");
         }
@@ -7962,7 +7985,7 @@ mod tests {
         .expect("a payload that is a program");
         let editor = Editor::open(&path, dividers());
 
-        let (_, _, _, fields) = panel_of(&editor, &None, Some("bay"));
+        let (_, _, _, fields, _) = panel_of(&editor, &None, Some("bay"));
         let kind = |name: &str| {
             fields
                 .iter()
@@ -7989,6 +8012,60 @@ mod tests {
         assert!(
             tightened.contains("if !f.is-heading && f.kind != \"boolean\": LineEdit {"),
             "the other kinds are not offered with a box to write in"
+        );
+    }
+
+    /// What the description tree says about a node, and about each of its
+    /// attributes, reaches the window, and the foot of the window shows the
+    /// one for the field that has the focus -- the node's own while none has.
+    #[test]
+    fn what_is_said_about_a_field_is_shown_while_it_has_the_focus() {
+        use i_slint_backend_testing::ElementHandle;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.yaml");
+        std::fs::write(
+            &path,
+            "payloads:\n  - name: bay\n    type: app_pl\n    \
+             executable: /bin/true\n    app-payload-arg: \"--bay\"\n",
+        )
+        .expect("a payload that is a program");
+        let editor = Editor::open(&path, dividers());
+
+        let (_, _, _, fields, about) = panel_of(&editor, &None, Some("bay"));
+        assert!(!about.is_empty(), "the node's own description says nothing");
+        let executable = fields
+            .iter()
+            .find(|field| field.name == "executable")
+            .expect("the window offers executable");
+        assert!(
+            !executable.about.is_empty(),
+            "nothing is said about executable"
+        );
+
+        i_slint_backend_testing::init_no_event_loop();
+        let window = NodeWindow::new().expect("a window");
+        put_node(&window, &editor, "bay");
+        window.show().expect("the window shows");
+        assert_eq!(window.get_about_shown(), about.as_str(), "before any field");
+
+        // The first box to write in is the executable's: it is the first
+        // attribute an app's description asks for that is not a true or false.
+        let boxes =
+            ElementHandle::find_by_element_type_name(&window, "LineEdit").collect::<Vec<_>>();
+        let named = fields
+            .iter()
+            .filter(|field| !field.is_heading && field.kind != "boolean")
+            .collect::<Vec<_>>();
+        let at = named
+            .iter()
+            .position(|field| field.name == "executable")
+            .expect("executable is a box to write in");
+        boxes[at].mock_single_click(slint::platform::PointerEventButton::Left);
+        assert_eq!(
+            window.get_about_shown(),
+            executable.about.as_str(),
+            "the field with the focus"
         );
     }
 
@@ -9839,7 +9916,7 @@ mod tests {
         chosen
             .borrow_mut()
             .insert(String::new(), "vote-1".to_string());
-        let (_, _, _, fields) = panel_of(&editor.borrow(), &None, Some("vote-1"));
+        let (_, _, _, fields, _) = panel_of(&editor.borrow(), &None, Some("vote-1"));
         let asked: Vec<String> = fields
             .iter()
             .filter(|field| !field.is_heading)
@@ -11094,7 +11171,7 @@ mod tests {
 
         // With no simulator file, a payload's panel is its own attributes and
         // nothing else: there is no second file for anything to go in.
-        let (_, _, _, fields) = panel_of(&editor.borrow(), &None, Some("temp_1"));
+        let (_, _, _, fields, _) = panel_of(&editor.borrow(), &None, Some("temp_1"));
         assert!(
             fields.iter().all(|f| !f.is_heading && !f.simulated),
             "the panel should carry nothing of a file that was not given"
@@ -11106,7 +11183,7 @@ mod tests {
 
         // Now the payload's panel is its attributes, a rule, and the
         // simulator's settings for it.
-        let (_, _, _, fields) = panel_of(&editor.borrow(), &None, Some("temp_1"));
+        let (_, _, _, fields, _) = panel_of(&editor.borrow(), &None, Some("temp_1"));
         let rule = fields
             .iter()
             .position(|f| f.is_heading)
@@ -11127,7 +11204,7 @@ mod tests {
 
         // A computation is not simulated -- nothing stands in for it -- so
         // its panel carries none of this.
-        let (_, _, _, fields) = panel_of(&editor.borrow(), &None, Some("k"));
+        let (_, _, _, fields, _) = panel_of(&editor.borrow(), &None, Some("k"));
         assert!(
             fields.iter().all(|f| !f.is_heading && !f.simulated),
             "a computation has no simulated payload"

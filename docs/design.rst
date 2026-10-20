@@ -3978,10 +3978,12 @@ would be an editor a typo turns off. What is wrong goes to the error output, as
 an unreadable preferences file does. Two descriptions of one name are refused
 the same way -- a name picks out one node here as it does in a configuration.
 
-Each attribute's ``about`` is read and kept and is not yet shown: the panel has
-a row per attribute and nowhere to put a sentence. **Needs examination.** The
-obvious place is beside the field it describes, which is a change to the
-panel's layout rather than to the tree.
+Each attribute's ``about`` is shown at the foot of a node's window, in a box
+that cannot be written in, while that attribute's field has the focus; the
+node's own ``about`` is shown there while no field with something said about it
+has. At the foot rather than beside each field, so that the rows stay a row
+each however long a sentence is, and read-only because what a description says
+is the tree's to say and not the node's.
 
 Schemas beside the tree
 -----------------------

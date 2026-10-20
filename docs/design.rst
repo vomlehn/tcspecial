@@ -692,6 +692,7 @@ And every interface type may say, beyond the terms of its own link:
    max_length      where one read of a line ends. A node's attributes are
    read_timeout    flat, so these are written beside the line's terms
    terminators     rather than nested
+   length_prefix
 
 Requirement
     An attribute nothing reads is refused, by name, for the type it is written
@@ -6737,7 +6738,7 @@ Requirement
 Where a Read of a Line Ends
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A stream delivers bytes with no frame boundaries of its own, so a node on one
-needs to be told where one read ends. Three attributes say so, written flat
+needs to be told where one read ends. Four attributes say so, written flat
 beside the line's other terms.
 
 **Stream attributes**
@@ -6753,6 +6754,9 @@ beside the line's other terms.
 | terminators   | See      | One or more byte values, each of which ends a    |
 |               | below    | read                                             |
 +---------------+----------+--------------------------------------------------+
+| length_prefix | See      | What a read's first bytes say its length is:     |
+|               | below    | ``u8``, ``u16be`` or ``u16le``                   |
++---------------+----------+--------------------------------------------------+
 
 Requirement
     A line specifies the maximum read length, and it is at most a datum's,
@@ -6761,7 +6765,8 @@ Requirement
     together.
 
 Requirement
-    A line specifies the timeout, the terminator list, or both.
+    A line specifies the timeout, the terminator list, the length prefix, or
+    the timeout beside either of the other two.
 
 Requirement
     Specifying both a timeout and a terminator list is valid. A read then ends
@@ -6774,6 +6779,45 @@ Requirement
 Requirement
     To read a fixed number of bytes at a time, with no timeout and no
     terminator, a line specifies a timeout of ``none``.
+
+Requirement
+    A length prefix is ``u8``, one byte; ``u16be``, two bytes, the more
+    significant first; or ``u16le``, two bytes, the less significant first.
+    The length it gives counts the bytes after the prefix. A read ends when
+    it holds the prefix and that many bytes, and is delivered prefix and
+    all, as a read ended by a terminator keeps its terminator.
+
+Requirement
+    A line with a length prefix specifies a timeout, which may be ``none``.
+    One lost byte puts every later prefix in the wrong place and nothing in
+    the bytes says so: the timeout is what ends a frame that never finishes,
+    so that the next byte is read as a prefix and the reads come back into
+    step. ``none`` says there is to be no such recovery, and saying it is
+    what tells that intent from a timeout forgotten.
+
+Requirement
+    A line with a length prefix does not specify terminators. A terminator's
+    byte can appear anywhere in the body of a frame whose length was given,
+    and would end a read inside it, at a place that depends on the data.
+
+Requirement
+    A line's ``max_length`` holds at least its length prefix.
+
+Requirement
+    On a prefixed line the timeout does not deliver what has arrived. A
+    frame shorter than its own prefix says is known to be broken, and is let
+    go rather than handed to the ground as though it were a reading. A frame
+    whose prefix gives more than ``max_length`` is let go as it arrives,
+    without being held, so that the frame after it is read from its own
+    prefix; a timeout ends the letting go of one that stops arriving. The
+    vehicle logs a warning naming the node for each frame let go.
+
+Requirement
+    A prefixed read asks the line for its prefix and then for no more than
+    the frame the prefix gives, so the next frame's prefix stays in the
+    line's buffer; both asks are made in one pass, so that a frame waiting on
+    the line is not delayed a group's interval between its prefix and its
+    body.
 
 Requirement
     The vehicle acts on the rule: each read of a line is held until it ends,

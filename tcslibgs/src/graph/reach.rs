@@ -76,8 +76,8 @@ pub struct Reach {
     /// tells the nodes apart by the port their data arrives at, and the
     /// vehicle sends from the first reading without being spoken to.
     pub ground: Option<HostPort>,
-    /// Where one read of a line ends: the most it may hold, and the timeout
-    /// and terminators that may end it sooner.
+    /// Where one read of a line ends: the most it may hold, and the timeout,
+    /// terminators or length prefix that may end it sooner.
     ///
     /// For a line, and only for one: a stream delivers bytes with no frame
     /// boundaries of its own, so the vehicle holds what has arrived until one
@@ -99,6 +99,7 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
         max_length: None,
         timeout: None,
         terminators: None,
+        length_prefix: None,
     };
     let mut stream_stated = false;
     let mut read_size = None;
@@ -186,7 +187,7 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
                         .map_err(|why| format!("\"{what}\": {why}"))?,
                 );
             }
-            // Where one read of a stream ends. Three attributes rather than a
+            // Where one read of a stream ends. Four attributes rather than a
             // section of its own, because a node's attributes are flat and
             // there is nowhere to nest them.
             "max_length" => {
@@ -199,6 +200,10 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
             }
             "terminators" => {
                 stream.terminators = Some(ByteList::of(value.as_str()));
+                stream_stated = true;
+            }
+            "length_prefix" => {
+                stream.length_prefix = Some(value.clone());
                 stream_stated = true;
             }
             // One a configuration used to write, told what to say instead:
@@ -240,7 +245,8 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
         if stream_stated {
             return Err(format!(
                 "\"{what}\" is {} {} node, and where a read ends is a property of a \
-                 line: max_length, read_timeout and terminators do not apply to it",
+                 line: max_length, read_timeout, terminators and length_prefix do not \
+                 apply to it",
                 kind.article(),
                 node.node_type
             ));
@@ -838,6 +844,7 @@ fn put_term(terms: &mut LinkTerms, attribute: &str, value: &Scalar) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::endpoint_config::LengthPrefix;
     use crate::graph::Graph;
     use crate::node::payload::gpio::Direction;
     use crate::node::payload::spi::SpiMode;
@@ -1617,6 +1624,7 @@ mod tests {
             max_length: None,
             timeout: None,
             terminators: None,
+            length_prefix: None,
         };
         let mut stream_stated = false;
         for (attribute, value) in &node.attributes {
@@ -1627,6 +1635,7 @@ mod tests {
                 "max_length" => stream.max_length = Some(value.clone()),
                 "read_timeout" => stream.timeout = Some(value.clone()),
                 "terminators" => stream.terminators = Some(ByteList::of(value.as_str())),
+                "length_prefix" => stream.length_prefix = Some(value.clone()),
                 _ => continue,
             }
             stream_stated = true;
@@ -1933,6 +1942,95 @@ mod tests {
         assert_eq!(stream.timeout, None);
         assert!(stream.terminators.is_empty());
         assert!(stream.is_fixed_length());
+    }
+
+    /// A length prefix ends a read, beside the timeout it must have: with
+    /// one, a frame cut short ends and the next is looked for afresh.
+    #[test]
+    fn a_length_prefix_ends_a_read() {
+        for (word, want) in [
+            ("u8", LengthPrefix::U8),
+            ("u16be", LengthPrefix::U16Be),
+            ("U16LE", LengthPrefix::U16Le),
+        ] {
+            let stream = line_stream(&[
+                ("max_length", "64"),
+                ("length_prefix", word),
+                ("read_timeout", "100 ms"),
+            ])
+            .unwrap_or_else(|e| panic!("{word}: {e}"));
+            assert_eq!(stream.length_prefix, Some(want), "for {word}");
+            assert!(!stream.is_fixed_length());
+        }
+        let none = line_stream(&[
+            ("max_length", "64"),
+            ("length_prefix", "u8"),
+            ("read_timeout", "none"),
+        ])
+        .expect("none is a timeout stated");
+        assert_eq!(none.timeout, None);
+        assert!(!none.is_fixed_length(), "the prefix ends it");
+    }
+
+    /// A length prefix with no timeout stated is refused: one lost byte
+    /// would leave every later read out of step, and saying none is how a
+    /// file says it means that.
+    #[test]
+    fn a_length_prefix_must_say_its_timeout() {
+        let said = line_stream(&[("max_length", "64"), ("length_prefix", "u8")])
+            .expect_err("no timeout stated");
+        assert!(
+            said.contains("length_prefix") && said.contains("read_timeout"),
+            "{said}"
+        );
+    }
+
+    /// Terminators would end a read in the body of a frame whose length was
+    /// given, so the two are not stated together.
+    #[test]
+    fn a_length_prefix_and_terminators_are_refused_together() {
+        let said = line_stream(&[
+            ("max_length", "64"),
+            ("length_prefix", "u8"),
+            ("read_timeout", "1 s"),
+            ("terminators", "0x0A"),
+        ])
+        .expect_err("two rules for one end");
+        assert!(
+            said.contains("length_prefix") && said.contains("terminators"),
+            "{said}"
+        );
+    }
+
+    #[test]
+    fn a_length_prefix_is_one_of_three_words() {
+        let said = line_stream(&[
+            ("max_length", "64"),
+            ("length_prefix", "2"),
+            ("read_timeout", "1 s"),
+        ])
+        .expect_err("not a prefix");
+        assert!(said.contains("u8") && said.contains("u16be"), "{said}");
+    }
+
+    #[test]
+    fn max_length_must_hold_a_length_prefix() {
+        let said = line_stream(&[
+            ("max_length", "1"),
+            ("length_prefix", "u16le"),
+            ("read_timeout", "1 s"),
+        ])
+        .expect_err("a frame cannot fit");
+        assert!(
+            said.contains("max_length") && said.contains("u16le"),
+            "{said}"
+        );
+        line_stream(&[
+            ("max_length", "2"),
+            ("length_prefix", "u16le"),
+            ("read_timeout", "1 s"),
+        ])
+        .expect("a prefix alone fits");
     }
 
     #[test]

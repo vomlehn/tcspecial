@@ -29,10 +29,37 @@ attributes:
     required: true
     about: >
       How many stop bits follow a byte: 1 or 2.
+  - name: max_length
+    required: true
+    kind: whole
+    about: >
+      The most one read of the line may hold, in bytes: at most 4096. A read
+      that fills it ends there.
   - name: parity
     required: false
     about: >
       Which parity the line carries: none, even or odd.
+  - name: read_timeout
+    required: false
+    kind: timeout
+    about: >
+      How long after its first byte a read ends with what has arrived: 250 ms,
+      or none. With a length_prefix, a frame still short when it runs out is
+      let go instead, and the next byte read as a prefix. A line says this,
+      terminators or length_prefix, and none alone means max_length bytes at a
+      time.
+  - name: terminators
+    required: false
+    about: >
+      Bytes that each end a read, and are its last byte: "0x0D, 0x0A". Not
+      beside a length_prefix.
+  - name: length_prefix
+    required: false
+    about: >
+      What a read's first bytes say its length is, counting the bytes after
+      them: u8, or u16be or u16le for two bytes with the more or the less
+      significant first. The read is delivered prefix and all. Needs a
+      read_timeout, which may be none.
   - name: group
     required: false
     about: >

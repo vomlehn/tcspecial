@@ -543,17 +543,19 @@ section every configuration holds, and it is required of every one of them.
      log:
        directory: /var/log/tcspecial
        segment_size: 65536
+     restart-arm-valid: "20 min"
 
-Four of its five entries are subsections, because each of them is one thing
+Five of its six entries are subsections, because each of them is one thing
 with more than one attribute to it: the spacecraft command link has two ends,
-a payload's telemetry has two, the beacon has two and a timing, and the log
-has a place and a size. A prefix repeated on two or three flat names --
-``beacon.send``, ``beacon.recv``, ``beacon.interval`` -- is a subsection
+the commands about nodes have two, a payload's telemetry has two, the beacon
+has two and a timing, and the log has a place and a size. The sixth,
+``restart-arm-valid``, is one fact and is written as one. A prefix repeated
+on two or three flat names -- ``beacon.send``, ``beacon.recv``, ``beacon.interval`` -- is a subsection
 somebody declined to write, and the names under one are short for the same
 reason: ``beacon.send`` says what ``beacon.send`` said, where the reader is
 already looking at the beacon.
 
-Eight of the ten attributes must be stated, and are required rather than
+Nine of the twelve attributes must be stated, and are required rather than
 defaulted for one reason: a configuration that has not been asked the question
 has not answered it. Where commands are taken and where beacons go are mission
 facts, and a file that was silently given an answer to either is a vehicle
@@ -562,6 +564,17 @@ exception, and so is ``log`` itself: no ``log.directory`` means the telemetry
 log is not kept, which is a configuration somebody may mean -- a vehicle with
 no writable storage -- and ``log.segment_size`` is a tuning choice with a
 defensible answer, so it has one.
+
+``restart-arm-valid`` is the third that may be left out: how long a
+RESTART_ARM licenses a RESTART for, as a length of time -- ``20 min``,
+``90 s``. Absent is twenty minutes,
+``tcslibgs::commands::RESTART_ARM_VALID_DEFAULT``, the length an arm had
+before it could be configured: long enough to arm, look at what the vehicle is
+doing and decide over a link with minutes of latency, short enough that an arm
+left behind by a session that ended does not stand ready for the next RESTART
+anybody sends. A mission whose link is slower, or whose operators want the
+window narrower, says so. Nought is refused, being an arm that lapses as it
+is taken and a vehicle that can never be restarted.
 
 Five of them are a host and a port written together, as ``address:port``: two
 things only ever used together are one fact about a configuration, and writing
@@ -2432,7 +2445,8 @@ Requirement
 
 Requirement
     A RESTART is taken only with the key of an arm taken within
-    ``RESTART_ARM_LASTS``, and uses the arm up: one lost or repeated datagram
+    ``restart-arm-valid`` -- twenty minutes where the configuration does not
+    say -- and uses the arm up: one lost or repeated datagram
     must not be able to restart the flight software. Anything else is
     answered ``NotArmed``. A key that does not match leaves the arm standing,
     so an operator who mistyped it sends the RESTART again without arming
@@ -4748,8 +4762,8 @@ Verify that TLSpecial is able to process commands.
 
 RESTART_ARM
 ~~~~~~~~~~~
-Enable a restart of TCSpecial for the next 20 minutes:
-``tcslibgs::commands::RESTART_ARM_LASTS``, which both ends read.
+Enable a restart of TCSpecial for as long as the ``tcspecial`` section's
+``restart-arm-valid`` says, and for twenty minutes where it says nothing.
 
 +----------------+-------------------------------------------------------------+
 | Name           | Parameters                                                  |
@@ -4768,8 +4782,8 @@ Enable a restart of TCSpecial for the next 20 minutes:
 
 RESTART
 ~~~~~~~
-Restart TCSpecial if the time is within 20 minutes -- ``RESTART_ARM_LASTS`` --
-of the last RESTART_ARM command and arm_key matches the value of arm_key from
+Restart TCSpecial if the time is within ``restart-arm-valid`` -- twenty
+minutes where it is not stated -- of the last RESTART_ARM command and arm_key matches the value of arm_key from
 the last RESTART_ARM command. Otherwise it is answered ``NotArmed``. See
 `Restarting`_ for what a restart does.
 
@@ -7818,7 +7832,9 @@ rare -- the beacon and the link come back together -- and a question owed
 indefinitely is a question that goes out at a moment nobody chose.
 
 Requirement
-    The ground does not poll its payloads. **Needs examination.**
+    The ground does not ask about its payloads on a timer. It asks at the two
+    moments above and when somebody presses Query all, and otherwise watches
+    what arrives.
 
     An enabled payload sends on its own -- that is what enabling it does --
     and every datagram it sends arrives on that payload's own telemetry

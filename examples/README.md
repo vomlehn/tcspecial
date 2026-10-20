@@ -18,6 +18,11 @@ the simulator file can't name a payload the configuration doesn't have.
 
 The YAML and XML files must say the same thing, so change both together.
 
+The examples' programs -- `beacon`, `lorem_moc` and `ping_moc.py` --
+are quiet unless given `-v` or `--verbose`: they print what they are for and
+any error, and with the flag they also say what they are doing, such as where
+they are listening.
+
 Two sets of tests find the examples on their own, so adding one means adding
 its directory here, and a row to the table of its section below; there's no
 list in the tests to update:

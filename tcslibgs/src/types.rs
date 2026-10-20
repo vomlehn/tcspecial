@@ -402,6 +402,9 @@ impl DHType {
     }
 }
 
+/// The word a configuration file uses for a raw socket's transport.
+pub const RAW: &str = "raw";
+
 impl NetworkProtocol {
     /// The word a configuration file uses for this transport.
     pub fn spelling(&self) -> &'static str {
@@ -410,10 +413,14 @@ impl NetworkProtocol {
             NetworkProtocol::Udp => "udp",
             NetworkProtocol::UnixStream => "unix_stream",
             NetworkProtocol::UnixDgram => "unix_dgram",
+            NetworkProtocol::Raw(_) => RAW,
         }
     }
 
     /// Which transport a file's word names, if it names one.
+    ///
+    /// Not `raw`, which names a transport only with the `ip_protocol` beside
+    /// it: see [`crate::graph::reach`], which reads the two together.
     pub fn from_spelling(text: &str) -> Option<NetworkProtocol> {
         [
             NetworkProtocol::Tcp,
@@ -427,7 +434,7 @@ impl NetworkProtocol {
 
     /// Every transport, as a file would write them, for an error to list.
     pub fn spellings() -> String {
-        "tcp, udp, unix_stream, or unix_dgram".to_string()
+        "tcp, udp, unix_stream, unix_dgram, or raw".to_string()
     }
 }
 
@@ -799,6 +806,39 @@ pub enum NetworkProtocol {
     Udp,
     UnixStream,
     UnixDgram,
+    /// IP datagrams of one protocol number, carried on a raw socket:
+    /// `SOCK_RAW` with the number the payload's `ip_protocol` states, from
+    /// IANA's list of protocol numbers. The payload's own bytes are what the
+    /// datagram carries; the IP header is the kernel's, on the way out and on
+    /// the way in.
+    Raw(IpProtocol),
+}
+
+/// An IP protocol number a raw socket may be opened with: 1 to 254.
+///
+/// Not 0, which on a raw socket is no protocol at all -- `IPPROTO_IP` is a
+/// level for socket options, and a raw socket opened with it is refused by
+/// the kernel -- and not 255, `IPPROTO_RAW`, which can only send: a payload
+/// that could never be read would be a payload nobody could tell was there.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct IpProtocol(u8);
+
+impl IpProtocol {
+    /// The number, if a raw socket may be opened with it.
+    pub fn of(number: u8) -> Option<IpProtocol> {
+        (1..=254).contains(&number).then_some(IpProtocol(number))
+    }
+
+    /// The number the socket is opened with.
+    pub fn number(&self) -> u8 {
+        self.0
+    }
+}
+
+impl std::fmt::Display for IpProtocol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
 }
 
 /// The two ends of the beacon link.

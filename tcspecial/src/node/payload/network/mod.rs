@@ -3,10 +3,11 @@
 //! Work in progress: only the unix family is filled in, and the commented-out
 //! blocks below are the families still to be described.
 
-// The three transports this type covers. They nest here rather than sitting
+// The transports this type covers. They nest here rather than sitting
 // beside network in node/, because the configuration already treats them as
 // one type with a protocol attribute -- a network node states which transport
 // it runs over, where every other type is addressed by what it is.
+pub mod raw;
 pub mod tcp;
 pub mod udp;
 pub mod unix;
@@ -46,7 +47,8 @@ pub static PROTOCOLS: LazyLock<BTreeMap<&str, AddressFamily>> = LazyLock::new(||
                         ("udp", IPPROTO_UDP),
                         ("sctp", IPPROTO_SCTP),
                         ("udplite", IPPROTO_UDPLITE),
-                        // FIXME: handle SOCK_RAW from RFC 1709
+                        // SOCK_RAW is handled, as `protocol: raw` with an
+                        // `ip_protocol`: see raw.rs.
                     ]),
                 },
             )]),

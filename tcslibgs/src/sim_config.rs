@@ -480,6 +480,24 @@ pub fn simulable(dh: &DHConfig) -> Result<(), String> {
         ));
     }
 
+    // Nor a raw socket's. One cannot be opened without CAP_NET_RAW, and on
+    // one host every raw socket of a protocol hears every datagram of it --
+    // the vehicle's own included -- so a stand-in beside tcspecial would be
+    // each end reading its own words back. A raw payload is reached on the
+    // network it is really on.
+    if let EndpointConfig::Network(net) = &dh.endpoint {
+        if let NetworkProtocol::Raw(protocol) = net.protocol {
+            return Err(format!(
+                "simulated payload \"{}\" is reached on a raw socket (IP protocol \
+                 {protocol} from {}), which nothing here stands in for: a raw \
+                 socket needs CAP_NET_RAW, and on one host every raw socket of a \
+                 protocol hears every datagram of it, its own included. Take it \
+                 out of the simulator file; tcspecial reaches it directly",
+                dh.name.0, net.address
+            ));
+        }
+    }
+
     if u32::try_from(dh.packet_size).is_err() {
         return Err(format!(
             "{} has a packet size too large to simulate",
@@ -620,6 +638,12 @@ fn what_it_is(
             None => Ok(()),
         };
     };
+
+    // Nothing stands in for a raw socket's payload -- see `simulable`, which
+    // is asked next and says so -- so there is nothing here to compare.
+    if let NetworkProtocol::Raw(_) = network.protocol {
+        return Ok(());
+    }
 
     let stated = match settings.protocol.as_deref() {
         Some(text) => {
@@ -2822,5 +2846,24 @@ simulated_payloads:
 
         let resolved = file.resolve(&[dh]).unwrap();
         assert_eq!(resolved[0].segment_size, 1);
+    }
+
+    /// A payload on a raw socket is refused by the simulator, saying why,
+    /// rather than run as one that looks simulated and is not.
+    #[test]
+    fn a_raw_payload_is_not_simulated() {
+        let dh = DHConfig {
+            endpoint: EndpointConfig::Network(crate::NetworkConfig {
+                protocol: NetworkProtocol::Raw(crate::IpProtocol::of(253).expect("a number")),
+                address: "10.0.0.7".to_string(),
+                port: 0,
+            }),
+            ..handler("sounder", 64)
+        };
+        let said = simulable(&dh).expect_err("nothing stands in for it");
+        assert!(
+            said.contains("raw socket") && said.contains("CAP_NET_RAW"),
+            "{said}"
+        );
     }
 }

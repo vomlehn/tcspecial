@@ -12,6 +12,7 @@
 //!
 //! * [`crate::node::payload::network::udp`] -- datagram sockets
 //! * [`crate::node::payload::network::tcp`] -- stream sockets
+//! * [`crate::node::payload::network::raw`] -- raw IP sockets
 //! * [`crate::node::payload::device_file`] -- device files
 //! * [`crate::node::payload::network`] -- the address family, socket type and
 //!   protocol tables the two socket kinds draw on
@@ -29,6 +30,7 @@ use crate::node::payload::gpio::GpioEndpoint;
 use crate::node::payload::hdlc::HdlcEndpoint;
 use crate::node::payload::i2c::I2cEndpoint;
 use crate::node::payload::iio::IioEndpoint;
+use crate::node::payload::network::raw::RawEndpoint;
 use crate::node::payload::network::tcp::TcpEndpoint;
 use crate::node::payload::network::udp::UdpEndpoint;
 use crate::node::payload::network::unix::{UnixDatagramEndpoint, UnixStreamEndpoint};
@@ -186,6 +188,11 @@ pub fn bind_endpoint_pair(
             }
             NetworkProtocol::Tcp => {
                 let reader = TcpEndpoint::new_server(what, net_config)?;
+                let writer = reader.try_clone()?;
+                Ok((Box::new(reader), Box::new(writer)))
+            }
+            NetworkProtocol::Raw(_) => {
+                let reader = RawEndpoint::connect(what, net_config)?;
                 let writer = reader.try_clone()?;
                 Ok((Box::new(reader), Box::new(writer)))
             }
@@ -356,6 +363,14 @@ pub fn connect_endpoint_pair(
             }
             NetworkProtocol::UnixDgram => {
                 let reader = UnixDatagramEndpoint::bind(what, net_config)?;
+                let writer = reader.try_clone()?;
+                Ok((Box::new(reader), Box::new(writer)))
+            }
+            // Connected, whichever way the payload is used: a raw socket has
+            // no port to wait at, and a connected one hears only its payload.
+            // See node/payload/network/raw.
+            NetworkProtocol::Raw(_) => {
+                let reader = RawEndpoint::connect(what, net_config)?;
                 let writer = reader.try_clone()?;
                 Ok((Box::new(reader), Box::new(writer)))
             }

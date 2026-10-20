@@ -1403,6 +1403,10 @@ enum Claim {
     OnCanBus { interface: String, can_id: u32 },
     /// One line of a GPIO chip.
     OnChip { chip: String, line: u32 },
+    /// One IP protocol from one host, on a raw socket. Every raw socket of a
+    /// protocol hears every datagram of it, so two nodes reading one protocol
+    /// from one host are two nodes each handed the other's data.
+    Raw { host: String, protocol: u8 },
 }
 
 /// What this node claims, and what to call each claim in a complaint.
@@ -1422,6 +1426,10 @@ fn claims_of(name: &str, endpoint: &EndpointConfig) -> Vec<(Claim, String)> {
             NetworkProtocol::Tcp | NetworkProtocol::Udp => Claim::Port {
                 host: crate::types::one_host(&net.address),
                 port: net.port,
+            },
+            NetworkProtocol::Raw(protocol) => Claim::Raw {
+                host: crate::types::one_host(&net.address),
+                protocol: protocol.number(),
             },
         },
         EndpointConfig::Device(device) => Claim::Path(device.path.clone()),
@@ -1473,6 +1481,7 @@ fn claim_text(claim: &Claim) -> String {
         Claim::OnBus { bus, address } => format!("address {address:#04X} on {bus}"),
         Claim::OnCanBus { interface, can_id } => format!("can_id {can_id:#x} on {interface}"),
         Claim::OnChip { chip, line } => format!("line {line} on {chip}"),
+        Claim::Raw { host, protocol } => format!("IP protocol {protocol} from {host}"),
     }
 }
 
@@ -1539,6 +1548,27 @@ mod tests {
     /// rather than a mean: a mean's inputs are checked against the links,
     /// which is the one computation whose attributes depend on the shape
     /// around it.
+    /// Two raw nodes reading one protocol from one host claim one thing; a
+    /// different protocol, or a different host, is a different claim.
+    #[test]
+    fn a_raw_node_claims_its_protocol_from_its_host() {
+        let raw = |address: &str, number: u8| {
+            EndpointConfig::Network(crate::NetworkConfig {
+                protocol: NetworkProtocol::Raw(crate::IpProtocol::of(number).expect("a number")),
+                address: address.to_string(),
+                port: 0,
+            })
+        };
+        let claim = |endpoint: &EndpointConfig| claims_of("n", endpoint)[0].0.clone();
+        assert_eq!(claim(&raw("localhost", 253)), claim(&raw("127.0.0.1", 253)));
+        assert_ne!(claim(&raw("127.0.0.1", 253)), claim(&raw("127.0.0.1", 254)));
+        assert_ne!(claim(&raw("10.0.0.7", 253)), claim(&raw("10.0.0.8", 253)));
+        assert_eq!(
+            claim_text(&claim(&raw("10.0.0.7", 253))),
+            "IP protocol 253 from 10.0.0.7"
+        );
+    }
+
     fn node(name: &str, node_type: &str) -> Node {
         let mut attributes = BTreeMap::new();
         let minimum: &[(&str, &str)] = match node_type {

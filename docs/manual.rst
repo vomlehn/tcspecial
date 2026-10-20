@@ -836,18 +836,40 @@ Keyword ``type: network``. A socket, which the transport decides the shape of.
 
 .. code-block:: text
 
-   protocol       tcp | udp | unix_stream | unix_dgram
+   protocol       tcp | udp | unix_stream | unix_dgram | raw
    payload_interface
                   where this payload is reached: the host and the port with a
                   colon between them, as localhost:5000 -- or the path of a
                   Unix-domain socket, which has no port and so is written
                   alone
+   ip_protocol    with raw, and only then: the IP protocol number the
+                  payload's datagrams carry, 1 to 254
 
 Which end waits and which reaches out follows from the transport, and so does
 whether a handler can trigger the payload at all: a stream is connected, so
 the handler reaches out and may ask the payload for data, while a datagram
 handler waits to be spoken to and learns where its payload is from the first
 packet that arrives.
+
+``raw`` is for a payload that speaks IP and nothing above it: no UDP header
+and no ports, the ``ip_protocol`` number being what says which datagrams are
+its. It takes an ``address`` and an ``ip_protocol`` and refuses a ``port``.
+253 and 254 are the numbers set aside for experiments; the rest are IANA's.
+tcspecial opens a raw socket of that protocol, connected to the address, so it
+hears only that payload and sends only to it, and a datagram read is handed
+on without its IP header. A raw socket needs ``CAP_NET_RAW``, which tcspecial
+must be given (``setcap cap_net_raw+ep``); without it, the node is refused as
+it opens, saying so. tcssim does not stand in for a raw payload -- on one host
+every raw socket of a protocol hears every datagram of it, its own included --
+and refuses a simulator file that asks it to.
+
+.. code-block:: yaml
+
+   - name: sounder
+     type: network
+     protocol: raw
+     ip_protocol: 253
+     address: 10.0.0.7
 
 A Device File Payload
 ---------------------

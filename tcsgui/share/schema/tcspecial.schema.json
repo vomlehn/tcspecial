@@ -286,6 +286,15 @@
               "null"
             ]
           },
+          "ip_protocol": {
+            "description": "The IP protocol number a node reached with `protocol: raw` reads and writes, 1 to 254. For a raw socket and nothing else.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
           "interface": {
             "type": [
               "string",
@@ -859,6 +868,15 @@
             ]
           },
           "protocol": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "ip_protocol": {
+            "description": "The IP protocol number a node reached with `protocol: raw` reads and writes, 1 to 254. For a raw socket and nothing else.",
             "type": [
               "string",
               "number",
@@ -1459,6 +1477,15 @@
             ]
           },
           "protocol": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "ip_protocol": {
+            "description": "The IP protocol number a node reached with `protocol: raw` reads and writes, 1 to 254. For a raw socket and nothing else.",
             "type": [
               "string",
               "number",

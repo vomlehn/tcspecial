@@ -67,6 +67,15 @@ pub fn payload_config_attached(
                 NetworkProtocol::Udp => PayloadProtocol::Udp,
                 NetworkProtocol::UnixStream => PayloadProtocol::UnixStream,
                 NetworkProtocol::UnixDgram => PayloadProtocol::UnixDgram,
+                // Refused by `simulable` above, which says why; here only so
+                // that a raw payload reaching this is refused and not run.
+                NetworkProtocol::Raw(_) => {
+                    return Err(format!(
+                        "{} is reached on a raw socket, which the simulator does not \
+                         stand in for",
+                        dh.name.0
+                    ))
+                }
             };
             (protocol, net.address.clone(), net.port, 0)
         }
@@ -185,12 +194,18 @@ pub fn endpoint_description(endpoint: &EndpointConfig) -> String {
                 NetworkProtocol::Udp => "UDP",
                 NetworkProtocol::UnixStream => "Unix stream",
                 NetworkProtocol::UnixDgram => "Unix datagram",
+                NetworkProtocol::Raw(_) => "Raw IP",
             };
 
             match net.protocol {
                 // A Unix socket is named by a path; its port means nothing.
                 NetworkProtocol::UnixStream | NetworkProtocol::UnixDgram => {
                     format!("{} {}", protocol, net.address)
+                }
+                // Nor has an IP datagram a port: its protocol number says
+                // which are the payload's.
+                NetworkProtocol::Raw(number) => {
+                    format!("{} {} protocol {}", protocol, net.address, number)
                 }
                 _ => format!("{} {}:{}", protocol, net.address, net.port),
             }

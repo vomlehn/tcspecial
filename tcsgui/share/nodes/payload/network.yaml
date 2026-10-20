@@ -1,4 +1,4 @@
-# Software reached over a socket: UDP, TCP or a Unix datagram.
+# Software reached over a socket: UDP, TCP, a Unix datagram, or raw IP.
 #
 # A payload: what the vehicle carries this flight. Its readings leave by
 # payload-out on their way to the ground, and what asks for them -- a
@@ -6,7 +6,7 @@
 node: network
 type: network
 about: >
-  Software reached over a socket: UDP, TCP or a Unix datagram.
+  Software reached over a socket: UDP, TCP, a Unix datagram, or raw IP.
 payload-sink: false
 payload-source: true
 moc-sink: true
@@ -15,14 +15,23 @@ attributes:
   - name: protocol
     required: true
     about: >
-      Which transport carries it: udp, tcp or unix_dgram.
+      Which transport carries it: udp, tcp, unix_dgram, or raw for IP
+      datagrams of one protocol number on a raw socket.
   - name: address
     required: true
     about: >
       The host it is reached at, or bound at where the payload speaks first.
+  - name: ip_protocol
+    required: false
+    about: >
+      With protocol raw, and only then: the IP protocol number its datagrams
+      carry, 1 to 254 (253 and 254 are set aside for experiments). A raw
+      socket needs CAP_NET_RAW.
   - name: port
-    required: true
-    about: The port that goes with the address.
+    required: false
+    about: >
+      The port that goes with the address. Every protocol but raw needs one,
+      and raw takes none.
   - name: group
     required: false
     about: >

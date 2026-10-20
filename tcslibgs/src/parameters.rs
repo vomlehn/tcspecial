@@ -122,6 +122,11 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
                     let _ = writeln!(out, "  address          {}", net.address);
                     let _ = writeln!(out, "  port             {}", net.port);
                 }
+                // An IP protocol has no ports: the number takes its place.
+                NetworkProtocol::Raw(protocol) => {
+                    let _ = writeln!(out, "  address          {}", net.address);
+                    let _ = writeln!(out, "  ip_protocol      {protocol}");
+                }
             }
         }
         EndpointConfig::Device(device) => {

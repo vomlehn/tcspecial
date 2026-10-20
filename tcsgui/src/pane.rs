@@ -353,12 +353,13 @@ pub fn pane_of(node_type: &str) -> Pane {
 ///
 /// From the top of the pane rather than four pixels down, because the band is
 /// drawn and not just reserved: a tint that began below the top edge would be
-/// a stripe across the pane rather than its head. Twenty-four pixels deep,
-/// which is the line box of the small type and a pixel with `Space.tight`
-/// above it and below -- the markup asks the labels how deep they are and this
-/// is the generous answer to the same question, so the row the placing keeps
-/// off is never shallower than the row that is drawn.
-pub const NAMES: (i32, i32) = (0, 24);
+/// a stripe across the pane rather than its head. Thirty pixels deep, which
+/// is the line box of the small type -- twelve points, sixteen pixels, every
+/// window's one size -- and a pixel, with `Space.tight` above it and below:
+/// the markup asks the labels how deep they are and this is the generous
+/// answer to the same question, so the row the placing keeps off is never
+/// shallower than the row that is drawn.
+pub const NAMES: (i32, i32) = (0, 30);
 
 /// Those bands as rectangles, one per pane, for the placing to keep off.
 ///

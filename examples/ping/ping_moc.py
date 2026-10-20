@@ -256,6 +256,7 @@ def run_the_window(setup, beacons, pinger):
     """The window, and the two loops that feed it."""
     import tkinter as tk
 
+    from tcsui import fonts
     from tcsui.beacon_panel import BeaconPanel, Shown
 
     reports = queue.Queue()
@@ -279,6 +280,7 @@ def run_the_window(setup, beacons, pinger):
                 return
 
     window = tk.Tk()
+    fonts.use_in(window)
     window.title("tcspecial ping")
     window.resizable(False, False)
 
@@ -292,7 +294,7 @@ def run_the_window(setup, beacons, pinger):
 
     def row(at, label):
         tk.Label(panel, text=label).grid(row=at, column=0, sticky="w")
-        value = tk.Label(panel, text="", font=("TkFixedFont", 9), anchor="w", width=60)
+        value = tk.Label(panel, text="", font=("TkFixedFont", fonts.POINTS), anchor="w", width=60)
         value.grid(row=at, column=1, sticky="w", padx=8)
         shown[label] = value
 

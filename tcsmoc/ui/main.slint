@@ -4,6 +4,7 @@ import { Copyable, CopyButton } from "../../tcsverify/ui/copy.slint";
 // it shows is worked out in Rust, from what tcslib::beacon reports.
 import { BeaconPanel } from "../../tcsui/ui/beacon.slint";
 import { PingPanel } from "../../tcsui/ui/ping.slint";
+import { Fonts } from "../../tcsui/ui/fonts.slint";
 // What was found wrong as the program started, shown before this window: the
 // one window tcsmoc and tcssim share, beside tcsverify, whose report it shows.
 export { StartupWindow, StartupLine } from "../../tcsverify/ui/startup.slint";
@@ -101,7 +102,7 @@ component DHPanel inherits Rectangle {
             // is the same number in each.
             Text {
                 text: dh-name + " (dev id " + dev-id + ")";
-                font-size: 14px;
+                font-size: Fonts.window;
                 font-weight: 700;
             }
             Text {
@@ -118,7 +119,7 @@ component DHPanel inherits Rectangle {
             min-height: 12px;
             Text {
                 text: "Config: " + dh-config;
-                font-size: 11px;
+                font-size: Fonts.window;
             }
         }
 
@@ -127,7 +128,7 @@ component DHPanel inherits Rectangle {
             // No packet interval: how often a payload produces a packet is a
             // property of a simulation rather than of a payload, so it lives in
             // the simulator's own file and tcssim is what shows it.
-            Text { text: "Packet Size: " + packet-size + " bytes"; font-size: 11px; }
+            Text { text: "Packet Size: " + packet-size + " bytes"; font-size: Fonts.window; }
         }
 
         // Two buttons, one per command, each saying what it sends. Enable
@@ -190,7 +191,7 @@ component DHPanel inherits Rectangle {
                         Copyable {
                             text: dh-name + " parameters";
                             font-weight: 700;
-                            font-size: 11px;
+                            font-size: Fonts.window;
                         }
                         CopyButton {
                             said: dh-name + " parameters\n" + parameters;
@@ -209,7 +210,7 @@ component DHPanel inherits Rectangle {
                             // are one width -- and they are not wrapped, a
                             // column broken in two being no column.
                             font-family: "monospace";
-                            font-size: 10px;
+                            font-size: Fonts.window;
                             wrap: no-wrap;
                             text: parameters;
                         }
@@ -225,14 +226,14 @@ component DHPanel inherits Rectangle {
                         spacing: 4px;
                         Text {
                             text: "The ground may set: " + settable;
-                            font-size: 10px;
+                            font-size: Fonts.window;
                             wrap: word-wrap;
                         }
                         HorizontalLayout {
                             spacing: 4px;
                             attribute-field := LineEdit {
                                 text: setting;
-                                font-size: 11px;
+                                font-size: Fonts.window;
                                 min-width: 80px;
                             }
                             Text {
@@ -241,7 +242,7 @@ component DHPanel inherits Rectangle {
                             }
                             value-field := LineEdit {
                                 placeholder-text: "value";
-                                font-size: 11px;
+                                font-size: Fonts.window;
                                 min-width: 60px;
                             }
                             Button {
@@ -257,7 +258,7 @@ component DHPanel inherits Rectangle {
                     // showing a field whose every press would be refused.
                     if settable == "": Text {
                         text: "No command binding names this node, so nothing on it may be set from the ground.";
-                        font-size: 10px;
+                        font-size: Fonts.window;
                         wrap: word-wrap;
                     }
                 }
@@ -293,15 +294,15 @@ component DHPanel inherits Rectangle {
             // a thermostat that emits only when its decision changes has no
             // rate to be judged against. A light that could never change is
             // worse than no light.
-            Text { text: "Last recv:"; font-size: 10px; vertical-alignment: center; }
-            Text { text: oc-time; font-size: 10px; vertical-alignment: center; }
+            Text { text: "Last recv:"; font-size: Fonts.window; vertical-alignment: center; }
+            Text { text: oc-time; font-size: Fonts.window; vertical-alignment: center; }
         }
 
         from-payload-row := HorizontalLayout {
             spacing: 4px;
             min-height: 14px;
-            Text { text: "From payload:"; font-size: 10px; vertical-alignment: center; }
-            Text { text: oc-data; font-size: 10px; vertical-alignment: center; }
+            Text { text: "From payload:"; font-size: Fonts.window; vertical-alignment: center; }
+            Text { text: oc-data; font-size: Fonts.window; vertical-alignment: center; }
         }
 
         // How many packets have arrived from this payload, counted by the
@@ -312,7 +313,7 @@ component DHPanel inherits Rectangle {
         // payload that was sending steadily.
         counters-row := HorizontalLayout {
             min-height: 14px;
-            Text { text: "Recv: " + packets-recv + " recv"; font-size: 10px; }
+            Text { text: "Recv: " + packets-recv + " recv"; font-size: Fonts.window; }
         }
     }
 }
@@ -328,23 +329,28 @@ export enum MenuAction { ping, arm-restart, restart, query, query-dh, start-dh, 
 // a say in the window's size. Nothing here is shown -- Rust builds one, reads
 // the two lengths, and drops it.
 export component PanelProbe inherits Window {
+    default-font-size: Fonts.window;
     probe := DHPanel { }
     out property <length> panel-width: probe.preferred-width;
     out property <length> panel-height: probe.preferred-height;
 }
 
 export component MainWindow inherits Window {
+    default-font-size: Fonts.window;
     title: "TCSpecial MOC Simulator";
     // Rust opens the window at the size the panel count calls for; these are
     // only the floors, below which the command interpreter's controls stop
     // fitting side by side and the grid stops having room for a row of
-    // panels. They match MIN_WINDOW_WIDTH and CHROME_HEIGHT + PANEL_HEIGHT in
-    // main.rs, which the_window_and_rust_agree_on_the_sizes checks.
+    // panels. The height is one row of panels and the chrome below:
+    // panel-height as PanelProbe measures it, 204, and chrome-height, 398.
+    // A window of only this, which is what the panel tests open, that is
+    // short of a row cuts a panel's last line off, and
+    // every_panel_shows_what_arrived_from_its_payload is what notices.
     min-width: 739px;
     // One row of panels and the chrome, which is the least the window is ever
     // opened at -- a tcspecial configuration of one handler. How much more it
     // opens at is Rust's to say: see rows_of_room() in main.rs.
-    min-height: 549px;
+    min-height: 602px;
     background: white;
 
     // Whether this window takes no presses: true while a question in a window
@@ -442,7 +448,7 @@ export component MainWindow inherits Window {
     // column was cut off.
     out property <length> grid-spacing: 10px;
     out property <length> chrome-width: 36px;
-    out property <length> chrome-height: 369px;
+    out property <length> chrome-height: 398px;
 
     // Rows follow from the panel count and the column count.
     property <int> grid-rows: Math.max(1, Math.ceil(dh-model.length / Math.max(1, columns)));
@@ -665,15 +671,15 @@ export component MainWindow inherits Window {
                 }
 
                 HorizontalLayout {
-                    Text { text: "Last Response: " + last-response; font-size: 11px; }
+                    Text { text: "Last Response: " + last-response; font-size: Fonts.window; }
                 }
 
                 command-times-row := HorizontalLayout {
                     spacing: 8px;
-                    Text { text: "Last sent:"; font-size: 11px; }
-                    Text { text: cmd-sent-time; font-size: 11px; }
-                    Text { text: "Last rcvd:"; font-size: 11px; }
-                    Text { text: cmd-recv-time; font-size: 11px; }
+                    Text { text: "Last sent:"; font-size: Fonts.window; }
+                    Text { text: cmd-sent-time; font-size: Fonts.window; }
+                    Text { text: "Last rcvd:"; font-size: Fonts.window; }
+                    Text { text: cmd-recv-time; font-size: Fonts.window; }
                 }
             }
         }
@@ -756,6 +762,7 @@ export component MainWindow inherits Window {
 // source's data arrives where the vehicle does not send it, so the operator
 // decides whether to go on.
 export component DiffersWindow inherits Window {
+    default-font-size: Fonts.window;
     title: "tcsmoc: configurations differ";
     background: #fbfbfa;
     min-width: 420px;
@@ -777,17 +784,17 @@ export component DiffersWindow inherits Window {
 
         Copyable {
             text: "tcspecial is serving a different configuration";
-            font-size: 15px;
+            font-size: Fonts.window;
             font-weight: 700;
             color: #c0392b;
         }
         Copyable {
             text: root.message;
-            font-size: 13px;
+            font-size: Fonts.window;
         }
         Copyable {
             text: "The panels may show sources where the vehicle does not send them. Continue anyway?";
-            font-size: 12px;
+            font-size: Fonts.window;
             color: #6b7280;
         }
         HorizontalLayout {
@@ -813,6 +820,7 @@ export component DiffersWindow inherits Window {
 // window's height is stated -- see `chrome-height` -- and seven more rows
 // in it would cost every panel below them their room.
 export component PingWindow inherits Window {
+    default-font-size: Fonts.window;
     title: "tcsmoc: ping";
     in property <string> node: "ping";
     in property <string> sent;

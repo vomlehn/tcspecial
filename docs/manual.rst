@@ -1737,7 +1737,7 @@ The beacon example
 ------------------
 .. figure:: ../examples/beacon/beacon.svg
    :alt: The beacon example: tcspecial sending a beacon every five seconds to
-         the ground station beacon_watch, which shows it on the beacon panel
+         the ground station beacon, which shows it on the beacon panel
          -- a light, the time the last one arrived, and what it said.
    :width: 100%
 
@@ -1766,7 +1766,7 @@ none of it is the program's own:
   test -- uses exactly this.
 * ``tcsui`` holds the panel, as markup other windows import, and works out
   what to show on it: which colour the light is, and the two lines beside it.
-* ``beacon_watch``, the program in the example, reads the configuration to
+* ``beacon``, the program in the example, reads the configuration to
   find where the beacons are, starts the loop on a thread of its own, and puts
   each pass in the window.
 
@@ -1827,7 +1827,7 @@ times until that ping's own answer arrives -- an answer is matched to its ping
 by the count. An answer to an earlier ping is still shown as the last thing
 received, and changes none of the times.
 
-The ground station is built the way ``beacon_watch`` is, from two halves and a
+The ground station is built the way the ``beacon`` program is, from two halves and a
 little of its own, and the halves are the same ones in Python:
 ``python/tcslib/beacon.py`` is ``tcslib::beacon``, ``python/tcsui/beacon_panel.py``
 is ``tcsui``'s panel, and ``python/tcslibgs`` holds the ping format and what a

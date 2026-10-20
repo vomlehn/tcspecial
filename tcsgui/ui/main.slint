@@ -1,5 +1,6 @@
 import { Button, CheckBox, ComboBox, LineEdit, ScrollView, TextEdit } from "std-widgets.slint";
 import { Copyable, CopyButton } from "../../tcsverify/ui/copy.slint";
+import { Fonts } from "../../tcsui/ui/fonts.slint";
 
 // The two scales, stated once.
 //
@@ -33,12 +34,17 @@ export global Space {
 }
 
 export global Type {
-    // Four steps. The per-node label sizes are not from here -- they are a
-    // channel for telling node types apart and live in style.rs -- but
+    // The window's sizes. The per-node label sizes are not from here -- they
+    // are a channel for telling node types apart and live in style.rs -- but
     // everything the window says in its own voice is.
-    out property <length> small: 10px;
-    out property <length> body: 12px;
-    out property <length> strong: 14px;
+    //
+    // Small, body and strong are all the one size every window is set in,
+    // tcsui's Fonts.window: nothing a window says is smaller than that. They
+    // are kept as three names because they still say three things -- strong
+    // is set bold -- and a title is larger, which is how it is a title.
+    out property <length> small: Fonts.window;
+    out property <length> body: Fonts.window;
+    out property <length> strong: Fonts.window;
     out property <length> title: 18px;
 
     // And the two weights a system face is sure to have.
@@ -1652,6 +1658,7 @@ component Surface inherits Rectangle {
 }
 
 export component MainWindow inherits Window {
+    default-font-size: Fonts.window;
     // Saying in the title bar when this session changes nothing, which is
     // where somebody looks to see what a window is.
     title: Session.read-only ? "TCSpecial Configuration (read-only)" : "TCSpecial Configuration";
@@ -1914,6 +1921,7 @@ export component MainWindow inherits Window {
 // top diagram: there is one document behind all of them, and each window is
 // redrawn from it after every edit.
 export component SubWindow inherits Window {
+    default-font-size: Fonts.window;
     title: "TCSpecial Configuration -- " + root.editing;
     background: #fbfbfa;
     // The same two working panes as the top diagram, so the same room: a
@@ -2137,6 +2145,7 @@ export component SubWindow inherits Window {
 // to every payload in the group, as one edit, so that undo takes back the
 // gesture and not the first of twelve consequences.
 export component GroupWindow inherits Window {
+    default-font-size: Fonts.window;
     title: "Group -- " + root.group;
     background: #fbfbfa;
     min-width: 360px;
@@ -2215,7 +2224,7 @@ export component GroupWindow inherits Window {
         LineEdit {
             text: root.group;
             read-only: Session.read-only;
-            font-size: Type.body;
+            font-size: Fonts.window;
             // On accept and not on every keystroke: a group's name is what
             // its payloads refer to, so each letter typed would be a rename
             // of the group and of every member -- a dozen edits to undo, and
@@ -2232,7 +2241,7 @@ export component GroupWindow inherits Window {
             text: root.interval;
             read-only: Session.read-only;
             placeholder-text: "500ms, 3s";
-            font-size: Type.body;
+            font-size: Fonts.window;
             edited => { root.interval-set(self.text); }
         }
         Text {
@@ -2279,7 +2288,7 @@ export component GroupWindow inherits Window {
                         text: f.value;
                         read-only: Session.read-only;
                         placeholder-text: f.differs ? "different on each" : "";
-                        font-size: Type.body;
+                        font-size: Fonts.window;
                         edited => { root.attribute-set(f.name, self.text); }
                     }
                 }
@@ -2325,6 +2334,7 @@ export component GroupWindow inherits Window {
 // what is done with it, and none of that reaches the ground until these are
 // answered -- so an unanswered one is a fault and not a blank.
 export component ParametersWindow inherits Window {
+    default-font-size: Fonts.window;
     title: "tcspecial parameters";
     background: #fbfbfa;
     min-width: 380px;
@@ -2400,7 +2410,7 @@ export component ParametersWindow inherits Window {
                     LineEdit {
                         text: f.value;
                         read-only: Session.read-only;
-                        font-size: Type.body;
+                        font-size: Fonts.window;
                         edited => { root.parameter-set(f.name, self.text); }
                     }
                 }
@@ -2431,6 +2441,7 @@ export component ParametersWindow inherits Window {
 // simulator file introduces no nodes and no connections, so a drawing of it
 // would be the same drawing with numbers on it. See sim.rs.
 export component SimWindow inherits Window {
+    default-font-size: Fonts.window;
     title: root.editing;
     background: #fbfbfa;
     min-width: 380px;
@@ -2519,7 +2530,7 @@ export component SimWindow inherits Window {
                     LineEdit {
                         text: f.value;
                         read-only: Session.read-only;
-                        font-size: Type.body;
+                        font-size: Fonts.window;
                         edited => { root.setting-set(f.name, self.text); }
                     }
                 }
@@ -2555,6 +2566,7 @@ export component SimWindow inherits Window {
 // Each row says which file it belongs to, because they are written to
 // different ones.
 export component NodeWindow inherits Window {
+    default-font-size: Fonts.window;
     title: root.node == "" ? "a node" : root.node;
     background: #f2f2f0;
     min-width: 300px;
@@ -2711,7 +2723,7 @@ export component NodeWindow inherits Window {
             read-only: Session.read-only;
             height: 72px;
             text: root.comment;
-            font-size: Type.body;
+            font-size: Fonts.window;
             wrap: word-wrap;
             edited => { root.comment-set(self.text); }
         }
@@ -2762,6 +2774,7 @@ export component NodeWindow inherits Window {
 // would be two copies of the same sentence, and the sentence is always about
 // the same session.
 export component AlertWindow inherits Window {
+    default-font-size: Fonts.window;
     title: "tcsgui";
     background: #fbfbfa;
     min-width: 360px;
@@ -2845,6 +2858,7 @@ export component AlertWindow inherits Window {
 /// looked at, and what somebody looked at and left. Two windows saying almost
 /// the same thing would be two windows to keep in step.
 export component ConcernsWindow inherits Window {
+    default-font-size: Fonts.window;
     title: "tcsgui";
     background: #fbfbfa;
     min-width: 420px;
@@ -2961,6 +2975,7 @@ export component ConcernsWindow inherits Window {
 /// is the one kind of problem the editor can mend by itself. Everything else
 /// is somebody's decision: open the node and put it right, or take it out.
 export component ProblemsWindow inherits Window {
+    default-font-size: Fonts.window;
     title: "Problems in this configuration";
     background: #fbfbfa;
     min-width: 520px;
@@ -3046,7 +3061,7 @@ export component ProblemsWindow inherits Window {
                             LineEdit {
                                 text: row.now;
                                 read-only: Session.read-only;
-                                font-size: Type.body;
+                                font-size: Fonts.window;
                                 horizontal-stretch: 1;
                                 edited(said) => { root.typed(i, said); }
                             }
@@ -3127,6 +3142,7 @@ export component ProblemsWindow inherits Window {
 }
 
 export component DeleteWindow inherits Window {
+    default-font-size: Fonts.window;
     title: "Delete a node";
     background: #fbfbfa;
     min-width: 320px;
@@ -3185,6 +3201,7 @@ export component DeleteWindow inherits Window {
 }
 
 export component LeaveWindow inherits Window {
+    default-font-size: Fonts.window;
     title: "Leave tcsgui";
     background: #fbfbfa;
     min-width: 360px;

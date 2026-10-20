@@ -4840,8 +4840,7 @@ Requirement
     584,554 years.
 
 It is called ``BeaconInterval`` because it is a length of time and not a time
-of day. It was ``BeaconTime``, which read as the time a beacon was sent --
-and the time a beacon carries is the timestamp in its header, so the one
+of day. It was ``BeaconTime``, which read as the time a beacon was sent, so the one
 thing in the system named "beacon time" was the one thing that was not a
 time.
 
@@ -4849,33 +4848,60 @@ Asynchronous Telemetry
 ----------------------
 Beacon
 
+The beacon is not JSON, as the answers to commands are. It is 34 bytes in a
+fixed layout, stated once, in XTCE, in ``tcslibgs/xtce/beacon.xml``, and packed
+and unpacked by the code tcsxtce generates from that file: Rust in
+``tcslibgs::beacon``, which tcspecial and ``tcslib`` use, and Python in
+``python/tcslibgs/beacon.py``. tcsxtce is vendored in ``vendor/tcsxtce`` until
+it is published.
+
 +----------------+-------------------------------------------------------------+
 | Name           | Parameters                                                  |
 +================+============+===========+====================================+
-+----------------+------------+-----------+------------------------------------+
-| BEACON         | Parameters                                                  |
+| BEACON         | Name       | Type      |  Description                       |
 |                +------------+-----------+------------------------------------+
-|                | Name       | Type      |  Description                       |
-|                +------------+-----------+------------------------------------+
-|                | sequence   | 4 bytes   | Which beacon this is: the number   |
-|                |            |           | of beacons this process has sent,  |
-|                |            |           | from one                           |
+|                | name       | 10 bytes  | ``tcspecial`` and a space, as      |
+|                |            |           | text                               |
 |                +------------+-----------+------------------------------------+
 |                | version    | 3 bytes   | Major, minor and patch version of  |
 |                |            |           | the tcspecial build sending it,    |
-|                |            |           | from its ``Cargo.toml``            |
+|                |            |           | from its ``Cargo.toml``, a byte    |
+|                |            |           | each                               |
+|                +------------+-----------+------------------------------------+
+|                | separator  | 1 byte    | A space                            |
 |                +------------+-----------+------------------------------------+
 |                | digest     | 16 bytes  | MD5 of the configuration file this |
 |                |            |           | tcspecial read                     |
+|                +------------+-----------+------------------------------------+
+|                | sequence   | 4 bytes   | Which beacon this is: the number   |
+|                |            |           | of beacons this process has sent,  |
+|                |            |           | from one, most significant byte    |
+|                |            |           | first                              |
 +----------------+------------+-----------+------------------------------------+
 
 Requirement
-    A beacon's time is the one in its header, which every response carries.
-    It had a second one of its own, which was the same time said twice and
-    two things to keep in step. It is eight bytes of microseconds since the
-    epoch like every other time here, and all ones in it says the
-    spacecraft's clock could not be read -- a beacon still arrives, and still
-    says the spacecraft is alive, when its clock does not.
+    A beacon is exactly 34 bytes, in the layout above, and the ground refuses
+    a datagram of any other length or without the name and the space where
+    they belong, showing what arrived rather than a beacon. Something else
+    sending to the beacon port is then seen for what it is.
+
+Requirement
+    The layout is stated once, in ``tcslibgs/xtce/beacon.xml``, and the code
+    that packs and unpacks it, in every language, is generated from that file
+    by ``make beacon-packet`` in ``tcslibgs/`` and never written by hand.
+
+Requirement
+    Packing a beacon allocates nothing once the packer is made: tcspecial's
+    beacon thread makes one ``BeaconPacker`` when it starts and packs every
+    beacon into its buffer. Unpacking one allocates three times, because
+    tcsxtce's Rust decoder hands back the name, the space and the digest as a
+    ``String``, a ``String`` and a ``Vec``; ``tcslib``'s tests hold a beacon
+    pass to exactly those.
+
+Requirement
+    A beacon carries no time. What the ground shows is when the last one
+    arrived, by the ground's clock: a spacecraft whose clock had stopped would
+    otherwise look as though its beacons had.
 
 Requirement
     A beacon carries the version and the digest a CONNECT is answered with. A beacon arrives whether or not anything has
@@ -4912,13 +4938,13 @@ Requirement
     nothing to read that against.
 
 Two of them used to carry a time of their own, PING and the beacon, and the
-other eight carried none; the header carries it for all of them now, and a
-header is built one way so that a type of telemetry added later cannot be the
-ninth.
+other eight carried none; the header carries it for all of the answers now,
+and a header is built one way so that a type of telemetry added later cannot
+be the ninth. The beacon is not an answer and has no header: see Beacon.
 
 Requirement
     Every beacon carries its own number, counted by the sender from one. A
-    beacon answers nothing, so the number in its header is not a command's as
+    beacon answers nothing, so the number it carries is not a command's as
     every other telemetry's is: it says which beacon this is.
 
 A beacon says only that the spacecraft is alive, and without a number a
@@ -8886,6 +8912,11 @@ CI must periodically send a Telemetry::Beacon message with a timestamp and uniqu
    what a CONNECT is answered with -- the software version, the configuration
    version, and the digest of the configuration file the spacecraft read --
    which this did not ask for.
+
+   It no longer carries a timestamp. Since the beacon became the fixed
+   34-byte layout described under Beacon, which has no time in it, the ground
+   goes by when each beacon arrives, which it did already. This requirement
+   says otherwise and is not met: one of the two is to change.
 
 CI must parse commands from the ground receved via UDP/IP
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

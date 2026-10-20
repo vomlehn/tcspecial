@@ -41,7 +41,9 @@ use std::io;
 use std::net::{SocketAddr, UdpSocket};
 use std::time::{Duration, SystemTime};
 
-use tcslibgs::{came_from, ConfigDigest, ConfigVersion, Telemetry, Timestamp, NO_TRANSFER_TIME};
+use tcslibgs::{
+    came_from, Beacon, BeaconError, ConfigDigest, ConfigVersion, Timestamp, NO_TRANSFER_TIME,
+};
 
 /// Where beacons come from and where they are received.
 ///
@@ -519,14 +521,12 @@ struct Reading {
 }
 
 /// [`hear`], with the message written into `message` in place of what it
-/// held: how a pass hears a beacon without allocating.
+/// held: how a pass hears a beacon allocating nothing of its own. Unpacking
+/// it does allocate, and says so: see [`Beacon::read`].
 fn read_into(datagram: &[u8], expected: Option<ConfigDigest>, message: &mut String) -> Reading {
     message.clear();
-    let read = serde_json::from_slice::<Telemetry>(datagram);
-    let beacon = match &read {
-        Ok(Telemetry::Beacon(beacon)) => Some(beacon),
-        _ => None,
-    };
+    let read = Beacon::read(datagram);
+    let beacon = read.as_ref().ok();
     let digests = match (beacon, expected) {
         (Some(beacon), Some(ours)) if beacon.digest != ours => Some((beacon.digest, ours)),
         _ => None,
@@ -537,7 +537,7 @@ fn read_into(datagram: &[u8], expected: Option<ConfigDigest>, message: &mut Stri
     }
     write_message(datagram, &read, message);
     Reading {
-        sequence: beacon.map(|beacon| beacon.header.sequence),
+        sequence: beacon.map(|beacon| beacon.sequence),
         digests,
     }
 }
@@ -575,11 +575,7 @@ fn write_differs(theirs: ConfigDigest, ours: ConfigDigest, out: &mut String) {
 /// than hidden behind a green light.
 pub fn message_of(datagram: &[u8]) -> String {
     let mut said = String::new();
-    write_message(
-        datagram,
-        &serde_json::from_slice::<Telemetry>(datagram),
-        &mut said,
-    );
+    write_message(datagram, &Beacon::read(datagram), &mut said);
     said
 }
 
@@ -592,12 +588,9 @@ const UNREADABLE_SHOWN: usize = 40;
 /// What cannot be read is shown as `String::from_utf8_lossy` would show it,
 /// a replacement character for each stretch that is not UTF-8, but a
 /// character at a time, so that nothing is made to show it.
-fn write_message(datagram: &[u8], read: &Result<Telemetry, serde_json::Error>, out: &mut String) {
+fn write_message(datagram: &[u8], read: &Result<Beacon, BeaconError>, out: &mut String) {
     match read {
-        Ok(Telemetry::Beacon(beacon)) => write_what_it_read(beacon.version, beacon.digest, out),
-        Ok(other) => {
-            let _ = write!(out, "not a beacon: {:?}", other.tm_type());
-        }
+        Ok(beacon) => write_what_it_read(beacon.version, beacon.digest, out),
         Err(_) => {
             out.push_str("unreadable: ");
             let mut text = datagram.utf8_chunks().flat_map(|chunk| {
@@ -925,7 +918,7 @@ mod tests {
             .collect();
         assert_eq!(said, ["Unheard", "Heard", "Aging", "Waiting"]);
     }
-    use tcslibgs::{BeaconTelemetry, CommandStatus, HostPort, PingTelemetry};
+    use tcslibgs::{CommandStatus, HostPort, PingTelemetry, Telemetry};
 
     /// A schedule with one stage of contact and one without, so that a test
     /// can tell a fresh beacon from a stale one.
@@ -1218,9 +1211,7 @@ mod tests {
         assert!(said.contains(&ours.to_string()), "{said}");
 
         let version = ConfigVersion::of_this_build();
-        let datagram =
-            serde_json::to_vec(&Telemetry::Beacon(BeaconTelemetry::new(1, version, theirs)))
-                .expect("it serializes");
+        let datagram = Beacon::new(1, version, theirs).to_bytes();
 
         let heard = hear(&datagram, Some(ours));
         assert!(heard.differs.is_some());
@@ -1248,8 +1239,7 @@ mod tests {
             patch: 3,
         };
         let digest = ConfigDigest([0xab; 16]);
-        let beacon = Telemetry::Beacon(BeaconTelemetry::new(3, version, digest));
-        let datagram = serde_json::to_vec(&beacon).expect("it serializes");
+        let datagram = Beacon::new(3, version, digest).to_bytes();
 
         // Each labelled, the version three decimal parts, and the digest hex
         // with nothing between the bytes. No configuration version: a
@@ -1284,12 +1274,17 @@ mod tests {
         assert!(shown.ends_with("..."), "{shown}");
         assert!(shown.len() < 60, "{shown}");
 
-        // Telemetry that is not a beacon says so. Nothing sends a response to
-        // this address, so this is a misconfiguration worth naming.
+        // Telemetry that is not a beacon is shown as what arrived. Nothing
+        // sends a response to this address, so this is a misconfiguration,
+        // and the start of the JSON is enough to name it.
         let other = Telemetry::Ping(PingTelemetry::new(1, CommandStatus::Success));
         let datagram = serde_json::to_vec(&other).expect("it serializes");
         let shown = message_of(&datagram);
-        assert!(shown.contains("not a beacon"), "{shown}");
+        assert!(
+            shown.contains("unreadable") && shown.contains("Ping"),
+            "{shown}"
+        );
+        assert_eq!(hear(&datagram, None).sequence, None);
     }
 
     /// A beacon's number says how many did not arrive.
@@ -1459,12 +1454,7 @@ mod tests {
 
         let stranger = UdpSocket::bind("127.0.0.1:0").expect("a socket for the stranger");
         let version = ConfigVersion::of_this_build();
-        let datagram = serde_json::to_vec(&Telemetry::Beacon(BeaconTelemetry::new(
-            1,
-            version,
-            ConfigDigest([0; 16]),
-        )))
-        .expect("it serializes");
+        let datagram = Beacon::new(1, version, ConfigDigest([0; 16])).to_bytes();
         stranger
             .send_to(&datagram, recv)
             .expect("the stranger sends");

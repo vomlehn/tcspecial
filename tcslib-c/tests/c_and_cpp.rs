@@ -23,9 +23,9 @@ use std::time::Duration;
 use tcslibgs::config_digest::{digest_of_file, ConfigVersion};
 use tcslibgs::node::vehicle::ping;
 use tcslibgs::{
-    BeaconTelemetry, CommandStatus, ConfigTelemetry, ConnectTelemetry, DHSample, NodeCounts,
-    NodeTelemetry, PingTelemetry, QueryNodeSampleTelemetry, QueryNodeTelemetry,
-    RestartArmTelemetry, RestartTelemetry, Telemetry, Timestamp,
+    Beacon, CommandStatus, ConfigTelemetry, ConnectTelemetry, DHSample, NodeCounts, NodeTelemetry,
+    PingTelemetry, QueryNodeSampleTelemetry, QueryNodeTelemetry, RestartArmTelemetry,
+    RestartTelemetry, Telemetry, Timestamp,
 };
 
 fn here() -> PathBuf {
@@ -203,8 +203,7 @@ vehicle:
             let mut answered = Vec::new();
             while !stop.load(Ordering::Relaxed) {
                 sequence += 1;
-                let sent = Telemetry::Beacon(BeaconTelemetry::new(sequence, version, digest));
-                let datagram = serde_json::to_vec(&sent).expect("it serializes");
+                let datagram = Beacon::new(sequence, version, digest).to_bytes();
                 let _ = beacon.send_to(&datagram, ("127.0.0.1", beacons));
 
                 // A ping, answered as the ping node answers it, down to where

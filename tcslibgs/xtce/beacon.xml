@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The beacon, as it goes on the link: what tcspecial sends every
+     beacon.interval to beacon.recv, and the whole of the datagram.
+
+     34 bytes, in this order:
+
+       "tcspecial "    10 bytes of text, the space included
+       major           1 byte, unsigned
+       minor           1 byte, unsigned
+       patch           1 byte, unsigned
+       " "             1 byte
+       digest          16 bytes, the MD5 of the configuration tcspecial read
+       sequence        4 bytes, unsigned, most significant byte first
+
+     The name and the space are constants: tcsxtce writes them when a beacon
+     is packed and refuses a datagram without them when one is unpacked, so
+     they are not fields of the generated Beacon. The sequence counts the
+     beacons this tcspecial has sent, from one, so that the ground can tell a
+     beacon it missed from a vehicle that restarted.
+
+     The Rust in tcslibgs/src/beacon_packet.rs and the Python in
+     python/tcslibgs/beacon_packet.py are generated from this file by
+     `make beacon-packet` in tcslibgs/: change this, and regenerate them. -->
+<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20250214" name="TcsBeacon">
+  <TelemetryMetaData>
+    <ParameterTypeSet>
+      <StringParameterType name="NameType">
+        <StringDataEncoding encoding="US-ASCII">
+          <SizeInBits>
+            <Fixed>
+              <FixedValue>80</FixedValue>
+            </Fixed>
+          </SizeInBits>
+        </StringDataEncoding>
+      </StringParameterType>
+      <StringParameterType name="SeparatorType">
+        <StringDataEncoding encoding="US-ASCII">
+          <SizeInBits>
+            <Fixed>
+              <FixedValue>8</FixedValue>
+            </Fixed>
+          </SizeInBits>
+        </StringDataEncoding>
+      </StringParameterType>
+      <IntegerParameterType name="U8Type" signed="false">
+        <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U32Type" signed="false">
+        <IntegerDataEncoding sizeInBits="32" encoding="unsigned"/>
+      </IntegerParameterType>
+      <BinaryParameterType name="DigestType">
+        <BinaryDataEncoding>
+          <SizeInBits>
+            <FixedValue>128</FixedValue>
+          </SizeInBits>
+        </BinaryDataEncoding>
+      </BinaryParameterType>
+    </ParameterTypeSet>
+    <ParameterSet>
+      <Parameter name="Name" parameterTypeRef="NameType"/>
+      <Parameter name="Major" parameterTypeRef="U8Type"/>
+      <Parameter name="Minor" parameterTypeRef="U8Type"/>
+      <Parameter name="Patch" parameterTypeRef="U8Type"/>
+      <Parameter name="Separator" parameterTypeRef="SeparatorType"/>
+      <Parameter name="Digest" parameterTypeRef="DigestType"/>
+      <Parameter name="Sequence" parameterTypeRef="U32Type"/>
+    </ParameterSet>
+    <ContainerSet>
+      <!-- Everything a beacon holds, constants and all. Abstract: what is
+           packed and unpacked is the Beacon below, which is this with the
+           constants fixed. -->
+      <SequenceContainer name="BeaconLayout" abstract="true">
+        <EntryList>
+          <ParameterRefEntry parameterRef="Name"/>
+          <ParameterRefEntry parameterRef="Major"/>
+          <ParameterRefEntry parameterRef="Minor"/>
+          <ParameterRefEntry parameterRef="Patch"/>
+          <ParameterRefEntry parameterRef="Separator"/>
+          <ParameterRefEntry parameterRef="Digest"/>
+          <ParameterRefEntry parameterRef="Sequence"/>
+        </EntryList>
+      </SequenceContainer>
+      <SequenceContainer name="Beacon">
+        <EntryList/>
+        <BaseContainer containerRef="BeaconLayout">
+          <RestrictionCriteria>
+            <ComparisonList>
+              <Comparison parameterRef="Name" value="tcspecial "/>
+              <Comparison parameterRef="Separator" value=" "/>
+            </ComparisonList>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+    </ContainerSet>
+  </TelemetryMetaData>
+</SpaceSystem>

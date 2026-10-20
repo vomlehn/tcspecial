@@ -2000,14 +2000,14 @@ vehicle:
     }
 
     /// What every command and every beacon goes through allocates nothing:
-    /// whether a datagram came from where the configuration says, and an
-    /// answer or a beacon written as JSON into a buffer that is reused. What
-    /// the command thread and the beacon thread do for each, but for the
-    /// socket.
+    /// whether a datagram came from where the configuration says, an answer
+    /// written as JSON into a buffer that is reused, and a beacon packed by a
+    /// packer that is. What the command thread and the beacon thread do for
+    /// each, but for the socket.
     #[test]
     fn answering_and_beaconing_allocate_nothing() {
         use tcslibgs::{
-            came_from, BeaconTelemetry, CommandStatus, ConfigDigest, ConfigVersion, HostPort,
+            came_from, Beacon, BeaconPacker, CommandStatus, ConfigDigest, ConfigVersion, HostPort,
             PingTelemetry, Telemetry,
         };
 
@@ -2017,23 +2017,19 @@ vehicle:
         };
         let from: std::net::SocketAddr = "127.0.0.1:4000".parse().expect("an address");
         let stranger: std::net::SocketAddr = "10.0.0.1:4000".parse().expect("an address");
-        let beacon = Telemetry::Beacon(BeaconTelemetry::new(
-            7,
-            ConfigVersion::of_this_build(),
-            ConfigDigest([0x5a; 16]),
-        ));
+        let beacon = Beacon::new(7, ConfigVersion::of_this_build(), ConfigDigest([0x5a; 16]));
         let answer = Telemetry::Ping(PingTelemetry::new(3, CommandStatus::Success));
         // Made once, as each thread makes its own.
         let mut data: Vec<u8> = Vec::with_capacity(1024);
+        let mut packer = BeaconPacker::new();
 
         let made = counting::allocations_in(|| {
             for _ in 0..10 {
                 assert!(came_from(&stated, &from));
                 assert!(!came_from(&stated, &stranger));
-                for said in [&beacon, &answer] {
-                    data.clear();
-                    serde_json::to_writer(&mut data, said).expect("it is written");
-                }
+                data.clear();
+                serde_json::to_writer(&mut data, &answer).expect("it is written");
+                assert!(!packer.pack(&beacon).is_empty());
             }
         });
         assert_eq!(

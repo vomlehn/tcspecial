@@ -1,7 +1,8 @@
-# Makefile for the tcslibgs crate's README
+# Makefile for the tcslibgs crate's README, and the beacon's packing code
 #
 # Cargo builds the crate itself, from the repository's root: see README.md.
-# This builds only the page.
+# This builds the page, and regenerates the code that packs and unpacks a
+# beacon from the XTCE that describes it.
 
 .PHONY: all
 all:	docs
@@ -13,6 +14,8 @@ help:
 	@echo ""
 	@echo "Usage:"
 	@echo "  make README.html     - Build README.html from README.md"
+	@echo "  make beacon-packet   - Regenerate the beacon's Rust and Python codecs"
+	@echo "                         from xtce/beacon.xml"
 	@echo "  make clean           - Remove README.html"
 
 .PHONY: docs
@@ -22,6 +25,27 @@ docs: README.html
 # styling, and reads the same wherever it is copied to.
 README.html: README.md
 	pandoc --standalone --metadata pagetitle=tcslibgs README.md -o README.html
+
+# The beacon's layout is stated once, in xtce/beacon.xml, and the code that
+# packs and unpacks it is generated from that by tcsxtce, vendored in
+# vendor/tcsxtce: Rust for tcspecial and tcslib, and Python for the Python
+# ground station. Both are committed, so that building needs no Python; run
+# this after changing the XML, and commit what it writes.
+TCSXTCE := cd ../vendor/tcsxtce/generator && python3 -m tcsxtce
+BEACON_XML := xtce/beacon.xml
+BEACON_RS := src/beacon_packet.rs
+BEACON_PY := ../python/tcslibgs/beacon_packet.py
+
+.PHONY: beacon-packet
+beacon-packet: $(BEACON_RS) $(BEACON_PY)
+
+$(BEACON_RS): $(BEACON_XML)
+	$(TCSXTCE) ../../../tcslibgs/$(BEACON_XML) ../../../tcslibgs/$(BEACON_RS) \
+		--lang rust --source-name tcslibgs/$(BEACON_XML)
+
+$(BEACON_PY): $(BEACON_XML)
+	$(TCSXTCE) ../../../tcslibgs/$(BEACON_XML) ../../../tcslibgs/$(BEACON_PY) \
+		--lang python --source-name tcslibgs/$(BEACON_XML)
 
 .PHONY: clean
 clean:

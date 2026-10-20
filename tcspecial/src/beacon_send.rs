@@ -16,7 +16,7 @@ use std::thread;
 use std::time::{Duration, SystemTime};
 
 use log::{error, info, trace};
-use tcslibgs::{BeaconTelemetry, ConfigDigest, ConfigVersion, TcsResult, Telemetry};
+use tcslibgs::{Beacon, BeaconPacker, ConfigDigest, ConfigVersion, TcsResult};
 
 use crate::telemetry_log::TelemetryLog;
 
@@ -57,10 +57,6 @@ pub struct BeaconSend {
     version: ConfigVersion,
     digest: ConfigDigest,
 }
-
-/// Room for a beacon as JSON, which it comes well inside: a sequence number,
-/// a version, a digest and a header.
-const BEACON_BYTES: usize = 512;
 
 impl BeaconSend {
     /// Bind where beacons come from, find where they go, and start sending.
@@ -146,11 +142,11 @@ impl BeaconSend {
     /// rather than every interval: a vehicle that cannot reach the ground for
     /// an hour should leave a log that says so in two lines.
     fn beacon_send(&self, socket: UdpSocket, dest: SocketAddr) {
-        // The buffer each beacon is written into, made once.
-        let mut data = Vec::with_capacity(BEACON_BYTES);
+        // What each beacon is packed with, buffer and all, made once.
+        let mut packer = BeaconPacker::new();
         let mut failing = Failing::default();
 
-        let outcome = self.send_beacon(&socket, dest, &mut data);
+        let outcome = self.send_beacon(&socket, dest, &mut packer);
         failing.after(outcome, &self.from_addr, &self.dest_addr);
 
         loop {
@@ -170,7 +166,7 @@ impl BeaconSend {
                 }
             }
 
-            let outcome = self.send_beacon(&socket, dest, &mut data);
+            let outcome = self.send_beacon(&socket, dest, &mut packer);
             failing.after(outcome, &self.from_addr, &self.dest_addr);
 
             // Calculate next expiration time
@@ -180,20 +176,18 @@ impl BeaconSend {
         }
     }
 
-    /// Send the next beacon to `dest`, written into `data`, which is the
-    /// thread's own buffer and is reused.
+    /// Send the next beacon to `dest`, packed by `packer`, which is the
+    /// thread's own and is reused.
     pub fn send_beacon(
         &self,
         socket: &UdpSocket,
         dest: SocketAddr,
-        data: &mut Vec<u8>,
+        packer: &mut BeaconPacker,
     ) -> TcsResult<()> {
         // From one: the first beacon is the first beacon, and nought is what
         // every beacon used to carry.
         let sequence = self.sent.fetch_add(1, Ordering::Relaxed).wrapping_add(1);
-        let beacon = Telemetry::Beacon(BeaconTelemetry::new(sequence, self.version, self.digest));
-        data.clear();
-        serde_json::to_writer(&mut *data, &beacon)?;
+        let data = packer.pack(&Beacon::new(sequence, self.version, self.digest));
         trace!("send_beacon: sending to {dest}");
         // Recorded before it is sent, as a command response is, so that a
         // beacon the send fails on is still known to have been produced.
@@ -365,14 +359,12 @@ mod tests {
                     Err(e) => panic!("a beacon: {e}"),
                 }
             };
-            match serde_json::from_slice::<Telemetry>(&buffer[..size]).expect("telemetry") {
-                Telemetry::Beacon(beacon) => assert_eq!(
-                    beacon.header.sequence, expected,
-                    "beacon {expected} is numbered {}",
-                    beacon.header.sequence
-                ),
-                other => panic!("expected a beacon, got {other:?}"),
-            }
+            let beacon = Beacon::read(&buffer[..size]).expect("a beacon");
+            assert_eq!(
+                beacon.sequence, expected,
+                "beacon {expected} is numbered {}",
+                beacon.sequence
+            );
         }
     }
 

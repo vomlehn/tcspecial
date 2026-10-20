@@ -1,6 +1,9 @@
 //! Telemetry definitions for TCSpecial
 //!
 //! Telemetry is sent from space to ground.
+//!
+//! These are the answers to commands, and go as JSON. The beacon, which
+//! answers nothing and has a layout of its own, is in [`crate::beacon`].
 
 use serde::{Deserialize, Serialize};
 
@@ -64,7 +67,6 @@ pub enum TelemetryType {
     QueryNode,
     /// And to a QUERY_NODE_SAMPLE: see [`QueryNodeSampleTelemetry`].
     QueryNodeSample,
-    Beacon,
 }
 
 impl TelemetryType {
@@ -80,7 +82,6 @@ impl TelemetryType {
             TelemetryType::SetNode => 0x32,
             TelemetryType::QueryNode => 0x33,
             TelemetryType::QueryNodeSample => 0x34,
-            TelemetryType::Beacon => 0xF0,
         }
     }
 
@@ -96,7 +97,6 @@ impl TelemetryType {
             0x32 => Some(TelemetryType::SetNode),
             0x33 => Some(TelemetryType::QueryNode),
             0x34 => Some(TelemetryType::QueryNodeSample),
-            0xF0 => Some(TelemetryType::Beacon),
             _ => None,
         }
     }
@@ -314,45 +314,6 @@ impl QueryNodeSampleTelemetry {
     }
 }
 
-/// BEACON asynchronous telemetry
-///
-/// It carries what a CONNECT response carries -- the build and the digest of
-/// the configuration this process read -- because a beacon arrives whether or
-/// not anything has connected. A ground station that is only listening can
-/// then see which software is flying and which payload set it is serving,
-/// rather than having to ask before it can know.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub struct BeaconTelemetry {
-    pub header: TelemetryHeader,
-    /// The version of this build, from its `Cargo.toml`.
-    pub version: ConfigVersion,
-    /// The digest of the configuration file this process read, which is what
-    /// says which payload set it is serving: a configuration states no
-    /// version of its own.
-    pub digest: ConfigDigest,
-}
-
-impl BeaconTelemetry {
-    /// `sequence` counts the beacons this process has sent, from one.
-    ///
-    /// Every other telemetry's sequence number is the command's, which is how
-    /// a ground station pairs an answer with what it asked. A beacon answers
-    /// nothing, so the number is the beacon's own: it says which beacon this
-    /// is, and a ground station that sees 7 after 5 knows it missed one
-    /// rather than wondering whether the spacecraft went quiet.
-    ///
-    /// Counted by the sender, so it starts again at one when tcspecial does.
-    /// A number going backwards is therefore a restart, which is worth
-    /// knowing and is not the same thing as a gap.
-    pub fn new(sequence: u32, version: ConfigVersion, digest: ConfigDigest) -> Self {
-        Self {
-            header: TelemetryHeader::new(sequence, TelemetryType::Beacon, CommandStatus::Success),
-            version,
-            digest,
-        }
-    }
-}
-
 /// An answer of this status to a command of that kind.
 ///
 /// The telemetry type has to match the command, because that is how the ground
@@ -422,7 +383,6 @@ pub enum Telemetry {
     SetNode(NodeTelemetry),
     QueryNode(QueryNodeTelemetry),
     QueryNodeSample(QueryNodeSampleTelemetry),
-    Beacon(BeaconTelemetry),
 }
 
 impl Telemetry {
@@ -438,7 +398,6 @@ impl Telemetry {
             }
             Telemetry::QueryNode(tm) => tm.header.sequence,
             Telemetry::QueryNodeSample(tm) => tm.header.sequence,
-            Telemetry::Beacon(tm) => tm.header.sequence,
         }
     }
 
@@ -454,7 +413,6 @@ impl Telemetry {
             }
             Telemetry::QueryNode(tm) => tm.header.tm_type,
             Telemetry::QueryNodeSample(tm) => tm.header.tm_type,
-            Telemetry::Beacon(tm) => tm.header.tm_type,
         }
     }
 
@@ -470,7 +428,6 @@ impl Telemetry {
             }
             Telemetry::QueryNode(tm) => tm.header.status,
             Telemetry::QueryNodeSample(tm) => tm.header.status,
-            Telemetry::Beacon(tm) => tm.header.status,
         }
     }
 
@@ -489,7 +446,6 @@ impl Telemetry {
             }
             Telemetry::QueryNode(tm) => tm.header.timestamp,
             Telemetry::QueryNodeSample(tm) => tm.header.timestamp,
-            Telemetry::Beacon(tm) => tm.header.timestamp,
         }
     }
 }
@@ -510,14 +466,6 @@ mod tests {
         let tm = PingTelemetry::new(1, CommandStatus::Success);
         assert_eq!(tm.header.sequence, 1);
         assert_eq!(tm.header.status, CommandStatus::Success);
-    }
-
-    #[test]
-    fn test_beacon_telemetry() {
-        let tm = BeaconTelemetry::new(7, ConfigVersion::of_this_build(), ConfigDigest([0u8; 16]));
-        assert_eq!(tm.header.tm_type, TelemetryType::Beacon);
-        // The beacon's own number, not a command's: a beacon answers nothing.
-        assert_eq!(tm.header.sequence, 7);
     }
 
     /// Every kind of response says when it was made.
@@ -567,7 +515,6 @@ mod tests {
                 DHSample::new(),
                 DHSample::new(),
             )),
-            Telemetry::Beacon(BeaconTelemetry::new(16, version, digest)),
         ];
 
         // Every kind there is, which is what makes this a statement about all

@@ -8,7 +8,7 @@
 //!
 //! The beacon is sent by this test rather than by tcspecial. What tcspecial
 //! does with the same two addresses is its own tests' business; the datagram
-//! is the same either way, being the one `tcslibgs` serialises.
+//! is the same either way, being the one `tcslibgs` packs with tcsxtce.
 
 use std::net::UdpSocket;
 use std::path::{Path, PathBuf};
@@ -17,7 +17,7 @@ use tcslib::beacon::{Arrived, Beacons, Contact, Schedule, Stage};
 use tcslibgs::config_digest::digest_of_file;
 use tcslibgs::graph::parameters::beacon_of;
 use tcslibgs::graph::Graph;
-use tcslibgs::{BeaconTelemetry, ConfigDigest, ConfigVersion, Telemetry};
+use tcslibgs::{Beacon, ConfigDigest, ConfigVersion};
 
 /// The example's configuration, found from this crate rather than from
 /// wherever the test was run.
@@ -95,12 +95,9 @@ fn a_beacon_from_the_configured_address_is_heard() {
     };
 
     let version = ConfigVersion::of_this_build();
-    let beacon = serde_json::to_vec(&Telemetry::Beacon(BeaconTelemetry::new(
-        7,
-        version,
-        ConfigDigest([0x5a; 16]),
-    )))
-    .expect("a beacon serialises");
+    // Packed by tcsxtce, from the layout in tcslibgs/xtce/beacon.xml, as
+    // tcspecial packs every beacon it sends.
+    let beacon = Beacon::new(7, version, ConfigDigest([0x5a; 16])).to_bytes();
     vehicle.send_to(&beacon, at).expect("the vehicle beacons");
 
     let pass = station.pass();

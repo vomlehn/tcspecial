@@ -1,12 +1,14 @@
 """The beacon's facts and its panel, held to the Rust's own examples.
 
 The tests of ``tcslib/src/beacon.rs`` and ``tcsui/src/lib.rs`` said again,
-with the same figures. The beacons are JSON as tcspecial sends it, captured
-from a running vehicle; ``examples/ping/tests/pings.rs`` sends this program
-beacons the Rust serializes, so a change to that JSON is caught at both ends.
+with the same figures. The beacons are built here byte by byte, in the layout
+``tcslibgs/xtce/beacon.xml`` states, rather than by the code under test;
+``examples/ping/tests/pings.rs`` sends this program beacons the Rust packs, so
+a change to the layout is caught at both ends.
 """
 
 import json
+import struct
 import sys
 import unittest
 from pathlib import Path
@@ -15,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tcslib import beacon  # noqa: E402
 from tcslib.beacon import Blink, Contact, Counted, Schedule, Stage, Step  # noqa: E402
+from tcslibgs.beacon import BEACON_BYTES, Beacon, BeaconError  # noqa: E402
 from tcslibgs.configuration import HostPort  # noqa: E402
 
 MS = 1_000_000
@@ -23,20 +26,10 @@ AT = 1_000_000 * SECOND
 
 
 def a_beacon(sequence=2, digest=None, version=(0, 1, 0)):
-    """A beacon, as tcspecial sends one."""
+    """A beacon, as tcspecial sends one: the name, the version a byte a part,
+    a space, the digest, and the number, four bytes big-endian."""
     digest = digest or [36, 195, 155, 114, 7, 4, 241, 185, 121, 87, 153, 67, 108, 53, 167, 176]
-    return json.dumps({
-        "Beacon": {
-            "header": {
-                "sequence": sequence,
-                "tm_type": "Beacon",
-                "status": "Success",
-                "timestamp": {"micros": 1792436939903024},
-            },
-            "version": dict(zip(("major", "minor", "patch"), version)),
-            "digest": digest,
-        }
-    }).encode()
+    return b"tcspecial " + bytes(version) + b" " + bytes(digest) + struct.pack(">I", sequence)
 
 
 def schedule():
@@ -149,6 +142,24 @@ class ScheduleTest(unittest.TestCase):
         self.assertEqual(beacon.missed(10 * SECOND, 0), 0)
 
 
+class LayoutTest(unittest.TestCase):
+    """tcslibgs/beacon.py, held to the layout and to the Rust's own example."""
+
+    def test_a_beacon_is_the_name_the_version_a_space_the_digest_and_its_number(self):
+        digest = bytes([0xD4, 0x1D, 0x8C, 0xD9, 0x8F, 0x00, 0xB2, 0x04,
+                        0xE9, 0x80, 0x09, 0x98, 0xEC, 0xF8, 0x42, 0x7E])
+        packed = Beacon(sequence=0x01020304, version=(1, 2, 3), digest=digest).to_bytes()
+        self.assertEqual(packed, a_beacon(sequence=0x01020304, digest=list(digest), version=(1, 2, 3)))
+        self.assertEqual(len(packed), BEACON_BYTES)
+        self.assertEqual(BEACON_BYTES, 34)
+
+    def test_a_beacon_reads_back_as_itself(self):
+        sent = Beacon(sequence=7, version=(1, 2, 3), digest=bytes(range(16)))
+        self.assertEqual(Beacon.read(sent.to_bytes()), sent)
+        with self.assertRaises(BeaconError):
+            Beacon.read(sent.to_bytes() + b"\0")
+
+
 class HearingTest(unittest.TestCase):
     def test_a_beacon_announcing_another_configuration_says_so(self):
         ours, theirs = "ab" * 16, "cd" * 16
@@ -178,8 +189,20 @@ class HearingTest(unittest.TestCase):
         self.assertTrue(shown.endswith("..."), shown)
         self.assertLess(len(shown), 60)
 
+        # Telemetry that is not a beacon is shown as what arrived, and the
+        # start of the JSON is enough to name it.
         ping = json.dumps({"Ping": {"header": {"sequence": 1}}}).encode()
-        self.assertIn("not a beacon", beacon.message_of(ping))
+        shown = beacon.message_of(ping)
+        self.assertIn("unreadable", shown)
+        self.assertIn("Ping", shown)
+
+    def test_a_beacon_of_another_length_or_without_its_name_is_not_one(self):
+        good = a_beacon(sequence=3)
+        self.assertEqual(beacon.hear(good, None).sequence, 3)
+        self.assertIsNone(beacon.hear(good + b"\0", None).sequence)
+        self.assertIsNone(beacon.hear(good[:-1], None).sequence)
+        self.assertIsNone(beacon.hear(b"T" + good[1:], None).sequence)
+        self.assertIsNone(beacon.hear(good[:13] + b"-" + good[14:], None).sequence)
 
     def test_a_beacons_number_says_what_happened_before_it(self):
         self.assertEqual(beacon.counted(None, 7), (Counted.FIRST, 0))

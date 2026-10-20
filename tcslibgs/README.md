@@ -27,6 +27,12 @@ the editor is the one the vehicle would have refused the file with.
 ## What is in it
 
 - `commands`, `telemetry`, `protocol`: the command and telemetry protocol.
+- `beacon`: the beacon, which is not JSON as the answers to commands are but
+  34 bytes in a fixed layout, described in XTCE in `xtce/beacon.xml`. The code
+  that packs and unpacks it, `src/beacon_packet.rs` and
+  `../python/tcslibgs/beacon_packet.py`, is generated from that file by
+  tcsxtce (vendored in `../vendor/tcsxtce`): run `make beacon-packet` here
+  after changing it.
 - `config_digest`: the digest of a configuration, which both ends report, so
   each can tell whether the other read the same files.
 - `graph`: the configuration, a graph of nodes, with its checks, and the

@@ -11,6 +11,11 @@
 //! that a panel in tcsmoc and a panel in tcssim show the one transfer the
 //! same way.
 
+/// The beacon, as it goes on the link.
+pub mod beacon;
+/// The beacon's packing code, which tcsxtce generated from
+/// `xtce/beacon.xml`: used through [`beacon`].
+mod beacon_packet;
 pub mod commands;
 pub mod config;
 pub mod config_digest;
@@ -35,6 +40,7 @@ pub mod types;
 pub mod verify;
 pub mod whole;
 
+pub use beacon::*;
 pub use commands::*;
 // The value types a runtime endpoint configuration carries. They are defined
 // with the kind of group that states them and named from here as well, since

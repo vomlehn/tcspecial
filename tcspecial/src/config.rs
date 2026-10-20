@@ -44,9 +44,6 @@ pub mod constants {
     /// Default buffer size for endpoints
     pub const ENDPOINT_BUFFER_SIZE: usize = 4096;
 
-    /// Restart arm timeout
-    pub const RESTART_ARM_TIMEOUT: Duration = Duration::from_secs(60);
-
     /// First part of every telemetry log segment file name
     pub const TELEMETRY_LOG_PREFIX: &str = "telem-";
 

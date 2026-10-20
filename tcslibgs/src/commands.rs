@@ -299,36 +299,240 @@ impl NodeCommand {
 /// fixed-length field because a node has a position in the configuration and
 /// the digest covers that order; an attribute has no such number of its own.
 /// A binding's position in the `commands` section would be one -- and would
-/// carry the node with it -- but the value here is text of no fixed length
-/// anyway, so a message of fixed length was never on offer, and a command
-/// that says `setpoint` is one a log reads back.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+/// carry the node with it -- but a command that says `setpoint` is one a log
+/// reads back.
+///
+/// Both are held in room of a fixed size, [`ATTRIBUTE_BYTES`] and
+/// [`VALUE_BYTES`], so that the vehicle reads one without allocating. The
+/// message on the link is the same JSON whatever holds it: the attribute a
+/// string, the value an array of numbers.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SetNodeCommand {
     pub header: CommandHeader,
     /// Which node, by its node id: see [`NodeId`].
     pub node: NodeId,
     /// Which of its attributes, as the `commands` section spells it.
-    pub attribute: String,
+    pub attribute: Attribute,
     /// What to set it to, as the bytes the node reads it from.
     ///
     /// Bytes and not a number, because what an attribute takes is the node's
     /// business: a setpoint is a temperature, a band is a width, and a node
     /// that wanted a word would want a word. The node refuses what it cannot
     /// use, which is where a setpoint that is not a number is caught.
-    pub value: Vec<u8>,
+    pub value: Value,
 }
 
 impl SetNodeCommand {
-    pub fn new(sequence: u32, node: NodeId, attribute: &str, value: &[u8]) -> Self {
-        Self {
+    /// A SET_NODE, or why there cannot be one: an attribute longer than
+    /// [`ATTRIBUTE_BYTES`] or a value longer than [`VALUE_BYTES`] is refused
+    /// here, on the ground, rather than sent to a vehicle that would refuse it.
+    pub fn new(sequence: u32, node: NodeId, attribute: &str, value: &[u8]) -> Result<Self, String> {
+        Ok(Self {
             header: CommandHeader {
                 sequence,
                 cmd_type: CommandType::SetNode,
             },
             node,
-            attribute: attribute.to_string(),
-            value: value.to_vec(),
+            attribute: Attribute::of(attribute)?,
+            value: Value::of(value)?,
+        })
+    }
+}
+
+/// The longest attribute name a SET_NODE carries, in bytes.
+///
+/// Longer than any attribute a node has, by some way; a command binding whose
+/// attribute is longer is refused where the configuration is read, so every
+/// attribute the ground may set is one a SET_NODE can name.
+pub const ATTRIBUTE_BYTES: usize = 64;
+
+/// The longest value a SET_NODE carries, in bytes.
+///
+/// A setpoint, a band, a word: what a node is set to is short. A value longer
+/// is refused on the ground, by [`SetNodeCommand::new`], and by the vehicle as
+/// it reads one.
+pub const VALUE_BYTES: usize = 256;
+
+/// Text of at most `N` bytes, held in place: what a SET_NODE's attribute is.
+///
+/// A string on the wire, as a `String` would be.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct Attribute {
+    bytes: [u8; ATTRIBUTE_BYTES],
+    len: u8,
+}
+
+impl Attribute {
+    /// This name, or why it cannot be one.
+    pub fn of(name: &str) -> Result<Attribute, String> {
+        if name.len() > ATTRIBUTE_BYTES {
+            return Err(format!(
+                "the attribute \"{name}\" is {} bytes long, and a command names one \
+                 of at most {ATTRIBUTE_BYTES}",
+                name.len()
+            ));
         }
+        let mut bytes = [0; ATTRIBUTE_BYTES];
+        bytes[..name.len()].copy_from_slice(name.as_bytes());
+        Ok(Attribute {
+            bytes,
+            len: name.len() as u8,
+        })
+    }
+
+    pub fn as_str(&self) -> &str {
+        // Made only from a `&str`, whole: see `of`.
+        std::str::from_utf8(&self.bytes[..usize::from(self.len)]).unwrap_or_default()
+    }
+}
+
+impl std::ops::Deref for Attribute {
+    type Target = str;
+    fn deref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl PartialEq<&str> for Attribute {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
+
+impl PartialEq<str> for Attribute {
+    fn eq(&self, other: &str) -> bool {
+        self.as_str() == other
+    }
+}
+
+impl std::fmt::Debug for Attribute {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self.as_str(), f)
+    }
+}
+
+impl std::fmt::Display for Attribute {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl Serialize for Attribute {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for Attribute {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct Name;
+        impl serde::de::Visitor<'_> for Name {
+            type Value = Attribute;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(f, "an attribute name of at most {ATTRIBUTE_BYTES} bytes")
+            }
+            // Copied out of whatever the reader hands over, which is the
+            // datagram itself where the text has no escapes in it: nothing
+            // is made to hold it.
+            fn visit_str<E: serde::de::Error>(self, name: &str) -> Result<Attribute, E> {
+                Attribute::of(name).map_err(E::custom)
+            }
+        }
+        deserializer.deserialize_str(Name)
+    }
+}
+
+/// Bytes, at most [`VALUE_BYTES`] of them, held in place: what a SET_NODE's
+/// value is.
+///
+/// An array of numbers on the wire, as a `Vec<u8>` would be.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct Value {
+    bytes: [u8; VALUE_BYTES],
+    len: u16,
+}
+
+impl Value {
+    /// These bytes, or why they cannot be one.
+    pub fn of(value: &[u8]) -> Result<Value, String> {
+        if value.len() > VALUE_BYTES {
+            return Err(format!(
+                "a value of {} bytes is longer than a command carries, which is at \
+                 most {VALUE_BYTES}",
+                value.len()
+            ));
+        }
+        let mut bytes = [0; VALUE_BYTES];
+        bytes[..value.len()].copy_from_slice(value);
+        Ok(Value {
+            bytes,
+            len: value.len() as u16,
+        })
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.bytes[..usize::from(self.len)]
+    }
+}
+
+impl std::ops::Deref for Value {
+    type Target = [u8];
+    fn deref(&self) -> &[u8] {
+        self.as_bytes()
+    }
+}
+
+impl std::fmt::Debug for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self.as_bytes(), f)
+    }
+}
+
+impl Serialize for Value {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeSeq;
+        let mut seq = serializer.serialize_seq(Some(self.as_bytes().len()))?;
+        for byte in self.as_bytes() {
+            seq.serialize_element(byte)?;
+        }
+        seq.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for Value {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct Bytes;
+        impl<'de> serde::de::Visitor<'de> for Bytes {
+            type Value = Value;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(f, "a value of at most {VALUE_BYTES} bytes")
+            }
+            fn visit_seq<A: serde::de::SeqAccess<'de>>(
+                self,
+                mut seq: A,
+            ) -> Result<Value, A::Error> {
+                let mut value = Value {
+                    bytes: [0; VALUE_BYTES],
+                    len: 0,
+                };
+                while let Some(byte) = seq.next_element::<u8>()? {
+                    let at = usize::from(value.len);
+                    let Some(room) = value.bytes.get_mut(at) else {
+                        return Err(serde::de::Error::custom(format!(
+                            "a value longer than a command carries, which is at most \
+                             {VALUE_BYTES} bytes"
+                        )));
+                    };
+                    *room = byte;
+                    value.len += 1;
+                }
+                Ok(value)
+            }
+            fn visit_bytes<E: serde::de::Error>(self, bytes: &[u8]) -> Result<Value, E> {
+                Value::of(bytes).map_err(E::custom)
+            }
+        }
+        deserializer.deserialize_seq(Bytes)
     }
 }
 /// CONFIG command - configure TCSpecial values
@@ -350,6 +554,11 @@ impl ConfigCommand {
     }
 }
 /// Union of all command types
+///
+/// As large as a SET_NODE, whose attribute and value are held in place: a
+/// SET_NODE boxed to make the rest smaller would be an allocation for each
+/// one read, which is what holding them in place is for.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Command {
     Ping(PingCommand),
@@ -452,6 +661,38 @@ impl Command {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A SET_NODE reads back as it was written, in the JSON a `String` and a
+    /// `Vec<u8>` would have made, and refuses what will not fit.
+    #[test]
+    fn a_set_node_is_the_json_it_was_and_refuses_what_will_not_fit() {
+        let command = SetNodeCommand::new(3, NodeId::of(2), "setpoint", b"295.0").expect("it fits");
+        let json = serde_json::to_value(command).expect("it serializes");
+        assert_eq!(json["attribute"], "setpoint");
+        assert_eq!(json["value"], serde_json::json!([50, 57, 53, 46, 48]));
+        let back: SetNodeCommand = serde_json::from_value(json).expect("it reads");
+        assert_eq!(back, command);
+        assert_eq!(back.attribute, "setpoint");
+        assert_eq!(back.value.as_bytes(), b"295.0");
+
+        // Each limit, exactly, and one past it.
+        let longest = "a".repeat(ATTRIBUTE_BYTES);
+        assert!(SetNodeCommand::new(1, NodeId::of(0), &longest, b"").is_ok());
+        let said = SetNodeCommand::new(1, NodeId::of(0), &format!("{longest}a"), b"")
+            .expect_err("too long a name");
+        assert!(said.contains(&ATTRIBUTE_BYTES.to_string()), "{said}");
+        assert!(SetNodeCommand::new(1, NodeId::of(0), "x", &[7; VALUE_BYTES]).is_ok());
+        assert!(SetNodeCommand::new(1, NodeId::of(0), "x", &[7; VALUE_BYTES + 1]).is_err());
+
+        // And as read off the link: a value too long is refused, not cut short.
+        let too_long = serde_json::json!({
+            "header": { "sequence": 1, "cmd_type": "SetNode" },
+            "node": 0,
+            "attribute": "x",
+            "value": vec![7u8; VALUE_BYTES + 1],
+        });
+        assert!(serde_json::from_value::<SetNodeCommand>(too_long).is_err());
+    }
 
     /// Every command belongs to one link, and the two classes between them
     /// hold every command there is.

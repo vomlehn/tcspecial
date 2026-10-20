@@ -1954,9 +1954,13 @@ both ends read; what follows is what a vehicle made of nodes does with each.
     and the value, as bytes. The attribute is text where the node is a number
     because a node has a position in the configuration and an attribute has no
     such number of its own -- a binding's position in the ``commands`` section
-    would be one, and would carry the node with it, but the value is text of no
-    fixed length anyway, so a message of fixed length was never on offer and a
-    command that says ``setpoint`` is one a log reads back.
+    would be one, and would carry the node with it -- and a command that says
+    ``setpoint`` is one a log reads back.
+
+    Each has a largest size: an attribute of 64 bytes, ``ATTRIBUTE_BYTES``, and
+    a value of 256, ``VALUE_BYTES``, both in ``tcslibgs::commands``. Fixed, so
+    that the vehicle reads a ``SET_NODE`` into room it holds and allocates
+    nothing to take one.
 
 Requirement
     Any node may be disabled, whatever its kind, but a ping node. A graph does
@@ -2058,6 +2062,13 @@ Requirement
     setpoint may be set from the ground, and a vehicle that took any attribute
     from a command would have no checked configuration at all: a bus address
     or a set of line numbers is what the file said.
+
+Requirement
+    A command binding whose attribute is longer than ``ATTRIBUTE_BYTES`` is
+    refused where the configuration is read, since the ground could never
+    name it. A ``SET_NODE`` whose attribute or value is longer than its
+    largest is refused on the ground and not sent; one that arrives anyway is
+    refused by the vehicle as it is read, rather than cut short.
 
 Requirement
     An attribute no binding mentions and a value the node will not take are

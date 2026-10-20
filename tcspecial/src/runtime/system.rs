@@ -29,7 +29,9 @@
 //! visible in the diagram and recorded in the beacon's digest.
 
 use std::collections::BTreeMap;
-use std::sync::mpsc::{Receiver, Sender};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::mpsc::{Receiver, SyncSender};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use tcslibgs::graph::telemetry::Telemetered;
@@ -71,12 +73,21 @@ pub const POLL_PAUSE: Duration = Duration::from_millis(20);
 /// has disabled must stop at once and not after the current read finishes.
 /// What is left for the pass is releasing what the node held, which must not
 /// happen while an operation is using it.
+///
+/// Nothing in it is made for it: a node is named by the name its state holds,
+/// shared rather than copied, and an attribute and a value are in room of a
+/// fixed size, as the SET_NODE carried them. So handing work over allocates
+/// nothing; what the work itself takes is the pass's to say.
+///
+/// As large as a setting, for the reason `tcslibgs::Command` is: a setting
+/// boxed would be an allocation for each one handed over.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Work {
     /// Open this node again and let the pass touch it.
-    Enable(String),
+    Enable(Arc<str>),
     /// Release what it held, it having already been told to stop.
-    Disable(String),
+    Disable(Arc<str>),
     /// Set one of its attributes, as the configuration binds it.
     ///
     /// The pass's work and not the command interpreter's, because what it
@@ -84,27 +95,70 @@ pub enum Work {
     /// middle of a computation would be a node doing half of one thing and
     /// half of another.
     Set {
-        node: String,
-        attribute: String,
-        value: Vec<u8>,
+        node: Arc<str>,
+        attribute: tcslibgs::Attribute,
+        value: tcslibgs::Value,
     },
 }
 
-/// One piece of work and where its answer goes.
+/// One piece of work, and the ticket its answer is matched to.
 pub struct Job {
     pub work: Work,
-    /// Where to say how it went. A send that fails is a caller that stopped
-    /// waiting, which is not a reason to leave the work undone.
-    pub reply: Sender<Result<(), String>>,
+    ticket: u64,
+}
+
+/// How a piece of work went, and which job it was.
+type Answer = (u64, Result<(), String>);
+
+/// How many jobs, and how many answers, the channels between the command
+/// interpreter and the pass have room for. One is in flight at a time -- see
+/// [`Workbench::ask`] -- and the rest is room for the answers to jobs whose
+/// asker gave up waiting.
+const JOBS_AT_ONCE: usize = 4;
+
+/// The pass's end of the workbench: the jobs handed to it, and where it
+/// answers them.
+pub struct Desk {
+    jobs: Receiver<Job>,
+    answers: SyncSender<Answer>,
+}
+
+impl Desk {
+    /// The next job, if there is one, without waiting.
+    pub fn take(&self) -> Option<Job> {
+        self.jobs.try_recv().ok()
+    }
+
+    /// The next job, waiting for it; `None` once nothing can hand one over.
+    pub fn wait(&self) -> Option<Job> {
+        self.jobs.recv().ok()
+    }
+
+    /// Say how a job went.
+    ///
+    /// Never waits: an answer with no room is one to a job nobody is waiting
+    /// for any longer, which is not a reason to hold up the pass, and the
+    /// work was done all the same.
+    pub fn answer(&self, job: &Job, how: Result<(), String>) {
+        let _ = self.answers.try_send((job.ticket, how));
+    }
 }
 
 /// How the command interpreter hands work to the pass and waits for it.
 ///
 /// Cheap to clone and safe to hold: everything in it is a channel or a
-/// descriptor, and nothing the pass owns is reachable through it.
+/// descriptor, and nothing the pass owns is reachable through it. The channels
+/// are made once, with room for [`JOBS_AT_ONCE`], so handing a job over and
+/// hearing how it went allocate nothing.
 #[derive(Clone)]
 pub struct Workbench {
-    jobs: Sender<Job>,
+    jobs: SyncSender<Job>,
+    /// Where the pass's answers arrive. Behind a lock, which is also what
+    /// keeps one job in flight at a time: a second asker waits for the first
+    /// to be answered.
+    answers: Arc<Mutex<Receiver<Answer>>>,
+    /// The next job's ticket.
+    tickets: Arc<AtomicU64>,
     nudge: Nudge,
 }
 
@@ -124,14 +178,20 @@ impl Workbench {
     /// command interpreter wants to see which work a command caused, and a
     /// program that drives the pass some other way wants the same handover
     /// without this module's loop.
-    pub fn in_two() -> std::io::Result<(Workbench, Receiver<Job>)> {
-        let (jobs, taken) = std::sync::mpsc::channel();
+    pub fn in_two() -> std::io::Result<(Workbench, Desk)> {
+        let (jobs, taken) = std::sync::mpsc::sync_channel(JOBS_AT_ONCE);
+        let (answering, answers) = std::sync::mpsc::sync_channel(JOBS_AT_ONCE);
         Ok((
             Workbench {
                 jobs,
+                answers: Arc::new(Mutex::new(answers)),
+                tickets: Arc::new(AtomicU64::new(0)),
                 nudge: Nudge::new()?,
             },
-            taken,
+            Desk {
+                jobs: taken,
+                answers: answering,
+            },
         ))
     }
 
@@ -141,22 +201,35 @@ impl Workbench {
     /// next group to come due takes the work now rather than when the group
     /// is read.
     ///
-    /// Allocates: the channel the pass answers on, once for each job. Jobs
-    /// come only from a START_NODE, STOP_NODE or SET_NODE the ground sends,
-    /// and a START opens a device again, which allocates whatever the device
-    /// needs to be open -- its port, its buffers, its socket or bus -- so the
-    /// channel is the least of it. Not on a pass's own path.
+    /// Allocates nothing to hand the work over or to hear how it went; what
+    /// the work takes is the pass's -- a START opens a device again, which
+    /// allocates whatever the device needs to be open: see `System::reopen`.
+    ///
+    /// An answer to an earlier job, whose asker gave up waiting, is passed
+    /// over: each answer carries its job's ticket, so a late one cannot be
+    /// taken for this one's.
     pub fn ask(&self, work: Work) -> Result<(), String> {
-        let (reply, answered) = std::sync::mpsc::channel();
+        let answers = self
+            .answers
+            .lock()
+            .map_err(|_| "the command interpreter's answers are lost".to_string())?;
+        let ticket = self.tickets.fetch_add(1, Ordering::Relaxed);
         self.jobs
-            .send(Job { work, reply })
+            .send(Job { work, ticket })
             .map_err(|_| "the vehicle is no longer making passes".to_string())?;
         self.nudge.poke();
-        match answered.recv_timeout(WORK_DEADLINE) {
-            Ok(how) => how,
-            Err(_) => Err(format!(
-                "the vehicle did not do it within {WORK_DEADLINE:?}"
-            )),
+        let deadline = Instant::now() + WORK_DEADLINE;
+        loop {
+            let left = deadline.saturating_duration_since(Instant::now());
+            match answers.recv_timeout(left) {
+                Ok((answered, how)) if answered == ticket => return how,
+                Ok(_) => continue,
+                Err(_) => {
+                    return Err(format!(
+                        "the vehicle did not do it within {WORK_DEADLINE:?}"
+                    ))
+                }
+            }
         }
     }
 }
@@ -204,7 +277,7 @@ pub struct System {
     /// same ways.
     opener: Opener,
     /// Work the command interpreter has handed over, taken between stages.
-    jobs: Receiver<Job>,
+    desk: Desk,
     /// How the interpreter asks for it, and wakes a pass that is waiting.
     bench: Workbench,
 }
@@ -292,8 +365,8 @@ impl System {
             return Err(refused);
         }
 
-        let (asking, jobs) = std::sync::mpsc::channel();
-        let nudge = Nudge::new().map_err(|e| vec![format!("the loop's own wakeup: {e}")])?;
+        let (bench, desk) =
+            Workbench::in_two().map_err(|e| vec![format!("the loop's own wakeup: {e}")])?;
 
         Ok(System {
             fabric,
@@ -309,11 +382,8 @@ impl System {
                 .collect(),
             routes,
             opener: Box::new(opener),
-            jobs,
-            bench: Workbench {
-                jobs: asking,
-                nudge,
-            },
+            desk,
+            bench,
         })
     }
 
@@ -492,7 +562,7 @@ impl System {
     /// is called is done before it returns, so a burst of commands costs one
     /// gap between stages rather than one each.
     fn take_the_work(&mut self) {
-        while let Ok(job) = self.jobs.try_recv() {
+        while let Some(job) = self.desk.take() {
             let how = match &job.work {
                 Work::Enable(node) => self.reopen(node),
                 Work::Disable(node) => self.release(node),
@@ -504,7 +574,7 @@ impl System {
             };
             // A reply nobody is waiting for is a caller that gave up, which is
             // not a reason to have left the work undone.
-            let _ = job.reply.send(how);
+            self.desk.answer(&job, how);
         }
     }
 
@@ -1519,7 +1589,7 @@ vehicle:
         states.named("asked").expect("the node").disable();
 
         // Asked from another thread, which blocks until a pass takes it.
-        let asking = std::thread::spawn(move || bench.ask(Work::Disable("asked".to_string())));
+        let asking = std::thread::spawn(move || bench.ask(Work::Disable("asked".into())));
 
         // The pass takes the work between its stages and answers it.
         let waited = Instant::now();
@@ -1756,45 +1826,10 @@ vehicle:
     /// heaters, telling the ground and writing the log.
     #[test]
     fn a_running_pass_allocates_nothing() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let mut graph =
-            Graph::load(root.join("tests/manual/thermostat.yaml")).expect("the example reads");
         let where_ = tempfile::tempdir().expect("a directory");
-        for node in graph.nodes.iter_mut() {
-            if node.node_type == "log" {
-                node.attributes.insert(
-                    "directory".to_string(),
-                    Scalar::of(where_.path().to_str().expect("a path")),
-                );
-            }
-        }
-
         let delivered = tally();
-        let opening = Arc::clone(&delivered);
-        let watched = Arc::clone(&delivered);
         let start = Instant::now();
-        let mut system = System::of_opening(
-            &graph,
-            start,
-            move |node: &Node, routes: &Routes, abandon: &Abandon| match node.node_type.as_str() {
-                "i2c" => Ok(Box::new(Steady {
-                    reading: &[0x01, 0x00],
-                }) as Box<dyn Port>),
-                "spi" => Ok(Box::new(Steady {
-                    reading: &[0x00, 0x10, 0x00],
-                }) as Box<dyn Port>),
-                "gpio" | "moc" => Ok(Box::new(Sink {
-                    got: Arc::clone(&opening),
-                }) as Box<dyn Port>),
-                _ => open(node, routes, abandon),
-            },
-            move |_: &Telemetered| {
-                Ok(Box::new(Sink {
-                    got: Arc::clone(&watched),
-                }) as Box<dyn Port>)
-            },
-        )
-        .expect("the example opens");
+        let mut system = steady_thermostat(where_.path(), &delivered, start);
 
         // A group's reading every 100 ms: one pass per interval.
         let at = |pass: u32| start + Duration::from_millis(100) * pass;
@@ -1819,6 +1854,139 @@ vehicle:
             "twenty running passes allocated {made} times: something in the main \
              loop is allocating again"
         );
+    }
+
+    /// Setting a setpoint from the ground allocates nothing on the way: the
+    /// SET_NODE read off the link, the work handed to the pass, and the pass
+    /// applying it and answering.
+    ///
+    /// Two threads, as aboard: one reads the commands and asks, and the other
+    /// makes the passes. Each counts its own.
+    #[test]
+    fn setting_a_setpoint_allocates_nothing() {
+        use tcslibgs::{Command, NodeId, SetNodeCommand};
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let delivered = tally();
+        let start = Instant::now();
+        let mut system = steady_thermostat(where_.path(), &delivered, start);
+        let bench = system.workbench();
+        let thermostat = system
+            .states()
+            .named("thermostat")
+            .expect("the thermostat")
+            .shared_name();
+
+        // The commands as they arrive, made before anything is counted.
+        let datagrams: Vec<Vec<u8>> = (0..30)
+            .map(|sequence| {
+                let value = if sequence % 2 == 0 { "280.0" } else { "300.0" };
+                serde_json::to_vec(&Command::SetNode(
+                    SetNodeCommand::new(sequence, NodeId::of(0), "setpoint", value.as_bytes())
+                        .expect("it fits"),
+                ))
+                .expect("it serializes")
+            })
+            .collect();
+
+        // When the asking thread starts counting, so that the passes start
+        // then too, and when it has finished.
+        let counting = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let started = Arc::clone(&counting);
+        let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let finished = Arc::clone(&done);
+        let asking = std::thread::spawn(move || {
+            // What the command thread does with each: read it, and hand the
+            // setting to the pass by the node's shared name.
+            let round = |datagram: &[u8]| {
+                let Ok(Command::SetNode(set)) = serde_json::from_slice::<Command>(datagram) else {
+                    panic!("a SET_NODE");
+                };
+                bench.ask(Work::Set {
+                    node: Arc::clone(&thermostat),
+                    attribute: set.attribute,
+                    value: set.value,
+                })
+            };
+            for datagram in &datagrams[..10] {
+                round(datagram).expect("the first ones are set");
+            }
+            let mut answers = Vec::with_capacity(20);
+            started.store(true, Ordering::SeqCst);
+            let made = counting::allocations_in(|| {
+                for datagram in &datagrams[10..] {
+                    answers.push(round(datagram));
+                }
+            });
+            finished.store(true, Ordering::SeqCst);
+            (made, answers)
+        });
+
+        let at = |pass: u32| start + Duration::from_millis(100) * pass;
+        let mut pass = 0;
+        // Until the asking thread is counting: the passes that answer its
+        // first ten.
+        while !counting.load(Ordering::SeqCst) {
+            let _ = system.pass(at(pass));
+            pass += 1;
+        }
+        let made = counting::allocations_in(|| {
+            while !done.load(Ordering::SeqCst) {
+                let _ = system.pass(at(pass));
+                pass += 1;
+            }
+        });
+        let (asked, answers) = asking.join().expect("the asking thread");
+
+        assert!(
+            answers.iter().all(Result::is_ok),
+            "every setpoint is set: {answers:?}"
+        );
+        assert_eq!(answers.len(), 20);
+        assert_eq!(asked, 0, "reading and handing over allocated {asked} times");
+        assert_eq!(made, 0, "the passes doing the work allocated {made} times");
+    }
+
+    /// The shipped thermostat, with its sensors steady, its heaters and the
+    /// ground counting what reaches them, and its log in `log_in`: a vehicle
+    /// that can be made to pass for ever.
+    fn steady_thermostat(log_in: &Path, delivered: &Tally, start: Instant) -> System {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let mut graph =
+            Graph::load(root.join("tests/manual/thermostat.yaml")).expect("the example reads");
+        for node in graph.nodes.iter_mut() {
+            if node.node_type == "log" {
+                node.attributes.insert(
+                    "directory".to_string(),
+                    Scalar::of(log_in.to_str().expect("a path")),
+                );
+            }
+        }
+
+        let opening = Arc::clone(delivered);
+        let watched = Arc::clone(delivered);
+        System::of_opening(
+            &graph,
+            start,
+            move |node: &Node, routes: &Routes, abandon: &Abandon| match node.node_type.as_str() {
+                "i2c" => Ok(Box::new(Steady {
+                    reading: &[0x01, 0x00],
+                }) as Box<dyn Port>),
+                "spi" => Ok(Box::new(Steady {
+                    reading: &[0x00, 0x10, 0x00],
+                }) as Box<dyn Port>),
+                "gpio" | "moc" => Ok(Box::new(Sink {
+                    got: Arc::clone(&opening),
+                }) as Box<dyn Port>),
+                _ => open(node, routes, abandon),
+            },
+            move |_: &Telemetered| {
+                Ok(Box::new(Sink {
+                    got: Arc::clone(&watched),
+                }) as Box<dyn Port>)
+            },
+        )
+        .expect("the example opens")
     }
 
     /// What every command and every beacon goes through allocates nothing:
@@ -2206,16 +2374,16 @@ vehicle:
         let finished = done.clone();
         let asking = std::thread::spawn(move || {
             let set = bench.ask(Work::Set {
-                node: "thermostat".to_string(),
-                attribute: "setpoint".to_string(),
-                value: b"280.0".to_vec(),
+                node: "thermostat".into(),
+                attribute: tcslibgs::Attribute::of("setpoint").expect("a name"),
+                value: tcslibgs::Value::of(b"280.0").expect("a value"),
             });
             // And an attribute the configuration does not bind, which must
             // come back refused rather than applied.
             let unbound = bench.ask(Work::Set {
-                node: "thermostat".to_string(),
-                attribute: "above".to_string(),
-                value: b"5.0".to_vec(),
+                node: "thermostat".into(),
+                attribute: tcslibgs::Attribute::of("above").expect("a name"),
+                value: tcslibgs::Value::of(b"5.0").expect("a value"),
             });
             finished.store(true, std::sync::atomic::Ordering::SeqCst);
             (set, unbound)

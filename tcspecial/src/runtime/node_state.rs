@@ -336,7 +336,7 @@ pub struct Samples {
 #[derive(Debug)]
 pub struct NodeState {
     /// What the node is called, for a message about it.
-    name: String,
+    name: Arc<str>,
     /// Its node id, which is what a command names it by.
     id: NodeId,
     /// Whether the pass may read it, ask it or deliver to it.
@@ -369,7 +369,7 @@ impl NodeState {
     /// whose links describe one machine.
     pub fn new(name: &str, id: NodeId) -> std::io::Result<NodeState> {
         Ok(NodeState {
-            name: name.to_string(),
+            name: name.into(),
             id,
             enabled: AtomicBool::new(true),
             wakeup: Arc::new(Wakeup::new()?),
@@ -381,6 +381,12 @@ impl NodeState {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    /// Its name, shared: what work about it is handed over by, which copies
+    /// a count rather than the name.
+    pub fn shared_name(&self) -> Arc<str> {
+        Arc::clone(&self.name)
     }
 
     pub fn id(&self) -> NodeId {

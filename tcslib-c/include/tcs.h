@@ -205,8 +205,14 @@ int tcs_client_restart(tcs_client *client, uint64_t key, tcs_status *status);
  * README's known limits. */
 int tcs_client_configure(tcs_client *client, uint64_t beacon_interval_us, tcs_status *status);
 
+/* The longest attribute name, and the longest value, a SET_NODE carries, in
+ * bytes. Longer is refused here, and not sent. */
+#define TCS_ATTRIBUTE_BYTES 64
+#define TCS_VALUE_BYTES 256
+
 /* Set attribute of the node whose id is node to the length bytes at value,
- * which the configuration must let the ground set. */
+ * which the configuration must let the ground set: an attribute of at most
+ * TCS_ATTRIBUTE_BYTES and a value of at most TCS_VALUE_BYTES. */
 int tcs_client_set_node(tcs_client *client, uint32_t node, const char *attribute,
                         const uint8_t *value, size_t length, tcs_status *status);
 

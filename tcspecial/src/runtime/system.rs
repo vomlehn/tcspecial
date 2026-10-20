@@ -138,6 +138,12 @@ impl Workbench {
     /// The nudge is poked after the job is queued, so a pass waiting for the
     /// next group to come due takes the work now rather than when the group
     /// is read.
+    ///
+    /// Allocates: the channel the pass answers on, once for each job. Jobs
+    /// come only from a START_NODE, STOP_NODE or SET_NODE the ground sends,
+    /// and a START opens a device again, which allocates whatever the device
+    /// needs to be open -- its port, its buffers, its socket or bus -- so the
+    /// channel is the least of it. Not on a pass's own path.
     pub fn ask(&self, work: Work) -> Result<(), String> {
         let (reply, answered) = std::sync::mpsc::channel();
         self.jobs
@@ -510,6 +516,11 @@ impl System {
     ///
     /// A node that is already open is success and nothing is done. An
     /// operator who presses Enable twice has asked for a state.
+    ///
+    /// Allocates: opening a node again is opening it, as at startup -- its
+    /// port, the device's handles and buffers -- and the node's description
+    /// is copied to open it from. Done for a START_NODE the ground sends,
+    /// and never by a pass of its own accord.
     pub fn reopen(&mut self, name: &str) -> Result<(), String> {
         let Some(node) = self.nodes.get(name).cloned() else {
             return Err(format!("there is no node called \"{name}\" here"));
@@ -1800,6 +1811,49 @@ vehicle:
             made, 0,
             "twenty running passes allocated {made} times: something in the main \
              loop is allocating again"
+        );
+    }
+
+    /// What every command and every beacon goes through allocates nothing:
+    /// whether a datagram came from where the configuration says, and an
+    /// answer or a beacon written as JSON into a buffer that is reused. What
+    /// the command thread and the beacon thread do for each, but for the
+    /// socket.
+    #[test]
+    fn answering_and_beaconing_allocate_nothing() {
+        use tcslibgs::{
+            came_from, BeaconTelemetry, CommandStatus, ConfigDigest, ConfigVersion, HostPort,
+            PingTelemetry, Telemetry,
+        };
+
+        let stated = HostPort {
+            address: "127.0.0.1".to_string(),
+            port: 4000,
+        };
+        let from: std::net::SocketAddr = "127.0.0.1:4000".parse().expect("an address");
+        let stranger: std::net::SocketAddr = "10.0.0.1:4000".parse().expect("an address");
+        let beacon = Telemetry::Beacon(BeaconTelemetry::new(
+            7,
+            ConfigVersion::of_this_build(),
+            ConfigDigest([0x5a; 16]),
+        ));
+        let answer = Telemetry::Ping(PingTelemetry::new(3, CommandStatus::Success));
+        // Made once, as each thread makes its own.
+        let mut data: Vec<u8> = Vec::with_capacity(1024);
+
+        let made = counting::allocations_in(|| {
+            for _ in 0..10 {
+                assert!(came_from(&stated, &from));
+                assert!(!came_from(&stated, &stranger));
+                for said in [&beacon, &answer] {
+                    data.clear();
+                    serde_json::to_writer(&mut data, said).expect("it is written");
+                }
+            }
+        });
+        assert_eq!(
+            made, 0,
+            "a command's or a beacon's way allocated {made} times"
         );
     }
 

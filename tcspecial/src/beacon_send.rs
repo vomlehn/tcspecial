@@ -9,7 +9,7 @@
  * the interval to a very large interval will effectively do so.
  */
 
-use std::net::UdpSocket;
+use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
@@ -57,6 +57,10 @@ pub struct BeaconSend {
     version: ConfigVersion,
     digest: ConfigDigest,
 }
+
+/// Room for a beacon as JSON, which it comes well inside: a sequence number,
+/// a version, a digest and a header.
+const BEACON_BYTES: usize = 512;
 
 impl BeaconSend {
     pub fn new(
@@ -106,8 +110,23 @@ impl BeaconSend {
         // or firewalled by a rule somebody could write down beforehand.
         let socket = UdpSocket::bind(self.from_addr.to_string())?;
 
+        // Where they go, resolved once, before the loop, and the buffer each
+        // is written into, made once: so that sending a beacon allocates
+        // nothing. Resolving a name is a lookup that allocates, and the
+        // destination does not move.
+        let dest: SocketAddr = (self.dest_addr.address.as_str(), self.dest_addr.port)
+            .to_socket_addrs()?
+            .next()
+            .ok_or_else(|| {
+                tcslibgs::TcsError::Config(format!(
+                    "{} does not resolve to an address beacons can be sent to",
+                    self.dest_addr
+                ))
+            })?;
+        let mut data = Vec::with_capacity(BEACON_BYTES);
+
         // FIXME: add check for error
-        let _ = self.send_beacon(&socket, &self.dest_addr.to_string());
+        let _ = self.send_beacon(&socket, dest, &mut data);
 
         loop {
             let mut expiration = self.pair.lock.lock().unwrap();
@@ -128,7 +147,7 @@ impl BeaconSend {
 
             // Send the beacon
             // FIXME: add check for error
-            let _ = self.send_beacon(&socket, &self.dest_addr.to_string());
+            let _ = self.send_beacon(&socket, dest, &mut data);
 
             // Calculate next expiration time1G
             let interval = *self.interval.lock().unwrap();
@@ -137,17 +156,25 @@ impl BeaconSend {
         }
     }
 
-    pub fn send_beacon(&self, socket: &UdpSocket, dest_addr: &str) -> TcsResult<()> {
+    /// Send the next beacon to `dest`, written into `data`, which is the
+    /// thread's own buffer and is reused.
+    pub fn send_beacon(
+        &self,
+        socket: &UdpSocket,
+        dest: SocketAddr,
+        data: &mut Vec<u8>,
+    ) -> TcsResult<()> {
         // From one: the first beacon is the first beacon, and nought is what
         // every beacon used to carry.
         let sequence = self.sent.fetch_add(1, Ordering::Relaxed).wrapping_add(1);
         let beacon = Telemetry::Beacon(BeaconTelemetry::new(sequence, self.version, self.digest));
-        let data = serde_json::to_vec(&beacon)?;
-        trace!("send_beacon: sending to {:?}", dest_addr);
+        data.clear();
+        serde_json::to_writer(&mut *data, &beacon)?;
+        trace!("send_beacon: sending to {dest}");
         // Recorded before it is sent, as a command response is, so that a
         // beacon the send fails on is still known to have been produced.
-        self.log.record(&data);
-        socket.send_to(&data, dest_addr)?;
+        self.log.record(data);
+        socket.send_to(data, dest)?;
         Ok(())
     }
 

@@ -79,5 +79,26 @@ class VehicleTest(unittest.TestCase):
         self.assertIn("--no-vehicle", str(said.exception))
 
 
+
+class VerboseTest(unittest.TestCase):
+    def test_status_is_said_only_when_asked_for(self):
+        import contextlib
+        import io
+
+        for flag in ["-v", "--verbose"]:
+            self.assertTrue(ping_moc.arguments([flag]).verbose, flag)
+        self.assertFalse(ping_moc.arguments([]).verbose)
+
+        was = ping_moc.VERBOSE
+        try:
+            for verbose, expected in [(False, ""), (True, "listening\n")]:
+                ping_moc.VERBOSE = verbose
+                said = io.StringIO()
+                with contextlib.redirect_stderr(said):
+                    ping_moc.status("listening")
+                self.assertEqual(said.getvalue(), expected)
+        finally:
+            ping_moc.VERBOSE = was
+
 if __name__ == "__main__":
     unittest.main()

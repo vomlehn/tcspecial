@@ -77,7 +77,7 @@ fn a_vehicle_that_stops_by_itself_puts_the_button_back() {
     let until = Instant::now() + Duration::from_secs(5);
     while window.get_tcspecial_label() == STOP && Instant::now() < until {
         std::thread::sleep(Duration::from_millis(20));
-        notice_exit(&window, &mut vehicle.borrow_mut());
+        notice_exit(&window, &mut vehicle.borrow_mut(), false);
     }
     assert_eq!(window.get_tcspecial_label(), START);
     assert!(!vehicle.borrow().is_running());

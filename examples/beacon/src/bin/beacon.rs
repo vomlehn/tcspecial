@@ -23,8 +23,15 @@
 //! halves, in a panel beside its command link; an operator who has read one
 //! has read the other.
 //!
-//! Arguments, both optional: the configuration, and nothing else. Run from the
-//! repository's root it needs none.
+//! Arguments, all optional: the configuration, and `-v` or `--verbose`. Run
+//! from the repository's root it needs none.
+//!
+//! Quiet unless `-v` or `--verbose` is given: the console then says where it
+//! is listening, each remark a beacon pass makes -- beacons missed, a vehicle
+//! that restarted, a configuration that differs -- and a tcspecial that
+//! stopped by itself. Without it the window is the whole account. Errors and
+//! warnings are said either way, because a program that cannot do what was
+//! asked, or is doing less of it, must say so to whoever started it.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -43,10 +50,50 @@ use tcsui::Shown;
 /// The configuration, where nobody says otherwise.
 const CONFIGURATION: &str = "examples/beacon/beacon.yaml";
 
+/// What the command line says: the configuration, and whether to talk.
+struct Arguments {
+    path: String,
+    verbose: bool,
+}
+
+impl Arguments {
+    /// The arguments, or what is wrong with them, said for the person who
+    /// typed them.
+    fn of(args: impl Iterator<Item = String>) -> Result<Arguments, String> {
+        let mut path = None;
+        let mut verbose = false;
+        for arg in args {
+            match arg.as_str() {
+                "-v" | "--verbose" => verbose = true,
+                flag if flag.starts_with('-') => {
+                    return Err(format!(
+                        "{flag} is not an option: the options are -v and --verbose"
+                    ))
+                }
+                _ if path.is_some() => {
+                    return Err(format!(
+                        "{arg}: one configuration, and only one, may be named"
+                    ))
+                }
+                _ => path = Some(arg),
+            }
+        }
+        Ok(Arguments {
+            path: path.unwrap_or_else(|| CONFIGURATION.to_string()),
+            verbose,
+        })
+    }
+}
+
 fn main() -> Result<(), slint::PlatformError> {
-    let path = std::env::args()
-        .nth(1)
-        .unwrap_or_else(|| CONFIGURATION.to_string());
+    let Arguments { path, verbose } = match Arguments::of(std::env::args().skip(1)) {
+        Ok(arguments) => arguments,
+        Err(why) => {
+            eprintln!("{why}");
+            eprintln!("usage: beacon [-v | --verbose] [configuration]");
+            std::process::exit(2);
+        }
+    };
 
     let graph = match Graph::load(&path) {
         Ok(graph) => graph,
@@ -105,11 +152,13 @@ fn main() -> Result<(), slint::PlatformError> {
             std::process::exit(1);
         }
     };
-    eprintln!(
-        "Listening for beacons at {}, which {} sends from",
-        beacons.link().recv,
-        beacons.link().send
-    );
+    if verbose {
+        eprintln!(
+            "Listening for beacons at {}, which {} sends from",
+            beacons.link().recv,
+            beacons.link().send
+        );
+    }
 
     // The vehicle the button starts, which is not running until it is
     // pressed. Found before the window opens, so that a tcspecial nobody has
@@ -138,7 +187,7 @@ fn main() -> Result<(), slint::PlatformError> {
             Duration::from_millis(500),
             move || {
                 if let Some(window) = weak.upgrade() {
-                    notice_exit(&window, &mut vehicle.borrow_mut());
+                    notice_exit(&window, &mut vehicle.borrow_mut(), verbose);
                 }
             },
         );
@@ -150,11 +199,14 @@ fn main() -> Result<(), slint::PlatformError> {
     thread::spawn(move || loop {
         let pass = beacons.pass();
 
-        // What did not arrive, said where a terminal can keep it: beacons
+        // What did not arrive, said where a terminal can keep it, when asked
+        // to be: beacons
         // that were missed, a spacecraft that restarted, a configuration that
         // differs. The window has room for what did arrive.
-        for remark in &pass.remarks {
-            eprintln!("{remark}");
+        if verbose {
+            for remark in &pass.remarks {
+                eprintln!("{remark}");
+            }
         }
 
         // Into the window, on the thread that owns it.
@@ -168,4 +220,40 @@ fn main() -> Result<(), slint::PlatformError> {
         eprintln!("{why}");
     }
     ran
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn of(args: &[&str]) -> Result<Arguments, String> {
+        Arguments::of(args.iter().map(|arg| arg.to_string()))
+    }
+
+    /// Quiet unless asked, by either spelling, before or after the
+    /// configuration.
+    #[test]
+    fn verbose_is_asked_for() {
+        let quiet = of(&[]).expect("no arguments are arguments");
+        assert!(!quiet.verbose);
+        assert_eq!(quiet.path, CONFIGURATION);
+
+        for args in [
+            &["-v"][..],
+            &["--verbose"],
+            &["a.yaml", "-v"],
+            &["-v", "a.yaml"],
+        ] {
+            assert!(of(args).expect("they read").verbose, "{args:?}");
+        }
+        assert_eq!(of(&["-v", "a.yaml"]).expect("they read").path, "a.yaml");
+    }
+
+    /// What is not an option, and a second configuration, are refused rather
+    /// than taken for something.
+    #[test]
+    fn what_is_not_understood_is_refused() {
+        assert!(of(&["-q"]).is_err());
+        assert!(of(&["a.yaml", "b.yaml"]).is_err());
+    }
 }

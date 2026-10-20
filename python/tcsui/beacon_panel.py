@@ -126,11 +126,11 @@ class BeaconPanel(ttk.LabelFrame):
         )
         self._light.grid(row=0, column=1, sticky="w", padx=12, pady=2)
 
-        ttk.Label(self, text="Last received:").grid(row=1, column=0, sticky="w", pady=2)
+        ttk.Label(self, text="Last rcvd:").grid(row=1, column=0, sticky="w", pady=2)
         self._received = ttk.Label(self, text=NOTHING_YET.received)
         self._received.grid(row=1, column=1, sticky="w", padx=12, pady=2)
 
-        ttk.Label(self, text="Last message:").grid(row=2, column=0, sticky="w", pady=2)
+        ttk.Label(self, text="Last msg:").grid(row=2, column=0, sticky="w", pady=2)
         self._message = ttk.Label(self, text=NOTHING_YET.message)
         self._message.grid(row=2, column=1, sticky="w", padx=12, pady=2)
 

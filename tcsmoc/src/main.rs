@@ -1378,11 +1378,12 @@ mod tests {
             // window has a line of its own saying when the last command went
             // out and when its answer came back, so these two labels appear
             // once each in the window and never in a panel: with one panel
-            // on screen, one of each is the window's.
-            for elsewhere in ["Last sent:", "Last rcvd:"] {
+            // on screen, one of each is the window's. The beacon's box says
+            // Last rcvd: too, of the last beacon, which makes two of that one.
+            for (elsewhere, outside) in [("Last sent:", 1), ("Last rcvd:", 2)] {
                 assert_eq!(
                     count(elsewhere),
-                    1,
+                    outside,
                     "a payload that {kind} shows {elsewhere} in its panel, or \
                      the window has lost its own: {lines:?}"
                 );

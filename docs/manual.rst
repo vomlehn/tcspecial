@@ -2686,9 +2686,9 @@ the beacon box
   .. code-block:: text
 
      Beacon
-       Status:         (indicator)
-       Last received:  02:02:02
-       Last message:   tcspecial v0.1.0 md5 36999e46a4bf436854442d8f97a2248d
+       Status:     (indicator)
+       Last rcvd:  02:02:02
+       Last msg:   tcspecial v0.1.0 md5 36999e46a4bf436854442d8f97a2248d
 
   The message wraps at its spaces where the window is too narrow for it on
   one line, as it is beside the command link.
@@ -2721,7 +2721,7 @@ the beacon box
   the last one warned of, not for every datagram, so that something sending
   steadily does not bury everything else.
 
-  ``Last message`` reads ``<none>`` until a beacon arrives. ``v`` is the software
+  ``Last msg`` reads ``<none>`` until a beacon arrives. ``v`` is the software
   flying and ``md5`` the digest of the configuration file tcspecial read, so
   the line says what is up there without anything having to connect first.
   The answer to a ``CONNECT`` says the same two in the same words: see `What each end read`_. A datagram the MOC cannot read is shown as

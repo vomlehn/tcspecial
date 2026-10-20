@@ -58,14 +58,14 @@ export component BeaconPanel inherits TitledBox {
         }
 
         Row {
-            Text { text: "Last received:"; vertical-alignment: center; }
+            Text { text: "Last rcvd:"; vertical-alignment: center; }
             Text { text: last-received; vertical-alignment: center; }
         }
 
         // What that beacon said, under when it arrived: the two read as one
         // message, received then and saying this.
         Row {
-            Text { text: "Last message:"; vertical-alignment: center; }
+            Text { text: "Last msg:"; vertical-alignment: center; }
             // Wrapped at its spaces where the box is narrower than the line,
             // as it is beside tcsmoc's command link: the digest goes to a
             // line of its own rather than off the edge of the window.

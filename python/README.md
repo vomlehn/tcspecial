@@ -16,10 +16,14 @@ And beside the ping example, because it is the example's own part of the
 ground station: `examples/ping/ping_ground.py`, written after
 `tcslib/src/ping.rs` -- the ground's half of a ping, which tcsmoc pings with.
 
-They use nothing outside the standard library. That has two consequences:
+They use nothing outside the standard library, but for one thing. That has
+two consequences:
 
-- A configuration is read in its XML spelling. The standard library has no
-  YAML, and the two spellings say the same thing.
+- A configuration is read in either spelling, by its extension: the XML with
+  the standard library, and the YAML with PyYAML, which the standard library
+  has no equivalent of. PyYAML is imported only when a YAML file is read, so a
+  station reading XML needs nothing else; the two spellings say the same
+  thing, and the tests hold them to reading alike.
 - The configuration's digest, which every beacon's is compared with, is asked
   of `tcsverify --digest` rather than worked out here: it is taken over what a
   configuration says, and a second statement of that would be a second digest

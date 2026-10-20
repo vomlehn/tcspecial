@@ -26,7 +26,7 @@ of it, up and down. Press Ping to send one.
 
 Usage, from the repository's root::
 
-    python3 examples/ping/ping_moc.py [configuration.xml]
+    python3 examples/ping/ping_moc.py [--yaml | --xml] [configuration]
     python3 examples/ping/ping_moc.py --pings 3        # no window
     python3 examples/ping/ping_moc.py --describe       # what it read
     python3 examples/ping/ping_moc.py --no-vehicle     # tcspecial runs elsewhere
@@ -38,9 +38,11 @@ missed, a vehicle that restarted, a configuration that differs -- and a
 tcspecial that stopped by itself. Errors and warnings are said either way, and
 so is what ``--pings`` and ``--describe`` print, which is what they are for.
 
-The configuration is the XML spelling, which the Python standard library can
-read, and defaults to ``examples/ping/ping.xml``. It uses nothing outside the
-standard library, and Python 3.7 or later.
+The configuration is ``examples/ping/ping.xml`` unless another is named:
+``--yaml`` reads ``ping.yaml`` instead, and ``--xml`` says the default. One
+of the two at most, and a file named beside one has to be that spelling.
+Reading XML it uses nothing outside the standard library; reading YAML it
+needs PyYAML. Python 3.7 or later.
 """
 
 import argparse
@@ -64,8 +66,10 @@ from tcslibgs import configuration  # noqa: E402
 from tcslibgs.configuration import find_built  # noqa: E402
 from ping_ground import NO_MESSAGE, Pinger, interval, precise_time  # noqa: E402
 
-#: The configuration, where nobody says otherwise.
-CONFIGURATION = HERE / "ping.xml"
+#: The example's configuration, without its extension: ``.xml``, which is
+#: read where nobody says otherwise, or ``.yaml``, the two saying the same
+#: thing.
+STEM = HERE / "ping"
 
 #: How often the window takes in what the two loops have reported.
 REFRESH_MS = 50
@@ -79,8 +83,17 @@ def arguments(argv):
     parser.add_argument(
         "configuration",
         nargs="?",
-        default=str(CONFIGURATION),
-        help="the configuration, in its XML spelling (default: %(default)s)",
+        help=f"the configuration (default: {STEM}.xml, or with --yaml {STEM}.yaml)",
+    )
+    # Which of the example's two files: one, or neither, and never both.
+    spelling = parser.add_mutually_exclusive_group()
+    spelling.add_argument(
+        "--yaml", dest="spelling", action="store_const", const="yaml",
+        help="read the YAML spelling of the configuration",
+    )
+    spelling.add_argument(
+        "--xml", dest="spelling", action="store_const", const="xml",
+        help="read the XML spelling of the configuration (the default)",
     )
     parser.add_argument(
         "--moc", help="the moc node the ping goes through, where there is more than one"
@@ -106,7 +119,14 @@ def arguments(argv):
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="print status messages on the console"
     )
-    return parser.parse_args(argv)
+    options = parser.parse_args(argv)
+    try:
+        options.configuration = configuration.choose(
+            options.configuration, STEM, "xml", options.spelling
+        )
+    except ValueError as why:
+        parser.error(str(why))
+    return options
 
 
 def the_one(nodes, kind, named):

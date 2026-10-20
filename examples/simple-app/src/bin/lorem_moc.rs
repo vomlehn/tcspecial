@@ -14,8 +14,9 @@
 //! waiting for more would be waiting for a payload that has said everything.
 //!
 //! Arguments, all optional: the configuration, the `moc` node to get the data
-//! from, and `-v` or `--verbose`. Run from the repository's root none need be
-//! given. Quiet unless `-v` or `--verbose` is given: the line is what this
+//! from, `--yaml` or `--xml` but not both -- which of the example's two files
+//! to read, YAML where neither is given -- and `-v` or `--verbose`. Run from
+//! the repository's root none need be given. Quiet unless `-v` or `--verbose` is given: the line is what this
 //! prints, on standard output, and errors are said on standard error whatever
 //! the flag. Verbose, it also says on standard error when the node is open,
 //! so that whoever started this knows the vehicle can be started.
@@ -26,8 +27,12 @@ use std::process::ExitCode;
 use simple_app::TERMINATOR;
 use tcslib::moc::Moc;
 
-/// The configuration, where nobody says otherwise.
-const CONFIGURATION: &str = "examples/simple-app/simple-app.yaml";
+/// The example's configuration, without its extension: `.yaml` or `.xml`,
+/// the two saying the same thing.
+const CONFIGURATION: &str = "examples/simple-app/simple-app";
+
+/// The spelling read where neither `--yaml` nor `--xml` is given.
+const SPELLING: tcslib::ConfigFormat = tcslib::ConfigFormat::Yaml;
 
 /// The node in it that `lorem`'s words go to, which the configuration calls
 /// `moc-1`.
@@ -47,12 +52,17 @@ impl Arguments {
     fn of(args: impl Iterator<Item = String>) -> Result<Arguments, String> {
         let mut names = Vec::new();
         let mut verbose = false;
+        let mut spelling = tcslib::Spelling::default();
         for arg in args {
+            if spelling.take(&arg)? {
+                continue;
+            }
             match arg.as_str() {
                 "-v" | "--verbose" => verbose = true,
                 flag if flag.starts_with('-') => {
                     return Err(format!(
-                        "{flag} is not an option: the options are -v and --verbose"
+                        "{flag} is not an option: the options are --yaml, --xml, -v \
+                         and --verbose"
                     ))
                 }
                 _ if names.len() == 2 => {
@@ -66,7 +76,7 @@ impl Arguments {
         }
         let mut names = names.into_iter();
         Ok(Arguments {
-            configuration: names.next().unwrap_or_else(|| CONFIGURATION.to_string()),
+            configuration: spelling.configuration(names.next(), CONFIGURATION, SPELLING)?,
             moc_name: names.next().unwrap_or_else(|| MOC.to_string()),
             verbose,
         })
@@ -82,7 +92,9 @@ fn main() -> ExitCode {
         Ok(arguments) => arguments,
         Err(why) => {
             eprintln!("lorem_moc: {why}");
-            eprintln!("usage: lorem_moc [-v | --verbose] [configuration [moc node]]");
+            eprintln!(
+                "usage: lorem_moc [--yaml | --xml] [-v | --verbose] [configuration [moc node]]"
+            );
             return ExitCode::from(2);
         }
     };
@@ -147,7 +159,7 @@ mod tests {
     fn verbose_is_asked_for() {
         let quiet = of(&[]).expect("nothing is fine");
         assert!(!quiet.verbose);
-        assert_eq!(quiet.configuration, CONFIGURATION);
+        assert_eq!(quiet.configuration, "examples/simple-app/simple-app.yaml");
         assert_eq!(quiet.moc_name, MOC);
 
         for args in [
@@ -168,5 +180,16 @@ mod tests {
             .expect_err("not an option")
             .contains("-v and --verbose"));
         assert!(of(&["a", "b", "c"]).is_err());
+    }
+
+    /// YAML where nobody says, XML with --xml, and not both.
+    #[test]
+    fn the_spelling_is_yaml_unless_xml_is_asked_for() {
+        assert_eq!(
+            of(&["--xml"]).expect("it reads").configuration,
+            "examples/simple-app/simple-app.xml"
+        );
+        assert!(of(&["--yaml", "--xml"]).is_err());
+        assert!(of(&["--xml", "a.yaml"]).is_err());
     }
 }

@@ -100,5 +100,22 @@ class VerboseTest(unittest.TestCase):
         finally:
             ping_moc.VERBOSE = was
 
+
+class SpellingTest(unittest.TestCase):
+    def test_the_spelling_is_xml_unless_yaml_is_asked_for_and_never_both(self):
+        import contextlib
+        import io
+
+        stem = str(ping_moc.STEM)
+        self.assertEqual(ping_moc.arguments([]).configuration, stem + ".xml")
+        self.assertEqual(ping_moc.arguments(["--xml"]).configuration, stem + ".xml")
+        self.assertEqual(ping_moc.arguments(["--yaml"]).configuration, stem + ".yaml")
+        self.assertEqual(ping_moc.arguments(["a.yaml"]).configuration, "a.yaml")
+        for refused in (["--yaml", "--xml"], ["--yaml", "a.xml"], ["--xml", "a.yaml"]):
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(
+                SystemExit, msg=refused
+            ):
+                ping_moc.arguments(refused)
+
 if __name__ == "__main__":
     unittest.main()

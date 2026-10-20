@@ -1818,7 +1818,8 @@ device id. Each time is seconds since the UNIX epoch to the nanosecond:
 ``tcslibgs::node::vehicle::ping``.
 
 The ground station is a Python 3 program, ``ping_moc.py``, that uses nothing
-outside the standard library -- its window is tkinter. It shows the beacon
+outside the standard library to read the XML spelling of its configuration --
+its window is tkinter -- and PyYAML to read the YAML one. It shows the beacon
 panel, the last ping sent and when, the last answer received and when, and
 three times:
 
@@ -1866,6 +1867,13 @@ the same configuration -- and kills it when it exits, however it exits: if the
 ground station is killed or crashes, the kernel kills tcspecial. So a vehicle
 is running exactly while its ground station is. ``--no-vehicle`` starts none,
 for a tcspecial run in another terminal.
+
+Every example program -- ``beacon``, ``ping_moc.py`` and ``lorem_moc`` -- takes
+``--yaml`` or ``--xml``, but not both, saying which of its example's two
+configuration files to read: they say the same thing. With neither, ``beacon``
+and ``lorem_moc`` read the YAML and ``ping_moc.py`` the XML. A file named on
+the command line beside one of the two has to be the spelling it asks for, and
+the vehicle the program starts reads the same file.
 
 ``make -C examples run-ping`` checks for Python 3 and tkinter, builds the
 vehicle and tcsverify, and runs the ground station, which starts the vehicle

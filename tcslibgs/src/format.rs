@@ -115,6 +115,96 @@ fn xml_position(
     (line, column)
 }
 
+/// Which spelling of a configuration a program was told to read: `--yaml`,
+/// `--xml`, or neither.
+///
+/// Every example program takes the two, and one of them at most: they say
+/// which of the example's two files -- `<name>.yaml` or `<name>.xml`, which
+/// say the same thing -- is read, and a command line naming both says two
+/// things at once. One reading of them, here, so that every program refuses
+/// the same mistakes in the same words.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Spelling(Option<ConfigFormat>);
+
+impl Spelling {
+    /// Take `arg` if it is `--yaml` or `--xml`: `Ok(true)` if it was one,
+    /// `Ok(false)` if it is something else for the caller to read, and what
+    /// is wrong where it contradicts one already taken. The same flag twice
+    /// says one thing twice and is taken.
+    pub fn take(&mut self, arg: &str) -> Result<bool, String> {
+        let said = match arg {
+            "--yaml" => ConfigFormat::Yaml,
+            "--xml" => ConfigFormat::Xml,
+            _ => return Ok(false),
+        };
+        match self.0 {
+            Some(already) if already != said => Err(
+                "--yaml and --xml each say which configuration to read: give one of \
+                 them, or neither"
+                    .to_string(),
+            ),
+            _ => {
+                self.0 = Some(said);
+                Ok(true)
+            }
+        }
+    }
+
+    /// The configuration to read.
+    ///
+    /// The one `named`, where one was; a flag beside it has to agree with its
+    /// extension, because a file named `.xml` read as asked for in YAML is a
+    /// command line that cannot both be right. Otherwise `stem` -- the
+    /// example's path without an extension -- in the spelling asked for, or
+    /// in `default` where neither was.
+    pub fn configuration(
+        &self,
+        named: Option<String>,
+        stem: &str,
+        default: ConfigFormat,
+    ) -> Result<String, String> {
+        match named {
+            Some(path) => match (self.0, ConfigFormat::from_path(&path)) {
+                (Some(asked), Some(is)) if asked != is => Err(format!(
+                    "{path} is {} and {} asks for {}: name the other file, or leave \
+                     the flag off",
+                    is.name(),
+                    asked.flag(),
+                    asked.name()
+                )),
+                _ => Ok(path),
+            },
+            None => Ok(format!("{stem}.{}", self.0.unwrap_or(default).extension())),
+        }
+    }
+}
+
+impl ConfigFormat {
+    /// The extension a file in this format is written with.
+    pub fn extension(self) -> &'static str {
+        match self {
+            ConfigFormat::Yaml => "yaml",
+            ConfigFormat::Xml => "xml",
+        }
+    }
+
+    /// This format's name, as a person says it.
+    pub fn name(self) -> &'static str {
+        match self {
+            ConfigFormat::Yaml => "YAML",
+            ConfigFormat::Xml => "XML",
+        }
+    }
+
+    /// The command-line flag that asks for this format.
+    pub fn flag(self) -> &'static str {
+        match self {
+            ConfigFormat::Yaml => "--yaml",
+            ConfigFormat::Xml => "--xml",
+        }
+    }
+}
+
 /// Read and parse a configuration file, choosing the parser from its extension.
 ///
 /// This is the single entry point every configuration loader should use.
@@ -128,6 +218,64 @@ pub fn load_config_file<T: DeserializeOwned, P: AsRef<Path>>(path: P) -> TcsResu
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// --yaml and --xml pick the example's file, one or neither but not
+    /// both, and a file named beside a flag has to be the spelling it asks
+    /// for.
+    #[test]
+    fn a_spelling_flag_picks_the_file_and_the_two_are_not_both_given() {
+        let stem = "examples/beacon/beacon";
+        let chosen = |args: &[&str]| -> Result<Spelling, String> {
+            let mut spelling = Spelling::default();
+            for arg in args {
+                assert!(spelling.take(arg)?, "{arg} is a spelling flag");
+            }
+            Ok(spelling)
+        };
+
+        let neither = chosen(&[]).unwrap();
+        assert_eq!(
+            neither.configuration(None, stem, ConfigFormat::Yaml),
+            Ok(format!("{stem}.yaml"))
+        );
+        assert_eq!(
+            neither.configuration(None, stem, ConfigFormat::Xml),
+            Ok(format!("{stem}.xml"))
+        );
+        assert_eq!(
+            chosen(&["--xml"])
+                .unwrap()
+                .configuration(None, stem, ConfigFormat::Yaml),
+            Ok(format!("{stem}.xml"))
+        );
+        assert_eq!(
+            chosen(&["--yaml", "--yaml"])
+                .unwrap()
+                .configuration(None, stem, ConfigFormat::Xml),
+            Ok(format!("{stem}.yaml"))
+        );
+
+        // Both is two answers to one question.
+        assert!(chosen(&["--yaml", "--xml"]).is_err());
+        assert!(chosen(&["--xml", "--yaml"]).is_err());
+
+        // Anything else is the caller's to read.
+        assert_eq!(Spelling::default().take("-v"), Ok(false));
+
+        // A file named is read, and a flag beside it must agree with it.
+        let xml = chosen(&["--xml"]).unwrap();
+        assert_eq!(
+            xml.configuration(Some("a.xml".into()), stem, ConfigFormat::Yaml),
+            Ok("a.xml".to_string())
+        );
+        assert!(xml
+            .configuration(Some("a.yaml".into()), stem, ConfigFormat::Yaml)
+            .is_err());
+        assert_eq!(
+            neither.configuration(Some("a.yaml".into()), stem, ConfigFormat::Xml),
+            Ok("a.yaml".to_string())
+        );
+    }
 
     #[test]
     fn test_format_from_extension() {

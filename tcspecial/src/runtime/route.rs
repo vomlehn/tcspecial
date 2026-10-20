@@ -257,6 +257,18 @@ impl Routes {
         self.deliveries.get(node).map_or(&[], Vec::as_slice)
     }
 
+    /// How many links lead into this node, from anywhere.
+    ///
+    /// The most a wave of deliveries gives it, where every node produces at
+    /// most once a wave: what its thread's mailbox is made with room for.
+    pub fn into_count(&self, node: &str) -> usize {
+        self.deliveries
+            .values()
+            .flatten()
+            .filter(|delivery| delivery.to == node)
+            .count()
+    }
+
     /// Which node fills this input.
     pub fn source_of(&self, node: &str, input: &str) -> Option<&str> {
         self.sources

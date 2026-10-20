@@ -5,6 +5,16 @@
 //! [`Fabric::deliver`] -- which takes what a node produced and hands it to
 //! every place the configuration says it goes.
 //!
+//! # A thread per node
+//!
+//! Every node has a thread of its own, made when the node is first held, and
+//! a pass is a run of stages: the reads of a group, then a wave of deliveries,
+//! then the next wave. Every operation of a stage runs at once, each on its
+//! node's thread, and the stage ends when the last of them has -- so a slow
+//! device holds up nothing but itself, and three sensors of a group are read
+//! at one moment rather than at three. See [`Worker`] for why a thread per
+//! node rather than a thread per operation or a pool.
+//!
 //! What a node *is* is deliberately a trait here rather than an endpoint. The
 //! flight-side nodes are endpoints and plug straight in, but a fabric that
 //! could only hold endpoints could only be tested with real ones -- a bus, a
@@ -41,35 +51,87 @@
 //! taken. What must never happen is a failure that nobody hears about, so
 //! every one is counted and named.
 
-use std::collections::{BTreeMap, VecDeque};
-use std::sync::{Arc, Mutex};
+use std::collections::BTreeMap;
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::thread::JoinHandle;
 
 use tcslibgs::graph::terminals::Stream;
 
 use super::node_state::Outcome;
 use super::route::{Delivery, Routes};
 
+/// Where a datum's bytes are while it is passed on.
+///
+/// Never owned, so that passing one on allocates nothing: the datum a
+/// delivery was asked to start from is copied into the fabric's own buffer,
+/// and everything after it is a result, in the node that produced it.
+#[derive(Debug, Clone, Copy)]
+enum Bytes {
+    /// The datum [`Fabric::deliver`] was given, in [`Shared::origin`].
+    Origin,
+    /// A result, in one of a node's two banks: see [`Worker::banks`].
+    Result {
+        node: usize,
+        bank: usize,
+        item: usize,
+    },
+}
+
 /// One datum on its way to the places a node's links lead.
 ///
-/// Where it came from, where its bytes are, how far it has already been
-/// passed on -- see the cascade in [`Fabric::deliver_on`] -- which stream it
-/// is on, and whether it is something said again rather than something new.
-///
-/// Nothing in it is owned, so that queueing one allocates nothing: the node
-/// is an index into [`Fabric`]'s names, and the bytes are in one of its
-/// slots, or are the datum the delivery started from.
+/// Which node's links it follows, where its bytes are, how far it has already
+/// been passed on -- see the waves in [`Fabric::cascade`] -- which stream it is
+/// on, and whether it is something said again rather than something new.
 #[derive(Debug, Clone, Copy)]
 struct Passing {
-    /// The node that produced it, or `None` for the one the delivery was
-    /// asked to start from.
-    from: Option<usize>,
-    /// The slot its bytes are in, or `None` for the datum the delivery was
-    /// given.
-    slot: Option<usize>,
+    /// The node whose links it follows, by its index in [`Shared::names`].
+    from: usize,
+    bytes: Bytes,
     len: usize,
     depth: usize,
     stream: Option<Stream>,
     again: bool,
+}
+
+/// One datum handed to one node: a passing, and which of its links it came
+/// down, by its place among `Routes::from(passing.from)`.
+#[derive(Debug, Clone, Copy)]
+struct Arrival {
+    passing: Passing,
+    delivery: usize,
+}
+
+/// A result a node produced in a wave, at `item` in the bank that wave
+/// writes.
+#[derive(Debug, Clone, Copy)]
+struct Produced {
+    item: usize,
+    taken: Taken,
+    depth: usize,
+}
+
+/// How a node is read in a stage of reads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Read {
+    /// Take what it has: [`Port::take`].
+    Take,
+    /// Take what has arrived without asking it: [`Port::take_unasked`].
+    Unasked,
+    /// The same, and then send its trigger: [`Port::ask`]. For a payload
+    /// that sends on its own and is asked on a timer of its own, when the
+    /// timer says.
+    UnaskedThenAsk,
+}
+
+/// What a node's thread is given to do in one stage.
+#[derive(Debug, Clone, Copy)]
+enum Job {
+    /// Read it, the result going to item 0 of `bank`.
+    Read { how: Read, bank: usize },
+    /// Give it everything in its inbox, in order, taking a result after each
+    /// one it has a result for, into `bank`. `most` is how far a result may
+    /// have been passed on before it has gone round a cycle.
+    Deliver { bank: usize, most: usize },
 }
 
 /// What a node handed over.
@@ -364,7 +426,7 @@ impl Moved {
 ///
 /// It was called `Gate` when it only answered the first question. A gate that
 /// also counts is a gate in name only.
-pub trait Watch {
+pub trait Watch: Send + Sync {
     /// Whether this node may be touched. A name this knows nothing about is
     /// enabled: a link to the ground is not something the ground can stop, and
     /// the node that feeds it is.
@@ -418,124 +480,296 @@ impl Watch for Unwatched {
     }
 }
 
-/// The nodes, and the table saying how they are joined.
+/// One node's thread, and what it shares with the conductor.
 ///
-/// Each port is behind a lock of its own, and the methods take `&self`. A
-/// node is a thing with a descriptor, a position in a stream and a buffer, so
-/// two threads inside one port would be two readers of one socket -- and one
-/// lock over the whole table would be one node operation at a time, which is
-/// the thing a thread per operation exists to stop. A lock apiece gives each
-/// operation the node it is about and nothing else.
+/// A thread per node, started when the node is first held, rather than a
+/// thread per operation or a pool. One per operation would be a thread made
+/// and joined for every read and every delivery, and making a thread
+/// allocates -- its stack, its handle, the closure it runs -- which a pass
+/// may not do. A pool has a size, and nothing can choose it: one smaller than
+/// a stage serialises operations the graph says may run together, and the
+/// figure that is too small depends on the configuration. A thread per node
+/// is the parallelism the file describes and no other figure: a stage never
+/// has more operations than nodes, since a node is held by one thread at a
+/// time, and the threads are made where everything else is, as the vehicle
+/// starts.
 ///
-/// Nothing holds one of these locks across a wave of deliveries. That is what
-/// keeps a cascade from deadlocking on itself: a delivery takes its
-/// destination's lock, gives it the bytes, takes whatever result came of it,
-/// and puts the lock down before the next wave starts.
-pub struct Fabric {
-    nodes: BTreeMap<String, Mutex<Box<dyn Port>>>,
+/// The conductor and the thread take turns. The conductor fills the mailbox
+/// and sets a job while the thread waits; the thread does the job holding the
+/// mailbox and the port; the conductor reads the mailbox once every thread of
+/// the stage has said it has finished. Nothing is ever touched by both at
+/// once, and every wait on either side is on a condition variable, which
+/// allocates nothing.
+struct Worker {
+    /// What the configuration calls the node, for everything said about it.
+    name: String,
+    /// The node, while it is held: `None` once the ground has released it.
+    ///
+    /// Locked by this node's thread for an operation, and by the conductor
+    /// between stages -- to set an attribute, flush a log, release it -- and by
+    /// nothing else: a node is a thing with a descriptor, a position in a
+    /// stream and a buffer, and two threads inside one port would be two
+    /// readers of one socket.
+    port: Mutex<Option<Box<dyn Port>>>,
+    /// Where this node's results are written, two banks of them.
+    ///
+    /// A wave delivers what the wave before it produced and produces what the
+    /// next will deliver, so a wave reads one bank of every node and writes
+    /// the other, and the two swap at the next wave. A node whose result is on
+    /// its way to its destinations can be given something itself in the same
+    /// wave -- a diamond in the graph does that -- and a single buffer would
+    /// be written while it was read.
+    ///
+    /// Each bank holds as many results as this node has ever produced in one
+    /// wave, made the first time it produces that many and kept: a node
+    /// produces one result per arrival at most, and most produce one.
+    banks: [RwLock<Vec<Vec<u8>>>; 2],
+    mail: Mutex<Mail>,
+    /// What the thread waits on for a job.
+    wake: Condvar,
+    /// Whether there is a thread at all. A thread the system would not start
+    /// leaves the node's work to the conductor, done in turn rather than at
+    /// once: slower, and still the vehicle's work done.
+    threaded: bool,
+}
+
+/// What passes between the conductor and one node's thread.
+///
+/// Made when the node is first held, and reused: the inbox and the list of
+/// results keep the room the busiest wave gave them.
+#[derive(Default)]
+struct Mail {
+    job: Option<Job>,
+    /// What this node is given in the wave under way, in the order it
+    /// arrived.
+    inbox: Vec<Arrival>,
+    /// What it produced.
+    produced: Vec<Produced>,
+    /// What it moved and what went wrong, for the conductor to add to the
+    /// pass's account.
+    moved: Moved,
+    /// Whether the fabric has gone, and the thread with it.
+    stop: bool,
+}
+
+/// What every node's thread and the conductor share.
+struct Shared {
+    /// Every node ever held, and every node a delivery was asked to start
+    /// from, by index. Added to only between stages.
+    names: RwLock<Vec<String>>,
+    /// Each node's thread, by the same index. `None` for a name that is only
+    /// ever started from and never held.
+    workers: RwLock<Vec<Option<Arc<Worker>>>>,
     routes: Routes,
-    /// How large a datum may be, which is the buffer a read is given.
-    buffer: usize,
     /// What says whether a node may be touched, and is told what it moved:
     /// see [`Watch`].
-    watch: Arc<dyn Watch>,
+    watch: RwLock<Arc<dyn Watch>>,
+    /// How large a datum may be, which is the buffer a read is given.
+    buffer: usize,
+    /// The datum [`Fabric::deliver`] was given, copied here so that every
+    /// thread can read it.
+    origin: RwLock<Vec<u8>>,
+    /// How many threads of the stage under way have not finished, and what
+    /// the conductor waits on for it to reach nought.
+    remaining: Mutex<usize>,
+    finished: Condvar,
+}
 
-    // What a pass works in, made when the fabric is and as nodes are held,
-    // and reused on every pass after: so that reading a node and passing on
-    // what it produced allocates nothing once the vehicle is running.
-    /// Each node ever held, by the index a [`Passing`] names it by.
-    names: Vec<String>,
-    /// And the index of each, by name.
+/// A lock, taken whether or not a thread panicked holding it.
+///
+/// A poisoned lock means a thread panicked while it held this, which is a
+/// fault to find in a log rather than a reason to stop reading a sensor for
+/// the rest of the flight: what it guards is in whatever state that operation
+/// left it, and the next operation is the one thing that might get it out of
+/// there.
+fn locked<T: ?Sized>(lock: &Mutex<T>) -> MutexGuard<'_, T> {
+    lock.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+fn read<T: ?Sized>(lock: &RwLock<T>) -> RwLockReadGuard<'_, T> {
+    lock.read().unwrap_or_else(|e| e.into_inner())
+}
+
+fn write<T: ?Sized>(lock: &RwLock<T>) -> RwLockWriteGuard<'_, T> {
+    lock.write().unwrap_or_else(|e| e.into_inner())
+}
+
+/// The nodes, and the table saying how they are joined.
+///
+/// Each node has a thread of its own, and a pass is a run of stages: the
+/// reads of a group, then the deliveries of what they read, a wave at a time.
+/// Every operation of a stage runs at once, each on its node's thread, and the
+/// stage ends when the last of them has; nothing of the next stage starts
+/// before. That is the only order kept, and the one the graph's meaning rests
+/// on: readings that will be compared are taken together, and every
+/// destination of a wave has a datum before any of their own destinations are
+/// given one.
+pub struct Fabric {
+    shared: Arc<Shared>,
+    /// The index of each name in [`Shared::names`].
     index: BTreeMap<String, usize>,
-    /// What a node is read into.
-    read: Vec<u8>,
-    /// Buffers of `buffer` bytes each, for the results a cascade carries on.
-    slots: Vec<Vec<u8>>,
-    /// Which of `slots` are not in use.
-    free: Vec<usize>,
-    /// The cascade's queue, empty between deliveries.
-    work: VecDeque<Passing>,
+    /// How many nodes are held.
+    held: usize,
+    /// The threads, joined when the fabric goes.
+    threads: Vec<JoinHandle<()>>,
+
+    // What a pass works in, made as nodes are held and reused on every pass
+    // after: so that reading a node and passing on what it produced allocates
+    // nothing once the vehicle is running.
+    /// What the wave under way delivers.
+    wave: Vec<Passing>,
+    /// And what it produces, for the next.
+    next: Vec<Passing>,
+    /// The nodes given work in the stage under way, in the order they were
+    /// first given it.
+    busy: Vec<usize>,
 }
 
 impl Fabric {
     pub fn new(routes: Routes, buffer: usize) -> Fabric {
         Fabric {
-            nodes: BTreeMap::new(),
-            routes,
-            buffer,
-            watch: Arc::new(Unwatched),
-            names: Vec::new(),
+            shared: Arc::new(Shared {
+                names: RwLock::new(Vec::new()),
+                workers: RwLock::new(Vec::new()),
+                routes,
+                watch: RwLock::new(Arc::new(Unwatched)),
+                buffer,
+                origin: RwLock::new(vec![0; buffer]),
+                remaining: Mutex::new(0),
+                finished: Condvar::new(),
+            }),
             index: BTreeMap::new(),
-            read: vec![0; buffer],
-            slots: Vec::new(),
-            free: Vec::new(),
-            work: VecDeque::new(),
+            held: 0,
+            threads: Vec::new(),
+            wave: Vec::new(),
+            next: Vec::new(),
+            busy: Vec::new(),
         }
     }
 
     /// Let something say which nodes are enabled, and be told what they move:
     /// see [`Watch`].
     pub fn watched_by(&mut self, watch: Arc<dyn Watch>) {
-        self.watch = watch;
+        *write(&self.shared.watch) = watch;
+    }
+
+    /// The index of a name, given one the first time it is seen.
+    ///
+    /// Allocates that first time, which for a node is when it is first held,
+    /// as the vehicle starts. A delivery started from a name never held is a
+    /// test's, and is given one the same way.
+    fn indexed(&mut self, name: &str) -> usize {
+        if let Some(&at) = self.index.get(name) {
+            return at;
+        }
+        let at = {
+            let mut names = write(&self.shared.names);
+            names.push(name.to_string());
+            names.len() - 1
+        };
+        write(&self.shared.workers).push(None);
+        self.index.insert(name.to_string(), at);
+        at
     }
 
     /// Put a node in, under the name the configuration calls it.
     ///
-    /// Allocates: the node's place in the table, and the first time a node
-    /// of this name is held, its index and a slot and a place in the queue
-    /// for its results. This is done as the vehicle starts, and again only
-    /// when the ground starts a node it had stopped -- never in a pass.
+    /// Allocates: the node's place in the table, and the first time a node of
+    /// this name is held, its thread, its mailbox and room in what a pass
+    /// works in. This is done as the vehicle starts, and again only when the
+    /// ground starts a node it had stopped -- never in a pass.
     pub fn hold(&mut self, name: &str, port: Box<dyn Port>) {
-        self.nodes.insert(name.to_string(), Mutex::new(port));
-        if !self.index.contains_key(name) {
-            self.index.insert(name.to_string(), self.names.len());
-            self.names.push(name.to_string());
-            // One slot and one place in the queue for each node: a cascade
-            // through a graph with no cycle in it holds no more results at
-            // once than there are nodes, except where one node's result goes
-            // to several -- see `slot`.
-            self.free.push(self.slots.len());
-            self.slots.push(vec![0; self.buffer]);
-            // Room for a result in every slot and the datum the cascade
-            // started from: `reserve` counts from the queue's length, which is
-            // nought between deliveries.
-            self.work.reserve(self.slots.len() + 1);
+        let at = self.indexed(name);
+        let existing = read(&self.shared.workers)[at].clone();
+        let worker = match existing {
+            Some(worker) => worker,
+            None => {
+                let worker = self.start(name);
+                write(&self.shared.workers)[at] = Some(worker.clone());
+                // Room for every node in a stage, and for a result from each
+                // in a wave.
+                let nodes = self.index.len();
+                self.busy.reserve(nodes.saturating_sub(self.busy.len()));
+                self.wave.reserve(nodes.saturating_sub(self.wave.len()));
+                self.next.reserve(nodes.saturating_sub(self.next.len()));
+                worker
+            }
+        };
+        if locked(&worker.port).replace(port).is_none() {
+            self.held += 1;
         }
     }
 
-    /// A slot not in use.
+    /// Make a node's thread, and what it shares with the conductor.
     ///
-    /// Allocates only where a cascade holds more results at once than the
-    /// fabric holds nodes, which a node whose result goes to several others
-    /// that each produce one can do. The slot made is kept, so a graph that
-    /// does this does it once, on the first pass that needs it, and never
-    /// again.
-    fn slot(slots: &mut Vec<Vec<u8>>, free: &mut Vec<usize>, buffer: usize) -> usize {
-        free.pop().unwrap_or_else(|| {
-            slots.push(vec![0; buffer]);
-            slots.len() - 1
-        })
+    /// A thread that will not start -- the system is out of them -- is said
+    /// once and leaves the node to the conductor, rather than refusing a
+    /// vehicle whose every node opened.
+    fn start(&mut self, name: &str) -> Arc<Worker> {
+        let mut worker = Worker {
+            name: name.to_string(),
+            port: Mutex::new(None),
+            banks: [
+                RwLock::new(vec![vec![0; self.shared.buffer]]),
+                RwLock::new(vec![vec![0; self.shared.buffer]]),
+            ],
+            mail: Mutex::new(Mail::default()),
+            wake: Condvar::new(),
+            threaded: true,
+        };
+        // Room for an arrival on every link into it, which is the most a
+        // wave gives a node in a graph where no node produces twice in one.
+        let into = self.shared.routes.into_count(name).max(1);
+        {
+            let mail = worker.mail.get_mut().unwrap_or_else(|e| e.into_inner());
+            mail.inbox.reserve(into);
+            mail.produced.reserve(into);
+        }
+
+        let (shared, handed) = (self.shared.clone(), Arc::new(worker));
+        let theirs = handed.clone();
+        match std::thread::Builder::new()
+            .name(format!("node {name}"))
+            .spawn(move || serve(&theirs, &shared))
+        {
+            Ok(thread) => {
+                self.threads.push(thread);
+                handed
+            }
+            Err(e) => {
+                log::error!(
+                    "\"{name}\": no thread can be started for it ({e}), so its reads \
+                     and deliveries are made in turn with the conductor's own"
+                );
+                worker = Arc::try_unwrap(handed).unwrap_or_else(|_| {
+                    unreachable!("the thread that would have held a copy never started")
+                });
+                worker.threaded = false;
+                Arc::new(worker)
+            }
+        }
+    }
+
+    /// This node's thread and port, if it is held.
+    fn worker(&self, name: &str) -> Option<Arc<Worker>> {
+        let at = *self.index.get(name)?;
+        read(&self.shared.workers)[at].clone()
     }
 
     pub fn holds(&self, name: &str) -> bool {
-        self.nodes.contains_key(name)
+        self.worker(name)
+            .is_some_and(|worker| locked(&worker.port).is_some())
     }
 
-    /// The port this node is, for one operation.
+    /// Do `f` with the port this node is, between stages.
     ///
     /// `None` is a node this fabric does not hold, which a checked
     /// configuration has no link to and which a node the ground released is
     /// until it is enabled again.
-    ///
-    /// A poisoned lock is taken anyway. It means a thread panicked while it
-    /// held this port, which is a fault to find in a log rather than a reason
-    /// to stop reading a sensor for the rest of the flight: the port is in
-    /// whatever state that operation left it, and the next operation on it is
-    /// the one thing that might get it out of there.
-    fn port(&self, name: &str) -> Option<std::sync::MutexGuard<'_, Box<dyn Port>>> {
-        self.nodes
-            .get(name)
-            .map(|held| held.lock().unwrap_or_else(|e| e.into_inner()))
+    fn with_port<R>(&self, name: &str, f: impl FnOnce(&mut dyn Port) -> R) -> Option<R> {
+        let worker = self.worker(name)?;
+        let mut port = locked(&worker.port);
+        port.as_mut().map(|port| f(port.as_mut()))
     }
 
     /// Take a node out, and with it whatever it had open.
@@ -545,25 +779,25 @@ impl Fabric {
     /// port owns what it opened. `None` is a node that was not held, which a
     /// stop arriving twice gives.
     ///
-    /// Nothing else changes. The routing still names the node, and a delivery
-    /// to it is dropped before it gets this far, by what [`Watch`] says of it.
+    /// Nothing else changes. The routing still names the node, its thread
+    /// waits for the node to be held again, and a delivery to it is dropped
+    /// before it gets that far, by what [`Watch`] says of it.
     pub fn release(&mut self, name: &str) -> Option<Box<dyn Port>> {
-        self.nodes
-            .remove(name)
-            // A lock whose holder panicked still has the port in it, and this
-            // is where the port is being dropped: a node being released is
-            // not a reason to carry a poisoned lock any further.
-            .map(|held| held.into_inner().unwrap_or_else(|e| e.into_inner()))
+        let released = locked(&self.worker(name)?.port).take();
+        if released.is_some() {
+            self.held -= 1;
+        }
+        released
     }
 
     /// How many nodes are held.
     pub fn len(&self) -> usize {
-        self.nodes.len()
+        self.held
     }
 
     /// Whether any node is held, which a checked configuration always has.
     pub fn is_empty(&self) -> bool {
-        self.nodes.is_empty()
+        self.held == 0
     }
 
     /// Flush one node, saying what went wrong if anything did.
@@ -574,11 +808,11 @@ impl Fabric {
     pub fn flush(&mut self, name: &str) -> Option<String> {
         // A node the ground has stopped holds nothing to flush, and may hold
         // no port at all: nothing has been delivered to it since it stopped.
-        if !self.watch.is_enabled(name) {
+        if !read(&self.shared.watch).is_enabled(name) {
             return None;
         }
-        match self.port(name) {
-            Some(mut node) => node.flush().err(),
+        match self.with_port(name, |node| node.flush()) {
+            Some(how) => how.err(),
             None => Some("there is no such node in this fabric".to_string()),
         }
     }
@@ -601,11 +835,12 @@ impl Fabric {
     /// device is not free and reading a MOC link would take a command off it
     /// and pass that on as though it were a result.
     ///
-    /// Breadth first, so that the three destinations of a "T" are all reached
-    /// before any of their own destinations are. The ground gets a reading
-    /// before an on-board computation over it starts, which is the order an
-    /// operator watching telemetry would expect, and the order that loses
-    /// least if a later step fails.
+    /// Breadth first, a wave at a time, so that the three destinations of a
+    /// "T" are all reached before any of their own destinations are. The
+    /// ground gets a reading before an on-board computation over it starts,
+    /// which is the order an operator watching telemetry would expect, and the
+    /// order that loses least if a later step fails. Within a wave every
+    /// destination is given its datum at once, on its own thread.
     pub fn deliver(&mut self, from: &str, data: &[u8]) -> Moved {
         self.deliver_on(from, data, None)
     }
@@ -652,172 +887,182 @@ impl Fabric {
         stream: Option<Stream>,
         again: bool,
     ) -> Moved {
-        let mut moved = Moved::default();
-
-        // How far a result may be passed on. A path through a graph with no
-        // cycle in it visits each node at most once, so a cascade longer than
-        // the number of nodes has been round a cycle -- and the links are
-        // checked for cycles before any of this runs, which makes this the
-        // backstop for a check that was wrong rather than the rule itself.
-        // Stopped and named rather than left to run: a loop here would be a
-        // vehicle that stops reading its sensors.
-        let most = self.nodes.len().max(1);
-
-        // The queue and the slots are the fabric's, taken out while the
-        // nodes and routes are borrowed and put back after: moved, not made.
-        let mut work = std::mem::take(&mut self.work);
-        let mut slots = std::mem::take(&mut self.slots);
-        let mut free = std::mem::take(&mut self.free);
-        work.clear();
-        work.push_back(Passing {
-            from: None,
-            slot: None,
+        let at = self.indexed(from);
+        {
+            let mut origin = write(&self.shared.origin);
+            // Larger than a read could be only where a test hands over
+            // something no node produced; made once and kept.
+            if origin.len() < data.len() {
+                origin.resize(data.len(), 0);
+            }
+            origin[..data.len()].copy_from_slice(data);
+        }
+        self.wave.clear();
+        self.wave.push(Passing {
+            from: at,
+            bytes: Bytes::Origin,
             len: data.len(),
             depth: 0,
             stream,
             again,
         });
+        let mut moved = Moved::default();
+        self.cascade(1, &mut moved);
+        moved
+    }
 
-        while let Some(passing) = work.pop_front() {
-            let from_name = match passing.from {
-                None => from,
-                Some(at) => self.names[at].as_str(),
-            };
-            // Borrowed, not copied: the routes and the nodes are both only
-            // read here, the nodes through their locks.
-            for delivery in self.routes.from(from_name) {
-                // A datum on one stream does not go down the other's links.
-                // Nothing is said about it: a node with two streams has two
-                // sets of links and every datum it produces belongs to one of
-                // them, so the others are not refusals -- they are the rest of
-                // the graph, going about its business.
-                if !carries(delivery, passing.stream) {
-                    continue;
-                }
+    /// Deliver the wave in [`Fabric::wave`], and every wave it gives rise to,
+    /// until one produces nothing. Each wave reads the bank the one before it
+    /// wrote, starting from `bank`'s other.
+    ///
+    /// How far a result may be passed on is bounded. A path through a graph
+    /// with no cycle in it visits each node at most once, so a cascade longer
+    /// than the number of nodes has been round a cycle -- and the links are
+    /// checked for cycles before any of this runs, which makes this the
+    /// backstop for a check that was wrong rather than the rule itself.
+    /// Stopped and named rather than left to run: a loop here would be a
+    /// vehicle that stops reading its sensors.
+    fn cascade(&mut self, mut bank: usize, moved: &mut Moved) {
+        let most = self.held.max(1);
+        let shared = self.shared.clone();
+        let watch = read(&shared.watch).clone();
 
-                // Dropped and counted, not queued. A queue for a node nobody
-                // has re-enabled is a queue that grows without bound, and a
-                // reading delivered minutes later is a reading that describes
-                // a moment that has passed.
-                if !self.watch.is_enabled(&delivery.to) {
-                    self.watch.dropped(&delivery.to);
-                    moved.dropped += 1;
-                    continue;
-                }
-
-                let Some(mut node) = self.port(&delivery.to) else {
-                    // A checked configuration has no such link. Counted
-                    // rather than ignored, because the alternative is
-                    // telemetry going quietly nowhere.
-                    moved.refused.push((
-                        delivery.to.clone(),
-                        "there is no such node in this fabric".to_string(),
-                    ));
-                    continue;
-                };
-
-                // Said again, to something that is not held at it: nothing to
-                // do and nothing to report. See `deliver_as`.
-                if passing.again && !node.holds() {
-                    continue;
-                }
-
-                if !node.accepts() {
-                    moved.refused.push((
-                        delivery.to.clone(),
-                        "this node takes nothing: it is read, not written".to_string(),
-                    ));
-                    continue;
-                }
-
-                let bytes: &[u8] = match passing.slot {
-                    None => data,
-                    Some(at) => &slots[at][..passing.len],
-                };
-                let arriving = Arriving {
-                    input: delivery.input.as_deref(),
-                    stream: delivery.stream,
-                };
-                match node.give(arriving, bytes) {
-                    Ok(()) => {
-                        self.watch.gave(&delivery.to, Outcome::Moved(bytes.len()));
-                        self.watch.sample_given(&delivery.to, bytes);
-                        moved.delivered += 1;
-                        moved.bytes += bytes.len();
-                    }
-                    Err(why) => {
-                        self.watch.gave(&delivery.to, Outcome::Failed);
-                        moved.refused.push((delivery.to.clone(), why));
-                        continue;
-                    }
-                }
-
-                if !node.ready() {
-                    continue;
-                }
-
-                if passing.depth + 1 >= most {
-                    moved.refused.push((
-                        delivery.to.clone(),
-                        format!(
-                            "a result is still being passed on after {most} nodes, \
-                             which is more than there are: the links must have a \
-                             cycle in them"
-                        ),
-                    ));
-                    continue;
-                }
-
-                // A slot for the result, taken out of the pool while the node
-                // writes into it -- the datum being delivered may be in
-                // another -- and put back after.
-                let into = Self::slot(&mut slots, &mut free, self.buffer);
-                let mut result = std::mem::take(&mut slots[into]);
-                let taken = node.take(&mut result);
-                slots[into] = result;
-                match taken {
-                    Ok(taken) if taken.bytes == 0 => free.push(into),
-                    Ok(taken) => {
-                        // A result is something the vehicle took from this
-                        // node, however it came about: an operator asking
-                        // what a computation has produced is asking for this.
-                        self.watch.took(&delivery.to, Outcome::Moved(taken.bytes));
-                        self.watch
-                            .sample_taken(&delivery.to, &slots[into][..taken.bytes]);
-                        match self.index.get(delivery.to.as_str()) {
-                            Some(&at) => work.push_back(Passing {
-                                from: Some(at),
-                                slot: Some(into),
-                                len: taken.bytes,
-                                depth: passing.depth + 1,
-                                stream: taken.stream,
-                                again: taken.again,
-                            }),
-                            // Held, as it was found just above, so it has an
-                            // index: see `hold`.
-                            None => free.push(into),
+        while !self.wave.is_empty() {
+            self.busy.clear();
+            {
+                let names = read(&shared.names);
+                let workers = read(&shared.workers);
+                for passing in &self.wave {
+                    // Borrowed, not copied: the routes are only read here.
+                    for (at, delivery) in
+                        shared.routes.from(&names[passing.from]).iter().enumerate()
+                    {
+                        // A datum on one stream does not go down the other's
+                        // links. Nothing is said about it: a node with two
+                        // streams has two sets of links and every datum it
+                        // produces belongs to one of them, so the others are
+                        // not refusals -- they are the rest of the graph,
+                        // going about its business.
+                        if !carries(delivery, passing.stream) {
+                            continue;
                         }
+
+                        // Dropped and counted, not queued. A queue for a node
+                        // nobody has re-enabled is a queue that grows without
+                        // bound, and a reading delivered minutes later is a
+                        // reading that describes a moment that has passed.
+                        if !watch.is_enabled(&delivery.to) {
+                            watch.dropped(&delivery.to);
+                            moved.dropped += 1;
+                            continue;
+                        }
+
+                        let Some(to) = self
+                            .index
+                            .get(delivery.to.as_str())
+                            .and_then(|&to| workers[to].as_ref().map(|worker| (to, worker)))
+                        else {
+                            // A checked configuration has no such link.
+                            // Counted rather than ignored, because the
+                            // alternative is telemetry going quietly nowhere.
+                            moved.refused.push((
+                                delivery.to.clone(),
+                                "there is no such node in this fabric".to_string(),
+                            ));
+                            continue;
+                        };
+                        let mut mail = locked(&to.1.mail);
+                        if mail.inbox.is_empty() {
+                            self.busy.push(to.0);
+                        }
+                        mail.inbox.push(Arrival {
+                            passing: *passing,
+                            delivery: at,
+                        });
                     }
-                    // A node that said it had a result and then did not give
-                    // one up. Counted, because the result is gone either way.
-                    Err(why) => {
-                        free.push(into);
-                        self.watch.took(&delivery.to, Outcome::Failed);
-                        moved.refused.push((delivery.to.clone(), why));
+                }
+                for &to in &self.busy {
+                    if let Some(worker) = &workers[to] {
+                        locked(&worker.mail).job = Some(Job::Deliver { bank, most });
                     }
                 }
             }
 
-            // Its bytes have gone everywhere they were going.
-            if let Some(at) = passing.slot {
-                free.push(at);
+            self.stage();
+
+            // What the wave produced is the next wave, node by node in the
+            // order they were first given something, and each node's in the
+            // order it produced it.
+            self.next.clear();
+            {
+                let workers = read(&shared.workers);
+                for &at in &self.busy {
+                    let Some(worker) = &workers[at] else {
+                        continue;
+                    };
+                    let mut mail = locked(&worker.mail);
+                    mail.inbox.clear();
+                    moved.add(std::mem::take(&mut mail.moved));
+                    for made in mail.produced.drain(..) {
+                        self.next.push(Passing {
+                            from: at,
+                            bytes: Bytes::Result {
+                                node: at,
+                                bank,
+                                item: made.item,
+                            },
+                            len: made.taken.bytes,
+                            depth: made.depth,
+                            stream: made.taken.stream,
+                            again: made.taken.again,
+                        });
+                    }
+                }
+            }
+            std::mem::swap(&mut self.wave, &mut self.next);
+            bank ^= 1;
+        }
+    }
+
+    /// Run the stage whose jobs are set for the nodes in [`Fabric::busy`]:
+    /// every one at once, each on its own thread, and wait for the last.
+    fn stage(&mut self) {
+        let shared = self.shared.clone();
+        let workers = read(&shared.workers);
+        let threaded = self
+            .busy
+            .iter()
+            .filter(|&&at| workers[at].as_ref().is_some_and(|worker| worker.threaded))
+            .count();
+
+        *locked(&shared.remaining) = threaded;
+        for &at in &self.busy {
+            if let Some(worker) = &workers[at] {
+                if worker.threaded {
+                    worker.wake.notify_one();
+                }
+            }
+        }
+        // A node with no thread of its own is the conductor's to do, while
+        // the threads do theirs.
+        for &at in &self.busy {
+            if let Some(worker) = &workers[at] {
+                if !worker.threaded {
+                    let mut mail = locked(&worker.mail);
+                    if let Some(job) = mail.job.take() {
+                        perform(worker, &shared, &mut mail, job);
+                    }
+                }
             }
         }
 
-        self.work = work;
-        self.slots = slots;
-        self.free = free;
-        moved
+        let mut left = locked(&shared.remaining);
+        while *left > 0 {
+            left = shared
+                .finished
+                .wait(left)
+                .unwrap_or_else(|e| e.into_inner());
+        }
     }
 
     /// Apply a command from the ground.
@@ -833,7 +1078,7 @@ impl Fabric {
     /// One answer rather than a [`Moved`]: a command is one thing, and the
     /// ground is told whether it took effect.
     pub fn set(&mut self, node: &str, attribute: &str, value: &[u8]) -> Result<(), String> {
-        if !self.routes.is_commanded(node, attribute) {
+        if !self.shared.routes.is_commanded(node, attribute) {
             return Err(format!(
                 "no command binding says the ground may set \"{node}.{attribute}\": \
                  what a command may change is in the configuration, so that it is \
@@ -841,11 +1086,8 @@ impl Fabric {
             ));
         }
 
-        let Some(mut port) = self.port(node) else {
-            return Err(format!("there is no node called \"{node}\" in this fabric"));
-        };
-
-        port.set(attribute, value)
+        self.with_port(node, |port| port.set(attribute, value))
+            .unwrap_or_else(|| Err(format!("there is no node called \"{node}\" in this fabric")))
     }
 
     /// Read one node and deliver whatever it had.
@@ -853,13 +1095,13 @@ impl Fabric {
     /// Nothing to say is not a failure and not a delivery: a device that is
     /// not due returns no bytes, which is the ordinary case on most passes.
     pub fn pump(&mut self, name: &str) -> Moved {
-        self.pump_by(name, false)
+        self.read_stage([(name, Read::Take)])
     }
 
     /// Read a node without asking it, and deliver what it had: see
     /// [`Port::take_unasked`].
     pub fn pump_unasked(&mut self, name: &str) -> Moved {
-        self.pump_by(name, true)
+        self.read_stage([(name, Read::Unasked)])
     }
 
     /// Ask a node, and take nothing: see [`Port::ask`]. What went wrong, if
@@ -867,62 +1109,189 @@ impl Fabric {
     pub fn ask(&mut self, name: &str) -> Option<String> {
         // A node the ground has stopped is not asked, and that is not a
         // failure to report: it is what stopping it means.
-        if !self.watch.is_enabled(name) {
+        let watch = read(&self.shared.watch).clone();
+        if !watch.is_enabled(name) {
             return None;
         }
-        let how = match self.port(name) {
-            None => return Some("there is no such node in this fabric".to_string()),
-            Some(mut node) => node.ask(),
-        };
-        match how {
+        match self.with_port(name, |node| node.ask()) {
+            None => Some("there is no such node in this fabric".to_string()),
             // A trigger that went out, which is counted on its own: see
             // `NodeCounts::asks`.
-            Ok(()) => {
-                self.watch.asked(name, Outcome::Moved(0));
+            Some(Ok(())) => {
+                watch.asked(name, Outcome::Moved(0));
                 None
             }
-            Err(why) => {
-                self.watch.asked(name, Outcome::Failed);
+            Some(Err(why)) => {
+                watch.asked(name, Outcome::Failed);
                 Some(why)
             }
         }
     }
 
-    /// Read a node, asking it or not, and deliver what it had.
-    fn pump_by(&mut self, name: &str, unasked: bool) -> Moved {
-        let mut moved = Moved::default();
+    /// Read every node of a group at once, and deliver what they had.
+    ///
+    /// At once, which is what a group is for: three sensors read together are
+    /// three readings of one moment, where three reads one after another are
+    /// readings of three moments being averaged as though they were one. And
+    /// every reading is taken before any is delivered, so that what is
+    /// computed from them is computed from the set.
+    pub fn pump_group(&mut self, members: &[String]) -> Moved {
+        self.read_stage(members.iter().map(|member| (member.as_str(), Read::Take)))
+    }
 
-        // A node the ground has stopped moves nothing. Nothing is counted
-        // here: a read that was not attempted is not a datum that was
-        // dropped, and the pass has nothing to say about a node that is off.
-        if !self.watch.is_enabled(name) {
-            return moved;
+    /// Read every node named, each as it says, all at once, and then deliver
+    /// what they had, a wave at a time.
+    ///
+    /// A node the ground has stopped is not read, and nothing is counted for
+    /// it: a read that was not attempted is not a datum that was dropped, and
+    /// the pass has nothing to say about a node that is off. A node named
+    /// twice is read once.
+    pub fn read_stage<'a>(&mut self, reads: impl IntoIterator<Item = (&'a str, Read)>) -> Moved {
+        let mut moved = Moved::default();
+        let shared = self.shared.clone();
+        let watch = read(&shared.watch).clone();
+
+        self.busy.clear();
+        {
+            let workers = read(&shared.workers);
+            for (name, how) in reads {
+                if !watch.is_enabled(name) {
+                    continue;
+                }
+                let Some(worker) = self
+                    .index
+                    .get(name)
+                    .and_then(|&at| workers[at].as_ref().map(|worker| (at, worker)))
+                else {
+                    moved.refused.push((
+                        name.to_string(),
+                        "there is no such node in this fabric".to_string(),
+                    ));
+                    continue;
+                };
+                let mut mail = locked(&worker.1.mail);
+                if mail.job.is_none() {
+                    mail.job = Some(Job::Read { how, bank: 0 });
+                    self.busy.push(worker.0);
+                }
+            }
         }
 
-        // The fabric's own read buffer, taken out while the delivery that
-        // follows borrows the fabric, and put back after: moved, not made.
-        let mut buffer = std::mem::take(&mut self.read);
-        let taken = {
-            let Some(mut node) = self.port(name) else {
-                self.read = buffer;
-                moved.refused.push((
-                    name.to_string(),
-                    "there is no such node in this fabric".to_string(),
-                ));
-                return moved;
-            };
-            if !node.produces() {
-                drop(node);
-                self.read = buffer;
-                return moved;
-            }
-            if unasked {
-                node.take_unasked(&mut buffer)
-            } else {
-                node.take(&mut buffer)
-            }
-        };
+        self.stage();
 
+        // Every reading, as one wave: see `cascade`.
+        self.wave.clear();
+        {
+            let workers = read(&shared.workers);
+            for &at in &self.busy {
+                let Some(worker) = &workers[at] else {
+                    continue;
+                };
+                let mut mail = locked(&worker.mail);
+                moved.add(std::mem::take(&mut mail.moved));
+                for made in mail.produced.drain(..) {
+                    self.wave.push(Passing {
+                        from: at,
+                        bytes: Bytes::Result {
+                            node: at,
+                            bank: 0,
+                            item: made.item,
+                        },
+                        len: made.taken.bytes,
+                        depth: 0,
+                        stream: made.taken.stream,
+                        again: made.taken.again,
+                    });
+                }
+            }
+        }
+        self.cascade(1, &mut moved);
+        moved
+    }
+}
+
+impl Drop for Fabric {
+    /// Stop every node's thread and wait for it, so that a fabric that has
+    /// gone has left nothing running -- and the ports go with it, every one
+    /// closing what it opened.
+    fn drop(&mut self) {
+        for worker in read(&self.shared.workers).iter().flatten() {
+            locked(&worker.mail).stop = true;
+            worker.wake.notify_one();
+        }
+        for thread in self.threads.drain(..) {
+            // A thread that panicked has said so; the fabric is going either
+            // way.
+            let _ = thread.join();
+        }
+    }
+}
+
+/// A node's thread: wait for a job, do it, say so, and wait again, until the
+/// fabric goes.
+fn serve(worker: &Worker, shared: &Shared) {
+    loop {
+        let mut mail = locked(&worker.mail);
+        while mail.job.is_none() && !mail.stop {
+            mail = worker.wake.wait(mail).unwrap_or_else(|e| e.into_inner());
+        }
+        if mail.stop {
+            return;
+        }
+        if let Some(job) = mail.job.take() {
+            perform(worker, shared, &mut mail, job);
+        }
+        drop(mail);
+
+        let mut left = locked(&shared.remaining);
+        *left = left.saturating_sub(1);
+        if *left == 0 {
+            shared.finished.notify_all();
+        }
+    }
+}
+
+/// Do one job, and say so whatever happens in it.
+///
+/// A port that panics is a fault in that port, and is reported against its
+/// node like any other failure. What it must not do is take the stage with
+/// it: a thread that died without saying it had finished would leave the
+/// conductor waiting for it for the rest of the flight.
+fn perform(worker: &Worker, shared: &Shared, mail: &mut Mail, job: Job) {
+    let done = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| match job {
+        Job::Read { how, bank } => read_node(worker, shared, mail, how, bank),
+        Job::Deliver { bank, most } => deliver_to(worker, shared, mail, bank, most),
+    }));
+    if done.is_err() {
+        mail.produced.clear();
+        mail.moved.refused.push((
+            worker.name.clone(),
+            "the node panicked part way through an operation, which is a fault in \
+             it to find in the log; the pass carried on without it"
+                .to_string(),
+        ));
+    }
+}
+
+/// Read a node, into item 0 of `bank`.
+fn read_node(worker: &Worker, shared: &Shared, mail: &mut Mail, how: Read, bank: usize) {
+    let watch = read(&shared.watch).clone();
+    let name = worker.name.as_str();
+    let mut port = locked(&worker.port);
+    let Some(node) = port.as_mut() else {
+        mail.moved.refused.push((
+            name.to_string(),
+            "there is no such node in this fabric".to_string(),
+        ));
+        return;
+    };
+
+    if node.produces() {
+        let mut out = write(&worker.banks[bank]);
+        let taken = match how {
+            Read::Take => node.take(&mut out[0]),
+            Read::Unasked | Read::UnaskedThenAsk => node.take_unasked(&mut out[0]),
+        };
         match taken {
             // Nought bytes is "nothing to say", which is the ordinary answer
             // from a device that is not due: counted as neither a read nor a
@@ -930,33 +1299,174 @@ impl Fabric {
             // telemetry.
             Ok(taken) if taken.bytes == 0 => {}
             Ok(taken) => {
-                let data = &buffer[..taken.bytes];
-                self.watch.took(name, Outcome::Moved(data.len()));
-                self.watch.sample_taken(name, data);
-                moved.add(self.deliver_as(name, data, taken.stream, taken.again));
+                watch.took(name, Outcome::Moved(taken.bytes));
+                watch.sample_taken(name, &out[0][..taken.bytes]);
+                mail.produced.push(Produced {
+                    item: 0,
+                    taken,
+                    depth: 0,
+                });
             }
             Err(why) => {
-                self.watch.took(name, Outcome::Failed);
+                watch.took(name, Outcome::Failed);
+                mail.moved.refused.push((name.to_string(), why));
+            }
+        }
+    }
+
+    if how == Read::UnaskedThenAsk {
+        match node.ask() {
+            // A trigger that went out, which is counted on its own: see
+            // `NodeCounts::asks`.
+            Ok(()) => watch.asked(name, Outcome::Moved(0)),
+            Err(why) => {
+                watch.asked(name, Outcome::Failed);
+                mail.moved.refused.push((name.to_string(), why));
+            }
+        }
+    }
+}
+
+/// Give a node everything in its inbox, in the order it arrived, and take a
+/// result after each arrival it has one for, into `bank`.
+fn deliver_to(worker: &Worker, shared: &Shared, mail: &mut Mail, bank: usize, most: usize) {
+    let watch = read(&shared.watch).clone();
+    let names = read(&shared.names);
+    let workers = read(&shared.workers);
+    let name = worker.name.as_str();
+    let Mail {
+        inbox,
+        produced,
+        moved,
+        ..
+    } = mail;
+
+    let mut port = locked(&worker.port);
+    let mut out = write(&worker.banks[bank]);
+
+    for arrival in inbox.iter() {
+        let passing = arrival.passing;
+        let Some(node) = port.as_mut() else {
+            moved.refused.push((
+                name.to_string(),
+                "there is no such node in this fabric".to_string(),
+            ));
+            continue;
+        };
+
+        // Said again, to something that is not held at it: nothing to do and
+        // nothing to report. See `Fabric::deliver_as`.
+        if passing.again && !node.holds() {
+            continue;
+        }
+
+        if !node.accepts() {
+            moved.refused.push((
+                name.to_string(),
+                "this node takes nothing: it is read, not written".to_string(),
+            ));
+            continue;
+        }
+
+        let delivery = &shared.routes.from(&names[passing.from])[arrival.delivery];
+        let arriving = Arriving {
+            input: delivery.input.as_deref(),
+            stream: delivery.stream,
+        };
+
+        // The bytes, where the wave before put them. Never the bank this wave
+        // writes -- see `Worker::banks` -- so never a lock this thread holds.
+        let given = match passing.bytes {
+            Bytes::Origin => {
+                let origin = read(&shared.origin);
+                give(node, arriving, &origin[..passing.len], name, &*watch, moved)
+            }
+            Bytes::Result {
+                node: from,
+                bank: from_bank,
+                item,
+            } => match &workers[from] {
+                Some(source) => {
+                    let results = read(&source.banks[from_bank]);
+                    give(
+                        node,
+                        arriving,
+                        &results[item][..passing.len],
+                        name,
+                        &*watch,
+                        moved,
+                    )
+                }
+                None => false,
+            },
+        };
+        if !given || !node.ready() {
+            continue;
+        }
+
+        if passing.depth + 1 >= most {
+            moved.refused.push((
+                name.to_string(),
+                format!(
+                    "a result is still being passed on after {most} nodes, which is \
+                     more than there are: the links must have a cycle in them"
+                ),
+            ));
+            continue;
+        }
+
+        // Room for the result, made the first time this node produces this
+        // many in one wave and kept.
+        let item = produced.len();
+        if out.len() <= item {
+            out.push(vec![0; shared.buffer]);
+        }
+        match node.take(&mut out[item]) {
+            Ok(taken) if taken.bytes == 0 => {}
+            Ok(taken) => {
+                // A result is something the vehicle took from this node,
+                // however it came about: an operator asking what a
+                // computation has produced is asking for this.
+                watch.took(name, Outcome::Moved(taken.bytes));
+                watch.sample_taken(name, &out[item][..taken.bytes]);
+                produced.push(Produced {
+                    item,
+                    taken,
+                    depth: passing.depth + 1,
+                });
+            }
+            // A node that said it had a result and then did not give one up.
+            // Counted, because the result is gone either way.
+            Err(why) => {
+                watch.took(name, Outcome::Failed);
                 moved.refused.push((name.to_string(), why));
             }
         }
-        self.read = buffer;
-        moved
     }
+}
 
-    /// Read every node of a group, in order, and deliver what they had.
-    ///
-    /// In order and without anything between them, which is what a group is
-    /// for: three sensors read one after another are three readings of nearly
-    /// the same moment, where three reads a third of an interval apart are
-    /// three readings of three different moments being averaged as though
-    /// they were one.
-    pub fn pump_group(&mut self, members: &[String]) -> Moved {
-        let mut moved = Moved::default();
-        for member in members {
-            moved.add(self.pump(member));
+/// Hand a node one datum, counting how it went. Whether it took it.
+fn give(
+    node: &mut Box<dyn Port>,
+    arriving: Arriving<'_>,
+    bytes: &[u8],
+    name: &str,
+    watch: &dyn Watch,
+    moved: &mut Moved,
+) -> bool {
+    match node.give(arriving, bytes) {
+        Ok(()) => {
+            watch.gave(name, Outcome::Moved(bytes.len()));
+            watch.sample_given(name, bytes);
+            moved.delivered += 1;
+            moved.bytes += bytes.len();
+            true
         }
-        moved
+        Err(why) => {
+            watch.gave(name, Outcome::Failed);
+            moved.refused.push((name.to_string(), why));
+            false
+        }
     }
 }
 
@@ -1827,6 +2337,195 @@ vehicle:
                 vec![(None, Some(Stream::Groundward), vec![n as u8])],
                 "converter {n} got the wrong reading"
             );
+        }
+    }
+
+    /// A graph of computations joined as `links` says, built by hand: what
+    /// the tests of a stage want is the shape, and nothing else.
+    fn shaped(nodes: &[&str], links: &[(&str, &str)]) -> Routes {
+        use tcslibgs::graph::{Destinations, Link, Node};
+        Routes::of(&Graph {
+            description: None,
+            tcspecial: None,
+            groups: Vec::new(),
+            nodes: nodes
+                .iter()
+                .map(|name| Node {
+                    name: name.to_string(),
+                    node_type: "compute".to_string(),
+                    group: None,
+                    attributes: Default::default(),
+                })
+                .collect(),
+            links: links
+                .iter()
+                .map(|(from, to)| Link {
+                    from: from.to_string(),
+                    to: Destinations::of(vec![to.to_string()]),
+                    comment: None,
+                })
+                .collect(),
+            commands: Vec::new(),
+            files: Vec::new(),
+            homes: Default::default(),
+            placed: Default::default(),
+            set_aside: Default::default(),
+        })
+    }
+
+    /// What happened, in the order it happened, across every thread.
+    type Events = Arc<TestLock<Vec<String>>>;
+
+    /// A node that takes `slow` over a read and over a delivery, saying when
+    /// each happened.
+    struct Slow {
+        name: &'static str,
+        slow: std::time::Duration,
+        events: Events,
+    }
+
+    impl Port for Slow {
+        fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
+            std::thread::sleep(self.slow);
+            self.events
+                .lock()
+                .unwrap()
+                .push(format!("read {}", self.name));
+            buffer[0] = 7;
+            Ok(Taken::of(1))
+        }
+
+        fn give(&mut self, _arriving: Arriving<'_>, _data: &[u8]) -> Result<(), String> {
+            self.events
+                .lock()
+                .unwrap()
+                .push(format!("given {}", self.name));
+            std::thread::sleep(self.slow);
+            Ok(())
+        }
+    }
+
+    fn slow(name: &'static str, events: &Events) -> Box<dyn Port> {
+        Box::new(Slow {
+            name,
+            slow: std::time::Duration::from_millis(200),
+            events: events.clone(),
+        })
+    }
+
+    /// A group's reads are made at once, each on its node's own thread: three
+    /// reads of 200 ms take about 200 ms, not 600.
+    ///
+    /// And every reading is taken before any is delivered, which is the
+    /// order a group exists for: a computation over the three is a
+    /// computation over one moment.
+    #[test]
+    fn a_groups_reads_are_made_at_once_and_all_before_any_is_delivered() {
+        let events: Events = Default::default();
+        let mut fabric = Fabric::new(
+            shaped(
+                &["s1", "s2", "s3", "sink"],
+                &[("s1", "sink"), ("s2", "sink"), ("s3", "sink")],
+            ),
+            64,
+        );
+        fabric.hold("s1", slow("s1", &events));
+        fabric.hold("s2", slow("s2", &events));
+        fabric.hold("s3", slow("s3", &events));
+        // Quick to give to, so that what is timed is the reads.
+        fabric.hold(
+            "sink",
+            Box::new(Slow {
+                name: "sink",
+                slow: std::time::Duration::ZERO,
+                events: events.clone(),
+            }),
+        );
+
+        let started = std::time::Instant::now();
+        let moved = fabric.pump_group(&["s1".to_string(), "s2".to_string(), "s3".to_string()]);
+        let took = started.elapsed();
+
+        assert!(moved.all_delivered(), "{:?}", moved.refused);
+        assert_eq!(moved.delivered, 3, "every reading arrives");
+        assert!(
+            took < std::time::Duration::from_millis(450),
+            "three 200 ms reads took {took:?}: they were made one after another"
+        );
+        let happened: Vec<String> = events.lock().unwrap().clone();
+        assert_eq!(happened.len(), 6, "{happened:?}");
+        assert!(
+            happened[..3].iter().all(|event| event.starts_with("read"))
+                && happened[3..].iter().all(|event| event == "given sink"),
+            "every reading should be taken before any is delivered: {happened:?}"
+        );
+    }
+
+    /// The destinations of a wave are given their data at once: one reading
+    /// to three slow destinations takes about one destination's time.
+    #[test]
+    fn a_waves_deliveries_are_made_at_once() {
+        let events: Events = Default::default();
+        let mut fabric = Fabric::new(
+            shaped(
+                &["source", "d1", "d2", "d3"],
+                &[("source", "d1"), ("source", "d2"), ("source", "d3")],
+            ),
+            64,
+        );
+        fabric.hold("d1", slow("d1", &events));
+        fabric.hold("d2", slow("d2", &events));
+        fabric.hold("d3", slow("d3", &events));
+
+        let started = std::time::Instant::now();
+        let moved = fabric.deliver("source", &[1]);
+        let took = started.elapsed();
+
+        assert_eq!(moved.delivered, 3, "{moved:?}");
+        assert!(
+            took < std::time::Duration::from_millis(450),
+            "three 200 ms deliveries took {took:?}: they were made one after another"
+        );
+    }
+
+    /// A port that panics is a failure of its node, reported against it, and
+    /// not a stage that never ends: the other destinations get their data,
+    /// and the next pass runs.
+    #[test]
+    fn a_port_that_panics_is_reported_and_the_pass_goes_on() {
+        struct Panics;
+
+        impl Port for Panics {
+            fn take(&mut self, _buffer: &mut [u8]) -> Result<Taken, String> {
+                Ok(Taken::NOTHING)
+            }
+
+            fn give(&mut self, _arriving: Arriving<'_>, _data: &[u8]) -> Result<(), String> {
+                panic!("a fault in this port");
+            }
+        }
+
+        let mut fabric = Fabric::new(
+            shaped(
+                &["source", "bad", "good"],
+                &[("source", "bad"), ("source", "good")],
+            ),
+            64,
+        );
+        fabric.hold("bad", Box::new(Panics));
+        let (good, port) = recorder();
+        fabric.hold("good", port);
+
+        for pass in 1..=2 {
+            let moved = fabric.deliver("source", &[pass]);
+            assert_eq!(moved.refused.len(), 1, "{:?}", moved.refused);
+            assert_eq!(moved.refused[0].0, "bad");
+            assert!(
+                moved.refused[0].1.contains("panicked"),
+                "{:?}",
+                moved.refused
+            );
+            assert_eq!(good.lock().unwrap().given.len(), pass as usize);
         }
     }
 }

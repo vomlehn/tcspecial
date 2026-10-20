@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1012" viewBox="0 0 1200 1012" role="img" aria-labelledby="title desc">
   <title id="title">The architecture, and what runs in parallel</title>
-  <desc id="desc">A configuration is a graph of nodes. At startup tcslibgs::graph reads and checks the whole file, and four pieces that open nothing turn it into tables: route, which says where each node's output goes and which link fills each named input; schedule, which says when each group is next read; telemetry, which gives each source a link to the ground at a moc node's ground_base plus that source's device id; and parameters, which reads the tcspecial section for the beacons, the log and the two command ports. Then system opens one port per node and holds them in a fabric. Four things then run at once, each on its own thread. The command thread owns both command links -- the spacecraft's and the payloads' -- so that a command is read and answered while node work is going on, and never queued behind it. The conductor runs the pass: it asks the schedule which group is due, starts a thread for each of that group's reads and waits for them all, then delivers along the routes breadth first, one wave at a time, each wave's deliveries handed out together, so that a result carries on in the same pass. A thread is started for each node operation and joined before the stage ends, rather than taken from a pool: how many operations a stage has is what the configuration says, so starting one thread each gives exactly the parallelism the file describes, bounded by the file rather than by a figure nobody chose. Every node operation of a stage runs in parallel with the others, and no node operation waits on another node. The beacon thread sends a beacon every beacon.interval from beacon.send to beacon.recv, carrying the configuration's digest. Each node has a state of its own -- enabled, disabled or faulted -- and a wakeup descriptor that is in every poll set the node's port ever waits on, so a command that disables a node reaches it at once even while it is waiting for input or output: the wait returns, the operation is abandoned, the endpoint is released, and deliveries to it are dropped and counted rather than queued. No read waits for data to arrive: a descriptor is asked whether it is ready and a node with nothing to say reads as nought bytes. On the ground, each source's data arrives as UDP at the moc node's port and ground software takes it with one call, tcslib::moc::Moc::receive; tcsmoc shows a panel per source, and its Enable and Disable buttons send START_NODE and STOP_NODE about that panel's node, by the device id the panel shows. It sends them only once a CONNECT has agreed that the vehicle is flying the configuration the window read, because a node id is a position in that configuration and means nothing against another one. Everything the vehicle sends to the ground -- the beacons now, and the command interpreter's answers when there is one -- is recorded in one telemetry log, where the tcspecial section's log.directory says; that is the vehicle's account of the downlink, of which the ground has only the half that arrived. tcssim stands in for the payloads, reading the simulator configuration. The parallel execution of a stage is the design; what runs today is one thread making the whole pass in order, never blocking on a read, with the command interpreter and the beacons beside it.</desc>
+  <desc id="desc">A configuration is a graph of nodes. At startup tcslibgs::graph reads and checks the whole file, and four pieces that open nothing turn it into tables: route, which says where each node's output goes and which link fills each named input; schedule, which says when each group is next read; telemetry, which gives each source a link to the ground at a moc node's ground_base plus that source's device id; and parameters, which reads the tcspecial section for the beacons, the log and the two command ports. Then system opens one port per node and holds them in a fabric. Four things then run at once, each on its own thread. The command thread owns both command links -- the spacecraft's and the payloads' -- so that a command is read and answered while node work is going on, and never queued behind it. The conductor runs the pass: it asks the schedule which group is due, hands each of that group's reads to its node's thread and waits for them all, then delivers along the routes breadth first, one wave at a time, each wave's deliveries handed out together, so that a result carries on in the same pass. Each node has a thread of its own, made as the vehicle starts, rather than a thread made for each operation or one taken from a pool: a stage never has more operations than nodes, so a thread per node gives exactly the parallelism the file describes, bounded by the file rather than by a figure nobody chose, and nothing is made once the vehicle is running. Every node operation of a stage runs in parallel with the others, and no node operation waits on another node. The beacon thread sends a beacon every beacon.interval from beacon.send to beacon.recv, carrying the configuration's digest. Each node has a state of its own -- enabled, disabled or faulted -- and a wakeup descriptor that is in every poll set the node's port ever waits on, so a command that disables a node reaches it at once even while it is waiting for input or output: the wait returns, the operation is abandoned, the endpoint is released, and deliveries to it are dropped and counted rather than queued. No read waits for data to arrive: a descriptor is asked whether it is ready and a node with nothing to say reads as nought bytes. On the ground, each source's data arrives as UDP at the moc node's port and ground software takes it with one call, tcslib::moc::Moc::receive; tcsmoc shows a panel per source, and its Enable and Disable buttons send START_NODE and STOP_NODE about that panel's node, by the device id the panel shows. It sends them only once a CONNECT has agreed that the vehicle is flying the configuration the window read, because a node id is a position in that configuration and means nothing against another one. Everything the vehicle sends to the ground -- the beacons now, and the command interpreter's answers when there is one -- is recorded in one telemetry log, where the tcspecial section's log.directory says; that is the vehicle's account of the downlink, of which the ground has only the half that arrived. tcssim stands in for the payloads, reading the simulator configuration. No read blocks waiting for data, and the only waits inside a stage are a node's own: a trigger's read_delay, a process computation's deadline.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -19,7 +19,6 @@
       .moc { fill: #e9f6ee; stroke: #2e7d4f; stroke-width: 1.6; }
       .ground { fill: #f3f4f6; stroke: #4b5563; stroke-width: 1.6; }
       .thread { fill: #fff7ed; stroke: #b45309; stroke-width: 1.8; }
-      .tobuild { fill: #fff7ed; stroke: #b45309; stroke-width: 1.8; stroke-dasharray: 9 3 2 3; }
       .band { fill: #fdfdfe; stroke: #94a3b8; stroke-width: 1.4; stroke-dasharray: 7 5; }
       .groundward { fill: none; stroke: #2563eb; stroke-width: 2.2; }
       .becomes { fill: none; stroke: #4b5563; stroke-width: 1.8; }
@@ -88,7 +87,7 @@
 
   <!-- The command thread -->
   <text class="lane" x="372" y="110">THREAD 1</text>
-  <rect class="tobuild" x="372" y="118" width="476" height="86" rx="10"/>
+  <rect class="thread" x="372" y="118" width="476" height="86" rx="10"/>
   <text class="name" x="388" y="141">the command interpreter</text>
   <text class="kind" x="388" y="159">reads and answers while the pass runs, so a command is never</text>
   <text class="kind" x="388" y="175">queued behind node work. Two links, because a</text>
@@ -106,9 +105,9 @@
   <path class="becomes" d="M610,350 L610,378" marker-end="url(#arrow-grey)"/>
   <text class="label" x="620" y="369">a stage of work</text>
 
-  <!-- A thread per node operation, started and joined with the stage -->
-  <text class="lane" x="372" y="400">A THREAD PER OPERATION</text>
-  <rect class="tobuild" x="372" y="408" width="476" height="104" rx="10"/>
+  <!-- A thread per node, made as the vehicle starts, given each stage's work -->
+  <text class="lane" x="372" y="400">A THREAD PER NODE</text>
+  <rect class="thread" x="372" y="408" width="476" height="104" rx="10"/>
   <text class="name" x="388" y="431">the node threads</text>
   <text class="kind" x="388" y="449">every node operation of a stage at once: a read, a delivery, a</text>
   <text class="kind" x="388" y="465">computation, a write to the ground. No node waits on another</text>
@@ -163,9 +162,9 @@
   <text class="kind" x="388" y="904">everything sent to the ground, where log.directory says: the account of</text>
   <text class="detail" x="388" y="918">the downlink, of which the ground has only the half that arrived</text>
 
-  <text class="note" x="356" y="956">what runs today: one thread for the whole pass, in order, with the command</text>
-  <text class="note" x="356" y="974">interpreter and the beacons beside it and the log under them. A stage's</text>
-  <text class="note" x="356" y="992">operations do not yet run at once: that is what the dash-dotted lane is.</text>
+  <text class="note" x="356" y="956">a node's thread is made as the vehicle starts and given its node's part</text>
+  <text class="note" x="356" y="974">of each stage: as many threads as the file has nodes, and nothing made</text>
+  <text class="note" x="356" y="992">once the vehicle is running.</text>
 
   <!-- The ground -->
   <rect class="moc" x="906" y="110" width="256" height="76" rx="10"/>
@@ -211,8 +210,6 @@
   <line x1="24" y1="860" x2="330" y2="860" stroke="#e5e7eb" stroke-width="1"/>
   <path class="groundward" d="M24,886 L64,886" marker-end="url(#arrow-blue)"/>
   <text class="label" x="72" y="890">data to the ground</text>
-  <rect class="tobuild" x="200" y="878" width="22" height="16" rx="4"/>
-  <text class="label" x="230" y="890">the design</text>
   <path class="commanding" d="M24,910 L64,910" marker-end="url(#arrow-amber)"/>
   <text class="label" x="72" y="914">a command</text>
   <path class="waking" d="M164,910 L204,910" marker-end="url(#arrow-amber)"/>

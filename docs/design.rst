@@ -1616,14 +1616,12 @@ the second is threads, descriptors and bytes.
          telemetry and parameters -- turn it into tables. Then system opens a
          port per node and holds them in a fabric. Four things run at once: the
          command interpreter on its own thread, the conductor running one pass,
-         a thread started for each node operation of a stage, and the beacons. Each node has a state and a wakeup descriptor, so a
+         a thread for each node, given its part of every stage, and the beacons. Each node has a state and a wakeup descriptor, so a
          command that disables a node reaches it while it is waiting. On the
          ground, data arrives as UDP and is taken with tcslib::moc::Moc::receive.
    :width: 100%
 
-   What a configuration becomes, and what runs at once. The
-   dash-dotted pieces are the design; what runs today is one thread for the
-   whole pass, the command interpreter and the beacons beside it.
+   What a configuration becomes, and what runs at once.
 
 What the file becomes
 ~~~~~~~~~~~~~~~~~~~~~
@@ -1658,13 +1656,14 @@ the command interpreter
 
 the conductor
     One thread, running one pass: it asks the schedule which group is due,
-    starts a thread for each of that group's reads, waits for them all, and
-    then walks the routes, one breadth-first wave at a time.
+    hands each of that group's reads to its node's thread, waits for them all,
+    and then walks the routes, one breadth-first wave at a time, each wave's
+    deliveries handed out the same way.
 
 the node threads
-    One per node operation, for as long as that operation takes. Every
-    operation of a stage -- a read, a delivery, a computation, a write to the
-    ground -- may run at the same time as every other operation of that stage,
+    One per node, made as the vehicle starts. Every operation of a stage -- a
+    read, a delivery, a computation, a write to the ground -- runs on its
+    node's thread at the same time as every other operation of that stage,
     and no node operation waits on another node.
 
 the beacons
@@ -1706,12 +1705,17 @@ Requirement
     and it is the only ordering parallel execution may not take away.
 
 Requirement
-    A thread is started for each node operation and joined before the stage
-    ends. Not taken from a pool: a pool has a size, and nothing can choose
-    that size correctly.
+    Each node has a thread of its own, made when the node is first held, as
+    the vehicle starts. A stage hands each of its operations to the thread of
+    the node it is about, and ends when the last of them has finished. Not a
+    thread made for each operation, and not a pool.
 
-A pool smaller than the stage serialises operations the graph says may run
-together, which is the one ordering parallel execution may not take away --
+A thread made for each operation was the design, and it allocates: a
+thread's stack, its handle and the closure it runs are all made when it is
+started, and nothing a pass does may allocate -- memory is allocated as the
+vehicle starts and not once it is running. A pool has a size, and nothing can
+choose it correctly. A pool smaller than the stage serialises operations the
+graph says may run together, which is the one ordering parallel execution may not take away --
 and the figure that is too small depends on the configuration, so a number
 chosen here would be wrong for some file somebody writes later. A pool larger
 than the stage holds threads that do nothing. And a pool needs a queue
@@ -1719,12 +1723,27 @@ between the conductor and the workers, which is a second place for a stage to
 stall and a place where one slow operation delays an operation it has nothing
 to do with.
 
-How many operations a stage has is what the configuration says -- a group of
-three sensors is three reads, a wave of two deliveries is two -- so starting
-one thread each gives exactly the parallelism the file describes, bounded by
-the file rather than by a figure nobody chose. What that costs is a thread
-started and joined per operation, which against a device read measured in
-milliseconds is noise.
+A stage never has more operations than there are nodes, since a node is held
+by one thread at a time -- a group of three sensors is three reads, a wave
+that gives one computation three arrivals is one operation that takes all
+three in turn -- so a thread per node gives exactly the parallelism the file
+describes, bounded by the file rather than by a figure nobody chose, and
+nothing is made once the vehicle is running. A thread that the system will
+not start is said once, and leaves its node's operations to the conductor,
+done in turn: slower, and still the vehicle's work done.
+
+Requirement
+    A node operation that panics is a failure of that node, reported against
+    it like any other, and the stage ends as it would have. A thread that died
+    without saying it had finished would leave the conductor waiting for it
+    for the rest of the flight.
+
+Requirement
+    A wave reads the results of the wave before it and writes its own
+    somewhere else: each node has two banks of result buffers, and the waves
+    take them in turn. A node whose result is on its way to its destinations
+    can be given something itself in the same wave -- a diamond in the graph
+    does that -- and one buffer would be written while it was read.
 
 Requirement
     A port is held by one thread at a time. A node is a thing with a
@@ -2418,9 +2437,8 @@ node's wait and no other.
    ``process`` computation's deadline. Disabling the node ends either one
    where it stands.
 
-   What is still the design and not the code is the parallel execution of a
-   stage: a stage's node operations run one after another on the conductor's
-   own thread, where the design starts a thread for each of them.
+   A stage's node operations run at once, each on its node's own thread:
+   the reads of a due group together, then each wave of deliveries together.
 
    SET_NODE is answered too, so the ``commands`` section finally does
    something: a setpoint set from the ground reaches the node between stages,

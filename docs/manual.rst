@@ -2642,10 +2642,6 @@ Tcspecial says both as it starts, on the terminal:
 
    5000 ms beacon: 0.0.0.0:5550 to 127.0.0.1:5650
 
-Every beacon carries a configuration version, 2.0, which goes out as three
-bytes and prints as 2.0.0. It is the software's: it says which build is
-reading the configuration, not anything the file states.
-
 ``RUST_LOG`` sets the logging, which the Makefile leaves at ``info``.
 
 .. code-block:: console
@@ -2692,8 +2688,7 @@ the beacon box
      Beacon
        Status:         (indicator)
        Last received:  02:02:02
-       Last message:   tcspecial v0.1.0, config v2.0.0,
-                       md5 36999e46a4bf436854442d8f97a2248d
+       Last message:   tcspecial v0.1.0 md5 36999e46a4bf436854442d8f97a2248d
 
   The message wraps at its spaces where the window is too narrow for it on
   one line, as it is beside the command link.
@@ -2711,9 +2706,9 @@ the beacon box
   beacon that was lost on the way reads exactly like one that was never sent.
 
   ``Last message`` reads ``<none>`` until a beacon arrives. ``v`` is the software
-  flying, ``config v`` its configuration version, and ``md5`` the digest of the configuration file tcspecial read, so the line says what is up
-  there without anything having to connect first. The answer to a ``CONNECT``
-  says the same three in the same words: see `What each end read`_. A datagram the MOC cannot read is shown as
+  flying and ``md5`` the digest of the configuration file tcspecial read, so
+  the line says what is up there without anything having to connect first.
+  The answer to a ``CONNECT`` says the same two in the same words: see `What each end read`_. A datagram the MOC cannot read is shown as
   what arrived, cut short, rather than left off the line: something else
   sending to the group is worth seeing beside a green light.
 
@@ -2836,21 +2831,21 @@ it.
 What each end read
 ^^^^^^^^^^^^^^^^^^
 When a link comes up, tcsmoc sends its software version and an MD5 of the
-payload configuration it read, and tcspecial answers with its own, and with
-its configuration version. Each prints what it read on the terminal it was
+payload configuration it read, and tcspecial answers with its own. Each
+prints what it read on the terminal it was
 started from before it makes the socket, so they are there to read even
 when the link never comes up -- the MOC's first, then tcspecial's, then what
 the answer said:
 
 .. code-block:: console
 
-   tcsmoc v0.1.0, config v2.0.0, md5 36999e46a4bf436854442d8f97a2248d
-   tcspecial v0.1.0, config v2.0.0, md5 36999e46a4bf436854442d8f97a2248d
-   CONNECT answer: tcspecial v0.1.0, config v2.0.0, md5 36999e46a4bf436854442d8f97a2248d
+   tcsmoc v0.1.0 md5 36999e46a4bf436854442d8f97a2248d
+   tcspecial v0.1.0 md5 36999e46a4bf436854442d8f97a2248d
+   CONNECT answer: tcspecial v0.1.0 md5 36999e46a4bf436854442d8f97a2248d
 
 The first two lines are written the same way by the two programs, each naming
-itself, so two ends reading one payload set print the same version,
-configuration version and digest -- which is what makes a difference in any
+itself, so two ends reading one payload set print the same version and
+digest -- which is what makes a difference in any
 part of it worth reading. The third says what came back over
 the link.
 
@@ -2858,11 +2853,10 @@ the link.
 
 .. code-block:: text
 
-   tcspecial agrees: v0.1.0, config v2.0.0 md5: 36999e46a4bf436854442d8f97a2248d
+   tcspecial agrees: v0.1.0 md5 36999e46a4bf436854442d8f97a2248d
 
-The configuration version shown there is the one tcspecial sent. The MOC does
-not send its own, so there is nothing to compare it with: what the verdict is
-reached on is the software version and the digest. They are the same payload
+The verdict is reached on the software version and the digest. They are the
+same payload
 set if the digests match: the digest is of what a file says rather than of its
 bytes, so the YAML and the XML of one set digest alike, and so do two files
 differing only in comments, spacing, the order of their sections or the order

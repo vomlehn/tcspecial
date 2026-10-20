@@ -295,9 +295,10 @@ def digest_text(digest):
     return "".join(f"{byte:02x}" for byte in digest)
 
 
-def what_it_read(version, config_version, digest):
-    """What one end of the link is running and reading, as one line."""
-    return f"tcspecial v{version}, config v{config_version}, md5 {digest}"
+def what_it_read(version, digest):
+    """What one end of the link is running and reading, as one line: the
+    version of the software and the digest of the files it read."""
+    return f"tcspecial v{version} md5 {digest}"
 
 
 @dataclass(frozen=True)
@@ -327,7 +328,6 @@ def _beacon_of(datagram):
         return {
             "sequence": body["header"]["sequence"],
             "version": version_text(body["version"]),
-            "config_version": version_text(body["config_version"]),
             "digest": digest_text(body["digest"]),
         }, kind
     except (KeyError, TypeError):
@@ -365,7 +365,7 @@ def message_of(datagram):
     is shown as what arrived, cut short."""
     beacon, kind = _beacon_of(datagram)
     if beacon is not None:
-        return what_it_read(beacon["version"], beacon["config_version"], beacon["digest"])
+        return what_it_read(beacon["version"], beacon["digest"])
     if kind is not None:
         return f"not a beacon: {kind}"
     text = datagram.decode("utf-8", errors="replace")

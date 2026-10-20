@@ -110,8 +110,7 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
             let mut sequence = 0;
             while !stop.load(Ordering::Relaxed) {
                 sequence += 1;
-                let sent =
-                    Telemetry::Beacon(BeaconTelemetry::new(sequence, version, version, digest));
+                let sent = Telemetry::Beacon(BeaconTelemetry::new(sequence, version, digest));
                 let datagram = serde_json::to_vec(&sent).expect("it serializes");
                 let _ = beacon.send_to(&datagram, ("127.0.0.1", beacons));
                 std::thread::sleep(Duration::from_millis(100));
@@ -147,7 +146,7 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
     // The beacon, read from the vehicle's own JSON.
     assert!(
         printed.contains(&format!(
-            "beacon: tcspecial v{0}, config v{0}, md5 {digest}",
+            "beacon: tcspecial v{0} md5 {digest}",
             ConfigVersion::of_this_build(),
         )),
         "{printed}"

@@ -98,7 +98,6 @@ fn a_beacon_from_the_configured_address_is_heard() {
     let beacon = serde_json::to_vec(&Telemetry::Beacon(BeaconTelemetry::new(
         7,
         version,
-        version,
         ConfigDigest([0x5a; 16]),
     )))
     .expect("a beacon serialises");

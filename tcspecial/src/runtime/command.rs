@@ -103,13 +103,11 @@ struct Link {
 /// Settled when the process starts, not read when a command arrives: the
 /// digest is of the file this process read, and a file edited since would
 /// otherwise have the answers claiming a configuration nothing is serving.
-/// The beacons carry the same three facts, from the same place.
+/// The beacons carry the same two facts, from the same place.
 #[derive(Debug, Clone, Copy)]
 pub struct Flying {
     /// The version of this build.
     pub version: ConfigVersion,
-    /// The version the configuration file states.
-    pub config_version: ConfigVersion,
     /// The digest of the configuration file this process read.
     pub digest: ConfigDigest,
 }
@@ -389,13 +387,12 @@ impl Serving {
                 Telemetry::Ping(PingTelemetry::new(sequence, CommandStatus::Success))
             }
 
-            // The three facts this vehicle is flying, which is what licenses
-            // every command that carries a node id: a ground station whose
-            // digest does not match does not send them.
+            // What this vehicle is flying, which is what licenses every
+            // command that carries a node id: a ground station whose digest
+            // does not match does not send them.
             Command::Connect(_) => Telemetry::Connect(ConnectTelemetry::new(
                 sequence,
                 self.flying.version,
-                self.flying.config_version,
                 self.flying.digest,
             )),
 
@@ -660,7 +657,6 @@ mod tests {
     fn flying() -> Flying {
         Flying {
             version: ConfigVersion::of_this_build(),
-            config_version: ConfigVersion::of_text("2.0").expect("a version"),
             digest: ConfigDigest([0x5Au8; 16]),
         }
     }
@@ -758,7 +754,7 @@ mod tests {
             Some(Telemetry::Connect(tm)) => {
                 assert_eq!(tm.header.status, CommandStatus::Success);
                 assert_eq!(tm.digest, ConfigDigest([0x5Au8; 16]), "the file it read");
-                assert_eq!(tm.config_version, ConfigVersion::of_text("2.0").unwrap());
+                assert_eq!(tm.version, ConfigVersion::of_this_build(), "this build");
             }
             other => panic!("expected a connect answer, got {other:?}"),
         }

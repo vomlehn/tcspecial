@@ -48,7 +48,7 @@ fn the_window_shows_what_a_pass_reported() {
 
     // A beacon, as the loop would report it: the time it arrived, what it
     // said, and a light that says the spacecraft is being heard from.
-    let said = "tcspecial v0.1.0, config v2.0.0, md5 0123456789abcdef";
+    let said = "tcspecial v0.1.0 md5 0123456789abcdef";
     show(
         &window,
         &Shown::at(

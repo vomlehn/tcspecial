@@ -149,24 +149,16 @@ impl RestartTelemetry {
 pub struct ConnectTelemetry {
     pub header: TelemetryHeader,
     pub version: ConfigVersion,
-    /// The version the tcspecial configuration file states, which the beacon
-    /// carries too: a ground station reading the answer is told which set
-    /// this end is serving and not only which build is serving it.
-    pub config_version: ConfigVersion,
+    /// The digest of the configuration this end read, which says which set
+    /// it is serving: see `crate::config_digest`.
     pub digest: ConfigDigest,
 }
 
 impl ConnectTelemetry {
-    pub fn new(
-        sequence: u32,
-        version: ConfigVersion,
-        config_version: ConfigVersion,
-        digest: ConfigDigest,
-    ) -> Self {
+    pub fn new(sequence: u32, version: ConfigVersion, digest: ConfigDigest) -> Self {
         Self {
             header: TelemetryHeader::new(sequence, TelemetryType::Connect, CommandStatus::Success),
             version,
-            config_version,
             digest,
         }
     }
@@ -175,7 +167,7 @@ impl ConnectTelemetry {
     ///
     /// For a CONNECT that is refused rather than answered -- one that arrived
     /// on a payload's link, which is not what a connection to the vehicle is
-    /// asked on. The three facts are this end's all the same, so the ground
+    /// asked on. The facts are this end's all the same, so the ground
     /// is told what it asked as well as that it asked in the wrong place.
     pub fn refused(self, status: CommandStatus) -> Self {
         Self {
@@ -334,13 +326,9 @@ pub struct BeaconTelemetry {
     pub header: TelemetryHeader,
     /// The version of this build, from its `Cargo.toml`.
     pub version: ConfigVersion,
-    /// The version the configuration file states, as its three decimal parts.
-    ///
-    /// The file's own, not this build's: a payload set is versioned by
-    /// whoever writes it, and a ground station reading a beacon wants to know
-    /// which set it is hearing from as well as which software.
-    pub config_version: ConfigVersion,
-    /// The digest of the configuration file this process read.
+    /// The digest of the configuration file this process read, which is what
+    /// says which payload set it is serving: a configuration states no
+    /// version of its own.
     pub digest: ConfigDigest,
 }
 
@@ -356,16 +344,10 @@ impl BeaconTelemetry {
     /// Counted by the sender, so it starts again at one when tcspecial does.
     /// A number going backwards is therefore a restart, which is worth
     /// knowing and is not the same thing as a gap.
-    pub fn new(
-        sequence: u32,
-        version: ConfigVersion,
-        config_version: ConfigVersion,
-        digest: ConfigDigest,
-    ) -> Self {
+    pub fn new(sequence: u32, version: ConfigVersion, digest: ConfigDigest) -> Self {
         Self {
             header: TelemetryHeader::new(sequence, TelemetryType::Beacon, CommandStatus::Success),
             version,
-            config_version,
             digest,
         }
     }
@@ -389,12 +371,11 @@ pub fn answer_to(command: &crate::commands::Command, status: CommandStatus) -> T
         Command::Ping(_) => Telemetry::Ping(PingTelemetry::new(sequence, status)),
         // A CONNECT is answered where it belongs -- see the command
         // interpreter -- so the one that comes through here is a refused one,
-        // and the status is the whole of what it says. The three facts are
-        // this build's, which is all a refusal knows.
+        // and the status is the whole of what it says. The build is this
+        // one's, which is all a refusal knows.
         Command::Connect(_) => Telemetry::Connect(
             ConnectTelemetry::new(
                 sequence,
-                ConfigVersion::of_this_build(),
                 ConfigVersion::of_this_build(),
                 ConfigDigest([0u8; 16]),
             )
@@ -533,12 +514,7 @@ mod tests {
 
     #[test]
     fn test_beacon_telemetry() {
-        let tm = BeaconTelemetry::new(
-            7,
-            ConfigVersion::of_this_build(),
-            ConfigVersion::of_text("1.0").expect("a version"),
-            ConfigDigest([0u8; 16]),
-        );
+        let tm = BeaconTelemetry::new(7, ConfigVersion::of_this_build(), ConfigDigest([0u8; 16]));
         assert_eq!(tm.header.tm_type, TelemetryType::Beacon);
         // The beacon's own number, not a command's: a beacon answers nothing.
         assert_eq!(tm.header.sequence, 7);
@@ -558,7 +534,7 @@ mod tests {
 
         let answers = [
             Telemetry::Ping(PingTelemetry::new(1, CommandStatus::Success)),
-            Telemetry::Connect(ConnectTelemetry::new(2, version, version, digest)),
+            Telemetry::Connect(ConnectTelemetry::new(2, version, digest)),
             Telemetry::RestartArm(RestartArmTelemetry::new(3, CommandStatus::Success)),
             Telemetry::Restart(RestartTelemetry::new(4, CommandStatus::Success)),
             Telemetry::Config(ConfigTelemetry::new(9, CommandStatus::Success)),
@@ -591,7 +567,7 @@ mod tests {
                 DHSample::new(),
                 DHSample::new(),
             )),
-            Telemetry::Beacon(BeaconTelemetry::new(16, version, version, digest)),
+            Telemetry::Beacon(BeaconTelemetry::new(16, version, digest)),
         ];
 
         // Every kind there is, which is what makes this a statement about all

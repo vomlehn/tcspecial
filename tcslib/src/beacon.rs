@@ -429,28 +429,25 @@ pub fn received_at(at: Option<SystemTime>) -> String {
 
 /// What one end of the link is running and reading, as one line.
 ///
-/// Three things, each labelled: the version of the software, the version the
-/// configuration states, and the digest of the files it read.
+/// Two things, each labelled: the version of the software and the digest of
+/// the files it read. A configuration states no version of its own; the
+/// digest is what says which one it is.
 ///
 /// ```text
-/// tcspecial v0.1.0, config v1.0.0, md5 36999e46a4bf436854442d8f97a2248d
+/// tcspecial v0.1.0 md5 36999e46a4bf436854442d8f97a2248d
 /// ```
 ///
-/// Both versions are three decimal parts, as they go on the link -- a byte
-/// each -- and the digest is the hex of its sixteen bytes with nothing between
+/// The version is three decimal parts, as it goes on the link -- a byte each
+/// -- and the digest is the hex of its sixteen bytes with nothing between
 /// them.
 ///
-/// One function because two messages carry these three facts: a beacon, which
+/// One function because two messages carry these facts: a beacon, which
 /// arrives on its own, and the answer to a CONNECT, which is asked for. They
 /// say the same thing about the same spacecraft, so they are read against each
 /// other, and two format strings would eventually disagree about how to write
 /// one of them.
-pub fn what_it_read(
-    version: ConfigVersion,
-    config_version: ConfigVersion,
-    digest: ConfigDigest,
-) -> String {
-    format!("tcspecial v{version}, config v{config_version}, md5 {digest}")
+pub fn what_it_read(version: ConfigVersion, digest: ConfigDigest) -> String {
+    format!("tcspecial v{version} md5 {digest}")
 }
 
 /// What a datagram on the beacon link turned out to be.
@@ -512,9 +509,7 @@ pub fn differs(theirs: ConfigDigest, ours: ConfigDigest) -> Option<String> {
 /// than hidden behind a green light.
 pub fn message_of(datagram: &[u8]) -> String {
     match serde_json::from_slice::<Telemetry>(datagram) {
-        Ok(Telemetry::Beacon(beacon)) => {
-            what_it_read(beacon.version, beacon.config_version, beacon.digest)
-        }
+        Ok(Telemetry::Beacon(beacon)) => what_it_read(beacon.version, beacon.digest),
         Ok(other) => format!("not a beacon: {:?}", other.tm_type()),
         Err(_) => {
             let text = String::from_utf8_lossy(datagram);
@@ -1072,10 +1067,9 @@ mod tests {
         assert!(said.contains(&ours.to_string()), "{said}");
 
         let version = ConfigVersion::of_this_build();
-        let datagram = serde_json::to_vec(&Telemetry::Beacon(BeaconTelemetry::new(
-            1, version, version, theirs,
-        )))
-        .expect("it serializes");
+        let datagram =
+            serde_json::to_vec(&Telemetry::Beacon(BeaconTelemetry::new(1, version, theirs)))
+                .expect("it serializes");
 
         let heard = hear(&datagram, Some(ours));
         assert!(heard.differs.is_some());
@@ -1102,23 +1096,19 @@ mod tests {
             minor: 2,
             patch: 3,
         };
-        let config_version = ConfigVersion {
-            major: 4,
-            minor: 5,
-            patch: 6,
-        };
         let digest = ConfigDigest([0xab; 16]);
-        let beacon = Telemetry::Beacon(BeaconTelemetry::new(3, version, config_version, digest));
+        let beacon = Telemetry::Beacon(BeaconTelemetry::new(3, version, digest));
         let datagram = serde_json::to_vec(&beacon).expect("it serializes");
 
-        // Each labelled, each version three decimal parts, and the digest hex
-        // with nothing between the bytes.
-        let want = format!("tcspecial v1.2.3, config v4.5.6, md5 {}", "ab".repeat(16));
+        // Each labelled, the version three decimal parts, and the digest hex
+        // with nothing between the bytes. No configuration version: a
+        // configuration states none.
+        let want = format!("tcspecial v1.2.3 md5 {}", "ab".repeat(16));
         assert_eq!(message_of(&datagram), want);
 
         // And the answer to a CONNECT is written by the same function, so the
         // two lines cannot come to disagree about how to say it.
-        assert_eq!(what_it_read(version, config_version, digest), want);
+        assert_eq!(what_it_read(version, digest), want);
 
         // The beacon's own number comes back beside the message, which is
         // what tells a beacon that was missed from one that was never sent.
@@ -1321,7 +1311,6 @@ mod tests {
         let version = ConfigVersion::of_this_build();
         let datagram = serde_json::to_vec(&Telemetry::Beacon(BeaconTelemetry::new(
             1,
-            version,
             version,
             ConfigDigest([0; 16]),
         )))

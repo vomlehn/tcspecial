@@ -22,7 +22,7 @@ SECOND = 1_000_000_000
 AT = 1_000_000 * SECOND
 
 
-def a_beacon(sequence=2, digest=None, version=(0, 1, 0), config_version=(2, 0, 0)):
+def a_beacon(sequence=2, digest=None, version=(0, 1, 0)):
     """A beacon, as tcspecial sends one."""
     digest = digest or [36, 195, 155, 114, 7, 4, 241, 185, 121, 87, 153, 67, 108, 53, 167, 176]
     return json.dumps({
@@ -34,7 +34,6 @@ def a_beacon(sequence=2, digest=None, version=(0, 1, 0), config_version=(2, 0, 0
                 "timestamp": {"micros": 1792436939903024},
             },
             "version": dict(zip(("major", "minor", "patch"), version)),
-            "config_version": dict(zip(("major", "minor", "patch"), config_version)),
             "digest": digest,
         }
     }).encode()
@@ -157,8 +156,8 @@ class HearingTest(unittest.TestCase):
         self.assertIsNone(beacon.hear(datagram, None).differs)
 
     def test_a_beacon_is_shown_by_what_it_said(self):
-        datagram = a_beacon(sequence=3, digest=[0xAB] * 16, version=(1, 2, 3), config_version=(4, 5, 6))
-        want = f"tcspecial v1.2.3, config v4.5.6, md5 {'ab' * 16}"
+        datagram = a_beacon(sequence=3, digest=[0xAB] * 16, version=(1, 2, 3))
+        want = f"tcspecial v1.2.3 md5 {'ab' * 16}"
         self.assertEqual(beacon.message_of(datagram), want)
         self.assertEqual(beacon.hear(datagram, None).sequence, 3)
         self.assertIsNone(beacon.hear(b"hello", None).sequence)

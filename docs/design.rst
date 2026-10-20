@@ -5832,13 +5832,12 @@ Requirement
     one is refused by name and told why, as a file writing any other name
     this language has dropped is told what to say instead.
 
-    The one place this rule is not yet kept is a synchronous serial line,
-    whose ``clock_type``, ``encoding`` and ``loopback`` are recorded and not
-    applied -- the kernel drives such a line through a network interface of
-    its own rather than through the terms of a device file, so a handler that
-    opens a path cannot set them. Either those terms go the way of the four
-    above, or they are applied through that interface; see the requirement
-    below, which records what is so today.
+    A synchronous serial line keeps it too, through the interface the kernel
+    gives such a line rather than through a device file: ``standard``,
+    ``clock_type``, ``clock_rate``, ``loopback``, ``encoding`` and
+    ``frame_check`` are every field of the two structures ``SIOCWANDEV``
+    takes for a raw HDLC line, and each is set and read back. See `HDLC
+    Payloads: a Synchronous Line`_.
 
 Requirement
     A term of a link is refused on the two types that are not on one: a

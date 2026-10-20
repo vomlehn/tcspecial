@@ -30,12 +30,26 @@ pub struct Due {
 }
 
 /// The groups of a configuration and their intervals.
+///
+/// Kept by position, in the order the configuration writes them, so that the
+/// pass can name a group by its place -- [`Schedule::most_overdue`],
+/// [`Schedule::members_at`], [`Schedule::read_at`] -- and read what is due
+/// without copying a name: see `System::pass`. The by-name calls are the same
+/// questions, for a caller that has a name.
 #[derive(Debug, Clone)]
 pub struct Schedule {
-    /// Each group's interval, and which nodes are in it.
-    groups: BTreeMap<String, (Duration, Vec<String>)>,
-    /// When each group is next due.
-    next: BTreeMap<String, Instant>,
+    /// Each group's name, interval, members and when it is next due.
+    groups: Vec<Group>,
+    /// Each group's place in `groups`, by name.
+    index: BTreeMap<String, usize>,
+}
+
+#[derive(Debug, Clone)]
+struct Group {
+    name: String,
+    interval: Duration,
+    members: Vec<String>,
+    next: Instant,
 }
 
 impl Schedule {
@@ -51,66 +65,106 @@ impl Schedule {
     /// is left out, with the group, rather than panicking in flight -- a
     /// group that does not run is better than a vehicle that stops.
     pub fn of(graph: &Graph, now: Instant) -> Schedule {
-        let mut groups: BTreeMap<String, (Duration, Vec<String>)> = BTreeMap::new();
+        let mut groups: Vec<Group> = Vec::new();
+        let mut index: BTreeMap<String, usize> = BTreeMap::new();
 
         for group in &graph.groups {
             let Ok(interval) = group.interval() else {
                 continue;
             };
-            groups.insert(group.name.clone(), (interval, Vec::new()));
+            index.insert(group.name.clone(), groups.len());
+            groups.push(Group {
+                name: group.name.clone(),
+                interval,
+                members: Vec::new(),
+                next: now,
+            });
         }
 
         for node in &graph.nodes {
             let Some(name) = &node.group else { continue };
-            if let Some((_, members)) = groups.get_mut(name) {
-                members.push(node.name.clone());
+            if let Some(&at) = index.get(name) {
+                groups[at].members.push(node.name.clone());
             }
         }
 
-        let next = groups.keys().map(|name| (name.clone(), now)).collect();
-        Schedule { groups, next }
+        Schedule { groups, index }
+    }
+
+    /// The group that has waited longest of those due at `now`, by its
+    /// place, or `None` where none is due.
+    ///
+    /// Several may be due at once -- two groups on the same interval, or a
+    /// run that fell behind -- and the one that has waited longest is read
+    /// first; a tie goes to the one written first. A group once read is not
+    /// due again until its interval has passed (see [`Schedule::read_at`]),
+    /// so asking again after each read goes through all that are due, each
+    /// once. Allocates nothing.
+    pub fn most_overdue(&self, now: Instant) -> Option<usize> {
+        self.groups
+            .iter()
+            .enumerate()
+            .filter(|(_, group)| group.next <= now)
+            .min_by_key(|(at, group)| (group.next, *at))
+            .map(|(at, _)| at)
     }
 
     /// Which groups are due at `now`, soonest first.
     ///
-    /// Several may be due at once -- two groups on the same interval, or a
-    /// run that fell behind -- and the order is by when they were due rather
-    /// than by name, so the one that has waited longest is read first.
+    /// The same answer as asking [`Schedule::most_overdue`] after each read,
+    /// all at once and as a list -- which allocates, so the pass does not ask
+    /// it this way.
     pub fn due(&self, now: Instant) -> Vec<Due> {
         let mut due: Vec<Due> = self
-            .next
+            .groups
             .iter()
-            .filter(|(_, at)| **at <= now)
-            .map(|(group, at)| Due {
-                group: group.clone(),
-                at: *at,
+            .filter(|group| group.next <= now)
+            .map(|group| Due {
+                group: group.name.clone(),
+                at: group.next,
             })
             .collect();
         due.sort_by_key(|d| d.at);
         due
     }
 
-    /// Record that a group has been read, and say when it is next due.
+    /// Record that the group at `at` has been read, and say when it is next
+    /// due.
     ///
     /// From the time it was *due* and not from now: a group read every three
     /// seconds whose reads take a moment is still read every three seconds.
     /// A group so far behind that the next time is already past is pushed to
     /// now rather than to a time in the past -- otherwise one slow pass would
     /// leave it due for ever and starve everything else.
-    pub fn read(&mut self, group: &str, now: Instant) -> Option<Instant> {
-        let (interval, _) = self.groups.get(group)?;
-        let was = *self.next.get(group)?;
-        let then = was.checked_add(*interval)?;
-        let then = if then <= now { now + *interval } else { then };
-        self.next.insert(group.to_string(), then);
+    pub fn read_at(&mut self, at: usize, now: Instant) -> Option<Instant> {
+        let group = self.groups.get_mut(at)?;
+        let then = group.next.checked_add(group.interval)?;
+        let then = if then <= now {
+            now + group.interval
+        } else {
+            then
+        };
+        group.next = then;
         Some(then)
     }
 
-    /// The nodes in a group, in the order the configuration names them.
-    pub fn members(&self, group: &str) -> &[String] {
+    /// The same, for the group called `group`.
+    pub fn read(&mut self, group: &str, now: Instant) -> Option<Instant> {
+        let at = *self.index.get(group)?;
+        self.read_at(at, now)
+    }
+
+    /// The nodes in the group at `at`, in the order the configuration names
+    /// them.
+    pub fn members_at(&self, at: usize) -> &[String] {
         self.groups
-            .get(group)
-            .map_or(&[], |(_, members)| members.as_slice())
+            .get(at)
+            .map_or(&[], |group| group.members.as_slice())
+    }
+
+    /// The same, for the group called `group`.
+    pub fn members(&self, group: &str) -> &[String] {
+        self.index.get(group).map_or(&[], |&at| self.members_at(at))
     }
 
     /// How long until something is due, or nothing if there is nothing to
@@ -121,15 +175,19 @@ impl Schedule {
     /// `None` is a configuration with no groups in it, where the loop waits
     /// on its devices alone.
     pub fn until_next(&self, now: Instant) -> Option<Duration> {
-        self.next
-            .values()
+        self.groups
+            .iter()
+            .map(|group| group.next)
             .min()
             .map(|at| at.saturating_duration_since(now))
     }
 
     /// Every group, by name.
     pub fn groups(&self) -> Vec<&str> {
-        self.groups.keys().map(String::as_str).collect()
+        self.groups
+            .iter()
+            .map(|group| group.name.as_str())
+            .collect()
     }
 }
 

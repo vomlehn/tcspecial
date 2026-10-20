@@ -55,7 +55,7 @@ use nix::poll::{poll, PollFd, PollFlags};
 use crate::runtime::node_state::Abandon;
 use tcslibgs::node::vehicle::compute::{ProcessParams, Restart};
 
-use super::Function;
+use super::{Function, Out};
 
 /// The program, running.
 ///
@@ -94,7 +94,21 @@ pub struct Process {
     /// is a disable that arrives seconds late. See
     /// [`crate::runtime::node_state::Abandon`].
     abandon: Abandon,
+
+    // What each datum is worked in, made with the node and reused, so that
+    // handing a datum to the program and reading its answer allocate nothing.
+    /// The line written to the program.
+    line: String,
+    /// The answer read back, without its newline.
+    answer: Vec<u8>,
+    /// The program's name in quotes, as a complaint about its answer names it.
+    quoted: String,
 }
+
+/// Room for a line to the program and its answer: a value as decimal text,
+/// and an input's name, are far shorter. A longer one is still taken, the
+/// buffer growing once to hold it and keeping the room after.
+const LINE_BYTES: usize = 256;
 
 impl Process {
     /// The program these settled parameters name, not yet started.
@@ -105,6 +119,7 @@ impl Process {
     /// found here is the machine's answer: see [`Process::start`].
     pub fn of(params: ProcessParams) -> Process {
         Process {
+            quoted: format!("\"{}\"", params.executable),
             executable: params.executable,
             timeout: params.timeout,
             restart: params.restart,
@@ -112,6 +127,8 @@ impl Process {
             restarts: 0,
             stopped: None,
             abandon: Abandon::nothing(),
+            line: String::with_capacity(LINE_BYTES),
+            answer: Vec::with_capacity(LINE_BYTES),
         }
     }
 
@@ -166,7 +183,7 @@ impl Process {
             child,
             stdin,
             stdout,
-            partial: Vec::new(),
+            partial: Vec::with_capacity(LINE_BYTES),
         })
     }
 
@@ -175,7 +192,12 @@ impl Process {
     /// The deadline is measured from here and not from the write: a program
     /// that takes its `timeout` to answer has used all of it, whatever the
     /// writing cost.
-    fn ask(&mut self, line: &str) -> Result<Option<Vec<u8>>, String> {
+    ///
+    /// The line is `self.line`, and the answer is left in `self.answer`:
+    /// `Ok(true)` is an answer there, and `Ok(false)` is none -- an empty line,
+    /// which is the program saying "nothing to send yet", or the node being
+    /// disabled while it waited.
+    fn ask(&mut self) -> Result<bool, String> {
         let deadline = Instant::now() + self.timeout;
         let Some(running) = self.running.as_mut() else {
             return Err("it is not running".to_string());
@@ -183,14 +205,17 @@ impl Process {
 
         running
             .stdin
-            .write_all(line.as_bytes())
+            .write_all(self.line.as_bytes())
             .and_then(|()| running.stdin.flush())
             .map_err(|e| format!("it would not take what arrived: {e}"))?;
 
         loop {
             // A whole line already in hand, from a read that brought two.
-            if let Some(answer) = take_line(&mut running.partial) {
-                return Ok(answer);
+            if let Some((consumed, line)) = next_line(&running.partial) {
+                self.answer.clear();
+                self.answer.extend_from_slice(line);
+                running.partial.drain(..consumed);
+                return Ok(!self.answer.is_empty());
             }
 
             let left = deadline.saturating_duration_since(Instant::now());
@@ -211,12 +236,25 @@ impl Process {
                 .abandon
                 .io_fd()
                 .map(|fd| unsafe { std::os::fd::BorrowedFd::borrow_raw(fd) });
-            let mut fds = vec![PollFd::new(&borrowed, PollFlags::POLLIN)];
-            if let Some(woken) = woken.as_ref() {
-                fds.push(PollFd::new(woken, PollFlags::POLLIN));
-            }
+            // On the stack: the program's output, and the node's wakeup
+            // where it has one.
+            let mut both;
+            let mut alone;
+            let fds: &mut [PollFd] = match woken.as_ref() {
+                Some(woken) => {
+                    both = [
+                        PollFd::new(&borrowed, PollFlags::POLLIN),
+                        PollFd::new(woken, PollFlags::POLLIN),
+                    ];
+                    &mut both
+                }
+                None => {
+                    alone = [PollFd::new(&borrowed, PollFlags::POLLIN)];
+                    &mut alone
+                }
+            };
             let waiting = left.as_millis().min(i32::MAX as u128) as i32;
-            match poll(&mut fds, waiting) {
+            match poll(fds, waiting) {
                 Ok(0) => continue,
                 Ok(_) => {}
                 Err(e) => return Err(format!("waiting for its answer failed: {e}")),
@@ -232,7 +270,7 @@ impl Process {
                 .and_then(|fd| fd.revents())
                 .is_some_and(|events| events.contains(PollFlags::POLLIN))
             {
-                return Ok(None);
+                return Ok(false);
             }
 
             let mut buffer = [0u8; 256];
@@ -319,26 +357,19 @@ impl Process {
 // run looks like a program that started -- which is the one failure this
 // node exists to make visible.
 
-/// One whole line out of what has arrived, if there is one.
+/// The first whole line in what has arrived, if there is one: how many bytes
+/// it takes up, its newline included, and the line without it.
 ///
-/// `Some(None)` is an empty line, which is the program saying "nothing to send
-/// yet"; `Some(Some(bytes))` is a result. `None` is "no whole line yet", which
-/// is what makes the caller wait rather than guess. A trailing carriage return
-/// is dropped, so a program written on a machine that writes them is not
-/// refused for the one byte.
-fn take_line(buffer: &mut Vec<u8>) -> Option<Option<Vec<u8>>> {
+/// An empty line is the program saying "nothing to send yet". `None` is "no
+/// whole line yet", which is what makes the caller wait rather than guess. A
+/// trailing carriage return is dropped, so a program written on a machine
+/// that writes them is not refused for the one byte. Borrowed from the
+/// buffer, so that finding it allocates nothing.
+fn next_line(buffer: &[u8]) -> Option<(usize, &[u8])> {
     let end = buffer.iter().position(|b| *b == b'\n')?;
-    let mut line: Vec<u8> = buffer.drain(..=end).collect();
-    line.pop();
-    if line.last() == Some(&b'\r') {
-        line.pop();
-    }
-
-    if line.is_empty() {
-        Some(None)
-    } else {
-        Some(Some(line))
-    }
+    let line = &buffer[..end];
+    let line = line.strip_suffix(b"\r").unwrap_or(line);
+    Some((end + 1, line))
 }
 
 /// What a program that has gone exited with, said in a sentence.
@@ -367,7 +398,7 @@ impl Function for Process {
     /// datum is refused with the reason. Nothing is swallowed. A computation
     /// that has stopped must look stopped, because the alternative is a
     /// control loop acting on numbers that stopped changing.
-    fn give(&mut self, input: Option<&str>, data: &[u8]) -> Result<Option<Vec<u8>>, String> {
+    fn give(&mut self, input: Option<&str>, data: &[u8]) -> Result<Option<Out>, String> {
         if let Some(why) = self.why_stopped() {
             return Err(format!("\"{}\" is not running: {why}", self.executable));
         }
@@ -388,26 +419,34 @@ impl Function for Process {
         // far end is a program reading lines. This is the one boundary where a
         // value is written out and read back, and both halves of it are here:
         // the number this writes and the number the answer is read as.
-        let datum = super::as_text(super::from_value(data, "what arrived")?);
-        let line = match input {
-            Some(input) => format!("{input}={datum}\n"),
-            None => format!("{datum}\n"),
-        };
+        //
+        // Written into the node's own line, which `as_text` would have made a
+        // string of: the same decimal, by the same `Display`.
+        let datum = super::from_value(data, "what arrived")?;
+        self.line.clear();
+        {
+            use std::fmt::Write as _;
+            // Writing to a String does not fail.
+            let _ = match input {
+                Some(input) => writeln!(self.line, "{input}={datum}"),
+                None => writeln!(self.line, "{datum}"),
+            };
+        }
 
-        match self.ask(&line) {
+        match self.ask() {
             // The program's answer is a number it wrote as text, and what
             // leaves this node is a value like any other.
-            Ok(Some(answer)) => {
-                let said = std::str::from_utf8(&answer).map_err(|_| {
+            Ok(true) => {
+                let said = std::str::from_utf8(&self.answer).map_err(|_| {
                     format!(
                         "\"{}\" answered with something that is not text",
                         self.executable
                     )
                 })?;
-                let number = super::from_text(said, &format!("\"{}\"", self.executable))?;
-                Ok(Some(super::as_value(number)?))
+                let number = super::from_text(said, &self.quoted)?;
+                Ok(Some(Out::value(number)?))
             }
-            Ok(None) => Ok(None),
+            Ok(false) => Ok(None),
             Err(why) => {
                 // Put down whatever is left of it before deciding: a program
                 // that missed its deadline is still running, and a second
@@ -761,19 +800,17 @@ mod tests {
     /// Whole lines are taken from what has arrived, and nothing else is.
     #[test]
     fn a_line_is_taken_only_when_it_is_whole() {
-        let mut buffer = b"291".to_vec();
-        assert_eq!(take_line(&mut buffer), None, "no newline yet");
-        assert_eq!(buffer, b"291", "and nothing is taken");
+        assert_eq!(next_line(b"291"), None, "no newline yet");
 
-        buffer.extend_from_slice(b".5\n292.0\n");
-        assert_eq!(take_line(&mut buffer), Some(Some(b"291.5".to_vec())));
-        assert_eq!(take_line(&mut buffer), Some(Some(b"292.0".to_vec())));
-        assert_eq!(take_line(&mut buffer), None);
+        let buffer = b"291.5\n292.0\n";
+        assert_eq!(next_line(buffer), Some((6, &b"291.5"[..])));
+        assert_eq!(next_line(&buffer[6..]), Some((6, &b"292.0"[..])));
+        assert_eq!(next_line(&buffer[12..]), None);
 
         // An empty line is an answer of its own, and a carriage return before
         // the newline is not part of one.
-        let mut buffer = b"\n293.15\r\n".to_vec();
-        assert_eq!(take_line(&mut buffer), Some(None));
-        assert_eq!(take_line(&mut buffer), Some(Some(b"293.15".to_vec())));
+        let buffer = b"\n293.15\r\n";
+        assert_eq!(next_line(buffer), Some((1, &b""[..])));
+        assert_eq!(next_line(&buffer[1..]), Some((8, &b"293.15"[..])));
     }
 }

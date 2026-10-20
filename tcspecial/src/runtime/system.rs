@@ -323,39 +323,46 @@ impl System {
         // `take_the_work`.
         self.take_the_work();
 
-        for due in self.schedule.due(now) {
-            let members: Vec<String> = self.schedule.members(&due.group).to_vec();
-            moved.add(self.fabric.pump_group(&members));
-            self.schedule.read(&due.group, now);
+        // By the group's place, not its name, and each group's members
+        // borrowed from the schedule while the fabric reads them: the two are
+        // different fields, so nothing is copied to read a group.
+        while let Some(group) = self.schedule.most_overdue(now) {
+            moved.add(self.fabric.pump_group(self.schedule.members_at(group)));
+            self.schedule.read_at(group, now);
             self.take_the_work();
         }
 
         // The nodes in no group, which are read as they become readable: a
         // read of no bytes is the ordinary answer and costs a system call.
         // One that states how often is read, or asked, as its `Pace` says.
-        let polled: Vec<String> = self.polled.clone();
-        for node in polled {
-            let Some((pace, due)) = self.paced.get(&node).copied() else {
-                moved.add(self.fabric.pump(&node));
+        // Borrowed, as the groups' members are: the fabric and the paces are
+        // other fields.
+        for node in &self.polled {
+            let Some((pace, due)) = self.paced.get(node).copied() else {
+                moved.add(self.fabric.pump(node));
                 continue;
             };
             let is_due = now >= due;
             if is_due {
-                self.paced.insert(node.clone(), (pace, pace.next(due, now)));
+                // In place: the entry is there, and replacing it would make
+                // its name again.
+                if let Some(entry) = self.paced.get_mut(node) {
+                    *entry = (pace, pace.next(due, now));
+                }
             }
             match pace {
                 // Read, and asked if it is asked, only when due.
                 Pace::Exchange(_) | Pace::Floor(_) => {
                     if is_due {
-                        moved.add(self.fabric.pump(&node));
+                        moved.add(self.fabric.pump(node));
                     }
                 }
                 // Read on every pass, taking what has arrived; asked only
                 // when due.
                 Pace::Ask(_) => {
-                    moved.add(self.fabric.pump_unasked(&node));
+                    moved.add(self.fabric.pump_unasked(node));
                     if is_due {
-                        if let Some(why) = self.fabric.ask(&node) {
+                        if let Some(why) = self.fabric.ask(node) {
                             moved.refused.push((node.clone(), why));
                         }
                     }
@@ -1623,6 +1630,177 @@ vehicle:
             log,
             sensors,
         }
+    }
+
+    /// Counting the allocations made on one thread, for
+    /// [`a_running_pass_allocates_nothing`].
+    ///
+    /// The process's allocator, counting a thread's allocations while that
+    /// thread asks it to and passing everything to the system allocator.
+    /// Per thread, so that the other tests of this binary, running beside it,
+    /// are not counted.
+    mod counting {
+        use std::alloc::{GlobalAlloc, Layout, System};
+        use std::cell::Cell;
+
+        thread_local! {
+            static COUNTING: Cell<bool> = const { Cell::new(false) };
+            static COUNT: Cell<usize> = const { Cell::new(0) };
+        }
+
+        pub struct Counting;
+
+        fn note() {
+            // `try_with`, because an allocation can come while a thread is
+            // being torn down, when its locals are gone.
+            if COUNTING.try_with(Cell::get).unwrap_or(false) {
+                let _ = COUNT.try_with(|count| count.set(count.get() + 1));
+            }
+        }
+
+        unsafe impl GlobalAlloc for Counting {
+            unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+                note();
+                System.alloc(layout)
+            }
+
+            unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
+                note();
+                System.alloc_zeroed(layout)
+            }
+
+            unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, size: usize) -> *mut u8 {
+                note();
+                System.realloc(ptr, layout, size)
+            }
+
+            unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+                System.dealloc(ptr, layout)
+            }
+        }
+
+        #[global_allocator]
+        static ALLOCATOR: Counting = Counting;
+
+        /// How many allocations `work` makes on this thread.
+        pub fn allocations_in(work: impl FnOnce()) -> usize {
+            COUNT.with(|count| count.set(0));
+            COUNTING.with(|on| on.set(true));
+            work();
+            COUNTING.with(|on| on.set(false));
+            COUNT.with(Cell::get)
+        }
+    }
+
+    /// A sensor that answers every read with the same reading.
+    struct Steady {
+        reading: &'static [u8],
+    }
+
+    impl Port for Steady {
+        fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
+            buffer[..self.reading.len()].copy_from_slice(self.reading);
+            Ok(Taken::of(self.reading.len()))
+        }
+
+        fn give(&mut self, _arriving: Arriving<'_>, _data: &[u8]) -> Result<(), String> {
+            Err("a sensor is read and not written".to_string())
+        }
+
+        fn accepts(&self) -> bool {
+            false
+        }
+    }
+
+    /// Somewhere a datum can go, keeping nothing but a count.
+    struct Sink {
+        got: Tally,
+    }
+
+    impl Port for Sink {
+        fn take(&mut self, _buffer: &mut [u8]) -> Result<Taken, String> {
+            Ok(Taken::NOTHING)
+        }
+
+        fn give(&mut self, _arriving: Arriving<'_>, _data: &[u8]) -> Result<(), String> {
+            self.got.fetch_add(1, Ordering::Relaxed);
+            Ok(())
+        }
+    }
+
+    /// Once it is running, a pass allocates nothing.
+    ///
+    /// The rule for everything after the main loop is entered: what a pass
+    /// needs is set up as the vehicle starts and reused. The worked example,
+    /// its sensors reading steadily, run for a while to settle -- the first
+    /// passes may grow what is kept for later ones, once -- and then counted:
+    /// reading the group, converting and voting, deciding, driving the
+    /// heaters, telling the ground and writing the log.
+    #[test]
+    fn a_running_pass_allocates_nothing() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let mut graph =
+            Graph::load(root.join("tests/manual/thermostat.yaml")).expect("the example reads");
+        let where_ = tempfile::tempdir().expect("a directory");
+        for node in graph.nodes.iter_mut() {
+            if node.node_type == "log" {
+                node.attributes.insert(
+                    "directory".to_string(),
+                    Scalar::of(where_.path().to_str().expect("a path")),
+                );
+            }
+        }
+
+        let delivered = tally();
+        let opening = Arc::clone(&delivered);
+        let watched = Arc::clone(&delivered);
+        let start = Instant::now();
+        let mut system = System::of_opening(
+            &graph,
+            start,
+            move |node: &Node, routes: &Routes, abandon: &Abandon| match node.node_type.as_str() {
+                "i2c" => Ok(Box::new(Steady {
+                    reading: &[0x01, 0x00],
+                }) as Box<dyn Port>),
+                "spi" => Ok(Box::new(Steady {
+                    reading: &[0x00, 0x10, 0x00],
+                }) as Box<dyn Port>),
+                "gpio" | "moc" => Ok(Box::new(Sink {
+                    got: Arc::clone(&opening),
+                }) as Box<dyn Port>),
+                _ => open(node, routes, abandon),
+            },
+            move |_: &Telemetered| {
+                Ok(Box::new(Sink {
+                    got: Arc::clone(&watched),
+                }) as Box<dyn Port>)
+            },
+        )
+        .expect("the example opens");
+
+        // A group's reading every 100 ms: one pass per interval.
+        let at = |pass: u32| start + Duration::from_millis(100) * pass;
+        for pass in 0..10 {
+            let moved = system.pass(at(pass));
+            assert!(moved.all_delivered(), "{:?}", moved.refused);
+        }
+        let before = delivered.load(Ordering::Relaxed);
+
+        let made = counting::allocations_in(|| {
+            for pass in 10..30 {
+                let _ = system.pass(at(pass));
+            }
+        });
+
+        assert!(
+            delivered.load(Ordering::Relaxed) > before,
+            "the passes counted should have delivered something"
+        );
+        assert_eq!(
+            made, 0,
+            "twenty running passes allocated {made} times: something in the main \
+             loop is allocating again"
+        );
     }
 
     /// A pass of the worked example, from the sensors to the heaters.

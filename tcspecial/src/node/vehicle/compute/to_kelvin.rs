@@ -12,7 +12,7 @@
 
 use tcslibgs::node::vehicle::compute::{Format, ToKelvinParams};
 
-use super::{as_value, Function};
+use super::{Function, Out};
 
 /// The number these bytes hold.
 ///
@@ -64,13 +64,13 @@ impl ToKelvin {
 }
 
 impl Function for ToKelvin {
-    fn give(&mut self, _input: Option<&str>, data: &[u8]) -> Result<Option<Vec<u8>>, String> {
+    fn give(&mut self, _input: Option<&str>, data: &[u8]) -> Result<Option<Out>, String> {
         let counts = read(self.format, data)?;
         // A scale and an offset that put the part's counts outside what a
         // value carries are refused here, naming the temperature: a part
         // read with somebody else's scale is the likeliest way to get one,
         // and it is better said than carried.
-        Ok(Some(as_value(counts * self.scale + self.offset)?))
+        Ok(Some(Out::value(counts * self.scale + self.offset)?))
     }
 
     fn name(&self) -> &'static str {

@@ -112,13 +112,44 @@ pub fn now() -> Result<Duration, String> {
     })
 }
 
-/// A time as a ping writes it: whole seconds, a point, and nine digits.
-pub fn time(since_epoch: Duration) -> String {
-    format!(
+/// A time as a ping writes it, into `out`: the bytes it took, or `None`
+/// where it does not fit. The one way a ping's time is written, and the way
+/// the vehicle writes it, allocating nothing: see [`reply`].
+fn write_time(since_epoch: Duration, out: &mut [u8]) -> Option<usize> {
+    use std::fmt::Write;
+
+    /// A slice written into, as far as it has room.
+    struct Into<'a> {
+        out: &'a mut [u8],
+        at: usize,
+    }
+
+    impl Write for Into<'_> {
+        fn write_str(&mut self, said: &str) -> std::fmt::Result {
+            let end = self.at + said.len();
+            let room = self.out.get_mut(self.at..end).ok_or(std::fmt::Error)?;
+            room.copy_from_slice(said.as_bytes());
+            self.at = end;
+            Ok(())
+        }
+    }
+
+    let mut into = Into { out, at: 0 };
+    write!(
+        into,
         "{}.{:09}",
         since_epoch.as_secs(),
         since_epoch.subsec_nanos()
     )
+    .ok()?;
+    Some(into.at)
+}
+
+/// A time as a ping writes it: whole seconds, a point, and nine digits.
+pub fn time(since_epoch: Duration) -> String {
+    let mut bytes = [0u8; TIME_BYTES];
+    let len = write_time(since_epoch, &mut bytes).unwrap_or(0);
+    String::from_utf8_lossy(&bytes[..len]).into_owned()
 }
 
 /// The ping numbered `count`, sent at `sent`.
@@ -166,15 +197,18 @@ pub fn read_message(bytes: &[u8]) -> Result<Ping, String> {
 /// names what was wrong with it.
 pub fn reply(message: &[u8], answered: Duration) -> Result<Reply, String> {
     read_message(message)?;
-    let stamp = time(answered);
 
+    // The time written straight into the answer, which is a fixed array:
+    // answering a ping allocates nothing.
     let mut reply = Reply {
         bytes: [0; REPLY_BYTES],
-        len: message.len() + 1 + stamp.len(),
+        len: 0,
     };
     reply.bytes[..message.len()].copy_from_slice(message);
     reply.bytes[message.len()] = b' ';
-    reply.bytes[message.len() + 1..reply.len].copy_from_slice(stamp.as_bytes());
+    let stamp = write_time(answered, &mut reply.bytes[message.len() + 1..])
+        .ok_or_else(|| "the time does not fit in an answer".to_string())?;
+    reply.len = message.len() + 1 + stamp;
     Ok(reply)
 }
 

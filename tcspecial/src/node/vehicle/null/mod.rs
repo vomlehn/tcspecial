@@ -29,17 +29,39 @@ use std::collections::VecDeque;
 #[derive(Debug, Default)]
 pub struct Through {
     waiting: VecDeque<Vec<u8>>,
+    /// Buffers taken out of `waiting`, kept to be filled again: so that a
+    /// datum passed through is copied into one made earlier, not into one
+    /// made for it.
+    spare: Vec<Vec<u8>>,
 }
 
+/// How many data a null node has room for before it would grow: normally one
+/// is waiting at most, the fabric taking it at once.
+const WAITING_AT_ONCE: usize = 4;
+
 impl Through {
-    /// A pass-through with nothing in it.
+    /// A pass-through with nothing in it, and buffers made for a few data of
+    /// the largest size a datum has: made with the node, so that passing
+    /// data through allocates nothing.
     pub fn new() -> Through {
-        Through::default()
+        Through {
+            waiting: VecDeque::with_capacity(WAITING_AT_ONCE),
+            spare: (0..WAITING_AT_ONCE)
+                .map(|_| Vec::with_capacity(tcslibgs::DATUM_BYTES))
+                .collect(),
+        }
     }
 
     /// Hold what arrived.
+    ///
+    /// Copied into a spare buffer. Only where more are waiting than there
+    /// were buffers made is one made, and it is kept after, so that happens
+    /// once if it happens at all.
     pub fn give(&mut self, data: &[u8]) {
-        self.waiting.push_back(data.to_vec());
+        let mut buffer = self.spare.pop().unwrap_or_default();
+        buffer.clear();
+        buffer.extend_from_slice(data);
+        self.waiting.push_back(buffer);
     }
 
     /// Whether anything is waiting to be handed on.
@@ -69,7 +91,9 @@ impl Through {
         }
 
         buffer[..datum.len()].copy_from_slice(&datum);
-        Ok(datum.len())
+        let len = datum.len();
+        self.spare.push(datum);
+        Ok(len)
     }
 }
 

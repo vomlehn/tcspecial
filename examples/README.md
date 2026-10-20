@@ -270,8 +270,9 @@ see what an app node is. Two programs, both in `examples/simple-app`:
   packet holding the line terminator.
 - `lorem_moc` is the ground station, a Rust program in the crate beside the
   configuration. It gets `lorem`'s words from the configuration's moc node,
-  `moc-1`, with one function call, `tcslib::moc::Moc::receive`, which works out
-  from the configuration which port they arrive at; it writes out each word
+  `moc-1`, with one function call, `tcslib::moc::Moc::receive_into`, which
+  works out from the configuration which port they arrive at and puts each
+  word in a buffer made before the loop, so that the loop allocates nothing; it writes out each word
   with one space between them, and stops when the terminator arrives.
 
 ```

@@ -44,6 +44,7 @@ use std::thread;
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
 use tcslib::moc::Moc;
+use tcslib::moc::DATUM_BYTES;
 use tcslib::ping::{Pinger, Uplink};
 use tcslibgs::graph::telemetry::{self, Telemetered, Via};
 use tcslibgs::graph::Graph;
@@ -952,20 +953,50 @@ fn serve(
     arrivals: Arrivals,
     pings: Option<PingFeed>,
 ) {
-    let mut packets: BTreeMap<String, u64> = BTreeMap::new();
+    // What each source is to this receiver, by its place in the moc node's
+    // sources, worked out before the loop: a datum says which source sent it
+    // by that place, so the loop looks nothing up by name.
+    struct Source {
+        /// The panel it is shown in, if it has one.
+        row: Option<usize>,
+        sends_values: bool,
+        /// Whether it is the ping node whose answers the pinger times.
+        pings: bool,
+        /// How many have arrived from it since the MOC started.
+        packets: u64,
+    }
+    let mut sources: Vec<Source> = moc
+        .sources()
+        .iter()
+        .map(|&source| Source {
+            row: rows.get(source).copied(),
+            sends_values: sends_values.contains(source),
+            pings: pings.as_ref().is_some_and(|feed| feed.node == source),
+            packets: 0,
+        })
+        .collect();
+    let mut datum = vec![0u8; DATUM_BYTES];
     loop {
-        let received = match moc.receive(None) {
-            Ok(Some(received)) => received,
+        let arrival = match moc.receive_into(None, &mut datum) {
+            Ok(Some(arrival)) => arrival,
             Ok(None) => continue,
             Err(e) => {
                 eprintln!("{e}");
                 continue;
             }
         };
-        if let Some(feed) = pings.as_ref().filter(|feed| feed.node == received.source) {
+        let data = &datum[..arrival.length];
+        let Some(source) = sources.get_mut(arrival.source) else {
+            continue;
+        };
+        if let Some(feed) = pings.as_ref().filter(|_| source.pings) {
             // The ground's clock, now: a datum is timed as it is taken.
             if let Ok(at) = tcslibgs::node::vehicle::ping::now() {
-                if let Some(shown) = take_answer(feed, &received.data, at) {
+                // Allocates, once for each answer: what the ping window
+                // shows is text, and it is handed to the window's thread in
+                // a closure of its own. An answer comes for each ping an
+                // operator sends, not for each pass of this loop.
+                if let Some(shown) = take_answer(feed, data, at) {
                     let window = feed.window.clone();
                     let _ = slint::invoke_from_event_loop(move || {
                         if let Some(window) = window.upgrade() {
@@ -975,20 +1006,19 @@ fn serve(
                 }
             }
         }
-        let Some(&row) = rows.get(&received.source) else {
+        let Some(row) = source.row else {
             continue;
         };
-        let count = packets.entry(received.source.clone()).or_insert(0);
-        *count += 1;
-        let mut data = DHSample::new();
-        data.record(&received.data);
+        source.packets += 1;
+        let mut sample = DHSample::new();
+        sample.record(data);
         if let Ok(mut slots) = arrivals.lock() {
             if let Some(slot) = slots.get_mut(row) {
                 *slot = Some(Arrival {
                     at: Timestamp::now(),
-                    data,
-                    packets: *count,
-                    sends_values: sends_values.contains(&received.source),
+                    data: sample,
+                    packets: source.packets,
+                    sends_values: source.sends_values,
                 });
             }
         }
@@ -1401,6 +1431,75 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
 pub(crate) mod tests {
     use super::*;
     use std::path::Path;
+
+    /// What arrives at a moc node is put in the panel of the source that
+    /// sent it, counted, and marked as values where that source sends them;
+    /// a source with no panel is passed over.
+    #[test]
+    fn each_datum_goes_to_its_sources_panel() {
+        let port = std::net::UdpSocket::bind("127.0.0.1:0")
+            .and_then(|socket| socket.local_addr())
+            .expect("a free port")
+            .port();
+        let dir = tempfile::tempdir().expect("a directory");
+        let path = dir.path().join("vehicle.yaml");
+        std::fs::write(
+            &path,
+            format!(
+                "moc:
+  - {{ name: ground, type: moc, ground_base: \"127.0.0.1:{}\" }}
+payloads:
+  - {{ name: a, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7001\", payload-out: ground }}
+  - {{ name: b, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7002\", payload-out: ground }}
+",
+                port - 1
+            ),
+        )
+        .expect("written");
+        let graph = Graph::load(&path).expect("it reads");
+        let Ok(moc) = Moc::open(&graph, "ground") else {
+            // The port was taken between being chosen and being bound.
+            return;
+        };
+
+        // b has the second panel and sends values; a has no panel.
+        let rows = Arc::new(BTreeMap::from([("b".to_string(), 1)]));
+        let sends_values = Arc::new(BTreeSet::from(["b".to_string()]));
+        let arrivals: Arrivals = Arc::new(Mutex::new(vec![None, None]));
+        {
+            let arrivals = arrivals.clone();
+            thread::spawn(move || serve(moc, rows, sends_values, arrivals, None));
+        }
+
+        let vehicle = std::net::UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
+        vehicle
+            .send_to(b"from a", ("127.0.0.1", port))
+            .expect("sent");
+        for _ in 0..2 {
+            vehicle
+                .send_to(b"293.15", ("127.0.0.1", port + 1))
+                .expect("sent");
+        }
+
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            let slots = arrivals.lock().expect("the slots");
+            if let Some(arrival) = &slots[1] {
+                if arrival.packets == 2 {
+                    assert_eq!(&arrival.data.bytes[..arrival.data.len as usize], b"293.15");
+                    assert!(arrival.sends_values);
+                    assert!(slots[0].is_none(), "a has no panel, and filled one");
+                    break;
+                }
+            }
+            drop(slots);
+            assert!(
+                std::time::Instant::now() < deadline,
+                "b's two data did not reach its panel"
+            );
+            thread::sleep(std::time::Duration::from_millis(10));
+        }
+    }
 
     /// When contact is lost every node's status is stale, whatever each said
     /// before: what the spacecraft answered while it was heard from is not

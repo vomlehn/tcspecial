@@ -25,7 +25,7 @@ use std::io::Write;
 use std::process::ExitCode;
 
 use simple_app::TERMINATOR;
-use tcslib::moc::Moc;
+use tcslib::moc::{Moc, DATUM_BYTES};
 
 /// The example's configuration, without its extension: `.yaml` or `.xml`,
 /// the two saying the same thing.
@@ -115,9 +115,11 @@ fn main() -> ExitCode {
     }
 
     let mut said_anything = false;
+    // Every word is received here, made once: room for any datagram.
+    let mut datum = vec![0u8; DATUM_BYTES];
     loop {
-        let received = match moc.receive(None) {
-            Ok(Some(received)) => received,
+        let arrival = match moc.receive_into(None, &mut datum) {
+            Ok(Some(arrival)) => arrival,
             Ok(None) => continue,
             Err(e) => {
                 eprintln!("lorem_moc: {e}");
@@ -125,7 +127,9 @@ fn main() -> ExitCode {
             }
         };
 
-        let word = String::from_utf8_lossy(&received.data).to_string();
+        // Borrowed where it is UTF-8, as the words are; made only for one
+        // that is not, to show it.
+        let word = String::from_utf8_lossy(&datum[..arrival.length]);
 
         // The end of the line: written out, and then there is no more line to
         // wait for.

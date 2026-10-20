@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="500" viewBox="0 0 900 500" role="img" aria-labelledby="title desc">
+  <title id="title">The tees example</title>
+  <desc id="desc">The ground sends a command up to the moc node ground, which tcspecial binds at 127.0.0.1:8600. It leaves ground by its moc-out link for echo, a tee-moc, which sends it on by its moc-out to the heater, as it was going, and again by its payload-out back to ground, and so down at 127.0.0.1:8704: ground_base, 8700, plus echo's device id, 4. The sensor's readings arrive at readings, a tee-payload, which sends each on by its payload-out to ground, arriving at 127.0.0.1:8705, and again by its moc-out to dropped, a null-moc, which drops it. The spare payload's data goes to unheard, a null-payload, which drops it.</desc>
+  <defs>
+    <style>
+      text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
+      .name { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 15px; font-weight: bold; }
+      .kind { font-size: 12.5px; fill: #374151; }
+      .detail { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 11.5px; fill: #4b5563; }
+      .heading { font-size: 13px; font-weight: bold; fill: #475569; letter-spacing: 0.06em; }
+      .label { font-size: 12px; fill: #1f2937; }
+      .note { font-size: 12px; fill: #4b5563; }
+      .vehicle { fill: #eef7ee; stroke: #2f7d4a; stroke-width: 1.6; }
+      .socket { fill: #ffffff; stroke: #2f6db5; stroke-width: 1.4; stroke-dasharray: 5 3; }
+      .ground { fill: #f3f4f6; stroke: #4b5563; stroke-width: 1.6; }
+      .boundary { fill: #fbfbfd; stroke: #94a3b8; stroke-width: 1.4; stroke-dasharray: 7 5; }
+      .up { fill: none; stroke: #b45309; stroke-width: 2; }
+      .down { fill: none; stroke: #2563eb; stroke-width: 2; }
+    </style>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#b45309"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/>
+    </marker>
+  </defs>
+
+  <rect width="900" height="500" fill="#ffffff"/>
+
+  <!-- Column headings -->
+  <text class="heading" x="20" y="44">PAYLOADS</text>
+  <text class="heading" x="245" y="44">TCSPECIAL (VEHICLE)</text>
+  <text class="heading" x="690" y="44">GROUND</text>
+
+  <rect class="boundary" x="230" y="58" width="420" height="330" rx="14"/>
+
+  <!-- The payloads, each the far end of a UDP socket tcspecial opens -->
+  <rect class="socket" x="20" y="80" width="170" height="70" rx="10"/>
+  <text class="name" x="34" y="105">heater</text>
+  <text class="kind" x="34" y="124">driven</text>
+  <text class="detail" x="34" y="141">127.0.0.1:8001</text>
+
+  <rect class="socket" x="20" y="190" width="170" height="70" rx="10"/>
+  <text class="name" x="34" y="215">sensor</text>
+  <text class="kind" x="34" y="234">read</text>
+  <text class="detail" x="34" y="251">127.0.0.1:8002</text>
+
+  <rect class="socket" x="20" y="300" width="170" height="70" rx="10"/>
+  <text class="name" x="34" y="325">spare</text>
+  <text class="kind" x="34" y="344">read</text>
+  <text class="detail" x="34" y="361">127.0.0.1:8003</text>
+
+  <!-- The vehicle's own nodes -->
+  <rect class="vehicle" x="260" y="80" width="160" height="70" rx="10"/>
+  <text class="name" x="274" y="105">echo</text>
+  <text class="kind" x="274" y="124">tee-moc, id 4</text>
+  <text class="detail" x="274" y="141">sends both ways</text>
+
+  <rect class="vehicle" x="260" y="190" width="160" height="70" rx="10"/>
+  <text class="name" x="274" y="215">readings</text>
+  <text class="kind" x="274" y="234">tee-payload, id 5</text>
+  <text class="detail" x="274" y="251">sends both ways</text>
+
+  <rect class="vehicle" x="470" y="190" width="160" height="70" rx="10"/>
+  <text class="name" x="484" y="215">dropped</text>
+  <text class="kind" x="484" y="234">null-moc</text>
+  <text class="detail" x="484" y="251">drops what arrives</text>
+
+  <rect class="vehicle" x="260" y="300" width="160" height="70" rx="10"/>
+  <text class="name" x="274" y="325">unheard</text>
+  <text class="kind" x="274" y="344">null-payload</text>
+  <text class="detail" x="274" y="361">drops what arrives</text>
+
+  <!-- The moc node, the ground's end of the link both ways -->
+  <rect class="socket" x="470" y="72" width="160" height="96" rx="10"/>
+  <text class="name" x="484" y="97">ground</text>
+  <text class="kind" x="484" y="116">moc node, id 0</text>
+  <text class="detail" x="484" y="135">binds :8600</text>
+  <text class="detail" x="484" y="152">ground_base :8700</text>
+
+  <!-- The ground station -->
+  <rect class="ground" x="690" y="72" width="190" height="96" rx="10"/>
+  <text class="name" x="704" y="97">ground station</text>
+  <text class="kind" x="704" y="116">sends a command,</text>
+  <text class="kind" x="704" y="134">sees it come back,</text>
+  <text class="kind" x="704" y="152">and the readings</text>
+
+  <!-- Up: a command, to the moc node and on to the tee, and from the tee to
+       the heater -->
+  <path class="up" d="M686,90 L634,90" marker-end="url(#arrow-amber)"/>
+  <path class="up" d="M470,98 L424,98" marker-end="url(#arrow-amber)"/>
+  <text class="label" x="426" y="90">moc-out</text>
+  <path class="up" d="M260,105 L194,105" marker-end="url(#arrow-amber)"/>
+  <text class="label" x="198" y="97">moc-out</text>
+
+  <!-- Down: the command's copy, from the tee back to the moc node and down -->
+  <path class="down" d="M420,132 L466,132" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="368" y="166">payload-out</text>
+  <path class="down" d="M630,130 L686,130" marker-end="url(#arrow-blue)"/>
+  <text class="detail" x="640" y="124">:8704</text>
+
+  <!-- The readings, to the tee; on to the ground, and to the null node -->
+  <path class="down" d="M190,225 L256,225" marker-end="url(#arrow-blue)"/>
+  <path class="down" d="M420,205 L445,205 L445,155 L466,155" marker-end="url(#arrow-blue)"/>
+  <path class="down" d="M630,155 L660,155 L660,150 L686,150" marker-end="url(#arrow-blue)"/>
+  <text class="detail" x="640" y="176">:8705</text>
+  <path class="up" d="M420,240 L466,240" marker-end="url(#arrow-amber)"/>
+  <text class="label" x="424" y="276">moc-out</text>
+
+  <!-- The spare's data, to the node that drops it -->
+  <path class="down" d="M190,335 L256,335" marker-end="url(#arrow-blue)"/>
+
+  <text class="note" x="440" y="300">Each datum a tee is given leaves</text>
+  <text class="note" x="440" y="316">by both of its sources: one copy</text>
+  <text class="note" x="440" y="332">for each link. A null node takes</text>
+  <text class="note" x="440" y="348">what it is given, and sends nothing.</text>
+
+  <!-- Legend -->
+  <line x1="20" y1="410" x2="880" y2="410" stroke="#e5e7eb" stroke-width="1"/>
+  <path class="up" d="M20,437 L70,437" marker-end="url(#arrow-amber)"/>
+  <text class="label" x="80" y="441">vehicleward: what the ground sends</text>
+  <path class="down" d="M330,437 L380,437" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="390" y="441">groundward: payload data</text>
+  <rect class="vehicle" x="20" y="461" width="22" height="16" rx="4"/>
+  <text class="label" x="50" y="474">vehicle node</text>
+  <rect class="socket" x="175" y="461" width="22" height="16" rx="4"/>
+  <text class="label" x="205" y="474">opened by tcspecial</text>
+  <rect class="ground" x="355" y="461" width="22" height="16" rx="4"/>
+  <text class="label" x="385" y="474">ground program</text>
+</svg>

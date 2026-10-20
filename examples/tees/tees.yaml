@@ -1,0 +1,103 @@
+# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial.schema.json
+
+description: "Tees and null nodes: a command copied back to the ground, a reading copied aboard, and data dropped"
+
+tcspecial:
+  # Every port is in the eight thousands, which no other example uses, so this
+  # one can be left running while another is looked at.
+  beacon:
+    interval: "5 s"
+    recv: "127.0.0.1:8510"
+    send: "0.0.0.0:8500"
+  log:
+    directory: "/tmp/telemetry"
+    segment_size: "65536"
+  payload_command:
+    dest_base: "0.0.0.0:8300"
+    source_base: "127.0.0.1:8310"
+  payload_telemetry:
+    dest_base: "127.0.0.1:8410"
+    source_base: "0.0.0.0:8400"
+  tcs_cmd:
+    recv: "0.0.0.0:8200"
+    send: "127.0.0.1:8210"
+
+moc:
+  # The ground's end of the link, both ways. What the ground sends goes up to
+  # address:port, which this node binds aboard, and leaves it by moc-out for
+  # the tee. What comes down arrives at ground_base plus the device id of the
+  # node that sent it.
+  - name: ground
+    type: moc
+    address: "127.0.0.1"
+    port: "8600"
+    ground_base: "127.0.0.1:8700"
+    payload-in: true
+    moc-out:
+      - target: echo
+
+payloads:
+  # A heater, driven by what the ground sends: the far end of a UDP socket.
+  - name: heater
+    type: network
+    protocol: "udp"
+    address: "127.0.0.1"
+    port: "8001"
+    moc-in: true
+  # A sensor whose readings go to the ground and are copied aboard.
+  - name: sensor
+    type: network
+    protocol: "udp"
+    address: "127.0.0.1"
+    port: "8002"
+    payload-out:
+      - target: readings
+  # A payload whose data nobody wants yet.
+  - name: spare
+    type: network
+    protocol: "udp"
+    address: "127.0.0.1"
+    port: "8003"
+    payload-out:
+      - target: unheard
+
+vehicle:
+  # Each command the ground sends goes on to the heater, as it was going, and
+  # back down to the ground as payload data, so that the ground sees what the
+  # vehicle was told. A tee has two data sources, so each link names its own.
+  - name: echo
+    type: tee-moc
+    moc-in: true
+    moc-out:
+      - target: heater
+    payload-out:
+      - target: ground
+  # Each reading goes on to the ground, as it was going, and again
+  # vehicleward -- here to a node that drops it, standing where something
+  # aboard that took readings as commands would be.
+  - name: readings
+    type: tee-payload
+    payload-in: true
+    payload-out:
+      - target: ground
+    moc-out:
+      - target: dropped
+  # Takes what arrives from the ground's side and drops it.
+  - name: dropped
+    type: null-moc
+    moc-in: true
+  # Takes the spare payload's data and drops it.
+  - name: unheard
+    type: null-payload
+    payload-in: true
+
+tcsgui:
+  nodes:
+    - { name: ground, x: 469, y: 34 }
+    - { name: heater, x: 34, y: 34 }
+    - { name: sensor, x: 34, y: 134 }
+    - { name: spare, x: 34, y: 234 }
+    - { name: echo, x: 34, y: 34 }
+    - { name: readings, x: 34, y: 134 }
+    - { name: dropped, x: 234, y: 134 }
+    - { name: unheard, x: 34, y: 234 }

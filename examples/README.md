@@ -12,9 +12,11 @@ ground station. An example may hold a ground program without holding a
 payload: `beacon` does, its ground station watching something tcspecial sends
 on its own account, and so does `ping`, whose ground station is Python 3.
 
-A configuration and its simulator file are matched by payload name. Every
-data handler in the configuration needs an entry in the simulator file, and
-the simulator file can't name a payload the configuration doesn't have.
+A configuration and its simulator file are matched by payload name. The
+simulator file can't name a payload the configuration doesn't have, nor one
+the simulator would not stand in for: a payload that is only driven, such as
+`tees`' heater, which nothing reads back, or one that is a program, which
+tcspecial runs itself. `tcsverify` refuses either, as tcssim does.
 
 The YAML and XML files must say the same thing, so change both together.
 
@@ -58,6 +60,7 @@ the vehicle saying it is alive, the vehicle answering a ping. Start with
 | `minimal` | The smallest working configuration: one UDP payload whose telemetry goes straight to the ground (MOC). |
 | `beacon` | The one thing a ground station knows without asking: a window showing the spacecraft's beacon, built from the two halves any ground station would use -- `tcslib::beacon` to listen and `tcsui`'s panel to show it. |
 | `ping` | The ground pings a `ping` vehicle node and times the answer: the round trip, and the two halves of it. The ground station is Python 3, with the beacon panel and the halves it is built from written again in Python under `python/`, and tests that hold them to the Rust. |
+| `tees` | The four nodes that do nothing to what passes: a `tee-moc` sends each command on to a heater and back to the ground, a `tee-payload` sends each reading to the ground and on aboard, and a `null-moc` and a `null-payload` drop what they are sent. `tcspecial/tests/tees.rs` flies it. |
 
 ### minimal
 

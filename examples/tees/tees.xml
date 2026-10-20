@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../tcsgui/share/schema/tcspecial.xsd">
+    <description>Tees and null nodes: a command copied back to the ground, a reading copied aboard, and data dropped</description>
+    <tcspecial>
+        <!-- Every port is in the eight thousands, which no other example
+             uses, so this one can be left running while another is looked
+             at. -->
+        <beacon>
+            <interval>5 s</interval>
+            <recv>127.0.0.1:8510</recv>
+            <send>0.0.0.0:8500</send>
+        </beacon>
+        <log>
+            <directory>/tmp/telemetry</directory>
+            <segment_size>65536</segment_size>
+        </log>
+        <payload_command>
+            <dest_base>0.0.0.0:8300</dest_base>
+            <source_base>127.0.0.1:8310</source_base>
+        </payload_command>
+        <payload_telemetry>
+            <dest_base>127.0.0.1:8410</dest_base>
+            <source_base>0.0.0.0:8400</source_base>
+        </payload_telemetry>
+        <tcs_cmd>
+            <recv>0.0.0.0:8200</recv>
+            <send>127.0.0.1:8210</send>
+        </tcs_cmd>
+    </tcspecial>
+    <!-- The ground's end of the link, both ways. What the ground sends goes
+         up to address:port, which this node binds aboard, and leaves it by
+         moc-out for the tee. What comes down arrives at ground_base plus the
+         device id of the node that sent it. -->
+    <moc>
+        <name>ground</name>
+        <type>moc</type>
+        <address>127.0.0.1</address>
+        <port>8600</port>
+        <ground_base>127.0.0.1:8700</ground_base>
+        <payload-in>true</payload-in>
+        <moc-out><target>echo</target></moc-out>
+    </moc>
+    <!-- A heater, driven by what the ground sends: the far end of a UDP
+         socket. -->
+    <payloads>
+        <name>heater</name>
+        <type>network</type>
+        <protocol>udp</protocol>
+        <address>127.0.0.1</address>
+        <port>8001</port>
+        <moc-in>true</moc-in>
+    </payloads>
+    <!-- A sensor whose readings go to the ground and are copied aboard. -->
+    <payloads>
+        <name>sensor</name>
+        <type>network</type>
+        <protocol>udp</protocol>
+        <address>127.0.0.1</address>
+        <port>8002</port>
+        <payload-out><target>readings</target></payload-out>
+    </payloads>
+    <!-- A payload whose data nobody wants yet. -->
+    <payloads>
+        <name>spare</name>
+        <type>network</type>
+        <protocol>udp</protocol>
+        <address>127.0.0.1</address>
+        <port>8003</port>
+        <payload-out><target>unheard</target></payload-out>
+    </payloads>
+    <!-- Each command the ground sends goes on to the heater, as it was going,
+         and back down to the ground as payload data, so that the ground sees
+         what the vehicle was told. A tee has two data sources, so each link
+         names its own. -->
+    <vehicle>
+        <name>echo</name>
+        <type>tee-moc</type>
+        <moc-in>true</moc-in>
+        <moc-out><target>heater</target></moc-out>
+        <payload-out><target>ground</target></payload-out>
+    </vehicle>
+    <!-- Each reading goes on to the ground, as it was going, and again
+         vehicleward: here to a node that drops it, standing where something
+         aboard that took readings as commands would be. -->
+    <vehicle>
+        <name>readings</name>
+        <type>tee-payload</type>
+        <payload-in>true</payload-in>
+        <payload-out><target>ground</target></payload-out>
+        <moc-out><target>dropped</target></moc-out>
+    </vehicle>
+    <!-- Takes what arrives from the ground's side and drops it. -->
+    <vehicle>
+        <name>dropped</name>
+        <type>null-moc</type>
+        <moc-in>true</moc-in>
+    </vehicle>
+    <!-- Takes the spare payload's data and drops it. -->
+    <vehicle>
+        <name>unheard</name>
+        <type>null-payload</type>
+        <payload-in>true</payload-in>
+    </vehicle>
+    <tcsgui>
+        <nodes><name>ground</name><x>469</x><y>34</y></nodes>
+        <nodes><name>heater</name><x>34</x><y>34</y></nodes>
+        <nodes><name>sensor</name><x>34</x><y>134</y></nodes>
+        <nodes><name>spare</name><x>34</x><y>234</y></nodes>
+        <nodes><name>echo</name><x>34</x><y>34</y></nodes>
+        <nodes><name>readings</name><x>34</x><y>134</y></nodes>
+        <nodes><name>dropped</name><x>234</x><y>134</y></nodes>
+        <nodes><name>unheard</name><x>34</x><y>234</y></nodes>
+    </tcsgui>
+</configuration>

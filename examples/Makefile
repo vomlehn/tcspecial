@@ -27,6 +27,7 @@ help:
 	@echo "  make run-simple-app  - Run the simple-app example, printing its line"
 	@echo "  make run-beacon      - Run the beacon example: a window watching the beacon, with a button that starts and stops tcspecial"
 	@echo "  make run-ping        - Run the ping example: a Python window that pings the vehicle"
+	@echo "  make run-tees        - Run tcsmoc on the tees example: tees and null nodes"
 	@echo "  make check-python3   - Check for the Python 3 simple-app's payload needs"
 	@echo "  make check-tkinter   - Check for the tkinter the ping example's window needs"
 
@@ -75,6 +76,12 @@ README.html: README.md style.html
 .PHONY: run-thermostat
 run-thermostat:
 	$(call runexample_on,thermostat)
+
+# Run tcsmoc on the tees example: a command copied back to the ground, a
+# reading copied aboard, and data dropped.
+.PHONY: run-tees
+run-tees:
+	$(call runexample_on,tees)
 
 # Run tcspecial on the simple-app example: a payload that is a program,
 # sending a line of text a word at a time.

@@ -22,9 +22,11 @@
 //! * The simulator file, if one is given: that it parses, and that every name
 //!   in it is one the graph and the file itself agree on -- a simulated
 //!   payload the graph has, a group the file declares and uses, no setting
-//!   that is not one. A graph's payloads are nodes rather than data handlers,
-//!   so the rules about what a handler is settled into are not asked of them;
-//!   see `tcslibgs::SimConfigFile::problems_by_name`.
+//!   that is not one; see `tcslibgs::SimConfigFile::problems_by_name`. And,
+//!   where those are all right, that the simulator would stand in for what it
+//!   names -- not for a payload that is only driven, nor for one that is a
+//!   program -- which is `tcslibgs::graph::simulated::handlers`, the question
+//!   tcssim and tcsmoc ask before they start one.
 //!
 //! The simulator file is checked against the configuration only when the
 //! configuration reads. One that does not read has no payloads to join to,
@@ -290,13 +292,12 @@ impl Report {
 pub fn verify(payload_path: &Path, sim_path: Option<&Path>, limits: Limits) -> Report {
     let mut report = Report::under(limits);
 
-    let payloads = check_graph(payload_path, &mut report);
+    let graph = check_graph(payload_path, &mut report);
     if let Some(sim_path) = sim_path {
-        // Against the graph's payloads by name, which is all a graph's
-        // simulator file is joined to it by -- and only when the graph read:
-        // see the module comment.
-        report.joined = payloads.is_some();
-        check_graph_simulator(sim_path, payloads.as_deref(), &mut report);
+        // Against the graph's payloads, and only when the graph read: see the
+        // module comment.
+        report.joined = graph.is_some();
+        check_graph_simulator(sim_path, graph.as_ref(), &mut report);
     }
 
     report
@@ -590,9 +591,9 @@ fn line_of_path(text: &str, path: &[String]) -> usize {
 /// tcspecial runs aboard. This adds only the line numbers, which it gets by
 /// scanning the text for the name the problem is about.
 ///
-/// Hands back the names of the graph's payloads, for a simulator file to be
-/// joined to, when the graph read at all.
-fn check_graph(path: &Path, report: &mut Report) -> Option<Vec<String>> {
+/// Hands back the graph, for a simulator file to be joined to, when it read at
+/// all.
+fn check_graph(path: &Path, report: &mut Report) -> Option<tcslibgs::graph::Graph> {
     let graph = match tcslibgs::graph::Graph::load(path) {
         Ok(graph) => graph,
         Err(e) => {
@@ -646,22 +647,17 @@ fn check_graph(path: &Path, report: &mut Report) -> Option<Vec<String>> {
         );
     }
 
-    Some(
-        graph
-            .nodes
-            .iter()
-            .filter(|node| node.is_payload())
-            .map(|node| node.name.clone())
-            .collect(),
-    )
+    Some(graph)
 }
 
-/// Check a configuration's simulator file, against the names of its payloads
-/// if the configuration read.
+/// Check a configuration's simulator file, against the configuration's
+/// payloads if the configuration read.
 ///
-/// By name only: see `tcslibgs::SimConfigFile::problems_by_name`, which says
-/// which of the simulator's rules a graph has anything to be asked of.
-fn check_graph_simulator(path: &Path, payloads: Option<&[String]>, report: &mut Report) {
+/// By name first: see `tcslibgs::SimConfigFile::problems_by_name`. Then, where
+/// the names are all right, what tcssim and tcsmoc ask before starting a
+/// simulator, `tcslibgs::graph::simulated::handlers`: a file that passed here
+/// and was refused there would be a verifier saying yes to a run that fails.
+fn check_graph_simulator(path: &Path, graph: Option<&tcslibgs::graph::Graph>, report: &mut Report) {
     let Some((text, format)) = read(path, report) else {
         return;
     };
@@ -674,15 +670,38 @@ fn check_graph_simulator(path: &Path, payloads: Option<&[String]>, report: &mut 
         }
     };
 
-    let Some(payloads) = payloads else { return };
-    let names: Vec<&str> = payloads.iter().map(String::as_str).collect();
+    let Some(graph) = graph else { return };
+    let names: Vec<&str> = graph
+        .nodes
+        .iter()
+        .filter(|node| node.is_payload())
+        .map(|node| node.name.as_str())
+        .collect();
 
     let found = Where::of(&text, format);
-    for problem in sim.problems_by_name(&names) {
+    let by_name = sim.problems_by_name(&names);
+    let named_well = by_name.is_empty();
+    for problem in by_name {
         if !report.room() {
             break;
         }
         report.add(path, found.line_of(&problem.about()), problem.to_string());
+    }
+
+    // One answer and not all of them: the simulator stops at the first
+    // payload it will not stand in for, and says which, as the start would.
+    if named_well && report.room() {
+        if let Err(why) = tcslibgs::graph::simulated::handlers(graph, &sim) {
+            // The complaint names the payload first, in quotes, which is the
+            // entry to point at.
+            let line = why
+                .strip_prefix('"')
+                .and_then(|rest| rest.split_once('"'))
+                .map_or(THE_FILE_ITSELF, |(payload, _)| {
+                    found.line_of(&tcslibgs::About::SimPayload(payload.to_string()))
+                });
+            report.add(path, line, why);
+        }
     }
 }
 
@@ -905,6 +924,71 @@ payloads:
 moc:
   - { name: moc, type: moc, address: \"10.0.0.1\", port: \"5000\", ground_base: \"10.0.0.2:5100\" }
 ";
+
+    /// A simulator file that names a payload the simulator will not stand in
+    /// for is refused here, as tcssim and tcsmoc refuse it, on its line.
+    ///
+    /// A heater is driven and never read, so a stand-in for it would be
+    /// sending data nothing reads: the simulator says to leave it out, and a
+    /// verifier that said nothing would pass a run that fails.
+    #[test]
+    fn a_simulated_payload_the_simulator_refuses_is_an_error() {
+        // The sound graph with a heater the ground drives through a tee.
+        let configuration = format!(
+            "{SOUND_GRAPH}vehicle:
+  - {{ name: echo, type: tee-moc, moc-out: heater }}
+"
+        )
+        .replace(
+            "payload-out: moc }\n",
+            "payload-out: moc }\n  - { name: heater, type: network, protocol: udp, \
+             address: \"127.0.0.1\", port: \"8001\" }\n",
+        )
+        .replace(
+            "ground_base: \"10.0.0.2:5100\" }",
+            "ground_base: \"10.0.0.2:5100\", moc-out: echo }",
+        );
+        let sim = "\
+simulated_payloads:
+  - name: sensor
+    type: i2c
+  - name: heater
+    type: network
+    protocol: udp
+";
+        let set = written(".yaml", &configuration, sim);
+        let report = verify(&set.payload, Some(&set.sim), Limits::EVERYTHING);
+        let said: Vec<&Finding> = report
+            .findings
+            .iter()
+            .filter(|f| f.file == set.sim)
+            .collect();
+        assert_eq!(said.len(), 1, "{:?}", report.findings);
+        assert!(
+            said[0]
+                .message
+                .contains("\"heater\" is driven and never read"),
+            "{}",
+            said[0].message
+        );
+        assert_eq!(said[0].line, 4, "the heater's entry");
+
+        // And without it, nothing.
+        let set = written(
+            ".yaml",
+            &configuration,
+            &sim.replace(
+                "  - name: heater\n    type: network\n    protocol: udp\n",
+                "",
+            ),
+        );
+        let report = verify(&set.payload, Some(&set.sim), Limits::EVERYTHING);
+        assert!(
+            !report.findings.iter().any(|f| f.file == set.sim),
+            "{:?}",
+            report.findings
+        );
+    }
 
     /// A sound configuration is accepted in silence.
     #[test]

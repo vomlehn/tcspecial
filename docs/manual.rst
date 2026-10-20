@@ -2749,6 +2749,33 @@ either way.
 
    $ tcspecial --quiet examples/ping/ping.xml
 
+A beacon address tcspecial cannot bind, or a ``beacon.recv`` that names no
+address, stops it before it starts, saying which setting to change: a vehicle
+flying without beacons is one the ground cannot tell from a dead one.
+
+Where the logs' segments go
+---------------------------
+
+A log -- the telemetry log under ``log.directory``, or a ``log`` node -- is
+written in segment files, and each one that fills is handed to a program
+called ``segsend``, beside tcspecial's own executable, with the segment's file
+name as its one argument. By then the name has ``.segsend`` on the end, which
+takes the file out of the log. tcspecial runs one ``segsend`` at a time, in
+the order the segments filled, and does not wait for it in the main loop.
+
+The ``segsend`` that ``cargo build --workspace`` builds deletes the file it is
+given, which is for testing. A mission puts its own program in its place --
+one that sends the file to the ground -- and that program must deal with the
+file before it ends: tcspecial hands each segment over once. A segment left
+with ``.segsend`` on its name when tcspecial stopped is handed over again at
+the next start.
+
+A configuration that keeps a log does not start without a ``segsend`` there:
+
+.. code-block:: console
+
+   filled log segments: /usr/local/bin/segsend
+
 ``RUST_LOG`` sets the logging, which the Makefile leaves at ``info``; it
 overrides the quieter default as well.
 

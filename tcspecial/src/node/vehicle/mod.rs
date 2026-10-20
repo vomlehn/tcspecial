@@ -20,7 +20,11 @@ pub mod app_payload_veh;
 pub mod compute;
 // Somewhere data stops rather than being passed on.
 pub mod log;
-// A node that carries both streams through and does nothing to what passes.
-pub mod null;
+// The nodes that take one stream and drop it.
+pub mod null_moc;
+pub mod null_payload;
 // A node that answers each ping from the ground with the vehicle's time.
 pub mod ping;
+// The nodes that take one stream and send it on both ways.
+pub mod tee_moc;
+pub mod tee_payload;

@@ -4950,7 +4950,7 @@ fn tint_of(node_type: &str) -> String {
 const MOC_RUNGS: &[&str] = &["#0073b5"];
 
 /// The vehicle's own graph, in the order the panel lists it: compute, log,
-/// null, subdiagram.
+/// null-moc (which took the null node's), ping, subdiagram.
 const VEHICLE_RUNGS: &[&str] = &["#547800", "#4b7000", "#446600", "#3d5d00"];
 
 /// And what it carries, which is the longest ramp: ten rungs from 46.2 of
@@ -4977,21 +4977,24 @@ fn ramp_order(pane: Pane) -> Vec<&'static str> {
         .copied()
         .filter(|t| pane_of(t.spelling()) == pane)
         .collect();
-    types.sort_by_key(|t| (is_app(*t), t.spelling()));
+    types.sort_by_key(|t| (came_later(*t), t.spelling()));
     types.iter().map(|t| t.spelling()).collect()
 }
 
-/// Whether a type is one of the five apps, which take their colours after the
-/// rest of their panel's: see `ramp_order`.
-fn is_app(node_type: NodeType) -> bool {
-    matches!(
-        node_type,
+/// When a type came, for `ramp_order`: the types the rungs were chosen for,
+/// then the five apps, then the types that came after them. `null-moc` took
+/// the place and the colour of the `null` node it replaced, and the other
+/// three that replaced it come last, so that no colour already in use moved.
+fn came_later(node_type: NodeType) -> u8 {
+    match node_type {
         NodeType::AppPayloadVeh
-            | NodeType::AppMocVeh
-            | NodeType::AppAllVeh
-            | NodeType::AppPl
-            | NodeType::AppAllPl
-    )
+        | NodeType::AppMocVeh
+        | NodeType::AppAllVeh
+        | NodeType::AppPl
+        | NodeType::AppAllPl => 1,
+        NodeType::NullPayload | NodeType::TeeMoc | NodeType::TeePayload => 2,
+        _ => 0,
+    }
 }
 
 /// The hue each family of colours is built around, in degrees of the CIE
@@ -5876,7 +5879,8 @@ mod tests {
             .map(|row| row.node.name.to_string())
             .collect();
         assert!(bare.contains(&"compute".to_string()), "{bare:?}");
-        assert!(bare.contains(&"null".to_string()), "{bare:?}");
+        assert!(bare.contains(&"null-moc".to_string()), "{bare:?}");
+        assert!(bare.contains(&"tee-payload".to_string()), "{bare:?}");
         assert!(!bare.contains(&"mean".to_string()), "{bare:?}");
     }
 
@@ -6154,10 +6158,17 @@ mod tests {
                 pane.label()
             );
 
-            // Alphabetical, the rest and then the apps, which is the order
-            // the ramp is walked in: see ramp_order.
+            // Alphabetical, the rest, then the apps, then the types that came
+            // after them, which is the order the ramp is walked in: see
+            // ramp_order.
             let mut sorted = order.clone();
-            sorted.sort_by_key(|name| (name.starts_with("app_"), *name));
+            sorted.sort_by_key(|name| {
+                let t = NodeType::ALL
+                    .into_iter()
+                    .find(|t| t.spelling() == *name)
+                    .expect("a type of its own");
+                (came_later(t), *name)
+            });
             assert_eq!(order, sorted, "the {} panel is out of order", pane.label());
 
             // The first rung is darker than the line, by the eight the tiers
@@ -6950,7 +6961,7 @@ mod tests {
         let mut document = Document::new();
         for (name, node_type, at) in [
             ("sensor", "i2c", (560, 120)),
-            ("through", "null", (300, 120)),
+            ("through", "app_all_veh", (300, 120)),
             ("ground", "moc", (16, 120)),
         ] {
             document.apply(&Edit::AddNode {
@@ -7225,7 +7236,7 @@ mod tests {
         let mut document = Document::new();
         for (name, node_type, at) in [
             ("ground", "moc", (16, 120)),
-            ("through", "null", (300, 120)),
+            ("through", "app_all_veh", (300, 120)),
             ("sensor", "i2c", (600, 120)),
             ("other", "i2c", (600, 400)),
         ] {
@@ -7659,7 +7670,7 @@ mod tests {
         let mut document = Document::new();
         for (name, node_type, at) in [
             ("ground", "moc", (16, 120)),
-            ("through", "null", (300, 120)),
+            ("through", "app_all_veh", (300, 120)),
         ] {
             document.apply(&Edit::AddNode {
                 name: name.into(),
@@ -7678,7 +7689,7 @@ mod tests {
         });
 
         let ends = ends_of(&document, &document.links[0], &None);
-        let ((x, y), _) = style::attachment("null", (300, 120), "moc-in").expect("the sink");
+        let ((x, y), _) = style::attachment("app_all_veh", (300, 120), "moc-in").expect("the sink");
         assert_eq!(
             ends.to,
             (x, y),

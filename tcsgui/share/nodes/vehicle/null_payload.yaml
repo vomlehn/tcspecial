@@ -1,0 +1,8 @@
+# A vehicle node that takes a payload's data and drops it.
+#
+# For a stream that has to go somewhere and has nowhere to go yet. Its Rust is
+# tcspecial/src/node/vehicle/null_payload/.
+node: null-payload
+type: null-payload
+about: Takes a payload's data and drops it.
+payload-sink: true

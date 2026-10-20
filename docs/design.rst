@@ -191,10 +191,10 @@ node
     *sinks* -- ``log`` -- somewhere data is kept rather than passed on. See
     `The logging node`_.
 
-    *generic vehicle nodes* -- ``null`` -- a node that carries both streams
-    through and does nothing to what passes. It is the one type with all four
-    terminals, which is what makes it the statement of what a vehicle node is:
-    see `Terminals: where a link is attached`_.
+    *generic vehicle nodes* -- ``null-moc``, ``null-payload``, ``tee-moc``,
+    ``tee-payload`` -- nodes that do nothing to what passes. Each takes one
+    stream: a null node drops it, and a tee sends each datum on both ways, on
+    its own stream and again on the other. See `Null nodes and tees`_.
 
     *link checks* -- ``ping`` -- a node that answers each ping the ground sends
     it with the vehicle's time. See `The ping node`_.
@@ -217,6 +217,14 @@ link
     as a "T" -- and it is a property of the link rather than a node of its own,
     because a node that only copied its input would be a type to implement,
     test, configure and get wrong for no gain.
+
+    Within one stream, that is. A link carries one stream and may not carry it
+    into the other, so a copy that has to cross -- what the ground sent, back
+    to the ground as payload data; a reading, to something that takes the
+    ground's data -- is what the ``tee-moc`` and ``tee-payload`` nodes are
+    for. The crossing is a node, drawn and named, rather than a link that
+    could be drawn backwards by mistake: see `Terminals: where a link is
+    attached`_.
 
     Where a destination takes more than one input, the link names which: a mean
     over three sensors is three links into three named inputs, and a
@@ -399,7 +407,7 @@ A link end is written ``node.terminal``, and may be written as ``node`` alone
 wherever the type has one terminal of the kind the end needs: ``{ from:
 temp_fore, to: moc }`` is unambiguous, because a payload has one data source
 and a MOC link has one data sink. A type with two of either has to be told
-which, which is why the ``null`` node's links name their terminals.
+which, which is why the links out of a tee name their terminals.
 
 Which types have which:
 
@@ -411,8 +419,21 @@ payloads
 MOC links
     ``payload-in`` and ``moc-out``. The ground is the other end of both.
 
-``null``
-    all four.
+``null-moc``
+    ``moc-in`` alone: what the ground sends arrives, and nothing leaves.
+
+``null-payload``
+    ``payload-in`` alone: a payload's data arrives, and nothing leaves.
+
+``tee-moc``
+    ``moc-in``, and both sources, ``moc-out`` and ``payload-out``: what the
+    ground sends arrives, and leaves both ways.
+
+``tee-payload``
+    ``payload-in``, and both sources, ``payload-out`` and ``moc-out``.
+
+``app_all_veh``
+    all four, a program with both interfaces: see `App nodes`_.
 
 ``ping``
     ``moc-in`` and ``payload-out``, a payload's pair: what the ground sends
@@ -481,8 +502,9 @@ Requirement
     A terminal is written into a file only where it says which. A node with one
     data source and one data sink needs neither name -- ``{ from: temp_fore,
     to: moc }`` is unambiguous, and the schema reads an unnamed end as the only
-    terminal of the kind that end needs -- so the editor writes a terminal for
-    the ``null`` node and for nothing else. A tool that wrote a name into every
+    terminal of the kind that end needs -- so the editor writes a terminal only
+    where the type has two of the kind, a tee's sources and an
+    ``app_all_veh``'s four. A tool that wrote a name into every
     link of every file it saved would churn every configuration it opened for
     no gain.
 
@@ -1037,6 +1059,64 @@ decided, in one log, in the order they happened -- which is what reconstructing
 the loop's behaviour afterwards requires, and what a log per sensor could not
 give.
 
+Null nodes and tees
+-------------------
+
+Four vehicle nodes that do nothing to what passes, each taking one stream.
+They replace the ``null`` node, which took both streams and passed both on
+through one queue: what arrived from the payload side and what arrived from
+the ground left by every link it had, so a configuration that used both of its
+streams sent commands to the ground and readings to the payloads, which nothing
+in the file showed.
+
+``null-moc`` and ``null-payload``
+    take one stream -- what the ground sends at a ``null-moc``'s ``moc-in``, a
+    payload's data at a ``null-payload``'s ``payload-in`` -- and drop it. For a
+    stream that has to go somewhere and has nowhere to go yet. They have no
+    data source.
+
+``tee-moc`` and ``tee-payload``
+    take one stream and send each datum on both ways. A ``tee-moc`` sends what
+    arrives at its ``moc-in`` on by its ``moc-out``, as it was going, and again
+    by its ``payload-out``; a ``tee-payload`` sends what arrives at its
+    ``payload-in`` on by its ``payload-out`` and again by its ``moc-out``.
+
+.. code-block:: yaml
+
+   moc:
+     - { name: ground, type: moc, address: 127.0.0.1, port: "5000",
+         ground_base: "127.0.0.1:5100", moc-out: echo }
+   payloads:
+     - { name: heater, type: gpio, direction: output, lines: "4",
+         path: /dev/gpiochip0 }
+   vehicle:
+     # What the ground sends the heater, and back to the ground to be seen.
+     - name: echo
+       type: tee-moc
+       moc-out: [heater]
+       payload-out: [ground]
+
+Requirement
+    A tee delivers each datum that arrives at it to every link leaving each of
+    its data sources, unchanged and in the order it arrived: one copy for each
+    link, each link's copy on that link's stream. A data source with no link
+    on it sends nothing, so a tee with one source linked is a pass-through.
+
+Requirement
+    A null node accepts every datum delivered to it and keeps none. Each is
+    counted as delivered, because it was.
+
+Requirement
+    None of the four takes an attribute, and one written on any of them is
+    refused naming it: what each does is fixed, and a word nothing reads is
+    most likely left behind by a type that was changed.
+
+Requirement
+    A ``null`` node is refused as a type that does not exist, naming the types
+    there are. Which of the four replaces one depends on which of its streams
+    the configuration used, and that is a choice the file's author makes, not
+    the reader.
+
 The ping node
 -------------
 
@@ -1324,7 +1404,8 @@ own, parts of the telemetry and control system itself:
 ``app_all_veh``
     Both, and so all four terminals. The one kind that can carry a stream
     *through* -- payload data in at the one interface and out at the other --
-    which makes it what a ``null`` node is with something done to what passes.
+    and the one type that carries both, each kept apart, with something done to
+    what passes.
 
 And two are payloads: what the vehicle carries this flight, where what it
 carries is a program the mission wrote rather than a device on a bus. A payload
@@ -1491,10 +1572,14 @@ Two consequences worth knowing. A delivery whose stream nothing settled takes
 whatever comes, and a datum on no stream in particular goes everywhere its
 node's links go: it is only a node that says which stream it produced on,
 delivering to a link that says which stream it carries, that can be told apart
-at all -- so every configuration that worked before works unchanged. And a
-``null`` node still does not keep the two apart: both streams pass through the
-one queue, which is written down where the queue is. A configuration that needs
-them kept apart has ``app_all_veh``, whose two interfaces are two streams.
+at all -- so every configuration that worked before works unchanged. And a tee
+uses it: one stream arrives at a tee, and each datum leaves on no stream in
+particular, so that it goes down every link the tee has, on both streams --
+one copy for each link. A node that took both streams and passed both on that
+way would hand the ground's commands to the ground and its readings to the
+payloads, which is why the ``null`` node that did is gone and each of the four
+that replaced it takes one stream. A configuration that needs both carried
+through has ``app_all_veh``, whose two interfaces are two streams.
 
 An app node is read like a device in no group: ``system::is_polled`` includes
 it, so every pass asks it, and both interfaces of an ``app_all_veh`` are asked
@@ -2873,13 +2958,14 @@ a strip to aim at. A press has to land on a terminal exactly, the terminal being
 what says which stream the line carries, where the release only has to land on
 a node; so the box is now twice the area and bigger in both directions, the
 hand being short in whichever one it is short. What bounds them is a node's
-size, 152 by 64, the ``null`` node being the one type with all four: two rows
+size, 152 by 64, ``app_all_veh`` being the one type with all four: two rows
 and their insets have to fit inside that height with daylight between them,
 and two columns inside the width. A name never collides with them however they grow, being
 padded away from whichever side carries terminals.
 
 Only the terminals the type actually has. A payload carries its two on its
-right, a MOC link its two on its left, a ``null`` node all four, a log the one
+right, a MOC link its two on its left, an ``app_all_veh`` all four, a tee its
+three, a null node its one, a log the one
 it receives on, and a page of its own none -- what a page has is what the nodes
 inside it have, and nothing outside it knows that. A drawing that showed four
 on every node would say nothing about what may be linked to what, which is the
@@ -3143,7 +3229,7 @@ rectangle. Within an outline the types are told apart by the line around them,
 its weight and the way the name is set.
 
 Every part of the vehicle is a **rectangle with rounded corners**, the process
-of a data-flow diagram: a computation, a log, a null node, a page of its own
+of a data-flow diagram: a computation, a log, a null node, a tee, a page of its own
 and the three apps aboard. They were five shapes once -- a log the open-ended
 data store, a page and the apps the barred predefined process -- and each of
 those said something about the node at the cost of saying it is part of the

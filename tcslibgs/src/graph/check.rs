@@ -357,9 +357,21 @@ impl Problem {
             Problem::UnknownType { node, node_type } => {
                 use crate::graph::{types_in, Section};
                 let listed = |section| types_in(section).join(", ");
+                // The null node is gone, and a file written before it went
+                // says `type: null` -- which YAML, unquoted, reads as nothing
+                // at all. Either way the reader is told what replaced it, it
+                // being the one type a file can name that once was one.
+                let was_null = if node_type == "null" || node_type.is_empty() {
+                    " The null node, which took both streams, is gone: write \
+                     null-moc or null-payload for a node that drops the one \
+                     stream it takes, or tee-moc or tee-payload for one that \
+                     sends it on both ways."
+                } else {
+                    ""
+                };
                 format!(
-                    "\"{node}\": there is no node type called \"{node_type}\". Write one \
-                     of these: in moc, {}; in vehicle, {}; in payloads, {}",
+                    "\"{node}\": there is no node type called \"{node_type}\".{was_null} \
+                     Write one of these: in moc, {}; in vehicle, {}; in payloads, {}",
                     listed(Section::Moc),
                     listed(Section::Vehicle),
                     listed(Section::Payloads)
@@ -1014,18 +1026,28 @@ impl Graph {
             }
         }
 
-        // A `null` node and a `ping` node say nothing about themselves.
+        // A `null-` node, a `tee-` node and a `ping` node say nothing about
+        // themselves.
         //
-        // They have nothing to say: neither is opened, neither has
-        // parameters, and what each does is fixed -- a null node carries what
-        // arrives through, and a ping node answers each ping with the time
-        // (see `crate::node::vehicle::ping`). So an attribute on one is a word
+        // They have nothing to say: none is opened, none has parameters, and
+        // what each does is fixed -- a null node drops what arrives, a tee
+        // sends it on both ways, and a ping node answers each ping with the
+        // time (see `crate::node::vehicle::ping`). So an attribute on one is a word
         // nothing reads -- most likely a node whose type was changed and whose
         // attributes were left behind -- and it is refused by name rather than
         // ignored, which is the rule every other type is held to.
         for node in self.nodes.iter() {
             let does = match node.node_type.as_str() {
-                "null" => "carries what arrives through",
+                "null-moc" => "drops what the ground sends it",
+                "null-payload" => "drops the payload data it is sent",
+                "tee-moc" => {
+                    "sends what the ground sends it on as MOC data and again as \
+                     payload data"
+                }
+                "tee-payload" => {
+                    "sends the payload data it is sent on as payload data and \
+                     again as MOC data"
+                }
                 "ping" => "answers each ping from the ground with the vehicle's time",
                 _ => continue,
             };
@@ -1670,8 +1692,8 @@ mod tests {
     ///
     /// The graph is sound first, which is worth as much as the refusal: it is
     /// the statement that the three kinds can be linked the way their
-    /// interfaces say. `through` stands where a `null` node would, carrying
-    /// both streams; `fore` takes a sensor's readings and answers with
+    /// interfaces say. `through` carries both streams, each on an interface
+    /// of its own; `fore` takes a sensor's readings and answers with
     /// commands, which is what the ground does; and `back` is asked and
     /// answers, which is what a payload does.
     #[test]
@@ -2566,7 +2588,7 @@ mod tests {
     /// given nothing and gives nothing to anyone.
     #[test]
     fn a_node_with_no_links_is_named() {
-        let g = graph(vec![node("lonely", "null")], Vec::new());
+        let g = graph(vec![node("lonely", "null-payload")], Vec::new());
         let problems = g.check();
         assert!(
             problems
@@ -3083,19 +3105,19 @@ mod tests {
             "{problems:?}"
         );
 
-        // And a node with two sinks has to be told which. The null node is
-        // both ends of both streams, so an unnamed link into it could be
-        // either, and guessing one would be guessing which stream it carries.
+        // And a node with two sources has to be told which. A tee sends what
+        // arrives both ways, so an unnamed link out of it could be either,
+        // and guessing one would be guessing which stream it carries.
         let g = graph(
-            vec![node("a", "i2c"), node("n", "null"), node("c", "moc")],
-            vec![link("a", &["n"]), link("n.payload-out", &["c"])],
+            vec![node("a", "i2c"), node("n", "tee-payload"), node("c", "moc")],
+            vec![link("a", &["n"]), link("n", &["c"])],
         );
         let problems = g.check();
         assert!(
             problems.iter().any(|p| matches!(
                 p,
                 Problem::BadTerminal { why, .. }
-                    if why.contains("payload-in") && why.contains("moc-in")
+                    if why.contains("payload-out") && why.contains("moc-out")
             )),
             "{problems:?}"
         );
@@ -3110,7 +3132,7 @@ mod tests {
     #[test]
     fn a_link_may_not_carry_two_streams() {
         let g = graph(
-            vec![node("n", "null"), node("c", "moc")],
+            vec![node("n", "tee-moc"), node("c", "moc")],
             // A data source at one end and a data sink at the other, so the
             // ends themselves are right -- and the stream is vehicleward
             // where it leaves and groundward where it arrives.
@@ -3124,47 +3146,77 @@ mod tests {
         assert!(said.describe().contains("backwards"), "{}", said.describe());
     }
 
-    /// The null node passes the rest of itself: all four terminals, each used.
+    /// A tee takes one stream and sends it on both ways, and a null node takes
+    /// one and sends nothing: the four of them, each used.
     ///
-    /// What a generic vehicle node is: a sink and a source at each end of each
-    /// stream, with nothing done to what goes through. A configuration built
-    /// of one is the smallest thing that exercises every terminal at once.
+    /// A link may not carry one stream into the other -- see
+    /// `a_link_may_not_carry_two_streams` -- so a tee is how a datum from the
+    /// ground reaches a payload-in, or a reading reaches a moc-in, and its
+    /// two sources each name the stream they carry.
     #[test]
-    fn a_null_vehicle_node_carries_both_streams_through() {
+    fn a_tee_sends_one_stream_both_ways_and_a_null_node_ends_one() {
         let mut sensor = node("a", "i2c");
         // Written to in order to be read, which is what the trigger says.
         sensor
             .attributes
             .insert("trigger".to_string(), Scalar::of("\"go\\n\""));
         let g = graph(
-            vec![sensor, node("n", "null"), node("c", "moc")],
             vec![
-                link("a.payload-out", &["n.payload-in"]),
-                link("n.payload-out", &["c.payload-in"]),
-                link("c.moc-out", &["n.moc-in"]),
-                link("n.moc-out", &["a.moc-in"]),
+                sensor,
+                node("readings", "tee-payload"),
+                node("commands", "tee-moc"),
+                node("heard", "null-payload"),
+                node("also_heard", "null-payload"),
+                node("told", "null-moc"),
+                node("c", "moc"),
+            ],
+            vec![
+                link("a", &["readings"]),
+                link("readings.payload-out", &["c", "heard"]),
+                link("readings.moc-out", &["told"]),
+                link("c", &["commands"]),
+                link("commands.moc-out", &["a"]),
+                link("commands.payload-out", &["also_heard"]),
             ],
         );
-        assert_eq!(g.check(), Vec::new());
+        let problems = g.check();
+        assert!(
+            !problems.iter().any(|p| p.severity() == Severity::Error),
+            "{problems:?}"
+        );
 
-        // And it has nothing to be told: an attribute on one is a word
-        // nothing reads, most likely left behind by a type that was changed.
-        let mut said_something = node("n", "null");
-        said_something
-            .attributes
-            .insert("address".to_string(), Scalar::of("0x48"));
+        // A null node has no data source, so nothing may leave one.
         let g = graph(
-            vec![node("a", "i2c"), said_something, node("c", "moc")],
-            vec![link("a", &["n.payload-in"]), link("n.payload-out", &["c"])],
+            vec![node("n", "null-payload"), node("c", "moc")],
+            vec![link("n", &["c"])],
         );
         let problems = g.check();
         assert!(
             problems.iter().any(|p| matches!(
                 p,
-                Problem::BadNode { node, why } if node == "n" && why.contains("address")
+                Problem::BadTerminal { why, .. } if why.contains("no data source at all")
             )),
             "{problems:?}"
         );
+
+        // And none of them has anything to be told: an attribute on one is a
+        // word nothing reads, most likely left behind by a type that was
+        // changed.
+        for node_type in ["null-moc", "null-payload", "tee-moc", "tee-payload"] {
+            let mut said_something = node("n", node_type);
+            said_something
+                .attributes
+                .insert("address".to_string(), Scalar::of("0x48"));
+            let g = graph(vec![said_something], Vec::new());
+            let problems = g.check();
+            assert!(
+                problems.iter().any(|p| matches!(
+                    p,
+                    Problem::BadNode { node, why } if node == "n" && why.contains("address")
+                )),
+                "{node_type}: {problems:?}"
+            );
+        }
     }
 
     /// A node of a type that does not exist is an error, and says which types
@@ -3184,6 +3236,31 @@ mod tests {
             said.contains("\"bogus\"") && said.contains("ping") && said.contains("i2c"),
             "{said}"
         );
+
+        // Nor is the null node, which the four that replaced it name: which
+        // of them a file meant is its author's to say.
+        let g = graph(vec![node("a", "null")], Vec::new());
+        let problems = g.check();
+        let said = problems
+            .iter()
+            .find(|p| matches!(p, Problem::UnknownType { .. }))
+            .unwrap_or_else(|| panic!("{problems:?}"))
+            .describe();
+        assert!(said.contains("is gone"), "{said}");
+        assert!(
+            said.contains("null-moc") && said.contains("tee-payload"),
+            "{said}"
+        );
+        // And `type: null` unquoted, which YAML reads as nothing, is told the
+        // same; a type that never was is not.
+        let said = graph(vec![node("a", "")], Vec::new())
+            .check()
+            .iter()
+            .map(Problem::describe)
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(said.contains("is gone"), "{said}");
+        assert!(!unknown.describe().contains("is gone"));
 
         for section in [Section::Moc, Section::Vehicle, Section::Payloads] {
             for node_type in crate::graph::types_in(section) {
@@ -3265,7 +3342,11 @@ mod tests {
         // And a vehicle node's sink is not: two streams into one link, in
         // whatever order they were sent, with nothing to say which was which.
         let g = graph(
-            vec![node("a", "i2c"), node("b", "i2c"), node("n", "null")],
+            vec![
+                node("a", "i2c"),
+                node("b", "i2c"),
+                node("n", "null-payload"),
+            ],
             vec![link("a", &["n.payload-in"]), link("b", &["n.payload-in"])],
         );
         let problems = g.check();

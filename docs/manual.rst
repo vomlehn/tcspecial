@@ -165,9 +165,12 @@ terminal
     ``payload-out`` is where a payload's readings leave and ``payload-in`` is
     where they arrive; ``moc-out`` is where what the ground sends leaves and
     ``moc-in`` is where it arrives. A payload has ``moc-in`` and
-    ``payload-out``; a MOC link has ``payload-in`` and ``moc-out``; a ``null``
-    node has all four; and a ``ping`` node has a payload's pair, ``moc-in`` and
-    ``payload-out``. With no vehicle node in the way, a payload's ``payload-out``
+    ``payload-out``; a MOC link has ``payload-in`` and ``moc-out``; a
+    ``null-moc`` has ``moc-in`` alone and a ``null-payload`` ``payload-in``
+    alone; a ``tee-moc`` has ``moc-in``, ``moc-out`` and ``payload-out``, and a
+    ``tee-payload`` ``payload-in``, ``payload-out`` and ``moc-out``; an
+    ``app_all_veh`` has all four; and a ``ping`` node has a payload's pair,
+    ``moc-in`` and ``payload-out``. With no vehicle node in the way, a payload's ``payload-out``
     connects to a MOC link's ``payload-in``.
 
     A link is written as an attribute of the node it leaves, named after the
@@ -185,7 +188,9 @@ terminal
     An entry's ``target`` is the node the line goes to; its ``input`` is which
     of that node's inputs it feeds, or which of its data sinks it arrives at,
     where either has to be said -- ``node`` alone will do wherever the type has
-    one data sink, which is every type but ``null``. The short spelling is read
+    one data sink, which is every type but ``app_all_veh``. A link leaving a type
+    with two data sources -- a tee, an ``app_all_veh`` -- is written under the
+    one it leaves by, which says which. The short spelling is read
     as well, the destination written as ``node`` or ``node.terminal``, alone or
     in a list: ``payload-out: k_fore``, or ``payload-out: [moc, mean_temp.in0]``.
 
@@ -218,9 +223,34 @@ terminal
     ``payload-in`` in its upper left, and what it sends leaves by the
     ``moc-out`` in its lower left.
 
-``null`` node
-    A vehicle node that carries both streams through and does nothing to what
-    passes. It is the one type with all four terminals.
+``null-moc`` and ``null-payload`` nodes
+    Vehicle nodes that take one stream and drop it: a ``null-moc`` takes what
+    the ground sends at its ``moc-in``, and a ``null-payload`` takes a
+    payload's data at its ``payload-in``. Neither has a data source, so nothing
+    can be linked out of one. For a stream that has to go somewhere and has
+    nowhere to go yet. They take no attributes.
+
+``tee-moc`` and ``tee-payload`` nodes
+    Vehicle nodes that take one stream and send each datum on both ways. A
+    ``tee-moc`` takes what the ground sends at its ``moc-in`` and sends it on by
+    its ``moc-out``, as it was going, and again by its ``payload-out``, as
+    payload data. A ``tee-payload`` takes a payload's data at its
+    ``payload-in`` and sends it on by its ``payload-out`` and again by its
+    ``moc-out``, as MOC data. A link cannot carry one stream into the other, so
+    a tee is how what the ground sends reaches a ``payload-in`` -- the ground's
+    own, to see what it sent, or a log's -- and how a payload's reading reaches
+    a ``moc-in``. Each data source may reach as many sinks as any other, so
+    every link out of a tee gets a copy. A link out of one names the source it
+    leaves by, there being two:
+
+    .. code-block:: yaml
+
+       - name: echo
+         type: tee-moc
+         moc-out: [heater]
+         payload-out: [moc]
+
+    They take no attributes.
 
 ``ping`` node
     A vehicle node that answers the ground. Link a MOC link's ``moc-out`` to

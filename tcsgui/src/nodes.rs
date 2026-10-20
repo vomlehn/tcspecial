@@ -681,8 +681,11 @@ mod tests {
                 "to_kelvin",
                 "vote",
                 "log",
-                "null",
+                "null-moc",
+                "null-payload",
                 "ping",
+                "tee-moc",
+                "tee-payload",
             ],
             "sorted by path, which puts a family's descriptions together"
         );
@@ -724,9 +727,9 @@ mod tests {
         // And a node with nothing to be told says nothing.
         let null = described
             .iter()
-            .find(|one| one.node == "null")
-            .expect("null");
-        assert_eq!(null.node_type, "null");
+            .find(|one| one.node == "null-payload")
+            .expect("null-payload");
+        assert_eq!(null.node_type, "null-payload");
         assert!(null.attributes.is_empty());
         assert!(null.sets.is_empty());
         assert!(!null.about.is_empty(), "every description says what it is");
@@ -1065,8 +1068,8 @@ mod tests {
 
         // A type described without answering anything matches whatever it is
         // told, there being nothing to disagree with.
-        let null = matching(&described, "null", &said(&[])).expect("the null node");
-        assert_eq!(null.node, "null");
+        let null = matching(&described, "null-moc", &said(&[])).expect("the null-moc node");
+        assert_eq!(null.node, "null-moc");
         assert!(null.asked().is_empty(), "a null node says nothing");
 
         // And a payload is described as itself: one kind, one description, no

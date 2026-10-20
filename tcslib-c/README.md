@@ -29,8 +29,14 @@ linkage throughout, and nothing in it that C++ will not compile.
   it.
 - **Commands.** `tcs_client_open` opens the two command links the
   configuration states. `tcs_client_connect` says whether the vehicle is
-  flying this configuration; then ping, and start, stop or query a node by
-  its id.
+  flying this configuration; then ping; start, stop or query a node by its
+  id, set one of its attributes, or ask for the last datum it moved each way;
+  retime the beacon; and arm a restart and restart the vehicle.
+- **Pinging a ping node.** `tcs_pinger_open` finds the first `ping` node the
+  ground can reach both ways and its `moc` node. `tcs_pinger_ping` sends a
+  ping up; its answer comes down as the ping node's data, which a station
+  takes with `tcs_moc_receive` and hands to `tcs_pinger_answered`; and
+  `tcs_pinger_exchange` gives the round trip and the two halves of it.
 
 Every handle is made by an `_open` and freed by its `_close`. A function that
 cannot do what it was asked returns `NULL` or -1, and `tcs_last_error()` says
@@ -48,9 +54,11 @@ c++ my_station.cpp -I tcslib-c/include target/debug/libtcs.a -lpthread -ldl -lm
 
 `examples/ground.c` is a ground station in C, and `examples/ground.cpp` the
 same one in C++: each reads the configuration, waits for the first beacon,
-connects and pings, asks what a node is doing, and prints the first datum
-from a `moc` node. They take `--yaml` or `--xml`, as every example program
-does.
+connects and pings, asks about a node and sets one of its attributes,
+retimes the beacon, pings the vehicle's ping node and times the answer, and
+prints the vehicle's data from a `moc` node. They take `--yaml` or `--xml`,
+as every example program does, and `--restart` to arm a restart and restart
+the vehicle, which they do only when asked.
 
 ## How the header is kept honest
 
@@ -65,12 +73,12 @@ The header alone is also compiled as C99 and as C++11.
 
 ## Known limits
 
-- **Not all of tcslib yet.** This first version has beacons, a `moc` node's
-  data, and CONNECT, PING and starting, stopping and querying a node. It has
-  no ping exchange with its times (`tcslib::ping`), no RESTART_ARM or
-  RESTART, no CONFIGURE (the beacon interval), no SET_NODE, and no node's
-  last transfers (`query_node_sample`). Each is a call into tcslib that has
-  not been given a C spelling.
+- **A retimed beacon is not followed.** After `tcs_client_configure`, a
+  station's beacon watch goes on aging beacons against the interval the
+  configuration states, as tcsmoc's does.
+- **A query's counts are not given.** `tcs_client_query_node` says whether a
+  node is running; the counts of what it has moved, which tcslib's answer
+  carries, have no C spelling yet.
 - **One thread per handle.** A handle is used from one thread at a time;
   nothing in the library locks one. `tcs_last_error()` is per thread.
 - **A beacon pass may wait for ever.** Before any beacon has arrived,
@@ -104,8 +112,9 @@ The header alone is also compiled as C99 and as C++11.
     `tcs_configuration_node_id` asks tcslib for every node's id.
   - *In tcslib, as a station runs.* A beacon pass holds what the beacon said,
     and its remarks and warnings, as strings; each datum comes back in a
-    buffer of its own, which this layer keeps rather than copies; and each
-    command is written as JSON and its answer read from it. Removing these
+    buffer of its own, which this layer keeps rather than copies; each
+    command is written as JSON and its answer read from it; and a ping and
+    what came back are kept as strings, copied here into fixed buffers. Removing these
     would need tcslib to fill buffers its caller provides.
 
 `make` in this directory builds `README.html` from this file.

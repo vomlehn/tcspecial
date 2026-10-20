@@ -40,15 +40,16 @@ use std::ffi::{c_char, c_int, CStr, CString};
 use std::fmt::{self, Display, Write};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::PathBuf;
-use std::time::{Duration, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use tcslib::beacon::{Beacons, Contact, Schedule, Stage, STANDARD_INTERVAL};
 use tcslib::moc::Moc;
+use tcslib::ping::{route_of, Pinger, Uplink, NO_MESSAGE};
 use tcslib::{command_links_of, CommandStatus, TcsClient};
 use tcslibgs::config_digest::{digest_of_graph, ConfigDigest, ConfigVersion};
 use tcslibgs::graph::parameters::{beacon_interval_of, beacon_of};
 use tcslibgs::graph::{telemetry, Graph};
-use tcslibgs::NodeId;
+use tcslibgs::{ArmKey, BeaconInterval, DHSample, NodeId, DH_SAMPLE_BYTES};
 
 /// The size of the buffer `tcs_last_error` returns, its NUL included:
 /// `TCS_ERROR_BYTES` in the header.
@@ -909,6 +910,396 @@ pub unsafe extern "C" fn tcs_client_close(client: *mut tcs_client) {
     }
 }
 
+/// Arm a restart.
+///
+/// # Safety
+///
+/// As [`tcs_client_connect`]; `status` NULL or writable.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_client_restart_arm(
+    client: *mut tcs_client,
+    key: u64,
+    status: *mut c_int,
+) -> c_int {
+    guard(-1, || {
+        let link = handle_of_mut(client, "the client")?;
+        let out = out_of(status, "the status")?;
+        let answered = link
+            .client
+            .restart_arm(ArmKey(key))
+            .map_err(|e| fail(format_args!("RESTART_ARM: {e}")))?;
+        *out = status_number(answered);
+        Ok(0)
+    })
+}
+
+/// Restart the vehicle.
+///
+/// # Safety
+///
+/// As [`tcs_client_restart_arm`].
+#[no_mangle]
+pub unsafe extern "C" fn tcs_client_restart(
+    client: *mut tcs_client,
+    key: u64,
+    status: *mut c_int,
+) -> c_int {
+    guard(-1, || {
+        let link = handle_of_mut(client, "the client")?;
+        let out = out_of(status, "the status")?;
+        let answered = link
+            .client
+            .restart(ArmKey(key))
+            .map_err(|e| fail(format_args!("RESTART: {e}")))?;
+        *out = status_number(answered);
+        Ok(0)
+    })
+}
+
+/// Change how often the vehicle beacons, in microseconds.
+///
+/// # Safety
+///
+/// As [`tcs_client_restart_arm`].
+#[no_mangle]
+pub unsafe extern "C" fn tcs_client_configure(
+    client: *mut tcs_client,
+    beacon_interval_us: u64,
+    status: *mut c_int,
+) -> c_int {
+    guard(-1, || {
+        let link = handle_of_mut(client, "the client")?;
+        let out = out_of(status, "the status")?;
+        let answered = link
+            .client
+            .configure(BeaconInterval(beacon_interval_us))
+            .map_err(|e| fail(format_args!("CONFIG: {e}")))?;
+        *out = status_number(answered);
+        Ok(0)
+    })
+}
+
+/// Set an attribute of a node.
+///
+/// # Safety
+///
+/// As [`tcs_client_connect`]; `attribute` NULL or a NUL-terminated string;
+/// `value` NULL with `length` 0, or `length` readable bytes; `status` NULL
+/// or writable.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_client_set_node(
+    client: *mut tcs_client,
+    node: u32,
+    attribute: *const c_char,
+    value: *const u8,
+    length: usize,
+    status: *mut c_int,
+) -> c_int {
+    guard(-1, || {
+        let link = handle_of_mut(client, "the client")?;
+        let attribute = text_of(attribute, "the attribute")?;
+        let out = out_of(status, "the status")?;
+        let value: &[u8] = if length == 0 {
+            &[]
+        } else if value.is_null() {
+            return Err(fail("the value is NULL"));
+        } else {
+            std::slice::from_raw_parts(value, length)
+        };
+        let asked = NodeId(node);
+        let (answered, about) = link
+            .client
+            .set_node(asked, attribute, value)
+            .map_err(|e| fail(format_args!("SET_NODE {node} {attribute}: {e}")))?;
+        if about != asked {
+            return Err(fail(format_args!(
+                "SET_NODE {node} was answered about node {}: the two ends are not reading \
+                 the same configuration",
+                about.0
+            )));
+        }
+        *out = status_number(answered);
+        Ok(0)
+    })
+}
+
+/// What the header's `tcs_sample` is.
+#[repr(C)]
+pub struct tcs_sample {
+    moved: c_int,
+    at_micros: i64,
+    total: u32,
+    length: u8,
+    bytes: [u8; DH_SAMPLE_BYTES],
+}
+
+impl tcs_sample {
+    fn of(sample: &DHSample) -> tcs_sample {
+        tcs_sample {
+            moved: c_int::from(sample.time.is_some()),
+            at_micros: sample
+                .time
+                .map_or(0, |at| i64::try_from(at.micros()).unwrap_or(i64::MAX)),
+            total: sample.total,
+            length: sample.len,
+            bytes: sample.bytes,
+        }
+    }
+}
+
+/// The last datum a node took, and the last it gave.
+///
+/// # Safety
+///
+/// As [`tcs_client_connect`]; `status`, `taken` and `given` NULL or
+/// writable.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_client_query_node_sample(
+    client: *mut tcs_client,
+    node: u32,
+    status: *mut c_int,
+    taken: *mut tcs_sample,
+    given: *mut tcs_sample,
+) -> c_int {
+    guard(-1, || {
+        let link = handle_of_mut(client, "the client")?;
+        let status_out = out_of(status, "the status")?;
+        let taken_out = out_of(taken, "taken")?;
+        let given_out = out_of(given, "given")?;
+        let (answered, took, gave) = link
+            .client
+            .query_node_sample(NodeId(node))
+            .map_err(|e| fail(format_args!("QUERY_NODE_SAMPLE {node}: {e}")))?;
+        *status_out = status_number(answered);
+        *taken_out = tcs_sample::of(&took);
+        *given_out = tcs_sample::of(&gave);
+        Ok(0)
+    })
+}
+
+// ---- Pinging a ping node --------------------------------------------------------
+
+/// What the header's `tcs_exchange` is.
+#[repr(C)]
+pub struct tcs_exchange {
+    sent: c_int,
+    sent_at: i64,
+    answered: c_int,
+    received_at: i64,
+    answered_at: i64,
+    round_trip: i64,
+    up: i64,
+    down: i64,
+}
+
+/// A ping node's way up and down, and what came of the last ping.
+pub struct tcs_pinger {
+    uplink: Uplink,
+    pinger: Pinger,
+    node: CString,
+    moc: CString,
+    sent: Text<TEXT_BYTES>,
+    received: Text<TEXT_BYTES>,
+}
+
+/// Nanoseconds since the epoch, as the header gives a time.
+fn nanos(at: Option<Duration>) -> i64 {
+    at.map_or(0, |at| i64::try_from(at.as_nanos()).unwrap_or(i64::MAX))
+}
+
+/// A length of time in nanoseconds, as the header gives one.
+fn length(nanoseconds: Option<i128>) -> i64 {
+    nanoseconds.map_or(0, |n| {
+        i64::try_from(n).unwrap_or(if n < 0 { i64::MIN } else { i64::MAX })
+    })
+}
+
+/// Now, by this machine's clock, as a ping is timed.
+fn now() -> Result<Duration, Failed> {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| fail("this machine's clock reads before 1970"))
+}
+
+/// Ping the configuration's first ping node the ground can reach both ways.
+///
+/// # Safety
+///
+/// `configuration` as [`tcs_configuration_digest`].
+#[no_mangle]
+pub unsafe extern "C" fn tcs_pinger_open(
+    configuration: *const tcs_configuration,
+) -> *mut tcs_pinger {
+    guard(std::ptr::null_mut(), || {
+        let configuration = handle_of(configuration, "the configuration")?;
+        let place = configuration.path.display();
+        let route = route_of(&configuration.graph).ok_or_else(|| {
+            fail(format_args!(
+                "{place} has no ping node the ground can reach both ways, through a moc \
+                 node that binds an address aboard"
+            ))
+        })?;
+        let uplink = Uplink::open(&configuration.graph, &route.moc)
+            .map_err(|e| fail(format_args!("{place}: {e}")))?;
+        let mut sent = Text::EMPTY;
+        sent.set(NO_MESSAGE);
+        let mut received = Text::EMPTY;
+        received.set(NO_MESSAGE);
+        // Allocates, once, at startup: the handle, which outlives this call,
+        // and the two nodes' names, read by every ping after.
+        Ok(Box::into_raw(Box::new(tcs_pinger {
+            uplink,
+            pinger: Pinger::new(),
+            node: CString::new(route.node).unwrap_or_default(),
+            moc: CString::new(route.moc).unwrap_or_default(),
+            sent,
+            received,
+        })))
+    })
+}
+
+/// The ping node's name.
+///
+/// # Safety
+///
+/// `pinger` NULL or made by `tcs_pinger_open` and not yet closed.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_pinger_node(pinger: *const tcs_pinger) -> *const c_char {
+    guard(std::ptr::null(), || {
+        Ok(handle_of(pinger, "the pinger")?.node.as_ptr())
+    })
+}
+
+/// The moc node's name.
+///
+/// # Safety
+///
+/// As [`tcs_pinger_node`].
+#[no_mangle]
+pub unsafe extern "C" fn tcs_pinger_moc(pinger: *const tcs_pinger) -> *const c_char {
+    guard(std::ptr::null(), || {
+        Ok(handle_of(pinger, "the pinger")?.moc.as_ptr())
+    })
+}
+
+/// Send the next ping.
+///
+/// # Safety
+///
+/// As [`tcs_pinger_node`], used from one thread at a time.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_pinger_ping(pinger: *mut tcs_pinger) -> c_int {
+    guard(-1, || {
+        let ping = handle_of_mut(pinger, "the pinger")?;
+        // Allocates, in tcslib: the ping is written as a string, and kept as
+        // the last one sent. Not this layer's to change; it copies the text
+        // into a fixed buffer.
+        let message = ping.pinger.ping(now()?).map_err(fail)?;
+        ping.uplink.send(message.as_bytes()).map_err(fail)?;
+        ping.sent.set(&message);
+        Ok(0)
+    })
+}
+
+/// Fold in what the ping node sent down.
+///
+/// # Safety
+///
+/// As [`tcs_pinger_ping`]; `data` NULL with `length` 0, or `length` readable
+/// bytes.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_pinger_answered(
+    pinger: *mut tcs_pinger,
+    data: *const u8,
+    length: usize,
+) -> c_int {
+    guard(-1, || {
+        let ping = handle_of_mut(pinger, "the pinger")?;
+        let data: &[u8] = if length == 0 {
+            &[]
+        } else if data.is_null() {
+            return Err(fail("the data is NULL"));
+        } else {
+            std::slice::from_raw_parts(data, length)
+        };
+        // Allocates, in tcslib: what arrived is kept as a string. Copied here
+        // into a fixed buffer.
+        ping.pinger.answered(data, now()?);
+        ping.received.set(
+            ping.pinger
+                .exchange()
+                .received
+                .as_deref()
+                .unwrap_or(NO_MESSAGE),
+        );
+        Ok(0)
+    })
+}
+
+/// What there is to know of the pings now.
+///
+/// # Safety
+///
+/// As [`tcs_pinger_node`]; `exchange` NULL or writable.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_pinger_exchange(
+    pinger: *const tcs_pinger,
+    exchange: *mut tcs_exchange,
+) -> c_int {
+    guard(-1, || {
+        let ping = handle_of(pinger, "the pinger")?;
+        let out = out_of(exchange, "the exchange")?;
+        let known = ping.pinger.exchange();
+        *out = tcs_exchange {
+            sent: c_int::from(known.sent_at.is_some()),
+            sent_at: nanos(known.sent_at),
+            answered: c_int::from(known.received_at.is_some()),
+            received_at: nanos(known.received_at),
+            answered_at: nanos(known.answered_at),
+            round_trip: length(known.round_trip()),
+            up: length(known.up()),
+            down: length(known.down()),
+        };
+        Ok(0)
+    })
+}
+
+/// The last ping sent, as text.
+///
+/// # Safety
+///
+/// As [`tcs_pinger_node`].
+#[no_mangle]
+pub unsafe extern "C" fn tcs_pinger_sent(pinger: *const tcs_pinger) -> *const c_char {
+    guard(std::ptr::null(), || {
+        Ok(handle_of(pinger, "the pinger")?.sent.as_ptr())
+    })
+}
+
+/// The last thing received, as text.
+///
+/// # Safety
+///
+/// As [`tcs_pinger_node`].
+#[no_mangle]
+pub unsafe extern "C" fn tcs_pinger_received(pinger: *const tcs_pinger) -> *const c_char {
+    guard(std::ptr::null(), || {
+        Ok(handle_of(pinger, "the pinger")?.received.as_ptr())
+    })
+}
+
+/// Stop pinging.
+///
+/// # Safety
+///
+/// `pinger` NULL or made by `tcs_pinger_open` and not yet closed.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_pinger_close(pinger: *mut tcs_pinger) {
+    if !pinger.is_null() {
+        drop(Box::from_raw(pinger));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -960,6 +1351,7 @@ mod tests {
             tcs_beacons_close(std::ptr::null_mut());
             tcs_moc_close(std::ptr::null_mut());
             tcs_client_close(std::ptr::null_mut());
+            tcs_pinger_close(std::ptr::null_mut());
         }
     }
 
@@ -1023,6 +1415,7 @@ mod tests {
             ("TCS_ERROR_BYTES", ERROR_BYTES),
             ("TCS_TEXT_BYTES", TEXT_BYTES),
             ("TCS_MAX_REMARKS", MAX_REMARKS),
+            ("TCS_SAMPLE_BYTES", DH_SAMPLE_BYTES),
         ] {
             let line = format!("#define {name} {size}");
             assert!(header.contains(&line), "the header has no \"{line}\"");

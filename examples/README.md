@@ -96,6 +96,11 @@ nothing in it is its own:
   beacons are, starts the loop on a thread, and puts each pass in the window.
   That is all of it, but for a button.
 
+Beside the light, between it and its `Status:` label, is the stage the light
+is at, in a word: `Unheard` before any beacon has arrived, `Heard` while
+beacons are arriving, `Aging` once several are missing, and `Waiting` once
+nothing is being heard. It changes as the stage does.
+
 The button starts tcspecial on the same configuration and stops it, so that
 the light can be watched coming on with the first beacon and going out after
 the last. The window opens with it saying `Start tcspecial`, because tcspecial

@@ -10,15 +10,42 @@ use tcsui::Shown;
 
 slint::include_modules!();
 
+/// A beacon's message at its full length: tcspecial at version 0.0.0, and a
+/// full MD5 digest -- the digest of nothing, `d41d8cd9...`. The window is as
+/// wide as this before any beacon has arrived, so that it opens at the width
+/// a beacon will want and keeps it.
+///
+/// Written by [`tcslib::beacon::what_it_read`], which writes every beacon's
+/// message, so a change to the format changes the width with it.
+pub fn widest_message() -> String {
+    use tcslibgs::config_digest::{ConfigDigest, ConfigVersion};
+
+    let nothing = [
+        0xd4, 0x1d, 0x8c, 0xd9, 0x8f, 0x00, 0xb2, 0x04, 0xe9, 0x80, 0x09, 0x98, 0xec, 0xf8, 0x42,
+        0x7e,
+    ];
+    tcslib::beacon::what_it_read(
+        ConfigVersion::of_text("0.0.0").expect("0.0.0 is a version"),
+        ConfigDigest(nothing),
+    )
+}
+
+/// Make the window ready to watch: sized for a beacon's message, as though
+/// one had arrived. See [`widest_message`].
+pub fn prepare(window: &WatchWindow) {
+    window.set_widest_message(widest_message().into());
+}
+
 /// Put what the beacon loop reported into the window.
 ///
-/// All three at once, from the one reading: a light that said beacons were
+/// All four at once, from the one reading: a light that said beacons were
 /// arriving beside a time that said none had would be two answers to one
 /// question. The window passes them down to the panel, which is `tcsui`'s.
 pub fn show(window: &WatchWindow, shown: &Shown) {
     window.set_indicator_color(shown.indicator);
     window.set_last_received(shown.received.clone().into());
     window.set_last_message(shown.message.clone().into());
+    window.set_stage(shown.stage.clone().into());
 }
 
 /// And the same for a window this does not own, which is what a background

@@ -18,8 +18,8 @@ Staleness
 A beacon is not a request and is not answered, so the only thing that ever
 happens is that one fails to arrive. How long ago the last one was is
 therefore the whole of the state, and what a ground station shows is how that
-age has grown: recently heard, aging, late, silent. :class:`Schedule` is
-those stages and how long each lasts, with no colours in it -- a stage is what
+age has grown, through four stages: Unheard, Heard, Aging and Waiting -- see
+:meth:`Stage.label`. :class:`Schedule` is those stages and how long each lasts, with no colours in it -- a stage is what
 is true, and which colour says so is the window's business.
 
 The stages also decide how long to wait on the socket. A station whose
@@ -54,10 +54,10 @@ STANDARD_INTERVAL = 5 * SECOND
 #: How many beacons in a row have gone missing when the steady green light
 #: starts to blink, when it turns yellow, and when it turns red:
 #: ``BLINKING_AFTER_MISSED``, ``AGING_AFTER_MISSED`` and
-#: ``SILENT_AFTER_MISSED`` in ``tcslib::beacon``.
+#: ``WAITING_AFTER_MISSED`` in ``tcslib::beacon``.
 BLINKING_AFTER_MISSED = 2
 AGING_AFTER_MISSED = 4
-SILENT_AFTER_MISSED = 8
+WAITING_AFTER_MISSED = 8
 
 
 def missed(elapsed, interval):
@@ -91,16 +91,27 @@ class Stage(enum.Enum):
     #: One arrived recently enough to count: the spacecraft is being heard
     #: from, one lost datagram allowed for.
     HEARD = "heard"
-    #: Late enough that contact is not claimed, and not long enough to call it
-    #: silence.
+    #: Late enough that contact is not claimed, and not so late that it is
+    #: ``WAITING``.
     AGING = "aging"
-    #: Long enough that nothing is being heard from the spacecraft.
-    SILENT = "silent"
+    #: Long enough that nothing is being heard from the spacecraft: the ground
+    #: is waiting for it to be heard from again.
+    WAITING = "waiting"
 
     def in_contact(self):
         """Whether the spacecraft is being heard from at this stage: HEARD and
         nothing else."""
         return self is Stage.HEARD
+
+    def label(self):
+        """What this stage is called where a person reads it: ``Stage::label``
+        in ``tcslib::beacon``, word for word."""
+        return {
+            Stage.UNHEARD: "Unheard",
+            Stage.HEARD: "Heard",
+            Stage.AGING: "Aging",
+            Stage.WAITING: "Waiting",
+        }[self]
 
 
 class Contact(enum.Enum):
@@ -195,11 +206,11 @@ class Schedule:
                 blink=blink,
             ),
             Step(
-                holds=missing(AGING_AFTER_MISSED, SILENT_AFTER_MISSED),
+                holds=missing(AGING_AFTER_MISSED, WAITING_AFTER_MISSED),
                 stage=Stage.AGING,
                 blink=blink,
             ),
-            Step(holds=FOREVER, stage=Stage.SILENT, blink=blink),
+            Step(holds=FOREVER, stage=Stage.WAITING, blink=blink),
         ])
 
     def steps(self):

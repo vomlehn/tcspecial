@@ -29,6 +29,11 @@ export component BeaconPanel inherits TitledBox {
     // What that beacon said: the build flying, the version of the
     // configuration it is serving, and the digest of the files it read.
     in property <string> last-message: "<none>";
+    // Which stage the light is at, in a word -- tcslib::beacon::Stage::label
+    // -- shown between the label and the light, which says the same thing in
+    // colour. Empty is a window that does not show it, and the row is then
+    // the label and the light alone.
+    in property <string> stage: "";
 
     // Titled and boxed, because this is not part of whatever sits beside it:
     // the beacon has a socket of its own and keeps arriving after a
@@ -46,6 +51,11 @@ export component BeaconPanel inherits TitledBox {
             // stands as tall as the line beside it at any type size.
             HorizontalLayout {
                 alignment: start;
+                spacing: 8px;
+                if root.stage != "": Text {
+                    text: root.stage;
+                    vertical-alignment: center;
+                }
                 Rectangle {
                     width: Fonts.window * 1.5;
                     height: self.width;

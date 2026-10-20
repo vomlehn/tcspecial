@@ -1770,7 +1770,7 @@ none of it is the program's own:
 
 * ``tcslib::beacon`` binds the socket, reads each datagram, counts the beacons
   that did not arrive, compares the digest each one carries with the ground's
-  own, and says how stale the last one is as a stage: heard, aging, silent.
+  own, and says how stale the last one is as a stage: Unheard, Heard, Aging or Waiting.
   There is no toolkit in it, so a ground station with no screen -- a logger, a
   test -- uses exactly this.
 * ``tcsui`` holds the panel, as markup other windows import, and works out
@@ -1783,6 +1783,10 @@ tcsmoc shows that same panel from that same library, in a row beside its
 command link. That is the point of their being apart: what a beacon means is
 one thing wherever it is shown, and an operator who has read one window has
 read the other.
+
+Between the panel's ``Status:`` label and its light is the stage the light is
+at, in a word -- Unheard, Heard, Aging or Waiting, as the table under
+`Beaconing`_ gives them -- which changes as the stage does.
 
 Under the panel is a button that starts and stops tcspecial, so that the light
 can be watched coming on with the first beacon and going out after the last.
@@ -2964,14 +2968,21 @@ since the last one arrived. A beacon is missed once the configuration's
 ``beacon.interval`` has passed without it, so the count goes up by one each
 interval, and a new beacon puts it back to nought:
 
-================  ===============
-Beacons missed    Light
-================  ===============
-0 or 1            steady green
-2 or 3            blinking green
-4 to 7            blinking yellow
-8 or more         blinking red
-================  ===============
+================  ===============  =======
+Beacons missed    Light            Stage
+================  ===============  =======
+none heard yet    steady grey      Unheard
+0 or 1            steady green     Heard
+2 or 3            blinking green   Heard
+4 to 7            blinking yellow  Aging
+8 or more         blinking red     Waiting
+================  ===============  =======
+
+The stage is what is true of the spacecraft, and the light is one way of saying
+it: Unheard before any beacon has arrived, Heard while the spacecraft is being
+heard from, Aging once enough beacons are missing that contact is not claimed,
+and Waiting once nothing is being heard and the ground is waiting for the
+spacecraft to be heard from again.
 
 One beacon may be missed with the light still steady, because one lost
 datagram is a network and not a spacecraft. For a five-second interval the

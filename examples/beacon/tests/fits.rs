@@ -50,21 +50,36 @@ fn fits_exactly(window: &WatchWindow, what: &str) {
 
 #[test]
 fn the_window_is_just_large_enough_for_what_it_holds() {
+    use beacon_example::{prepare, widest_message};
+
     i_slint_backend_testing::init_no_event_loop();
 
     let window = WatchWindow::new().expect("the window opens");
+    assert_eq!(
+        window.get_widest_message(),
+        widest_message(),
+        "the markup's own copy of the widest message is not the one the \
+         library writes"
+    );
+    assert_eq!(
+        widest_message(),
+        "tcspecial v0.0.0 md5 d41d8cd98f00b204e9800998ecf8427e"
+    );
+    prepare(&window);
     window.show().expect("it is shown");
     assert!(window.get_border() > 0.0, "there is a border");
 
+    // Before any beacon, already as wide as a beacon's message wants.
     fits_exactly(&window, "before any beacon");
     let before = window.get_window_width();
 
-    // A beacon's message is the longest line the panel shows, and the window
-    // grows to hold it, still to within a border.
-    window.set_last_message(A_BEACON.into());
-    assert!(
-        window.get_window_width() > before,
-        "a beacon's message did not make the window wider"
+    // And a message of that length arriving changes nothing: the window
+    // opened at the width it keeps.
+    window.set_last_message(widest_message().into());
+    assert_eq!(
+        window.get_window_width(),
+        before,
+        "the window grew when a beacon's message arrived"
     );
     fits_exactly(&window, "with a beacon's message");
 }

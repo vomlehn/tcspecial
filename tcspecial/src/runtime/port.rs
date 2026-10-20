@@ -47,7 +47,7 @@ use std::time::{Duration, Instant};
 
 use nix::poll::{poll, PollFd, PollFlags};
 
-use tcsapp::parent::Arrived;
+use tcsapp::parent::ReadInto;
 use tcslibgs::graph::reach::reach_of;
 use tcslibgs::graph::terminals::Stream;
 use tcslibgs::graph::Node;
@@ -986,22 +986,25 @@ impl AppPort {
     }
 
     /// Whatever has arrived on this stream's interface, without waiting.
-    fn asked(&mut self, stream: Stream) -> Result<Arrived, String> {
+    ///
+    /// Read straight into `buffer`, so that a packet reaches the fabric with
+    /// nothing allocated on the way: see `tcsapp::parent::ReadInto`.
+    fn asked(&mut self, stream: Stream, buffer: &mut [u8]) -> Result<ReadInto, String> {
         match (&mut self.program, stream) {
             // What the app writes as MOC data, which it does on the payload
             // interface: see `tcsapp`.
-            (Program::Payload(app), Stream::Vehicleward) => app.take_moc_data_now(),
-            (Program::Moc(app), Stream::Groundward) => app.take_payload_data_now(),
-            (Program::All(app), Stream::Vehicleward) => app.take_moc_data_now(),
-            (Program::All(app), Stream::Groundward) => app.take_payload_data_now(),
+            (Program::Payload(app), Stream::Vehicleward) => app.take_moc_data_now_into(buffer),
+            (Program::Moc(app), Stream::Groundward) => app.take_payload_data_now_into(buffer),
+            (Program::All(app), Stream::Vehicleward) => app.take_moc_data_now_into(buffer),
+            (Program::All(app), Stream::Groundward) => app.take_payload_data_now_into(buffer),
             // A payload's readings, which are groundward whether anything
             // asked for them or not.
-            (Program::Pl(app), Stream::Groundward) => app.take_payload_data_now(),
-            (Program::AllPl(app), Stream::Groundward) => app.take_payload_data_now(),
+            (Program::Pl(app), Stream::Groundward) => app.take_payload_data_now_into(buffer),
+            (Program::AllPl(app), Stream::Groundward) => app.take_payload_data_now_into(buffer),
             // A stream this kind does not produce on. Nothing, rather than a
             // refusal: it is not a fault to ask, and `take` asks only what the
             // kind has.
-            _ => Ok(Arrived::Nothing),
+            _ => Ok(ReadInto::Nothing),
         }
     }
 
@@ -1041,26 +1044,24 @@ impl Port for AppPort {
         }
 
         for stream in self.to_ask() {
-            match self.asked(*stream) {
-                Ok(Arrived::Nothing) => {}
-                Ok(Arrived::Packet(data)) => {
-                    // A datum that will not fit is reported and not cut down:
-                    // part of a packet is not a smaller packet, and the app
-                    // wrote what it wrote.
-                    if data.len() > buffer.len() {
-                        return Err(format!(
-                            "{}: a packet of {} bytes arrived and the buffer holds \
-                             {}: part of a packet is not a smaller packet",
-                            self.what,
-                            data.len(),
-                            buffer.len()
-                        ));
-                    }
-                    buffer[..data.len()].copy_from_slice(&data);
+            match self.asked(*stream, buffer) {
+                Ok(ReadInto::Nothing) => {}
+                Ok(ReadInto::Packet(len)) => {
                     self.last = Some(*stream);
-                    return Ok(Taken::on(data.len(), *stream));
+                    return Ok(Taken::on(len, *stream));
                 }
-                Ok(Arrived::Ended) => {
+                // A datum that will not fit is reported and not cut down:
+                // part of a packet is not a smaller packet, and the app wrote
+                // what it wrote.
+                Ok(ReadInto::TooLong(len)) => {
+                    return Err(format!(
+                        "{}: a packet of {len} bytes arrived and the buffer holds \
+                         {}: part of a packet is not a smaller packet",
+                        self.what,
+                        buffer.len()
+                    ));
+                }
+                Ok(ReadInto::Ended) => {
                     let why = format!(
                         "{}: its program has finished with the {} interface, so \
                          nothing more will come from it",

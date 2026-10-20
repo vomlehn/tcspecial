@@ -26,7 +26,7 @@
 
 use std::process::ExitStatus;
 
-use tcsapp::parent::{self, Arrived, Running, Supports};
+use tcsapp::parent::{self, Arrived, ReadInto, Running, Supports};
 use tcslibgs::node::app::{AppParams, Kind};
 
 /// The program this node is, running, and this end of its interfaces.
@@ -76,6 +76,11 @@ impl AppPayloadVeh {
     /// with nothing to say, which is the ordinary answer.
     pub fn take_moc_data_now(&mut self) -> Result<Arrived, String> {
         self.running.read_moc_now()
+    }
+
+    /// The same, into the fabric's buffer, allocating nothing.
+    pub fn take_moc_data_now_into(&mut self, out: &mut [u8]) -> Result<ReadInto, String> {
+        self.running.read_moc_now_into(out)
     }
 
     /// Take a packet of MOC data from it, or `None` once it has ended.

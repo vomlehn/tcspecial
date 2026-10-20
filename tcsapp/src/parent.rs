@@ -123,7 +123,37 @@ struct End {
     want: Option<usize>,
     /// What has arrived of whichever of the two is being read: the length, or
     /// the bytes after it.
+    ///
+    /// Kept between packets, cleared rather than given away by
+    /// [`End::read_now_into`], so that it grows to the longest packet the
+    /// program writes and is not made again.
     got: Vec<u8>,
+    /// What a packet is framed in before it is written: kept, as `got` is.
+    framed: Vec<u8>,
+}
+
+/// What came off an interface into a caller's buffer: see
+/// [`End::read_now_into`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReadInto {
+    /// A whole packet of this many bytes, now at the front of the buffer.
+    Packet(usize),
+    /// A whole packet of this many bytes, more than the buffer holds: taken
+    /// off the interface, and not copied, part of a packet not being a
+    /// smaller packet.
+    TooLong(usize),
+    /// Nothing yet.
+    Nothing,
+    /// The interface has ended.
+    Ended,
+}
+
+/// How far a read has got: see [`End::fill`].
+enum Filled {
+    /// A whole packet is in `got`.
+    Packet,
+    Nothing,
+    Ended,
 }
 
 /// What came off an interface.
@@ -147,6 +177,7 @@ impl End {
             socket,
             want: None,
             got: Vec::new(),
+            framed: Vec::new(),
         })
     }
 
@@ -156,6 +187,41 @@ impl End {
     /// two for the next two calls. Which is what the fabric wants: one datum
     /// per delivery, and the next one when it comes round again.
     fn read_now(&mut self) -> io::Result<Arrived> {
+        Ok(match self.fill()? {
+            // Given away, which is what a caller wanting the packet as a
+            // `Vec` asks for: a tool, a test. The fabric reads with
+            // `read_now_into` instead, which keeps the buffer.
+            Filled::Packet => Arrived::Packet(std::mem::take(&mut self.got)),
+            Filled::Nothing => Arrived::Nothing,
+            Filled::Ended => Arrived::Ended,
+        })
+    }
+
+    /// The same, the packet copied to the front of `out` rather than handed
+    /// over, so that reading one allocates nothing once `got` has grown to
+    /// the longest packet the program writes.
+    fn read_now_into(&mut self, out: &mut [u8]) -> io::Result<ReadInto> {
+        Ok(match self.fill()? {
+            Filled::Packet => {
+                let len = self.got.len();
+                let into = match out.get_mut(..len) {
+                    Some(room) => {
+                        room.copy_from_slice(&self.got);
+                        ReadInto::Packet(len)
+                    }
+                    None => ReadInto::TooLong(len),
+                };
+                self.got.clear();
+                into
+            }
+            Filled::Nothing => ReadInto::Nothing,
+            Filled::Ended => ReadInto::Ended,
+        })
+    }
+
+    /// Read until a whole packet is in `got`, or there is nothing more to
+    /// read now, or the interface has ended.
+    fn fill(&mut self) -> io::Result<Filled> {
         loop {
             let wanted = match self.want {
                 None => packet::LENGTH,
@@ -173,7 +239,7 @@ impl End {
                         // is not a datum, and passing it on would pass on
                         // something nobody wrote.
                         return if self.got.is_empty() && self.want.is_none() {
-                            Ok(Arrived::Ended)
+                            Ok(Filled::Ended)
                         } else {
                             Err(io::Error::new(
                                 io::ErrorKind::UnexpectedEof,
@@ -185,7 +251,7 @@ impl End {
                         };
                     }
                     Ok(some) => self.got.extend_from_slice(&byte[..some]),
-                    Err(e) if e.kind() == io::ErrorKind::WouldBlock => return Ok(Arrived::Nothing),
+                    Err(e) if e.kind() == io::ErrorKind::WouldBlock => return Ok(Filled::Nothing),
                     // What a signal leaves behind: nothing has been lost, so
                     // the read is made again.
                     Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
@@ -197,17 +263,17 @@ impl End {
                 // The length has arrived; the bytes after it may be there too,
                 // so round again rather than answering with nothing.
                 None => {
-                    let said: [u8; packet::LENGTH] = self
-                        .got
-                        .drain(..)
-                        .collect::<Vec<u8>>()
+                    // Read where it lies, and the buffer cleared for the
+                    // bytes after it: nothing made.
+                    let said: [u8; packet::LENGTH] = self.got[..packet::LENGTH]
                         .try_into()
                         .expect("four bytes of length");
+                    self.got.clear();
                     self.want = Some(u32::from_ne_bytes(said) as usize);
                 }
                 Some(_) => {
                     self.want = None;
-                    return Ok(Arrived::Packet(std::mem::take(&mut self.got)));
+                    return Ok(Filled::Packet);
                 }
             }
         }
@@ -250,8 +316,17 @@ impl End {
     /// alternatives to waiting are to lose the datum or to hold it in a queue
     /// of our own, which is a queue with no bound.
     fn write_all(&mut self, data: &[u8]) -> io::Result<()> {
-        let mut whole = Vec::with_capacity(packet::LENGTH + data.len());
-        packet::write(&mut whole, data)?;
+        // Framed in the end's own buffer, taken out while it is written and
+        // put back after: it grows to the longest packet written, once.
+        let mut whole = std::mem::take(&mut self.framed);
+        whole.clear();
+        let written = self.write_framed(&mut whole, data);
+        self.framed = whole;
+        written
+    }
+
+    fn write_framed(&mut self, whole: &mut Vec<u8>, data: &[u8]) -> io::Result<()> {
+        packet::write(whole, data)?;
 
         let mut gone = 0;
         while gone < whole.len() {
@@ -458,6 +533,13 @@ impl Running {
             .map_err(|e| said(Interface::Payload, "read", e))
     }
 
+    /// The same, into `out`, allocating nothing: what the fabric reads with.
+    pub fn read_moc_now_into(&mut self, out: &mut [u8]) -> Result<ReadInto, String> {
+        let end = Self::held(&mut self.payload, Interface::Payload)?;
+        end.read_now_into(out)
+            .map_err(|e| said(Interface::Payload, "read", e))
+    }
+
     /// And the same, waiting up to [`Running::waits`] for a packet.
     pub fn read_moc(&mut self) -> Result<Option<Vec<u8>>, String> {
         let waits = self.waits;
@@ -476,6 +558,13 @@ impl Running {
     pub fn read_payload_now(&mut self) -> Result<Arrived, String> {
         let end = Self::held(&mut self.moc, Interface::Moc)?;
         end.read_now().map_err(|e| said(Interface::Moc, "read", e))
+    }
+
+    /// The same, into `out`, allocating nothing: what the fabric reads with.
+    pub fn read_payload_now_into(&mut self, out: &mut [u8]) -> Result<ReadInto, String> {
+        let end = Self::held(&mut self.moc, Interface::Moc)?;
+        end.read_now_into(out)
+            .map_err(|e| said(Interface::Moc, "read", e))
     }
 
     /// And the same, waiting up to [`Running::waits`] for a packet.
@@ -603,6 +692,90 @@ mod tests {
     fn pair() -> (End, UnixStream) {
         let (mine, theirs) = UnixStream::pair().expect("a socket pair");
         (End::of(mine).expect("an end"), theirs)
+    }
+
+    /// Counting the allocations made on one thread, for
+    /// [`a_running_interface_allocates_nothing`]: the process's allocator,
+    /// counting while the thread asks it to.
+    mod counting {
+        use std::alloc::{GlobalAlloc, Layout, System};
+        use std::cell::Cell;
+
+        thread_local! {
+            static COUNTING: Cell<bool> = const { Cell::new(false) };
+            static COUNT: Cell<usize> = const { Cell::new(0) };
+        }
+
+        pub struct Counting;
+
+        fn note() {
+            if COUNTING.try_with(Cell::get).unwrap_or(false) {
+                let _ = COUNT.try_with(|count| count.set(count.get() + 1));
+            }
+        }
+
+        unsafe impl GlobalAlloc for Counting {
+            unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+                note();
+                System.alloc(layout)
+            }
+            unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
+                note();
+                System.alloc_zeroed(layout)
+            }
+            unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, size: usize) -> *mut u8 {
+                note();
+                System.realloc(ptr, layout, size)
+            }
+            unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+                System.dealloc(ptr, layout)
+            }
+        }
+
+        #[global_allocator]
+        static ALLOCATOR: Counting = Counting;
+
+        pub fn allocations_in(work: impl FnOnce()) -> usize {
+            COUNT.with(|count| count.set(0));
+            COUNTING.with(|on| on.set(true));
+            work();
+            COUNTING.with(|on| on.set(false));
+            COUNT.with(Cell::get)
+        }
+    }
+
+    /// Once its buffers have grown to the packets it carries, an interface
+    /// reads a packet into a caller's buffer and writes one without
+    /// allocating: what the fabric does with an app node on every pass.
+    #[test]
+    fn a_running_interface_allocates_nothing() {
+        let (mut end, mut theirs) = pair();
+        let mut out = [0u8; 64];
+        let mut read_back = [0u8; 64];
+
+        let mut round = |end: &mut End, theirs: &mut UnixStream| {
+            packet::write(theirs, b"293.15").expect("the program writes");
+            assert_eq!(
+                end.read_now_into(&mut out).expect("a read"),
+                ReadInto::Packet(6)
+            );
+            end.write_all(b"1").expect("a packet written");
+            let mut whole = [0u8; packet::LENGTH + 1];
+            std::io::Read::read_exact(theirs, &mut whole).expect("the program reads");
+            read_back[..1].copy_from_slice(&whole[packet::LENGTH..]);
+        };
+
+        // Settling: the end's buffers grow to these packets, once.
+        for _ in 0..3 {
+            round(&mut end, &mut theirs);
+        }
+        let made = counting::allocations_in(|| {
+            for _ in 0..20 {
+                round(&mut end, &mut theirs);
+            }
+        });
+        assert_eq!(made, 0, "twenty packets each way allocated {made} times");
+        assert_eq!(&read_back[..1], b"1");
     }
 
     /// Nothing on an interface is nothing, and not a failure.

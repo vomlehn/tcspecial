@@ -51,10 +51,26 @@ use super::route::{Delivery, Routes};
 
 /// One datum on its way to the places a node's links lead.
 ///
-/// Where it came from, the bytes, how far it has already been passed on --
-/// see the cascade in [`Fabric::deliver_on`] -- which stream it is on, and
-/// whether it is something said again rather than something new.
-type Passing = (String, Vec<u8>, usize, Option<Stream>, bool);
+/// Where it came from, where its bytes are, how far it has already been
+/// passed on -- see the cascade in [`Fabric::deliver_on`] -- which stream it
+/// is on, and whether it is something said again rather than something new.
+///
+/// Nothing in it is owned, so that queueing one allocates nothing: the node
+/// is an index into [`Fabric`]'s names, and the bytes are in one of its
+/// slots, or are the datum the delivery started from.
+#[derive(Debug, Clone, Copy)]
+struct Passing {
+    /// The node that produced it, or `None` for the one the delivery was
+    /// asked to start from.
+    from: Option<usize>,
+    /// The slot its bytes are in, or `None` for the datum the delivery was
+    /// given.
+    slot: Option<usize>,
+    len: usize,
+    depth: usize,
+    stream: Option<Stream>,
+    again: bool,
+}
 
 /// What a node handed over.
 ///
@@ -423,6 +439,22 @@ pub struct Fabric {
     /// What says whether a node may be touched, and is told what it moved:
     /// see [`Watch`].
     watch: Arc<dyn Watch>,
+
+    // What a pass works in, made when the fabric is and as nodes are held,
+    // and reused on every pass after: so that reading a node and passing on
+    // what it produced allocates nothing once the vehicle is running.
+    /// Each node ever held, by the index a [`Passing`] names it by.
+    names: Vec<String>,
+    /// And the index of each, by name.
+    index: BTreeMap<String, usize>,
+    /// What a node is read into.
+    read: Vec<u8>,
+    /// Buffers of `buffer` bytes each, for the results a cascade carries on.
+    slots: Vec<Vec<u8>>,
+    /// Which of `slots` are not in use.
+    free: Vec<usize>,
+    /// The cascade's queue, empty between deliveries.
+    work: VecDeque<Passing>,
 }
 
 impl Fabric {
@@ -432,6 +464,12 @@ impl Fabric {
             routes,
             buffer,
             watch: Arc::new(Unwatched),
+            names: Vec::new(),
+            index: BTreeMap::new(),
+            read: vec![0; buffer],
+            slots: Vec::new(),
+            free: Vec::new(),
+            work: VecDeque::new(),
         }
     }
 
@@ -442,8 +480,41 @@ impl Fabric {
     }
 
     /// Put a node in, under the name the configuration calls it.
+    ///
+    /// Allocates: the node's place in the table, and the first time a node
+    /// of this name is held, its index and a slot and a place in the queue
+    /// for its results. This is done as the vehicle starts, and again only
+    /// when the ground starts a node it had stopped -- never in a pass.
     pub fn hold(&mut self, name: &str, port: Box<dyn Port>) {
         self.nodes.insert(name.to_string(), Mutex::new(port));
+        if !self.index.contains_key(name) {
+            self.index.insert(name.to_string(), self.names.len());
+            self.names.push(name.to_string());
+            // One slot and one place in the queue for each node: a cascade
+            // through a graph with no cycle in it holds no more results at
+            // once than there are nodes, except where one node's result goes
+            // to several -- see `slot`.
+            self.free.push(self.slots.len());
+            self.slots.push(vec![0; self.buffer]);
+            // Room for a result in every slot and the datum the cascade
+            // started from: `reserve` counts from the queue's length, which is
+            // nought between deliveries.
+            self.work.reserve(self.slots.len() + 1);
+        }
+    }
+
+    /// A slot not in use.
+    ///
+    /// Allocates only where a cascade holds more results at once than the
+    /// fabric holds nodes, which a node whose result goes to several others
+    /// that each produce one can do. The slot made is kept, so a graph that
+    /// does this does it once, on the first pass that needs it, and never
+    /// again.
+    fn slot(slots: &mut Vec<Vec<u8>>, free: &mut Vec<usize>, buffer: usize) -> usize {
+        free.pop().unwrap_or_else(|| {
+            slots.push(vec![0; buffer]);
+            slots.len() - 1
+        })
     }
 
     pub fn holds(&self, name: &str) -> bool {
@@ -592,22 +663,35 @@ impl Fabric {
         // vehicle that stops reading its sensors.
         let most = self.nodes.len().max(1);
 
-        let mut work: VecDeque<Passing> =
-            VecDeque::from(vec![(from.to_string(), data.to_vec(), 0, stream, again)]);
+        // The queue and the slots are the fabric's, taken out while the
+        // nodes and routes are borrowed and put back after: moved, not made.
+        let mut work = std::mem::take(&mut self.work);
+        let mut slots = std::mem::take(&mut self.slots);
+        let mut free = std::mem::take(&mut self.free);
+        work.clear();
+        work.push_back(Passing {
+            from: None,
+            slot: None,
+            len: data.len(),
+            depth: 0,
+            stream,
+            again,
+        });
 
-        while let Some((from, data, depth, stream, again)) = work.pop_front() {
-            // Cloned because the deliveries are borrowed from the table while
-            // the nodes are borrowed mutably from the same struct. A handful
-            // of names per datum is not the cost worth restructuring for.
-            let deliveries: Vec<_> = self.routes.from(&from).to_vec();
-
-            for delivery in deliveries {
+        while let Some(passing) = work.pop_front() {
+            let from_name = match passing.from {
+                None => from,
+                Some(at) => self.names[at].as_str(),
+            };
+            // Borrowed, not copied: the routes and the nodes are both only
+            // read here, the nodes through their locks.
+            for delivery in self.routes.from(from_name) {
                 // A datum on one stream does not go down the other's links.
                 // Nothing is said about it: a node with two streams has two
                 // sets of links and every datum it produces belongs to one of
                 // them, so the others are not refusals -- they are the rest of
                 // the graph, going about its business.
-                if !carries(&delivery, stream) {
+                if !carries(delivery, passing.stream) {
                     continue;
                 }
 
@@ -634,7 +718,7 @@ impl Fabric {
 
                 // Said again, to something that is not held at it: nothing to
                 // do and nothing to report. See `deliver_as`.
-                if again && !node.holds() {
+                if passing.again && !node.holds() {
                     continue;
                 }
 
@@ -646,17 +730,20 @@ impl Fabric {
                     continue;
                 }
 
+                let bytes: &[u8] = match passing.slot {
+                    None => data,
+                    Some(at) => &slots[at][..passing.len],
+                };
                 let arriving = Arriving {
                     input: delivery.input.as_deref(),
                     stream: delivery.stream,
                 };
-                let given = node.give(arriving, &data);
-                match given {
+                match node.give(arriving, bytes) {
                     Ok(()) => {
-                        self.watch.gave(&delivery.to, Outcome::Moved(data.len()));
-                        self.watch.sample_given(&delivery.to, &data);
+                        self.watch.gave(&delivery.to, Outcome::Moved(bytes.len()));
+                        self.watch.sample_given(&delivery.to, bytes);
                         moved.delivered += 1;
-                        moved.bytes += data.len();
+                        moved.bytes += bytes.len();
                     }
                     Err(why) => {
                         self.watch.gave(&delivery.to, Outcome::Failed);
@@ -669,44 +756,67 @@ impl Fabric {
                     continue;
                 }
 
-                if depth + 1 >= most {
+                if passing.depth + 1 >= most {
                     moved.refused.push((
                         delivery.to.clone(),
                         format!(
-                            "a result is still being passed on after {most} nodes,                              which is more than there are: the links must have a                              cycle in them"
+                            "a result is still being passed on after {most} nodes, \
+                             which is more than there are: the links must have a \
+                             cycle in them"
                         ),
                     ));
                     continue;
                 }
 
-                let mut buffer = vec![0u8; self.buffer];
-                match node.take(&mut buffer) {
-                    Ok(taken) if taken.bytes == 0 => {}
+                // A slot for the result, taken out of the pool while the node
+                // writes into it -- the datum being delivered may be in
+                // another -- and put back after.
+                let into = Self::slot(&mut slots, &mut free, self.buffer);
+                let mut result = std::mem::take(&mut slots[into]);
+                let taken = node.take(&mut result);
+                slots[into] = result;
+                match taken {
+                    Ok(taken) if taken.bytes == 0 => free.push(into),
                     Ok(taken) => {
-                        buffer.truncate(taken.bytes);
                         // A result is something the vehicle took from this
                         // node, however it came about: an operator asking
                         // what a computation has produced is asking for this.
-                        self.watch.took(&delivery.to, Outcome::Moved(buffer.len()));
-                        self.watch.sample_taken(&delivery.to, &buffer);
-                        work.push_back((
-                            delivery.to.clone(),
-                            buffer,
-                            depth + 1,
-                            taken.stream,
-                            taken.again,
-                        ));
+                        self.watch.took(&delivery.to, Outcome::Moved(taken.bytes));
+                        self.watch
+                            .sample_taken(&delivery.to, &slots[into][..taken.bytes]);
+                        match self.index.get(delivery.to.as_str()) {
+                            Some(&at) => work.push_back(Passing {
+                                from: Some(at),
+                                slot: Some(into),
+                                len: taken.bytes,
+                                depth: passing.depth + 1,
+                                stream: taken.stream,
+                                again: taken.again,
+                            }),
+                            // Held, as it was found just above, so it has an
+                            // index: see `hold`.
+                            None => free.push(into),
+                        }
                     }
                     // A node that said it had a result and then did not give
                     // one up. Counted, because the result is gone either way.
                     Err(why) => {
+                        free.push(into);
                         self.watch.took(&delivery.to, Outcome::Failed);
                         moved.refused.push((delivery.to.clone(), why));
                     }
                 }
             }
+
+            // Its bytes have gone everywhere they were going.
+            if let Some(at) = passing.slot {
+                free.push(at);
+            }
         }
 
+        self.work = work;
+        self.slots = slots;
+        self.free = free;
         moved
     }
 
@@ -789,9 +899,12 @@ impl Fabric {
             return moved;
         }
 
-        let mut buffer = vec![0u8; self.buffer];
+        // The fabric's own read buffer, taken out while the delivery that
+        // follows borrows the fabric, and put back after: moved, not made.
+        let mut buffer = std::mem::take(&mut self.read);
         let taken = {
             let Some(mut node) = self.port(name) else {
+                self.read = buffer;
                 moved.refused.push((
                     name.to_string(),
                     "there is no such node in this fabric".to_string(),
@@ -799,6 +912,8 @@ impl Fabric {
                 return moved;
             };
             if !node.produces() {
+                drop(node);
+                self.read = buffer;
                 return moved;
             }
             if unasked {
@@ -813,20 +928,20 @@ impl Fabric {
             // from a device that is not due: counted as neither a read nor a
             // failure, or a silent payload would be the busiest thing in the
             // telemetry.
-            Ok(taken) if taken.bytes == 0 => moved,
+            Ok(taken) if taken.bytes == 0 => {}
             Ok(taken) => {
-                let data = buffer[..taken.bytes].to_vec();
+                let data = &buffer[..taken.bytes];
                 self.watch.took(name, Outcome::Moved(data.len()));
-                self.watch.sample_taken(name, &data);
-                moved.add(self.deliver_as(name, &data, taken.stream, taken.again));
-                moved
+                self.watch.sample_taken(name, data);
+                moved.add(self.deliver_as(name, data, taken.stream, taken.again));
             }
             Err(why) => {
                 self.watch.took(name, Outcome::Failed);
                 moved.refused.push((name.to_string(), why));
-                moved
             }
         }
+        self.read = buffer;
+        moved
     }
 
     /// Read every node of a group, in order, and deliver what they had.

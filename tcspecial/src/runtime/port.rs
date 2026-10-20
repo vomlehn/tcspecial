@@ -59,7 +59,7 @@ use crate::node::payload::app_pl::AppPl;
 use crate::node::vehicle::app_all_veh::AppAllVeh;
 use crate::node::vehicle::app_moc_veh::AppMocVeh;
 use crate::node::vehicle::app_payload_veh::AppPayloadVeh;
-use crate::node::vehicle::compute::{self, Function};
+use crate::node::vehicle::compute::{self, Function, Out};
 use crate::node::vehicle::log::LogNode;
 use crate::node::vehicle::null::Through;
 use crate::node::vehicle::ping::Answers;
@@ -648,6 +648,11 @@ impl Port for EndpointPort {
 /// says for itself when it has enough -- a mean over three sensors answers on
 /// the third -- so the result appears as a consequence of a delivery and not
 /// of a schedule, which is what [`Port::ready`] is for.
+/// How many results a computation's queue has room for before it would grow:
+/// normally one is waiting at most -- see `ComputePort::ready` -- so this is
+/// room to spare.
+const RESULTS_AT_ONCE: usize = 4;
+
 pub struct ComputePort {
     /// The node's name in the configuration, which every complaint names.
     what: String,
@@ -665,7 +670,11 @@ pub struct ComputePort {
     /// afterwards: by the time a result is taken the function has moved on,
     /// and a question answered about the wrong result is worse than no
     /// question.
-    ready: VecDeque<(Vec<u8>, bool)>,
+    ///
+    /// Made with room for a few results when the node is, and the results
+    /// are held in place, so that a computation's result is queued and taken
+    /// without anything being allocated.
+    ready: VecDeque<(Out, bool)>,
 }
 
 impl ComputePort {
@@ -674,7 +683,7 @@ impl ComputePort {
         ComputePort {
             what: what.to_string(),
             function,
-            ready: VecDeque::new(),
+            ready: VecDeque::with_capacity(RESULTS_AT_ONCE),
         }
     }
 

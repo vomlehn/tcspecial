@@ -47,6 +47,71 @@ use crate::runtime::node_state::Abandon;
 use tcslibgs::graph::Node;
 use tcslibgs::node::vehicle::compute::{self, Computation};
 
+/// The most a computation hands on at once.
+///
+/// Every computation's result is a value -- four bytes, see
+/// `tcslibgs::node::vehicle::compute::VALUE_BYTES` -- or a decision of one
+/// byte, so this is room to spare rather than a limit anything meets.
+pub const OUT_BYTES: usize = 16;
+
+/// What a computation hands on: a few bytes, held in place.
+///
+/// Not a `Vec`, so that working something out allocates nothing once the
+/// vehicle is running: a result is made, copied into the node's queue and
+/// taken out of it without anything being made on the way.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct Out {
+    bytes: [u8; OUT_BYTES],
+    len: usize,
+}
+
+impl Out {
+    /// A value, as every computation's result over temperatures is: see
+    /// `tcslibgs::node::vehicle::compute::as_value`.
+    pub fn value(number: f64) -> Result<Out, String> {
+        let value = value_bytes(number)?;
+        let mut bytes = [0u8; OUT_BYTES];
+        bytes[..value.len()].copy_from_slice(&value);
+        Ok(Out {
+            bytes,
+            len: value.len(),
+        })
+    }
+
+    /// One byte: a decision.
+    pub const fn byte(byte: u8) -> Out {
+        let mut bytes = [0u8; OUT_BYTES];
+        bytes[0] = byte;
+        Out { bytes, len: 1 }
+    }
+}
+
+impl std::ops::Deref for Out {
+    type Target = [u8];
+
+    fn deref(&self) -> &[u8] {
+        &self.bytes[..self.len]
+    }
+}
+
+impl std::fmt::Debug for Out {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Out({:?})", &**self)
+    }
+}
+
+impl PartialEq<[u8]> for Out {
+    fn eq(&self, other: &[u8]) -> bool {
+        **self == *other
+    }
+}
+
+impl PartialEq<Vec<u8>> for Out {
+    fn eq(&self, other: &Vec<u8>) -> bool {
+        **self == **other
+    }
+}
+
 /// Something a compute node runs.
 ///
 /// Given what arrived and told which input it arrived at; hands back what to
@@ -58,7 +123,7 @@ pub trait Function: Send {
     /// from a function waiting for the rest of its inputs, and from one that
     /// decided nothing needs to change. An error is a datum the function
     /// cannot use, and is reported rather than guessed at.
-    fn give(&mut self, input: Option<&str>, data: &[u8]) -> Result<Option<Vec<u8>>, String>;
+    fn give(&mut self, input: Option<&str>, data: &[u8]) -> Result<Option<Out>, String>;
 
     /// Set one of this function's parameters, as a command from the ground
     /// does.
@@ -98,7 +163,7 @@ pub trait Function: Send {
     /// vote answer that way because what they produce is a measurement -- a
     /// reading nobody took is not a reading, where a decision nobody has
     /// changed is still the decision.
-    fn held(&self) -> Option<Vec<u8>> {
+    fn held(&self) -> Option<Out> {
         None
     }
 
@@ -164,7 +229,11 @@ pub fn make(node: &Node, inputs: &[&str], abandon: &Abandon) -> Result<Box<dyn F
 // checks on a desk. Named here because every computation in this tree calls
 // these by their short names, and because this is where a reader of the
 // arithmetic looks for them.
-pub(crate) use tcslibgs::node::vehicle::compute::{as_text, as_value, from_text, from_value};
+pub(crate) use tcslibgs::node::vehicle::compute::{from_text, from_value, value_bytes};
+// What the vehicle no longer makes as it runs -- a value as a `Vec` -- and the
+// tests still compare against.
+#[cfg(test)]
+pub(crate) use tcslibgs::node::vehicle::compute::as_value;
 
 #[cfg(test)]
 mod tests {
@@ -214,7 +283,7 @@ mod tests {
             voted: &mut vote::Vote,
             thermostat: &mut hysteresis::Hysteresis,
             counts: [i16; 3],
-        ) -> Option<Vec<u8>> {
+        ) -> Option<Out> {
             let mut averaged = None;
             for (n, count) in counts.iter().enumerate() {
                 let kelvin = converters[n]
@@ -239,7 +308,7 @@ mod tests {
         );
         assert_eq!(
             decision,
-            Some(b"1".to_vec()),
+            Some(Out::byte(b'1')),
             "a cold cabin should assert the heater lines"
         );
 
@@ -259,7 +328,7 @@ mod tests {
             &mut thermostat,
             [360, 360, 360],
         );
-        assert_eq!(decision, Some(b"0".to_vec()));
+        assert_eq!(decision, Some(Out::byte(b'0')));
         let decision = pass(
             &mut converters,
             &mut voted,
@@ -278,7 +347,7 @@ mod tests {
         );
         assert_eq!(
             decision,
-            Some(b"1".to_vec()),
+            Some(Out::byte(b'1')),
             "a higher setpoint should call for the heaters again"
         );
     }

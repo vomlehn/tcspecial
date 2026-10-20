@@ -34,9 +34,13 @@ pub struct Answers {
 }
 
 impl Answers {
-    /// A ping node that has answered nothing.
+    /// A ping node that has answered nothing, with room for a few answers
+    /// made with it: an answer is a fixed array, so answering a ping
+    /// allocates nothing.
     pub fn new() -> Answers {
-        Answers::default()
+        Answers {
+            waiting: VecDeque::with_capacity(4),
+        }
     }
 
     /// Answer what arrived, with the time now.

@@ -123,7 +123,13 @@ pub fn micro_kelvin(number: f64) -> Result<i32, String> {
 /// A decision is still text, `1` or `0`, because what it drives is a set of
 /// discrete lines and that is the value they take.
 pub fn as_value(number: f64) -> Result<Vec<u8>, String> {
-    Ok(micro_kelvin(number)?.to_le_bytes().to_vec())
+    Ok(value_bytes(number)?.to_vec())
+}
+
+/// The same, as the four bytes themselves, allocating nothing: what a
+/// computation aboard makes a value with, once the vehicle is running.
+pub fn value_bytes(number: f64) -> Result<[u8; VALUE_BYTES], String> {
+    Ok(micro_kelvin(number)?.to_le_bytes())
 }
 
 /// A value that arrived, as a number of kelvin.

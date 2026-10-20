@@ -36,26 +36,30 @@
 //! majority, and a vote over one is that sensor's word taken on trust, which
 //! is what the trio was built to avoid.
 
-use std::collections::BTreeMap;
-
 use tcslibgs::node::vehicle::compute::{Algorithm, VoteParams};
 
-use super::{as_value, from_value, Function};
+use super::{from_value, Function, Out};
 
 /// The one value from a set of named inputs, by the algorithm the node names.
 #[derive(Debug)]
 pub struct Vote {
-    /// The last reading from each input, by input name. An input not in here
-    /// has not reported yet.
+    /// The last reading from each input, by its place in `expected`. An
+    /// input with none has not reported yet.
     ///
     /// Kept rather than cleared after a vote: the readings are of one
     /// quantity, so the last from each is the best that is known about it
-    /// until a newer one arrives.
-    latest: BTreeMap<String, f64>,
+    /// until a newer one arrives. By place rather than by name, so that a
+    /// reading is kept without its name being made again.
+    latest: Vec<Option<f64>>,
+    /// How many of `latest` have reported.
+    reported: usize,
     /// The inputs this votes over, which the routing found bound.
     expected: Vec<String>,
     /// How the one value is picked out of them.
     algorithm: Algorithm,
+    /// Where the readings are sorted for a verdict: made with room for every
+    /// input when the vote is, so that a verdict allocates nothing.
+    sorted: Vec<f64>,
 }
 
 impl Vote {
@@ -69,10 +73,13 @@ impl Vote {
     /// once, and names an algorithm it knows, is
     /// `tcslibgs::node::vehicle::compute`'s rule.
     pub fn of(params: VoteParams) -> Vote {
+        let inputs = params.inputs.len();
         Vote {
-            latest: BTreeMap::new(),
+            latest: vec![None; inputs],
+            reported: 0,
             expected: params.inputs,
             algorithm: params.algorithm,
+            sorted: Vec::with_capacity(inputs),
         }
     }
 
@@ -82,15 +89,17 @@ impl Vote {
     /// that has reported once has a reading, whether or not it is still
     /// arriving.
     pub fn waiting_for(&self) -> usize {
-        self.expected.len() - self.latest.len()
+        self.expected.len() - self.reported
     }
 
     /// The value this set of readings comes to.
     ///
     /// Taken in sorted order, which is what both algorithms are about: the
     /// middle of them, or the closest pair.
-    fn verdict(&self) -> f64 {
-        let mut readings: Vec<f64> = self.latest.values().copied().collect();
+    fn verdict(&mut self) -> f64 {
+        self.sorted.clear();
+        self.sorted.extend(self.latest.iter().flatten().copied());
+        let readings = &mut self.sorted;
         // By partial order, there being no total order on a float. Nothing
         // here is NaN -- `from_value` refuses what will not parse as a number
         // -- so the comparison never falls back, and the fallback is written
@@ -99,8 +108,8 @@ impl Vote {
         readings.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         match self.algorithm {
-            Algorithm::Median => middle(&readings),
-            Algorithm::ClosestMean => closest_pair_mean(&readings),
+            Algorithm::Median => middle(readings),
+            Algorithm::ClosestMean => closest_pair_mean(readings),
         }
     }
 }
@@ -140,38 +149,40 @@ fn closest_pair_mean(sorted: &[f64]) -> f64 {
 }
 
 impl Function for Vote {
-    fn give(&mut self, input: Option<&str>, data: &[u8]) -> Result<Option<Vec<u8>>, String> {
+    fn give(&mut self, input: Option<&str>, data: &[u8]) -> Result<Option<Out>, String> {
         let input = input.ok_or_else(|| {
             "a vote takes named inputs, and this arrived without a name: a link \
              into it is written to.in0 and not to"
                 .to_string()
         })?;
 
-        if !self.expected.iter().any(|e| e == input) {
+        let Some(at) = self.expected.iter().position(|e| e == input) else {
             return Err(format!(
                 "\"{input}\" is not one of this vote's inputs ({})",
                 self.expected.join(", ")
             ));
-        }
+        };
 
         // The newest reading from that input, replacing whatever it said
         // before. A second arrival from one input before the others have
         // reported is not a fault here, as it was for a mean: this votes over
         // the latest from each, so a sensor reporting twice simply has its
         // later reading used.
-        self.latest
-            .insert(input.to_string(), from_value(data, input)?);
+        let reading = from_value(data, input)?;
+        if self.latest[at].replace(reading).is_none() {
+            self.reported += 1;
+        }
 
         // Nothing to vote on until every input has reported once: see the
         // module comment.
-        if self.latest.len() < self.expected.len() {
+        if self.reported < self.expected.len() {
             return Ok(None);
         }
 
         // The verdict is one of the readings, or the mean of two of them,
         // so it is inside the range every reading came in by -- but it is
         // made into a value the one way everything else is.
-        Ok(Some(as_value(self.verdict())?))
+        Ok(Some(Out::value(self.verdict())?))
     }
 
     fn name(&self) -> &'static str {
@@ -182,6 +193,7 @@ impl Function for Vote {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::node::vehicle::compute::as_value;
 
     /// A temperature as it arrives on a link: four bytes of micro-kelvin.
     ///
@@ -200,7 +212,7 @@ mod tests {
     }
 
     /// What a vote says, as a number.
-    fn said(out: Option<Vec<u8>>) -> f64 {
+    fn said(out: Option<Out>) -> f64 {
         from_value(&out.expect("a value"), "a vote").expect("a value")
     }
 

@@ -239,18 +239,15 @@ fn anything_simulated(graph: &Graph, sim_path: Option<&str>) -> bool {
 /// `None` for a configuration with no section, which takes no commands, as it
 /// sends no beacons: the section is where the ports are written down.
 fn command_links_of(graph: &Graph) -> Result<Option<(String, String, Commanded)>, String> {
-    let Some(section) = graph.tcspecial.as_ref() else {
+    let Some(links) = tcslib::command_links_of(graph)? else {
         return Ok(None);
     };
-    let ci =
-        tcslibgs::graph::parameters::ci_config_of(&tcslibgs::graph::parameters::flatten(section))?
-            .to_ci_config()?;
     Ok(Some((
-        ci.moc_cmd_send.to_string(),
-        format!("{}:{}", ci.address, ci.port),
+        links.from,
+        links.interpreter,
         Commanded {
-            from: ci.payload_command_source_base,
-            to: ci.payload_command_dest_base,
+            from: links.nodes_from,
+            to: links.nodes_to,
         },
     )))
 }

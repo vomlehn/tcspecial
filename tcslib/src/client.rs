@@ -29,6 +29,47 @@ use crate::connection::Connection;
 /// Default timeout for command responses
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 
+/// The two command links a configuration's `tcspecial` section states, from
+/// the ground's end.
+///
+/// Read from the file rather than stated again by a ground station, because
+/// tcspecial takes commands only from where its configuration says the MOC
+/// sends them: a station sending from anywhere else is ignored, and says
+/// nothing about why.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommandLinks {
+    /// Where the spacecraft's link is sent from: `tcs_cmd.send`.
+    pub from: String,
+    /// Where the vehicle's command interpreter takes it: the section's
+    /// address and port.
+    pub interpreter: String,
+    /// Where node commands are sent from: `payload_command.source_base`.
+    pub nodes_from: tcslibgs::HostPort,
+    /// And where they go: `payload_command.dest_base`, one socket for every
+    /// node, a command carrying the node's id.
+    pub nodes_to: tcslibgs::HostPort,
+}
+
+/// The command links of a configuration, or `None` for one with no
+/// `tcspecial` section, which states no ports and so nowhere to command.
+///
+/// One reading of them, here, for every ground station: tcsmoc and the C/C++
+/// library alike.
+pub fn command_links_of(graph: &tcslibgs::graph::Graph) -> Result<Option<CommandLinks>, String> {
+    use tcslibgs::graph::parameters::{ci_config_of, flatten};
+
+    let Some(section) = graph.tcspecial.as_ref() else {
+        return Ok(None);
+    };
+    let ci = ci_config_of(&flatten(section))?.to_ci_config()?;
+    Ok(Some(CommandLinks {
+        from: ci.moc_cmd_send.to_string(),
+        interpreter: format!("{}:{}", ci.address, ci.port),
+        nodes_from: ci.payload_command_source_base,
+        nodes_to: ci.payload_command_dest_base,
+    }))
+}
+
 /// TCSpecial client for sending commands and receiving telemetry
 pub struct TcsClient {
     /// The spacecraft's own link: ping it, arm it, restart it, configure it.
@@ -79,6 +120,14 @@ impl TcsClient {
             last_sent: None,
             last_received: None,
         }
+    }
+
+    /// A client on a configuration's two command links, over UDP.
+    pub fn open(links: &CommandLinks) -> TcsResult<Self> {
+        let connection = crate::UdpConnection::new(&links.from, &links.interpreter)?;
+        let nodes =
+            crate::UdpConnection::new(&links.nodes_from.to_string(), &links.nodes_to.to_string())?;
+        Ok(Self::of_a_graph(Box::new(connection), Box::new(nodes)))
     }
 
     /// A client with the spacecraft's link and no node link.

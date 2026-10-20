@@ -24,6 +24,31 @@ use crate::config::constants::{TELEMETRY_LOG_PREFIX, TELEMETRY_LOG_SUFFIX};
 #[derive(Clone)]
 pub struct TelemetryLog(Option<Arc<Mutex<LogWrite>>>);
 
+/// What is wrong with `dir` as the place the log is kept, said in the
+/// configuration's terms, or `None` where there is a directory there.
+///
+/// Asked before the log is opened because what `tcslog` says of a directory
+/// that is not there -- "invalid path name" -- names neither the directory nor
+/// the setting. tcspecial makes no directory of its own: one named wrongly
+/// would be a log kept somewhere nobody looks, and a vehicle refused at the
+/// start is the one told so while somebody is watching.
+fn unusable(dir: &str) -> Option<String> {
+    let fix = "create it, or change log.directory in the configuration's tcspecial \
+               section to a directory that is there";
+    match std::fs::metadata(dir) {
+        Ok(found) if found.is_dir() => None,
+        Ok(_) => Some(format!(
+            "the telemetry log directory, {dir}, is not a directory: {fix}"
+        )),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Some(format!(
+            "the telemetry log directory, {dir}, does not exist: {fix}"
+        )),
+        Err(e) => Some(format!(
+            "the telemetry log directory, {dir}, cannot be looked at ({e}): {fix}"
+        )),
+    }
+}
+
 impl TelemetryLog {
     /// Open the log the configuration describes.
     ///
@@ -35,6 +60,9 @@ impl TelemetryLog {
         let Some(dir) = config.log_dir.as_deref() else {
             return Ok(TelemetryLog(None));
         };
+        if let Some(why) = unusable(dir) {
+            return Err(TcsError::Log(why));
+        }
 
         let log = LogWrite::new(
             dir,
@@ -99,5 +127,32 @@ impl TelemetryLog {
             // through a record. Left alone rather than written past.
             Err(_) => error!("telemetry log unusable: a writer panicked"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A directory is a place for the log; nothing there, or a file there,
+    /// is refused, naming it and the setting to change.
+    #[test]
+    fn a_log_directory_that_is_not_one_is_refused_by_name() {
+        let dir = tempfile::tempdir().expect("a directory");
+        let here = dir.path().to_str().expect("a path");
+        assert_eq!(unusable(here), None);
+
+        let missing = dir.path().join("telemetry");
+        let missing = missing.to_str().expect("a path");
+        let said = unusable(missing).expect("nothing is there");
+        assert!(said.contains(missing), "{said}");
+        assert!(said.contains("does not exist"), "{said}");
+        assert!(said.contains("log.directory"), "{said}");
+
+        let file = dir.path().join("a file");
+        std::fs::write(&file, b"").expect("written");
+        let file = file.to_str().expect("a path");
+        let said = unusable(file).expect("a file is not a directory");
+        assert!(said.contains("is not a directory"), "{said}");
     }
 }

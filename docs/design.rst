@@ -2224,8 +2224,9 @@ on warms the cabin until then. A payload's ``init`` says what it starts in
 instead.
 
 Requirement
-    ``init`` is bytes, written in the notation a ``trigger`` is -- one byte
-    in hexadecimal, or text as a C string -- and read by the same code, which
+    ``init`` is bytes, written in the notation a ``trigger`` is -- parts one
+    after another, each a C string in quotes or bytes in brackets -- and read
+    by the same code, which
     says what is wrong with one in the words of the attribute it is in.
 
 Requirement
@@ -6030,37 +6031,43 @@ A trigger is bytes rather than text: a payload's interface document asks for
 what it asks for, and that is as likely to be ``55`` as ``"READ\r"``.
 
 Requirement
-    A trigger of one byte is written as one or two hexadecimal digits, and a
-    trigger of more than one byte as a string in C's notation. ``5`` and ``05``
-    are the same byte, a datasheet writing either, and ``"\x55\xAA"`` is the
-    two bytes nothing else now spells: ``55AA`` was two bytes and ``55 AA`` the
-    same two written another way, which made the length of a value decide how
-    many bytes it meant. A list of values, and a run of digits longer than two,
-    are each refused by name and told what to write instead.
+    A trigger is written as one or more parts, one after another, and is the
+    bytes the parts make together. A part is a string in C's notation, in
+    quotes, or bytes in hexadecimal, in square brackets: ``"READ\r"``,
+    ``[55 AA]``, ``"AT" [0D 0A]``. Parts may stand with space between them or
+    none. One notation for text and one for bytes, and either may say any
+    run of bytes, so a value whose bytes are mostly text and partly not is
+    written as what each part is.
 
 Requirement
-    There is no ``x`` in a trigger that is not in quotes, ``0x`` included. A
-    trigger written without quotes is hexadecimal and nothing else, so a prefix
-    saying "this is hexadecimal" would be saying it for a notation that has no
-    alternative. A file written for the older spelling, which had one, is told
-    so by name rather than being refused for the ``x``: an error about a digit
-    says nothing about what to write instead.
+    Inside brackets each byte is one or two hexadecimal digits, in either
+    case, with space between one byte and the next: ``5`` and ``05`` are the
+    same byte, a datasheet writing either. A run of digits longer than two is
+    refused rather than split -- ``[55AA]`` is not two bytes -- so that how
+    many bytes a value means never depends on counting its digits. There is
+    no ``0x`` inside brackets: everything there is hexadecimal, and a prefix
+    saying so would be saying it for a notation that has no alternative.
 
 Requirement
-    Which notation a value is in follows from its first character and nothing
-    else: a quote opens a C string, and anything else is one byte in
-    hexadecimal. ``52`` is a plausible byte and a plausible pair of digits of
-    something longer, so something has to say which, and a file that meant one
-    and got the other would send something nobody asked for.
+    Which notation a part is in follows from its first character and nothing
+    else: a quote opens text and a bracket opens bytes. ``52`` is a plausible
+    byte and a plausible pair of digits of something longer, so something has
+    to say which, and a file that meant one and got the other would send
+    something nobody asked for. Anything else where a part should begin is
+    refused, naming the character.
 
 Requirement
-    The quotes of a C string are part of the value rather than part of the way
-    the file is written, since they are the mark that says which notation it
-    is. So a YAML file writes them inside its own -- ``'"READ\r"'`` -- and an
-    XML one as ``<trigger>&quot;READ\r&quot;</trigger>``. A value whose quotes
-    belong only to the format, such as ``"55"``, arrives as ``55`` and is read
-    as the one byte it is. A string that opens and does not close is refused
-    rather than taken for hexadecimal.
+    A value written bare -- ``55``, ``0x55``, ``55 AA``, which is how one
+    byte was written before brackets -- is refused, and told the brackets it
+    wants: ``[55]``. A terminator was a byte in decimal unless it said ``0x``,
+    and is told the byte it meant: ``13`` is ``[0D]``.
+
+Requirement
+    The marks are part of the value rather than part of the way the file is
+    written. So a YAML file writes them inside its own quotes --
+    ``'"READ\r"'``, ``'[55]'`` -- and an XML one as
+    ``<trigger>&quot;READ\r&quot;</trigger>`` or ``<trigger>[55]</trigger>``.
+    A quote or a bracket that opens and does not close is refused.
 
 Requirement
     A C string's escapes are C's own -- ``\\`` ``\"`` ``\'`` ``\n`` ``\r``
@@ -6076,8 +6083,9 @@ Requirement
 
 Requirement
     A trigger's bytes go out as the file wrote them, and are shown as a file
-    could have written them: one byte as two hexadecimal digits, and several
-    as a C string, which is the notation that states several bytes.
+    could have written them: text as a C string, and anything else as bytes
+    in brackets. See ``tcslibgs::trigger``, which is the one reader of the
+    notation for triggers, inits and terminators alike.
 
 Requirement
     Tcspecial sends a trigger on the conduit that writes the payload, and
@@ -7070,7 +7078,8 @@ Where a Read of a Line Ends
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A stream delivers bytes with no frame boundaries of its own, so a node on one
 needs to be told where one read ends. Four attributes say so, written flat
-beside the line's other terms.
+beside the node's other terms. A stream is a line or a stream socket: a
+network node whose protocol is ``tcp`` or ``unix_stream``.
 
 **Stream attributes**
 
@@ -7082,8 +7091,8 @@ beside the line's other terms.
 | read_timeout  | See      | How long after its first byte a read ends with   |
 |               | below    | what has arrived, or ``none``                    |
 +---------------+----------+--------------------------------------------------+
-| terminators   | See      | One or more byte values, each of which ends a    |
-|               | below    | read                                             |
+| terminators   | See      | A list of byte sequences, each in the notation a |
+|               | below    | trigger is written in, any of which ends a read  |
 +---------------+----------+--------------------------------------------------+
 | length_prefix | See      | What a read's first bytes say its length is:     |
 |               | below    | ``u8``, ``u16be`` or ``u16le``                   |
@@ -7104,8 +7113,34 @@ Requirement
     on whichever condition occurs first.
 
 Requirement
-    A terminator list contains at least one byte value. An empty list is an
+    A terminator list contains at least one terminator. An empty list is an
     error, because it states a terminator list without naming a terminator.
+
+Requirement
+    A terminator is a run of one or more bytes, in the notation a trigger is
+    written in, so that a record ending ``"\r\n"`` ends a read only when both
+    have arrived, in order. A read ends where the first terminator to arrive
+    whole ends -- the earliest to end, not the earliest to begin -- which is
+    where it would have ended had the bytes come one at a time. A terminator
+    longer than ``max_length`` is an error: no read could hold it, so it
+    would end none.
+
+Requirement
+    Terminators are a list: a YAML sequence, or one XML element for each. One
+    may be written on its own, as a list of one. Several written as one value
+    with commas between them are an error -- each is an entry of its own --
+    so a list has the one shape in a file. A node holds the list as one value
+    with its entries joined by commas, which is what the editor shows; a
+    comma inside a string is a character of it, so the join is exact. See
+    ``tcslibgs::graph::LISTED``.
+
+Requirement
+    A stream socket -- ``tcp`` or ``unix_stream`` -- specifies these
+    attributes as a line does, ``max_length`` among them, because it is a
+    stream of bytes with no packets of its own: without them a pass would take
+    whatever bytes happened to be waiting. A datagram socket -- ``udp``,
+    ``unix_dgram``, ``raw`` -- that specifies them is an error: a datagram is
+    a packet already, and a rule on one would be a rule nothing applies.
 
 Requirement
     To read a fixed number of bytes at a time, with no timeout and no
@@ -7152,7 +7187,7 @@ Requirement
 
 Requirement
     The vehicle acts on the rule: each read of a line is held until it ends,
-    and is then one datum. A terminator is the read's last byte, and what
+    and is then one datum. A terminator is the read's last bytes, and what
     arrived after it is the start of the next read; ``max_length`` ends a
     read that has filled; the timeout counts from the read's first byte and
     ends it with what has arrived. Without this a pass would take whatever
@@ -7194,13 +7229,13 @@ same value may be written ``8`` or ``"8"`` without changing its meaning.
 +===============+==============================================================+
 | Whole number  | Decimal, or hexadecimal with an ``0x`` prefix                |
 +---------------+--------------------------------------------------------------+
-| Byte value    | Decimal or ``0x`` hexadecimal, from 0 to 255                 |
+| Bytes         | Parts one after another, each a C string in quotes or bytes  |
+|               | in hexadecimal in square brackets: ``"AT" [0D 0A]``          |
 +---------------+--------------------------------------------------------------+
 | Timeout       | A whole number with a unit of ``us``, ``ms``, or ``s``, or   |
 |               | the word ``none``                                            |
 +---------------+--------------------------------------------------------------+
-| Byte list     | A sequence, or one string of values separated by commas or   |
-|               | whitespace                                                   |
+| List          | A YAML sequence, or one XML element for each entry           |
 +---------------+--------------------------------------------------------------+
 | Flag          | ``true`` or ``false``                                        |
 +---------------+--------------------------------------------------------------+

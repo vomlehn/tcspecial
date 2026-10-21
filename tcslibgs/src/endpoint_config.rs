@@ -22,7 +22,7 @@
 use std::fmt;
 use std::time::Duration;
 
-use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
+use serde::de::{self, Deserializer, MapAccess, Visitor};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -99,8 +99,8 @@ pub enum EndpointConfigError {
     StreamPrefixNeedsTimeout(String),
 
     #[error(
-        "payload \"{0}\": an empty terminator list is not a terminator list; omit it or \
-         give at least one byte"
+        "payload \"{0}\": terminators is empty, which names no terminator: leave it out, \
+         or give at least one, as \"\\r\\n\" or [03]"
     )]
     StreamEmptyTerminators(String),
 
@@ -310,8 +310,9 @@ pub struct StreamParams {
     pub max_length: u32,
     /// How long a read waits, or `None` for a read that does not time out.
     pub timeout: Option<Duration>,
-    /// Bytes that each end a read. Empty when the file gave no terminators.
-    pub terminators: Vec<u8>,
+    /// The sequences of bytes that each end a read, where it arrives whole.
+    /// Empty when the file gave no terminators.
+    pub terminators: Vec<Vec<u8>>,
     /// The length a read's first bytes give it, or `None` for a line whose
     /// reads say nothing of their own length. Never beside terminators.
     pub length_prefix: Option<LengthPrefix>,
@@ -518,7 +519,10 @@ pub(crate) struct LinkTerms {
 pub(crate) struct StreamTerms {
     pub(crate) max_length: Option<Scalar>,
     pub(crate) timeout: Option<Scalar>,
-    pub(crate) terminators: Option<ByteList>,
+    /// Each terminator, as [`crate::trigger::sequences_of`] reads them: the
+    /// alternatives joined by commas, which is how the reader of a node
+    /// gathers a list of them -- see `crate::graph::NodeFile`.
+    pub(crate) terminators: Option<Scalar>,
     pub(crate) length_prefix: Option<Scalar>,
 }
 
@@ -648,134 +652,6 @@ impl<'de> Deserialize<'de> for Scalar {
     }
 }
 
-#[cfg(test)]
-mod a_scalar_of_nothing {
-    use super::Scalar;
-
-    /// A key with nothing after it is a value nobody has supplied.
-    ///
-    /// Which is what the editor writes into a form: every question present and
-    /// the answers blank. `""` would read the same and say something else --
-    /// that somebody typed two quotation marks -- and the rules make no
-    /// distinction anyway, absent and empty meaning the same thing throughout.
-    #[test]
-    fn a_key_with_nothing_after_it_is_read_as_nothing() {
-        #[derive(Debug, serde::Deserialize)]
-        struct Said {
-            payload_port: Option<Scalar>,
-            packet_size: Option<Scalar>,
-        }
-
-        let said: Said =
-            serde_norway::from_str("payload_port:\npacket_size: 4\n").expect("it reads");
-        // An optional field never reaches the scalar: the reader answers the
-        // Option itself, and nothing is None. Which is the same meaning by a
-        // shorter road.
-        assert_eq!(said.payload_port.as_ref().map(Scalar::as_str), None);
-        assert_eq!(said.packet_size.as_ref().map(Scalar::as_str), Some("4"));
-
-        // And a map of them, which is how a node's attributes and a simulated
-        // payload's settings are read.
-        let mut settings: std::collections::BTreeMap<String, Scalar> =
-            serde_norway::from_str("drop_percent:\njitter_ms: 20\n").expect("it reads");
-        assert_eq!(
-            settings
-                .remove("drop_percent")
-                .map(|s| s.as_str().to_string()),
-            Some(String::new())
-        );
-        assert_eq!(
-            settings.remove("jitter_ms").map(|s| s.as_str().to_string()),
-            Some("20".to_string())
-        );
-    }
-}
-
-/// A list of byte values, written as a sequence or as one delimited string.
-///
-/// XML has no sequences in an attribute, so `terminators="0x0D,0x0A"` is the
-/// form there; YAML may use either that or `[0x0D, 0x0A]`. Repeated
-/// `<terminator>` children work too, by way of section-like flattening
-/// in the untagged enum below.
-#[derive(Debug, Clone)]
-pub struct ByteList(Vec<String>);
-
-impl ByteList {
-    /// The bytes this text lists, as a file would have written them: commas
-    /// or spaces between them, decimal or `0x`.
-    ///
-    /// For a caller building a configuration rather than reading one -- a
-    /// node states its terminators as one attribute, and this is how that
-    /// one attribute becomes the list.
-    pub fn of(text: &str) -> ByteList {
-        ByteList(split_list(text))
-    }
-}
-
-/// Compared and written out as the values it holds, for the reason
-/// [`Scalar`] is.
-impl PartialEq for ByteList {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
-}
-
-impl Serialize for ByteList {
-    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-        self.0.serialize(s)
-    }
-}
-
-impl<'de> Deserialize<'de> for ByteList {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        struct V;
-
-        impl<'de> Visitor<'de> for V {
-            type Value = ByteList;
-
-            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.write_str("a list of byte values, or a comma- or space-separated string of them")
-            }
-
-            fn visit_str<E: de::Error>(self, v: &str) -> Result<ByteList, E> {
-                Ok(ByteList(split_list(v)))
-            }
-
-            /// An XML element with text in it; see [`Scalar`]'s.
-            fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<ByteList, A::Error> {
-                let mut text: Option<String> = None;
-                while let Some((_, value)) = map.next_entry::<String, String>()? {
-                    text = Some(value);
-                }
-                text.map(|t| ByteList(split_list(&t)))
-                    .ok_or_else(|| de::Error::custom("an element with no value in it"))
-            }
-
-            fn visit_u64<E: de::Error>(self, v: u64) -> Result<ByteList, E> {
-                Ok(ByteList(vec![v.to_string()]))
-            }
-
-            fn visit_seq<A: SeqAccess<'de>>(self, mut a: A) -> Result<ByteList, A::Error> {
-                let mut out = Vec::new();
-                while let Some(s) = a.next_element::<Scalar>()? {
-                    out.push(s.as_str().to_string());
-                }
-                Ok(ByteList(out))
-            }
-        }
-
-        d.deserialize_any(V)
-    }
-}
-
-fn split_list(text: &str) -> Vec<String> {
-    text.split([',', ' ', '\t', '\n'])
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .map(str::to_string)
-        .collect()
-}
-
 // ---------------------------------------------------------------------------
 // Validation -- wire types to domain types
 // ---------------------------------------------------------------------------
@@ -799,19 +675,31 @@ pub(crate) fn validate_stream(group: &str, s: StreamTerms) -> EndpointConfigResu
         None => None,
     };
 
-    // 3. Terminators, if given, must actually name a byte.
+    // 3. Terminators, if given, are each one or more bytes, in the notation
+    //    a trigger is written in, and each fits in a read: one longer than
+    //    max_length could never arrive whole in one, and so would never end
+    //    anything.
     let terminators = match s.terminators.as_ref() {
         Some(list) => {
-            if list.0.is_empty() {
+            if list.as_str().trim().is_empty() {
                 return Err(EndpointConfigError::StreamEmptyTerminators(
                     group.to_string(),
                 ));
             }
-            let mut out = Vec::with_capacity(list.0.len());
-            for item in &list.0 {
-                out.push(parse_byte(group, item)?);
+            let each = crate::trigger::sequences_of(&crate::trigger::TERMINATOR, list.as_str())
+                .map_err(|why| bad(group, &format!("terminators: {why}")))?;
+            if let Some(long) = each.iter().find(|t| t.len() > max_length as usize) {
+                return Err(bad(
+                    group,
+                    &format!(
+                        "the terminator {} is {} bytes, more than max_length {max_length}: \
+                         a read could never hold it, so it would end none",
+                        crate::trigger::trigger_as_written(long),
+                        long.len()
+                    ),
+                ));
             }
-            Some(out)
+            Some(each)
         }
         None => None,
     };
@@ -1039,22 +927,6 @@ pub(crate) fn parse_u32(group: &str, field: &str, s: &Scalar) -> EndpointConfigR
     crate::whole::whole_u32(s.as_str()).map_err(|why| bad(group, &format!("{field}: {why}")))
 }
 
-/// Parse a byte value, by the one grammar: see [`crate::whole`].
-fn parse_byte(group: &str, text: &str) -> EndpointConfigResult<u8> {
-    let text = text.trim();
-    match crate::whole::whole(text) {
-        Ok(v) if v <= u8::MAX as u64 => Ok(v as u8),
-        Ok(v) => Err(bad(
-            group,
-            &format!("terminator {v} is not a byte value: expected 0 to 255"),
-        )),
-        Err(_) => Err(bad(
-            group,
-            &format!("terminator \"{text}\" is not a byte value"),
-        )),
-    }
-}
-
 /// Parse a flag written `true` or `false`.
 ///
 /// A YAML 1.1 reader folds `yes`, `no`, `on`, and `off` to a boolean before
@@ -1107,3 +979,46 @@ pub(crate) fn parse_timeout(group: &str, s: &Scalar) -> EndpointConfigResult<Opt
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod a_scalar_of_nothing {
+    use super::Scalar;
+
+    /// A key with nothing after it is a value nobody has supplied.
+    ///
+    /// Which is what the editor writes into a form: every question present and
+    /// the answers blank. `""` would read the same and say something else --
+    /// that somebody typed two quotation marks -- and the rules make no
+    /// distinction anyway, absent and empty meaning the same thing throughout.
+    #[test]
+    fn a_key_with_nothing_after_it_is_read_as_nothing() {
+        #[derive(Debug, serde::Deserialize)]
+        struct Said {
+            payload_port: Option<Scalar>,
+            packet_size: Option<Scalar>,
+        }
+
+        let said: Said =
+            serde_norway::from_str("payload_port:\npacket_size: 4\n").expect("it reads");
+        // An optional field never reaches the scalar: the reader answers the
+        // Option itself, and nothing is None. Which is the same meaning by a
+        // shorter road.
+        assert_eq!(said.payload_port.as_ref().map(Scalar::as_str), None);
+        assert_eq!(said.packet_size.as_ref().map(Scalar::as_str), Some("4"));
+
+        // And a map of them, which is how a node's attributes and a simulated
+        // payload's settings are read.
+        let mut settings: std::collections::BTreeMap<String, Scalar> =
+            serde_norway::from_str("drop_percent:\njitter_ms: 20\n").expect("it reads");
+        assert_eq!(
+            settings
+                .remove("drop_percent")
+                .map(|s| s.as_str().to_string()),
+            Some(String::new())
+        );
+        assert_eq!(
+            settings.remove("jitter_ms").map(|s| s.as_str().to_string()),
+            Some("20".to_string())
+        );
+    }
+}

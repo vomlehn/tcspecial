@@ -25,8 +25,8 @@
 //! nothing in the telemetry would ever say so.
 
 use crate::endpoint_config::{
-    a_link_term, endpoint_of, parse_u32, ByteList, EndpointLocation, LinkTerms, Scalar,
-    StreamParams, StreamTerms,
+    a_link_term, endpoint_of, parse_u32, EndpointLocation, LinkTerms, Scalar, StreamParams,
+    StreamTerms,
 };
 use crate::graph::Node;
 use crate::types::{host_port_of, DeviceConfig, EndpointConfig, HostPort, NetworkConfig};
@@ -144,18 +144,20 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
                 node.node_type
             ));
         }
-        if stream_stated {
+        // A network node's rule is settled below, once its protocol says
+        // whether it is a stream.
+        if stream_stated && kind == DHType::Device {
             return Err(format!(
                 "\"{what}\" is {} {} node, and where a read ends is a property of a \
-                 line: max_length, read_timeout, terminators and length_prefix do not \
-                 apply to it",
+                 stream -- a line, or a tcp or unix_stream socket: max_length, \
+                 read_timeout, terminators and length_prefix do not apply to it",
                 kind.article(),
                 node.node_type
             ));
         }
     }
 
-    // What the rules settle about where a read ends, for a line.
+    // What the rules settle about where a read ends, for a stream.
     let mut framing = None;
     let endpoint = match kind {
         // A socket: a host and a port, and which protocol is spoken to it.
@@ -188,6 +190,39 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
             };
 
             ip_protocol_misplaced(what, node, protocol)?;
+
+            // A stream socket delivers bytes with no packets of their own,
+            // as a line does, so it says where one ends by the same rule and
+            // must: without one a pass would take whatever bytes happened to
+            // be waiting, half a record as often as a whole one. A datagram
+            // is a packet already, and a rule on one would be a rule nothing
+            // applies.
+            match (protocol.is_stream(), terms.stream.take()) {
+                (true, Some(stated)) => {
+                    framing = Some(
+                        crate::endpoint_config::validate_stream(what, stated)
+                            .map_err(|why| why.to_string())?,
+                    );
+                }
+                (true, None) => {
+                    return Err(format!(
+                        "\"{what}\" is reached over {}, which is a stream of bytes, so \
+                         it must say where one packet of it ends: give max_length, and \
+                         read_timeout, terminators or length_prefix",
+                        protocol.spelling()
+                    ))
+                }
+                (false, Some(_)) => {
+                    return Err(format!(
+                        "\"{what}\" is reached over {}, whose datagrams are packets \
+                         already: max_length, read_timeout, terminators and \
+                         length_prefix say where a packet of a stream ends, and apply \
+                         only to a line or a tcp or unix_stream socket",
+                        protocol.spelling()
+                    ))
+                }
+                (false, None) => {}
+            }
 
             // A ground link that states neither address nor port binds
             // nothing: it only sends, to its ground_base, and the ground has
@@ -432,7 +467,7 @@ fn take(
             said.stream_stated = true;
         }
         "terminators" => {
-            said.stream.terminators = Some(ByteList::of(value.as_str()));
+            said.stream.terminators = Some(value.clone());
             said.stream_stated = true;
         }
         "length_prefix" => {
@@ -1245,7 +1280,7 @@ mod tests {
             &[
                 ("path", "/dev/gpiochip0"),
                 ("lines", "0"),
-                ("trigger", "55"),
+                ("trigger", "[55]"),
             ],
         ))
         .expect_err("a set of discrete lines cannot be asked");
@@ -1257,7 +1292,7 @@ mod tests {
         let said = reach_of(&node(
             "asked_sensor",
             "iio",
-            &[("path", "/dev/iio:device0"), ("trigger", "55")],
+            &[("path", "/dev/iio:device0"), ("trigger", "[55]")],
         ))
         .expect_err("a sample buffer cannot be asked");
         assert!(
@@ -1274,7 +1309,7 @@ mod tests {
                 ("path", "/dev/i2c-1"),
                 ("address", "0x48"),
                 ("read_size", "2"),
-                ("trigger", "55"),
+                ("trigger", "[55]"),
             ],
         ))
         .expect("a register is read by asking for it");
@@ -1315,7 +1350,7 @@ mod tests {
         let said = reach_of(&node(
             "switches",
             "gpio",
-            &[("path", "/dev/gpiochip0"), ("lines", "0"), ("init", "01")],
+            &[("path", "/dev/gpiochip0"), ("lines", "0"), ("init", "[01]")],
         ))
         .expect_err("watched lines are not written");
         assert!(
@@ -1326,7 +1361,7 @@ mod tests {
         let said = reach_of(&node(
             "accel",
             "iio",
-            &[("path", "/dev/iio:device0"), ("init", "01")],
+            &[("path", "/dev/iio:device0"), ("init", "[01]")],
         ))
         .expect_err("a sample buffer is not written");
         assert!(said.contains("accel") && said.contains("sysfs"), "{said}");
@@ -1334,7 +1369,7 @@ mod tests {
         let said = reach_of(&node(
             "link",
             "moc",
-            &[("address", "10.0.0.1"), ("port", "5000"), ("init", "01")],
+            &[("address", "10.0.0.1"), ("port", "5000"), ("init", "[01]")],
         ))
         .expect_err("a ground link has no state to start in");
         assert!(said.contains("link") && said.contains("init"), "{said}");
@@ -1495,6 +1530,8 @@ mod tests {
                 ("address", "127.0.0.1"),
                 ("port", "5000"),
                 ("protocol", "tcp"),
+                ("max_length", "64"),
+                ("read_timeout", "250 ms"),
             ],
         ))
         .expect("a TCP payload");
@@ -1516,6 +1553,44 @@ mod tests {
         assert!(said.contains("smoke"), "{said}");
     }
 
+    /// A stream socket is a stream of bytes, as a line is, so it says where
+    /// one of its packets ends by the same rule, and must; a datagram is a
+    /// packet already, and is refused one.
+    #[test]
+    fn a_stream_socket_says_where_a_packet_ends() {
+        let socket = |protocol: &str, extra: &[(&str, &str)]| {
+            let mut attributes = vec![
+                ("protocol", protocol),
+                ("address", "127.0.0.1"),
+                ("port", "5000"),
+            ];
+            attributes.extend_from_slice(extra);
+            reached("network", &attributes)
+        };
+        for protocol in ["tcp", "unix_stream"] {
+            let reach = socket(
+                protocol,
+                &[("max_length", "128"), ("terminators", "\"\\r\\n\"")],
+            )
+            .unwrap_or_else(|e| panic!("{protocol}: {e}"));
+            let rule = reach.stream.expect("a stream's packets end somewhere");
+            assert_eq!(rule.max_length, 128);
+            assert_eq!(rule.terminators, vec![b"\r\n".to_vec()]);
+
+            let said = socket(protocol, &[]).expect_err("a stream with no rule");
+            assert!(
+                said.contains(protocol) && said.contains("stream") && said.contains("max_length"),
+                "{protocol}: {said}"
+            );
+        }
+        for protocol in ["udp", "unix_dgram"] {
+            assert_eq!(socket(protocol, &[]).expect("a datagram").stream, None);
+            let said = socket(protocol, &[("max_length", "128"), ("read_timeout", "none")])
+                .expect_err("a datagram is a packet already");
+            assert!(said.contains("packets already"), "{protocol}: {said}");
+        }
+    }
+
     /// A line says where one of its reads ends, as three attributes.
     ///
     /// A node's attributes are flat, so they are written beside the rest of
@@ -1532,7 +1607,7 @@ mod tests {
                 ("parity", "none"),
                 ("byte_length", "8"),
                 ("max_length", "512"),
-                ("terminators", "0x0a"),
+                ("terminators", "[0A]"),
             ],
         ))
         .expect("a line");
@@ -1583,7 +1658,7 @@ mod tests {
                 ("path", "/dev/i2c-1"),
                 ("address", "0x48"),
                 ("read_size", "2"),
-                ("trigger", "00"),
+                ("trigger", "[00]"),
             ],
         ))
         .expect("a sensor that is asked");
@@ -1692,7 +1767,7 @@ mod tests {
             match attribute.as_str() {
                 "max_length" => stream.max_length = Some(value.clone()),
                 "read_timeout" => stream.timeout = Some(value.clone()),
-                "terminators" => stream.terminators = Some(ByteList::of(value.as_str())),
+                "terminators" => stream.terminators = Some(value.clone()),
                 "length_prefix" => stream.length_prefix = Some(value.clone()),
                 _ => continue,
             }
@@ -1840,7 +1915,17 @@ mod tests {
                     ("address", "127.0.0.1"),
                     ("port", "5000"),
                     ("trigger", "\"READ\""),
-                ],
+                ]
+                .into_iter()
+                // A stream says where its packets end; see
+                // a_stream_socket_says_where_a_packet_ends.
+                .chain(
+                    (protocol == "tcp")
+                        .then_some([("max_length", "64"), ("read_timeout", "none")])
+                        .into_iter()
+                        .flatten(),
+                )
+                .collect::<Vec<_>>(),
             )
             .unwrap_or_else(|e| panic!("{protocol}: {e}"));
             assert_eq!(
@@ -1920,11 +2005,11 @@ mod tests {
     /// end them there; nothing else's does.
     #[test]
     fn a_line_carries_its_stream_rule_and_nothing_else_does() {
-        let line = line_with(&[("max_length", "80"), ("terminators", "0x0A")]);
+        let line = line_with(&[("max_length", "80"), ("terminators", "[0A]")]);
         let reach = reached("serial", &line).expect("a line");
         let rule = reach.stream.expect("a line's reads end somewhere");
         assert_eq!(rule.max_length, 80);
-        assert_eq!(rule.terminators, vec![0x0A]);
+        assert_eq!(rule.terminators, vec![vec![0x0A]]);
 
         let bus = reached("i2c", &[("path", "/dev/i2c-1"), ("address", "0x48")]).expect("a bus");
         assert_eq!(bus.stream, None, "a bus transfer is already a frame");
@@ -1964,9 +2049,10 @@ mod tests {
 
     #[test]
     fn terminators_alone_end_a_read() {
-        let stream = line_stream(&[("max_length", "64"), ("terminators", "10")]).expect("accepted");
+        let stream =
+            line_stream(&[("max_length", "64"), ("terminators", "[0A]")]).expect("accepted");
         assert_eq!(stream.timeout, None);
-        assert_eq!(stream.terminators, vec![10]);
+        assert_eq!(stream.terminators, vec![vec![10]]);
         assert!(!stream.is_fixed_length());
     }
 
@@ -1975,11 +2061,11 @@ mod tests {
         let stream = line_stream(&[
             ("max_length", "64"),
             ("read_timeout", "1 s"),
-            ("terminators", "0x04"),
+            ("terminators", "[04]"),
         ])
         .expect("accepted");
         assert_eq!(stream.timeout, Some(Duration::from_secs(1)));
-        assert_eq!(stream.terminators, vec![0x04]);
+        assert_eq!(stream.terminators, vec![vec![0x04]]);
     }
 
     #[test]
@@ -2051,7 +2137,7 @@ mod tests {
             ("max_length", "64"),
             ("length_prefix", "u8"),
             ("read_timeout", "1 s"),
-            ("terminators", "0x0A"),
+            ("terminators", "[0A]"),
         ])
         .expect_err("two rules for one end");
         assert!(
@@ -2196,27 +2282,49 @@ mod tests {
         }
     }
 
-    /// Terminators are one attribute, so a list of them is written as text:
-    /// the bytes, separated by commas.
+    /// A node's terminators are its alternatives, each a run of bytes in the
+    /// notation a trigger is written in: held as one value with commas
+    /// between them, which is how the reader of a file gathers its list.
     #[test]
-    fn terminators_are_a_string_of_them() {
-        let stream =
-            line_stream(&[("max_length", "8"), ("terminators", "0x0D, 0x0A")]).expect("a string");
-        assert_eq!(stream.terminators, vec![0x0D, 0x0A]);
+    fn terminators_are_runs_of_bytes_any_of_which_ends_a_read() {
+        let stream = line_stream(&[
+            ("max_length", "8"),
+            ("terminators", "\"\\r\\n\", [03], \"END\" [00]"),
+        ])
+        .expect("alternatives");
+        assert_eq!(
+            stream.terminators,
+            vec![b"\r\n".to_vec(), vec![0x03], b"END\0".to_vec()]
+        );
     }
 
+    /// The spelling this replaced -- each terminator a byte, in decimal or
+    /// 0x -- is refused with the brackets each one wants.
     #[test]
-    fn terminators_are_written_in_decimal_or_hexadecimal() {
-        let stream = line_stream(&[("max_length", "8"), ("terminators", "13, 0x0A")])
-            .expect("either spelling");
-        assert_eq!(stream.terminators, vec![13, 10]);
+    fn a_terminator_written_bare_is_told_its_brackets() {
+        let said = line_stream(&[("max_length", "8"), ("terminators", "13")]).expect_err("bare");
+        assert!(
+            said.contains("terminators") && said.contains("[0D]"),
+            "{said}"
+        );
+    }
+
+    /// A terminator longer than a read can hold would never end one.
+    #[test]
+    fn a_terminator_longer_than_max_length_is_refused() {
+        let said =
+            line_stream(&[("max_length", "2"), ("terminators", "\"END\"")]).expect_err("too long");
+        assert!(
+            said.contains("max_length 2") && said.contains("\"END\""),
+            "{said}"
+        );
     }
 
     #[test]
     fn a_terminator_wider_than_a_byte_is_refused() {
-        let said = line_stream(&[("max_length", "8"), ("terminators", "256")])
+        let said = line_stream(&[("max_length", "8"), ("terminators", "[100]")])
             .expect_err("a line carries bytes");
-        assert!(said.contains("not a byte value"), "{said}");
+        assert!(said.contains("more than one byte"), "{said}");
     }
 
     // -- the framing of a line ------------------------------------------------

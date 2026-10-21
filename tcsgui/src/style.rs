@@ -998,6 +998,12 @@ impl NodeType {
                 // port is not marked as always wanted.
                 ("ip_protocol", false),
                 ("port", false),
+                // Only with protocol tcp or unix_stream, where max_length is
+                // then wanted; the checking has the rule.
+                ("max_length", false),
+                ("read_timeout", false),
+                ("terminators", false),
+                ("length_prefix", false),
                 ("group", false),
                 ("trigger", false),
                 ("trigger_interval", false),

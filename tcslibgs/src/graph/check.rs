@@ -1792,7 +1792,7 @@ mod tests {
         for one in [&mut sensor, &mut answers] {
             // Written to, so each says what asks it for a reading.
             one.attributes
-                .insert("trigger".to_string(), Scalar::of("55"));
+                .insert("trigger".to_string(), Scalar::of("[55]"));
         }
 
         let sound = graph(
@@ -2176,6 +2176,10 @@ mod tests {
             made.attributes
                 .insert("address".to_string(), Scalar::of("/tmp/node.sock"));
             made.attributes.insert("port".to_string(), Scalar::of(port));
+            made.attributes
+                .insert("max_length".to_string(), Scalar::of("64"));
+            made.attributes
+                .insert("read_timeout".to_string(), Scalar::of("none"));
             made
         };
         let said = wanted(&two(named_socket("a", "5200"), named_socket("b", "5201")))
@@ -2488,7 +2492,7 @@ mod tests {
             );
 
             // Asked on a timer of its own, it is not refused for that.
-            let found = paced(sender, &[("trigger", "55"), ("trigger_interval", "1 s")]);
+            let found = paced(sender, &[("trigger", "[55]"), ("trigger_interval", "1 s")]);
             assert!(!refused(&found), "{sender} asked: {found:?}");
         }
         for quiet in ["i2c", "spi", "device-file"] {
@@ -2525,13 +2529,13 @@ mod tests {
 
         // Each of the three on its own, with what it belongs to.
         assert_eq!(
-            driven(&[("trigger", "55"), ("trigger_interval", "1 s")]),
+            driven(&[("trigger", "[55]"), ("trigger_interval", "1 s")]),
             Vec::new()
         );
         assert_eq!(driven(&[("poll_interval", "1 s")]), Vec::new());
         assert_eq!(
             driven(&[
-                ("trigger", "55"),
+                ("trigger", "[55]"),
                 ("trigger_interval", "1 s"),
                 ("read_delay", "2 ms")
             ]),
@@ -2550,12 +2554,12 @@ mod tests {
                 Problem::ReadDelayWithoutTrigger { node: "a".into() },
             ),
             (
-                vec![("trigger", "55"), ("poll_interval", "1 s")],
+                vec![("trigger", "[55]"), ("poll_interval", "1 s")],
                 Problem::PollIntervalWithTrigger { node: "a".into() },
             ),
             (
                 vec![
-                    ("trigger", "55"),
+                    ("trigger", "[55]"),
                     ("trigger_interval", "1 s"),
                     ("poll_interval", "1 s"),
                 ],
@@ -2621,7 +2625,7 @@ mod tests {
             if rate == "trigger_interval" {
                 g.nodes[0].attributes.insert(
                     "trigger".to_string(),
-                    crate::endpoint_config::Scalar::of("55"),
+                    crate::endpoint_config::Scalar::of("[55]"),
                 );
             }
             let found = g.check();

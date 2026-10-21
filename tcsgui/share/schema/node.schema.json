@@ -46,7 +46,7 @@
             "type": "boolean"
           },
           "kind": {
-            "description": "What kind of value it takes, which decides what the node's window offers to type it with: `boolean` is a control with two states, and the rest are a box to write in. Absent is `text`, which is what an attribute whose rule is its own business takes. The rules themselves are tcslibgs': `whole` is a whole number as `whole::whole_u32` reads one, `interval` a length of time with its unit, `bytes` hex bytes as a trigger is written, `path` a file or a program, and `text` anything.",
+            "description": "What kind of value it takes, which decides what the node's window offers to type it with: `boolean` is a control with two states, and the rest are a box to write in. Absent is `text`, which is what an attribute whose rule is its own business takes. The rules themselves are tcslibgs': `whole` is a whole number as `whole::whole_u32` reads one, `interval` a length of time with its unit, `bytes` bytes as a trigger is written -- a C string in quotes, hexadecimal in square brackets, or both one after another, `path` a file or a program, and `text` anything.",
             "enum": [
               "text",
               "path",

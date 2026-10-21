@@ -1,18 +1,20 @@
-//! The bytes that make a triggered payload answer, as a file writes them.
+//! Bytes as a file writes them: what makes a triggered payload answer, what a
+//! payload is set to as it opens, and what ends a packet of a stream.
 //!
-//! A trigger is bytes, not text: a payload's interface document asks for what
-//! it asks for, and that is as likely to be `55` as it is to be `"READ\r"`.
-//! So a file may write it either way -- one byte in hexadecimal, or a string
-//! in C's notation -- and both arrive here as the bytes to send.
+//! These are bytes, not text: a payload's interface document asks for what it
+//! asks for, and that is as likely to be `55` as it is to be `"READ\r"`. So a
+//! file writes them as one or more parts, one after another, each in one of
+//! two notations -- a string in C's notation, in quotes, or bytes in
+//! hexadecimal, in square brackets -- and they arrive here as the bytes the
+//! parts make together. `"AT" [0D 0A]` is four bytes.
 //!
-//! Which notation a value is in is decided by its first character and nothing
-//! else: a quote opens a C string, and anything else is one byte in
-//! hexadecimal. Guessing would be worse: `52` is a plausible byte and a
-//! plausible pair of digits of something longer, and a file that meant one and
-//! got the other would send something nobody asked for. The quote is the mark,
-//! so it is part of the value and not of the way the file happens to be
-//! written -- in YAML a C string is `trigger: '"READ\r"'`, and in XML
-//! `<trigger>"READ\r"</trigger>`.
+//! Which notation a part is in is decided by its first character and nothing
+//! else: a quote opens a C string and a bracket opens bytes. Guessing would be
+//! worse: `52` is a plausible byte and a plausible pair of digits of something
+//! longer, and a file that meant one and got the other would send something
+//! nobody asked for. The marks are part of the value and not of the way the
+//! file happens to be written -- in YAML a trigger is `trigger: '"READ\r"'` or
+//! `trigger: '[55]'`, and in XML `<trigger>"READ\r"</trigger>`.
 
 /// A node that is asked for its data, and what asks it.
 ///
@@ -46,10 +48,11 @@ pub trait Triggered {
 
 /// The bytes a file's trigger names, or what is wrong with it.
 ///
-/// Two notations, and the first character says which: a trigger that opens
-/// with a quote is text in C's notation, escapes and all, and anything else is
-/// one byte in hexadecimal. So `"READ\r"` is five bytes and `55` is one, and
-/// nothing has to be guessed from the length of what was written.
+/// Parts in two notations, and each part's first character says which: a
+/// quote opens text in C's notation, escapes and all, and a square bracket
+/// opens bytes in hexadecimal. So `"READ\r"` is five bytes, `[55]` is one and
+/// `"AT" [0D]` is three, and nothing has to be guessed from the length of
+/// what was written.
 ///
 /// Empty is refused: a payload that answers requests has to be asked
 /// something, and nought bytes asks nothing. The error is the sentence shown
@@ -69,6 +72,11 @@ pub struct Named {
     pub a: &'static str,
     /// Why nought bytes is refused.
     pub empty: &'static str,
+    /// Whether a byte written bare, before brackets, was decimal unless it
+    /// said `0x` -- as a terminator was -- rather than hexadecimal, as a
+    /// trigger was. What the old spelling meant decides the brackets it is
+    /// told to write: a terminator's `13` is `[0D]`, a trigger's is `[13]`.
+    pub bare_was_decimal: bool,
 }
 
 /// A trigger: the bytes that make a payload answer.
@@ -76,6 +84,7 @@ pub const TRIGGER: Named = Named {
     word: "trigger",
     a: "a trigger",
     empty: "a payload that answers requests has to be asked something",
+    bare_was_decimal: false,
 };
 
 /// An init: the bytes a payload is set to as the vehicle opens it.
@@ -84,26 +93,73 @@ pub const INIT: Named = Named {
     a: "an init",
     empty: "an init sets a payload to something, and one that sets nothing is \
             left out",
+    bare_was_decimal: false,
+};
+
+/// A terminator: bytes that end a packet of a stream where they arrive.
+pub const TERMINATOR: Named = Named {
+    word: "terminator",
+    a: "a terminator",
+    empty: "a terminator is the bytes that end a packet, and nought bytes would \
+            end every packet before it began",
+    bare_was_decimal: true,
 };
 
 /// The bytes a file wrote in the attribute `named`, or what is wrong with
 /// them: see [`trigger_bytes`] for the two notations.
+///
+/// The parts may stand with space between them or none: `"AT"[0D]` and
+/// `"AT" [0D]` are the same three bytes. What stands outside a part is
+/// refused, and the spelling this replaced -- one bare byte, `55` or `0x55`
+/// -- is refused by name, with the brackets it wants: a file written for the
+/// old rule is told what to say rather than read as something else.
 pub fn bytes_of(named: &Named, written: &str) -> Result<Vec<u8>, String> {
-    let Named { word, a, empty } = named;
+    let Named { word, a, empty, .. } = named;
     let written = written.trim();
+    if let Some(bracketed) = bare_bytes(named, written) {
+        return Err(format!(
+            "the {word} {written:?} is bytes written bare, and bytes are written \
+             in square brackets now: {bracketed}. Text is a C string in quotes"
+        ));
+    }
 
-    let bytes = match written.strip_prefix('"') {
-        Some(rest) => {
-            let text = rest.strip_suffix('"').ok_or_else(|| {
-                format!(
-                    "the {word} {written:?} opens with a quote and does not close: \
-                     {a} that is text is a C string, quotes and all"
-                )
-            })?;
-            c_string_bytes(named, text)?
-        }
-        None => one_byte(named, written)?,
-    };
+    let mut bytes = Vec::new();
+    let mut rest = written;
+    loop {
+        rest = rest.trim_start();
+        let Some(first) = rest.chars().next() else {
+            break;
+        };
+        let (part, after) = match first {
+            '"' => {
+                let (text, after) = c_string_part(rest).ok_or_else(|| {
+                    format!(
+                        "the {word} {written:?} opens a quote that does not close: \
+                         text in {a} is a C string, quotes and all"
+                    )
+                })?;
+                (c_string_bytes(named, text)?, after)
+            }
+            '[' => {
+                let close = rest.find(']').ok_or_else(|| {
+                    format!(
+                        "the {word} {written:?} opens a bracket that does not close: \
+                         bytes in {a} are written [0D 0A], brackets and all"
+                    )
+                })?;
+                (hex_bytes(named, &rest[1..close])?, &rest[close + 1..])
+            }
+            other => {
+                return Err(format!(
+                    "{other:?} in the {word} {written:?} begins neither text nor bytes: \
+                     {a} is parts one after another, each a C string in quotes, \
+                     \"READ\\r\", or bytes in square brackets, [0D 0A]"
+                ))
+            }
+        };
+        bytes.extend(part);
+        rest = after;
+    }
 
     if bytes.is_empty() {
         return Err(format!(
@@ -114,55 +170,132 @@ pub fn bytes_of(named: &Named, written: &str) -> Result<Vec<u8>, String> {
     Ok(bytes)
 }
 
-/// One byte, as one or two hexadecimal digits.
+/// Each of the sequences a file wrote, where several are written as one
+/// value with commas between them: `"\r\n", [03]`.
 ///
-/// Hexadecimal because that is how an interface document writes what it wants,
-/// and one byte because a trigger of several is text: `"\x55\xAA"` says two
-/// bytes and says which notation it is in, where `55AA` was a value whose
-/// length decided how many bytes it meant. One digit is the same byte as two,
-/// a datasheet writing `5` where it means `05`.
+/// For terminators, of which a stream may have several, any one of which ends
+/// a packet. A comma inside a C string or between brackets is part of what it
+/// is in, so only a comma between parts separates sequences; each sequence is
+/// read by [`bytes_of`], and an empty one -- two commas together, or one at
+/// either end -- is refused as no bytes at all.
+pub fn sequences_of(named: &Named, written: &str) -> Result<Vec<Vec<u8>>, String> {
+    split_sequences(written)
+        .into_iter()
+        .map(|one| bytes_of(named, one))
+        .collect()
+}
+
+/// The text of each sequence in `written`, split at the commas that stand
+/// between parts and not inside one.
 ///
-/// No `x` anywhere, `0x` included. A trigger written without quotes is
-/// hexadecimal and nothing else, so a prefix saying so would be saying it for
-/// a notation that has no alternative -- and a file that writes one is told
-/// what to write instead rather than having `0x55` read as something.
-fn one_byte(named: &Named, written: &str) -> Result<Vec<u8>, String> {
-    let Named { word, a, empty } = named;
-    // The spellings this replaced, each caught by name: a file written for an
-    // older rule is told what to say rather than being refused for a
-    // character it was right to write.
-    if written.starts_with("0x") || written.starts_with("0X") {
-        return Err(format!(
-            "the {word} {written:?} is written after 0x, and {a} is no longer: \
-             a byte stands on its own, as in 55"
-        ));
+/// A quote or a bracket that does not close is left for [`bytes_of`] to
+/// refuse in its own words, so this only has to find the commas.
+pub fn split_sequences(written: &str) -> Vec<&str> {
+    let mut sequences = Vec::new();
+    let mut start = 0;
+    let mut in_string = false;
+    let mut in_brackets = false;
+    let mut escaped = false;
+    for (at, c) in written.char_indices() {
+        if in_string {
+            match c {
+                _ if escaped => escaped = false,
+                '\\' => escaped = true,
+                '"' => in_string = false,
+                _ => {}
+            }
+            continue;
+        }
+        match c {
+            '"' if !in_brackets => in_string = true,
+            '[' => in_brackets = true,
+            ']' => in_brackets = false,
+            ',' if !in_brackets => {
+                sequences.push(&written[start..at]);
+                start = at + 1;
+            }
+            _ => {}
+        }
     }
-    if written.split_whitespace().count() > 1 {
-        return Err(format!(
-            "the {word} {written:?} is more than one value: {a} is one byte in \
-             hexadecimal, as in 55, or text as a C string -- {a} of several \
-             bytes is written \"\\x55\\xAA\""
-        ));
-    }
+    sequences.push(&written[start..]);
+    sequences
+}
 
-    if let Some(bad) = written.chars().find(|c| !c.is_ascii_hexdigit()) {
+/// The text of a C string at the front of `rest`, which opens with its
+/// quote, and what follows its closing quote: `None` if it does not close.
+///
+/// The closing quote is the first one no backslash escapes, as in C.
+fn c_string_part(rest: &str) -> Option<(&str, &str)> {
+    let mut escaped = false;
+    for (at, c) in rest.char_indices().skip(1) {
+        match c {
+            _ if escaped => escaped = false,
+            '\\' => escaped = true,
+            '"' => return Some((&rest[1..at], &rest[at + 1..])),
+            _ => {}
+        }
+    }
+    None
+}
+
+/// The bytes between a pair of square brackets: each one or two hexadecimal
+/// digits, with space between one and the next.
+///
+/// Space between them, so that how many bytes a run of digits is never has
+/// to be counted: `[0D 0A]` is two bytes, and `[0D0A]` is refused rather than
+/// read as two. One digit is the same byte as two, a datasheet writing `5`
+/// where it means `05`. No `0x`: everything between the brackets is
+/// hexadecimal, so a prefix saying so would be saying it for a notation that
+/// has no alternative.
+fn hex_bytes(named: &Named, inside: &str) -> Result<Vec<u8>, String> {
+    let Named { a, .. } = named;
+    let mut bytes = Vec::new();
+    for byte in inside.split_whitespace() {
+        if byte.starts_with("0x") || byte.starts_with("0X") {
+            return Err(format!(
+                "[{inside}] has {byte:?} in it, and inside brackets a byte is its \
+                 digits alone: [{}]",
+                &byte[2..]
+            ));
+        }
+        if let Some(bad) = byte.chars().find(|c| !c.is_ascii_hexdigit()) {
+            return Err(format!(
+                "{bad:?} in [{inside}] is not a hexadecimal digit: bytes in {a} are \
+                 0-9, a-f or A-F, with a space between one and the next"
+            ));
+        }
+        if byte.len() > 2 {
+            return Err(format!(
+                "{byte:?} in [{inside}] is {} digits, which is more than one byte: \
+                 write each byte apart, as in [0D 0A]",
+                byte.len()
+            ));
+        }
+        bytes.push(u8::from_str_radix(byte, 16).expect("checked digits"));
+    }
+    if bytes.is_empty() {
         return Err(format!(
-            "{bad:?} in {written:?} is not a hexadecimal digit: {a} is one byte \
-             in 0-9, a-f or A-F -- or a C string in quotes"
+            "[{inside}] names no byte: bytes in {a} are written [0D 0A]"
         ));
     }
+    Ok(bytes)
+}
 
-    match written.len() {
-        // One digit is the same byte as two: 5 and 05 are one byte.
-        1 | 2 => Ok(vec![
-            u8::from_str_radix(written, 16).expect("checked digits")
-        ]),
-        0 => Err(format!("{a} names a byte: {empty}")),
-        length => Err(format!(
-            "{written:?} is {length} digits, which is more than one byte: {a} of \
-             several bytes is text, as in \"\\x55\\xAA\""
-        )),
+/// How bytes written bare in the spelling this replaced are written now, if
+/// `written` is that: `55`, `0x55` or `55 AA` becomes `[55]` or `[55 AA]`,
+/// and a terminator's decimal `13` becomes `[0D]`.
+fn bare_bytes(named: &Named, written: &str) -> Option<String> {
+    let mut each = Vec::new();
+    for byte in written.split_whitespace() {
+        let hex = byte.strip_prefix("0x").or_else(|| byte.strip_prefix("0X"));
+        let value = match hex {
+            Some(digits) => u8::from_str_radix(digits, 16).ok()?,
+            None if named.bare_was_decimal => byte.parse::<u8>().ok()?,
+            None => u8::from_str_radix(byte, 16).ok()?,
+        };
+        each.push(format!("{value:02X}"));
     }
+    (!each.is_empty()).then(|| format!("[{}]", each.join(" ")))
 }
 
 /// A string in C's notation: its characters, with C's escapes.
@@ -226,8 +359,8 @@ fn c_string_bytes(named: &Named, written: &str) -> Result<Vec<u8>, String> {
             other => {
                 return Err(format!(
                     "\\{other} is not an escape: {a} takes C's own -- \\\\ \\\" \
-                     \\' \\n \\r \\t \\0 \\a \\b \\f \\v and \\xNN -- and a list of \
-                     byte values is written without quotes instead"
+                     \\' \\n \\r \\t \\0 \\a \\b \\f \\v and \\xNN -- and bytes \
+                     that are not text are written in brackets instead, [0D 0A]"
                 ))
             }
         }
@@ -239,19 +372,20 @@ fn c_string_bytes(named: &Named, written: &str) -> Result<Vec<u8>, String> {
 /// Bytes as a file could write them.
 ///
 /// The notation a file would use for these bytes, so that what is shown can be
-/// copied back into one: a single byte as its two hexadecimal digits, and
-/// anything longer as the C string it would have to be written as -- there
-/// being one notation for more than one byte. See [`trigger_bytes`], which
+/// copied back into one. Text as the C string it is -- which is what makes a
+/// trigger from an interface document readable: `"READ\r"` rather than five
+/// bytes in hexadecimal -- and anything else as bytes in brackets, `[55 AA]`.
+/// Text is printable ASCII and the three escapes a line of it ends in; the
+/// two characters a C string cannot hold plainly, the quote and the
+/// backslash, are escaped as C escapes them. See [`trigger_bytes`], which
 /// reads what this writes.
-///
-/// A printable byte is shown as itself inside the string, which is what makes
-/// a trigger from an interface document readable: `"READ\r"` rather than four
-/// escapes and a fifth. The rest are `\xNN`, and the two characters a C string
-/// cannot hold plainly -- the quote and the backslash -- are escaped as C
-/// escapes them.
 pub fn trigger_as_written(bytes: &[u8]) -> String {
-    if let [byte] = bytes {
-        return format!("{byte:02X}");
+    let text = bytes
+        .iter()
+        .all(|byte| matches!(byte, 0x20..=0x7e | b'\r' | b'\n' | b'\t'));
+    if !text {
+        let each: Vec<String> = bytes.iter().map(|byte| format!("{byte:02X}")).collect();
+        return format!("[{}]", each.join(" "));
     }
 
     let mut shown = String::from("\"");
@@ -262,9 +396,7 @@ pub fn trigger_as_written(bytes: &[u8]) -> String {
             b'\r' => shown.push_str("\\r"),
             b'\n' => shown.push_str("\\n"),
             b'\t' => shown.push_str("\\t"),
-            // Printable ASCII, which is what a word of a trigger is.
-            0x20..=0x7e => shown.push(*byte as char),
-            other => shown.push_str(&format!("\\x{other:02X}")),
+            other => shown.push(*other as char),
         }
     }
     shown.push('"');
@@ -275,67 +407,87 @@ pub fn trigger_as_written(bytes: &[u8]) -> String {
 mod tests {
     use super::*;
 
-    /// One byte, in either case, one or two digits.
+    /// Bytes in brackets, in either case, one or two digits each, with space
+    /// between them.
     #[test]
-    fn a_byte_is_read_as_the_byte_it_is() {
-        assert_eq!(trigger_bytes("55").unwrap(), vec![0x55]);
-        assert_eq!(trigger_bytes("aa").unwrap(), vec![0xAA]);
-        assert_eq!(trigger_bytes("Aa").unwrap(), vec![0xAA]);
+    fn bytes_in_brackets_are_read_as_the_bytes_they_are() {
+        assert_eq!(trigger_bytes("[55]").unwrap(), vec![0x55]);
+        assert_eq!(trigger_bytes("[aa]").unwrap(), vec![0xAA]);
+        assert_eq!(trigger_bytes("[Aa]").unwrap(), vec![0xAA]);
+        assert_eq!(trigger_bytes("[55 AA 0D]").unwrap(), vec![0x55, 0xAA, 0x0D]);
+        assert_eq!(trigger_bytes("  [ 0d\t0a ]  ").unwrap(), vec![0x0D, 0x0A]);
 
         // One digit is the same byte as two: a datasheet writes 5 where it
         // means 05, and counting zeroes is not what a configuration is for.
-        assert_eq!(trigger_bytes("5").unwrap(), vec![0x05]);
-        assert_eq!(trigger_bytes("05").unwrap(), trigger_bytes("5").unwrap());
-
-        // The byte a payload most often wants, and whatever space somebody
-        // left around it.
-        assert_eq!(trigger_bytes("0D").unwrap(), vec![0x0D]);
-        assert_eq!(trigger_bytes("  0d  ").unwrap(), vec![0x0D]);
+        assert_eq!(trigger_bytes("[5]").unwrap(), vec![0x05]);
+        assert_eq!(
+            trigger_bytes("[05]").unwrap(),
+            trigger_bytes("[5]").unwrap()
+        );
     }
 
-    /// More than one byte is text, and a file that writes a longer value is
-    /// told so.
-    ///
-    /// The notation was a list whose values meant one byte or two by their
-    /// length, which made `55AA` two bytes and `55 AA` the same two written
-    /// another way. A trigger of several bytes is a C string now -- one
-    /// notation for "more than one byte", and the quote at the front says
-    /// which notation is being read before anything is counted.
+    /// A run of digits is not split into bytes: how many bytes it meant
+    /// would be a guess from its length.
     #[test]
-    fn more_than_one_byte_is_a_c_string() {
-        assert_eq!(trigger_bytes("\"\\x55\\xAA\"").unwrap(), vec![0x55, 0xAA]);
-
-        for written in ["55 AA", "55AA", "0400", "03 0400", "5 a f"] {
+    fn a_run_of_digits_is_refused() {
+        for written in ["[55AA]", "[0400]", "[03 0400]"] {
             let said = trigger_bytes(written).expect_err("not one byte");
+            assert!(said.contains("more than one byte"), "{written}: {said}");
+        }
+    }
+
+    /// What is not a byte in brackets is said not to be.
+    #[test]
+    fn what_is_not_a_byte_in_brackets_is_refused() {
+        let said = trigger_bytes("[5g]").expect_err("g is not a digit");
+        assert!(said.contains("hexadecimal digit"), "{said}");
+        let said = trigger_bytes("[0D, 0A]").expect_err("commas are not bytes");
+        assert!(said.contains("hexadecimal digit"), "{said}");
+        let said = trigger_bytes("[0x55]").expect_err("no 0x inside brackets");
+        assert!(said.contains("[55]"), "{said}");
+        let said = trigger_bytes("[]").expect_err("no byte");
+        assert!(said.contains("names no byte"), "{said}");
+        let said = trigger_bytes("[55").expect_err("open bracket");
+        assert!(said.contains("does not close"), "{said}");
+    }
+
+    /// The spelling this replaced -- bytes written bare -- is refused with
+    /// the brackets it wants, rather than puzzled over or read as something.
+    #[test]
+    fn bytes_written_bare_are_told_their_brackets() {
+        for (written, wanted) in [
+            ("55", "[55]"),
+            ("0x55", "[55]"),
+            ("0X55", "[55]"),
+            ("0D", "[0D]"),
+            ("5", "[05]"),
+            ("55 AA", "[55 AA]"),
+        ] {
+            let said = trigger_bytes(written).expect_err("bare bytes");
             assert!(
-                said.contains("one byte") || said.contains("more than one"),
+                said.contains("square brackets") && said.contains(wanted),
+                "{written}: {said}"
+            );
+        }
+
+        // A terminator was decimal unless it said 0x, so its brackets are
+        // the byte it meant.
+        for (written, wanted) in [("13", "[0D]"), ("0x0A", "[0A]"), ("10", "[0A]")] {
+            let said = bytes_of(&TERMINATOR, written).expect_err("bare bytes");
+            assert!(
+                said.contains("square brackets") && said.contains(wanted),
                 "{written}: {said}"
             );
         }
     }
 
-    /// What is not a byte is said not to be, rather than read as something
-    /// else.
+    /// A word without quotes is neither notation, and is said to be.
     #[test]
-    fn a_value_that_is_not_a_byte_is_refused() {
-        // A word, which is what a C string looks like without its quotes:
-        // the quotes are the mark, so this is not one.
-        let said = trigger_bytes("READ").expect_err("a word is not hexadecimal");
-        assert!(said.contains("hexadecimal digit"), "{said}");
-
-        // And a digit string with something in it that is not a digit.
-        let said = trigger_bytes("5g").expect_err("g is not a digit");
-        assert!(said.contains("hexadecimal digit"), "{said}");
-    }
-
-    /// The spelling this replaced is named rather than puzzled over.
-    #[test]
-    fn the_older_spelling_is_named_rather_than_puzzled_over() {
-        for written in ["0x55", "0X55"] {
-            let said = trigger_bytes(written).expect_err("0x is no longer written");
-            assert!(said.contains("0x"), "{said}");
-            assert!(said.contains("stands on its own"), "{said}");
-        }
+    fn a_word_without_quotes_is_refused() {
+        let said = trigger_bytes("READ").expect_err("neither text nor bytes");
+        assert!(said.contains("begins neither"), "{said}");
+        let said = trigger_bytes("\"AT\" 0D").expect_err("a bare byte after text");
+        assert!(said.contains("begins neither"), "{said}");
     }
 
     /// A C string is its characters, with C's escapes, inside its quotes.
@@ -362,9 +514,27 @@ mod tests {
         assert_eq!(trigger_bytes("\"\u{00B5}\"").unwrap(), vec![0xC2, 0xB5]);
 
         // A string that opens and does not close, which is the mistake the
-        // quotes being the mark makes possible.
+        // quotes being the mark makes possible -- and an escaped quote does
+        // not close one.
         let said = trigger_bytes("\"READ").unwrap_err();
         assert!(said.contains("does not close"), "{said}");
+        let said = trigger_bytes("\"READ\\\"").unwrap_err();
+        assert!(said.contains("does not close"), "{said}");
+    }
+
+    /// Parts one after another are the bytes they make together, with space
+    /// between them or none.
+    #[test]
+    fn parts_one_after_another_are_one_run_of_bytes() {
+        assert_eq!(trigger_bytes("\"AT\" [0D 0A]").unwrap(), b"AT\r\n".to_vec());
+        assert_eq!(trigger_bytes("\"AT\"[0D]").unwrap(), b"AT\r".to_vec());
+        assert_eq!(
+            trigger_bytes("[02] \"T=\" [03]").unwrap(),
+            vec![0x02, b'T', b'=', 0x03]
+        );
+        assert_eq!(trigger_bytes("\"a\" \"b\"").unwrap(), b"ab".to_vec());
+        // A bracket inside a string is a character of it.
+        assert_eq!(trigger_bytes("\"[x]\"").unwrap(), b"[x]".to_vec());
     }
 
     /// An escape C does not have is refused rather than passed through.
@@ -372,13 +542,7 @@ mod tests {
     fn an_escape_c_does_not_have_is_refused() {
         let said = trigger_bytes("\"\\q\"").unwrap_err();
         assert!(
-            said.contains("not an escape") && said.contains("without quotes"),
-            "{said}"
-        );
-
-        let said = trigger_bytes("\"READ\\\"").unwrap_err();
-        assert!(
-            said.contains("escapes nothing") || said.contains("does not close"),
+            said.contains("not an escape") && said.contains("in brackets"),
             "{said}"
         );
 
@@ -394,45 +558,57 @@ mod tests {
     /// Nothing is not a trigger.
     #[test]
     fn a_trigger_of_no_bytes_is_refused() {
-        for written in ["", "   ", "\"\""] {
+        for written in ["", "   ", "\"\"", "\"\" \"\""] {
             let said = trigger_bytes(written).unwrap_err();
-            assert!(
-                said.contains("no bytes") || said.contains("names a byte"),
-                "{written:?}: {said}"
-            );
+            assert!(said.contains("no bytes"), "{written:?}: {said}");
         }
     }
 
-    /// The two notations can write the same trigger, and do.
-    ///
-    /// One byte is where they meet: beyond that there is one notation, a C
-    /// string, and the hexadecimal form is the byte on its own.
+    /// The two notations can write the same bytes, and do.
     #[test]
     fn the_two_notations_meet() {
         assert_eq!(
-            trigger_bytes("0D").unwrap(),
+            trigger_bytes("[0D]").unwrap(),
             trigger_bytes("\"\\r\"").unwrap()
         );
         assert_eq!(
-            trigger_bytes("41").unwrap(),
-            trigger_bytes("\"A\"").unwrap()
+            trigger_bytes("[41 54]").unwrap(),
+            trigger_bytes("\"AT\"").unwrap()
         );
+    }
+
+    /// Several sequences, any of which ends a packet, are written with commas
+    /// between them; a comma inside a string is a character of it.
+    #[test]
+    fn sequences_are_split_at_the_commas_between_them() {
+        assert_eq!(
+            sequences_of(&TERMINATOR, "\"\\r\\n\", [03]").unwrap(),
+            vec![b"\r\n".to_vec(), vec![0x03]]
+        );
+        assert_eq!(
+            sequences_of(&TERMINATOR, "\",\"").unwrap(),
+            vec![b",".to_vec()]
+        );
+        assert_eq!(
+            sequences_of(&TERMINATOR, "\"\\\",\" , [0A]").unwrap(),
+            vec![b"\",".to_vec(), vec![0x0A]]
+        );
+        for written in ["[0D],", ",[0D]", "[0D],,[0A]"] {
+            let said = sequences_of(&TERMINATOR, written).unwrap_err();
+            assert!(
+                said.contains("terminator") && said.contains("no bytes"),
+                "{written}: {said}"
+            );
+        }
     }
 
     /// Bytes read back as a file could have written them.
     #[test]
     fn bytes_are_shown_as_a_file_could_write_them() {
-        // One byte is the hexadecimal form, which is what a file writes for
-        // one byte.
-        assert_eq!(trigger_as_written(&[0x55]), "55");
-        assert_eq!(trigger_as_written(&[0x00]), "00");
-
-        // More than one is the notation that can hold more than one, with a
-        // word shown as a word: a trigger from an interface document is
-        // commonly one.
+        assert_eq!(trigger_as_written(&[0x55, 0xAA]), "[55 AA]");
+        assert_eq!(trigger_as_written(&[0x00]), "[00]");
         assert_eq!(trigger_as_written(b"READ"), "\"READ\"");
         assert_eq!(trigger_as_written(b"READ\r"), "\"READ\\r\"");
-        assert_eq!(trigger_as_written(&[0x55, 0xAA]), "\"U\\xAA\"");
         assert_eq!(trigger_as_written(b"a\"b"), "\"a\\\"b\"");
 
         // What is shown is read back as the bytes it was shown for, which is

@@ -25,5 +25,6 @@ directories again from a tcsxtce checkout (`rust/` without its `tests/` or
 `target/`), leaving out `__pycache__`, then run `make beacon-packet` in
 `tcslibgs/` and `cargo test --workspace`.
 
-tcsxtce is licensed under the Apache License 2.0, in `LICENSE`; its Rust crate
-says `MIT OR Apache-2.0`.
+tcsxtce is licensed under either of the Apache License, Version 2.0, in
+`LICENSE-APACHE`, or the MIT license, in `LICENSE-MIT`, at your option; its
+Rust crate says `MIT OR Apache-2.0`.

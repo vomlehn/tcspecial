@@ -1035,10 +1035,10 @@ and may not share a ``can_id``: two handlers filtering on one identifier would
 each read the other's frames.
 
 A frame is its own length and carries eight bytes, or sixty-four as CAN FD,
-and CAN does not fragment -- so a ``packet_size`` larger than a frame is
+and CAN does not fragment -- so a ``read_size`` larger than a frame is
 refused where the file is read rather than discovered a frame at a time. The
-segment settings still apply: a packet may go as several frames, each a
-segment.
+simulator's segment settings still apply: a stand-in's packet may go as
+several frames, each a segment.
 
 A CAN payload may be triggered, unlike a payload on an
 I\ :superscript:`2`\ C bus. The handler sends its trigger with the same
@@ -1147,8 +1147,10 @@ This is the one type whose payload data is made rather than carried. A line
 has no bytes: it is high or low, and what the ground wants is when it changed.
 So each change becomes a record of sixteen bytes -- eight of time in
 microseconds since the epoch, four of line offset, four of the value it became
--- and a ``packet_size`` must be a whole number of those, a packet that was
-part of a record being a reading nobody could use.
+-- and a read takes whole records only, so a ``read_size`` must be a whole
+number of them. One that is not is refused where the file is read: room left
+unfilled on every read, or, smaller than a record, a node that would never
+deliver anything.
 
 A report makes the same record, one per line: this line, this value, this
 time. The ground reads the two alike, which is the point of their being the
@@ -1274,7 +1276,7 @@ not the channel the file asked for. Where the kernel publishes no name --
 and a simulated channel has none to publish -- nothing is refused.
 
 A read hands over one whole message, so there is no stream rule. rpmsg does
-not fragment, so a ``packet_size`` larger than one message is refused where
+not fragment, so a ``read_size`` larger than one message is refused where
 the file is read.
 
 An rpmsg payload may be triggered: the channel carries both directions, so the
@@ -1584,13 +1586,10 @@ otherwise produces a payload that looks configured and is not:
   two sets may name their payloads and their groups alike, and the shipped
   examples do.
 * An **attribute of another type** -- a device file payload stating
-  ``protocol``, ``payload_address`` or ``payload_interface``, or a network
-  payload stating ``path`` or ``payload_address``. The check is
-  made after the group has been laid under the payload, since an attribute
-  inherited from a group reaches the payload just as one it states itself
-  does: a payload of one type joining a group written for another is what this
-  catches, and the error names the group when the group is where the attribute
-  came from.
+  ``address``, ``port`` or ``protocol``, or a network payload stating
+  ``path``. Each type is located by its own attributes, and the refusal says
+  which: ``"random-device" is a device-file node, so port does not locate it:
+  it is located by path``.
 * A **term of a link on a type that is not on one**: a ``datarate`` or a
   ``spi_mode`` or a set of ``lines`` on a network or device file payload. Each
   type
@@ -1599,22 +1598,24 @@ otherwise produces a payload that looks configured and is not:
   written on one of them used to be taken in and dropped, which is a payload
   that looks configured and is not. A network payload's ``protocol`` is its
   own type's and is not a term of somebody else's link.
-* A **word that is not an attribute**. A misspelled ``packet_size`` is a
-  payload with nowhere to send its data, and ignoring the word says nothing
-  about it.
+* A **word that is not an attribute**. A misspelled ``read_size`` is a
+  payload read in pieces nobody chose, and ignoring the word says nothing
+  about it. A word written with hyphens where the attribute has underscores,
+  or the other way round, is told its one spelling: ``read-size`` is answered
+  *it is spelled read_size*. A word the configuration used to have and no
+  longer does, such as ``packet_size`` or ``packet_interval`` on a payload,
+  is refused the same way: nothing reads it now, and a file that states it
+  has said something about the payload that nothing would act on.
 * A **misspelled section**, for the same reason: ``payload`` is not
   ``payloads``, and a file whose only section is misspelled describes no
   payloads at all.
-* **A trigger and a packet interval on one payload**. A payload says how it
-  is driven by stating one or the other, so one with both has said that it is
-  asked and that it sends on its own, and either guess would run something
-  nobody asked for. The interval belongs to the payload group -- that is where
-  the rate a payload is asked at is kept -- and the error says so, as it does
-  for a payload that sends on its own and whose rate belongs in the simulator
-  configuration. This was ignored for a while, which was the silence the rule
-  exists to prevent: a file stating an interval has said something about the
-  payload's timing, and reading it as though it had not is reading a different
-  file than the one that was written.
+* **Two clocks on one payload**. A payload in a group is read when its group
+  is, so one that states a ``trigger_interval`` as well has said two rates;
+  a payload with a ``trigger`` is read when it has been asked, so one that
+  states a ``poll_interval`` as well has said two ways of being read. Either
+  guess would run something nobody asked for, and the refusal says which
+  rate the payload has: ``"both" states poll_interval and a trigger: a node
+  that is asked is read when it has been asked, so say trigger_interval``.
 * **A temperature a value could not carry**. A ``setpoint`` or a
   ``half_band`` on a thermostat, or an ``offset`` on a conversion, is a
   temperature in kelvin, and a value carries 2147.483647 K either way. A
@@ -2628,15 +2629,18 @@ the file, the line and what is wrong there:
 .. code-block:: console
 
    $ cargo run --bin tcsverify -- /tmp/draft.yaml
-   /tmp/draft.yaml:61: error: payload "udp-steady": packet_size must be greater than zero
-   /tmp/draft.yaml:68: error: payload "random-device" is a device-file payload, so port does not apply to it
+   /tmp/draft.yaml:33: error: "both" states poll_interval and a trigger: a node that is asked is read when it has been asked, so say trigger_interval
+   /tmp/draft.yaml:23: warning: "udp-steady": read_size must be more than nought -- a read of no bytes is not a read, and a node that is not read says nothing about it
+   /tmp/draft.yaml:29: warning: "random-device" is a device-file node, so port does not locate it: it is located by path
 
 Each line says which kind it is. An **error** is a configuration that says
 something wrong -- two nodes of one name, a link to a node that is not there,
 a node whose type does not exist (the message lists the types each section
-takes). A **warning** is one that has not finished saying it: a node whose attributes
-are not all in yet, a node nothing is linked to. That is the state every
-configuration is in while it is being drawn, so warnings do not fail the run.
+takes). A **warning** is about one node's own attributes, or a node nothing
+is linked to: an attribute not in yet, and one that is there and wrong, as
+both warnings above are. The first is the state every configuration is in
+while it is being drawn, and a reader of either has the same thing to do --
+open that node and look at its words -- so warnings do not fail the run.
 
 It exits 0 when it printed no errors, 1 when it printed one -- a difference between
 two spellings is one -- and 2 when the command line is none of those shapes,

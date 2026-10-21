@@ -13,9 +13,10 @@
 //! So this is the one kind whose payload data is made rather than carried. A
 //! conduit moves bytes, and a line's change is not bytes, so each event
 //! becomes a record of a fixed size: when it happened, which line, and what it
-//! became. The size is [`EVENT_BYTES`], and a payload's `packet_size` must be
-//! a whole number of them -- a packet that was part of a record would be a
-//! reading nobody could use.
+//! became. The size is [`EVENT_BYTES`], and a payload's `read_size` must be
+//! a whole number of them -- a read takes whole records only, so one smaller
+//! than a record would never deliver anything. `graph::reach` holds a node
+//! to it.
 //!
 //! What a GPIO payload cannot be is triggered. These are inputs: there is
 //! nothing to write a request to, and writing would mean driving an output,

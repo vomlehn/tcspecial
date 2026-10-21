@@ -109,14 +109,16 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
             };
             return Err(match crate::graph::spelled(attribute, known) {
                 Some(hint) => format!(
-                    "\"{what}\": there is nothing called \"{attribute}\" on a {} node: \
-                     {hint}",
+                    "\"{what}\": there is nothing called \"{attribute}\" on {} {} \
+                     node: {hint}",
+                    kind.article(),
                     node.node_type
                 ),
                 None => format!(
-                    "\"{what}\": there is nothing called \"{attribute}\" on a \
+                    "\"{what}\": there is nothing called \"{attribute}\" on {} \
                      {} node. An attribute nothing reads is worse than one that \
                      is refused: it looks like something that was set",
+                    kind.article(),
                     node.node_type
                 ),
             });
@@ -640,9 +642,38 @@ fn cannot_be_written(endpoint: &EndpointConfig) -> Option<&'static str> {
 /// A CAN frame carries eight bytes, or sixty-four where the file says
 /// `can_fd: true`; an rpmsg message carries what `max_message_bytes` says,
 /// and 496 where it says nothing -- 512-byte buffers less the 16-byte header.
+/// A set of discrete lines is the other way round: what it delivers is made
+/// rather than carried, as records of
+/// [`crate::node::payload::gpio::EVENT_BYTES`], and a read takes whole ones
+/// only. A `read_size` that is not a whole number of them is room left
+/// unfilled on every read -- and one smaller than a record is a node that
+/// can never deliver anything, with nothing to say why.
+///
 /// Every other interface is a stream or a register and has nothing to say
 /// here: where one read ends is the `stream` rule's business.
 fn fits_one_read(what: &str, size: u32, endpoint: &EndpointConfig) -> Result<(), String> {
+    if let EndpointConfig::Gpio(_) = endpoint {
+        let record = crate::node::payload::gpio::EVENT_BYTES as u32;
+        if size.is_multiple_of(record) {
+            return Ok(());
+        }
+        let whole = (size / record).max(1) * record;
+        return Err(if size < record {
+            format!(
+                "\"{what}\": read_size is {size}, and a set of lines is read in \
+                 records of {record} bytes, whole ones only: a read of {size} could \
+                 never hold one, so the node would never deliver anything. Say \
+                 {record}, or a multiple of it"
+            )
+        } else {
+            format!(
+                "\"{what}\": read_size is {size}, and a set of lines is read in \
+                 records of {record} bytes, whole ones only: {} of every read would \
+                 never be filled. Say {whole}, or another multiple of {record}",
+                size % record
+            )
+        });
+    }
     let (room, carries) = match endpoint {
         EndpointConfig::Can(can) => (
             crate::node::payload::can::frame_bytes(can.fd) as u32,
@@ -1472,6 +1503,30 @@ mod tests {
         ))
         .expect_err("bytes that are not bytes");
         assert!(said.contains("init") && !said.contains("trigger"), "{said}");
+    }
+
+    /// A set of lines is read in whole records, so a read_size that is not a
+    /// whole number of them is refused -- one smaller than a record being a
+    /// node that would never deliver anything -- and one that is, is not.
+    #[test]
+    fn a_set_of_lines_is_read_in_whole_records() {
+        let lines = |size: &str| {
+            reached(
+                "gpio",
+                &[
+                    ("path", "/dev/gpiochip0"),
+                    ("lines", "3"),
+                    ("read_size", size),
+                ],
+            )
+        };
+        lines("16").expect("one record");
+        lines("64").expect("four records");
+
+        let short = lines("10").expect_err("less than a record");
+        assert!(short.contains("never deliver anything"), "{short}");
+        let ragged = lines("20").expect_err("a record and a piece");
+        assert!(ragged.contains("Say 16"), "{ragged}");
     }
 
     /// A read larger than the interface carries at once is refused.

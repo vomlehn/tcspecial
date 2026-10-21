@@ -100,7 +100,19 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
     BufReader::new(ground.stderr.take().expect("its complaints"))
         .read_line(&mut said)
         .expect("what it said");
-    assert!(said.contains("Listening for beacons"), "{said}");
+    // A ground station that cannot digest its configuration says so first,
+    // and the usual reason is that nothing has built tcsverify: this test's
+    // own package does not, a program of another package being nothing cargo
+    // builds for it.
+    assert!(
+        said.contains("Listening for beacons"),
+        "{said}{}",
+        if said.contains("not built") {
+            "build the workspace's programs first: cargo build --workspace"
+        } else {
+            ""
+        }
+    );
 
     // The beacons, until the ground has had enough of them.
     let stop = Arc::new(AtomicBool::new(false));

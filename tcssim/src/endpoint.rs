@@ -268,6 +268,7 @@ mod tests {
             ground: None,
             mode: Default::default(),
             stale_interval: None,
+            sends_from: None,
         };
 
         let config = payload_config_from(&dh, &sim(250, 100, 2)).unwrap();
@@ -303,6 +304,7 @@ mod tests {
                 interval: Duration::from_millis(500),
             },
             stale_interval: None,
+            sends_from: None,
         };
 
         let deaf = [
@@ -356,6 +358,7 @@ mod tests {
                 interval: Duration::from_millis(500),
             },
             stale_interval: None,
+            sends_from: None,
         };
 
         let config = payload_config_from(&dh, &sim(0, 100, 2)).expect("a stream can be asked");
@@ -394,6 +397,7 @@ mod tests {
                 ground: None,
                 mode: Default::default(),
                 stale_interval: None,
+                sends_from: None,
             };
 
             let config =
@@ -425,6 +429,7 @@ mod tests {
             ground: None,
             mode: Default::default(),
             stale_interval: None,
+            sends_from: None,
         };
 
         let config = payload_config_from(&dh, &sim(250, 100, 2)).expect("a line is simulable");
@@ -460,6 +465,7 @@ mod tests {
             ground: None,
             mode: Default::default(),
             stale_interval: None,
+            sends_from: None,
         };
 
         let config = payload_config_from(&dh, &sim(250, 100, 2)).expect("a bus is simulable");
@@ -494,6 +500,7 @@ mod tests {
             ground: None,
             mode: Default::default(),
             stale_interval: None,
+            sends_from: None,
         };
 
         let config =

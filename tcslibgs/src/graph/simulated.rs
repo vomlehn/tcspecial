@@ -200,6 +200,7 @@ pub fn handlers(graph: &Graph, sim_file: &SimConfigFile) -> Result<Vec<DHConfig>
             ground: None,
             mode,
             stale_interval: None,
+            sends_from: reach.sends_from,
         });
     }
     Ok(handlers)

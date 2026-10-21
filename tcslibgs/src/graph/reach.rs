@@ -84,6 +84,10 @@ pub struct Reach {
     /// of these says a read is done. Every other interface's read is already
     /// a frame -- a datagram, a bus transfer, a CAN frame, a line event.
     pub stream: Option<StreamParams>,
+    /// Where a datagram payload that speaks first sends from, where its node
+    /// says: the one address its datagrams are read from. See
+    /// [`crate::SendsFrom`], and [`sends_from_of`] for what a node may say.
+    pub sends_from: Option<crate::SendsFrom>,
 }
 
 /// What this node reaches, or what is wrong with what it says.
@@ -126,6 +130,7 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
         trigger,
         init,
         read_delay,
+        sends_from,
     } = said;
 
     if stream_stated {
@@ -320,6 +325,10 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
     }
 
     let ground = ground_of(what, node)?;
+    let sends_from = match sends_from {
+        Some(written) => Some(sends_from_of(what, written.as_str(), &endpoint)?),
+        None => None,
+    };
 
     Ok(Reach {
         endpoint,
@@ -329,7 +338,84 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
         read_delay,
         ground,
         stream: framing,
+        sends_from,
     })
+}
+
+/// Where a node says its payload sends from, or what is wrong with it.
+///
+/// A datagram socket's, and only one's: a stream is connected, so the
+/// connection says who is at the other end, and a raw socket is connected to
+/// its payload's host already. A host and a port over UDP, written together
+/// as one address, and over a Unix datagram socket a path. Never the node's
+/// own address, which is the vehicle's end of the link: the payload sending
+/// from where the vehicle waits would be one socket at both ends.
+///
+/// Whether the payload is one that speaks first, the only kind this is for,
+/// is a question of its links, and `Graph::check` asks it.
+fn sends_from_of(
+    what: &str,
+    written: &str,
+    endpoint: &EndpointConfig,
+) -> Result<crate::SendsFrom, String> {
+    let net = match endpoint {
+        EndpointConfig::Network(net) => net,
+        _ => {
+            return Err(format!(
+                "\"{what}\" states sends_from, which says where a datagram payload \
+                 sends from: only a network node over udp or unix_dgram has one"
+            ))
+        }
+    };
+    match net.protocol {
+        NetworkProtocol::Udp => {
+            let at: std::net::SocketAddr = written.trim().parse().map_err(|_| {
+                format!(
+                    "\"{what}\": sends_from {written:?} is not a host and a port: \
+                     write the payload's IP address and the port it sends from, \
+                     as 10.0.0.7:7001"
+                )
+            })?;
+            if at.port() == 0 {
+                return Err(format!(
+                    "\"{what}\": sends_from {written:?} names port 0, which is any \
+                     port at all: write the port the payload sends from"
+                ));
+            }
+            let own = format!("{}:{}", net.address, net.port).parse::<std::net::SocketAddr>();
+            if own.is_ok_and(|own| own == at) {
+                return Err(format!(
+                    "\"{what}\": sends_from {written:?} is the node's own address and \
+                     port, which is where the vehicle waits for it: write where the \
+                     payload sends from"
+                ));
+            }
+            Ok(crate::SendsFrom::Socket(at))
+        }
+        NetworkProtocol::UnixDgram => {
+            let path = written.trim();
+            if path.is_empty() {
+                return Err(format!(
+                    "\"{what}\": sends_from is empty: write the path the payload's \
+                     socket is bound to"
+                ));
+            }
+            if path == net.address {
+                return Err(format!(
+                    "\"{what}\": sends_from {written:?} is the node's own address, \
+                     which is where the vehicle waits for it: write the path the \
+                     payload's socket is bound to"
+                ));
+            }
+            Ok(crate::SendsFrom::Path(path.to_string()))
+        }
+        other => Err(format!(
+            "\"{what}\" is reached over {}, and sends_from says where a datagram \
+             payload sends from: a stream is connected, and so is a raw socket, so \
+             the other end is known already. Take sends_from out",
+            other.spelling()
+        )),
+    }
 }
 
 /// What a node's attributes have said so far, as [`take`] sorts them.
@@ -341,6 +427,7 @@ struct Said {
     trigger: Option<Vec<u8>>,
     init: Option<Vec<u8>>,
     read_delay: Option<std::time::Duration>,
+    sends_from: Option<Scalar>,
 }
 
 impl Default for Said {
@@ -358,6 +445,7 @@ impl Default for Said {
             trigger: None,
             init: None,
             read_delay: None,
+            sends_from: None,
         }
     }
 }
@@ -455,6 +543,9 @@ fn take(
                     .map_err(|why| format!("\"{what}\": {why}"))?,
             );
         }
+        // Where a datagram payload that speaks first sends from, which is
+        // checked once the protocol is known: see `sends_from_of`.
+        "sends_from" => said.sends_from = Some(value.clone()),
         // Where one read of a stream ends. Four attributes rather than a
         // section of its own, because a node's attributes are flat and
         // there is nowhere to nest them.
@@ -1896,6 +1987,77 @@ mod tests {
             said.contains("service"),
             "the error should name what is missing: {said}"
         );
+    }
+
+    /// Where a datagram payload sends from is a host and port over UDP and a
+    /// path over a Unix datagram socket, and is refused on anything else and
+    /// in any shape that names no one sender.
+    #[test]
+    fn sends_from_names_one_sender_of_datagrams() {
+        let udp = |from: &str| {
+            reached(
+                "network",
+                &[
+                    ("protocol", "udp"),
+                    ("address", "127.0.0.1"),
+                    ("port", "6200"),
+                    ("sends_from", from),
+                ],
+            )
+        };
+        assert_eq!(
+            udp("10.0.0.7:7001").expect("a host and a port").sends_from,
+            Some(crate::SendsFrom::Socket("10.0.0.7:7001".parse().unwrap()))
+        );
+        for (from, says) in [
+            ("10.0.0.7", "host and a port"),
+            ("sensor.local:7001", "host and a port"),
+            ("10.0.0.7:0", "port 0"),
+            ("127.0.0.1:6200", "own address"),
+        ] {
+            let why = udp(from).expect_err(from);
+            assert!(why.contains(says), "{from}: {why}");
+        }
+
+        let unix = |from: &str| {
+            reached(
+                "network",
+                &[
+                    ("protocol", "unix_dgram"),
+                    ("address", "/run/vehicle.sock"),
+                    ("port", "5200"),
+                    ("sends_from", from),
+                ],
+            )
+        };
+        assert_eq!(
+            unix("/run/sensor.sock").expect("a path").sends_from,
+            Some(crate::SendsFrom::Path("/run/sensor.sock".to_string()))
+        );
+        assert!(unix("/run/vehicle.sock")
+            .unwrap_err()
+            .contains("own address"));
+
+        let tcp = reached(
+            "network",
+            &[
+                ("protocol", "tcp"),
+                ("address", "127.0.0.1"),
+                ("port", "6200"),
+                ("max_length", "64"),
+                ("read_timeout", "none"),
+                ("sends_from", "127.0.0.1:6201"),
+            ],
+        )
+        .expect_err("a stream is connected");
+        assert!(tcp.contains("Take sends_from out"), "{tcp}");
+
+        let file = reached(
+            "device-file",
+            &[("path", "/dev/null"), ("sends_from", "/run/x.sock")],
+        )
+        .expect_err("a file sends from nowhere");
+        assert!(file.contains("only a network node"), "{file}");
     }
 
     /// A network node may be asked, whatever its protocol, datagrams

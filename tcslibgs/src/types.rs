@@ -907,6 +907,21 @@ pub struct NetworkConfig {
     pub port: u16,
 }
 
+/// Where a datagram payload that speaks first sends from, where its node
+/// says: its `sends_from`.
+///
+/// A payload that speaks first is learnt from what arrives, so without this
+/// the vehicle reads the first sender it hears as the payload, whoever that
+/// is. With it, the vehicle reads that address and nothing else, as it reads
+/// a payload it reaches at a stated address.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum SendsFrom {
+    /// A UDP payload's host and port.
+    Socket(std::net::SocketAddr),
+    /// A Unix datagram payload's path.
+    Path(String),
+}
+
 /// Configuration for a device endpoint
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DeviceConfig {
@@ -1251,6 +1266,12 @@ pub struct DHConfig {
     /// data arriving only when tcspecial asks -- has not been worked through.
     #[serde(default)]
     pub stale_interval: Option<Duration>,
+    /// Where this payload sends from, where its node says: see [`SendsFrom`].
+    ///
+    /// Read by the simulator, whose stand-in sends from there; aboard it is
+    /// [`crate::graph::reach::Reach::sends_from`] that is read.
+    #[serde(default)]
+    pub sends_from: Option<SendsFrom>,
 }
 
 /// What the rules for `kind` make of these terms.

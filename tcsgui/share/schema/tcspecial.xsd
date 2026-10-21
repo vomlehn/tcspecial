@@ -155,6 +155,9 @@
       <xs:element name="protocol" type="xs:string"/>
       <!-- The IP protocol number of a raw socket: `protocol` raw. -->
       <xs:element name="ip_protocol" type="xs:string"/>
+      <!-- Where a udp or unix_dgram payload that speaks first sends from:
+           host:port, or a path. -->
+      <xs:element name="sends_from" type="xs:string"/>
       <xs:element name="interface" type="xs:string"/>
       <xs:element name="can_id" type="xs:string"/>
       <!-- How it is read. -->

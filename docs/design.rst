@@ -2315,8 +2315,27 @@ Requirement
     pass, so a flood costs a payload a pass and not the vehicle its loop. A
     payload that answers from another address than the one its node states
     -- a host with several, answering from the wrong one -- is turned away
-    too, and the climbing count is what says to state the address it
-    answers from.
+    too, and the climbing count is what says to bind it to the address its
+    node states.
+
+A datagram payload that speaks first has no address in the file to read
+from: the vehicle learns where it is from what arrives, and the first sender
+it hears is taken for the payload. Locking onto that sender would be strict
+and brittle at once -- a payload that restarts from a new port would be shut
+out until the node was restarted -- so the file says it instead, where it can.
+
+Requirement
+    A ``udp`` or ``unix_dgram`` payload that speaks first may state
+    ``sends_from``: a host and port over UDP, an IP address and not a name,
+    or a path over a Unix datagram socket. With it, the payload is read from
+    that address alone, others turned away and counted as for a payload
+    reached at its address. Without it, the payload is learnt from what
+    arrives, as before. It is refused on any other protocol, on any other
+    kind of node, where it is the node's own address, and on a payload that
+    is asked or only driven -- the first three having no use for it and the
+    last being read only from its address already. The simulator's stand-in
+    sends from it, and a simulator file that states ``payload_address`` or
+    ``payload_port`` for that payload is refused, the address being said once.
 
 A Unix datagram payload has the same shape and is reached the same way, with
 one difference: the vehicle's end is bound to a name the kernel chooses in

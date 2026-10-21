@@ -174,6 +174,14 @@ class WindowTest(unittest.TestCase):
                 shown["texts"] = texts
                 window.destroy()
 
+            # The keys that send a ping are let go of first. The window is a
+            # real one on whatever display the run has, a new window takes the
+            # keyboard, and Enter typed elsewhere while the suite runs was a
+            # second ping the test never sent -- the panel then showing that
+            # one, unanswered. The button is what this presses, so the keys
+            # are not what it is about.
+            for key in ("<Return>", "<KP_Enter>", "<space>"):
+                window.unbind(key)
             window.after(200, press)
             original(window, n)
 

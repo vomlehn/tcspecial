@@ -22,6 +22,7 @@ use crate::config::constants::ENDPOINT_BUFFER_SIZE;
 use crate::endpoint::bind_failed;
 use crate::endpoint::{
     wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable, WaitResult,
+    STRANGERS_PER_READ,
 };
 
 /// UDP endpoint for network communication
@@ -51,6 +52,17 @@ pub struct UdpEndpoint {
     /// then cut off by a START_DH rebinding this socket is a failure mode
     /// that has gone with it.
     told: Option<SocketAddr>,
+    /// The one sender whose datagrams are read, for a payload that is
+    /// reached where its node says it is.
+    ///
+    /// Everything else that arrives is a stranger's: turned away and
+    /// counted, rather than handed on as a reading from the payload. Only
+    /// where the far end is known before it speaks -- see
+    /// [`UdpEndpoint::reaching`]; a payload that speaks first is learnt from
+    /// what arrives.
+    only_from: Option<SocketAddr>,
+    /// Datagrams turned away since [`EndpointReadable::strangers`] last asked.
+    strangers: u64,
     _buffer: Vec<u8>,
 }
 
@@ -92,7 +104,9 @@ impl UdpEndpoint {
             address: if told.is_ipv6() { "::" } else { "0.0.0.0" }.to_string(),
             port: 0,
         };
-        Self::bound(what, &mine, Some(told))
+        let mut reaching = Self::bound(what, &mine, Some(told))?;
+        reaching.only_from = Some(told);
+        Ok(reaching)
     }
 
     /// An endpoint that sends where the configuration says, not where it was
@@ -124,6 +138,8 @@ impl UdpEndpoint {
             socket,
             peer: Arc::new(Mutex::new(None)),
             told,
+            only_from: None,
+            strangers: 0,
             _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
         })
     }
@@ -146,6 +162,9 @@ impl UdpEndpoint {
             // reader learns where the far end is.
             peer: self.peer.clone(),
             told: self.told,
+            only_from: self.only_from,
+            // Counted where they are read, which is one of the pair.
+            strangers: 0,
             _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
         })
     }
@@ -170,16 +189,31 @@ impl EndpointReadable for UdpEndpoint {
     fn read(&mut self, buffer: &mut [u8]) -> TcsResult<usize> {
         // recv_from rather than recv, so that answering is possible: a
         // datagram's sender is the only statement of where the far end is.
-        match self.socket.recv_from(buffer) {
-            Ok((n, from)) => {
-                if let Ok(mut peer) = self.peer.lock() {
-                    *peer = Some(from);
+        //
+        // A stranger's datagram is passed over and the next one looked at,
+        // a few at a time: a flood of them costs this read a bounded amount
+        // of work rather than the pass, and what is left is looked at on the
+        // next.
+        for _ in 0..STRANGERS_PER_READ {
+            match self.socket.recv_from(buffer) {
+                Ok((_, from)) if self.only_from.is_some_and(|only| from != only) => {
+                    self.strangers += 1;
                 }
-                Ok(n)
+                Ok((n, from)) => {
+                    if let Ok(mut peer) = self.peer.lock() {
+                        *peer = Some(from);
+                    }
+                    return Ok(n);
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => return Ok(0),
+                Err(e) => return Err(TcsError::Io(e)),
             }
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Ok(0),
-            Err(e) => Err(TcsError::Io(e)),
         }
+        Ok(0)
+    }
+
+    fn strangers(&mut self) -> u64 {
+        std::mem::take(&mut self.strangers)
     }
 }
 
@@ -388,6 +422,55 @@ mod tests {
             }
         };
         assert_eq!(&into[..size], b"21.5");
+    }
+
+    /// A payload reached where it is reads only what comes from there.
+    ///
+    /// Anything else that can reach the vehicle's port would otherwise be
+    /// handed on as the payload's reading -- a temperature nobody measured,
+    /// voted on and acted on as though it were real. Turned away and
+    /// counted, and the payload's own datagram behind it still read.
+    #[test]
+    fn a_stranger_is_turned_away_and_counted() {
+        use std::net::UdpSocket;
+        use tcslibgs::NetworkProtocol;
+
+        let sensor = UdpSocket::bind("127.0.0.1:0").unwrap();
+        let at = sensor.local_addr().unwrap();
+        let device = NetworkConfig {
+            protocol: NetworkProtocol::Udp,
+            address: at.ip().to_string(),
+            port: at.port(),
+        };
+        let mut reader = UdpEndpoint::reaching("temp_1", &device).unwrap();
+        let mine = ("127.0.0.1", mine_address(&reader).port());
+
+        let stranger = UdpSocket::bind("127.0.0.1:0").unwrap();
+        stranger.send_to(b"99.9", mine).unwrap();
+        stranger.send_to(b"99.9", mine).unwrap();
+        sensor.send_to(b"21.5", mine).unwrap();
+
+        let mut into = [0u8; 64];
+        let size = read_soon(&mut reader, &mut into);
+        assert_eq!(
+            &into[..size],
+            b"21.5",
+            "the stranger's was read as the payload's"
+        );
+        assert_eq!(reader.strangers(), 2);
+        assert_eq!(reader.strangers(), 0, "counted once, and asked once");
+    }
+
+    /// What arrives within two seconds: a datagram sent over the loopback is
+    /// readable at once, nearly always, and the test is not about when.
+    fn read_soon(reader: &mut UdpEndpoint, into: &mut [u8]) -> usize {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        loop {
+            match reader.read(into).expect("a read") {
+                0 if std::time::Instant::now() < deadline => std::thread::yield_now(),
+                size => return size,
+            }
+        }
     }
 
     /// Where an endpoint's own socket is bound, for a test that has to send

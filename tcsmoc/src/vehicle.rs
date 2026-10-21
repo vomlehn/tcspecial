@@ -484,6 +484,7 @@ fn counted(counts: &tcslibgs::NodeCounts) -> String {
          refused        {}\n\
          dropped        {} (it was stopped)\n\
          asked          {} triggers, {} refused\n\
+         strangers      {} (datagrams from elsewhere, turned away)\n\
          last moved     {moved}",
         counts.taken_bytes,
         counts.reads,
@@ -494,6 +495,7 @@ fn counted(counts: &tcslibgs::NodeCounts) -> String {
         counts.dropped,
         counts.asks,
         counts.asks_failed,
+        counts.strangers,
     )
 }
 

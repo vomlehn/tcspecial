@@ -1468,6 +1468,69 @@ vehicle:
         assert_eq!(given.dropped, 1, "and the drop is still counted");
     }
 
+    /// A node turned some datagrams away as a stranger's.
+    struct Besieged {
+        turned_away: u64,
+    }
+
+    impl Port for Besieged {
+        fn take(&mut self, _buffer: &mut [u8]) -> Result<Taken, String> {
+            Ok(Taken::NOTHING)
+        }
+
+        fn strangers(&mut self) -> u64 {
+            std::mem::take(&mut self.turned_away)
+        }
+
+        fn give(&mut self, _arriving: Arriving<'_>, _data: &[u8]) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
+    /// What a node's socket turned away is in its counts, for the ground to
+    /// see, though the read that turned it away found nothing of the
+    /// payload's: that is the read a flood of strangers looks like.
+    #[test]
+    fn the_strangers_a_node_turned_away_are_counted() {
+        let start = Instant::now();
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("besieged.yaml");
+        std::fs::write(
+            &path,
+            "payloads:
+  - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7010\",
+      trigger: \"[55]\", trigger_interval: \"100 ms\", payload-out: average }
+vehicle:
+  - { name: average, type: compute, function: mean, inputs: 1 }
+",
+        )
+        .expect("written");
+        let graph = Graph::load(&path).expect("it reads");
+
+        let mut system = System::of_opening(
+            &graph,
+            start,
+            |node: &Node, _: &Routes, _: &Abandon| match node.node_type.as_str() {
+                "network" => Ok(Box::new(Besieged { turned_away: 3 }) as Box<dyn Port>),
+                _ => Ok(Box::new(Ground::default()) as Box<dyn Port>),
+            },
+            |_: &Telemetered| Ok(Box::new(Ground::default()) as Box<dyn Port>),
+        )
+        .expect("it opens");
+        let states = system.states();
+        let counts = |node: &str| states.named(node).expect("the node").counts();
+
+        system.pass(start);
+        assert_eq!(counts("asked").strangers, 3);
+        assert_eq!(
+            counts("asked").reads,
+            0,
+            "nothing of the payload's was read"
+        );
+        system.pass(start + Duration::from_millis(100));
+        assert_eq!(counts("asked").strangers, 3, "and each is counted once");
+    }
+
     /// A stopped node gives up what it held, and starting it opens it again.
     ///
     /// Through the opener, because that is the claim: releasing a node drops

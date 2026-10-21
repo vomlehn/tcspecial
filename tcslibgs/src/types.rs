@@ -641,6 +641,20 @@ pub struct NodeCounts {
     /// asking are three states, and one count of attempts could not tell them
     /// apart.
     pub asks_failed: u64,
+    /// Datagrams turned away from this node's socket because they came from
+    /// somewhere other than its payload.
+    ///
+    /// A datagram socket that knows where its payload is reads only what
+    /// comes from there; anything else would be a reading nobody could tell
+    /// from the payload's own. Counted rather than named, so that a flood of
+    /// them is one number climbing and not a log filling: a count that moves
+    /// at all is something on the vehicle's network that should not be
+    /// talking to this node.
+    ///
+    /// Defaulted where it is read, so that an answer from a vehicle built
+    /// before it was counted still reads, as nought.
+    #[serde(default)]
+    pub strangers: u64,
     /// When this node last moved anything, either way.
     ///
     /// `None` for a node that has moved nothing, which is not the same as a

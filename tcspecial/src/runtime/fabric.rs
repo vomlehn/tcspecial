@@ -275,6 +275,13 @@ pub trait Port: Send {
         self.take(buffer)
     }
 
+    /// How many datagrams this node turned away as a stranger's since this
+    /// was last asked: see [`crate::endpoint::EndpointReadable::strangers`].
+    /// Nought for every node that has nobody to turn away.
+    fn strangers(&mut self) -> u64 {
+        0
+    }
+
     /// Ask this node for a reading, and take nothing: send its trigger.
     ///
     /// Nothing for a node that has no trigger, which is every node but a
@@ -454,6 +461,11 @@ pub trait Watch: Send + Sync {
     /// A trigger sent to it, or one it would not take.
     fn asked(&self, node: &str, how: Outcome) {
         let _ = (node, how);
+    }
+
+    /// Datagrams its socket turned away as a stranger's.
+    fn strangers(&self, node: &str, count: u64) {
+        let _ = (node, count);
     }
 
     /// The last datum taken from it, kept for an operator who wants the bytes.
@@ -1312,6 +1324,12 @@ fn read_node(worker: &Worker, shared: &Shared, mail: &mut Mail, how: Read, bank:
                 mail.moved.refused.push((name.to_string(), why));
             }
         }
+    }
+    // Counted whatever the read came to: a read that turned strangers away
+    // and found nothing of the payload's is the one a flood looks like.
+    let strangers = node.strangers();
+    if strangers > 0 {
+        watch.strangers(name, strangers);
     }
 
     if how == Read::UnaskedThenAsk {

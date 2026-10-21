@@ -30,6 +30,7 @@ use crate::config::constants::ENDPOINT_BUFFER_SIZE;
 use crate::endpoint::bind_failed;
 use crate::endpoint::{
     wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable, WaitResult,
+    STRANGERS_PER_READ,
 };
 use crate::node::payload::network::tcp::connect_retrying;
 
@@ -121,10 +122,16 @@ pub struct UnixDatagramEndpoint {
     ///
     /// What is written down beats what was learnt, as it does over UDP: a
     /// node that is spoken to first has nothing to learn from, and one that
-    /// speaks first is bound to its path and leaves this `None`. Not shared between the
-    /// pair, because it does not change: it is the file's word, and both
-    /// endpoints are made from the same file.
+    /// speaks first is bound to its path and leaves this `None`. Not shared
+    /// between the pair, because it does not change: it is the file's word,
+    /// and both endpoints are made from the same file.
+    ///
+    /// And, where it is known, the one path whose datagrams are read:
+    /// anything from elsewhere is a stranger's, turned away and counted
+    /// rather than handed on as the device's reading.
     told: Option<PathBuf>,
+    /// Datagrams turned away since [`EndpointReadable::strangers`] last asked.
+    strangers: u64,
     _buffer: Vec<u8>,
 }
 
@@ -143,6 +150,7 @@ impl UnixDatagramEndpoint {
             socket,
             peer: std::sync::Arc::new(std::sync::Mutex::new(None)),
             told: None,
+            strangers: 0,
             _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
         })
     }
@@ -180,6 +188,7 @@ impl UnixDatagramEndpoint {
             socket,
             peer: std::sync::Arc::new(std::sync::Mutex::new(None)),
             told: Some(PathBuf::from(&config.address)),
+            strangers: 0,
             _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
         })
     }
@@ -191,6 +200,8 @@ impl UnixDatagramEndpoint {
             socket: self.socket.try_clone()?,
             peer: self.peer.clone(),
             told: self.told.clone(),
+            // Counted where they are read, which is one of the pair.
+            strangers: 0,
             _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
         })
     }
@@ -208,17 +219,34 @@ impl EndpointWaitable for UnixDatagramEndpoint {
 
 impl EndpointReadable for UnixDatagramEndpoint {
     fn read(&mut self, buffer: &mut [u8]) -> TcsResult<usize> {
-        // recv_from rather than recv, so that answering is possible.
-        match self.socket.recv_from(buffer) {
-            Ok((n, from)) => {
-                if let Ok(mut peer) = self.peer.lock() {
-                    *peer = Some(from);
+        // recv_from rather than recv, so that answering is possible. A
+        // stranger's datagram is passed over, a bounded number a read, as it
+        // is over UDP.
+        for _ in 0..STRANGERS_PER_READ {
+            match self.socket.recv_from(buffer) {
+                Ok((_, from))
+                    if self
+                        .told
+                        .as_deref()
+                        .is_some_and(|told| from.as_pathname() != Some(told)) =>
+                {
+                    self.strangers += 1;
                 }
-                Ok(n)
+                Ok((n, from)) => {
+                    if let Ok(mut peer) = self.peer.lock() {
+                        *peer = Some(from);
+                    }
+                    return Ok(n);
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => return Ok(0),
+                Err(e) => return Err(TcsError::Io(e)),
             }
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Ok(0),
-            Err(e) => Err(TcsError::Io(e)),
         }
+        Ok(0)
+    }
+
+    fn strangers(&mut self) -> u64 {
+        std::mem::take(&mut self.strangers)
     }
 }
 
@@ -543,6 +571,57 @@ mod tests {
         assert_eq!(&into[..n], b"21.5");
 
         std::fs::remove_file(&device_path).ok();
+    }
+
+    /// A device reached at its path reads only what comes from there: a
+    /// datagram from any other socket is turned away and counted, and the
+    /// device's own behind it is still read.
+    #[test]
+    fn a_stranger_is_turned_away_and_counted() {
+        let device_path = a_path("strangers-device");
+        let stranger_path = a_path("strangers-stranger");
+        for path in [&device_path, &stranger_path] {
+            std::fs::remove_file(path).ok();
+        }
+        let device = UnixDatagram::bind(&device_path).expect("the device binds");
+        let stranger = UnixDatagram::bind(&stranger_path).expect("a stranger binds");
+
+        let mut endpoint = UnixDatagramEndpoint::reaching(
+            "temp",
+            &config_at(&device_path, NetworkProtocol::UnixDgram),
+        )
+        .expect("the vehicle's end opens");
+        // The vehicle's end has a name only the kernel knows; asking the
+        // device something is how to learn it.
+        endpoint.write(b"READ").expect("the trigger goes out");
+        let mut asked = [0u8; 64];
+        let (_, vehicle) = device.recv_from(&mut asked).expect("the device reads");
+
+        stranger
+            .send_to_addr(b"99.9", &vehicle)
+            .expect("the stranger sends");
+        device
+            .send_to_addr(b"21.5", &vehicle)
+            .expect("the answer goes");
+
+        let mut into = [0u8; 64];
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        let n = loop {
+            match endpoint.read(&mut into).expect("a read") {
+                0 if std::time::Instant::now() < deadline => std::thread::yield_now(),
+                n => break n,
+            }
+        };
+        assert_eq!(
+            &into[..n],
+            b"21.5",
+            "the stranger's was read as the device's"
+        );
+        assert_eq!(endpoint.strangers(), 1);
+
+        for path in [&device_path, &stranger_path] {
+            std::fs::remove_file(path).ok();
+        }
     }
 
     /// A socket file left by a handler that was killed is replaced rather than

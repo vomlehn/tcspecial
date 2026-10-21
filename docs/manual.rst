@@ -3681,3 +3681,18 @@ To see where everything in the build comes from, its dependencies included::
 
    $ cargo tree --workspace
    $ cargo metadata --format-version 1
+
+License
+=======
+TCSpecial -- the flight software, the libraries, the ground programs and the
+examples -- is licensed under either of the Apache License, Version 2.0
+(``LICENSE-APACHE``, or http://www.apache.org/licenses/LICENSE-2.0) or the MIT
+license (``LICENSE-MIT``, or http://opensource.org/licenses/MIT), at your
+option. Every crate says so as ``MIT OR Apache-2.0``.
+
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
+dual licensed as above, without any additional terms or conditions.
+
+The crates TCSpecial is built with are under licenses of their own: see
+`Crates Used`_.

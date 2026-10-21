@@ -126,3 +126,13 @@ The header alone is also compiled as C99 and as C++11.
 - [This page as HTML](https://vomlehn.github.io/tcspecial/tcslib-c/README.html).
 - [tcslib](https://vomlehn.github.io/tcspecial/tcslib/README.html), the Rust library this one wraps, and [tcslibgs](https://vomlehn.github.io/tcspecial/tcslibgs/README.html), what the ground and the vehicle share.
 - [The tcspecial manual](https://vomlehn.github.io/tcspecial/docs/manual.html) and [design](https://vomlehn.github.io/tcspecial/docs/design.html).
+
+## License
+
+Licensed under either of the Apache License, Version 2.0 ([LICENSE-APACHE](https://github.com/vomlehn/tcspecial/blob/main/LICENSE-APACHE)
+or <http://www.apache.org/licenses/LICENSE-2.0>) or the MIT license
+([LICENSE-MIT](https://github.com/vomlehn/tcspecial/blob/main/LICENSE-MIT) or <http://opensource.org/licenses/MIT>), at your option.
+
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
+dual licensed as above, without any additional terms or conditions.

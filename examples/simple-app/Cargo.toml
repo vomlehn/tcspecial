@@ -2,6 +2,7 @@
 name = "simple_app"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "The ground end of the simple-app example, which prints the line its payload sends; the payload itself is lorem_pl.py"
 
 [dependencies]

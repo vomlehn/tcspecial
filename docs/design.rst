@@ -552,13 +552,13 @@ section every configuration holds, and it is required of every one of them.
      log:
        directory: /var/log/tcspecial
        segment_size: 65536
-     restart-arm-valid: "20 min"
+     restart_arm_valid: "20 min"
 
 Five of its seven entries are subsections, because each of them is one thing
 with more than one attribute to it: the spacecraft command link has two ends,
 the commands about nodes have two, a payload's telemetry has two, the beacon
 has two and a timing, and the log has a place and a size. The other two,
-``gateway`` and ``restart-arm-valid``, are one fact each and are written as
+``gateway`` and ``restart_arm_valid``, are one fact each and are written as
 one. ``gateway`` is what the vehicle answers to -- see `Gateways: what the
 vehicle answers to`_. A prefix repeated
 on two or three flat names -- ``beacon.send``, ``beacon.recv``, ``beacon.interval`` -- is a subsection
@@ -576,7 +576,7 @@ log is not kept, which is a configuration somebody may mean -- a vehicle with
 no writable storage -- and ``log.segment_size`` is a tuning choice with a
 defensible answer, so it has one.
 
-``restart-arm-valid`` is the third that may be left out: how long a
+``restart_arm_valid`` is the third that may be left out: how long a
 RESTART_ARM licenses a RESTART for, as a length of time -- ``20 min``,
 ``90 s``. Absent is twenty minutes,
 ``tcslibgs::commands::RESTART_ARM_VALID_DEFAULT``, the length an arm had
@@ -2999,7 +2999,7 @@ Requirement
 
 Requirement
     A RESTART is taken only with the key of an arm taken within
-    ``restart-arm-valid`` -- twenty minutes where the configuration does not
+    ``restart_arm_valid`` -- twenty minutes where the configuration does not
     say -- and uses the arm up: one lost or repeated datagram
     must not be able to restart the flight software. Anything else is
     answered ``NotArmed``. A key that does not match leaves the arm standing,
@@ -5317,7 +5317,7 @@ Verify that TLSpecial is able to process commands.
 RESTART_ARM
 ~~~~~~~~~~~
 Enable a restart of TCSpecial for as long as the ``tcspecial`` section's
-``restart-arm-valid`` says, and for twenty minutes where it says nothing.
+``restart_arm_valid`` says, and for twenty minutes where it says nothing.
 
 +----------------+-------------------------------------------------------------+
 | Name           | Parameters                                                  |
@@ -5336,7 +5336,7 @@ Enable a restart of TCSpecial for as long as the ``tcspecial`` section's
 
 RESTART
 ~~~~~~~
-Restart TCSpecial if the time is within ``restart-arm-valid`` -- twenty
+Restart TCSpecial if the time is within ``restart_arm_valid`` -- twenty
 minutes where it is not stated -- of the last RESTART_ARM command and arm_key matches the value of arm_key from
 the last RESTART_ARM command. Otherwise it is answered ``NotArmed``. See
 `Restarting`_ for what a restart does.

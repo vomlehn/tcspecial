@@ -380,7 +380,7 @@
       </xs:element>
       <!-- How long a RESTART_ARM licenses a RESTART for, as a length of
            time: 20 min. Twenty minutes where it is not stated. -->
-      <xs:element name="restart-arm-valid" type="xs:string" minOccurs="0"/>
+      <xs:element name="restart_arm_valid" type="xs:string" minOccurs="0"/>
       <!-- Where tcsgui writes the Rust it generates from this configuration.
            The one attribute of this section about building the software rather
            than about running it: nothing aboard reads it. -->

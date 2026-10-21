@@ -189,7 +189,7 @@ pub const ATTRIBUTES: &[(&str, bool)] = &[
     ("beacon.recv", true),
     ("log.directory", false),
     ("log.segment_size", false),
-    ("restart-arm-valid", false),
+    ("restart_arm_valid", false),
 ];
 
 /// What a new configuration is given, where anything.
@@ -330,7 +330,7 @@ pub fn ci_config_of(said: &BTreeMap<String, Scalar>) -> Result<CIConfigJson, Str
         // Absent is the twenty minutes an arm has always lasted. Read here
         // all the same, as the beacon's interval is, so that a length of time
         // that is not one is refused where the section is.
-        restart_arm_valid: match said.get("restart-arm-valid") {
+        restart_arm_valid: match said.get("restart_arm_valid") {
             Some(value) if !value.as_str().trim().is_empty() => {
                 let said = value.as_str().trim().to_string();
                 crate::types::restart_arm_valid_of(&said)?;
@@ -462,7 +462,7 @@ mod tests {
         assert_eq!(settled.payload_dest_base.at(3).unwrap().port, 6103);
     }
 
-    /// How long an arm lasts is the section's `restart-arm-valid`, a length
+    /// How long an arm lasts is the section's `restart_arm_valid`, a length
     /// of time, and twenty minutes where it says nothing; nought, and what is
     /// not a length of time, are refused naming it.
     #[test]
@@ -478,20 +478,20 @@ mod tests {
             crate::RESTART_ARM_VALID_DEFAULT
         );
         assert_eq!(
-            settled(&[("restart-arm-valid", "")])
+            settled(&[("restart_arm_valid", "")])
                 .expect("left empty")
                 .restart_arm_valid,
             crate::RESTART_ARM_VALID_DEFAULT
         );
         assert_eq!(
-            settled(&[("restart-arm-valid", "90 s")])
+            settled(&[("restart_arm_valid", "90 s")])
                 .expect("stated")
                 .restart_arm_valid,
             std::time::Duration::from_secs(90)
         );
         for wrong in ["0 s", "20", "soon"] {
-            let why = settled(&[("restart-arm-valid", wrong)]).expect_err(wrong);
-            assert!(why.contains("restart-arm-valid"), "{wrong}: {why}");
+            let why = settled(&[("restart_arm_valid", wrong)]).expect_err(wrong);
+            assert!(why.contains("restart_arm_valid"), "{wrong}: {why}");
         }
     }
 
@@ -641,7 +641,13 @@ mod tests {
         // without opening the manual.
         assert!(why.contains("beacon.send"), "{why}");
 
-        // One written with a hyphen for its underscore is told its spelling.
+        // One written with a hyphen for its underscore is told its spelling,
+        // which is also what a file written before restart_arm_valid took
+        // the underscores every other name has is told.
+        let mut hyphened = whole();
+        hyphened.push(("restart-arm-valid", "20 min"));
+        let why = ci_config_of(&said(&hyphened)).expect_err("one spelling");
+        assert!(why.contains("it is spelled restart_arm_valid"), "{why}");
         let mut hyphened = whole();
         hyphened.push(("log.segment-size", "65536"));
         let why = ci_config_of(&said(&hyphened)).expect_err("one spelling");

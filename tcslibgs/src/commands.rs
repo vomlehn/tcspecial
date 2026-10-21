@@ -171,7 +171,7 @@ impl PingCommand {
 
 /// How long a RESTART_ARM lasts where the configuration does not say:
 /// twenty minutes from when the vehicle takes it. The `tcspecial` section's
-/// `restart-arm-valid` says otherwise -- see [`crate::CIConfig::restart_arm_valid`].
+/// `restart_arm_valid` says otherwise -- see [`crate::CIConfig::restart_arm_valid`].
 ///
 /// A RESTART is refused unless an arm with its key was taken within this long
 /// before it. Long enough for an operator to arm, confirm what the vehicle is
@@ -180,7 +180,7 @@ impl PingCommand {
 /// vehicle on the next RESTART anybody sends.
 pub const RESTART_ARM_VALID_DEFAULT: std::time::Duration = std::time::Duration::from_secs(20 * 60);
 
-/// RESTART_ARM command - enable a restart for the next `restart-arm-valid`
+/// RESTART_ARM command - enable a restart for the next `restart_arm_valid`
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RestartArmCommand {
     pub header: CommandHeader,

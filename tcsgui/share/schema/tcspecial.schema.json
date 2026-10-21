@@ -138,7 +138,7 @@
           },
           "additionalProperties": false
         },
-        "restart-arm-valid": {
+        "restart_arm_valid": {
           "description": "How long a RESTART_ARM licenses a RESTART for, as a length of time: 20 min, 90 s. Twenty minutes where it is not stated; nought is refused.",
           "type": [
             "string",

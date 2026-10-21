@@ -248,6 +248,15 @@ pub fn ci_config_of(said: &BTreeMap<String, Scalar>) -> Result<CIConfigJson, Str
             if let Some(instead) = retired(name) {
                 return Err(format!("\"{name}\" is no longer an attribute: {instead}"));
             }
+            // And one written with hyphens for underscores, or the other way
+            // round, is told its one spelling rather than handed the list to
+            // find it in: see `crate::graph::spelled`.
+            let known = |other: &str| ATTRIBUTES.iter().any(|(known, _)| *known == other);
+            if let Some(hint) = crate::graph::spelled(name, known) {
+                return Err(format!(
+                    "there is no tcspecial attribute called \"{name}\": {hint}"
+                ));
+            }
             return Err(format!(
                 "there is no tcspecial attribute called \"{name}\". They are {}",
                 ATTRIBUTES
@@ -631,6 +640,12 @@ mod tests {
         // And the complaint lists what there is, so the typo can be fixed
         // without opening the manual.
         assert!(why.contains("beacon.send"), "{why}");
+
+        // One written with a hyphen for its underscore is told its spelling.
+        let mut hyphened = whole();
+        hyphened.push(("log.segment-size", "65536"));
+        let why = ci_config_of(&said(&hyphened)).expect_err("one spelling");
+        assert!(why.contains("it is spelled log.segment_size"), "{why}");
     }
 
     /// What a configuration being started is given, and what it is not.

@@ -1091,6 +1091,20 @@ impl Fabric {
     /// ground is told whether it took effect.
     pub fn set(&mut self, node: &str, attribute: &str, value: &[u8]) -> Result<(), String> {
         if !self.shared.routes.is_commanded(node, attribute) {
+            // An attribute written with hyphens for underscores, or the other
+            // way round, is told the spelling a binding does give it: an
+            // operator who typed `half-band` meant `half_band`, and is better
+            // told so than told nothing may be set. Made only on the way to
+            // refusing a command, which allocates its answer already.
+            let routes = &self.shared.routes;
+            if let Some(hint) =
+                tcslibgs::graph::spelled(attribute, |other| routes.is_commanded(node, other))
+            {
+                return Err(format!(
+                    "no command binding says the ground may set \"{node}.{attribute}\": \
+                     {hint}"
+                ));
+            }
             return Err(format!(
                 "no command binding says the ground may set \"{node}.{attribute}\": \
                  what a command may change is in the configuration, so that it is \
@@ -2135,6 +2149,26 @@ vehicle:
         assert!(
             said.contains("thermostat.above") && said.contains("checkable"),
             "the refusal should name what was asked and why not: {said}"
+        );
+
+        // An attribute a binding names, written with a hyphen for its
+        // underscore, is told its spelling.
+        let mut bound = graph.clone();
+        bound.commands.push(tcslibgs::graph::CommandBinding {
+            from: "moc".to_string(),
+            sets: "thermostat.half_band".to_string(),
+        });
+        let mut fabric_bound = Fabric::new(Routes::of(&bound), 64);
+        fabric_bound.hold(
+            "thermostat",
+            Box::new(ComputePort::make(thermostat, &[], &Abandon::nothing()).expect("it builds")),
+        );
+        let said = fabric_bound
+            .set("thermostat", "half-band", b"1.0")
+            .expect_err("a spelling no binding names");
+        assert!(
+            said.contains("it is spelled half_band"),
+            "the refusal should give the spelling: {said}"
         );
 
         // A value that is not a number is refused by the computation, which

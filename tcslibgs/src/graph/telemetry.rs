@@ -112,13 +112,22 @@ pub fn of(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
         let source = link.origin().node;
         for destination in link.to.each() {
             let to = Destination::parse(destination).node;
-            let Some(moc) = graph.node(&to).filter(|n| n.node_type == "moc") else {
+            let Some(moc) = graph
+                .node(&to)
+                .filter(|n| crate::gateway::is_gateway(&n.node_type))
+            else {
                 continue;
             };
+            // Each kind names its far end by what is there: a radio's
+            // ground_base, an F´ gateway's bridge_base. One rule counts on
+            // from either.
+            let attribute = crate::gateway::GatewayKind::of_node_type(&moc.node_type)
+                .expect("a gateway node")
+                .base_attribute();
             let Some(base) = moc
                 .attributes
-                .get("ground_base")
-                .and_then(|b| host_port_of("ground_base", b.as_str()).ok())
+                .get(attribute)
+                .and_then(|b| host_port_of(attribute, b.as_str()).ok())
             else {
                 continue;
             };
@@ -130,7 +139,7 @@ pub fn of(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
             };
             let ground = base.at(id).map_err(|why| Refused {
                 node: Some(to.clone()),
-                why: format!("\"{to}\": ground_base {why}"),
+                why: format!("\"{to}\": {attribute} {why}"),
             })?;
             links.push(Telemetered {
                 name: moc_link_name(&source, &to),

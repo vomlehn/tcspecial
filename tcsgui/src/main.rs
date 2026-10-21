@@ -6276,7 +6276,10 @@ mod tests {
             // is the statement of -- so two nodes sharing a tint are still two
             // shapes nobody can confuse. The ramp is walked in order either
             // way, which the loop above is what checks.
-            if !matches!(pane, Pane::Vehicle | Pane::Payloads) {
+            // And the MOC panel, since the F´ gateway joined the ground
+            // station: two types and one rung, the two being told apart by
+            // their edge and their label rather than by colour.
+            if !matches!(pane, Pane::Vehicle | Pane::Payloads | Pane::Moc) {
                 assert!(
                     order.len() <= rungs.len(),
                     "the {} panel has {} nodes and {} rungs, so it wraps -- \

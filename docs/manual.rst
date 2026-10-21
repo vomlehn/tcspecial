@@ -2191,6 +2191,41 @@ moved to ports nothing holds: a command sent up reaches the heater and comes
 back down, and a reading reaches the ground. Every port the example uses is in
 the eight thousands, which no other example uses.
 
+The fprime example
+------------------
+.. figure:: ../examples/fprime/fprime.svg
+   :alt: The fprime example: the thermometer's readings go to fsw, a
+         gateway_fprime node, and on to the F´ deployment's TcsBridge
+         component at bridge_base plus the thermometer's device id; a command
+         from the bridge goes up to fsw and on to the heater.
+   :width: 100%
+
+   ``examples/fprime``: a vehicle that answers to an F´ flight computer.
+
+The vehicle answers to an F´ flight computer rather than to the ground, so the
+``tcspecial`` section says ``gateway: "fprime"`` and the one gateway node,
+``fsw``, is a ``gateway_fprime``. Its far end is a component of the F´
+deployment, ``TcsBridge``, built on tcslib-c: as far as tcspecial can tell it is
+a ground station, so every link is the radio's, UDP in the radio's protocol,
+and everything in the ``tcspecial`` section is written as it is for a radio.
+
+What differs is the gateway node. Where a ``moc`` node says where the ground
+station is as ``ground_base``, a ``gateway_fprime`` node says where the bridge
+is as ``bridge_base``, counted on the same way: the ``thermometer``, device id
+2, reports to ``127.0.0.1:9702``. It also states ``fprime_id_base``, the first
+of the F´ IDs the bridge gives what arrives, counted on by the same device id
+-- the thermometer's readings are F´ channel ``0x3002`` -- which the bridge's
+model is made from and nothing aboard reads. A command the bridge sends up to
+``fsw``, which binds ``127.0.0.1:9600``, leaves it by its ``moc-out`` for the
+``heater``.
+
+``make -C examples run-fprime`` runs tcsmoc on the example, which starts
+tcspecial and tcssim; tcsmoc plays the bridge's part, the two speaking the one
+protocol. ``tcspecial/tests/fprime.rs`` flies it, with its sockets moved to
+ports nothing holds: a reading reaches the bridge, and a command from the
+bridge reaches the heater. Every port the example uses is in the nine
+thousands, which no other example uses.
+
 The Simulator Configuration
 ===========================
 What simulating a payload takes, which is not a property of the payload: how
@@ -2853,18 +2888,21 @@ telemetry, and every configuration states it:
    tcspecial:
      gateway: "radio"
 
-``radio`` is the ground, over UDP through the vehicle's radio, and is the only
-kind there is yet. ``cfs`` -- a cFS flight computer's software bus -- and
-``fprime`` -- an F´ flight computer, through a bridge component -- are
-designed (see "Gateways" in ``docs/design.rst``) and not yet built, and a
-configuration naming either is refused, saying to write ``radio`` until it is.
+``radio`` is the ground, over UDP through the vehicle's radio. ``fprime`` is an
+F´ flight computer, through a bridge component in its deployment, over the
+same links in the same protocol: see `The fprime example`_. ``cfs`` -- a cFS
+flight computer's software bus -- is designed (see "Gateways" in
+``docs/design.rst``) and not yet built, and a configuration naming it is
+refused, saying which kinds to write instead.
 A configuration that says nothing is refused too, rather than given ``radio``:
 what a vehicle answers to is a fact about the mission, and the kind decides
 how every link below is written.
 
-The ground links are still written in the ``moc`` section, with ``type: moc``;
-every one of them is a radio's, so a configuration that answers to ``radio``
-needs nothing else changed.
+The gateway nodes are still written in the ``moc`` section: a radio's with
+``type: moc``, an F´ bridge's with ``type: gateway_fprime``. Every node there is
+of the kind ``gateway`` names, and one of another kind is refused, naming both,
+because a vehicle answers to one: commands, beacons and data all go the one
+way.
 
 Where the links are
 -------------------

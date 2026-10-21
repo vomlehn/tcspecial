@@ -79,10 +79,10 @@ impl Moc {
     /// for ever -- and for a port that cannot be bound, which says which.
     pub fn open(graph: &Graph, moc: &str) -> Result<Moc, String> {
         match graph.node(moc) {
-            Some(node) if node.node_type == "moc" => {}
+            Some(node) if tcslibgs::gateway::is_gateway(&node.node_type) => {}
             Some(node) => {
                 return Err(format!(
-                    "\"{moc}\" is a {} node, not a moc node",
+                    "\"{moc}\" is a {} node, not a gateway node",
                     node.node_type
                 ))
             }
@@ -340,6 +340,44 @@ payloads:
         );
     }
 
+    /// An F´ gateway is opened as a ground link is, and what is drawn into
+    /// it arrives at its bridge_base plus the source's id: what the F´
+    /// bridge component, built on this through tcslib-c, receives.
+    #[test]
+    fn an_fprime_gateway_receives_at_its_bridge_base() {
+        let port = a_free_port();
+        let dir = tempfile::tempdir().expect("a directory");
+        let path = dir.path().join("vehicle.yaml");
+        std::fs::write(
+            &path,
+            format!(
+                "moc:
+  - {{ name: fsw, type: gateway_fprime, bridge_base: \"127.0.0.1:{}\", fprime_id_base: \"0x3000\" }}
+payloads:
+  - {{ name: a, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7001\", payload-out: fsw }}
+",
+                port - 1
+            ),
+        )
+        .expect("written");
+        let graph = Graph::load(&path).expect("it reads");
+        let mut moc = Moc::open(&graph, "fsw").expect("it opens");
+        assert_eq!(moc.sources(), vec!["a"]);
+
+        UdpSocket::bind("127.0.0.1:0")
+            .expect("the vehicle's socket")
+            .send_to(b"from a", ("127.0.0.1", port))
+            .expect("sent");
+        let received = moc
+            .receive(Some(Duration::from_secs(5)))
+            .expect("it reads")
+            .expect("something arrived");
+        assert_eq!(
+            (received.source, received.data),
+            ("a".to_string(), b"from a".to_vec())
+        );
+    }
+
     /// A wait that runs out says nothing arrived.
     #[test]
     fn a_wait_that_runs_out_is_nothing() {
@@ -385,7 +423,7 @@ payloads:
     fn what_cannot_be_opened_says_why() {
         let graph = graph(a_free_port());
         let said = Moc::open(&graph, "a").expect_err("a payload");
-        assert!(said.contains("not a moc node"), "{said}");
+        assert!(said.contains("not a gateway node"), "{said}");
         let said = Moc::open(&graph, "nowhere").expect_err("no such node");
         assert!(said.contains("no node called"), "{said}");
     }

@@ -265,7 +265,7 @@ impl Section {
 pub fn section_of(node_type: &str) -> Section {
     if Node::is_payload_type(node_type) {
         Section::Payloads
-    } else if node_type == "moc" {
+    } else if crate::gateway::is_gateway(node_type) {
         Section::Moc
     } else {
         Section::Vehicle
@@ -304,7 +304,11 @@ pub fn types_in(section: Section) -> Vec<&'static str> {
             .map(|kind| kind.node_type())
     };
     match section {
-        Section::Moc => vec!["moc"],
+        Section::Moc => crate::gateway::GatewayKind::ALL
+            .into_iter()
+            .filter(|kind| kind.is_built())
+            .filter_map(|kind| kind.node_type())
+            .collect(),
         Section::Vehicle => VEHICLE_TYPES.iter().copied().chain(apps(false)).collect(),
         Section::Payloads => crate::types::DHType::ALL
             .iter()

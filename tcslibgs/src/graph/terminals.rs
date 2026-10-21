@@ -243,7 +243,7 @@ pub fn terminals_of(node_type: &str) -> Option<Terminals> {
     match node_type {
         "i2c" | "spi" | "serial" | "hdlc" | "can" | "iio" | "rpmsg" | "network" | "device-file"
         | "gpio" => Some(PAYLOAD),
-        "moc" => Some(MOC),
+        gateway if crate::gateway::is_gateway(gateway) => Some(MOC),
         "null-moc" => Some(NULL_MOC),
         "null-payload" => Some(NULL_PAYLOAD),
         "tee-moc" => Some(TEE_MOC),

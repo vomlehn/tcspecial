@@ -1,0 +1,70 @@
+# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial.schema.json
+
+description: "Answering to an F´ flight computer: a reading to its bridge component, and a command from it to a heater"
+
+tcspecial:
+  # Every port is in the nine thousands, which no other example uses, so this
+  # one can be left running while another is looked at.
+  #
+  # The vehicle answers to an F´ flight computer rather than to the ground.
+  # Its links are the radio's -- UDP, in the radio's protocol -- because the
+  # far end of each is the F´ deployment's TcsBridge component, which is a
+  # ground station built on tcslib-c as far as tcspecial can tell.
+  beacon:
+    interval: "5 s"
+    recv: "127.0.0.1:9510"
+    send: "0.0.0.0:9500"
+  gateway: "fprime"
+  log:
+    directory: "/tmp/telemetry"
+    segment_size: "65536"
+  payload_command:
+    dest_base: "0.0.0.0:9300"
+    source_base: "127.0.0.1:9310"
+  payload_telemetry:
+    dest_base: "127.0.0.1:9410"
+    source_base: "0.0.0.0:9400"
+  tcs_cmd:
+    recv: "0.0.0.0:9200"
+    send: "127.0.0.1:9210"
+
+moc:
+  # The F´ bridge's end of the link, both ways. What the bridge sends goes up
+  # to address:port, which this node binds aboard, and leaves it by moc-out
+  # for the heater. What comes down arrives at bridge_base plus the device id
+  # of the node that sent it, and the bridge gives it the F´ ID
+  # fprime_id_base plus that same id: the thermometer, device id 2, arrives
+  # at 127.0.0.1:9702 as 0x3002.
+  - name: fsw
+    type: gateway_fprime
+    address: "127.0.0.1"
+    port: "9600"
+    bridge_base: "127.0.0.1:9700"
+    fprime_id_base: "0x3000"
+    payload-in: true
+    moc-out:
+      - target: heater
+
+payloads:
+  # A heater, driven by what the flight computer sends: the far end of a UDP
+  # socket.
+  - name: heater
+    type: network
+    protocol: "udp"
+    address: "127.0.0.1"
+    port: "9001"
+    moc-in: true
+  # A thermometer whose readings go to the flight computer.
+  - name: thermometer
+    type: network
+    protocol: "udp"
+    address: "127.0.0.1"
+    port: "9002"
+    payload-out:
+      - target: fsw
+
+tcsgui:
+  nodes:
+    - { name: fsw, x: 469, y: 34 }
+    - { name: heater, x: 34, y: 34 }
+    - { name: thermometer, x: 34, y: 134 }

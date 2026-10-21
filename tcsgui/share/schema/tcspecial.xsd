@@ -92,6 +92,7 @@
   <xs:simpleType name="mocType">
     <xs:restriction base="xs:token">
       <xs:enumeration value="moc"/>
+      <xs:enumeration value="gateway_fprime"/>
     </xs:restriction>
   </xs:simpleType>
 
@@ -152,6 +153,10 @@
       <!-- Where a ground link's data goes: address:port, the port counted on
            by each source node's device id. -->
       <xs:element name="ground_base" type="xs:string"/>
+      <!-- An F´ gateway's ground_base: where its bridge component is. -->
+      <xs:element name="bridge_base" type="xs:string"/>
+      <!-- Where the F´ IDs of what reaches an F´ gateway begin. -->
+      <xs:element name="fprime_id_base" type="xs:string"/>
       <xs:element name="protocol" type="xs:string"/>
       <!-- The IP protocol number of a raw socket: `protocol` raw. -->
       <xs:element name="ip_protocol" type="xs:string"/>
@@ -328,12 +333,14 @@
        before a configuration flies is tcsverify's to say. -->
   <xs:complexType name="tcspecial">
     <xs:all>
-      <!-- What the vehicle answers to: radio, the ground over UDP. cfs and
-           fprime are specified in the design and not yet built. -->
+      <!-- What the vehicle answers to: radio, the ground over UDP; fprime,
+           an F´ flight computer's bridge component, over the same. cfs is
+           specified in the design and not yet built. -->
       <xs:element name="gateway" minOccurs="0">
         <xs:simpleType>
           <xs:restriction base="xs:string">
             <xs:enumeration value="radio"/>
+            <xs:enumeration value="fprime"/>
           </xs:restriction>
         </xs:simpleType>
       </xs:element>

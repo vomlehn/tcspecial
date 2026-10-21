@@ -346,8 +346,9 @@ The Payload Configuration
 =========================
 The payloads are a section of the tcspecial configuration file: a
 description, the ``tcspecial`` section, an optional section of groups, and the
-data handlers themselves. A handler takes every attribute it does not state
-from the group it names, so a group holds what several handlers share.
+data handlers themselves. A group is a rate and nothing else: the payloads in
+it are read together, every ``interval`` of the group, and each payload states
+the rest of what it is for itself.
 
 .. code-block:: text
 
@@ -359,12 +360,12 @@ from the group it names, so a group holds what several handlers share.
 
    payload_groups                  optional
      name         the name payloads refer to
-     ...          any of the attributes below
+     interval     how often the group is read, as a length of time
 
    payloads
      name         the handler's name, which commands address it by and the
                   panels show
-     group        the group to take unstated attributes from, if any
+     group        the group it is read with, if any
      ...          any of the attributes below
 
 The shipped examples each carry a ``tcspecial`` section, first in the file, so
@@ -378,8 +379,8 @@ where it is read.
 What follows is the attributes every payload has, whatever it is, and then one
 section per type of payload for the attributes only that type has. A payload
 states its type in ``type`` and is then held to that type's attributes and no
-others: a device stating a ``payload_interface``, or a network payload stating
-a ``path``, is refused.
+others: a device file stating a ``port``, or a network payload stating a
+``path``, is refused.
 
 About the experimental interfaces
 ---------------------------------
@@ -406,38 +407,31 @@ Attributes Every Payload Has
 
    name           the handler's name, which commands address it by and the
                   panels show
-   group          the group to take unstated attributes from, if any.
-                  Optional, though a payload that is asked needs one: the
-                  group is where the rate it is asked at lives
-   type           network | device | serial | i2c | spi, or one of the
-                  experimental can | iio | rpmsg | gpio
-   packet_size    bytes in one packet
+   group          the group it is read with, if any. Optional: a payload in
+                  no group states its own rate, or is read on every pass --
+                  see `How a Payload's Data Is Read`_
+   type           network | device-file | serial | i2c | spi, or one of the
+                  experimental can | iio | rpmsg | gpio | hdlc
 
 How a payload is driven
 ^^^^^^^^^^^^^^^^^^^^^^^
 
-**Exactly one of these two, and never both.** Which one a payload states is
-what says how it is driven; there is no other attribute that says it, and
-nothing decides it for a file that says neither.
+**One attribute says it.** A payload that states a ``trigger`` is asked, and
+one that states none is read; nothing else decides it, and nothing decides it
+for a file that leaves it out.
 
 .. code-block:: text
 
-   trigger             what to send to make it answer: one byte in
-                       hexadecimal, or text as a quoted C string. The payload
-                       is asked, and how often it is asked is the interval of
-                       the payload group it is in
-
-   packet_interval     how long between packets, as a length of time. The
-                       payload sends of its own accord, at that rate, and
-                       nothing asks it
+   trigger        what to send to make it answer, as one or more parts: text
+                  as a quoted C string, bytes in hexadecimal in square
+                  brackets. The payload is asked, as often as its group is
+                  read or as its trigger_interval says
 
 A payload with a ``trigger`` is asked, so the trigger is the question and the
-group is the clock: a payload that is asked and is in no group has no rate,
-and is refused saying so -- a trigger with nothing to send it at is a payload
-nothing would ever ask.
+group, or the payload's own ``trigger_interval``, is the clock.
 
-A payload with a ``packet_interval`` sends on its own, so there is nothing
-to send it and nothing to keep time for it. A simulated one is driven at the
+A payload with no ``trigger`` sends on its own, or holds a value to be read,
+so there is nothing to send it. A simulated one that sends is driven at the
 rate its simulator configuration gives it, which is how fast a stand-in
 produces data rather than how fast the payload would.
 
@@ -461,17 +455,16 @@ figure is in the simulator configuration.
 **triggered** -- tcspecial sends a request and the payload answers. It states
 the ``trigger`` to send, because tcspecial does the sending and what to send
 comes from the payload's interface document, and how often the trigger goes
-out is the ``packet_interval`` of the payload group it is in -- so a
-triggered payload in no group is refused. Its entry in the simulator
-configuration states no interval at all, packet or segment: such a payload
-sends when it is asked, so a rate there would govern nothing.
+out is the ``interval`` of the payload group it is in, or, in no group, its
+own ``trigger_interval``. Its entry in the simulator configuration states no
+interval at all, packet or segment: such a payload sends when it is asked, so
+a rate there would govern nothing.
 
 So each type states its timing in one place and the other type's place is
 empty, which is what lets a file be read without deciding anything: the rate a
-payload is asked at is its group's ``packet_interval``, and the rate a
-payload sends at is the simulator configuration's ``packet_interval``. A
-configuration spells the group's rate ``interval``; every one of them is a
-length of time, as `Lengths of Time`_ says.
+payload is asked at is in the tcspecial configuration, and the rate a payload
+sends at is the simulator configuration's ``packet_interval``. Every one of
+them is a length of time, as `Lengths of Time`_ says.
 
 In a graph, a ``trigger`` is also what allows anything to be sent to a payload
 at all. What is written to a payload that is read is the question it answers,
@@ -857,36 +850,42 @@ attribute, in the node description tree, as its ``kind``: ``interval`` or
 
    payload_groups:
      - name: every_half_second
-       packet_interval: "500 ms"
+       interval: "500 ms"
 
    payloads:
-     # Sends on its own: nothing here about timing.
+     # Sends on its own: nothing here about timing. A TCP payload is a
+     # stream, so it says where a packet ends: twelve bytes at a time.
      - name: auto-send
        type: network
        protocol: tcp
-       payload_interface: localhost:5000
-       packet_size: 12
+       address: 127.0.0.1
+       port: 5000
+       max_length: 12
+       read_timeout: none
 
      # Answers a request: the trigger is the question, and the group it is in
      # is how often the question is asked.
      - name: triggered-send
        type: network
        protocol: tcp
-       payload_interface: localhost:5001
-       packet_size: 12
+       address: 127.0.0.1
+       port: 5001
+       max_length: 12
+       read_timeout: none
        group: every_half_second
        trigger: '"READ\r"'      # text, so a C string
 
-A file that states both is refused rather than run: a payload carrying a
-trigger and an interval of its own has not said whether it answers or sends,
-and either guess would operate it in a way nobody asked for. So is a payload
-with a trigger and no group -- a question nothing sends is a payload nothing
-would ever ask.
+A file that gives one payload two clocks is refused rather than run: a
+payload in a group that states a ``trigger_interval`` as well, or a payload
+that states both a ``trigger`` and a ``poll_interval``, has not said which
+rate it is read at, and either guess would operate it in a way nobody asked
+for.
 
-A datagram payload -- ``udp`` or ``unix_dgram`` -- cannot be triggered. Its
-handler learns where to send from the payload's first packet, so there is
-nowhere to send a request until the payload has spoken, which a triggered
-payload does not do.
+A datagram payload that is read -- ``udp`` or ``unix_dgram`` -- may be
+triggered, but its handler waits at the address the node states and learns
+where the payload is from the first datagram that arrives. Until the payload
+has sent one, a trigger has nowhere to go, and is counted as one that would
+not go.
 
 Tcspecial counts the triggers it sends apart from the data it carries, which
 ``QUERY_NODE`` reports: a node whose asks climb while nothing arrives is
@@ -901,19 +900,20 @@ Keyword ``type: network``. A socket, which the transport decides the shape of.
 .. code-block:: text
 
    protocol       tcp | udp | unix_stream | unix_dgram | raw
-   payload_interface
-                  where this payload is reached: the host and the port with a
-                  colon between them, as localhost:5000 -- or the path of a
-                  Unix-domain socket, which has no port and so is written
-                  alone
+   address        where this payload is reached: a host, as 127.0.0.1 -- or,
+                  over unix_stream or unix_dgram, the path of the socket
+   port           the port that goes with the address. Every protocol but
+                  raw states one; a Unix-domain socket is named by its path
+                  and does nothing with it
    ip_protocol    with raw, and only then: the IP protocol number the
                   payload's datagrams carry, 1 to 254
 
-Which end waits and which reaches out follows from the transport, and so does
-whether a handler can trigger the payload at all: a stream is connected, so
-the handler reaches out and may ask the payload for data, while a datagram
-handler waits to be spoken to and learns where its payload is from the first
-packet that arrives.
+Which end waits and which reaches out follows from the transport: a stream is
+connected, so the handler reaches out to the address, while a datagram
+handler that reads waits there to be spoken to and learns where its payload
+is from the first packet that arrives. A datagram payload that is only
+written -- a heater, a valve -- has nothing to say, so for one of those the
+handler sends to the address instead.
 
 A ``tcp`` or ``unix_stream`` socket is a stream of bytes with no packets of
 its own, as a serial line is, so a node on one says where one of its packets
@@ -2796,6 +2796,30 @@ file:
        interval: 5 s
        send: "0.0.0.0:5550"
        recv: "127.0.0.1:5650"
+
+What the vehicle answers to
+---------------------------
+
+The section's ``gateway`` says what commands the vehicle and takes its
+telemetry, and every configuration states it:
+
+.. code-block:: yaml
+
+   tcspecial:
+     gateway: "radio"
+
+``radio`` is the ground, over UDP through the vehicle's radio, and is the only
+kind there is yet. ``cfs`` -- a cFS flight computer's software bus -- and
+``fprime`` -- an F´ flight computer, through a bridge component -- are
+designed (see "Gateways" in ``docs/design.rst``) and not yet built, and a
+configuration naming either is refused, saying to write ``radio`` until it is.
+A configuration that says nothing is refused too, rather than given ``radio``:
+what a vehicle answers to is a fact about the mission, and the kind decides
+how every link below is written.
+
+The ground links are still written in the ``moc`` section, with ``type: moc``;
+every one of them is a radio's, so a configuration that answers to ``radio``
+needs nothing else changed.
 
 Where the links are
 -------------------

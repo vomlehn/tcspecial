@@ -59,21 +59,23 @@ impl UdpEndpoint {
         Self::bound(what, config, None)
     }
 
-    /// An endpoint for a payload that is only driven: a heater, a valve.
+    /// An endpoint for a payload that is spoken to first: a heater, a valve,
+    /// or a sensor that is asked.
     ///
-    /// Such a payload never speaks, so there is nothing to learn from it, and
-    /// the arrangement every other UDP payload uses cannot work: this end
-    /// would bind the configured address and wait to be told where its device
-    /// is by a device that has nothing to say. It would wait for ever, and
-    /// every write would be refused for want of a peer -- a heater the vehicle
-    /// decided to switch on and could not reach.
+    /// Such a payload says nothing until it is spoken to, so there is nothing
+    /// to learn from it first, and the arrangement for a payload that speaks
+    /// first cannot work: this end would bind the configured address and wait
+    /// to be told where its device is by a device waiting to be told
+    /// something. It would wait for ever, and every write would be refused for
+    /// want of a peer -- a heater the vehicle decided to switch on and could
+    /// not reach, a trigger with nowhere to go.
     ///
     /// So the two ends swap roles. What the node says is where the vehicle
-    /// reaches the payload, which is what the attribute means everywhere else;
-    /// for a payload that is written to and never read, that reading is the
-    /// literal one: the device waits there and this sends to it. The local
-    /// port is whatever is free, because nothing has to find this end.
-    pub fn driving(what: &str, config: &NetworkConfig) -> TcsResult<Self> {
+    /// reaches the payload, which is what the attribute means everywhere else:
+    /// the device waits there and this sends to it. The local port is
+    /// whatever is free, because nothing has to find this end before it has
+    /// spoken, and an answer comes back to it.
+    pub fn reaching(what: &str, config: &NetworkConfig) -> TcsResult<Self> {
         let told = format!("{}:{}", config.address, config.port)
             .parse::<SocketAddr>()
             .map_err(|e| {
@@ -302,7 +304,7 @@ mod tests {
             port: at.port(),
         };
 
-        let reader = UdpEndpoint::driving("heaters_1", &device).unwrap();
+        let reader = UdpEndpoint::reaching("heaters_1", &device).unwrap();
         let mut writer = reader.try_clone().unwrap();
 
         // Not bound to the device's address: that is the device's, and two
@@ -340,6 +342,52 @@ mod tests {
             .recv_from(&mut buffer)
             .expect("the stranger should not have taken the link");
         assert_eq!(&buffer[..size], b"0");
+    }
+
+    /// A payload that is asked is sent its trigger where the node says it
+    /// is, before it has said anything, and its answer comes back.
+    ///
+    /// The arrangement for a payload that speaks first would bind that
+    /// address and wait, and the trigger would have nowhere to go until the
+    /// payload, waiting to be asked, had spoken -- which it never would.
+    #[test]
+    fn an_asked_payload_is_sent_its_trigger_where_the_node_says_it_is() {
+        use std::net::UdpSocket;
+        use std::time::{Duration, Instant};
+        use tcslibgs::NetworkProtocol;
+
+        // The sensor, waiting to be asked where the configuration says.
+        let sensor = UdpSocket::bind("127.0.0.1:0").unwrap();
+        sensor
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        let at = sensor.local_addr().unwrap();
+        let device = NetworkConfig {
+            protocol: NetworkProtocol::Udp,
+            address: at.ip().to_string(),
+            port: at.port(),
+        };
+
+        let mut reader = UdpEndpoint::reaching("temp_1", &device).unwrap();
+        let mut writer = reader.try_clone().unwrap();
+
+        assert_eq!(writer.write(b"READ\r").expect("somewhere to send"), 5);
+        let mut asked = [0u8; 8];
+        let (size, from) = sensor
+            .recv_from(&mut asked)
+            .expect("the trigger should reach the sensor unprompted");
+        assert_eq!(&asked[..size], b"READ\r");
+
+        sensor.send_to(b"21.5", from).expect("the answer goes");
+        let mut into = [0u8; 64];
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let size = loop {
+            match reader.read(&mut into).expect("a read") {
+                0 if Instant::now() < deadline => std::thread::yield_now(),
+                size => break size,
+            }
+        };
+        assert_eq!(&into[..size], b"21.5");
     }
 
     /// Where an endpoint's own socket is bound, for a test that has to send

@@ -29,9 +29,38 @@ pub fn sends(node_type: &str) -> bool {
     !matches!(node_type, "i2c" | "spi" | "device-file")
 }
 
+/// Whether a datagram payload is the end that speaks first, and so the end
+/// that reaches out to the address its node states rather than the end
+/// that waits there.
+///
+/// A datagram connect sends nothing, so one end has to speak before the
+/// other knows where it is, and the end that speaks first is the one that
+/// is not found. A payload that is read and not asked produces data because
+/// it is running, so it speaks first: the vehicle waits at the address and
+/// learns where the payload is from what arrives. Any other payload is
+/// spoken to first -- one that is asked hears its trigger, one that is only
+/// driven hears what the vehicle decided -- so it waits at the address and
+/// the vehicle sends there from a socket of its own, which is where any
+/// answer comes back to.
+///
+/// The one statement of the rule, read aboard to open the socket, by the
+/// simulator to stand in for the payload, and by the check that refuses an
+/// init with nowhere to go.
+pub fn speaks_first(read: bool, asked: bool) -> bool {
+    read && !asked
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Only a payload that is read and nothing asks speaks first.
+    #[test]
+    fn a_payload_speaks_first_only_where_nothing_speaks_to_it() {
+        assert!(speaks_first(true, false), "a sensor that sends");
+        assert!(!speaks_first(true, true), "a sensor that is asked");
+        assert!(!speaks_first(false, false), "a heater");
+    }
 
     /// The parts that originate nothing are the clocked buses and a file.
     #[test]

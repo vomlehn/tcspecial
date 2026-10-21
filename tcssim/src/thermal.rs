@@ -646,7 +646,7 @@ mod tests {
         }
 
         // The vehicle's end of the heater links: it sends where the file says
-        // the heater is, which is what `driven_endpoint_pair` does aboard.
+        // the heater is, which is what `reaching_endpoint_pair` does aboard.
         let driving = std::net::UdpSocket::bind("127.0.0.1:0").expect("a socket for the vehicle");
         let drive = |on: bool| {
             for at in &heaters {

@@ -567,9 +567,10 @@ thing ``init`` exists to prevent, so it is not flown without one.
 
 ``init`` is refused where nothing can be written as the node opens: lines that
 are watched rather than driven, a sensor's sample buffer (``iio``), a link to
-the ground, and a ``udp`` or ``unix_dgram`` payload that is read. That last is
-the payload that speaks first: the vehicle learns where it is from what
-arrives, and as the node opens nothing has.
+the ground, and a ``udp`` or ``unix_dgram`` payload that is read and has no
+``trigger``. That last is the payload that speaks first: the vehicle learns
+where it is from what arrives, and as the node opens nothing has. Give it a
+trigger and it is reached at its address, init and all.
 
 tcssim takes an init as something received. A stand-in that is asked answers
 it as it would any request, which a real part would not: the vehicle then
@@ -881,11 +882,9 @@ that states both a ``trigger`` and a ``poll_interval``, has not said which
 rate it is read at, and either guess would operate it in a way nobody asked
 for.
 
-A datagram payload that is read -- ``udp`` or ``unix_dgram`` -- may be
-triggered, but its handler waits at the address the node states and learns
-where the payload is from the first datagram that arrives. Until the payload
-has sent one, a trigger has nowhere to go, and is counted as one that would
-not go.
+A datagram payload -- ``udp`` or ``unix_dgram`` -- may be triggered. Its
+trigger goes to the address the node states, and the answer comes back to the
+handler's own socket, so the payload is asked before it has said anything.
 
 Tcspecial counts the triggers it sends apart from the data it carries, which
 ``QUERY_NODE`` reports: a node whose asks climb while nothing arrives is
@@ -908,12 +907,15 @@ Keyword ``type: network``. A socket, which the transport decides the shape of.
    ip_protocol    with raw, and only then: the IP protocol number the
                   payload's datagrams carry, 1 to 254
 
-Which end waits and which reaches out follows from the transport: a stream is
-connected, so the handler reaches out to the address, while a datagram
-handler that reads waits there to be spoken to and learns where its payload
-is from the first packet that arrives. A datagram payload that is only
-written -- a heater, a valve -- has nothing to say, so for one of those the
-handler sends to the address instead.
+Which end waits and which reaches out follows from the transport, and for a
+datagram from which end speaks first. A stream is connected, so the handler
+reaches out to the address. A datagram payload that is read and has no
+``trigger`` speaks first, so its handler waits at the address and learns
+where the payload is from the first packet that arrives. Any other datagram
+payload -- one that is asked, or one that is only written, as a heater or a
+valve is -- is spoken to first, so it is the payload that waits at the
+address, and the handler sends there from a socket of its own, which is where
+an answer comes back to.
 
 A ``tcp`` or ``unix_stream`` socket is a stream of bytes with no packets of
 its own, as a serial line is, so a node on one says where one of its packets
@@ -2203,7 +2205,9 @@ sends. Stating the type here makes that pairing an error instead.
                           says
    payload_address        the socket the simulated payload answers from: a
                           host for a UDP payload, a path for a Unix datagram
-                          one. Optional, and only for those two types
+                          one. Optional, only for those two types, and not
+                          for a triggered one, which waits at the address the
+                          tcspecial configuration gives
    payload_port           the port it answers from. Optional, and refused for
                           a Unix datagram payload, which answers from a path
 
@@ -2228,9 +2232,10 @@ socket the simulated payload answers from.
 
 Nothing in the link needs it -- a handler learns where its payload is from the
 first packet it gets -- but something outside the simulation may: a rule on a
-firewall, or a capture being read afterwards. Only a datagram payload has an
-address of its own to bind; a stream payload is the end that waits, so it
-binds the address the tcspecial configuration gives it. A Unix datagram
+firewall, or a capture being read afterwards. Only a datagram payload that
+is not asked has an address of its own to bind; a stream payload, and a
+datagram payload that is asked, is the end that waits, so it binds the
+address the tcspecial configuration gives it. A Unix datagram
 payload answers from a path, so it takes an address and no port. Neither end
 may be the other: a payload told to bind its handler's own socket is refused
 rather than left to fail at the bind. Stating neither gets what every

@@ -48,6 +48,7 @@ use std::time::{Duration, Instant};
 use nix::poll::{poll, PollFd, PollFlags};
 
 use tcsapp::parent::ReadInto;
+use tcslibgs::graph::interface::speaks_first;
 use tcslibgs::graph::reach::reach_of;
 use tcslibgs::graph::terminals::Stream;
 use tcslibgs::graph::Node;
@@ -68,7 +69,7 @@ use crate::runtime::frame::Framer;
 use crate::runtime::node_state::Abandon;
 
 use crate::endpoint::{
-    bind_endpoint_pair, connect_endpoint_pair, driven_endpoint_pair, EndpointReadable,
+    bind_endpoint_pair, connect_endpoint_pair, reaching_endpoint_pair, EndpointReadable,
     EndpointWritable, WaitResult,
 };
 use crate::runtime::fabric::{Arriving, Port, Taken};
@@ -193,12 +194,13 @@ impl EndpointPort {
         Ok(EndpointPort::of(what, reader, writer, uses))
     }
 
-    /// Reach out to a payload that is only driven, as one node.
+    /// Reach out to a payload that is spoken to first, as one node.
     ///
-    /// For a heater or a valve: see [`crate::endpoint::driven_endpoint_pair`]
-    /// for why the ends swap roles when nothing is read.
-    pub fn driving(what: &str, config: &EndpointConfig, uses: Use) -> TcsResult<EndpointPort> {
-        let (reader, writer) = driven_endpoint_pair(what, config)?;
+    /// For a heater or a valve, and for a payload that is asked: see
+    /// [`crate::endpoint::reaching_endpoint_pair`] for why the ends swap roles
+    /// when the payload does not speak first.
+    pub fn reaching(what: &str, config: &EndpointConfig, uses: Use) -> TcsResult<EndpointPort> {
+        let (reader, writer) = reaching_endpoint_pair(what, config)?;
         Ok(EndpointPort::of(what, reader, writer, uses))
     }
 
@@ -270,10 +272,11 @@ impl EndpointPort {
 
         let opened = if node.node_type == "moc" {
             EndpointPort::bind(&node.name, &reach.endpoint, uses)
-        } else if uses == Use::Driven {
-            // Nothing is read from this one, so there is nobody to learn from:
-            // what the node says is where the device is, and this sends there.
-            EndpointPort::driving(&node.name, &reach.endpoint, uses)
+        } else if !speaks_first(uses.produces(), reach.trigger.is_some()) {
+            // Spoken to first -- driven, or asked -- so there is nobody to
+            // learn from before the first write: what the node says is where
+            // the device is, and this sends there.
+            EndpointPort::reaching(&node.name, &reach.endpoint, uses)
         } else {
             EndpointPort::connect(&node.name, &reach.endpoint, uses)
         };
@@ -1839,6 +1842,74 @@ mod tests {
             said.contains("heater") && said.contains("init"),
             "the complaint should name the node and the init: {said}"
         );
+    }
+
+    /// A datagram payload that is read and asked is reached where its node
+    /// says it is: it is the end that waits, and the vehicle the end that
+    /// speaks first. The init shows it, being the first thing the vehicle
+    /// says, as the node opens.
+    ///
+    /// Opened as a payload that speaks first, the vehicle would bind the
+    /// sensor's own address -- refused, the sensor holding it -- and wait to
+    /// be told where to send a trigger by a sensor waiting for one.
+    #[test]
+    fn an_asked_datagram_payload_is_reached_where_it_waits() {
+        use std::net::UdpSocket;
+        use tcslibgs::graph::{Destinations, Link};
+
+        let sensor = UdpSocket::bind("127.0.0.1:0").expect("the sensor waits");
+        sensor
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .expect("a timeout");
+        let at = sensor.local_addr().expect("where").port().to_string();
+
+        let node = Node {
+            name: "temp".to_string(),
+            node_type: "network".to_string(),
+            group: None,
+            attributes: [
+                ("protocol", "udp"),
+                ("address", "127.0.0.1"),
+                ("port", at.as_str()),
+                ("trigger", "\"READ\""),
+                ("init", "\"RESET\""),
+            ]
+            .into_iter()
+            .map(|(a, v)| (a.to_string(), tcslibgs::Scalar::of(v)))
+            .collect(),
+        };
+        let routes = Routes::of(&Graph {
+            description: None,
+            tcspecial: None,
+            groups: Vec::new(),
+            nodes: vec![
+                node.clone(),
+                Node {
+                    name: "decide".to_string(),
+                    node_type: "compute".to_string(),
+                    group: None,
+                    attributes: Default::default(),
+                },
+            ],
+            links: vec![Link {
+                from: "temp".to_string(),
+                to: Destinations::of(vec!["decide".to_string()]),
+                comment: None,
+            }],
+            commands: Vec::new(),
+            files: Vec::new(),
+            homes: Default::default(),
+            placed: Default::default(),
+            set_aside: Default::default(),
+        });
+
+        let _port = EndpointPort::open(&node, &routes, &Abandon::nothing())
+            .expect("the sensor is reached where it waits");
+        let mut said = [0u8; 16];
+        let (size, _) = sensor
+            .recv_from(&mut said)
+            .expect("the init should reach the sensor as the node opens");
+        assert_eq!(&said[..size], b"RESET");
     }
 
     /// A node of the shipped example is opened from its configuration.

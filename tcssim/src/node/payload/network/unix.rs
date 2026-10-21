@@ -226,6 +226,9 @@ pub fn run_unix_stream_node(
 /// and for the same reason: a datagram connect tells the far end nothing, and
 /// a device produces data because it is running rather than because it was
 /// asked. A path of its own is bound so that the handler can answer.
+///
+/// A device that is asked is the other way round: the vehicle speaks first,
+/// so this end binds the configured path and answers whoever asked.
 pub fn run_unix_dgram_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
@@ -240,16 +243,22 @@ pub fn run_unix_dgram_node(
     // be findable, so it binds that path rather than one of its own.
     //
     // The vehicle's end is unbound, so nothing arrives here from a path: see
-    // `tcspecial::node::payload::network::unix::UnixDatagramEndpoint::driving`.
+    // `tcspecial::node::payload::network::unix::UnixDatagramEndpoint::reaching`.
     if matches!(config.thermal, Some(crate::thermal::Thermal::Heats { .. })) {
         run_driven_unix_dgram_node(config, running, stats, &handler);
         return;
     }
+    // And a device that is asked waits at the path as a heater does: the
+    // vehicle speaks first, with its trigger, and the answer goes back to
+    // the name it asked from. The rule is the vehicle's own.
+    let speaks_first = tcslibgs::graph::interface::speaks_first(true, config.triggered);
+
     // The path this end answers from: the one the simulator file asked for,
     // or one beside the handler's. A file that says nothing gets the second,
     // which is what every simulator file asked for before this could be
-    // stated.
+    // stated. A device that is asked is found at the configuration's path.
     let mine = match config.own_address.as_deref() {
+        _ if !speaks_first => handler.clone(),
         Some(path) => PathBuf::from(path),
         None => a_path_of_its_own(&config.address),
     };
@@ -271,12 +280,22 @@ pub fn run_unix_dgram_node(
     };
     let _bound = BoundPath { path: mine.clone() };
     socket.set_nonblocking(true).ok();
-    eprintln!(
-        "{}: a Unix datagram device at {} is sending to {}",
-        config.name,
-        mine.display(),
-        handler.display()
-    );
+    if speaks_first {
+        eprintln!(
+            "{}: a Unix datagram device at {} is sending to {}",
+            config.name,
+            mine.display(),
+            handler.display()
+        );
+    } else {
+        eprintln!(
+            "{}: a Unix datagram device is waiting to be asked at {}",
+            config.name,
+            mine.display()
+        );
+    }
+    // Who last asked, for a device that answers: where its answer goes.
+    let mut asker = None;
 
     let mut rng = rand::thread_rng();
     // Packets that have gone, which the faults that are counted rather than
@@ -290,9 +309,10 @@ pub fn run_unix_dgram_node(
         // Whatever the handler has sent down.
         let mut buf = vec![0u8; 4096];
         let mut asked = 0;
-        if let Ok((n, _)) = socket.recv_from(&mut buf) {
+        if let Ok((n, from)) = socket.recv_from(&mut buf) {
             if n > 0 {
                 asked = n;
+                asker = Some(from);
                 let mut guard = stats.lock().unwrap();
                 guard.a_packet_has_come(&buf[..n]);
                 guard.bytes_recv += n as u64;
@@ -319,7 +339,10 @@ pub fn run_unix_dgram_node(
                 pacing.segment_size,
                 pacing.segment_interval,
                 &running,
-                &mut |segment| socket.send_to(segment, &handler),
+                &mut |segment| match &asker {
+                    Some(to) if !speaks_first => socket.send_to_addr(segment, to),
+                    _ => socket.send_to(segment, &handler),
+                },
             );
 
             if bytes > 0 {
@@ -538,6 +561,64 @@ mod tests {
             Some(a_path_of_its_own(&path.display().to_string())),
             "the device sent from an unnamed socket, which cannot be answered"
         );
+
+        std::fs::remove_file(&path).ok();
+    }
+
+    /// A device that is asked waits at the path the configuration names, and
+    /// answers the name it was asked from -- which the vehicle's end has,
+    /// outside the filesystem, so that it can be answered.
+    #[test]
+    fn an_asked_datagram_device_waits_at_its_path_and_answers_the_asker() {
+        use std::os::linux::net::SocketAddrExt;
+        use std::os::unix::net::SocketAddr;
+
+        let path = a_path("asked");
+        std::fs::remove_file(&path).ok();
+        let mut device = SimulatedPayload::new(PayloadConfig {
+            thermal: None,
+            name: "temp".to_string(),
+            protocol: PayloadProtocol::UnixDgram,
+            address: path.display().to_string(),
+            port: 0,
+            bus_address: 0,
+            can_id: 0,
+            can_fd: false,
+            gpio_lines: Vec::new(),
+            triggered: true,
+            faults: Default::default(),
+            own_address: None,
+            own_port: None,
+            packet_size: Arc::new(AtomicU32::new(12)),
+            segment_size: Arc::new(AtomicU32::new(12)),
+            packet_interval_ms: Arc::new(AtomicU32::new(10)),
+            segment_interval_ms: Arc::new(AtomicU32::new(0)),
+        });
+        device.start().expect("the device starts");
+
+        // The vehicle's end, named outside the filesystem as it is aboard.
+        let name = format!("tcssim-asked-{}", std::process::id());
+        let vehicle = UnixDatagram::bind_addr(
+            &SocketAddr::from_abstract_name(name.as_bytes()).expect("a name"),
+        )
+        .expect("the vehicle's end binds");
+        vehicle
+            .set_read_timeout(Some(Duration::from_millis(100)))
+            .expect("a read timeout");
+
+        let mut buf = [0u8; 64];
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let n = loop {
+            // Asked until the device is up to hear it.
+            let _ = vehicle.send_to(b"READ", &path);
+            match vehicle.recv(&mut buf) {
+                Ok(n) => break n,
+                Err(_) if Instant::now() < deadline => continue,
+                Err(e) => panic!("the device never answered: {e}"),
+            }
+        };
+        device.stop();
+        assert_eq!(n, 12, "a packet of twelve bytes, in one segment");
 
         std::fs::remove_file(&path).ok();
     }

@@ -266,29 +266,29 @@ pub fn bind_endpoint_pair(
     }
 }
 
-/// A reader and a writer for a payload that is only driven, opened once.
+/// A reader and a writer for a payload that is spoken to first, opened once.
 ///
-/// For the one direction the arrangement below cannot serve. Every other UDP
-/// payload is reached by binding its address and waiting to hear from it, and
-/// a payload that is written to and never read has nothing to say -- so the
+/// For what the arrangement below cannot serve. A UDP payload that speaks
+/// first is reached by binding its address and waiting to hear from it, and
+/// a payload that is spoken to first has nothing to say until it is -- so the
 /// wait would never end and every write would be refused for want of a peer.
 /// A heater is such a payload, and so is a valve: the vehicle decides and the
-/// device obeys.
+/// device obeys. So is a sensor that is asked: the trigger is the first word.
+/// [`tcslibgs::graph::interface::speaks_first`] says which payloads these are.
 ///
 /// So this sends where the node says the device is, and binds a port of its
-/// own that nothing has to find. See [`UdpEndpoint::driving`].
+/// own that nothing has to find, which is where an answer comes back to. See
+/// [`UdpEndpoint::reaching`].
 ///
-/// A Unix datagram payload has the same shape and is driven the same way:
-/// see [`UnixDatagramEndpoint::driving`]. Its socket is unbound rather than
-/// bound to a port of its own, a datagram from an unbound Unix socket
-/// arriving all the same -- what it costs is that the device cannot answer,
-/// which a device that is only driven does not do. That is the path of this
-/// end's own that this used to want and no longer needs.
+/// A Unix datagram payload has the same shape and is reached the same way:
+/// see [`UnixDatagramEndpoint::reaching`]. Its socket is bound to a name the
+/// kernel chooses, outside the filesystem, so that an answer has somewhere to
+/// come back to and nothing is left behind when the node goes.
 ///
 /// Nothing else differs. A TCP or Unix stream payload is connected to
 /// whichever way it is used, a device is opened, and both work as well
 /// written as read, so for anything else this is [`connect_endpoint_pair`].
-pub fn driven_endpoint_pair(
+pub fn reaching_endpoint_pair(
     what: &str,
     config: &EndpointConfig,
 ) -> TcsResult<(
@@ -297,14 +297,14 @@ pub fn driven_endpoint_pair(
 )> {
     match config {
         EndpointConfig::Network(net_config) if net_config.protocol == NetworkProtocol::Udp => {
-            let reader = UdpEndpoint::driving(what, net_config)?;
+            let reader = UdpEndpoint::reaching(what, net_config)?;
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }
         EndpointConfig::Network(net_config)
             if net_config.protocol == NetworkProtocol::UnixDgram =>
         {
-            let reader = UnixDatagramEndpoint::driving(what, net_config)?;
+            let reader = UnixDatagramEndpoint::reaching(what, net_config)?;
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }
@@ -324,9 +324,11 @@ pub fn driven_endpoint_pair(
 /// nothing and -- producing data because it is running rather than because it
 /// was asked -- would have nowhere to send it. So for UDP the handler binds
 /// the address and the payload reaches out to it, and the handler learns
-/// where its payload is from the first packet that arrives. Both ends binding
-/// it is what they used to do, and an address can be bound once, so whichever
-/// started second got `AddrInUse` and no data moved at all.
+/// where its payload is from the first packet that arrives -- for a payload
+/// that speaks first; one that is spoken to first is reached by
+/// [`reaching_endpoint_pair`] instead. Both ends binding it is what they used
+/// to do, and an address can be bound once, so whichever started second got
+/// `AddrInUse` and no data moved at all.
 ///
 /// A device is neither bound nor connected -- it is opened -- so for one of
 /// those this is [`bind_endpoint_pair`] by another name. Two opens of a device

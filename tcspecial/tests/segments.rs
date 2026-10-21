@@ -43,6 +43,7 @@ fn filled_segments_are_handed_to_segsend_and_leave_the_directory() {
         &configuration,
         format!(
             "tcspecial:
+  gateway: radio
   beacon: {{ interval: \"5 ms\", recv: \"{}\", send: \"{}\" }}
   log: {{ directory: \"{}\", segment_size: \"512\" }}
   payload_command: {{ dest_base: \"{}\", source_base: \"{}\" }}

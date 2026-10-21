@@ -1823,6 +1823,7 @@ mod tests {
             "include:
   - cabin
 tcspecial:
+  gateway: radio
   tcs_cmd:
     recv: 0.0.0.0:4000
     send: 127.0.0.1:4100

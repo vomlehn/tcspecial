@@ -23,6 +23,8 @@ pub mod display;
 pub mod endpoint_config;
 pub mod error;
 pub mod format;
+/// What the vehicle answers to: the ground by radio, cFS, or F´.
+pub mod gateway;
 pub mod graph;
 pub mod node;
 pub mod parameters;

@@ -535,6 +535,7 @@ section every configuration holds, and it is required of every one of them.
 .. code-block:: yaml
 
    tcspecial:
+     gateway: radio
      tcs_cmd:
        recv: 0.0.0.0:4000
        send: 127.0.0.1:4100
@@ -553,20 +554,22 @@ section every configuration holds, and it is required of every one of them.
        segment_size: 65536
      restart-arm-valid: "20 min"
 
-Five of its six entries are subsections, because each of them is one thing
+Five of its seven entries are subsections, because each of them is one thing
 with more than one attribute to it: the spacecraft command link has two ends,
 the commands about nodes have two, a payload's telemetry has two, the beacon
-has two and a timing, and the log has a place and a size. The sixth,
-``restart-arm-valid``, is one fact and is written as one. A prefix repeated
+has two and a timing, and the log has a place and a size. The other two,
+``gateway`` and ``restart-arm-valid``, are one fact each and are written as
+one. ``gateway`` is what the vehicle answers to -- see `Gateways: what the
+vehicle answers to`_. A prefix repeated
 on two or three flat names -- ``beacon.send``, ``beacon.recv``, ``beacon.interval`` -- is a subsection
 somebody declined to write, and the names under one are short for the same
 reason: ``beacon.send`` says what ``beacon.send`` said, where the reader is
 already looking at the beacon.
 
-Nine of the twelve attributes must be stated, and are required rather than
+Ten of the thirteen attributes must be stated, and are required rather than
 defaulted for one reason: a configuration that has not been asked the question
-has not answered it. Where commands are taken and where beacons go are mission
-facts, and a file that was silently given an answer to either is a vehicle
+has not answered it. What the vehicle answers to, where commands are taken and
+where beacons go are mission facts, and a file that was silently given an answer to either is a vehicle
 nobody can reach whose configuration looks complete. The two in ``log`` are the
 exception, and so is ``log`` itself: no ``log.directory`` means the telemetry
 log is not kept, which is a configuration somebody may mean -- a vehicle with
@@ -673,8 +676,11 @@ winner decided by the order the files happened to be read in.
 Gateways: what the vehicle answers to
 -------------------------------------
 
-**Specified, not yet built.** Of the three gateways below, only the radio
-exists, and under its old name: today it is the ``moc`` node, in the ``moc``
+**Specified, and built only as far as the radio.** ``tcspecial.gateway`` is
+read and required, ``radio`` is the one kind it accepts, and a configuration
+naming ``cfs`` or ``fprime`` is refused as specified but not yet built --
+``tcslibgs::gateway`` is the one place that says which kinds are. Of the three
+gateways below, only the radio exists, and under its old name: today it is the ``moc`` node, in the ``moc``
 section, linked through ``moc-in`` and ``moc-out``, with ``tee-moc``,
 ``null-moc`` and ``app_moc_veh`` beside it. The rename to ``gateway`` changes
 configuration keys, so it is held back to land with the ``payload`` rename,

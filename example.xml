@@ -9,6 +9,7 @@
             <recv>127.0.0.1:5650</recv>
             <send>0.0.0.0:5550</send>
         </beacon>
+        <gateway>radio</gateway>
         <payload_command>
             <dest_base>0.0.0.0:4200</dest_base>
             <source_base>127.0.0.1:4300</source_base>

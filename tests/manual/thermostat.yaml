@@ -6,6 +6,7 @@ tcspecial:
     interval: "5 s"
     recv: "127.0.0.1:5650"
     send: "0.0.0.0:5550"
+  gateway: "radio"
   log:
     directory: "/var/log/tcspecial"
     segment_size: "65536"

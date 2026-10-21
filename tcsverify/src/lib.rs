@@ -903,6 +903,7 @@ mod tests {
 
     const SOUND_GRAPH: &str = "\
 tcspecial:
+  gateway: radio
   tcs_cmd:
     recv: 0.0.0.0:4000
     send: 127.0.0.1:4100
@@ -1186,6 +1187,7 @@ vehicle:
     const GOOD: &str = "\
 description: two payloads
 tcspecial:
+  gateway: radio
   beacon:
     interval: \"5 s\"
     recv: \"127.0.0.1:5650\"
@@ -1283,7 +1285,7 @@ payloads:
 
         // Each beside the node it is about, in the order the file wrote them.
         let lines: Vec<usize> = report.findings.iter().map(|f| f.line).collect();
-        assert_eq!(lines, vec![20, 25, 30], "{:?}", report.findings);
+        assert_eq!(lines, vec![21, 26, 31], "{:?}", report.findings);
         for (finding, missing) in report
             .findings
             .iter()

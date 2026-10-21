@@ -13,6 +13,7 @@ fn with_errors(dir: &Path, count: usize) -> PathBuf {
     let mut text = "\
 description: many
 tcspecial:
+  gateway: radio
   beacon:
     interval: \"5 s\"
     recv: \"127.0.0.1:5650\"
@@ -215,6 +216,7 @@ fn with_vehicle_node(dir: &Path, node: &str) -> PathBuf {
         "\
 description: one vehicle node
 tcspecial:
+  gateway: radio
   beacon:
     interval: \"5 s\"
     recv: \"127.0.0.1:5650\"

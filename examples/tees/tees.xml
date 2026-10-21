@@ -12,6 +12,7 @@
             <recv>127.0.0.1:8510</recv>
             <send>0.0.0.0:8500</send>
         </beacon>
+        <gateway>radio</gateway>
         <log>
             <directory>/tmp/telemetry</directory>
             <segment_size>65536</segment_size>

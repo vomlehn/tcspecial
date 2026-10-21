@@ -171,12 +171,13 @@ pub fn nest(flat: &BTreeMap<String, Scalar>) -> BTreeMap<String, Parameter> {
 ///
 /// The one list of them. The ground check reads it to refuse a name that
 /// belongs to nothing, and the editor reads it to know which fields to offer
-/// and which to mark when they are empty -- so a tenth attribute is added here
+/// and which to mark when they are empty -- so an attribute is added here
 /// and appears in both.
 ///
 /// Required ones first, so a panel built from this asks for what it must have
 /// before what it may.
 pub const ATTRIBUTES: &[(&str, bool)] = &[
+    ("gateway", true),
     ("tcs_cmd.recv", true),
     ("tcs_cmd.send", true),
     ("payload_command.source_base", true),
@@ -233,7 +234,7 @@ pub fn retired(attribute: &str) -> Option<&'static str> {
 /// tcspecial starts, and there is nothing in it about building the software.
 ///
 /// Every complaint names the attribute, because a configuration is read by
-/// somebody who needs to know which of nine words to change.
+/// somebody who needs to know which of ten words to change.
 pub fn ci_config_of(said: &BTreeMap<String, Scalar>) -> Result<CIConfigJson, String> {
     // A name belonging to nothing, first. A misspelled attribute is otherwise
     // a value silently ignored -- `beacon_adress` would leave beacons going
@@ -281,6 +282,10 @@ pub fn ci_config_of(said: &BTreeMap<String, Scalar>) -> Result<CIConfigJson, Str
     };
 
     Ok(CIConfigJson {
+        // First, because it decides how the rest is written: a configuration
+        // that answers to a gateway this build cannot is refused here, by
+        // name, before anything is said about its sockets.
+        gateway: crate::gateway::GatewayKind::of(&text("gateway")?)?,
         tcs_cmd: TcsCmdJson {
             recv: text("tcs_cmd.recv")?,
             send: text("tcs_cmd.send")?,
@@ -407,6 +412,7 @@ mod tests {
 
     fn whole() -> Vec<(&'static str, &'static str)> {
         vec![
+            ("gateway", "radio"),
             ("tcs_cmd.recv", "0.0.0.0:4000"),
             ("tcs_cmd.send", "127.0.0.1:4100"),
             ("payload_command.source_base", "127.0.0.1:4300"),
@@ -482,8 +488,8 @@ mod tests {
 
     /// Every attribute that must be stated is complained about by name.
     ///
-    /// Nine attributes and one complaint apiece: "the tcspecial section is
-    /// wrong" is a sentence that sends somebody to read all nine.
+    /// Ten attributes and one complaint apiece: "the tcspecial section is
+    /// wrong" is a sentence that sends somebody to read all ten.
     #[test]
     fn a_missing_attribute_is_named() {
         for (name, required) in ATTRIBUTES {

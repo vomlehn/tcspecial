@@ -27,6 +27,7 @@ fn a_missing_log_directory_is_named_with_what_to_do() {
         &configuration,
         format!(
             "tcspecial:
+  gateway: radio
   beacon: {{ interval: \"5 s\", recv: \"{}\", send: \"{}\" }}
   log: {{ directory: \"{}\", segment_size: \"65536\" }}
   payload_command: {{ dest_base: \"{}\", source_base: \"{}\" }}

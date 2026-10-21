@@ -1578,6 +1578,11 @@ pub struct PayloadCommandJson {
 /// looking at the beacon.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CIConfigJson {
+    /// What the vehicle answers to, which decides how every link below is
+    /// written. Required, with no default, for the reason the links are: a
+    /// file given an answer it was never asked for is a vehicle that listens
+    /// for commands where nobody sends them.
+    pub gateway: crate::gateway::GatewayKind,
     /// The spacecraft command link: both ends of it.
     pub tcs_cmd: TcsCmdJson,
     /// Where each payload's telemetry comes from and goes to.
@@ -1674,6 +1679,8 @@ pub struct CIConfig {
     pub log_segment_bytes: u32,
     /// How long after a RESTART_ARM a RESTART with its key is taken.
     pub restart_arm_valid: Duration,
+    /// What the vehicle answers to.
+    pub gateway: crate::gateway::GatewayKind,
 }
 
 impl CIConfigJson {
@@ -1761,6 +1768,7 @@ impl CIConfigJson {
                 Some(said) => restart_arm_valid_of(said)?,
                 None => crate::RESTART_ARM_VALID_DEFAULT,
             },
+            gateway: self.gateway,
         })
     }
 }

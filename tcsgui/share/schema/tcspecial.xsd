@@ -328,6 +328,15 @@
        before a configuration flies is tcsverify's to say. -->
   <xs:complexType name="tcspecial">
     <xs:all>
+      <!-- What the vehicle answers to: radio, the ground over UDP. cfs and
+           fprime are specified in the design and not yet built. -->
+      <xs:element name="gateway" minOccurs="0">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="radio"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
       <xs:element name="tcs_cmd" minOccurs="0">
         <xs:complexType>
           <xs:all>

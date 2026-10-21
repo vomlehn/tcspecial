@@ -41,6 +41,13 @@
       "description": "What tcspecial itself is configured with: where commands are taken, where beacons go, where the telemetry log is written. Everything optional here, because the editor has to be able to write a section somebody is halfway through filling in; what must be answered before a configuration flies is tcsverify's to say.",
       "type": "object",
       "properties": {
+        "gateway": {
+          "description": "What the vehicle answers to: radio, the ground over UDP. cfs and fprime are specified in the design and not yet built, and are refused. Required, with no default.",
+          "type": "string",
+          "enum": [
+            "radio"
+          ]
+        },
         "tcs_cmd": {
           "type": "object",
           "properties": {

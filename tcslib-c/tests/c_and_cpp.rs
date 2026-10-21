@@ -146,6 +146,7 @@ fn against_a_vehicle(program: &Path) -> String {
         &configuration,
         format!(
             "tcspecial:
+  gateway: radio
   beacon:
     interval: \"5 s\"
     recv: \"127.0.0.1:{beacons}\"

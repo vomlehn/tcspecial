@@ -54,6 +54,7 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
         format!(
             "<configuration>
     <tcspecial>
+        <gateway>radio</gateway>
         <beacon><interval>5 s</interval><recv>127.0.0.1:{beacons}</recv><send>127.0.0.1:{}</send></beacon>
     </tcspecial>
     <moc>

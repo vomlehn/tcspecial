@@ -14,6 +14,7 @@ tcspecial:
     interval: "5 s"
     recv: "127.0.0.1:5750"
     send: "0.0.0.0:5650"
+  gateway: "radio"
   log:
     directory: "/tmp/telemetry"
     segment_size: "65536"

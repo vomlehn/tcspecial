@@ -2338,8 +2338,9 @@ pub fn thermostat_example() -> Document {
 
     // What tcspecial itself is configured with, which every configuration
     // must say: where commands are taken, where beacons go, where the
-    // telemetry log is written.
+    // telemetry log is written, and what it answers to.
     for (attribute, value) in [
+        ("gateway", "radio"),
         ("tcs_cmd.recv", "0.0.0.0:4000"),
         ("tcs_cmd.send", "127.0.0.1:4100"),
         ("payload_command.source_base", "127.0.0.1:4300"),
@@ -2741,6 +2742,7 @@ mod tests {
     #[test]
     fn a_finished_tcspecial_section_is_checked_by_its_own_rules() {
         let whole = [
+            ("gateway", "radio"),
             ("tcs_cmd.recv", "0.0.0.0:4000"),
             ("tcs_cmd.send", "127.0.0.1:4100"),
             ("payload_command.source_base", "127.0.0.1:4300"),
@@ -2777,6 +2779,8 @@ mod tests {
 
         // Complete and wrong, in the words of the rules that know why.
         for (attribute, instead, expected) in [
+            // A kind that is specified and not built yet.
+            ("gateway", "cfs", "not yet built"),
             ("beacon.send", "10.0.0.1", "address:port"),
             ("beacon.recv", "127.0.0.1:0", "port 0"),
             // Half a command interface, which is the one way an attribute

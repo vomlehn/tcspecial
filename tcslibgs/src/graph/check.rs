@@ -610,10 +610,25 @@ fn said(names: &[String]) -> String {
 /// `parameters::flatten`.
 fn section_refusal(
     said: &BTreeMap<String, crate::graph::parameters::Parameter>,
-) -> Result<(), String> {
+) -> Result<crate::gateway::GatewayKind, String> {
     let flat = crate::graph::parameters::flatten(said);
-    crate::graph::parameters::ci_config_of(&flat)?.to_ci_config()?;
-    Ok(())
+    Ok(crate::graph::parameters::ci_config_of(&flat)?
+        .to_ci_config()?
+        .gateway)
+}
+
+/// What is wrong with a node of `node_type` in a configuration that answers to
+/// `kind`, or `None` where nothing is: a type that is no gateway's, or one of
+/// the kind's own.
+fn gateway_stray(kind: crate::gateway::GatewayKind, node_type: &str) -> Option<String> {
+    let of = crate::gateway::GatewayKind::of_node_type(node_type)?;
+    (of != kind).then(|| {
+        format!(
+            "a {node_type} node is a {of} gateway, and this configuration's \
+             tcspecial.gateway is {kind}: a vehicle answers to one kind, so \
+             change the node or the section"
+        )
+    })
 }
 
 impl Graph {
@@ -1244,11 +1259,23 @@ impl Graph {
         // mistake is one complaint wherever the section is written.
         match &self.tcspecial {
             None => problems.push(Problem::NoTcspecial),
-            Some(said) => {
-                if let Err(why) = section_refusal(said) {
-                    problems.push(Problem::BadTcspecial { why });
+            Some(said) => match section_refusal(said) {
+                Err(why) => problems.push(Problem::BadTcspecial { why }),
+                // Every gateway node is of the kind the section answers to.
+                // A vehicle answers to one: commands, beacons and data all go
+                // the one way, so that an operator never has to ask which of
+                // two masters a command came from.
+                Ok(kind) => {
+                    for node in self.nodes.iter() {
+                        if let Some(why) = gateway_stray(kind, &node.node_type) {
+                            problems.push(Problem::BadNode {
+                                node: node.name.clone(),
+                                why,
+                            });
+                        }
+                    }
                 }
-            }
+            },
         }
 
         // Every node that is opened says what opening it takes.
@@ -1597,6 +1624,7 @@ mod tests {
         // subsections back.
         crate::graph::parameters::nest(
             &[
+                ("gateway", "radio"),
                 ("tcs_cmd.recv", "0.0.0.0:4000"),
                 ("tcs_cmd.send", "127.0.0.1:4100"),
                 ("payload_telemetry.source_base", "0.0.0.0:6000"),
@@ -1613,6 +1641,39 @@ mod tests {
             .map(|(name, value)| (name.to_string(), Scalar::of(value)))
             .collect(),
         )
+    }
+
+    /// A gateway node of another kind than the section answers to is
+    /// refused, naming both kinds; one of the section's kind, and a node that
+    /// is no gateway, are not.
+    ///
+    /// Asked of the rule directly, because while only the radio is built no
+    /// configuration can be read that names another kind for its node to
+    /// disagree with.
+    #[test]
+    fn a_gateway_node_of_another_kind_is_refused() {
+        use crate::gateway::GatewayKind;
+        let why = gateway_stray(GatewayKind::Cfs, "moc").expect("a radio under cfs");
+        assert!(why.contains("radio") && why.contains("cfs"), "{why}");
+        assert_eq!(gateway_stray(GatewayKind::Radio, "moc"), None);
+        assert_eq!(gateway_stray(GatewayKind::Cfs, "log"), None);
+    }
+
+    /// A section that names no gateway is refused naming the attribute.
+    #[test]
+    fn a_section_without_a_gateway_is_refused() {
+        let mut said = crate::graph::parameters::flatten(&tcspecial());
+        said.remove("gateway");
+        let mut g = graph(Vec::new(), Vec::new());
+        g.tcspecial = Some(crate::graph::parameters::nest(&said));
+        assert!(
+            g.check().iter().any(|p| matches!(
+                p,
+                Problem::BadTcspecial { why } if why.contains("gateway")
+            )),
+            "{:?}",
+            g.check()
+        );
     }
 
     /// A graph built here rather than read, so a test can make one wrong.

@@ -196,3 +196,111 @@ fn every_example_is_in_the_manual() {
         );
     }
 }
+
+/// And the manual's examples of a node verify, as the examples do.
+///
+/// An example in the manual is copied as often as one in `examples/`, and a
+/// rule that changes leaves it behind without anything saying so: the manual
+/// once showed TCP payloads by attributes the reader had retired, which
+/// tcsverify refused. So every YAML block of the manual that is a node, or a
+/// set of them under `payload_groups`, is put in a file with the worked
+/// example's `tcspecial` section and checked, warnings counting.
+///
+/// Except a block that draws a link. It is a piece of a graph shown for the
+/// link, and the node at the other end is somewhere else in the text or
+/// nowhere, so a check of it alone would find a line to nothing.
+#[test]
+fn every_node_in_the_manual_verifies() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let manual = root.join("docs/manual.rst");
+    let text =
+        std::fs::read_to_string(&manual).unwrap_or_else(|e| panic!("{}: {e}", manual.display()));
+    let worked = std::fs::read_to_string(root.join("tests/manual/thermostat.yaml"))
+        .expect("the worked example");
+    let section = top_level_section(&worked, "tcspecial");
+    let dir = tempfile::tempdir().expect("a directory");
+
+    let mut checked = 0;
+    for (line, block) in yaml_blocks(&text) {
+        let first = block.lines().next().unwrap_or_default();
+        let file = if first.starts_with("payload_groups:") {
+            format!("{section}{block}")
+        } else if first.starts_with("- name:") {
+            let node_type = block
+                .lines()
+                .find_map(|l| l.trim().strip_prefix("type:"))
+                .map(str::trim)
+                .unwrap_or_else(|| panic!("manual.rst:{line}: a node with no type"));
+            let nested: String = block.lines().map(|l| format!("  {l}\n")).collect();
+            let under = tcslibgs::graph::section_of(node_type).name();
+            format!("{section}{under}:\n{nested}")
+        } else {
+            continue;
+        };
+        if block.contains("-out:") {
+            continue;
+        }
+
+        let path = dir.path().join(format!("manual-{line}.yaml"));
+        std::fs::write(&path, &file).unwrap();
+        let report = verify(&path, None, tcsverify::Limits::EVERYTHING);
+        assert!(
+            !report.found_anything(),
+            "the example at manual.rst:{line} does not verify: {:?}\n{file}",
+            report.findings
+        );
+        checked += 1;
+    }
+    // A change to how the manual marks its blocks would otherwise pass this
+    // by checking nothing.
+    assert!(
+        checked >= 5,
+        "only {checked} of the manual's nodes were found"
+    );
+}
+
+/// One top-level section of a YAML file, its key line included.
+fn top_level_section(yaml: &str, key: &str) -> String {
+    let mut lines = yaml.lines().skip_while(|l| *l != format!("{key}:"));
+    let mut section: String = lines.next().map(|l| format!("{l}\n")).unwrap_or_default();
+    for l in lines.take_while(|l| l.is_empty() || l.starts_with(' ')) {
+        section.push_str(l);
+        section.push('\n');
+    }
+    assert!(!section.is_empty(), "no {key}: section");
+    section
+}
+
+/// Each `.. code-block:: yaml` of an RST text, unindented, with the line its
+/// body starts on.
+fn yaml_blocks(text: &str) -> Vec<(usize, String)> {
+    let lines: Vec<&str> = text.lines().collect();
+    let indent = |l: &str| l.len() - l.trim_start().len();
+    let mut blocks = Vec::new();
+    let mut i = 0;
+    while i < lines.len() {
+        if lines[i].trim() != ".. code-block:: yaml" {
+            i += 1;
+            continue;
+        }
+        // The body is indented past the directive, and ends at the first
+        // line that is not.
+        let deeper = indent(lines[i]) + 1;
+        i += 1;
+        let start = i;
+        while i < lines.len() && (lines[i].trim().is_empty() || indent(lines[i]) >= deeper) {
+            i += 1;
+        }
+        let body = &lines[start..i];
+        let Some(first) = body.iter().position(|l| !l.trim().is_empty()) else {
+            continue;
+        };
+        let margin = indent(body[first]);
+        let block: String = body[first..]
+            .iter()
+            .map(|l| format!("{}\n", l.get(margin..).unwrap_or_default()))
+            .collect();
+        blocks.push((start + first + 1, block.trim_end().to_string() + "\n"));
+    }
+    blocks
+}

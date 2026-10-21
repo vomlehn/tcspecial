@@ -596,6 +596,7 @@ fn what_it_is(
     name: &str,
     settings: &SimSettings,
     endpoint: &EndpointConfig,
+    triggered: bool,
 ) -> Result<(), SimConfigError> {
     let actually = endpoint.kind();
 
@@ -696,6 +697,26 @@ fn what_it_is(
                     setting,
                     why: "a stream payload is the end that waits, so it binds the \
                           address the payload configuration gives it",
+                });
+            }
+        }
+    }
+
+    // A datagram payload that is asked waits too: tcspecial speaks first,
+    // sending its trigger to the address the payload configuration gives, so
+    // the payload binds that and answers whoever asked.
+    if datagram && !crate::graph::interface::speaks_first(true, triggered) {
+        for (setting, stated) in [
+            ("payload_address", settings.payload_address.is_some()),
+            ("payload_port", settings.payload_port.is_some()),
+        ] {
+            if stated {
+                return Err(SimConfigError::NoAddressOfItsOwn {
+                    payload: name.to_string(),
+                    setting,
+                    why: "a triggered payload is the end that waits: tcspecial \
+                          sends its trigger to the address the payload \
+                          configuration gives, so it binds that address",
                 });
             }
         }
@@ -1353,7 +1374,12 @@ impl SimConfigFile {
             // payload set copied from another keeps the names -- so the
             // kind is what tells a simulator file paired with the wrong
             // tcspecial configuration from one paired with the right one.
-            what_it_is(&payload.name, &settings, &dh.endpoint)?;
+            what_it_is(
+                &payload.name,
+                &settings,
+                &dh.endpoint,
+                dh.mode.polling().is_some(),
+            )?;
 
             // And whether there is anything to be it at all.
             simulable(dh).map_err(|why| SimConfigError::CannotSimulate {
@@ -2072,6 +2098,42 @@ simulated_payloads:
             said.contains("the handler's own end") && said.contains("5000"),
             "{said}"
         );
+    }
+
+    /// But a triggered one may not: it is the end that waits, at the address
+    /// the tcspecial configuration gives, because the trigger is the first
+    /// word and tcspecial sends it there. An address of its own would be a
+    /// setting nothing reads.
+    #[test]
+    fn a_triggered_datagram_payload_has_no_address_of_its_own() {
+        let mut asked = handler("DH0", 4);
+        asked.mode = DHMode::Triggered {
+            trigger: b"READ".to_vec(),
+            interval: Duration::from_millis(500),
+        };
+        let file = |extra: &str| {
+            parse(&format!(
+                "simulated_payloads:\n  - name: DH0\n    type: network\n    \
+                 protocol: udp\n{extra}"
+            ))
+        };
+
+        file("")
+            .resolve(std::slice::from_ref(&asked))
+            .expect("one that states nothing resolves");
+        for stated in ["payload_address: 127.0.0.1", "payload_port: 7000"] {
+            let said = format!(
+                "{}",
+                file(&format!("    {stated}\n"))
+                    .resolve(std::slice::from_ref(&asked))
+                    .unwrap_err()
+            );
+            let setting = stated.split(':').next().unwrap();
+            assert!(
+                said.contains(setting) && said.contains("triggered"),
+                "{stated}: {said}"
+            );
+        }
     }
 
     /// Only a payload with an address of its own to bind may be told what to

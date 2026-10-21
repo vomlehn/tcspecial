@@ -503,11 +503,12 @@ impl Problem {
                 }
             }
             Problem::InitBeforeItSpeaks { node, protocol } => format!(
-                "\"{node}\" states an init and is read over {protocol}, where the \
-                 payload speaks first and the vehicle learns where it is from what \
-                 arrives: as the node opens nothing has, so there is nowhere to \
-                 write the init. Reach it over a stream (tcp or unix_stream), or \
-                 take init out"
+                "\"{node}\" states an init and is read over {protocol} with no \
+                 trigger, so the payload speaks first and the vehicle learns where \
+                 it is from what arrives: as the node opens nothing has, so there \
+                 is nowhere to write the init. Give it a trigger, and the vehicle \
+                 reaches it at its address; reach it over a stream (tcp or \
+                 unix_stream); or take init out"
             ),
             Problem::UntriggeredInput { node, from } => format!(
                 "\"{from}\" is delivered to \"{node}\", which states no trigger: \
@@ -733,7 +734,8 @@ impl Graph {
         }
 
         // An init is written as the node opens, so it needs somewhere to go
-        // then: a datagram payload that is read has not said where it is yet.
+        // then: a datagram payload that speaks first has not said where it is
+        // yet.
         for node in self.nodes.iter().filter(|node| {
             node.is_payload() && node.node_type == "network" && node.attributes.contains_key("init")
         }) {
@@ -749,7 +751,8 @@ impl Graph {
                 .links
                 .iter()
                 .any(|link| link.from.split('.').next().unwrap_or(&link.from) == node.name);
-            if read {
+            let asked = node.attributes.contains_key("trigger");
+            if crate::graph::interface::speaks_first(read, asked) {
                 problems.push(Problem::InitBeforeItSpeaks {
                     node: node.name.clone(),
                     protocol,
@@ -3612,7 +3615,8 @@ mod tests {
 
     /// An init on a datagram payload that speaks first is refused: as the
     /// node opens nothing has arrived from it, so there is nowhere to write
-    /// the init. One that is only driven is told where it is, and takes one.
+    /// the init. One that is only driven, or is asked, is reached at its
+    /// address, and takes one.
     #[test]
     fn an_init_needs_somewhere_to_go_as_the_node_opens() {
         let with = |links: Vec<Link>| {
@@ -3653,6 +3657,29 @@ mod tests {
         assert!(
             with(vec![link("decide", "valve")]).is_empty(),
             "a driven datagram payload is told where it is"
+        );
+
+        let mut asked = graph(
+            vec![node("valve", "network"), node("decide", "compute")],
+            vec![link("valve", "decide")],
+        );
+        for (attribute, value) in [
+            ("protocol", "udp"),
+            ("address", "127.0.0.1"),
+            ("port", "6200"),
+            ("init", "\"0\""),
+            ("trigger", "\"READ\""),
+        ] {
+            asked.nodes[0]
+                .attributes
+                .insert(attribute.to_string(), Scalar::of(value));
+        }
+        assert!(
+            !asked
+                .check()
+                .iter()
+                .any(|problem| matches!(problem, Problem::InitBeforeItSpeaks { .. })),
+            "a datagram payload that is asked is reached at its address"
         );
     }
 }

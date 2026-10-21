@@ -3,9 +3,9 @@
 //! Two protocols, and they divide the way TCP and UDP divide. A stream is
 //! accepted, so the connection itself says who is at each end and the device
 //! is the end that listens. A datagram is not, so -- as over UDP, and for the
-//! same reason -- the handler is the end that waits at the configured path and
-//! the device reaches out to it, a device producing data because it is
-//! running rather than because it was asked.
+//! same reason -- the end that speaks first reaches out and the other waits at
+//! the configured path: the handler, for a device that produces data because
+//! it is running, and the device, for one that is driven or asked.
 //!
 //! What neither TCP nor UDP has is a file to tidy up. A Unix socket's address
 //! is a path in the filesystem, and binding one leaves an entry there that
@@ -103,9 +103,9 @@ impl EndpointWritable for UnixStreamEndpoint {
 /// datagram's sender is the only statement of where it came from. A device's
 /// own path is its own business, so nothing here knows it until it writes.
 ///
-/// Except for a node that is only driven, where there is nothing to learn
-/// from and the configured path is where the device is: see
-/// [`UnixDatagramEndpoint::driving`].
+/// Except for a node that is spoken to first -- driven, or asked -- where
+/// there is nothing to learn from before the first write and the configured
+/// path is where the device is: see [`UnixDatagramEndpoint::reaching`].
 pub struct UnixDatagramEndpoint {
     /// The handler this endpoint belongs to, as the device configuration
     /// names it.
@@ -116,12 +116,12 @@ pub struct UnixDatagramEndpoint {
     /// Shared between the two endpoints of a conduit pair, so that the one
     /// writing sends where the one reading learnt.
     peer: std::sync::Arc<std::sync::Mutex<Option<std::os::unix::net::SocketAddr>>>,
-    /// Where the configuration says the device is, for a node that is only
-    /// driven.
+    /// Where the configuration says the device is, for a node that is
+    /// spoken to first.
     ///
     /// What is written down beats what was learnt, as it does over UDP: a
-    /// node that is only driven has nothing to learn from, and one that is
-    /// read binds its path and leaves this `None`. Not shared between the
+    /// node that is spoken to first has nothing to learn from, and one that
+    /// speaks first is bound to its path and leaves this `None`. Not shared between the
     /// pair, because it does not change: it is the file's word, and both
     /// endpoints are made from the same file.
     told: Option<PathBuf>,
@@ -150,28 +150,29 @@ impl UnixDatagramEndpoint {
     /// Send where the configuration says the device is, from a socket of this
     /// end's own.
     ///
-    /// For a node that is only driven -- a heater, a valve, a latch -- which
-    /// [`UnixDatagramEndpoint::bind`] cannot serve. Binding the path and
-    /// waiting to hear from the device is what every datagram node does, and
-    /// a device that is never read never writes, so the wait would not end
-    /// and every write would be refused for want of a path to send to. The
-    /// vehicle decides and the device obeys; the address in the file is where
-    /// the device is, which is what it always meant.
+    /// For a node that is spoken to first -- a heater, a valve, a latch, or a
+    /// sensor that is asked -- which [`UnixDatagramEndpoint::bind`] cannot
+    /// serve. Binding the path and waiting to hear from the device is what a
+    /// node that speaks first does, and a device waiting to be spoken to does
+    /// not write, so the wait would not end and every write would be refused
+    /// for want of a path to send to. The address in the file is where the
+    /// device is, which is what it always meant.
     ///
-    /// The socket is unbound, where the UDP equivalent binds a port of its
-    /// own: a datagram sent from an unbound socket arrives, and what it
-    /// costs is that the device cannot answer -- which a device that is only
-    /// driven does not do. This is the thing that needed a path of this end's
-    /// own and now needs none, and nothing is left in the filesystem when the
-    /// node goes, where a bound path would have to be cleared up.
-    pub fn driving(what: &str, config: &NetworkConfig) -> TcsResult<Self> {
-        let socket = UnixDatagram::unbound().map_err(|e| {
-            TcsError::Endpoint(format!(
-                "{what}: a Unix datagram socket to drive \"{}\" with could not be \
-                 made: {e}",
-                config.address
-            ))
-        })?;
+    /// The socket is bound to a name the kernel chooses, in the abstract
+    /// namespace rather than the filesystem, so that a device that is asked
+    /// has somewhere to send its answer, and nothing is left behind to be
+    /// cleared up when the node goes. A device that is only driven does not
+    /// answer, and is none the worse for being able to.
+    pub fn reaching(what: &str, config: &NetworkConfig) -> TcsResult<Self> {
+        let socket = UnixDatagram::unbound()
+            .and_then(|socket| autobind(&socket).map(|()| socket))
+            .map_err(|e| {
+                TcsError::Endpoint(format!(
+                    "{what}: a Unix datagram socket to reach \"{}\" with could not \
+                     be made: {e}",
+                    config.address
+                ))
+            })?;
         socket.set_nonblocking(true)?;
 
         Ok(Self {
@@ -223,9 +224,9 @@ impl EndpointReadable for UnixDatagramEndpoint {
 
 impl EndpointWritable for UnixDatagramEndpoint {
     fn write(&mut self, data: &[u8]) -> TcsResult<usize> {
-        // What the file says, where it says anything: a node that is only
-        // driven is sent to at the path it names, without waiting to be
-        // written to first. See `UnixDatagramEndpoint::driving`.
+        // What the file says, where it says anything: a node that is
+        // spoken to first is sent to at the path it names, without waiting
+        // to be written to first. See `UnixDatagramEndpoint::reaching`.
         //
         // Sent to an address as it is held, either way: a learnt one is not
         // made into a path first, so that answering allocates nothing.
@@ -267,6 +268,33 @@ impl EndpointWritable for UnixDatagramEndpoint {
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Ok(0),
             Err(e) => Err(TcsError::Io(e)),
         }
+    }
+}
+
+/// Bind a socket to a name the kernel chooses in the abstract namespace.
+///
+/// Linux's autobind: a bind that gives the address family and no name. The
+/// name is unique, so two nodes, or two runs, never contend for one, and it
+/// is not a file, so nothing outlives the socket. std has no call for it.
+fn autobind(socket: &UnixDatagram) -> io::Result<()> {
+    // SAFETY: an all-zero sockaddr_un is a valid value of it, and bind reads
+    // only the family from it, the length given covering nothing more.
+    let mut address: libc::sockaddr_un = unsafe { std::mem::zeroed() };
+    address.sun_family = libc::AF_UNIX as libc::sa_family_t;
+    let length = std::mem::size_of::<libc::sa_family_t>() as libc::socklen_t;
+    // SAFETY: the descriptor is the socket's own and open for as long as it
+    // is borrowed, and the address is valid for the length given.
+    let bound = unsafe {
+        libc::bind(
+            socket.as_raw_fd(),
+            &address as *const libc::sockaddr_un as *const libc::sockaddr,
+            length,
+        )
+    };
+    if bound == 0 {
+        Ok(())
+    } else {
+        Err(io::Error::last_os_error())
     }
 }
 
@@ -434,9 +462,8 @@ mod tests {
     /// The case binding cannot serve: a device that is never read never
     /// writes, so a handler waiting to learn where it is would wait for ever
     /// and refuse every write meanwhile -- which for a heater or a valve is
-    /// the vehicle deciding and nothing happening. Driven from an unbound
-    /// socket, so nothing is left in the filesystem and the device does not
-    /// have to be able to answer.
+    /// the vehicle deciding and nothing happening. Driven from a socket with
+    /// a name outside the filesystem, so nothing is left there.
     #[test]
     fn a_driven_datagram_device_is_sent_to_where_it_is() {
         let device_path = a_path("driven-device");
@@ -446,7 +473,7 @@ mod tests {
         // configuration names and waits to be driven, saying nothing.
         let device = UnixDatagram::bind(&device_path).expect("the device binds");
 
-        let mut endpoint = UnixDatagramEndpoint::driving(
+        let mut endpoint = UnixDatagramEndpoint::reaching(
             "heaters",
             &config_at(&device_path, NetworkProtocol::UnixDgram),
         )
@@ -461,8 +488,7 @@ mod tests {
         assert_eq!(
             from.as_pathname(),
             None,
-            "an unbound sender has no path, which is what a driven device does \
-             not need"
+            "the vehicle's end should leave nothing in the filesystem"
         );
 
         // Again, because a decision is asserted on every sample rather than
@@ -474,6 +500,48 @@ mod tests {
 
         // And nothing of this end is in the filesystem to clear up.
         drop(endpoint);
+        std::fs::remove_file(&device_path).ok();
+    }
+
+    /// A device that is asked is sent its trigger where the file says it is,
+    /// and its answer comes back: the vehicle's end has a name to be answered
+    /// at, though not one in the filesystem.
+    #[test]
+    fn an_asked_datagram_device_is_answered_back() {
+        use std::os::linux::net::SocketAddrExt;
+
+        let device_path = a_path("asked-device");
+        std::fs::remove_file(&device_path).ok();
+        let device = UnixDatagram::bind(&device_path).expect("the device binds");
+
+        let mut endpoint = UnixDatagramEndpoint::reaching(
+            "temp",
+            &config_at(&device_path, NetworkProtocol::UnixDgram),
+        )
+        .expect("the vehicle's end opens");
+
+        endpoint.write(b"READ").expect("the trigger goes out");
+        let mut asked = [0u8; 64];
+        let (n, from) = device.recv_from(&mut asked).expect("the device reads");
+        assert_eq!(&asked[..n], b"READ");
+        assert!(
+            from.as_abstract_name().is_some(),
+            "the vehicle's end should have a name to be answered at: {from:?}"
+        );
+
+        device
+            .send_to_addr(b"21.5", &from)
+            .expect("the answer goes");
+        let mut into = [0u8; 64];
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        let n = loop {
+            match endpoint.read(&mut into).expect("a read") {
+                0 if std::time::Instant::now() < deadline => std::thread::yield_now(),
+                n => break n,
+            }
+        };
+        assert_eq!(&into[..n], b"21.5");
+
         std::fs::remove_file(&device_path).ok();
     }
 

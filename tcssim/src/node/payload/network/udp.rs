@@ -3,7 +3,8 @@
 //! The one kind that has to speak first. A datagram connect sends nothing, so
 //! a device waiting at an address is never spoken to, and a device produces
 //! data because it is running rather than because it was asked -- so this end
-//! reaches out and the handler is the end that binds.
+//! reaches out and the handler is the end that binds. A device that is asked
+//! or driven is spoken to first, and is the end that binds instead.
 //!
 //! See [`crate::payload`] for the pacing, which is common to every kind.
 
@@ -57,17 +58,27 @@ pub fn run_udp_node(
         return;
     }
 
-    // What this end answers from. Nothing has to find the device at a
-    // particular port -- the handler learns where it is from the first packet
-    // it gets -- so a file that says nothing gets any interface and whatever
-    // port is free. A file that does say is obeyed: something outside the
-    // simulation, a rule on a firewall or a capture being read afterwards,
-    // may need to know which socket the device answers from.
-    let mine = format!(
-        "{}:{}",
-        config.own_address.as_deref().unwrap_or("0.0.0.0"),
-        config.own_port.unwrap_or(0)
-    );
+    // And a device that is asked waits as a heater does, for the same
+    // reason: the vehicle speaks first, with its trigger, at the address the
+    // configuration gives, and the answer goes back to whoever asked. The
+    // rule is the vehicle's own, so the two ends cannot disagree about it.
+    let speaks_first = tcslibgs::graph::interface::speaks_first(true, config.triggered);
+
+    // What this end answers from. Nothing has to find a device that speaks
+    // first at a particular port -- the handler learns where it is from the
+    // first packet it gets -- so a file that says nothing gets any interface
+    // and whatever port is free. A file that does say is obeyed: something
+    // outside the simulation, a rule on a firewall or a capture being read
+    // afterwards, may need to know which socket the device answers from.
+    let mine = if speaks_first {
+        format!(
+            "{}:{}",
+            config.own_address.as_deref().unwrap_or("0.0.0.0"),
+            config.own_port.unwrap_or(0)
+        )
+    } else {
+        handler.clone()
+    };
 
     let socket = match UdpSocket::bind(&mine) {
         Ok(s) => s,
@@ -79,13 +90,17 @@ pub fn run_udp_node(
             return;
         }
     };
-    if let Err(e) = socket.connect(&handler) {
-        eprintln!(
-            "{}: failed to reach the handler at {}: {}",
-            config.name, handler, e
-        );
-        return;
+    if speaks_first {
+        if let Err(e) = socket.connect(&handler) {
+            eprintln!(
+                "{}: failed to reach the handler at {}: {}",
+                config.name, handler, e
+            );
+            return;
+        }
     }
+    // Who last asked, for a device that answers: where its answer goes.
+    let mut asker = None;
 
     socket.set_nonblocking(true).ok();
 
@@ -98,13 +113,15 @@ pub fn run_udp_node(
         let started = Instant::now();
         let pacing = Pacing::read(&config);
 
-        // Whatever the handler has sent down. The socket is connected, so
-        // this is the handler's data and nobody else's.
+        // Whatever the handler has sent down. A device that speaks first is
+        // connected, so this is the handler's data and nobody else's; one
+        // that is asked answers whoever asked.
         let mut buf = vec![0u8; 4096];
         let mut asked = 0;
-        if let Ok(n) = socket.recv(&mut buf) {
+        if let Ok((n, from)) = socket.recv_from(&mut buf) {
             if n > 0 {
                 asked = n;
+                asker = Some(from);
                 // A heater is driven by what arrives: the mass is told before
                 // the statistics are, so that nothing holds the stats lock
                 // across the mass's own.
@@ -135,7 +152,10 @@ pub fn run_udp_node(
                 pacing.segment_size,
                 pacing.segment_interval,
                 &running,
-                &mut |segment| socket.send(segment),
+                &mut |segment| match asker {
+                    Some(to) if !speaks_first => socket.send_to(segment, to),
+                    _ => socket.send(segment),
+                },
             );
 
             if bytes > 0 {
@@ -302,6 +322,57 @@ mod tests {
             stats.packets_sent,
             stats.bytes_sent
         );
+    }
+
+    /// A device that is asked waits where the configuration says it is, and
+    /// answers whoever asked.
+    ///
+    /// The vehicle sends its trigger there before the device has said
+    /// anything, from a port of its own: the trigger is the first word, so
+    /// the device is the end that has to be found.
+    #[test]
+    fn an_asked_udp_device_waits_where_it_is_and_answers_the_asker() {
+        // A port to stand the device at, taken and given back.
+        let at = UdpSocket::bind("127.0.0.1:0")
+            .and_then(|taken| taken.local_addr())
+            .expect("a free port");
+        let mut device = SimulatedPayload::new(PayloadConfig {
+            thermal: None,
+            name: "DH0".to_string(),
+            protocol: PayloadProtocol::Udp,
+            address: at.ip().to_string(),
+            port: at.port(),
+            bus_address: 0,
+            can_id: 0,
+            can_fd: false,
+            gpio_lines: Vec::new(),
+            faults: Default::default(),
+            own_address: None,
+            own_port: None,
+            packet_size: Arc::new(AtomicU32::new(12)),
+            segment_size: Arc::new(AtomicU32::new(12)),
+            packet_interval_ms: Arc::new(AtomicU32::new(10)),
+            segment_interval_ms: Arc::new(AtomicU32::new(0)),
+            triggered: true,
+        });
+        device.start().expect("the device starts");
+
+        // The vehicle's end, asking until the device is up to hear it.
+        let (vehicle, _) = handler_end(Duration::from_millis(100));
+        let mut buf = [0u8; 64];
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let answer = loop {
+            vehicle.send_to(b"READ", at).expect("the trigger goes");
+            match vehicle.recv_from(&mut buf) {
+                Ok((n, from)) => break (n, from),
+                Err(_) if Instant::now() < deadline => continue,
+                Err(e) => panic!("the device never answered: {e}"),
+            }
+        };
+        device.stop();
+
+        assert_eq!(answer.0, 12, "a packet of twelve bytes, in one segment");
+        assert_eq!(answer.1, at, "the answer should come from where it waits");
     }
 
     /// A device at the handler's address, with faults.

@@ -2263,55 +2263,72 @@ Requirement
     to state: a payload that said it originated nothing while sitting on a
     socket would be a file disagreeing with the interface it names.
 
-A payload that is only driven
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A payload that is spoken to first
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A heater, a valve, a relay: a payload the vehicle writes to and never reads.
-The links say which it is -- nothing leaves it and something arrives at it --
-and for every kind of interface but one that changes nothing about how it is
+Or a sensor the vehicle asks: one whose trigger is the first word on the
+link. The links and the trigger say which a payload is, and for every kind of
+interface but the datagram sockets that changes nothing about how it is
 opened. A device is opened whichever way it is used, and a TCP payload is
 connected to.
 
-UDP is the exception, and the reason is the one that decided the ordinary
-case. A UDP payload is reached by binding its address and waiting for it to
-speak, because a datagram connect sends nothing and a payload produces data
-because it is running; the vehicle learns where its payload is from the first
-packet. A payload that is never read has no first packet. So the vehicle would
-wait at the address for ever, and every write would be refused for want of a
-peer -- the vehicle deciding to switch the heaters on and having nowhere to
-send it.
+A datagram socket is the exception, and the reason is the one that decided
+the ordinary case. A UDP payload that is read and not asked is reached by
+binding its address and waiting for it to speak, because a datagram connect
+sends nothing and such a payload produces data because it is running; the
+vehicle learns where its payload is from the first packet. A payload that is
+never read has no first packet, and one that is asked has none until it has
+been asked. So the vehicle would wait at the address for ever, and every
+write would be refused for want of a peer -- the vehicle deciding to switch
+the heaters on, or sending a trigger, and having nowhere to send it.
 
 Requirement
-    For a UDP payload nothing is read from, the ends swap roles: the vehicle
-    sends to the address and port the node states, from a port of its own
-    that nothing has to find, and the payload is the end that waits at the
-    stated address.
+    A datagram payload speaks first when it is read and not asked, and
+    every other datagram payload is spoken to first. The rule is stated once,
+    in the library, and the vehicle, the simulator and the configuration
+    check all ask it, so that the two ends of a link and the check of it
+    cannot disagree about which end waits.
+
+Requirement
+    For a UDP payload that is spoken to first, the ends swap roles: the
+    vehicle sends to the address and port the node states, from a port of
+    its own that nothing has to find, and the payload is the end that waits
+    at the stated address. A payload that is asked answers to the vehicle's
+    port, where its answers are read.
 
 That is what the address already means. ``address`` and ``port`` say where the
-vehicle reaches the payload, and for a payload that is written to and never
-read the reading is the literal one.
+vehicle reaches the payload, and for a payload that is spoken to first the
+reading is the literal one.
 
 Requirement
     What arrives on that socket does not change where it sends. A stranger
     that speaks to the vehicle's end of a heater link does not become the
     heater.
 
-A Unix datagram payload has the same shape and is driven the same way, with
-one difference: the vehicle's end is *unbound* where the UDP one binds a port
-of its own. This is what used to want a path for the vehicle's end -- a path
-being a thing for a file to state rather than for the software to invent --
-and it turns out to need none. A datagram sent from an unbound Unix socket
-arrives; what it costs is that the receiver has no path to answer at, and a
-device that is only driven does not answer. Nothing of the vehicle's end is
-left in the filesystem either, where a bound path would have to be cleared up
-after a vehicle that was killed.
+A Unix datagram payload has the same shape and is reached the same way, with
+one difference: the vehicle's end is bound to a name the kernel chooses in
+the abstract namespace, where the UDP one binds a port of its own. A path for
+the vehicle's end would be a thing for a file to state rather than for the
+software to invent, and a name outside the filesystem is neither: it is
+unique without anyone choosing it, a payload that is asked has somewhere to
+answer to, and nothing of the vehicle's end is left in the filesystem to be
+cleared up after a vehicle that was killed.
 
 Requirement
-    For a Unix datagram payload nothing is read from, the ends swap roles as
-    they do for UDP: the vehicle sends to the path the node states, from an
-    unbound socket, and the payload is the end that binds that path. The
-    simulator's stand-in binds it, as the vehicle's end used to, and the
-    dead-socket rule applies to it like any other path this software binds.
+    For a Unix datagram payload that is spoken to first, the ends swap roles
+    as they do for UDP: the vehicle sends to the path the node states, from
+    a socket bound to a name the kernel chooses in the abstract namespace,
+    and the payload is the end that binds that path. The simulator's
+    stand-in binds it, and the dead-socket rule applies to it like any other
+    path this software binds.
+
+Requirement
+    The simulator stands in for a datagram payload that is asked by waiting
+    at the address the configuration gives and answering whoever asked. A
+    simulator file that gives such a payload an address of its own --
+    ``payload_address`` or ``payload_port`` -- is refused, the address being
+    one nothing would read.
 
 What a payload starts in
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2345,10 +2362,11 @@ Requirement
     ``init`` is refused, where the configuration is read, wherever nothing
     can be written as the node opens: a set of discrete lines that is watched
     rather than driven, a sensor's sample buffer, a link to the ground, and a
-    ``udp`` or ``unix_dgram`` payload that is read. The last is the payload
-    that speaks first -- the vehicle learns where it is from what arrives --
-    and as the node opens nothing has, so the write would fail every time. A
-    datagram payload that is only driven is told where it is, and takes one.
+    ``udp`` or ``unix_dgram`` payload that is read and not asked. The last is
+    the payload that speaks first -- the vehicle learns where it is from what
+    arrives -- and as the node opens nothing has, so the write would fail
+    every time. A datagram payload that is spoken to first, being driven or
+    asked, is reached where it is, and takes one.
 
 Requirement
     It is not only for what is driven. A part that must have a register set
@@ -6093,18 +6111,11 @@ Requirement
     nothing and the segments of one answer go as fast as they can.
 
 Requirement
-    How often a triggered payload is asked is the ``packet_interval`` of
-    the payload group it is in, and no payload states an interval of its own.
-    A rate is a property of a schedule rather than of one payload, and
-    payloads read on one schedule are what a group is -- so a payload with a
-    rate beside its trigger is refused, and told that the rate belongs to its
-    group.
-
-Requirement
-    A triggered payload in no group is refused, saying so. The group is where
-    the rate lives, so a trigger with nothing to send it at is a payload
-    nothing would ever ask, and a handler that never asked would look from the
-    ground exactly like a payload that had stopped answering.
+    How often a triggered payload is asked is the ``interval`` of the
+    payload group it is in, or, for a payload in no group, its own
+    ``trigger_interval``. Payloads read on one schedule are what a group is,
+    so a payload in a group that states a ``trigger_interval`` beside it is
+    refused, and told that the rate belongs to its group.
 
 Requirement
     A name this language no longer has is refused with the name it has now,
@@ -6120,11 +6131,12 @@ into -- a periodic handler has nowhere to put a trigger -- so it cannot be lost
 downstream of the check.
 
 Requirement
-    A datagram payload cannot be triggered. Its handler learns where to send
-    from the payload's first packet, a datagram's sender being the only
-    statement of where it came from, so there is nowhere to send a trigger
-    until the payload has spoken -- which a triggered payload does not do. A
-    file asking for it is refused rather than left to fail as silence.
+    A datagram payload may be triggered. One that is asked is spoken to
+    first, so the vehicle sends its trigger to the address the node states
+    and reads the answer on a socket of its own, as `A payload that is spoken
+    to first`_ says. There is somewhere to send a trigger before the payload
+    has said anything, which there would not be were the vehicle to wait at
+    that address to learn where the payload is.
 
 A trigger is bytes rather than text: a payload's interface document asks for
 what it asks for, and that is as likely to be ``55`` as ``"READ\r"``.
@@ -7925,8 +7937,10 @@ Requirement
 
 The four divide in two, and which end binds divides with them. A TCP or
 Unix-stream payload listens at the configured address and the handler connects
-to it. A UDP or Unix-datagram payload sends first, so the handler binds that
-address and the payload reaches out to it.
+to it. A UDP or Unix-datagram payload that is read and not asked sends first,
+so the handler binds that address and the payload reaches out to it; one that
+is asked or driven is spoken to first, so it binds the address and the
+handler reaches out.
 
 Requirement
     A Unix-domain socket's address is a path, which outlives the process that

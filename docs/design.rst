@@ -7421,6 +7421,15 @@ Requirement
     and a node that wrote both would say one thing twice with nothing to
     choose between them. See ``tcslibgs::graph::spelled``.
 
+Requirement
+    The rule and its answer are the same wherever a name is refused: a
+    node's attribute, an attribute of the ``tcspecial`` section --
+    ``log.segment-size`` is answered *it is spelled log.segment_size* -- and
+    the attribute a ``SET_NODE`` names, which is told the spelling a command
+    binding gives it. A refused ``SET_NODE`` reaches the ground as
+    ``InvalidParameter``, and the hint is in the vehicle's log beside the
+    rest of the reason.
+
 Simulator Configuration Files
 =============================
 The tcspecial configuration describes payloads. Simulating one takes more than

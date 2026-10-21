@@ -2,6 +2,7 @@
 name = "tcsgui"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "TCSpecial graphical configuration editor"
 build = "build.rs"
 

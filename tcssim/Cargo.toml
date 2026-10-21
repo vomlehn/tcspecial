@@ -2,6 +2,7 @@
 name = "tcssim"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "TCSpecial Payload Simulator GUI"
 build = "build.rs"
 

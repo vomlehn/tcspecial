@@ -2,6 +2,7 @@
 name = "tcspecial"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 # The repository's README, which is the crate's page on crates.io.
 readme = "../README.md"
 description = "TCSpecial flight software: the spacecraft's command interpreter and data handler manager, being integrated with NASA's cFS and JPL's F Prime"

@@ -51,8 +51,9 @@ attributes:
   - name: terminators
     required: false
     about: >
-      Bytes that each end a read, and are its last byte: "0x0D, 0x0A". Not
-      beside a length_prefix.
+      Byte sequences that each end a read, and are its last bytes: the first
+      to arrive whole ends it. Each written as a trigger is, and several with
+      commas between them: "\r\n", [03]. Not beside a length_prefix.
   - name: length_prefix
     required: false
     about: >
@@ -70,8 +71,9 @@ attributes:
     required: false
     kind: bytes
     about: >
-      What to send to make it answer, as hex bytes. A payload with none
-      is one the configuration describes as only read.
+      What to send to make it answer: "READ\r", [55], or parts of both one
+      after another, "AT" [0D 0A]. A payload with none is one the
+      configuration describes as only read.
   - name: trigger_interval
     required: false
     kind: interval
@@ -100,7 +102,7 @@ attributes:
     kind: bytes
     about: >
       What to write to it as the vehicle opens it -- at startup, and whenever
-      the ground starts it again -- written as a trigger is: hex for one
-      byte, a C string for several. A heater that must start off, a register
+      the ground starts it again -- written as a trigger is: a C string in quotes,
+      bytes in brackets, or both one after another. A heater that must start off, a register
       to set before the part reads sensibly. A write that fails stops the
       node from starting.

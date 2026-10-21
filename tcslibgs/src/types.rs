@@ -436,6 +436,13 @@ impl NetworkProtocol {
     pub fn spellings() -> String {
         "tcp, udp, unix_stream, unix_dgram, or raw".to_string()
     }
+
+    /// Whether this transport is a stream of bytes, with no packets of its
+    /// own -- so that a node on it says where one of its packets ends, as a
+    /// line does. A datagram is a packet already.
+    pub fn is_stream(&self) -> bool {
+        matches!(self, NetworkProtocol::Tcp | NetworkProtocol::UnixStream)
+    }
 }
 
 /// Data handler name

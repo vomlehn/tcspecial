@@ -1362,7 +1362,7 @@ mod tests {
         let mut port = port.framed_by(tcslibgs::endpoint_config::StreamParams {
             max_length: 64,
             timeout: None,
-            terminators: vec![b'\n'],
+            terminators: vec![b"\n".to_vec()],
             length_prefix: None,
         });
         let mut buffer = [0u8; 64];
@@ -1447,7 +1447,7 @@ mod tests {
                 ("stop_bits", "1"),
                 ("byte_length", "8"),
                 ("max_length", "64"),
-                ("terminators", "0x0A"),
+                ("terminators", "[0A]"),
             ]
             .into_iter()
             .map(|(a, v)| (a.to_string(), tcslibgs::Scalar::of(v)))

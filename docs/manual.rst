@@ -484,49 +484,52 @@ valve or a latch is driven rather than asked, and a trigger on one would be
 bytes written before a read that never happens.
 
 **The trigger itself** is bytes, not text, since an interface document asks
-for what it asks for. One byte is written as one or two hexadecimal digits, in
-either case -- ``5`` and ``05`` are the same byte::
+for what it asks for. It is written as one or more **parts**, one after
+another, each in one of two notations, and the trigger is the bytes the parts
+make together.
 
-   trigger: 55
-   trigger: 0D
-   trigger: d
+**Bytes** are written in hexadecimal inside square brackets, each one or two
+digits in either case, with a space between one byte and the next -- ``5``
+and ``05`` are the same byte::
 
-There is no ``x`` anywhere in it, ``0x`` included. A trigger written without
-quotes is hexadecimal and nothing else, so a prefix saying "this is
-hexadecimal" would be saying it for a notation that has no alternative. A file
-that writes one is told what to write instead rather than having ``0x55`` read
-as something.
+   trigger: '[55]'
+   trigger: '[55 AA 0D]'
+   trigger: '[d]'
 
-A trigger of **more than one byte** is text, below: there is one notation for
-several bytes, and the quote at the front of it says which notation is being
-read before anything is counted. ``55AA`` was two bytes and ``55 AA`` was the
-same two written another way, which made a value's length decide how many
-bytes it meant; ``'"\x55\xAA"'`` says it once.
+There is no ``x`` inside the brackets, ``0x`` included: everything between
+them is hexadecimal, so a prefix saying so would be saying it for a notation
+that has no alternative. A run of digits is not split into bytes -- ``[55AA]``
+is refused rather than read as two, so that how many bytes a value means
+never depends on counting its digits.
 
-A trigger that is text is written as a string in C's notation, **quotes and
-all**, which is what its escapes need -- ``\\`` ``\"`` ``\'`` ``\n`` ``\r``
-``\t`` ``\0`` ``\a`` ``\b`` ``\f`` ``\v`` and ``\xNN``::
+**Text** is written as a string in C's notation, **quotes and all**, which is
+what its escapes need -- ``\\`` ``\"`` ``\'`` ``\n`` ``\r`` ``\t`` ``\0``
+``\a`` ``\b`` ``\f`` ``\v`` and ``\xNN``::
 
    trigger: '"READ\r"'
    trigger: '"\x02ARM\x03"'
 
-Which of the two a value is in follows from its first character and nothing
-else: a quote opens a C string, and anything else is one byte in hexadecimal.
-``52`` is a plausible byte and a plausible pair of digits, so something has to
-say which, and the quote is it.
+And the two together, with a space between parts or none::
 
-The quotes are therefore part of the **value** rather than part of the way the
-file is written, which is why a YAML trigger of text is written inside the
-format's own quotes -- ``'"READ\r"'`` -- and an XML one as
-``<trigger>&quot;READ\r&quot;</trigger>``. A value whose quotes belong to the
-format alone, such as ``"55"``, arrives here as ``55`` and is read as the one
-byte it is.
+   trigger: '"AT" [0D 0A]'
+   trigger: '[02] "ARM" [03]'
 
-An escape C does not have is refused rather than passed through, a string that
-opens and does not close is refused, and a trigger of no bytes at all is
-refused: a payload that answers requests has to be asked something. Writing
-the escapes yourself is also how an XML configuration states a trigger that a
-YAML one states with the format's own escapes.
+Which notation a part is in follows from its first character and nothing
+else: a quote opens text and a bracket opens bytes. ``52`` is a plausible byte
+and a plausible pair of digits, so something has to say which, and the mark is
+it. A trigger written bare, as ``55`` or ``0x55`` -- which is how a single byte
+was written once -- is refused, and told the brackets it wants: ``[55]``.
+
+The marks are therefore part of the **value** rather than part of the way the
+file is written, which is why a YAML trigger is written inside the format's
+own quotes -- ``'"READ\r"'``, ``'[55]'`` -- and an XML one as
+``<trigger>&quot;READ\r&quot;</trigger>`` or ``<trigger>[55]</trigger>``.
+
+An escape C does not have is refused rather than passed through, a quote or a
+bracket that opens and does not close is refused, and a trigger of no bytes at
+all is refused: a payload that answers requests has to be asked something.
+Writing the escapes yourself is also how an XML configuration states a
+trigger that a YAML one states with the format's own escapes.
 
 What a payload starts in
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -872,7 +875,7 @@ attribute, in the node description tree, as its ``kind``: ``interval`` or
        payload_interface: localhost:5001
        packet_size: 12
        group: every_half_second
-       trigger: '"READ\r"'      # five bytes, so a C string
+       trigger: '"READ\r"'      # text, so a C string
 
 A file that states both is refused rather than run: a payload carrying a
 trigger and an interval of its own has not said whether it answers or sends,
@@ -911,6 +914,27 @@ whether a handler can trigger the payload at all: a stream is connected, so
 the handler reaches out and may ask the payload for data, while a datagram
 handler waits to be spoken to and learns where its payload is from the first
 packet that arrives.
+
+A ``tcp`` or ``unix_stream`` socket is a stream of bytes with no packets of
+its own, as a serial line is, so a node on one says where one of its packets
+ends: ``max_length``, and ``read_timeout``, ``terminators`` or
+``length_prefix``, exactly as a line says it -- see `A Serial Payload`_. What
+arrives is held until the packet is done, and is then sent on as one, so a
+record split across two segments is not sent as two halves:
+
+.. code-block:: yaml
+
+   - name: logger
+     type: network
+     protocol: tcp
+     address: 10.0.0.9
+     port: 7000
+     max_length: 512
+     terminators: '"\r\n"'
+     read_timeout: 1 s
+
+A datagram is a packet already, so a ``udp``, ``unix_dgram`` or ``raw`` node
+that gives these attributes is refused.
 
 ``raw`` is for a payload that speaks IP and nothing above it: no UDP header
 and no ports, the ``ip_protocol`` number being what says which datagrams are
@@ -1349,15 +1373,41 @@ record, never half of one.
                   and at most 4096, which is the most a datum carries
    read_timeout   how long after its first byte a read ends with what has
                   arrived, or the word none for a read that does not time out
-   terminators    bytes that each end a read, as a comma-separated list:
-                  "0x0D, 0x0A"
+   terminators    byte sequences that each end a read: a list, each written
+                  as a trigger is -- '"\r\n"', '[03]'
+
    length_prefix  what a read's first bytes say its length is: u8 for one
                   byte, u16be or u16le for two with the more or the less
                   significant first
 
 A read ends on whichever comes first: a terminator, which is the read's last
-byte; ``max_length`` bytes; or ``read_timeout``. Whatever arrived after a
+bytes; ``max_length`` bytes; or ``read_timeout``. Whatever arrived after a
 terminator is the start of the next read.
+
+A **terminator** is a run of bytes, written in the notation a trigger is --
+parts one after another, each a C string in quotes or bytes in brackets: see
+`The two types of payload`_ -- so a line whose records end in a carriage
+return and a line feed says so, and a read ends only when both have arrived,
+in that order. A node may give several, as a list, and a read ends where the
+first of them to arrive whole ends:
+
+.. code-block:: yaml
+
+   terminators:
+     - '"\r\n"'
+     - '[03]'
+
+and in XML, one element for each:
+
+.. code-block:: xml
+
+   <terminators>"\r\n"</terminators>
+   <terminators>[03]</terminators>
+
+One terminator may be written on its own, ``terminators: '[0A]'``, as a list
+of one. Several written as one value with commas between them are refused:
+each is an entry of its own. A terminator longer than ``max_length`` is
+refused too, since no read could hold it.
 
 A node gives a timeout, terminators, a length prefix, or a timeout beside
 either of the others. One that gives none of them is refused, because it
@@ -1402,9 +1452,15 @@ A pass never waits on a line, so a timeout is noticed by the first pass after
 it: a read that ends by its timeout is late by as much as the interval its
 group is read at.
 
-Only a line has a rule for where a read ends. A master on a bus clocks exactly
-as many bytes as it asks for, so a transfer is already bounded; a network
-node's datagram is already a frame.
+A **stream socket** -- a network node whose protocol is ``tcp`` or
+``unix_stream`` -- is a stream of bytes as a line is, so it says where one of
+its packets ends by the same attributes, and must: without them a pass would
+take whatever bytes happened to be waiting. See `A Network Payload`_.
+
+Nothing else has a rule for where a read ends. A master on a bus clocks
+exactly as many bytes as it asks for, so a transfer is already bounded; a
+datagram -- ``udp``, ``unix_dgram``, ``raw`` -- is already a packet, and a
+node on one that gives the attributes is refused.
 
 An I\ :superscript:`2`\ C Payload
 ---------------------------------

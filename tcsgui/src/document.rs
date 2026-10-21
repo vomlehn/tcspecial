@@ -1659,6 +1659,17 @@ impl Document {
                     if value.trim().is_empty() {
                         continue;
                     }
+                    // A list is the element once for each entry, which is
+                    // how XML writes one: see tcslibgs::graph::LISTED.
+                    if tcslibgs::graph::LISTED.contains(&attribute.as_str()) {
+                        for one in tcslibgs::graph::entries(value) {
+                            out.push_str(&format!(
+                                "        <{attribute}>{}</{attribute}>\n",
+                                escape(one)
+                            ));
+                        }
+                        continue;
+                    }
                     out.push_str(&format!(
                         "        <{attribute}>{}</{attribute}>\n",
                         escape(value)
@@ -1887,6 +1898,14 @@ impl Document {
                     // would read differently, and the digest of one would not
                     // match the other. Quoting keeps the spelling the person
                     // wrote.
+                    // A list is a sequence: see tcslibgs::graph::LISTED.
+                    if tcslibgs::graph::LISTED.contains(&attribute.as_str()) {
+                        out.push_str(&format!("    {attribute}:\n"));
+                        for one in tcslibgs::graph::entries(value) {
+                            out.push_str(&format!("      - {}\n", quoted(one)));
+                        }
+                        continue;
+                    }
                     out.push_str(&format!("    {attribute}: {}\n", quoted(value)));
                 }
                 // And the links out of it, each under the data source it
@@ -2578,7 +2597,7 @@ mod tests {
             node: "sensor".into(),
             attribute: "trigger".into(),
             was: None,
-            now: Some("01".into()),
+            now: Some("[01]".into()),
         });
         assert!(
             !document
@@ -3972,6 +3991,47 @@ mod tests {
         std::fs::write(&yaml, "description: a sibling\n").expect("a sibling");
         let files = document.files(&xml).expect("the files");
         assert_eq!(files.len(), 2, "{files:?}");
+    }
+
+    /// Terminators are written as a list -- a YAML sequence, an XML element
+    /// for each -- and read back as the one value the editor holds them in,
+    /// in either format.
+    #[test]
+    fn terminators_are_written_as_a_list_and_read_back() {
+        let mut document = Document::new();
+        document.apply(&add("console", "serial"));
+        document.apply(&Edit::SetAttribute {
+            node: "console".into(),
+            attribute: "terminators".into(),
+            was: None,
+            now: Some("\"\\r\\n\", [03]".into()),
+        });
+
+        let yaml = document.to_yaml();
+        assert!(
+            yaml.contains("    terminators:\n      - \"\\\"\\\\r\\\\n\\\"\"\n      - \"[03]\"\n"),
+            "{yaml}"
+        );
+        let xml = document.to_xml();
+        assert!(
+            xml.contains("<terminators>\"\\r\\n\"</terminators>")
+                || xml.contains("<terminators>&quot;\\r\\n&quot;</terminators>"),
+            "{xml}"
+        );
+        assert!(xml.contains("<terminators>[03]</terminators>"), "{xml}");
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        for (name, text) in [("c.yaml", &yaml), ("c.xml", &xml)] {
+            let path = where_.path().join(name);
+            std::fs::write(&path, text).expect("written");
+            let graph = tcslibgs::graph::Graph::load(&path).expect("read back");
+            let console = graph.node("console").expect("the node");
+            assert_eq!(
+                console.attributes["terminators"].as_str(),
+                "\"\\r\\n\", [03]",
+                "{name}"
+            );
+        }
     }
 
     /// A line is written at both of the nodes it joins.

@@ -356,7 +356,7 @@
             ]
           },
           "init": {
-            "description": "What to write to this payload as the vehicle opens it -- at startup, and whenever the ground starts it again -- written as a trigger is: one byte in hexadecimal (00) or text as a C string ('\"\\x01\\x60\"'). A write that fails stops the node from starting. Not on lines that are watched, a sensor's sample buffer, or a datagram payload that speaks first.",
+            "description": "What to write to this payload as the vehicle opens it -- at startup, and whenever the ground starts it again -- written as a trigger is: parts one after another, each a C string in quotes or bytes in hexadecimal in square brackets: '\"READ\\r\"', '[55]', '\"AT\" [0D 0A]'. A write that fails stops the node from starting. Not on lines that are watched, a sensor's sample buffer, or a datagram payload that speaks first.",
             "type": [
               "string",
               "number",
@@ -365,7 +365,7 @@
             ]
           },
           "trigger": {
-            "description": "What to write to make this payload answer, as one byte in hexadecimal (55) or text as a C string ('\"READ\\r\"'). A payload that states one is asked and is read at the interval of the payload group it is in; one that states none is only read, and a line delivering into it is refused. A payload says what asks it or that it sends on its own, never both, and there is no mode attribute: which it is follows from whether it has a trigger.",
+            "description": "What to write to make this payload answer: parts one after another, each a C string in quotes or bytes in hexadecimal in square brackets: '\"READ\\r\"', '[55]', '\"AT\" [0D 0A]'. A payload that states one is asked and is read at the interval of the payload group it is in; one that states none is only read, and a line delivering into it is refused. A payload says what asks it or that it sends on its own, never both, and there is no mode attribute: which it is follows from whether it has a trigger.",
             "type": [
               "string",
               "number",
@@ -390,11 +390,22 @@
             ]
           },
           "terminators": {
+            "description": "The byte sequences that each end a packet of a stream -- a line, or a tcp or unix_stream socket -- where the first of them arrives whole, which is the packet's last bytes. A list, one entry per terminator, each written as a trigger is: parts one after another, each a C string in quotes or bytes in hexadecimal in square brackets: '\"READ\\r\"', '[55]', '\"AT\" [0D 0A]'. Not beside a length_prefix.",
             "type": [
+              "array",
               "string",
-              "number",
-              "boolean",
               "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "length_prefix": {
+            "description": "What a packet's first bytes say its length is, counting the bytes after them: u8, or u16be or u16le for two bytes with the more or the less significant first. The packet is delivered prefix and all. Needs a read_timeout, which may be none, and is not beside terminators.",
+            "enum": [
+              "u8",
+              "u16be",
+              "u16le"
             ]
           },
           "datarate": {
@@ -954,7 +965,7 @@
             ]
           },
           "init": {
-            "description": "What to write to this payload as the vehicle opens it -- at startup, and whenever the ground starts it again -- written as a trigger is: one byte in hexadecimal (00) or text as a C string ('\"\\x01\\x60\"'). A write that fails stops the node from starting. Not on lines that are watched, a sensor's sample buffer, or a datagram payload that speaks first.",
+            "description": "What to write to this payload as the vehicle opens it -- at startup, and whenever the ground starts it again -- written as a trigger is: parts one after another, each a C string in quotes or bytes in hexadecimal in square brackets: '\"READ\\r\"', '[55]', '\"AT\" [0D 0A]'. A write that fails stops the node from starting. Not on lines that are watched, a sensor's sample buffer, or a datagram payload that speaks first.",
             "type": [
               "string",
               "number",
@@ -963,7 +974,7 @@
             ]
           },
           "trigger": {
-            "description": "What to write to make this payload answer, as one byte in hexadecimal (55) or text as a C string ('\"READ\\r\"'). A payload that states one is asked and is read at the interval of the payload group it is in; one that states none is only read, and a line delivering into it is refused. A payload says what asks it or that it sends on its own, never both, and there is no mode attribute: which it is follows from whether it has a trigger.",
+            "description": "What to write to make this payload answer: parts one after another, each a C string in quotes or bytes in hexadecimal in square brackets: '\"READ\\r\"', '[55]', '\"AT\" [0D 0A]'. A payload that states one is asked and is read at the interval of the payload group it is in; one that states none is only read, and a line delivering into it is refused. A payload says what asks it or that it sends on its own, never both, and there is no mode attribute: which it is follows from whether it has a trigger.",
             "type": [
               "string",
               "number",
@@ -988,11 +999,22 @@
             ]
           },
           "terminators": {
+            "description": "The byte sequences that each end a packet of a stream -- a line, or a tcp or unix_stream socket -- where the first of them arrives whole, which is the packet's last bytes. A list, one entry per terminator, each written as a trigger is: parts one after another, each a C string in quotes or bytes in hexadecimal in square brackets: '\"READ\\r\"', '[55]', '\"AT\" [0D 0A]'. Not beside a length_prefix.",
             "type": [
+              "array",
               "string",
-              "number",
-              "boolean",
               "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "length_prefix": {
+            "description": "What a packet's first bytes say its length is, counting the bytes after them: u8, or u16be or u16le for two bytes with the more or the less significant first. The packet is delivered prefix and all. Needs a read_timeout, which may be none, and is not beside terminators.",
+            "enum": [
+              "u8",
+              "u16be",
+              "u16le"
             ]
           },
           "datarate": {
@@ -1572,7 +1594,7 @@
             ]
           },
           "init": {
-            "description": "What to write to this payload as the vehicle opens it -- at startup, and whenever the ground starts it again -- written as a trigger is: one byte in hexadecimal (00) or text as a C string ('\"\\x01\\x60\"'). A write that fails stops the node from starting. Not on lines that are watched, a sensor's sample buffer, or a datagram payload that speaks first.",
+            "description": "What to write to this payload as the vehicle opens it -- at startup, and whenever the ground starts it again -- written as a trigger is: parts one after another, each a C string in quotes or bytes in hexadecimal in square brackets: '\"READ\\r\"', '[55]', '\"AT\" [0D 0A]'. A write that fails stops the node from starting. Not on lines that are watched, a sensor's sample buffer, or a datagram payload that speaks first.",
             "type": [
               "string",
               "number",
@@ -1581,7 +1603,7 @@
             ]
           },
           "trigger": {
-            "description": "What to write to make this payload answer, as one byte in hexadecimal (55) or text as a C string ('\"READ\\r\"'). A payload that states one is asked and is read at the interval of the payload group it is in; one that states none is only read, and a line delivering into it is refused. A payload says what asks it or that it sends on its own, never both, and there is no mode attribute: which it is follows from whether it has a trigger.",
+            "description": "What to write to make this payload answer: parts one after another, each a C string in quotes or bytes in hexadecimal in square brackets: '\"READ\\r\"', '[55]', '\"AT\" [0D 0A]'. A payload that states one is asked and is read at the interval of the payload group it is in; one that states none is only read, and a line delivering into it is refused. A payload says what asks it or that it sends on its own, never both, and there is no mode attribute: which it is follows from whether it has a trigger.",
             "type": [
               "string",
               "number",
@@ -1606,11 +1628,22 @@
             ]
           },
           "terminators": {
+            "description": "The byte sequences that each end a packet of a stream -- a line, or a tcp or unix_stream socket -- where the first of them arrives whole, which is the packet's last bytes. A list, one entry per terminator, each written as a trigger is: parts one after another, each a C string in quotes or bytes in hexadecimal in square brackets: '\"READ\\r\"', '[55]', '\"AT\" [0D 0A]'. Not beside a length_prefix.",
             "type": [
+              "array",
               "string",
-              "number",
-              "boolean",
               "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "length_prefix": {
+            "description": "What a packet's first bytes say its length is, counting the bytes after them: u8, or u16be or u16le for two bytes with the more or the less significant first. The packet is delivered prefix and all. Needs a read_timeout, which may be none, and is not beside terminators.",
+            "enum": [
+              "u8",
+              "u16be",
+              "u16le"
             ]
           },
           "datarate": {

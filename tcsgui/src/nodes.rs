@@ -182,8 +182,8 @@ pub const TEXT: &str = "text";
 ///   difference, and because an attribute called `timeout` is not always one
 ///   -- a computation's is an `interval`, a deadline that may be `none` being
 ///   a program that may hang.
-/// * `bytes` -- one byte in hexadecimal, or text as a C string, as a trigger
-///   is written.
+/// * `bytes` -- bytes as a trigger is written: a C string in quotes, bytes
+///   in hexadecimal in square brackets, or parts of both one after another.
 /// * `boolean` -- `true` or `false`, and nothing else.
 pub const KINDS: &[&str] = &[
     TEXT, "path", "whole", "interval", "timeout", "bytes", "boolean",

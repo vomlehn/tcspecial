@@ -26,8 +26,9 @@ attributes:
     required: false
     kind: bytes
     about: >
-      What to send to make it answer, as hex bytes. A payload with none
-      is one the configuration describes as only read.
+      What to send to make it answer: "READ\r", [55], or parts of both one
+      after another, "AT" [0D 0A]. A payload with none is one the
+      configuration describes as only read.
   - name: trigger_interval
     required: false
     kind: interval

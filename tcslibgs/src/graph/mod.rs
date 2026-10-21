@@ -321,6 +321,24 @@ pub fn is_node_type(node_type: &str) -> bool {
         .any(|section| types_in(section).contains(&node_type))
 }
 
+/// The attributes a node writes as a list: a YAML sequence, or one XML
+/// element for each entry.
+///
+/// A node's attributes are one value each, so a listed one is held with its
+/// entries joined by commas -- which is what the editor shows, and what
+/// [`entries`] takes apart again for a writer. Its entries are runs of bytes,
+/// whose commas are inside quotes where there are any, so the join is exact.
+/// The one list: the reader and both of the editor's writers ask it.
+pub const LISTED: &[&str] = &["terminators"];
+
+/// Each entry of a listed attribute, as the model holds it: see [`LISTED`].
+pub fn entries(joined: &str) -> Vec<&str> {
+    crate::trigger::split_sequences(joined)
+        .into_iter()
+        .map(str::trim)
+        .collect()
+}
+
 /// What to tell a file that wrote an attribute with hyphens where it has
 /// underscores, or the other way round, if that is what it did.
 ///
@@ -450,6 +468,7 @@ impl<'de> Deserialize<'de> for NodeFile {
                 let mut moc_out: Vec<String> = Vec::new();
                 let mut payload_in: Option<bool> = None;
                 let mut moc_in: Option<bool> = None;
+                let mut lists: BTreeMap<String, Vec<String>> = BTreeMap::new();
 
                 while let Some(key) = map.next_key::<String>()? {
                     match key.as_str() {
@@ -492,6 +511,29 @@ impl<'de> Deserialize<'de> for NodeFile {
                         // as the configuration is read: see `mirror`.
                         "payload-in" => payload_in = Some(said_so("payload-in", &mut map)?),
                         "moc-in" => moc_in = Some(said_so("moc-in", &mut map)?),
+                        // A list of alternatives, each a run of bytes: a YAML
+                        // list, or a repeated XML element, whose repeats add
+                        // to it as payload-out's do. See `Listed`.
+                        listed if LISTED.contains(&listed) => {
+                            let attribute = listed.to_string();
+                            let listed = map.next_value::<Listed>()?;
+                            for one in &listed.0 {
+                                if entries(one.as_str()).len() > 1 {
+                                    return Err(de::Error::custom(format!(
+                                        "\"{}\" writes the {attribute} {:?} as one value \
+                                         with commas between them: write each as an entry \
+                                         of its own -- a YAML list, or one <{attribute}> \
+                                         element for each",
+                                        name.as_deref().unwrap_or("a node"),
+                                        one.as_str()
+                                    )));
+                                }
+                            }
+                            lists
+                                .entry(attribute)
+                                .or_default()
+                                .extend(listed.0.iter().map(|one| one.as_str().trim().to_string()));
+                        }
                         // Everything else is an attribute of the node, which
                         // is where a word nothing reads ends up -- and is
                         // refused by name against what the type takes. See
@@ -506,6 +548,15 @@ impl<'de> Deserialize<'de> for NodeFile {
                             }
                         }
                     }
+                }
+
+                // Held as one value, the alternatives joined by commas, which
+                // is what a node's attribute is and what the editor shows:
+                // the commas are between parts, where none can be otherwise,
+                // so `crate::trigger::sequences_of` splits them back apart
+                // exactly. The file has the one shape; this is the model's.
+                for (attribute, each) in lists {
+                    attributes.insert(attribute, Scalar::of(each.join(", ")));
                 }
 
                 Ok(NodeFile {
@@ -749,6 +800,68 @@ impl<'de> Deserialize<'de> for Bound {
 
             fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Bound, A::Error> {
                 Ok(Bound(written_as(map)?))
+            }
+        }
+
+        d.deserialize_any(V)
+    }
+}
+
+/// Values written as a list: a YAML sequence, or one value, which is one
+/// element of a list an XML file writes by repeating the element.
+///
+/// Each element is read as a [`Scalar`], for the reason that type exists.
+struct Listed(Vec<Scalar>);
+
+impl<'de> Deserialize<'de> for Listed {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        use serde::de::value::MapAccessDeserializer;
+        use serde::de::{MapAccess, SeqAccess, Visitor};
+        use std::fmt;
+
+        struct V;
+
+        impl<'de> Visitor<'de> for V {
+            type Value = Listed;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("a value, or a list of them")
+            }
+
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Listed, E> {
+                Ok(Listed(vec![Scalar::of(v)]))
+            }
+
+            fn visit_u64<E: serde::de::Error>(self, v: u64) -> Result<Listed, E> {
+                Ok(Listed(vec![Scalar::of(v.to_string())]))
+            }
+
+            fn visit_i64<E: serde::de::Error>(self, v: i64) -> Result<Listed, E> {
+                Ok(Listed(vec![Scalar::of(v.to_string())]))
+            }
+
+            /// Nothing after the key, which says an empty list.
+            fn visit_unit<E: serde::de::Error>(self) -> Result<Listed, E> {
+                Ok(Listed(Vec::new()))
+            }
+
+            fn visit_none<E: serde::de::Error>(self) -> Result<Listed, E> {
+                Ok(Listed(Vec::new()))
+            }
+
+            fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Listed, A::Error> {
+                let mut all = Vec::new();
+                while let Some(one) = seq.next_element::<Scalar>()? {
+                    all.push(one);
+                }
+                Ok(Listed(all))
+            }
+
+            /// An XML element with text in it, read as [`Scalar`] reads one.
+            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Listed, A::Error> {
+                Ok(Listed(vec![Scalar::deserialize(
+                    MapAccessDeserializer::new(map),
+                )?]))
             }
         }
 
@@ -1880,5 +1993,49 @@ payload-out:
             .expect_err("an input names no node")
         );
         assert!(said.contains("which node"), "{said}");
+    }
+
+    /// A node's terminators are a list: a YAML sequence, or a repeated XML
+    /// element, and the two say the same thing. A lone value is a list of
+    /// one.
+    #[test]
+    fn terminators_are_read_as_a_list_in_either_format() {
+        let yaml: NodeFile = serde_norway::from_str(
+            "name: a\ntype: serial\nterminators:\n  - '\"\\r\\n\"'\n  - '[03]'\n",
+        )
+        .expect("a list");
+        let xml: NodeFile = ConfigFormat::Xml
+            .parse(
+                "<node><name>a</name><type>serial</type>\
+                 <terminators>\"\\r\\n\"</terminators><terminators>[03]</terminators></node>",
+            )
+            .expect("repeated elements");
+        let joined = |file: &NodeFile| file.node.attributes["terminators"].as_str().to_string();
+        assert_eq!(joined(&yaml), "\"\\r\\n\", [03]");
+        assert_eq!(joined(&xml), joined(&yaml));
+
+        let one: NodeFile =
+            serde_norway::from_str("name: a\ntype: serial\nterminators: '[0A]'\n").expect("one");
+        assert_eq!(joined(&one), "[0A]");
+    }
+
+    /// Several terminators written as one value with commas between them
+    /// are refused: a terminator is an entry of its own, which is the one
+    /// shape -- and a comma inside a string is a character of it.
+    #[test]
+    fn terminators_written_as_one_value_are_refused() {
+        let said = format!(
+            "{}",
+            serde_norway::from_str::<NodeFile>(
+                "name: a\ntype: serial\nterminators: '[0D], [0A]'\n"
+            )
+            .expect_err("one value, two terminators")
+        );
+        assert!(said.contains("entry of its own"), "{said}");
+
+        let comma: NodeFile =
+            serde_norway::from_str("name: a\ntype: serial\nterminators: '\",\"'\n")
+                .expect("a comma in a string is a character");
+        assert_eq!(comma.node.attributes["terminators"].as_str(), "\",\"");
     }
 }

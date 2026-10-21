@@ -32,6 +32,34 @@ attributes:
     about: >
       The port that goes with the address. Every protocol but raw needs one,
       and raw takes none.
+  - name: max_length
+    required: false
+    kind: whole
+    about: >
+      The most one packet may hold, in bytes: at most 4096. Required over tcp
+      or unix_stream, which are streams of bytes and so say where a packet
+      ends, as a serial line does; refused over the datagram protocols, whose
+      datagrams are packets already.
+  - name: read_timeout
+    required: false
+    kind: timeout
+    about: >
+      How long after its first byte a packet ends with what has arrived: 250
+      ms, or none. Over tcp or unix_stream only. A stream says this,
+      terminators or length_prefix.
+  - name: terminators
+    required: false
+    about: >
+      Byte sequences that each end a packet, and are its last bytes: the first
+      to arrive whole ends it. Each written as a trigger is, and several with
+      commas between them: "\r\n", [03]. Over tcp or unix_stream only, and not
+      beside a length_prefix.
+  - name: length_prefix
+    required: false
+    about: >
+      What a packet's first bytes say its length is, counting the bytes after
+      them: u8, or u16be or u16le. Over tcp or unix_stream only. Needs a
+      read_timeout, which may be none.
   - name: group
     required: false
     about: >
@@ -42,8 +70,9 @@ attributes:
     required: false
     kind: bytes
     about: >
-      What to send to make it answer, as hex bytes. A payload with none
-      is one the configuration describes as only read.
+      What to send to make it answer: "READ\r", [55], or parts of both one
+      after another, "AT" [0D 0A]. A payload with none is one the
+      configuration describes as only read.
   - name: trigger_interval
     required: false
     kind: interval
@@ -72,7 +101,7 @@ attributes:
     kind: bytes
     about: >
       What to write to it as the vehicle opens it -- at startup, and whenever
-      the ground starts it again -- written as a trigger is: hex for one
-      byte, a C string for several. A heater that must start off, a register
+      the ground starts it again -- written as a trigger is: a C string in quotes,
+      bytes in brackets, or both one after another. A heater that must start off, a register
       to set before the part reads sensibly. A write that fails stops the
       node from starting.

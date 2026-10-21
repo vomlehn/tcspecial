@@ -6,7 +6,8 @@
 //! holds what has arrived until one of them says the read is done. A read
 //! then ends on whichever comes first:
 //!
-//! * a terminator, which is the last byte of the read;
+//! * a terminator, which is the last bytes of the read: the first of them,
+//!   where there are several, to arrive whole;
 //! * `max_length` bytes;
 //! * `read_timeout` since the read's first byte, with what has arrived by then.
 //!
@@ -186,12 +187,8 @@ impl Framer {
             // delivered, and room() never asks past the frame's end.
             return frame_length(prefix, &self.held).filter(|&whole| self.held.len() == whole);
         }
-        if let Some(at) = self
-            .held
-            .iter()
-            .position(|byte| self.rule.terminators.contains(byte))
-        {
-            return Some(at + 1);
+        if let Some(end) = self.terminated() {
+            return Some(end);
         }
         if self.held.len() >= self.rule.max_length as usize {
             return Some(self.held.len());
@@ -200,6 +197,27 @@ impl Framer {
             (Some(timeout), Some(began)) if timed_out(began, now, timeout) => Some(self.held.len()),
             _ => None,
         }
+    }
+}
+
+impl Framer {
+    /// Where the earliest terminator held ends, if one has arrived whole.
+    ///
+    /// The earliest to end rather than the earliest to begin: a read ends as
+    /// soon as any of its terminators has arrived, which is the moment it
+    /// would have ended had the bytes come one at a time. Looked for in what
+    /// is held, which is at most max_length, by comparing in place.
+    fn terminated(&self) -> Option<usize> {
+        self.rule
+            .terminators
+            .iter()
+            .filter_map(|terminator| {
+                self.held
+                    .windows(terminator.len())
+                    .position(|here| here == terminator.as_slice())
+                    .map(|at| at + terminator.len())
+            })
+            .min()
     }
 }
 
@@ -217,12 +235,21 @@ fn timed_out(began: Instant, now: Instant, timeout: Duration) -> bool {
 mod tests {
     use super::*;
 
+    /// A rule whose terminators are each one of these bytes.
     fn rule(max_length: u32, timeout: Option<Duration>, terminators: &[u8]) -> StreamParams {
         StreamParams {
             max_length,
             timeout,
-            terminators: terminators.to_vec(),
+            terminators: terminators.iter().map(|byte| vec![*byte]).collect(),
             length_prefix: None,
+        }
+    }
+
+    /// A rule whose terminators are these sequences.
+    fn ended_by(max_length: u32, terminators: &[&[u8]]) -> StreamParams {
+        StreamParams {
+            terminators: terminators.iter().map(|t| t.to_vec()).collect(),
+            ..rule(max_length, None, &[])
         }
     }
 
@@ -271,6 +298,39 @@ mod tests {
             after(&mut framer, b"RMC\n", now),
             Some(b"$GPRMC\n".to_vec())
         );
+    }
+
+    /// A terminator of several bytes ends a read when all of them have
+    /// arrived, in order, however the line split them.
+    #[test]
+    fn a_terminator_of_several_bytes_ends_a_read_when_whole() {
+        let now = Instant::now();
+        let mut framer = Framer::new(ended_by(64, &[b"\r\n"]));
+        assert_eq!(
+            after(&mut framer, b"ab\rc\r", now),
+            None,
+            "a CR alone is not it"
+        );
+        assert_eq!(
+            after(&mut framer, b"\nde", now),
+            Some(b"ab\rc\r\n".to_vec())
+        );
+        assert_eq!(after(&mut framer, b"\r\n", now), Some(b"de\r\n".to_vec()));
+    }
+
+    /// Of several terminators, the first to arrive whole ends the read.
+    #[test]
+    fn the_first_terminator_to_arrive_whole_ends_a_read() {
+        let now = Instant::now();
+        let mut framer = Framer::new(ended_by(64, &[b"END", b"\x03"]));
+        assert_eq!(
+            after(&mut framer, b"aEN\x03ND", now),
+            Some(b"aEN\x03".to_vec())
+        );
+        assert_eq!(after(&mut framer, b"bEND", now), Some(b"NDbEND".to_vec()));
+        // One that begins first but ends later does not win.
+        let mut framer = Framer::new(ended_by(64, &[b"abc", b"b"]));
+        assert_eq!(after(&mut framer, b"abc", now), Some(b"ab".to_vec()));
     }
 
     /// Two reads that arrived together come out one at a time, the second

@@ -138,6 +138,7 @@ fn stub_counts() -> NodeCounts {
         dropped: 2,
         asks: 40,
         asks_failed: 3,
+        strangers: 4,
         last_moved: Some(tcslibgs::Timestamp {
             micros: 1_700_000_000_000_000,
         }),

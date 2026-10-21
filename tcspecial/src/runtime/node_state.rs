@@ -280,6 +280,7 @@ pub struct Counters {
     dropped: AtomicU64,
     asks: AtomicU64,
     asks_failed: AtomicU64,
+    strangers: AtomicU64,
     /// Microseconds since the epoch, or nought for a node that has moved
     /// nothing. Nought and not a sentinel: the epoch is not a time anything
     /// here will move something at, and `None` is what it becomes on the way
@@ -305,6 +306,7 @@ impl Counters {
             dropped: read(&self.dropped),
             asks: read(&self.asks),
             asks_failed: read(&self.asks_failed),
+            strangers: read(&self.strangers),
             last_moved: match read(&self.last_moved) {
                 0 => None,
                 micros => Some(Timestamp { micros }),
@@ -482,6 +484,11 @@ impl NodeState {
         }
     }
 
+    /// Datagrams turned away from this node's socket as a stranger's.
+    pub fn strangers(&self, count: u64) {
+        self.counters.strangers.fetch_add(count, Ordering::Relaxed);
+    }
+
     /// A delivery dropped because this node is disabled.
     pub fn dropped(&self) {
         self.counters.dropped.fetch_add(1, Ordering::Relaxed);
@@ -648,6 +655,12 @@ impl crate::runtime::fabric::Watch for NodeStates {
     fn asked(&self, node: &str, how: Outcome) {
         if let Some(state) = self.named(node) {
             state.asked(how);
+        }
+    }
+
+    fn strangers(&self, node: &str, count: u64) {
+        if let Some(state) = self.named(node) {
+            state.strangers(count);
         }
     }
 

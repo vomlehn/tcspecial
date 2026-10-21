@@ -2306,6 +2306,18 @@ Requirement
     that speaks to the vehicle's end of a heater link does not become the
     heater.
 
+Requirement
+    Nor is it read. A datagram from anywhere but the address the node
+    states -- the exact host and port, or the exact path -- is turned away
+    and counted, never handed on as the payload's reading: a reading nobody
+    measured, voted on and acted on, is the failure nothing downstream could
+    catch. A read turns away a bounded number before it gives up for the
+    pass, so a flood costs a payload a pass and not the vehicle its loop. A
+    payload that answers from another address than the one its node states
+    -- a host with several, answering from the wrong one -- is turned away
+    too, and the climbing count is what says to state the address it
+    answers from.
+
 A Unix datagram payload has the same shape and is reached the same way, with
 one difference: the vehicle's end is bound to a name the kernel chooses in
 the abstract namespace, where the UDP one binds a port of its own. A path for
@@ -2557,6 +2569,14 @@ Requirement
     all -- and a payload that has stopped answering, one that has gone away,
     and a vehicle that has stopped asking are three states that one count
     could not tell apart.
+
+Requirement
+    Datagrams a node's socket turned away as a stranger's are counted, apart
+    from everything else, as ``strangers``. Counted and not logged: each
+    failure is a line in the log, and a sender flooding a port would be a
+    log filling and a message made in the loop for each datagram, where a
+    count is one number climbing. A count that moves at all is something on
+    the vehicle's network talking to a node it has no business with.
 
 Requirement
     Deliveries dropped because a node is disabled are counted apart from the

@@ -892,6 +892,14 @@ one whose payload is not answering. The triggers that would not go are counted
 apart again, since a payload that has gone away and a handler that has stopped
 asking are different things -- and a handler goes on asking through either.
 
+A datagram payload that is asked or driven is read only from the address its
+node states, host and port exactly, or the path. A datagram from anywhere else
+is turned away rather than taken as the payload's reading, and counted as
+``strangers`` in what ``QUERY_NODE`` reports. A count that climbs is something
+else on the network sending to that node -- or the payload itself, answering
+from another address than the one its node states, which is fixed by stating
+the address it answers from.
+
 A Network Payload
 -----------------
 Keyword ``type: network``. A socket, which the transport decides the shape of.

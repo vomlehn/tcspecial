@@ -84,7 +84,30 @@ pub enum WaitResult {
 pub trait EndpointReadable: EndpointWaitable {
     /// Read data from the endpoint
     fn read(&mut self, buffer: &mut [u8]) -> TcsResult<usize>;
+
+    /// How many datagrams were turned away as a stranger's since this was
+    /// last asked, and start counting again.
+    ///
+    /// A datagram socket that knows where its payload is reads only what
+    /// comes from there: anything else that can reach the port would
+    /// otherwise be handed on as the payload's reading, which nothing
+    /// downstream could tell from the real one. Turned away and counted
+    /// rather than reported as a failed read, because each failure is a line
+    /// in the log, and a stranger sending a thousand datagrams would be a
+    /// thousand lines and a thousand messages made in the loop. Nought for
+    /// every endpoint
+    /// that has nobody to turn away, which is what the default is.
+    fn strangers(&mut self) -> u64 {
+        0
+    }
 }
+
+/// The most datagrams one read turns away before it gives up for the pass.
+///
+/// A bound on the work a flood of strangers can make a read do: the rest
+/// wait for the next pass, and the payload's own datagrams with them, which
+/// is a payload late by a pass rather than a vehicle that stops passing.
+pub(crate) const STRANGERS_PER_READ: usize = 16;
 
 /// Trait for writable endpoints
 pub trait EndpointWritable: EndpointWaitable {

@@ -563,6 +563,10 @@ impl EndpointPort {
 }
 
 impl Port for EndpointPort {
+    fn strangers(&mut self) -> u64 {
+        self.reader.strangers()
+    }
+
     /// What this device had, on no stream in particular.
     ///
     /// A device has one source terminal, so which way its data goes is the

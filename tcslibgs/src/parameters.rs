@@ -462,6 +462,7 @@ mod tests {
             ground: None,
             mode: DHMode::Periodic,
             stale_interval: None,
+            sends_from: None,
         }
     }
 

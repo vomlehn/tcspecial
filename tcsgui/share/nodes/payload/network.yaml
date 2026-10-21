@@ -34,6 +34,15 @@ attributes:
     about: >
       The port that goes with the address. Every protocol but raw needs one,
       and raw takes none.
+  - name: sends_from
+    required: false
+    about: >
+      Where the payload sends from, for a udp or unix_dgram payload that sends
+      on its own: its host and port, as 10.0.0.7:7001, or its socket's path.
+      The vehicle then reads that address and nothing else, and counts what
+      it turns away. Without it, the vehicle takes the first sender it hears
+      for the payload. Not on a payload that is asked or only driven, which
+      is reached at its address and read only from there already.
   - name: max_length
     required: false
     kind: whole

@@ -16,7 +16,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::{Arc, Mutex};
 
 use nix::poll::PollFlags;
-use tcslibgs::{NetworkConfig, TcsError, TcsResult};
+use tcslibgs::{NetworkConfig, SendsFrom, TcsError, TcsResult};
 
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
 use crate::endpoint::bind_failed;
@@ -53,13 +53,15 @@ pub struct UdpEndpoint {
     /// that has gone with it.
     told: Option<SocketAddr>,
     /// The one sender whose datagrams are read, for a payload that is
-    /// reached where its node says it is.
+    /// reached where its node says it is, or that speaks first from where
+    /// its node says.
     ///
     /// Everything else that arrives is a stranger's: turned away and
     /// counted, rather than handed on as a reading from the payload. Only
     /// where the far end is known before it speaks -- see
-    /// [`UdpEndpoint::reaching`]; a payload that speaks first is learnt from
-    /// what arrives.
+    /// [`UdpEndpoint::reaching`] and [`UdpEndpoint::hear_only`]; a payload
+    /// that speaks first and says nothing of where from is learnt from what
+    /// arrives.
     only_from: Option<SocketAddr>,
     /// Datagrams turned away since [`EndpointReadable::strangers`] last asked.
     strangers: u64,
@@ -147,6 +149,21 @@ impl UdpEndpoint {
     pub fn connect(&self, addr: &str) -> TcsResult<()> {
         self.socket.connect(addr)?;
         Ok(())
+    }
+
+    /// Read datagrams from this sender and turn every other away, for a
+    /// payload that speaks first and whose node says where from.
+    pub fn hear_only(&mut self, what: &str, from: &SendsFrom) -> TcsResult<()> {
+        match from {
+            SendsFrom::Socket(at) => {
+                self.only_from = Some(*at);
+                Ok(())
+            }
+            SendsFrom::Path(path) => Err(TcsError::Config(format!(
+                "{what}: sends_from {path:?} is a path, and this is a UDP socket, \
+                 whose payload sends from a host and a port"
+            ))),
+        }
     }
 
     /// A second endpoint on the same socket.

@@ -597,6 +597,7 @@ fn what_it_is(
     settings: &SimSettings,
     endpoint: &EndpointConfig,
     triggered: bool,
+    sends_from: Option<&crate::SendsFrom>,
 ) -> Result<(), SimConfigError> {
     let actually = endpoint.kind();
 
@@ -717,6 +718,27 @@ fn what_it_is(
                     why: "a triggered payload is the end that waits: tcspecial \
                           sends its trigger to the address the payload \
                           configuration gives, so it binds that address",
+                });
+            }
+        }
+    }
+
+    // And a payload whose node says where it sends from sends from there:
+    // the vehicle reads nothing else, so a stand-in told another address
+    // here would be a payload the vehicle turned away. Said once, in the
+    // tcspecial configuration, which is the file both ends read it from.
+    if sends_from.is_some() {
+        for (setting, stated) in [
+            ("payload_address", settings.payload_address.is_some()),
+            ("payload_port", settings.payload_port.is_some()),
+        ] {
+            if stated {
+                return Err(SimConfigError::NoAddressOfItsOwn {
+                    payload: name.to_string(),
+                    setting,
+                    why: "its node in the tcspecial configuration states sends_from, \
+                          which is where it sends from and the one address the \
+                          vehicle reads it from",
                 });
             }
         }
@@ -1379,6 +1401,7 @@ impl SimConfigFile {
                 &settings,
                 &dh.endpoint,
                 dh.mode.polling().is_some(),
+                dh.sends_from.as_ref(),
             )?;
 
             // And whether there is anything to be it at all.
@@ -1556,8 +1579,17 @@ impl SimConfigFile {
 
             Ok(ResolvedSim {
                 attached,
-                payload_address: settings.payload_address.clone(),
-                payload_port: settings.payload_port,
+                // Where its node says it sends from, if it says: the file
+                // may not say both, which `what_it_is` has refused.
+                payload_address: match &dh.sends_from {
+                    Some(crate::SendsFrom::Socket(at)) => Some(at.ip().to_string()),
+                    Some(crate::SendsFrom::Path(path)) => Some(path.clone()),
+                    None => settings.payload_address.clone(),
+                },
+                payload_port: match &dh.sends_from {
+                    Some(crate::SendsFrom::Socket(at)) => Some(at.port()),
+                    _ => settings.payload_port,
+                },
                 packet_interval,
                 segment_interval: how_often("segment_interval", &settings.segment_interval)?
                     .unwrap_or(packet_interval),
@@ -1706,6 +1738,7 @@ mod tests {
             ground: None,
             mode: Default::default(),
             stale_interval: None,
+            sends_from: None,
         }
     }
 
@@ -2100,6 +2133,43 @@ simulated_payloads:
         );
     }
 
+    /// A payload whose node says where it sends from is stood in for from
+    /// there, and a simulator file that says so again is refused: the
+    /// vehicle reads that address and no other, so a second statement could
+    /// only be the same or a stand-in the vehicle turned away.
+    #[test]
+    fn a_payload_that_says_where_it_sends_from_is_simulated_from_there() {
+        let mut sending = handler("DH0", 4);
+        sending.sends_from = Some(crate::SendsFrom::Socket("127.0.0.1:7001".parse().unwrap()));
+        let file = |extra: &str| {
+            parse(&format!(
+                "simulated_payloads:\n  - name: DH0\n    type: network\n    \
+                 protocol: udp\n    packet_interval: 100 ms\n{extra}"
+            ))
+        };
+
+        let resolved = file("")
+            .resolve(std::slice::from_ref(&sending))
+            .expect("resolves");
+        assert_eq!(
+            (
+                resolved[0].payload_address.as_deref(),
+                resolved[0].payload_port
+            ),
+            (Some("127.0.0.1"), Some(7001))
+        );
+
+        for stated in ["payload_address: 127.0.0.1", "payload_port: 7001"] {
+            let said = format!(
+                "{}",
+                file(&format!("    {stated}\n"))
+                    .resolve(std::slice::from_ref(&sending))
+                    .unwrap_err()
+            );
+            assert!(said.contains("sends_from"), "{stated}: {said}");
+        }
+    }
+
     /// But a triggered one may not: it is the end that waits, at the address
     /// the tcspecial configuration gives, because the trigger is the first
     /// word and tcspecial sends it there. An address of its own would be a
@@ -2484,6 +2554,7 @@ simulated_payloads:
             ground: None,
             mode: DHMode::Periodic,
             stale_interval: None,
+            sends_from: None,
         };
 
         let file = parse(
@@ -2542,6 +2613,7 @@ simulated_payloads:
                 interval: Duration::from_millis(500),
             },
             stale_interval: None,
+            sends_from: None,
         };
 
         for stated in ["packet_interval: 1 s", "segment_interval: 1 s"] {
@@ -2624,6 +2696,7 @@ simulated_payloads:
                 interval: Duration::from_millis(500),
             },
             stale_interval: None,
+            sends_from: None,
         };
 
         // Stated, and refused in terms of where it belongs.
@@ -2672,6 +2745,7 @@ simulated_payloads:
                 interval: Duration::from_millis(500),
             },
             stale_interval: None,
+            sends_from: None,
         };
         let file = parse("simulated_payloads:\n  - name: DH0\n    type: device-file\n");
         let problems = file.problems(&[device]);

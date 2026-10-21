@@ -897,8 +897,33 @@ node states, host and port exactly, or the path. A datagram from anywhere else
 is turned away rather than taken as the payload's reading, and counted as
 ``strangers`` in what ``QUERY_NODE`` reports. A count that climbs is something
 else on the network sending to that node -- or the payload itself, answering
-from another address than the one its node states, which is fixed by stating
-the address it answers from.
+from another address than the one its node states, a host with several
+answering from the wrong one, which is fixed by binding the payload to the
+address its node states.
+
+A datagram payload that speaks first is learnt from what arrives, so the
+first sender the handler hears is taken for it, whoever that is. Its node
+says where it sends from with ``sends_from``, and is then read from there
+alone, strangers counted as above:
+
+.. code-block:: yaml
+
+   - name: sounder_feed
+     type: network
+     protocol: udp
+     address: 0.0.0.0
+     port: 7000
+     sends_from: 10.0.0.7:7001
+
+``sends_from`` is a host and a port over ``udp`` -- an IP address, not a name
+-- and a path over ``unix_dgram``, and never the node's own address, which is
+where the handler waits. It is refused on a stream or a raw socket, which are
+connected and so know their other end already, and on a datagram payload
+that is asked or only driven, which is reached at its address and read only
+from there. Without it, a payload that restarts from a new port is heard
+again at once; with it, the payload must send from the address it names. The
+simulator's stand-in sends from there, and a simulator file that names a
+``payload_address`` or ``payload_port`` for it as well is refused.
 
 A Network Payload
 -----------------
@@ -914,6 +939,9 @@ Keyword ``type: network``. A socket, which the transport decides the shape of.
                   and does nothing with it
    ip_protocol    with raw, and only then: the IP protocol number the
                   payload's datagrams carry, 1 to 254
+   sends_from     with udp or unix_dgram, on a payload that speaks first:
+                  where it sends from, and so the one address it is read
+                  from. Optional
 
 Which end waits and which reaches out follows from the transport, and for a
 datagram from which end speaks first. A stream is connected, so the handler

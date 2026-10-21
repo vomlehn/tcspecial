@@ -69,8 +69,8 @@ use crate::runtime::frame::Framer;
 use crate::runtime::node_state::Abandon;
 
 use crate::endpoint::{
-    bind_endpoint_pair, connect_endpoint_pair, reaching_endpoint_pair, EndpointReadable,
-    EndpointWritable, WaitResult,
+    bind_endpoint_pair, connect_endpoint_pair, hearing_endpoint_pair, reaching_endpoint_pair,
+    EndpointReadable, EndpointWritable, WaitResult,
 };
 use crate::runtime::fabric::{Arriving, Port, Taken};
 use crate::runtime::route::Routes;
@@ -194,6 +194,19 @@ impl EndpointPort {
         Ok(EndpointPort::of(what, reader, writer, uses))
     }
 
+    /// [`EndpointPort::connect`], reading a payload that speaks first only
+    /// from where its node says it sends from, if it says: see
+    /// [`crate::endpoint::hearing_endpoint_pair`].
+    pub fn hearing(
+        what: &str,
+        config: &EndpointConfig,
+        uses: Use,
+        sends_from: Option<&tcslibgs::SendsFrom>,
+    ) -> TcsResult<EndpointPort> {
+        let (reader, writer) = hearing_endpoint_pair(what, config, sends_from)?;
+        Ok(EndpointPort::of(what, reader, writer, uses))
+    }
+
     /// Reach out to a payload that is spoken to first, as one node.
     ///
     /// For a heater or a valve, and for a payload that is asked: see
@@ -278,7 +291,7 @@ impl EndpointPort {
             // the device is, and this sends there.
             EndpointPort::reaching(&node.name, &reach.endpoint, uses)
         } else {
-            EndpointPort::connect(&node.name, &reach.endpoint, uses)
+            EndpointPort::hearing(&node.name, &reach.endpoint, uses, reach.sends_from.as_ref())
         };
         let mut port = opened.map_err(|e| format!("{e}"))?;
 
@@ -1846,6 +1859,87 @@ mod tests {
             said.contains("heater") && said.contains("init"),
             "the complaint should name the node and the init: {said}"
         );
+    }
+
+    /// A datagram payload that speaks first, and whose node says where it
+    /// sends from, is read from there and nowhere else: a stranger that
+    /// reaches the vehicle's socket first is turned away and counted, not
+    /// taken for the payload.
+    #[test]
+    fn a_payload_that_says_where_it_sends_from_is_read_only_from_there() {
+        use std::net::UdpSocket;
+        use tcslibgs::graph::{Destinations, Link};
+
+        let payload = UdpSocket::bind("127.0.0.1:0").expect("the payload's socket");
+        let sends_from = payload.local_addr().expect("where").to_string();
+        // A port for the vehicle to wait at, taken and given back.
+        let waits = UdpSocket::bind("127.0.0.1:0")
+            .and_then(|taken| taken.local_addr())
+            .expect("a free port");
+        let port = waits.port().to_string();
+
+        let node = Node {
+            name: "temp".to_string(),
+            node_type: "network".to_string(),
+            group: None,
+            attributes: [
+                ("protocol", "udp"),
+                ("address", "127.0.0.1"),
+                ("port", port.as_str()),
+                ("sends_from", sends_from.as_str()),
+            ]
+            .into_iter()
+            .map(|(a, v)| (a.to_string(), tcslibgs::Scalar::of(v)))
+            .collect(),
+        };
+        let routes = Routes::of(&Graph {
+            description: None,
+            tcspecial: None,
+            groups: Vec::new(),
+            nodes: vec![
+                node.clone(),
+                Node {
+                    name: "decide".to_string(),
+                    node_type: "compute".to_string(),
+                    group: None,
+                    attributes: Default::default(),
+                },
+            ],
+            links: vec![Link {
+                from: "temp".to_string(),
+                to: Destinations::of(vec!["decide".to_string()]),
+                comment: None,
+            }],
+            commands: Vec::new(),
+            files: Vec::new(),
+            homes: Default::default(),
+            placed: Default::default(),
+            set_aside: Default::default(),
+        });
+        let mut port = EndpointPort::open(&node, &routes, &Abandon::nothing())
+            .expect("the vehicle waits for the payload");
+
+        let stranger = UdpSocket::bind("127.0.0.1:0").expect("a stranger");
+        stranger
+            .send_to(b"99.9", waits)
+            .expect("the stranger sends");
+        payload.send_to(b"21.5", waits).expect("the payload sends");
+
+        let mut buffer = [0u8; 64];
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let taken = loop {
+            let taken = port.take(&mut buffer).expect("a read");
+            if taken.bytes > 0 || Instant::now() >= deadline {
+                break taken;
+            }
+            std::thread::yield_now();
+        };
+        assert_eq!(
+            &buffer[..taken.bytes],
+            b"21.5",
+            "the stranger was taken for the payload"
+        );
+        assert_eq!(port.strangers(), 1);
     }
 
     /// A datagram payload that is read and asked is reached where its node

@@ -1472,6 +1472,7 @@ mod tests {
             ground: None,
             mode: Default::default(),
             stale_interval: None,
+            sends_from: None,
         }
     }
 
@@ -1849,6 +1850,7 @@ mod tests {
             ground: None,
             mode: Default::default(),
             stale_interval: None,
+            sends_from: None,
         };
 
         let info = payload_info_from(0, &dh, &sim(500, 250, 5));

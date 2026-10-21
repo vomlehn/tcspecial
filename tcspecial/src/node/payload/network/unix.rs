@@ -24,7 +24,7 @@ use std::path::{Path, PathBuf};
 
 use log::info;
 use nix::poll::PollFlags;
-use tcslibgs::{NetworkConfig, TcsError, TcsResult};
+use tcslibgs::{NetworkConfig, SendsFrom, TcsError, TcsResult};
 
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
 use crate::endpoint::bind_failed;
@@ -126,10 +126,13 @@ pub struct UnixDatagramEndpoint {
     /// between the pair, because it does not change: it is the file's word,
     /// and both endpoints are made from the same file.
     ///
-    /// And, where it is known, the one path whose datagrams are read:
-    /// anything from elsewhere is a stranger's, turned away and counted
-    /// rather than handed on as the device's reading.
     told: Option<PathBuf>,
+    /// The one path whose datagrams are read, where it is known: the path a
+    /// device reached at its address is at, or the one a device that speaks
+    /// first sends from, where its node says. Anything from elsewhere is a
+    /// stranger's, turned away and counted rather than handed on as the
+    /// device's reading.
+    only_from: Option<PathBuf>,
     /// Datagrams turned away since [`EndpointReadable::strangers`] last asked.
     strangers: u64,
     _buffer: Vec<u8>,
@@ -150,6 +153,7 @@ impl UnixDatagramEndpoint {
             socket,
             peer: std::sync::Arc::new(std::sync::Mutex::new(None)),
             told: None,
+            only_from: None,
             strangers: 0,
             _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
         })
@@ -188,9 +192,25 @@ impl UnixDatagramEndpoint {
             socket,
             peer: std::sync::Arc::new(std::sync::Mutex::new(None)),
             told: Some(PathBuf::from(&config.address)),
+            only_from: Some(PathBuf::from(&config.address)),
             strangers: 0,
             _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
         })
+    }
+
+    /// Read datagrams from this path and turn every other away, for a device
+    /// that speaks first and whose node says where from.
+    pub fn hear_only(&mut self, what: &str, from: &SendsFrom) -> TcsResult<()> {
+        match from {
+            SendsFrom::Path(path) => {
+                self.only_from = Some(PathBuf::from(path));
+                Ok(())
+            }
+            SendsFrom::Socket(at) => Err(TcsError::Config(format!(
+                "{what}: sends_from {at} is a host and a port, and this is a Unix \
+                 datagram socket, whose device sends from a path"
+            ))),
+        }
     }
 
     /// A second endpoint on the same socket, sharing what it learns.
@@ -200,6 +220,7 @@ impl UnixDatagramEndpoint {
             socket: self.socket.try_clone()?,
             peer: self.peer.clone(),
             told: self.told.clone(),
+            only_from: self.only_from.clone(),
             // Counted where they are read, which is one of the pair.
             strangers: 0,
             _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
@@ -226,9 +247,9 @@ impl EndpointReadable for UnixDatagramEndpoint {
             match self.socket.recv_from(buffer) {
                 Ok((_, from))
                     if self
-                        .told
+                        .only_from
                         .as_deref()
-                        .is_some_and(|told| from.as_pathname() != Some(told)) =>
+                        .is_some_and(|only| from.as_pathname() != Some(only)) =>
                 {
                     self.strangers += 1;
                 }
@@ -620,6 +641,55 @@ mod tests {
         assert_eq!(endpoint.strangers(), 1);
 
         for path in [&device_path, &stranger_path] {
+            std::fs::remove_file(path).ok();
+        }
+    }
+
+    /// A device that speaks first, from a path its node states, is read from
+    /// that path only: a stranger's datagram to the vehicle's path is turned
+    /// away and counted.
+    #[test]
+    fn a_device_that_says_where_it_sends_from_is_read_only_from_there() {
+        let vehicle_path = a_path("hearing-vehicle");
+        let device_path = a_path("hearing-device");
+        let stranger_path = a_path("hearing-stranger");
+        for path in [&vehicle_path, &device_path, &stranger_path] {
+            std::fs::remove_file(path).ok();
+        }
+        let mut endpoint = UnixDatagramEndpoint::bind(
+            "temp",
+            &config_at(&vehicle_path, NetworkProtocol::UnixDgram),
+        )
+        .expect("the vehicle binds");
+        endpoint
+            .hear_only("temp", &SendsFrom::Path(device_path.display().to_string()))
+            .expect("a path for a path");
+
+        let device = UnixDatagram::bind(&device_path).expect("the device binds");
+        let stranger = UnixDatagram::bind(&stranger_path).expect("a stranger binds");
+        stranger
+            .send_to(b"99.9", &vehicle_path)
+            .expect("the stranger sends");
+        device
+            .send_to(b"21.5", &vehicle_path)
+            .expect("the device sends");
+
+        let mut into = [0u8; 64];
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        let n = loop {
+            match endpoint.read(&mut into).expect("a read") {
+                0 if std::time::Instant::now() < deadline => std::thread::yield_now(),
+                n => break n,
+            }
+        };
+        assert_eq!(
+            &into[..n],
+            b"21.5",
+            "the stranger's was read as the device's"
+        );
+        assert_eq!(endpoint.strangers(), 1);
+
+        for path in [&vehicle_path, &device_path, &stranger_path] {
             std::fs::remove_file(path).ok();
         }
     }

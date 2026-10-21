@@ -22,7 +22,7 @@ use std::os::fd::BorrowedFd;
 use std::os::unix::io::RawFd;
 
 use nix::poll::{poll, PollFd, PollFlags};
-use tcslibgs::{EndpointConfig, NetworkConfig, NetworkProtocol, TcsError, TcsResult};
+use tcslibgs::{EndpointConfig, NetworkConfig, NetworkProtocol, SendsFrom, TcsError, TcsResult};
 
 use crate::node::payload::can::CanEndpoint;
 use crate::node::payload::device_file::DeviceEndpoint;
@@ -364,12 +364,34 @@ pub fn connect_endpoint_pair(
     Box<dyn EndpointReadable + Send>,
     Box<dyn EndpointWritable + Send>,
 )> {
+    hearing_endpoint_pair(what, config, None)
+}
+
+/// [`connect_endpoint_pair`], for a payload whose node may say where it
+/// sends from.
+///
+/// A datagram payload that speaks first is learnt from what arrives, so the
+/// first sender heard would otherwise be taken for it, whoever that was.
+/// Where its node states `sends_from`, its datagrams are read from there and
+/// nowhere else, as a payload reached at a stated address is read: see
+/// [`EndpointReadable::strangers`]. Nothing changes for anything else.
+pub fn hearing_endpoint_pair(
+    what: &str,
+    config: &EndpointConfig,
+    sends_from: Option<&SendsFrom>,
+) -> TcsResult<(
+    Box<dyn EndpointReadable + Send>,
+    Box<dyn EndpointWritable + Send>,
+)> {
     match config {
         EndpointConfig::Network(net_config) => match net_config.protocol {
             // Bound, not connected: the payload is the end that speaks first
             // over UDP, so this is the end that has to be findable.
             NetworkProtocol::Udp => {
-                let reader = UdpEndpoint::new(what, net_config)?;
+                let mut reader = UdpEndpoint::new(what, net_config)?;
+                if let Some(from) = sends_from {
+                    reader.hear_only(what, from)?;
+                }
                 let writer = reader.try_clone()?;
                 Ok((Box::new(reader), Box::new(writer)))
             }
@@ -387,7 +409,10 @@ pub fn connect_endpoint_pair(
                 Ok((Box::new(reader), Box::new(writer)))
             }
             NetworkProtocol::UnixDgram => {
-                let reader = UnixDatagramEndpoint::bind(what, net_config)?;
+                let mut reader = UnixDatagramEndpoint::bind(what, net_config)?;
+                if let Some(from) = sends_from {
+                    reader.hear_only(what, from)?;
+                }
                 let writer = reader.try_clone()?;
                 Ok((Box::new(reader), Box::new(writer)))
             }

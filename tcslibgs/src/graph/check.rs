@@ -246,6 +246,15 @@ pub enum Problem {
     /// nowhere to write the init to, and the node would fail to open every
     /// time. A payload that is only driven is told where it is, and takes one.
     InitBeforeItSpeaks { node: String, protocol: String },
+    /// A `sends_from` on a payload that does not speak first.
+    ///
+    /// It says where a payload the vehicle learns from what arrives sends
+    /// from, so that nothing else is read as it. A payload that is asked is
+    /// reached at its address and read only from there already, and one that
+    /// is only driven is read not at all: either way the attribute is one
+    /// nothing reads, which looks like something that was set. `asked` says
+    /// which of the two this one is.
+    SendsFromSpokenTo { node: String, asked: bool },
     /// A set of discrete lines used the way its `direction` does not allow.
     ///
     /// `driven` is what the links do with it: true where something is
@@ -315,6 +324,7 @@ impl Problem {
             // would have to be written.
             Problem::UntriggeredInput { node, .. } => About::Node(node.clone()),
             Problem::InitBeforeItSpeaks { node, .. } => About::Node(node.clone()),
+            Problem::SendsFromSpokenTo { node, .. } => About::Node(node.clone()),
             Problem::LinesAgainstTheirDirection { node, .. } => About::Node(node.clone()),
             Problem::TwoNodesWantOneThing { node, .. } => About::Node(node.clone()),
             // The section, where there is one to point at. A missing section
@@ -509,6 +519,16 @@ impl Problem {
                  is nowhere to write the init. Give it a trigger, and the vehicle \
                  reaches it at its address; reach it over a stream (tcp or \
                  unix_stream); or take init out"
+            ),
+            Problem::SendsFromSpokenTo { node, asked: true } => format!(
+                "\"{node}\" states sends_from and a trigger: it is asked, so the \
+                 vehicle reaches it at its address and reads only what comes from \
+                 there already. Take sends_from out"
+            ),
+            Problem::SendsFromSpokenTo { node, asked: false } => format!(
+                "\"{node}\" states sends_from, and nothing is read from it: it is \
+                 only driven, so where it sends from is read by nothing. Take \
+                 sends_from out"
             ),
             Problem::UntriggeredInput { node, from } => format!(
                 "\"{from}\" is delivered to \"{node}\", which states no trigger: \
@@ -756,6 +776,34 @@ impl Graph {
                 problems.push(Problem::InitBeforeItSpeaks {
                     node: node.name.clone(),
                     protocol,
+                });
+            }
+        }
+
+        // And where a payload sends from is said of one that speaks first,
+        // and of no other: see `Problem::SendsFromSpokenTo`. Whether the
+        // node is a datagram one is `reach`'s to say, and said there.
+        for node in self
+            .nodes
+            .iter()
+            .filter(|node| node.is_payload() && node.attributes.contains_key("sends_from"))
+        {
+            let read = self
+                .links
+                .iter()
+                .any(|link| link.from.split('.').next().unwrap_or(&link.from) == node.name);
+            let asked = node.attributes.contains_key("trigger");
+            // A payload with no line at all is neither, and is reported as
+            // one with nothing joined to it: said here, it would be called
+            // driven for want of being read.
+            let driven = !self.sources_of(&node.name).is_empty();
+            if !read && !asked && !driven {
+                continue;
+            }
+            if !crate::graph::interface::speaks_first(read, asked) {
+                problems.push(Problem::SendsFromSpokenTo {
+                    node: node.name.clone(),
+                    asked,
                 });
             }
         }
@@ -3681,5 +3729,59 @@ mod tests {
                 .any(|problem| matches!(problem, Problem::InitBeforeItSpeaks { .. })),
             "a datagram payload that is asked is reached at its address"
         );
+    }
+
+    /// Where a payload sends from is said of one that speaks first, and is
+    /// refused on one that is asked or only driven, where nothing would read
+    /// it.
+    #[test]
+    fn sends_from_is_for_a_payload_that_speaks_first() {
+        let link = |from: &str, to: &str| Link {
+            from: from.to_string(),
+            to: Destinations::of(vec![to.to_string()]),
+            comment: None,
+        };
+        let said = |extra: &[(&str, &str)], links: Vec<Link>| {
+            let mut graph = graph(
+                vec![node("sensor", "network"), node("decide", "compute")],
+                links,
+            );
+            for (attribute, value) in [
+                ("protocol", "udp"),
+                ("address", "127.0.0.1"),
+                ("port", "6200"),
+                ("sends_from", "127.0.0.1:6201"),
+            ]
+            .iter()
+            .chain(extra)
+            {
+                graph.nodes[0]
+                    .attributes
+                    .insert(attribute.to_string(), Scalar::of(*value));
+            }
+            graph
+                .check()
+                .into_iter()
+                .filter(|problem| matches!(problem, Problem::SendsFromSpokenTo { .. }))
+                .collect::<Vec<_>>()
+        };
+
+        assert!(
+            said(&[], vec![link("sensor", "decide")]).is_empty(),
+            "a payload that speaks first says where it sends from"
+        );
+
+        let asked = said(&[("trigger", "\"READ\"")], vec![link("sensor", "decide")]);
+        assert_eq!(asked.len(), 1, "{asked:?}");
+        assert!(asked[0].describe().contains("trigger"), "{:?}", asked[0]);
+
+        assert!(
+            said(&[], vec![]).is_empty(),
+            "a payload with no line is reported as that, not as driven"
+        );
+
+        let driven = said(&[], vec![link("decide", "sensor")]);
+        assert_eq!(driven.len(), 1, "{driven:?}");
+        assert!(driven[0].describe().contains("driven"), "{:?}", driven[0]);
     }
 }

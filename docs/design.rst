@@ -803,9 +803,14 @@ publishes reaches every peer that subscribed to it. tcspecial joins as one
 more peer, and so needs no new code in the cFS build -- the mission adds a
 peer to its SBN table, and allots tcspecial its message IDs.
 
-The cost is that tcspecial speaks SBN's own wire format, which is SBN's to
-change and has changed between releases. That is answered by naming the
-release, and refusing anything else, at both moments it can be seen.
+What follows was checked against SBN v7.0.1 and cFE as they stood in
+October 2026, by reading their source; where a rule rests on one of their
+details, it says which.
+
+The cost of joining as a peer is that tcspecial speaks SBN's own wire format,
+which is SBN's to change and has changed between releases. That is answered
+by naming what the far end was built from, and refusing anything else, at
+both moments it can be seen.
 
 The peer is one connection for everything the vehicle sends and takes, so it
 is stated once, in ``tcspecial``:
@@ -815,93 +820,162 @@ is stated once, in ``tcspecial``:
    tcspecial:
      gateway: cfs
      sbn:
-       version: "1.18"
+       release: "v7.0.1"
+       ident: "0653995939d714ac94906f867b4397e9953ca66a"
        spacecraft_id: "0x42"
        processor_id: "2"
        local: "0.0.0.0:2234"
        peer: "10.0.0.1:2234"
        peer_processor_id: "1"
        max_message: "32768"
-     msgid_range: { first: "0x1880", last: "0x18FF" }
-     tcs_cmd: { cmd_msgid: "0x1880", response_msgid: "0x0880" }
-     payload_command: { cmd_base: "0x1890", response_base: "0x0890" }
-     payload_telemetry: { tlm_base: "0x08A0" }
-     beacon: { interval: "5 s", tlm_msgid: "0x0881" }
+     msgid_range: { first: "0x4200", last: "0x42FF" }
+     tcs_cmd: { cmd_msgid: "0x4280", response_msgid: "0x4200" }
+     payload_command: { cmd_base: "0x4290", response_base: "0x4210" }
+     payload_telemetry: { tlm_base: "0x4220" }
+     beacon: { interval: "5 s", tlm_msgid: "0x4201" }
 
    gateway:
      - name: fsw
        type: gateway_cfs
-       cmd_msgid: "0x1881"
-       tlm_base: "0x08C0"
+       cmd_msgid: "0x4281"
+       tlm_base: "0x4240"
        payload-in: true
 
-(The numbers and the release are illustrative; the layout of the IDs is the
-mission's.)
+(The numbers are illustrative, and laid out for the message-ID mapping below;
+the allotment is the mission's.)
+
+What SBN is, on the wire
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+Every SBN message over UDP is one datagram: a 13-byte header -- the length of
+what follows as four bytes, the message type as one, the sender's processor
+ID as four and its spacecraft ID as four, all most significant byte first --
+and then the message. The types are a subscription, an unsubscription, an
+application's message (a cFS packet, carried whole), and SBN's protocol
+version; the UDP module adds a heartbeat, an announcement and a disconnect of
+its own. A peer is connected by the first datagram that arrives from it, sends
+a heartbeat when it has sent nothing for five seconds, and is disconnected by
+ten seconds of silence. Each of those numbers is compiled into SBN and none
+can be configured from this side.
+
+Two facts in that shape decide requirements here:
+
+* SBN on a cFS announces itself only to a peer whose spacecraft ID *and*
+  processor ID both differ from its own. tcspecial is on the same spacecraft,
+  so cFS will never speak first: the link exists when tcspecial starts it, and
+  not otherwise.
+* What SBN checks a peer by is not a release number. Its protocol version --
+  ``SBN_PROTO_VER``, 11 in v7.0.1 -- is compared and a difference only
+  logged. What is enforced is ``SBN_IDENT``: 48 bytes that open every
+  subscription message, and a subscription whose bytes are not the receiver's
+  own is refused. Those bytes are git's ``$Id$`` of ``sbn_types.h`` -- the
+  hash of that one file as it was checked out -- so they differ between
+  releases, and between a release and a mission's copy of it with that file
+  changed.
 
 Requirement
-    ``sbn.version`` names an SBN release this build of tcspecial speaks, and
+    ``sbn.release`` names an SBN release this build of tcspecial speaks, and
     one it does not is refused where the file is read, naming the releases it
-    does. A peer that announces another protocol version when it connects is
-    refused there, and the refusal is logged with both versions, every time
-    the peer tries again: a link that half works is the fault this is here to
-    prevent.
+    does. The release decides the layout of every message.
 
 Requirement
-    SBN's UDP protocol module is the one spoken. SBN has others -- TCP, and
-    more -- and each would be a second implementation to build, test and keep
-    in step with SBN, for a link between two computers on one vehicle that
-    UDP already serves.
+    ``sbn.ident`` is the hash in the far end's ``SBN_IDENT``, 40 hexadecimal
+    digits, as SBN prints it in its start-up event, and tcspecial puts it into
+    every subscription it sends. It is stated rather than known from the
+    release because it is the far end's build that it has to match, and it
+    has no default because a wrong one is a link that connects, heartbeats,
+    and carries nothing: SBN refuses every subscription, so nothing tcspecial
+    publishes is wanted and nothing it subscribes to is sent.
+
+Requirement
+    A peer whose protocol-version message is not the release's, or whose
+    subscriptions carry another ident, is refused, and the refusal is logged
+    with what was expected and what arrived, every time the peer tries again:
+    a link that half works is the fault this is here to prevent, and SBN
+    itself only logs the first of the two.
+
+Requirement
+    tcspecial announces itself to ``sbn.peer`` until it is answered, and once
+    connected sends a heartbeat after five seconds without sending anything,
+    as SBN does, so that the far end's ten seconds of silence never come. A peer silent for
+    ten seconds is disconnected on this side too, and announced to again.
+
+Requirement
+    SBN's UDP protocol module is the one spoken. SBN has others -- TCP,
+    SpaceWire, serial, DTN -- and each would be a second implementation to
+    build, test and keep in step with SBN, for a link between two computers
+    on one vehicle that UDP already serves.
 
 Requirement
     ``sbn.local`` and ``sbn.peer`` are ``address:port``, as every other
     address in ``tcspecial`` is; ``spacecraft_id``, ``processor_id`` and
     ``peer_processor_id`` are the numbers SBN identifies peers by, and
-    ``processor_id`` and ``peer_processor_id`` may not be equal.
+    ``processor_id`` and ``peer_processor_id`` may not be equal. The far end's
+    SBN table must list tcspecial with the same three, which nothing on this
+    side can check, so the manual says so where these are described.
 
 Requirement
-    ``msgid_range`` is the block of message IDs the mission allotted
-    tcspecial, and every message ID the configuration states, or counts to
-    from a base, lies inside it; one outside it is refused, naming the
-    attribute, the ID and the range. No ID is used twice. tcspecial cannot see
-    the message-ID header the cFS build was compiled with, so the range is the
-    one fact the two can be held to, and a collision with another
-    application's ID -- two kinds of packet arriving under one ID, each read
-    as the other -- is refused on the ground rather than discovered in
-    flight.
+    ``sbn.max_message`` is the cFS build's ``CFE_MISSION_SB_MAX_SB_MSG_SIZE``
+    -- 32768 in cFE's example -- and has no default, because it is a
+    compile-time setting of the far end. A source whose largest datum, with
+    the packet's headers, would not fit is refused where the file is read,
+    naming the node and both sizes, rather than cut short or dropped as it is
+    sent: SBN drops a message longer than this on arrival, and says so only
+    in an event on the cFS side.
+
+What crosses the bus
+^^^^^^^^^^^^^^^^^^^^
 
 Requirement
-    ``sbn.max_message`` is the cFS build's largest software bus message, and
-    has no default, because it is a compile-time setting of the far end. A
-    source whose largest datum, with the packet's headers, would not fit is
-    refused where the file is read, naming the node and both sizes, rather
-    than cut short or dropped as it is sent.
+    What crosses the bus is a cFS packet: the CCSDS primary header, cFS's
+    extended header, and a secondary header -- for a command, a function code
+    and a checksum; for telemetry, a time -- and then exactly what the UDP
+    link carries in a datagram. A command's function code is its tcspecial
+    command code, and its data is the command as tcspecial already encodes
+    it; a response, a beacon and a datum are the data of a telemetry packet.
+    Each command, response and the beacon is then still stated once, in
+    ``tcslibgs``, and the gateway changes how it is carried and nothing about
+    what it says.
 
 Requirement
-    What crosses the bus is a CCSDS space packet as cFS frames one, carrying
-    in its data exactly what the UDP link carries in a datagram. A command's
-    function code is its tcspecial command code, and its data is the command
-    as tcspecial already encodes it; a response, a beacon and a datum are the
-    data of a telemetry packet. Each command, response and the beacon is then
-    still stated once, in ``tcslibgs``, and the gateway changes how it is
-    carried and nothing about what it says.
+    The extended header is the one supported, as a cFS built with
+    ``MISSION_INCLUDE_CCSDSEXT_HEADER`` frames every packet, and the
+    primary-only header is not. A cFS built without it is a different packet
+    on the wire, which each end would misread as the other's, so a mission
+    running one cannot use tcspecial until it builds with the extended
+    header. One header is one packing to build and test, and none to state
+    wrongly: the configuration says nothing about it, because there is
+    nothing it could choose.
 
 Requirement
-    The packet header is cFS's version 2: the CCSDS primary header followed
-    by the extended header, as a cFS built with the extended header frames
-    every packet, and no other. A cFS built with the version 1 header is a
-    different packet on the wire, which each end would misread as the
-    other's, so a mission running one cannot use tcspecial until it builds
-    with version 2.
-    One header is one packing to build and test, and none to state wrongly:
-    the configuration says nothing about the header, because there is
-    nothing it could choose. The extended header's spacecraft field is
-    ``sbn.spacecraft_id``.
+    A cFS function code is seven bits, so every tcspecial command code is
+    below 128. ``tcslibgs`` holds the codes to that where they are listed,
+    in a test, rather than leaving it to be found by the first code that
+    is not.
+
+Requirement
+    A command's checksum is checked as it arrives, as cFS's own applications
+    check theirs, and a command whose checksum is wrong is answered as one
+    that could not be read; every command and response tcspecial sends
+    carries a correct one.
 
 Requirement
     At start tcspecial subscribes to its command message IDs --
     ``tcs_cmd.cmd_msgid``, each payload's ``payload_command.cmd_base`` plus
     its id, and each ``gateway_cfs`` node's ``cmd_msgid`` -- and to nothing
     else, and it publishes nothing outside ``msgid_range``.
+
+Requirement
+    ``msgid_range`` is the block of message IDs the mission allotted
+    tcspecial, and every message ID the configuration states, or counts to
+    from a base, lies inside it; one outside it is refused, naming the
+    attribute, the ID and the range. No ID is used twice, and an ID stated
+    as a command's is one the mapping reads as a command, and a telemetry
+    ID one it reads as telemetry. tcspecial cannot see the message-ID
+    header the cFS build was compiled with, so the range is the one fact the
+    two can be held to, and a collision with another application's ID -- two
+    kinds of packet arriving under one ID, each read as the other -- is
+    refused on the ground rather than discovered in flight.
 
 Requirement
     ``CONNECT`` and the beacon go over the bus as they go over the radio: the
@@ -924,21 +998,46 @@ Requirement
     build, with SBN, is the test that the wire format is SBN's and not only
     ours.
 
-Open questions, to be settled before this is built:
+Requirement
+    A message ID is read and written by cFE's version 2 mapping, which a cFS
+    built with ``MISSION_MSGID_V2`` uses, and by no other: the low seven bits
+    are the low seven of the packet's APID, ``0x80`` is set for a command and
+    clear for telemetry, and the high byte is the extended header's
+    subsystem. The rest of the APID is zero in every packet tcspecial sends.
+    One mapping is one packing to test, and it matches the extended header
+    the vehicle is built with. A mission's allotment is then naturally one
+    subsystem -- ``0x4200`` to ``0x42FF`` above being subsystem ``0x42``,
+    its telemetry below ``0x4280`` and its commands from there.
 
-* How a message ID maps onto the version 2 header. cFS chooses at build
-  time how the bits of a message ID are taken from the APID, the packet type
-  and the extended header's fields, and tcspecial must pack each packet the
-  way the cFS build it talks to unpacks it.
-* What time a telemetry packet's secondary header carries. tcspecial keeps
-  microseconds since the UNIX epoch and cannot ask cFE for its time; the
-  header can carry tcspecial's clock in cFE's format against an epoch the
-  configuration states, or the cFS side can stamp it on arrival.
-* Whether commands stay tunnelled. Carrying tcspecial's encoding inside a
-  packet keeps one statement of each command, but a cFS ground system cannot
-  show the parameters of one. Stating each command's parameters in XTCE, as
-  the beacon is stated, would let it, at the price of the packing being
-  generated rather than shared with the UDP link.
+Requirement
+    A telemetry packet's time is tcspecial's own clock when the datum was
+    taken -- the reading's time, not its arrival's -- in cFE's six bytes:
+    seconds as four and 1/65536ths of a second as two, most significant
+    first. It is counted from the epoch, and on the time scale, the cFS
+    build was compiled with, which the configuration states:
+
+    .. code-block:: yaml
+
+       tcspecial:
+         cfe_time:
+           epoch: "1980-01-01T00:00:00"
+           scale: tai
+           leap_seconds: "37"
+
+    ``epoch`` is a UTC date and time, ``scale`` is ``tai`` or ``utc``, and
+    ``leap_seconds`` -- TAI less UTC -- is stated where the scale is TAI and
+    refused where it is UTC. None has a default: each copies a compile-time
+    setting of the far end -- ``CFE_MISSION_TIME_EPOCH_*``,
+    ``CFE_MISSION_TIME_CFG_DEFAULT_TAI`` -- and a wrong one is every packet
+    stamped wrong by the same amount, which nothing downstream can see.
+    The leap-second count is fixed for as long as the configuration is, and
+    a change is a new configuration; none has been added since 2017.
+
+Requirement
+    Commands are carried tunnelled, as stated above, for now. A cFS ground
+    system sees a tcspecial command as its function code and its bytes, and
+    stating each command's parameters in XTCE, so that one can show them,
+    is a later step.
 
 F´: ``gateway_fprime``
 ~~~~~~~~~~~~~~~~~~~~~~

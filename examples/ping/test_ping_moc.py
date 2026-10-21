@@ -19,11 +19,16 @@ import ping_moc  # noqa: E402
 
 
 def alive(pid):
-    """Whether a process of this id is still there, a zombie counting as gone."""
+    """Whether a process of this id is still there, a zombie counting as gone.
+
+    Gone either way it can be found gone: no entry to open, or -- reaped
+    between the open and the read -- an entry that answers ESRCH, which
+    reading raises as ProcessLookupError.
+    """
     try:
         with open(f"/proc/{pid}/stat") as stat:
             return stat.read().split()[2] != "Z"
-    except FileNotFoundError:
+    except (FileNotFoundError, ProcessLookupError):
         return False
 
 

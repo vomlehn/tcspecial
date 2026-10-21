@@ -8,9 +8,16 @@
 //! payload telemetry and the beacon all go the one way. See "Gateways: what the
 //! vehicle answers to" in `docs/design.rst`.
 //!
-//! Only the radio is built. The other two are specified, and a configuration
-//! naming one is refused where it is read, saying so, rather than accepted
-//! and found to have nothing to talk to when it flies.
+//! The radio and F´ are built. cFS is specified, and a configuration naming
+//! it is refused where it is read, saying so, rather than accepted and found
+//! to have nothing to talk to when it flies.
+//!
+//! F´ is the radio's own protocol with a component of an F´ deployment at the
+//! far end in place of a ground station, so a `gateway_fprime` node is opened,
+//! counted and driven as a radio's is. What differs is what the far end is
+//! called in the file -- `bridge_base` where a radio says `ground_base` -- and
+//! that it states where its F´ channel IDs begin, `fprime_id_base`, which
+//! nothing aboard reads.
 //!
 //! The section the gateway nodes are written in, and the node type the radio
 //! is, are still `moc`: the rename to `gateway` changes configuration keys, and
@@ -50,7 +57,38 @@ impl GatewayKind {
     /// The one place that says which kinds are built, so that the section's
     /// reader and its tests agree about it, and building one is a line here.
     pub fn is_built(self) -> bool {
-        matches!(self, GatewayKind::Radio)
+        matches!(self, GatewayKind::Radio | GatewayKind::Fprime)
+    }
+
+    /// The node type of the kind's gateway nodes, where it has one.
+    pub fn node_type(self) -> Option<&'static str> {
+        match self {
+            GatewayKind::Radio => Some("moc"),
+            GatewayKind::Fprime => Some("gateway_fprime"),
+            GatewayKind::Cfs => None,
+        }
+    }
+
+    /// The attribute a gateway node of the kind says where its data goes
+    /// with: an `address:port`, counted on by each source's device id.
+    ///
+    /// Named for what is there: the ground for a radio, the bridge
+    /// component for F´. One rule counts on from either.
+    pub fn base_attribute(self) -> &'static str {
+        match self {
+            GatewayKind::Radio => "ground_base",
+            GatewayKind::Fprime => "bridge_base",
+            GatewayKind::Cfs => "tlm_base",
+        }
+    }
+
+    /// What is at the far end, in words a complaint can use.
+    pub fn far_end(self) -> &'static str {
+        match self {
+            GatewayKind::Radio => "the ground station",
+            GatewayKind::Fprime => "the F´ bridge component",
+            GatewayKind::Cfs => "the cFS software bus",
+        }
     }
 
     /// The kind a file named, if it is one this build answers to.
@@ -80,14 +118,12 @@ impl GatewayKind {
     /// The kind a gateway node's type belongs to, or `None` for a type that
     /// is not a gateway's.
     ///
-    /// The one statement of which node type is which kind's. The radio's is
-    /// still spelled `moc`; the other kinds have no node types until they are
-    /// built.
+    /// The one statement of which node type is which kind's, read from
+    /// [`GatewayKind::node_type`]. The radio's is still spelled `moc`.
     pub fn of_node_type(node_type: &str) -> Option<GatewayKind> {
-        match node_type {
-            "moc" => Some(GatewayKind::Radio),
-            _ => None,
-        }
+        GatewayKind::ALL
+            .into_iter()
+            .find(|kind| kind.node_type() == Some(node_type))
     }
 
     /// The kinds this build answers to, as a file would write them, for a
@@ -100,6 +136,15 @@ impl GatewayKind {
             .collect::<Vec<_>>()
             .join(" or ")
     }
+}
+
+/// Whether a node of this type is a gateway's: the vehicle's end of the link
+/// to whatever it answers to.
+///
+/// What every rule that was about the `moc` node is now about, so that a
+/// gateway node of any kind is opened, counted and checked as one.
+pub fn is_gateway(node_type: &str) -> bool {
+    GatewayKind::of_node_type(node_type).is_some()
 }
 
 impl fmt::Display for GatewayKind {
@@ -135,13 +180,18 @@ mod tests {
         assert!(why.contains("radio"), "{why}");
     }
 
-    /// The radio's node type is the radio's, and no other type is a
+    /// Each built kind's node type is its own, and no other type is a
     /// gateway's.
     #[test]
-    fn only_the_radio_has_a_node_type() {
+    fn each_built_kind_has_its_node_type() {
         assert_eq!(GatewayKind::of_node_type("moc"), Some(GatewayKind::Radio));
+        assert_eq!(
+            GatewayKind::of_node_type("gateway_fprime"),
+            Some(GatewayKind::Fprime)
+        );
         for other in ["log", "compute", "i2c", "tee-moc", "gateway_cfs"] {
             assert_eq!(GatewayKind::of_node_type(other), None, "{other}");
+            assert!(!is_gateway(other), "{other}");
         }
     }
 }

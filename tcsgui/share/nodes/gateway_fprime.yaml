@@ -1,0 +1,37 @@
+# A link to an F´ flight computer, which the vehicle answers to in place of
+# the ground: a TcsBridge component in the F´ deployment, built on tcslib-c,
+# plays the ground station's part and passes what arrives on as F´ telemetry.
+#
+# The radio's own protocol, so it is opened, counted and driven as a moc node
+# is, and like that node it has no Rust of its own: it is served by the
+# network payload code, tcspecial/src/node/payload/network/. See
+# tcslibgs::gateway, and "Gateways" in docs/design.rst.
+node: gateway_fprime
+type: gateway_fprime
+about: >
+  An F´ flight computer's bridge component: what the vehicle answers to in
+  place of the ground.
+payload-sink: true
+payload-source: false
+moc-sink: false
+moc-source: true
+attributes:
+  - name: bridge_base
+    required: true
+    about: >
+      Where the bridge component is, as address:port. What each node linked
+      into this one produces is sent to that address, at that port plus the
+      node's device id, from the start.
+  - name: fprime_id_base
+    required: true
+    about: >
+      The first of the F´ IDs the bridge gives what arrives: each node linked
+      into this one is this ID plus its own device id.
+  - name: address
+    required: false
+    about: >
+      The address tcspecial binds for what the bridge sends: needed, with
+      port, when commands or a line come from this node.
+  - name: port
+    required: false
+    about: The port that goes with the address.

@@ -882,12 +882,14 @@ pub fn described(graph: &Graph) -> BTreeMap<String, String> {
                 // and saying "no link touches it" of one would be reporting a
                 // fault that is not there. See `open`, which holds such a
                 // node as a `NullPort` for the same reason.
-                "moc" => match Use::of(&routes, &node.name) {
-                    Ok(Use::Read) => "read".to_string(),
-                    Ok(Use::Driven) => "driven".to_string(),
-                    Ok(Use::Both) => "read and written".to_string(),
-                    Err(_) => "to the ground".to_string(),
-                },
+                gateway if tcslibgs::gateway::is_gateway(gateway) => {
+                    match Use::of(&routes, &node.name) {
+                        Ok(Use::Read) => "read".to_string(),
+                        Ok(Use::Driven) => "driven".to_string(),
+                        Ok(Use::Both) => "read and written".to_string(),
+                        Err(_) => "to the ground".to_string(),
+                    }
+                }
                 _ => match Use::of(&routes, &node.name) {
                     Ok(Use::Read) => "read".to_string(),
                     Ok(Use::Driven) => "driven".to_string(),

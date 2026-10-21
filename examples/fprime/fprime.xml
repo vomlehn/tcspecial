@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../tcsgui/share/schema/tcspecial.xsd">
+    <description>Answering to an F´ flight computer: a reading to its bridge component, and a command from it to a heater</description>
+    <tcspecial>
+        <!-- Every port is in the nine thousands, which no other example
+             uses, so this one can be left running while another is looked
+             at.
+
+             The vehicle answers to an F´ flight computer rather than to the
+             ground. Its links are the radio's - UDP, in the radio's protocol
+             - because the far end of each is the F´ deployment's TcsBridge
+             component, which is a ground station built on tcslib-c as far as
+             tcspecial can tell. -->
+        <beacon>
+            <interval>5 s</interval>
+            <recv>127.0.0.1:9510</recv>
+            <send>0.0.0.0:9500</send>
+        </beacon>
+        <gateway>fprime</gateway>
+        <log>
+            <directory>/tmp/telemetry</directory>
+            <segment_size>65536</segment_size>
+        </log>
+        <payload_command>
+            <dest_base>0.0.0.0:9300</dest_base>
+            <source_base>127.0.0.1:9310</source_base>
+        </payload_command>
+        <payload_telemetry>
+            <dest_base>127.0.0.1:9410</dest_base>
+            <source_base>0.0.0.0:9400</source_base>
+        </payload_telemetry>
+        <tcs_cmd>
+            <recv>0.0.0.0:9200</recv>
+            <send>127.0.0.1:9210</send>
+        </tcs_cmd>
+    </tcspecial>
+    <!-- The F´ bridge's end of the link, both ways. What the bridge sends
+         goes up to address:port, which this node binds aboard, and leaves it
+         by moc-out for the heater. What comes down arrives at bridge_base plus
+         the device id of the node that sent it, and the bridge gives it the
+         F´ ID fprime_id_base plus that same id: the thermometer, device id 2,
+         arrives at 127.0.0.1:9702 as 0x3002. -->
+    <moc>
+        <name>fsw</name>
+        <type>gateway_fprime</type>
+        <address>127.0.0.1</address>
+        <port>9600</port>
+        <bridge_base>127.0.0.1:9700</bridge_base>
+        <fprime_id_base>0x3000</fprime_id_base>
+        <payload-in>true</payload-in>
+        <moc-out><target>heater</target></moc-out>
+    </moc>
+    <!-- A heater, driven by what the flight computer sends: the far end of a
+         UDP socket. -->
+    <payloads>
+        <name>heater</name>
+        <type>network</type>
+        <protocol>udp</protocol>
+        <address>127.0.0.1</address>
+        <port>9001</port>
+        <moc-in>true</moc-in>
+    </payloads>
+    <!-- A thermometer whose readings go to the flight computer. -->
+    <payloads>
+        <name>thermometer</name>
+        <type>network</type>
+        <protocol>udp</protocol>
+        <address>127.0.0.1</address>
+        <port>9002</port>
+        <payload-out><target>fsw</target></payload-out>
+    </payloads>
+    <tcsgui>
+        <nodes><name>fsw</name><x>469</x><y>34</y></nodes>
+        <nodes><name>heater</name><x>34</x><y>34</y></nodes>
+        <nodes><name>thermometer</name><x>34</x><y>134</y></nodes>
+    </tcsgui>
+</configuration>

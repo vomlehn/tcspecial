@@ -1369,7 +1369,7 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
     let mocs: Vec<&str> = graph
         .nodes
         .iter()
-        .filter(|n| n.node_type == "moc")
+        .filter(|n| tcslibgs::gateway::is_gateway(&n.node_type))
         .map(|n| n.name.as_str())
         .filter(|name| links.iter().any(|l| l.via == Via::Moc(name.to_string())))
         .collect();

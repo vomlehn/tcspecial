@@ -137,5 +137,5 @@ fn a_moc_node_it_cannot_open_is_refused() {
         .expect("the ground station runs");
     assert!(!output.status.success());
     let said = String::from_utf8_lossy(&output.stderr);
-    assert!(said.contains("not a moc node"), "{said}");
+    assert!(said.contains("not a gateway node"), "{said}");
 }

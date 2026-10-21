@@ -42,10 +42,11 @@
       "type": "object",
       "properties": {
         "gateway": {
-          "description": "What the vehicle answers to: radio, the ground over UDP. cfs and fprime are specified in the design and not yet built, and are refused. Required, with no default.",
+          "description": "What the vehicle answers to: radio, the ground over UDP; fprime, an F´ flight computer's bridge component, over the same. cfs is specified in the design and not yet built, and is refused. Required, with no default.",
           "type": "string",
           "enum": [
-            "radio"
+            "radio",
+            "fprime"
           ]
         },
         "tcs_cmd": {
@@ -187,10 +188,11 @@
             "type": "string"
           },
           "type": {
-            "description": "What it is: the configuration's own word for the type. A ground link is moc.",
+            "description": "What it is: the configuration's own word for the type. A link to the ground over the radio is moc; one to an F´ bridge component is gateway_fprime.",
             "type": "string",
             "enum": [
-              "moc"
+              "moc",
+              "gateway_fprime"
             ]
           },
           "group": {
@@ -287,6 +289,24 @@
           },
           "ground_base": {
             "description": "Where the ground station is, as address:port. What each node linked into this moc node produces is sent to that address, at that port plus the node's device id.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "bridge_base": {
+            "description": "Where the F´ bridge component is, as address:port: a gateway_fprime node's ground_base. What each node linked into it produces is sent to that address, at that port plus the node's device id.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "fprime_id_base": {
+            "description": "The first of the F´ IDs the bridge gives what arrives at a gateway_fprime node: each node linked into it is this ID plus its own device id. Decimal, or hexadecimal with 0x.",
             "type": [
               "string",
               "number",

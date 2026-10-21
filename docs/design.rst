@@ -676,18 +676,24 @@ winner decided by the order the files happened to be read in.
 Gateways: what the vehicle answers to
 -------------------------------------
 
-**Specified, and built only as far as the radio.** ``tcspecial.gateway`` is
-read and required, ``radio`` is the one kind it accepts, and a configuration
-naming ``cfs`` or ``fprime`` is refused as specified but not yet built --
-``tcslibgs::gateway`` is the one place that says which kinds are. Of the three
-gateways below, only the radio exists, and under its old name: today it is the ``moc`` node, in the ``moc``
-section, linked through ``moc-in`` and ``moc-out``, with ``tee-moc``,
-``null-moc`` and ``app_moc_veh`` beside it. The rename to ``gateway`` changes
-configuration keys, so it is held back to land with the ``payload`` rename,
-when the configuration schema is complete; until then a file says ``moc``
-wherever this section says ``gateway``. The rest of this section is written
-in the names it will have, because it is the statement the code is to be built
-to.
+**Specified, and built as far as the F´ gateway node.** ``tcspecial.gateway``
+is read and required; ``radio`` and ``fprime`` are the kinds it accepts, and a
+configuration naming ``cfs`` is refused as specified but not yet built --
+``tcslibgs::gateway`` is the one place that says which kinds are built, which
+node type is which kind's, and what each calls its far end. The radio is the
+``moc`` node, under its old name; the F´ gateway is the ``gateway_fprime``
+node, opened, counted and driven as the radio's is, and ``examples/fprime``
+flies it. Not yet built: the bridge's F´ model generated from the
+configuration, and the ``TcsBridge`` component itself.
+
+The gateway nodes are written in the ``moc`` section, linked through
+``moc-in`` and ``moc-out``, with ``tee-moc``, ``null-moc`` and ``app_moc_veh``
+beside them. The rename to ``gateway`` changes configuration keys, so it is
+held back to land with the ``payload`` rename, when the configuration schema
+is complete; until then a file says ``moc`` wherever this section says
+``gateway``, and the radio's node type is ``moc`` where this section says
+``gateway_radio``. The rest of this section is written in the names it will
+have, because it is the statement the code is to be built to.
 
 tcspecial was written to answer to the ground. What it does well -- reach a
 payload over any of the interfaces in `Payloads`_ from a configuration

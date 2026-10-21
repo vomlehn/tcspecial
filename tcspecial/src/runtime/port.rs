@@ -283,7 +283,7 @@ impl EndpointPort {
         let uses = Use::of(routes, &node.name)?;
         let reach = reach_of(node)?;
 
-        let opened = if node.node_type == "moc" {
+        let opened = if tcslibgs::gateway::is_gateway(&node.node_type) {
             EndpointPort::bind(&node.name, &reach.endpoint, uses)
         } else if !speaks_first(uses.produces(), reach.trigger.is_some()) {
             // Spoken to first -- driven, or asked -- so there is nobody to

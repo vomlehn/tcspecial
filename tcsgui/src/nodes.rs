@@ -656,9 +656,10 @@ mod tests {
         assert_eq!(
             names,
             vec![
-                // The ground link, which is at the root because it has no
-                // Rust of its own, then the two families in the order the
-                // code tree holds them.
+                // The gateway nodes, which are at the root because they have
+                // no Rust of their own, then the two families in the order
+                // the code tree holds them.
+                "gateway_fprime",
                 "moc",
                 // What the vehicle carries: the two that are programs first,
                 // the tree being sorted by path.
@@ -932,8 +933,8 @@ mod tests {
 
         let mut families: Vec<PathBuf> = Vec::new();
         for one in &described {
-            // The ground link, which has none: see above.
-            if one.path == Path::new("moc.yaml") {
+            // The gateway nodes, which have none: see above.
+            if one.path == Path::new("moc.yaml") || one.path == Path::new("gateway_fprime.yaml") {
                 continue;
             }
             // The same path, with the extension taken off:

@@ -811,13 +811,16 @@ pub enum NodeType {
     AppPl,
     AppAllPl,
     Moc,
+    /// A link to an F´ flight computer's bridge component, which the vehicle
+    /// answers to in place of the ground: see `tcslibgs::gateway`.
+    GatewayFprime,
     /// A diagram of its own, kept in its own file and shown here as one box.
     Subdiagram,
 }
 
 impl NodeType {
     /// Every type, for the palette and for the tests.
-    pub const ALL: [NodeType; 24] = [
+    pub const ALL: [NodeType; 25] = [
         NodeType::I2c,
         NodeType::Spi,
         NodeType::Serial,
@@ -841,6 +844,7 @@ impl NodeType {
         NodeType::AppPl,
         NodeType::AppAllPl,
         NodeType::Moc,
+        NodeType::GatewayFprime,
         NodeType::Subdiagram,
     ];
 
@@ -872,6 +876,7 @@ impl NodeType {
             NodeType::AppPl => "app_pl",
             NodeType::AppAllPl => "app_all_pl",
             NodeType::Moc => "moc",
+            NodeType::GatewayFprime => "gateway_fprime",
             NodeType::Subdiagram => "subdiagram",
         }
     }
@@ -1090,6 +1095,12 @@ impl NodeType {
             | NodeType::AppAllPl => tcslibgs::node::app::attributes_of(self.spelling())
                 .expect("a type that is one of the app kinds"),
             NodeType::Moc => &[("ground_base", true), ("address", false), ("port", false)],
+            NodeType::GatewayFprime => &[
+                ("bridge_base", true),
+                ("fprime_id_base", true),
+                ("address", false),
+                ("port", false),
+            ],
             NodeType::Subdiagram => &[("file", true)],
         }
     }
@@ -1216,6 +1227,7 @@ impl NodeType {
             // `tests::a_payload_is_a_device_or_a_driven_line`.
             NodeType::AppPl | NodeType::AppAllPl => "Payloads of their own",
             NodeType::Moc => "The ground station",
+            NodeType::GatewayFprime => "An F´ flight computer",
             NodeType::Subdiagram => "Pages",
         }
     }
@@ -1266,6 +1278,7 @@ impl NodeType {
             | NodeType::AppMocVeh
             | NodeType::AppAllVeh
             | NodeType::Moc
+            | NodeType::GatewayFprime
             | NodeType::Subdiagram => false,
         }
     }
@@ -1583,6 +1596,20 @@ impl NodeType {
                 label_italic: true,
                 outline: Square,
                 edge: Single,
+                weight: Wide,
+                size: (WIDTH, HEIGHT),
+            },
+            // The F´ gateway is the same thing to the vehicle -- what it
+            // answers to -- so it is the ground station's rectangle, wide and
+            // set large; told from it by a second line inside the first and
+            // an upright label, two differences that are not colour.
+            NodeType::GatewayFprime => Appearance {
+                face: Face::Plain,
+                label_size: 16,
+                label_weight: 700,
+                label_italic: false,
+                outline: Square,
+                edge: Double,
                 weight: Wide,
                 size: (WIDTH, HEIGHT),
             },

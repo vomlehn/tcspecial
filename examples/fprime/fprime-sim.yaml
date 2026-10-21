@@ -1,0 +1,13 @@
+# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial-sim.schema.json
+
+# How tcssim stands in for the payloads of fprime.yaml.
+description: Simulator settings for the payloads of fprime.yaml
+
+# The heater is not here: it is driven and never read, so there is nothing for
+# a simulator to send in its place.
+simulated_payloads:
+  # One reading a second, sent whole.
+  - name: thermometer
+    type: network
+    protocol: udp
+    packet_interval: 1 s

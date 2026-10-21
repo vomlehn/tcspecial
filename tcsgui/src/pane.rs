@@ -291,7 +291,7 @@ pub fn is_moc(node_type: &str) -> bool {
     NodeType::ALL
         .iter()
         .find(|t| t.spelling() == node_type)
-        .is_some_and(|t| *t == NodeType::Moc)
+        .is_some_and(|t| matches!(t, NodeType::Moc | NodeType::GatewayFprime))
 }
 
 /// Which working pane a node of this type belongs in.

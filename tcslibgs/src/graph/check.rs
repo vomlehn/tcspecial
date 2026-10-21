@@ -478,8 +478,8 @@ impl Problem {
                 crate::ATTRIBUTE_BYTES
             ),
             Problem::NotAMocLink { from } => format!(
-                "a command arrives on \"{from}\", which is not a moc node -- \
-                 commands come from the ground"
+                "a command arrives on \"{from}\", which is not a gateway node -- \
+                 commands come from what the vehicle answers to"
             ),
             Problem::Unconnected { node } => format!(
                 "\"{node}\" has no link to or from it, so nothing reaches it and \
@@ -974,7 +974,7 @@ impl Graph {
         for node in self
             .nodes
             .iter()
-            .filter(|node| node.is_payload() || node.node_type == "moc")
+            .filter(|node| node.is_payload() || crate::gateway::is_gateway(&node.node_type))
             .filter(|node| !telemetered.contains(&node.name))
         {
             let (sink, source) = linked.get(node.name.as_str()).copied().unwrap_or_default();
@@ -1059,7 +1059,11 @@ impl Graph {
         // A ground link that receives -- commands, or a line out of it --
         // says where aboard the ground sends them: both its address and its
         // port. One that only sends to its ground_base binds nothing.
-        for node in self.nodes.iter().filter(|n| n.node_type == "moc") {
+        for node in self
+            .nodes
+            .iter()
+            .filter(|n| crate::gateway::is_gateway(&n.node_type))
+        {
             let commanded = self.commands.iter().any(|b| b.from == node.name);
             let feeds = self.links.iter().any(|l| l.origin().node == node.name);
             if (commanded || feeds) && !crate::graph::reach::binds(node) {
@@ -1083,7 +1087,7 @@ impl Graph {
         // Command bindings: from the ground, to an attribute of a real node.
         for binding in &self.commands {
             match self.node(&binding.from) {
-                Some(node) if node.node_type == "moc" => {}
+                Some(node) if crate::gateway::is_gateway(&node.node_type) => {}
                 _ => problems.push(Problem::NotAMocLink {
                     from: binding.from.clone(),
                 }),
@@ -1299,7 +1303,7 @@ impl Graph {
         // use for.
         for node in self.nodes.iter().filter(|node| {
             (node.is_payload() && crate::node::app::Kind::of(&node.node_type).is_none())
-                || node.node_type == "moc"
+                || crate::gateway::is_gateway(&node.node_type)
         }) {
             if let Err(why) = crate::graph::reach::reach_of(node) {
                 problems.push(Problem::BadNode {
@@ -1315,7 +1319,7 @@ impl Graph {
         let mut taken: BTreeMap<Claim, String> = BTreeMap::new();
         for node in self.nodes.iter().filter(|node| {
             (node.is_payload() && crate::node::app::Kind::of(&node.node_type).is_none())
-                || node.node_type == "moc"
+                || crate::gateway::is_gateway(&node.node_type)
         }) {
             // A node whose terms will not parse has no claim to compare: the
             // rule above names what is wrong with it, and a second complaint
@@ -1752,6 +1756,12 @@ mod tests {
                 ("port", "5000"),
                 ("ground_base", "10.0.0.2:5100"),
             ],
+            "gateway_fprime" => &[
+                ("address", "10.0.0.1"),
+                ("port", "5000"),
+                ("bridge_base", "10.0.0.3:7700"),
+                ("fprime_id_base", "0x3000"),
+            ],
             // An app node is the program it names, and the argument for each
             // stream its kind handles: see `crate::node::app`.
             "app_payload_veh" | "app_pl" => &[
@@ -1790,6 +1800,82 @@ mod tests {
             to: Destinations::of(to.iter().map(|s| s.to_string()).collect()),
             comment: None,
         }
+    }
+
+    /// A graph that answers to an F´ bridge rather than to the ground.
+    fn answering_fprime(nodes: Vec<Node>, links: Vec<Link>) -> Graph {
+        let mut said = crate::graph::parameters::flatten(&tcspecial());
+        said.insert("gateway".to_string(), Scalar::of("fprime"));
+        let mut g = graph(nodes, links);
+        g.tcspecial = Some(crate::graph::parameters::nest(&said));
+        g
+    }
+
+    /// A configuration that answers to an F´ bridge, through a
+    /// `gateway_fprime` node, is as sound as one that answers to the ground.
+    #[test]
+    fn a_graph_answering_to_fprime_is_sound() {
+        let g = answering_fprime(
+            vec![node("a", "i2c"), node("fsw", "gateway_fprime")],
+            vec![link("a", &["fsw"])],
+        );
+        assert_eq!(g.check(), Vec::new());
+    }
+
+    /// An F´ gateway says where its bridge is and where its IDs begin, and
+    /// a node that says it in a radio's words, or a radio that says it in an
+    /// F´ gateway's, is told which word is its own.
+    #[test]
+    fn a_gateway_states_its_far_end_in_its_own_words() {
+        let refused = |g: &Graph, node_name: &str, wanted: &str| {
+            let problems = g.check();
+            assert!(
+                problems.iter().any(|p| matches!(
+                    p,
+                    Problem::BadNode { node, why } if node == node_name && why.contains(wanted)
+                )),
+                "{node_name} should be told about {wanted}: {problems:?}"
+            );
+        };
+
+        for missing in ["bridge_base", "fprime_id_base"] {
+            let mut fsw = node("fsw", "gateway_fprime");
+            fsw.attributes.remove(missing);
+            let g = answering_fprime(vec![node("a", "i2c"), fsw], vec![link("a", &["fsw"])]);
+            refused(&g, "fsw", missing);
+        }
+
+        let mut fsw = node("fsw", "gateway_fprime");
+        fsw.attributes
+            .insert("ground_base".to_string(), Scalar::of("10.0.0.2:5100"));
+        let g = answering_fprime(vec![node("a", "i2c"), fsw], vec![link("a", &["fsw"])]);
+        refused(&g, "fsw", "say bridge_base");
+
+        let mut ground = node("ground", "moc");
+        ground
+            .attributes
+            .insert("fprime_id_base".to_string(), Scalar::of("0x3000"));
+        let g = graph(vec![node("a", "i2c"), ground], vec![link("a", &["ground"])]);
+        refused(&g, "ground", "only a gateway_fprime node");
+    }
+
+    /// An F´ gateway in a configuration that answers to the radio is a
+    /// vehicle answering to two kinds, and is refused naming both.
+    #[test]
+    fn an_fprime_gateway_under_the_radio_is_refused() {
+        let g = graph(
+            vec![node("a", "i2c"), node("fsw", "gateway_fprime")],
+            vec![link("a", &["fsw"])],
+        );
+        assert!(
+            g.check().iter().any(|p| matches!(
+                p,
+                Problem::BadNode { node, why } if node == "fsw"
+                    && why.contains("fprime") && why.contains("radio")
+            )),
+            "{:?}",
+            g.check()
+        );
     }
 
     /// A configuration with nothing wrong with it is accepted.

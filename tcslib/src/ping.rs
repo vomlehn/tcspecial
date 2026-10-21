@@ -121,9 +121,9 @@ impl Uplink {
         let node = graph
             .node(moc)
             .ok_or_else(|| format!("there is no node called \"{moc}\""))?;
-        if node.node_type != "moc" {
+        if !tcslibgs::gateway::is_gateway(&node.node_type) {
             return Err(format!(
-                "\"{moc}\" is a {} node, not a moc node",
+                "\"{moc}\" is a {} node, not a gateway node",
                 node.node_type
             ));
         }

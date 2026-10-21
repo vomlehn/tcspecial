@@ -37,6 +37,12 @@ from pathlib import Path
 #: the order it writes them, whatever section each is in.
 NODE_SECTIONS = ("moc", "vehicle", "payloads")
 
+#: Each gateway node type, and the attribute it says where its data goes
+#: with: a radio's ``ground_base``, an F´ gateway's ``bridge_base``. The Python
+#: spelling of ``tcslibgs::gateway::GatewayKind::base_attribute``, for the
+#: kinds that have a node type.
+GATEWAY_BASES = {"moc": "ground_base", "gateway_fprime": "bridge_base"}
+
 
 @dataclass(frozen=True)
 class HostPort:
@@ -129,8 +135,9 @@ class Configuration:
         return parse_interval(self._said("beacon.interval"))
 
     def moc_nodes(self):
-        """The ground links, in the order written."""
-        return [node for node in self.nodes if node.node_type == "moc"]
+        """The gateway nodes -- the links to what the vehicle answers to -- in
+        the order written."""
+        return [node for node in self.nodes if node.node_type in GATEWAY_BASES]
 
     def uplink(self, moc):
         """Where the ground sends to the ``moc`` node called ``moc``: the
@@ -147,30 +154,34 @@ class Configuration:
         return HostPort.of(f'"{moc}" address:port', f"{address}:{port}")
 
     def downlink(self, moc, source):
-        """Where the ground receives what ``source`` sends to the ``moc`` node
-        called ``moc``: that node's ``ground_base``, its port counted on by the
-        source's device id, so that each source arrives on a port of its own."""
+        """Where the ground receives what ``source`` sends to the gateway node
+        called ``moc``: that node's ``ground_base`` -- or ``bridge_base``, for an
+        F´ gateway -- its port counted on by the source's device id, so that
+        each source arrives on a port of its own."""
         node = self._moc(moc)
+        attribute = GATEWAY_BASES[node.node_type]
         if moc not in self.node(source).links.get("payload-out", []):
             raise ValueError(
                 f'{self.path}: "{source}" sends nothing to "{moc}": it has no '
                 "payload-out link to it"
             )
         base = HostPort.of(
-            f'"{moc}" ground_base', node.attributes.get("ground_base", "")
+            f'"{moc}" {attribute}', node.attributes.get(attribute, "")
         )
         port = base.port + self.device_id(source)
         if port > 65535:
             raise ValueError(
-                f'{self.path}: "{moc}" ground_base {base} plus {source}\'s device '
+                f'{self.path}: "{moc}" {attribute} {base} plus {source}\'s device '
                 f"id is port {port}, and a port is at most 65535"
             )
         return HostPort(base.address, port)
 
     def _moc(self, name):
         node = self.node(name)
-        if node.node_type != "moc":
-            raise ValueError(f'{self.path}: "{name}" is a {node.node_type} node, not a moc')
+        if node.node_type not in GATEWAY_BASES:
+            raise ValueError(
+                f'{self.path}: "{name}" is a {node.node_type} node, not a gateway node'
+            )
         return node
 
     def _said(self, attribute):

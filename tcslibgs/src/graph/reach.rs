@@ -28,6 +28,7 @@ use crate::endpoint_config::{
     a_link_term, endpoint_of, parse_u32, EndpointLocation, LinkTerms, Scalar, StreamParams,
     StreamTerms,
 };
+use crate::gateway::{is_gateway, GatewayKind};
 use crate::graph::Node;
 use crate::types::{host_port_of, DeviceConfig, EndpointConfig, HostPort, NetworkConfig};
 use crate::{DHType, NetworkProtocol};
@@ -186,7 +187,7 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
                         )
                     })?
                 }
-                None if node.node_type == "moc" => NetworkProtocol::Udp,
+                None if is_gateway(&node.node_type) => NetworkProtocol::Udp,
                 None => {
                     return Err(format!(
                         "\"{what}\" is a network node, so it needs the protocol spoken \
@@ -238,7 +239,7 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
             // to, knowing the links. Both or neither, whichever: half an
             // address is a mistake on any node.
             let has = |a: &str| node.attributes.contains_key(a);
-            if node.node_type == "moc" && !has("address") && !has("port") {
+            if is_gateway(&node.node_type) && !has("address") && !has("port") {
                 EndpointConfig::Network(NetworkConfig {
                     protocol,
                     address: UNBOUND.to_string(),
@@ -502,13 +503,40 @@ fn take(
                     .map_err(|why| format!("\"{what}\": read_delay: {why}"))?,
             );
         }
-        // Where a ground link's data goes, which only a ground link has:
-        // read below.
-        "ground_base" if node.node_type == "moc" => {}
-        "ground_base" => {
+        // Where a gateway node's data goes, which only a gateway node has,
+        // each kind saying it by the name of what is at its far end: read
+        // below.
+        other if GatewayKind::ALL.iter().any(|k| k.base_attribute() == other) => {
+            match GatewayKind::of_node_type(&node.node_type) {
+                Some(of) if of.base_attribute() == other => {}
+                Some(of) => {
+                    return Err(format!(
+                        "\"{what}\" is a {} node, whose data goes to {}: say {} \
+                         rather than {other}",
+                        node.node_type,
+                        of.far_end(),
+                        of.base_attribute()
+                    ))
+                }
+                None => {
+                    return Err(format!(
+                        "\"{what}\" is {} {} node, and {other} says where a ground \
+                         link's data goes: only a gateway node has one",
+                        kind.article(),
+                        node.node_type
+                    ))
+                }
+            }
+        }
+        // Where the F´ IDs of what goes to an F´ bridge begin, which the
+        // bridge's model is made from and nothing aboard reads: read below.
+        "fprime_id_base"
+            if GatewayKind::of_node_type(&node.node_type) == Some(GatewayKind::Fprime) => {}
+        "fprime_id_base" => {
             return Err(format!(
-                "\"{what}\" is {} {} node, and ground_base says where a ground \
-                 link's data goes: only a moc node has one",
+                "\"{what}\" is {} {} node, and fprime_id_base says where the F´ \
+                 IDs of what goes to an F´ bridge begin: only a gateway_fprime \
+                 node has one",
                 kind.article(),
                 node.node_type
             ))
@@ -532,7 +560,7 @@ fn take(
         }
         // Written the way a trigger is, because it is bytes written the
         // way a trigger is: only once, as the node opens.
-        "init" if node.node_type == "moc" => {
+        "init" if is_gateway(&node.node_type) => {
             return Err(format!(
                 "\"{what}\" is a link to the ground, and init is what a payload \
                  is set to as the vehicle opens it: a ground link has no state \
@@ -702,31 +730,51 @@ const UNBOUND: &str = "0.0.0.0";
 
 /// Whether a node's endpoint is bound aboard for the far end to reach.
 ///
-/// False only for a `moc` node that states no address and no port, which only
-/// sends. Everything else opens what it describes.
+/// False only for a gateway node that states no address and no port, which
+/// only sends. Everything else opens what it describes.
 pub fn binds(node: &Node) -> bool {
-    node.node_type != "moc"
+    !is_gateway(&node.node_type)
         || node.attributes.contains_key("address")
         || node.attributes.contains_key("port")
 }
 
-/// Where a `moc` node's data goes: its `ground_base`, `address:port`.
+/// Where a gateway node's data goes: the `address:port` its kind's base
+/// attribute states -- a radio's `ground_base`, an F´ gateway's
+/// `bridge_base`.
 ///
 /// Required: a ground link with nowhere written down to send would be one
-/// that waits to be spoken to before it can report anything.
+/// that waits to be spoken to before it can report anything. An F´ gateway's
+/// `fprime_id_base` is required here too, and read as a whole number, though
+/// nothing aboard uses it: a bridge model made from a configuration that did
+/// not say where its IDs begin would be one nobody could check.
 fn ground_of(what: &str, node: &Node) -> Result<Option<HostPort>, String> {
-    if node.node_type != "moc" {
+    let Some(kind) = GatewayKind::of_node_type(&node.node_type) else {
         return Ok(None);
-    }
+    };
+    let base = kind.base_attribute();
     let stated = required(
         what,
         node,
-        "ground_base",
+        base,
         "a ground link",
-        "where the ground station is, as address:port -- each node linked into it \
-         sends to that port plus its own device id",
+        &format!(
+            "where {} is, as address:port -- each node linked into it sends to \
+             that port plus its own device id",
+            kind.far_end()
+        ),
     )?;
-    host_port_of("ground_base", stated.as_str())
+    if kind == GatewayKind::Fprime {
+        let ids = required(
+            what,
+            node,
+            "fprime_id_base",
+            "a link to an F´ bridge",
+            "the first of the F´ IDs the bridge gives what arrives -- each node \
+             linked into it is that ID plus its own device id",
+        )?;
+        number(what, "fprime_id_base", ids)?;
+    }
+    host_port_of(base, stated.as_str())
         .map(Some)
         .map_err(|why| format!("\"{what}\": {why}"))
 }
@@ -783,7 +831,8 @@ fn kind_of(node: &Node) -> Result<DHType, String> {
         "gpio" => Ok(DHType::Gpio),
         "hdlc" => Ok(DHType::Hdlc),
         "device-file" => Ok(DHType::Device),
-        "network" | "moc" => Ok(DHType::Network),
+        "network" => Ok(DHType::Network),
+        other if is_gateway(other) => Ok(DHType::Network),
         "compute" => Err(format!(
             "\"{}\" is a compute node: it is a computation and not something \
              that is opened",
@@ -1132,7 +1181,7 @@ mod tests {
         }
     }
 
-    /// Only a ground link has a ground_base.
+    /// Only a gateway node has a ground_base.
     #[test]
     fn a_ground_base_is_refused_anywhere_else() {
         let network = node(
@@ -1146,7 +1195,7 @@ mod tests {
             ],
         );
         let said = reach_of(&network).expect_err("not a ground link");
-        assert!(said.contains("only a moc node"), "{said}");
+        assert!(said.contains("only a gateway node"), "{said}");
     }
 
     /// Every device of the worked example becomes what the flight software

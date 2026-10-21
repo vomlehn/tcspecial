@@ -5,6 +5,7 @@ shipped example; these say how they are worked out, on configurations made
 to show it.
 """
 
+import os
 import sys
 import tempfile
 import unittest
@@ -25,6 +26,29 @@ def written(text):
     path = Path(directory.name) / "vehicle.xml"
     path.write_text(f"<configuration>{text}</configuration>")
     return directory, path
+
+
+class FindBuiltTest(unittest.TestCase):
+    def test_a_build_sent_elsewhere_is_found_there(self):
+        # A program in a target directory of its own, which is where a
+        # CARGO_TARGET_DIR build puts it and no other is looked for.
+        with tempfile.TemporaryDirectory() as target:
+            program = Path(target) / "debug" / "tcs-find-built-test"
+            program.parent.mkdir()
+            program.write_text("")
+            original = os.environ.get("CARGO_TARGET_DIR")
+            os.environ["CARGO_TARGET_DIR"] = target
+            try:
+                found = configuration.find_built("tcs-find-built-test")
+            finally:
+                if original is None:
+                    del os.environ["CARGO_TARGET_DIR"]
+                else:
+                    os.environ["CARGO_TARGET_DIR"] = original
+            self.assertEqual(found, str(program))
+
+    def test_a_program_built_nowhere_is_said_so(self):
+        self.assertIsNone(configuration.find_built("tcs-built-nowhere"))
 
 
 class ConfigurationTest(unittest.TestCase):

@@ -25,6 +25,7 @@ whether a configuration is sound, and a ground station should run on one it
 has passed.
 """
 
+import os
 import re
 import shutil
 import subprocess
@@ -414,11 +415,23 @@ def came_from(stated, sender):
 
 def find_built(program):
     """Where one of the repository's programs is: its own build first, then
-    the path. ``None`` where it is in neither."""
+    the path. ``None`` where it is in neither.
+
+    Its own build is where cargo put it: the directory ``CARGO_TARGET_DIR``
+    names, where that is set -- a relative one read from the repository's
+    root, which is where cargo is run -- and ``target`` otherwise. A build
+    sent elsewhere and looked for in ``target`` is a program that is not
+    there, or worse, an older one that is.
+    """
     root = Path(__file__).resolve().parents[2]
-    for built in (f"target/debug/{program}", f"target/release/{program}"):
-        if (root / built).is_file():
-            return str(root / built)
+    targets = [root / "target"]
+    if os.environ.get("CARGO_TARGET_DIR"):
+        targets.insert(0, root / os.environ["CARGO_TARGET_DIR"])
+    for target in targets:
+        for profile in ("debug", "release"):
+            built = target / profile / program
+            if built.is_file():
+                return str(built)
     return shutil.which(program)
 
 

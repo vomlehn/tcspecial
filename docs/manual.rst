@@ -3286,8 +3286,8 @@ Ping
 ARM Restart
   Arms a restart, which a restart will not happen without. An arm lasts 20
   minutes from when the vehicle takes it unless the ``tcspecial`` section's
-  ``restart-arm-valid`` says otherwise, as a length of time --
-  ``restart-arm-valid: "45 min"`` -- and a restart after that is refused until
+  ``restart_arm_valid`` says otherwise, as a length of time --
+  ``restart_arm_valid: "45 min"`` -- and a restart after that is refused until
   the vehicle is armed again. Long enough to arm, see what the
   vehicle is doing and decide, over a link with minutes of latency; short
   enough that an arm left behind does not stand ready for the next restart

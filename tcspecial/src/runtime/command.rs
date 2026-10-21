@@ -264,7 +264,7 @@ struct Serving {
     /// uses it.
     armed: Option<(ArmKey, Instant)>,
     /// How long an arm licenses a RESTART for: the configuration's
-    /// `restart-arm-valid`.
+    /// `restart_arm_valid`.
     arm_valid: Duration,
     /// What an armed RESTART calls, once it has been answered: asks the
     /// vehicle to stop and run itself again. See [`crate::runtime::restart`].
@@ -510,7 +510,7 @@ impl Serving {
                 }
             },
 
-            // Armed for the next restart-arm-valid, with this key. A second
+            // Armed for the next restart_arm_valid, with this key. A second
             // arm replaces the first, so the arm that counts is the one the
             // operator gave last.
             Command::RestartArm(cmd) => {
@@ -518,7 +518,7 @@ impl Serving {
                 answer_to(command, CommandStatus::Success)
             }
 
-            // Only with the key of an arm taken within restart-arm-valid, and
+            // Only with the key of an arm taken within restart_arm_valid, and
             // the arm is used up: one lost or repeated datagram must not be
             // able to restart the flight software. A key that does not match
             // leaves the arm as it was, so an operator who mistyped it can
@@ -536,7 +536,7 @@ impl Serving {
                 _ => {
                     warn!(
                         "a RESTART came with no RESTART_ARM in the last {:?}, which is \
-                         how long restart-arm-valid says an arm lasts: refused",
+                         how long restart_arm_valid says an arm lasts: refused",
                         self.arm_valid
                     );
                     answer_to(command, CommandStatus::NotArmed)
@@ -1275,7 +1275,7 @@ mod tests {
         assert_eq!(ASKED.load(Ordering::SeqCst), 1);
     }
 
-    /// An arm lasts as long as the configuration's `restart-arm-valid` and
+    /// An arm lasts as long as the configuration's `restart_arm_valid` and
     /// no longer: within it a RESTART is taken, after it refused.
     ///
     /// Asked of the interpreter directly, with arms taken a known while ago,

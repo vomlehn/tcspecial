@@ -115,6 +115,25 @@ To Do
   create network, device, and, eventually, stackable DHs. The later part has to
   consider how to dynamically load code.
 
+See also
+========
+* [The tcspecial manual](https://vomlehn.github.io/tcspecial/docs/manual.html): how to write a
+  configuration, and how to run the flight software and the programs that
+  test it.
+
+* [The tcspecial design](https://vomlehn.github.io/tcspecial/docs/design.html): the specification, and why
+  each rule is what it is.
+
+* [The examples](https://vomlehn.github.io/tcspecial/examples/README.html): working configurations, each
+  with a diagram.
+
+* [tcslib](https://vomlehn.github.io/tcspecial/tcslib/README.html), [tcslibgs](https://vomlehn.github.io/tcspecial/tcslibgs/README.html) and
+  [tcslib-c](https://vomlehn.github.io/tcspecial/tcslib-c/README.html): the libraries a ground station is
+  built on, and what the ground and the vehicle share.
+
+* [Third-party software](https://vomlehn.github.io/tcspecial/docs/third-party.html): what tcspecial is built
+  with, and under which licenses.
+
 Mandatory Note About the Name
 =============================
 The TCSpecial name indicates that it is a central process

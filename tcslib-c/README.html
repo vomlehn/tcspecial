@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>tcslib-c</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<h1 id="tcslib-c">tcslib-c</h1>
+<p><strong>tcslib-c is tcslib for C and C++.</strong> It is the library
+a ground station written in C or C++ is built on: the vehicle’s beacons,
+the vehicle’s data from a <code>moc</code> node, and commands to the
+vehicle, behind one header, <code>include/tcs.h</code>.</p>
+<p>It is not a second implementation of anything. Each function is a
+call into <a href="../tcslib/README.md">tcslib</a>, so a C or C++ ground
+station reads the configuration, counts ports and ages beacons exactly
+as tcsmoc does, and the two cannot come to disagree.</p>
+<p>C and C++ alike: the header is C, includable from C++ as it stands,
+with C linkage throughout, and nothing in it that C++ will not
+compile.</p>
+<h2 id="what-is-in-it">What is in it</h2>
+<ul>
+<li><strong>The configuration.</strong>
+<code>tcs_configuration_open</code> reads and checks a configuration,
+YAML or XML, as the vehicle does. It gives the configuration’s digest
+and each node’s id.</li>
+<li><strong>Beacons.</strong> <code>tcs_beacons_listen</code> listens
+where the configuration says beacons arrive, and each
+<code>tcs_beacons_pass</code> says how long since the last one: the
+stage (Unheard, Heard, Aging or Waiting), whether a light showing it is
+lit, whether the spacecraft is being heard from, when the last beacon
+arrived and what it said. Each pass also gives remarks, which are news,
+and warnings, which are to be said whether or not anybody asked.</li>
+<li><strong>The vehicle’s data.</strong> <code>tcs_moc_open</code> opens
+a <code>moc</code> node, and each <code>tcs_moc_receive</code> returns
+one datum and the name of the node that produced it.</li>
+<li><strong>Commands.</strong> <code>tcs_client_open</code> opens the
+two command links the configuration states.
+<code>tcs_client_connect</code> says whether the vehicle is flying this
+configuration; then ping; start, stop or query a node by its id, set one
+of its attributes, or ask for the last datum it moved each way; retime
+the beacon; and arm a restart and restart the vehicle.</li>
+<li><strong>Pinging a ping node.</strong> <code>tcs_pinger_open</code>
+finds the first <code>ping</code> node the ground can reach both ways
+and its <code>moc</code> node. <code>tcs_pinger_ping</code> sends a ping
+up; its answer comes down as the ping node’s data, which a station takes
+with <code>tcs_moc_receive</code> and hands to
+<code>tcs_pinger_answered</code>; and <code>tcs_pinger_exchange</code>
+gives the round trip and the two halves of it.</li>
+</ul>
+<p>Every handle is made by an <code>_open</code> and freed by its
+<code>_close</code>. A function that cannot do what it was asked returns
+<code>NULL</code> or -1, and <code>tcs_last_error()</code> says why. The
+header says the rest.</p>
+<h2 id="building-with-it">Building with it</h2>
+<p>Cargo builds <code>libtcs.a</code> and <code>libtcs.so</code>, from
+the repository’s root:</p>
+<pre><code>cargo build -p tcslib-c
+cc  my_station.c   -I tcslib-c/include target/debug/libtcs.a -lpthread -ldl -lm
+c++ my_station.cpp -I tcslib-c/include target/debug/libtcs.a -lpthread -ldl -lm</code></pre>
+<p><code>examples/ground.c</code> is a ground station in C, and
+<code>examples/ground.cpp</code> the same one in C++: each reads the
+configuration, waits for the first beacon, connects and pings, asks
+about a node and sets one of its attributes, retimes the beacon, pings
+the vehicle’s ping node and times the answer, and prints the vehicle’s
+data from a <code>moc</code> node. They take <code>--yaml</code> or
+<code>--xml</code>, as every example program does, and
+<code>--restart</code> to arm a restart and restart the vehicle, which
+they do only when asked.</p>
+<h2 id="how-the-header-is-kept-honest">How the header is kept
+honest</h2>
+<p>It is written by hand, for people, so the proof that it says what the
+library does is a program that compiles against it and works.
+<code>tests/c_and_cpp.rs</code> builds <code>libtcs.a</code> from the
+source as it is, compiles both example programs against the header with
+gcc and g++ – warnings as errors – and runs each against a vehicle the
+test plays. The two must print the same lines, and the right ones, and
+they compare what they read against the header’s own constants, so a
+header whose numbers had drifted from the library’s fails. The header
+alone is also compiled as C99 and as C++11.</p>
+<h2 id="known-limits">Known limits</h2>
+<ul>
+<li><strong>A retimed beacon is not followed.</strong> After
+<code>tcs_client_configure</code>, a station’s beacon watch goes on
+aging beacons against the interval the configuration states, as tcsmoc’s
+does.</li>
+<li><strong>A query’s counts are not given.</strong>
+<code>tcs_client_query_node</code> says whether a node is running; the
+counts of what it has moved, which tcslib’s answer carries, have no C
+spelling yet.</li>
+<li><strong>One thread per handle.</strong> A handle is used from one
+thread at a time; nothing in the library locks one.
+<code>tcs_last_error()</code> is per thread.</li>
+<li><strong>A beacon pass may wait for ever.</strong> Before any beacon
+has arrived, <code>tcs_beacons_pass</code> waits for one, with no
+timeout: run it on a thread of its own, as tcsmoc does.</li>
+<li><strong>Strings are borrowed.</strong> A string a function returns
+is good until the next call on the same handle or its
+<code>_close</code>. Copy it to keep it.</li>
+<li><strong>Linking.</strong> On Linux, <code>libtcs.a</code> needs
+<code>-lpthread -ldl -lm</code> beside it, which is what the tests link
+with. That is enough where the C library has folded the rest into
+itself, as recent glibc has; the whole list for a system is what
+<code>cargo rustc -p tcslib-c --lib --crate-type staticlib -- --print native-static-libs</code>
+prints, which here is
+<code>-lgcc_s -lutil -lrt -lpthread -lm -ldl -lc</code>. Nothing but
+Linux has been built or tested.</li>
+<li><strong>Tests without a C compiler.</strong> Where there is no gcc
+or no g++, <code>tests/c_and_cpp.rs</code> says so and passes without
+building that program: a machine with no C compiler has no C program to
+break, but it has also not checked the header.</li>
+<li><strong>Fixed-size text.</strong> What the library hands back is
+held in buffers of fixed size, stated in the header:
+<code>TCS_ERROR_BYTES</code> (512) for <code>tcs_last_error()</code>,
+<code>TCS_TEXT_BYTES</code> (256) for what a beacon said and each remark
+and warning, and at most <code>TCS_MAX_REMARKS</code> (8) remarks and as
+many warnings a pass. Text too long is cut short at a character and ends
+“…”; a pass with more to say keeps seven and says how many more there
+were. A SET_NODE carries an attribute of at most
+<code>TCS_ATTRIBUTE_BYTES</code> (64) and a value of at most
+<code>TCS_VALUE_BYTES</code> (256); longer is refused, and not
+sent.</li>
+<li><strong>Where it still allocates.</strong> Avoiding dynamic
+allocation is a rule of this repository. This layer allocates nothing of
+its own as a station runs; what remains is said in the source where it
+happens, and is:
+<ul>
+<li><em>Once, at startup.</em> Each <code>_open</code> allocates its
+handle, which has to outlive the call and whose size C does not see.
+<code>tcs_configuration_open</code> reads and checks a whole
+configuration, as tcslib does; <code>tcs_moc_open</code> makes the names
+of the node’s sources, which every receive then points at, and the
+buffer every datum is received in; and
+<code>tcs_configuration_node_id</code> asks tcslib for every node’s
+id.</li>
+<li><em>In tcslib, as a station runs, only where something happens.</em>
+A beacon pass, a datum, a ping and its answer, and a command sent
+allocate nothing. What does: a remark or warning, on the pass where
+something changed; an answer to a command, whose strings tcslib reads as
+its own; and what came down from the ping node that is not an answer, to
+say why.</li>
+</ul></li>
+</ul>
+<p><code>make</code> in this directory builds <code>README.html</code>
+from this file.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a
+href="https://vomlehn.github.io/tcspecial/tcslib-c/README.html">This
+page as HTML</a>.</li>
+<li><a
+href="https://vomlehn.github.io/tcspecial/tcslib/README.html">tcslib</a>,
+the Rust library this one wraps, and <a
+href="https://vomlehn.github.io/tcspecial/tcslibgs/README.html">tcslibgs</a>,
+what the ground and the vehicle share.</li>
+<li><a href="https://vomlehn.github.io/tcspecial/docs/manual.html">The
+tcspecial manual</a> and <a
+href="https://vomlehn.github.io/tcspecial/docs/design.html">design</a>.</li>
+</ul>
+</body>
+</html>

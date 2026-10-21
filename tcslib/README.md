@@ -55,3 +55,9 @@ cargo doc -p tcslib --open
 
 `make` in this directory builds `README.html` from this file, and
 `make clean` removes it.
+
+## See also
+
+- [This page as HTML](https://vomlehn.github.io/tcspecial/tcslib/README.html).
+- [tcslibgs](https://vomlehn.github.io/tcspecial/tcslibgs/README.html), what the ground and the vehicle share, and [tcslib-c](https://vomlehn.github.io/tcspecial/tcslib-c/README.html), this library for C and C++.
+- [The tcspecial manual](https://vomlehn.github.io/tcspecial/docs/manual.html) and [design](https://vomlehn.github.io/tcspecial/docs/design.html).

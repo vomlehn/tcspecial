@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>tcslibgs</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<h1 id="tcslibgs">tcslibgs</h1>
+<p><strong>tcslibgs is what the ground software and the vehicle software
+share.</strong> The “gs” is ground and space. Anything both ends of the
+link have to agree on is written here, once, and both ends use it: the
+vehicle (tcspecial) on one side, the ground stations and tools on the
+other.</p>
+<p>That agreement covers two things.</p>
+<p><strong>The link itself.</strong> The commands the ground sends, the
+telemetry and beacons the vehicle answers with, and how each is encoded.
+If the two ends defined these separately, a change to one would be a
+link that no longer works.</p>
+<p><strong>The configuration.</strong> Every configuration file is read
+here, in YAML or XML, and every rule about what a configuration may say
+is checked here. A configuration describes the vehicle as a graph of
+nodes and the links between them (<code>graph</code>), and every program
+that opens one reads it through this crate:</p>
+<ul>
+<li>tcspecial runs it aboard.</li>
+<li>tcsmoc and tcssim build their panels from it.</li>
+<li>tcsgui edits it.</li>
+<li>tcsverify checks it.</li>
+</ul>
+<p>So no program reads a file in a way of its own, and the error a
+person sees in the editor is the one the vehicle would have refused the
+file with.</p>
+<h2 id="what-is-in-it">What is in it</h2>
+<ul>
+<li><code>commands</code>, <code>telemetry</code>,
+<code>protocol</code>: the command and telemetry protocol.</li>
+<li><code>beacon</code>: the beacon, which is not JSON as the answers to
+commands are but 34 bytes in a fixed layout, described in XTCE in
+<code>xtce/beacon.xml</code>. The code that packs and unpacks it,
+<code>src/beacon_packet.rs</code> and
+<code>../python/tcslibgs/beacon_packet.py</code>, is generated from that
+file by tcsxtce (vendored in <code>../vendor/tcsxtce</code>): run
+<code>make beacon-packet</code> here after changing it.</li>
+<li><code>config_digest</code>: the digest of a configuration, which
+both ends report, so each can tell whether the other read the same
+files.</li>
+<li><code>graph</code>: the configuration, a graph of nodes, with its
+checks, and the ports each link to the ground arrives at.</li>
+<li><code>node</code>: one module per node type, giving each type’s
+attributes and how they are checked. tcspecial and tcssim have trees of
+the same shape, one for the node aboard and one for the simulator’s
+stand-in for it.</li>
+<li><code>format</code>, <code>config</code>, <code>types</code>,
+<code>endpoint_config</code>, <code>whole</code>, <code>trigger</code>:
+reading the files. One parser per format, one set of types for both, one
+grammar for whole numbers, one for trigger bytes.</li>
+<li><code>sim_config</code>: the simulator’s own configuration
+file.</li>
+<li><code>verify</code>: what a problem in a configuration is about, so
+that tcsverify and the editor can put it beside the line that has to
+change.</li>
+<li><code>parameters</code>, <code>display</code>: what both test
+windows, tcsmoc and tcssim, show about a payload, and where on the
+screen each window goes.</li>
+<li><code>error</code>: the errors all of the above return.</li>
+</ul>
+<h2 id="what-tcslibgs-is-not">What tcslibgs is not</h2>
+<p>It has no network code for the ground. Opening a link to the vehicle,
+sending a command, receiving data and listening for beacons are all in
+<code>tcslib</code>, which builds on this crate and re-exports it. The
+flight software itself is <code>tcspecial</code>.</p>
+<h2 id="who-uses-it">Who uses it</h2>
+<p>Every crate in the workspace that has anything to do with the link or
+a configuration: tcspecial, tcslib, tcsmoc, tcssim, tcsgui and
+tcsverify, and <code>examples/beacon</code>.</p>
+<h2 id="building-and-testing">Building and testing</h2>
+<pre><code>cargo build -p tcslibgs
+cargo test -p tcslibgs
+cargo doc -p tcslibgs --open</code></pre>
+<p><code>make</code> in this directory builds <code>README.html</code>
+from this file, and <code>make clean</code> removes it.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a
+href="https://vomlehn.github.io/tcspecial/tcslibgs/README.html">This
+page as HTML</a>.</li>
+<li><a
+href="https://vomlehn.github.io/tcspecial/tcslib/README.html">tcslib</a>,
+what a ground station is built on, and <a
+href="https://vomlehn.github.io/tcspecial/tcslib-c/README.html">tcslib-c</a>,
+the same for C and C++.</li>
+<li><a href="https://vomlehn.github.io/tcspecial/docs/manual.html">The
+tcspecial manual</a> and <a
+href="https://vomlehn.github.io/tcspecial/docs/design.html">design</a>.</li>
+</ul>
+</body>
+</html>

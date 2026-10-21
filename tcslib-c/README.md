@@ -120,3 +120,9 @@ The header alone is also compiled as C99 and as C++11.
     and what came down from the ping node that is not an answer, to say why.
 
 `make` in this directory builds `README.html` from this file.
+
+## See also
+
+- [This page as HTML](https://vomlehn.github.io/tcspecial/tcslib-c/README.html).
+- [tcslib](https://vomlehn.github.io/tcspecial/tcslib/README.html), the Rust library this one wraps, and [tcslibgs](https://vomlehn.github.io/tcspecial/tcslibgs/README.html), what the ground and the vehicle share.
+- [The tcspecial manual](https://vomlehn.github.io/tcspecial/docs/manual.html) and [design](https://vomlehn.github.io/tcspecial/docs/design.html).

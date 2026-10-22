@@ -647,8 +647,9 @@ fn handle_close(
 ///
 /// Continue closes the question and leaves everything running; Quit stops
 /// tcspecial and tcssim, where this MOC started them, and exits, as the Quit
-/// button does. Asked from the beacon thread, so the window is made on the
-/// event loop.
+/// button does. Asked inside the main window, in front of its panels, so it
+/// cannot be lost behind them: see DiffersPanel in the markup. Asked from the
+/// beacon thread, so the window is touched on the event loop.
 fn ask_whether_to_continue(
     pm_tcssim: Arc<ProcessManager>,
     pm_tcspecial: Option<Arc<ProcessManager>>,
@@ -657,51 +658,45 @@ fn ask_whether_to_continue(
         let pm_tcssim = pm_tcssim.clone();
         let pm_tcspecial = pm_tcspecial.clone();
         let _ = slint::invoke_from_event_loop(move || {
-            let Ok(window) = DiffersWindow::new() else {
+            let Some(ui) = main_window() else {
                 return;
             };
-            window.set_message(SharedString::from(why));
+            ui.set_differs_message(SharedString::from(why));
             // The panels take no presses until it is answered: nothing is
             // commanded behind a question about whether to go on at all.
-            main_window_inert(true);
-            // The window holds a handle on itself through this callback, so
-            // that it stays up until it is answered rather than until this
-            // function returns.
-            let held = window.clone_strong();
-            window.on_continue_anyway(move || {
-                main_window_inert(false);
-                let _ = held.hide();
+            ui.set_inert(true);
+            ui.on_differs_continue_anyway(move || {
+                if let Some(ui) = main_window() {
+                    ui.set_differs_up(false);
+                    ui.set_inert(false);
+                }
             });
-            window.on_quit(move || {
+            ui.on_differs_quit(move || {
                 kill_and_exit_all(&pm_tcssim, pm_tcspecial.as_ref());
             });
-            let _ = window.show();
+            ui.set_differs_up(true);
         });
     })
 }
 
 thread_local! {
-    /// The main window, for a question asked in a window of its own to make
-    /// it inert while it waits: see `ask_whether_to_continue`. Weak, so the
+    /// The main window, for a question to be asked in it, and to make it
+    /// inert while it waits: see `ask_whether_to_continue`. Weak, so the
     /// window is not kept alive by being remembered. On the event loop's
     /// thread, which is the only one a window may be touched from.
     static MAIN_WINDOW: std::cell::RefCell<Option<slint::Weak<MainWindow>>> =
         const { std::cell::RefCell::new(None) };
 }
 
-/// Remember the main window, so a question can make it inert. Called where
+/// Remember the main window, so a question can be asked in it. Called where
 /// each run makes its window.
 fn remember_main_window(ui: &MainWindow) {
     MAIN_WINDOW.with(|main| *main.borrow_mut() = Some(ui.as_weak()));
 }
 
-/// Make the main window take no presses, or take them again.
-fn main_window_inert(inert: bool) {
-    MAIN_WINDOW.with(|main| {
-        if let Some(ui) = main.borrow().as_ref().and_then(|weak| weak.upgrade()) {
-            ui.set_inert(inert);
-        }
-    });
+/// The main window, while it is there.
+fn main_window() -> Option<MainWindow> {
+    MAIN_WINDOW.with(|main| main.borrow().as_ref().and_then(|weak| weak.upgrade()))
 }
 
 fn kill_and_exit_all(pm_tcssim: &Arc<ProcessManager>, pm_tcspecial: Option<&Arc<ProcessManager>>) {
@@ -1290,8 +1285,72 @@ mod tests {
         every_panel_shows_what_arrived_from_its_payload();
         panels_fill_left_to_right();
         every_panel_in_a_row_is_the_same_width();
+        the_question_is_asked_in_front_of_the_greyed_panels();
         crate::vehicle::tests::pressing_connect_and_enable_commands_the_vehicle();
         crate::vehicle::tests::pressing_send_ping_pings_the_node_and_times_its_answer();
+    }
+
+    /// The question about a configuration that differs is asked inside the
+    /// main window, in front of a veil that greys the panels, and answering
+    /// it takes both away.
+    ///
+    /// Inside rather than in a window of its own, because a window of its own
+    /// cannot be kept in front of the main one on Wayland, and a question
+    /// behind the window waiting for it leaves nothing anybody can press.
+    ///
+    /// Not a test of its own: one test per binary may start the testing
+    /// backend, and its windows belong to the thread that made them.
+    fn the_question_is_asked_in_front_of_the_greyed_panels() {
+        use i_slint_backend_testing::{ElementHandle, ElementQuery};
+
+        let ui = MainWindow::new().unwrap();
+        ui.window().set_size(slint::LogicalSize::new(900.0, 600.0));
+        ui.show().unwrap();
+        remember_main_window(&ui);
+
+        // As `ask_whether_to_continue` asks it, without the processes it
+        // would stop on Quit.
+        ui.set_differs_message("tcspecial md5 aaaa, this MOC md5 bbbb".into());
+        ui.set_inert(true);
+        ui.on_differs_continue_anyway(|| {
+            if let Some(ui) = main_window() {
+                ui.set_differs_up(false);
+                ui.set_inert(false);
+            }
+        });
+        ui.set_differs_up(true);
+
+        // The question is there, in front of the veil and inside the window.
+        let panel = ElementQuery::from_root(&ui)
+            .match_inherits("DiffersPanel")
+            .find_first()
+            .expect("the question is in the main window");
+        let at = panel.absolute_position();
+        let size = panel.size();
+        let window = ui.window().size().to_logical(ui.window().scale_factor());
+        assert!(
+            at.x >= 0.0
+                && at.y >= 0.0
+                && at.x + size.width <= window.width
+                && at.y + size.height <= window.height,
+            "the question at {at:?}, {size:?} is not inside a window {window:?}"
+        );
+        let veil = ElementHandle::find_by_element_type_name(&ui, "Rectangle")
+            .find(|e| e.size().width == window.width && e.size().height == window.height)
+            .expect("a veil over the whole window");
+        assert!(veil.is_valid());
+
+        // Continue anyway takes the question and the veil away.
+        ElementQuery::from_root(&ui)
+            .match_inherits("DiffersPanel")
+            .match_descendants()
+            .match_predicate(|e| e.accessible_label().as_deref() == Some("Continue anyway"))
+            .find_first()
+            .expect("the question has Continue anyway")
+            .invoke_accessible_default_action();
+        assert!(!ui.get_differs_up(), "the question has gone");
+        assert!(!ui.get_inert(), "and the panels take presses again");
+        let _ = ui.hide();
     }
 
     /// The MOC listens where tcspecial sends, by reading the same files.

@@ -467,7 +467,14 @@ impl ProcessManager {
         }
     }
 
-    /// Starts a child in a background thread and exits when it completes.
+    /// Starts a child, and a thread that asks the MOC to stop when it ends.
+    ///
+    /// Asks rather than exits: a child that ends on its own -- a tcssim whose
+    /// window was closed, a tcspecial that could not bind its ports -- left
+    /// the other one running when this exited here, holding the ports the
+    /// next MOC on that configuration then fails to bind. Asking is what a
+    /// signal does, so the timer that notices a signal stops what the MOC
+    /// started, the one that ended included, and exits: see `stop_if_asked`.
     fn start_child(&self, name: &str, payload_path: &str) {
         let child = child_command(name, payload_path)
             .spawn()
@@ -488,16 +495,16 @@ impl ProcessManager {
                     match child.try_wait() {
                         Ok(Some(status)) => {
                             println!("{} exited with status: {}", name_clone, status);
-                            drop(guard);
-                            exit(0);
+                            ask_to_stop();
+                            break;
                         }
                         Ok(None) => {
                             // Still running
                         }
                         Err(e) => {
                             println!("Error waiting for {}: {}", name_clone, e);
-                            drop(guard);
-                            exit(1);
+                            ask_to_stop();
+                            break;
                         }
                     }
                 } else {
@@ -740,6 +747,11 @@ pub(crate) fn listen_for_stop() {
 /// unwind from a handler -- so the timer that repaints the panels notices
 /// within a second and does it from the event loop.
 extern "C" fn note_the_stop(_signal: libc::c_int) {
+    ask_to_stop();
+}
+
+/// Ask the MOC to stop, as a signal does: see `stop_if_asked`.
+fn ask_to_stop() {
     STOPPING.store(true, std::sync::atomic::Ordering::Relaxed);
 }
 

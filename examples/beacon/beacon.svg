@@ -17,7 +17,7 @@
       .groundward { fill: none; stroke: #2563eb; stroke-width: 2; }
       .telemetry { fill: none; stroke: #2563eb; stroke-width: 2; stroke-dasharray: 8 5; }
       .beacon { fill: none; stroke: #15803d; stroke-width: 2.4; }
-      .lamp { stroke: #6b7280; stroke-width: 1; }
+      .indicator { stroke: #6b7280; stroke-width: 1; }
     </style>
     <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/>
@@ -63,7 +63,7 @@
   <!-- The panel it shows, drawn as it looks -->
   <rect class="socket" x="676" y="170" width="183" height="46" rx="6"/>
   <text class="label" x="688" y="190">Beacon:</text>
-  <circle class="lamp" cx="748" cy="185" r="7" fill="#00ff00"/>
+  <circle class="indicator" cx="748" cy="185" r="7" fill="#00ff00"/>
   <text class="detail" x="688" y="208">last rcvd, last msg</text>
 
   <!-- Links -->

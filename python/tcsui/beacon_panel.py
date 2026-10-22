@@ -129,7 +129,7 @@ class BeaconPanel(ttk.LabelFrame):
             highlightthickness=0,
             background=theme.background(self),
         )
-        self._lamp = self._indicator.create_oval(
+        self._oval = self._indicator.create_oval(
             1, 1, size - 1, size - 1, fill=NOTHING_YET.indicator, outline="#808080"
         )
         self._indicator.grid(row=0, column=1, sticky="w", padx=12, pady=2)
@@ -145,14 +145,14 @@ class BeaconPanel(ttk.LabelFrame):
     def show(self, shown):
         """Put what a pass of the beacon loop reported on the panel: all three
         at once, from the one reading."""
-        self._indicator.itemconfigure(self._lamp, fill=shown.indicator)
+        self._indicator.itemconfigure(self._oval, fill=shown.indicator)
         self._received.configure(text=shown.received)
         self._message.configure(text=shown.message)
 
     def showing(self):
         """What the panel shows now, for a test to read back."""
         return Shown(
-            indicator=self._indicator.itemcget(self._lamp, "fill"),
+            indicator=self._indicator.itemcget(self._oval, "fill"),
             received=self._received.cget("text"),
             message=self._message.cget("text"),
         )

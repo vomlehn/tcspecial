@@ -1,6 +1,7 @@
 import { Button, CheckBox, ComboBox, LineEdit, ScrollView, TextEdit } from "std-widgets.slint";
 import { Copyable, CopyButton } from "../../tcsverify/ui/copy.slint";
 import { Fonts } from "../../tcsui/ui/fonts.slint";
+import { Colors } from "../../tcsui/ui/colors.slint";
 
 // The two scales, stated once.
 //
@@ -1260,7 +1261,7 @@ component Surface inherits Rectangle {
     // of its own -- see NodeWindow -- so this is all the canvas needs.
     in property <string> selected: "";
 
-    background: #fbfbfa;
+    background: Colors.window;
 
     VerticalLayout {
         padding: Space.step;
@@ -1667,7 +1668,7 @@ export component MainWindow inherits Window {
     // Saying in the title bar when this session changes nothing, which is
     // where somebody looks to see what a window is.
     title: Session.read-only ? "TCSpecial Configuration (read-only)" : "TCSpecial Configuration";
-    background: #fbfbfa;
+    background: Colors.window;
     // Wide enough for both working panes and both selection panes, which is
     // what the preferred width is: 960 of working area, 180 of selection
     // panes and the gaps between them. There was a 260-pixel panel here as
@@ -1928,7 +1929,7 @@ export component MainWindow inherits Window {
 export component SubWindow inherits Window {
     default-font-size: Fonts.window;
     title: "TCSpecial Configuration -- " + root.editing;
-    background: #fbfbfa;
+    background: Colors.window;
     // The same two working panes as the top diagram, so the same room: a
     // subdiagram is a page of one configuration and its payloads go on the
     // same side of it.
@@ -2152,7 +2153,7 @@ export component SubWindow inherits Window {
 export component GroupWindow inherits Window {
     default-font-size: Fonts.window;
     title: "Group -- " + root.group;
-    background: #fbfbfa;
+    background: Colors.window;
     min-width: 360px;
     min-height: 320px;
     preferred-width: 420px;
@@ -2341,7 +2342,7 @@ export component GroupWindow inherits Window {
 export component ParametersWindow inherits Window {
     default-font-size: Fonts.window;
     title: "tcspecial parameters";
-    background: #fbfbfa;
+    background: Colors.window;
     min-width: 380px;
     min-height: 360px;
     preferred-width: 440px;
@@ -2448,7 +2449,7 @@ export component ParametersWindow inherits Window {
 export component SimWindow inherits Window {
     default-font-size: Fonts.window;
     title: root.editing;
-    background: #fbfbfa;
+    background: Colors.window;
     min-width: 380px;
     min-height: 360px;
     preferred-width: 440px;
@@ -2573,7 +2574,7 @@ export component SimWindow inherits Window {
 export component NodeWindow inherits Window {
     default-font-size: Fonts.window;
     title: root.node == "" ? "a node" : root.node;
-    background: #f2f2f0;
+    background: Colors.window;
     min-width: 300px;
     min-height: 260px;
     preferred-width: 340px;
@@ -2831,7 +2832,7 @@ export component NodeWindow inherits Window {
 export component AlertWindow inherits Window {
     default-font-size: Fonts.window;
     title: "tcsgui";
-    background: #fbfbfa;
+    background: Colors.window;
     min-width: 360px;
     min-height: 140px;
     preferred-width: 460px;
@@ -2915,7 +2916,7 @@ export component AlertWindow inherits Window {
 export component ConcernsWindow inherits Window {
     default-font-size: Fonts.window;
     title: "tcsgui";
-    background: #fbfbfa;
+    background: Colors.window;
     min-width: 420px;
     min-height: 200px;
     preferred-width: 560px;
@@ -3032,7 +3033,7 @@ export component ConcernsWindow inherits Window {
 export component ProblemsWindow inherits Window {
     default-font-size: Fonts.window;
     title: "Problems in this configuration";
-    background: #fbfbfa;
+    background: Colors.window;
     min-width: 520px;
     min-height: 260px;
     preferred-width: 680px;
@@ -3199,7 +3200,7 @@ export component ProblemsWindow inherits Window {
 export component DeleteWindow inherits Window {
     default-font-size: Fonts.window;
     title: "Delete a node";
-    background: #fbfbfa;
+    background: Colors.window;
     min-width: 320px;
     min-height: 150px;
     preferred-width: 400px;
@@ -3258,7 +3259,7 @@ export component DeleteWindow inherits Window {
 export component LeaveWindow inherits Window {
     default-font-size: Fonts.window;
     title: "Leave tcsgui";
-    background: #fbfbfa;
+    background: Colors.window;
     min-width: 360px;
     min-height: 160px;
     preferred-width: 420px;

@@ -20,6 +20,7 @@ THEME = "clam"
 #: The window's background, and every box's: white rather than the theme's
 #: grey, which is the one colour the beacon indicator keeps for "nothing heard
 #: yet" and would leave an unheard indicator nearly the colour of its window.
+#: The Slint windows read the same white from tcsui/ui/colors.slint.
 BACKGROUND = "#ffffff"
 
 #: A box's edge: one flat pixel, the colour tcsui's TitledBox draws in, rather

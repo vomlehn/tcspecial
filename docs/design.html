@@ -5508,9 +5508,9 @@ time.</p>
 <p>Beacon</p>
 <p>The beacon is not JSON, as the answers to commands are. It is 34 bytes in a
 fixed layout, stated once, in XTCE, in <tt class="docutils literal">tcslibgs/xtce/beacon.xml</tt>, and packed
-and unpacked by the code tcsxtce generates from that file: Rust in
+and unpacked by the code tcs-xtce generates from that file: Rust in
 <tt class="docutils literal"><span class="pre">tcslibgs::beacon</span></tt>, which tcspecial and <tt class="docutils literal">tcslib</tt> use, and Python in
-<tt class="docutils literal">python/tcslibgs/beacon.py</tt>. tcsxtce is vendored in <tt class="docutils literal">vendor/tcsxtce</tt> until
+<tt class="docutils literal">python/tcslibgs/beacon.py</tt>. tcs-xtce is vendored in <tt class="docutils literal"><span class="pre">vendor/tcs-xtce</span></tt> until
 it is published.</p>
 <table border="1" class="docutils">
 <colgroup>
@@ -5574,7 +5574,7 @@ by <tt class="docutils literal">make <span class="pre">beacon-packet</span></tt>
 <dd>Packing a beacon allocates nothing once the packer is made: tcspecial's
 beacon thread makes one <tt class="docutils literal">BeaconPacker</tt> when it starts and packs every
 beacon into its buffer. Unpacking one allocates three times, because
-tcsxtce's Rust decoder hands back the name, the space and the digest as a
+tcs-xtce's Rust decoder hands back the name, the space and the digest as a
 <tt class="docutils literal">String</tt>, a <tt class="docutils literal">String</tt> and a <tt class="docutils literal">Vec</tt>; <tt class="docutils literal">tcslib</tt>'s tests hold a beacon
 pass to exactly those.</dd>
 <dt>Requirement</dt>

@@ -5422,9 +5422,9 @@ Beacon
 
 The beacon is not JSON, as the answers to commands are. It is 34 bytes in a
 fixed layout, stated once, in XTCE, in ``tcslibgs/xtce/beacon.xml``, and packed
-and unpacked by the code tcsxtce generates from that file: Rust in
+and unpacked by the code tcs-xtce generates from that file: Rust in
 ``tcslibgs::beacon``, which tcspecial and ``tcslib`` use, and Python in
-``python/tcslibgs/beacon.py``. tcsxtce is vendored in ``vendor/tcsxtce`` until
+``python/tcslibgs/beacon.py``. tcs-xtce is vendored in ``vendor/tcs-xtce`` until
 it is published.
 
 +----------------+-------------------------------------------------------------+
@@ -5466,7 +5466,7 @@ Requirement
     Packing a beacon allocates nothing once the packer is made: tcspecial's
     beacon thread makes one ``BeaconPacker`` when it starts and packs every
     beacon into its buffer. Unpacking one allocates three times, because
-    tcsxtce's Rust decoder hands back the name, the space and the digest as a
+    tcs-xtce's Rust decoder hands back the name, the space and the digest as a
     ``String``, a ``String`` and a ``Vec``; ``tcslib``'s tests hold a beacon
     pass to exactly those.
 

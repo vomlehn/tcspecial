@@ -482,7 +482,7 @@ Every interface offered to C is offered to C++ as well: a C header can be
 included from C++ as it stands, and nothing in it is C that C++ will not
 compile.</p>
 <p><strong>cFS and F´.</strong> Work is under way on using TCSpecial, its telemetry log tcslog
-and its packet compiler tcsxtce with the two flight software frameworks most
+and its packet compiler tcs-xtce with the two flight software frameworks most
 missions are built on, NASA's core Flight System and JPL's F´. What each
 project brings to them, what has to change to fit, and in what order, is in
 <tt class="docutils literal"><span class="pre">third-party.rst</span></tt>, beside this manual.</p>
@@ -2333,7 +2333,7 @@ version's major, minor and patch a byte each, a space, the sixteen bytes of
 the configuration's MD5 digest, and the beacon's number in four bytes, most
 significant first. The layout is described in XTCE, in
 <tt class="docutils literal">tcslibgs/xtce/beacon.xml</tt>, and tcspecial packs each beacon, and
-<tt class="docutils literal"><span class="pre">tcslib::beacon</span></tt> unpacks it, with the code tcsxtce generates from that file:
+<tt class="docutils literal"><span class="pre">tcslib::beacon</span></tt> unpacks it, with the code tcs-xtce generates from that file:
 <tt class="docutils literal"><span class="pre">tcslibgs::Beacon</span></tt>. The example's test packs the beacon it sends the same
 way. Nothing about the layout is written by hand, so to change it, change the
 XML and run <tt class="docutils literal">make <span class="pre">beacon-packet</span></tt> in <tt class="docutils literal">tcslibgs/</tt>.</p>
@@ -2376,7 +2376,7 @@ device id. Each time is seconds since the UNIX epoch to the nanosecond:
 <p>The ground station is a Python 3 program, <tt class="docutils literal">ping_moc.py</tt>, that uses nothing
 outside the standard library to read the XML spelling of its configuration --
 its window is tkinter -- and PyYAML to read the YAML one. It unpacks beacons
-with tcsxtce's Python runtime, which is in this tree, in <tt class="docutils literal">vendor/tcsxtce</tt>,
+with tcs-xtce's Python runtime, which is in this tree, in <tt class="docutils literal"><span class="pre">vendor/tcs-xtce</span></tt>,
 and found from there. It shows the beacon
 panel, the last ping sent and when, the last answer received and when, and
 three times:</p>
@@ -3678,8 +3678,8 @@ crates they depend on in turn are not listed: <tt class="docutils literal">cargo
 graph, and <tt class="docutils literal">Cargo.lock</tt> says which version of each is built.</p>
 <p>Every one is fetched from <a class="reference external" href="https://crates.io">crates.io</a>, the Rust package
 registry, which is where <tt class="docutils literal">cargo build</tt> downloads it from, but one: <tt class="docutils literal">xtce</tt>,
-tcsxtce's runtime, which packs and unpacks the beacon, is taken from a copy in
-<tt class="docutils literal">vendor/tcsxtce</tt> until tcsxtce is published, and is not listed below. Each
+tcs-xtce's runtime, which packs and unpacks the beacon, is taken from a copy in
+<tt class="docutils literal"><span class="pre">vendor/tcs-xtce</span></tt> until tcs-xtce is published, and is not listed below. Each
 name below links to its page there, the version links to its documentation on
 <a class="reference external" href="https://docs.rs">docs.rs</a>, and the last column to the repository its source
 is developed in.</p>

@@ -2,8 +2,8 @@
 
 The Python spelling of ``tcslibgs/src/beacon.rs``. The layout is stated once,
 in XTCE, in ``tcslibgs/xtce/beacon.xml``, and packed and unpacked here by the
-code tcsxtce generates from it, ``beacon_packet.py``, as the Rust packs and
-unpacks it with the Rust tcsxtce generates from the same file::
+code tcs-xtce generates from it, ``beacon_packet.py``, as the Rust packs and
+unpacks it with the Rust tcs-xtce generates from the same file::
 
     "tcspecial " major minor patch " " digest[16] sequence[4, big-endian]
 
@@ -14,11 +14,11 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-# tcsxtce's Python runtime, which beacon_packet.py imports as ``xtce``. It is
-# vendored in this tree until tcsxtce is published: see
-# vendor/tcsxtce/README.md. Found from here, so that a ground station need not
+# tcs-xtce's Python runtime, which beacon_packet.py imports as ``xtce``. It is
+# vendored in this tree until tcs-xtce is published: see
+# vendor/tcs-xtce/README.md. Found from here, so that a ground station need not
 # be run with a path of its own.
-_XTCE = Path(__file__).resolve().parents[2] / "vendor" / "tcsxtce" / "python"
+_XTCE = Path(__file__).resolve().parents[2] / "vendor" / "tcs-xtce" / "python"
 if str(_XTCE) not in sys.path:
     sys.path.insert(0, str(_XTCE))
 

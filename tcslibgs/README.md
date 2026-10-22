@@ -31,7 +31,7 @@ the editor is the one the vehicle would have refused the file with.
   34 bytes in a fixed layout, described in XTCE in `xtce/beacon.xml`. The code
   that packs and unpacks it, `src/beacon_packet.rs` and
   `../python/tcslibgs/beacon_packet.py`, is generated from that file by
-  tcsxtce (vendored in `../vendor/tcsxtce`): run `make beacon-packet` here
+  tcs-xtce (vendored in `../vendor/tcs-xtce`): run `make beacon-packet` here
   after changing it.
 - `config_digest`: the digest of a configuration, which both ends report, so
   each can tell whether the other read the same files.

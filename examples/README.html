@@ -344,10 +344,10 @@ version’s major, minor and patch a byte each, a space, the
 configuration’s MD5 digest, and the beacon’s number in four bytes, most
 significant first. The layout is described once, in XTCE, in
 <code>tcslibgs/xtce/beacon.xml</code>; tcspecial packs every beacon and
-<code>tcslib::beacon</code> unpacks it with the code tcsxtce generates
+<code>tcslib::beacon</code> unpacks it with the code tcs-xtce generates
 from that file, <code>tcslibgs::Beacon</code>, and this example’s test
-packs the beacon it sends the same way. tcsxtce itself is in
-<code>vendor/tcsxtce</code>.</p>
+packs the beacon it sends the same way. tcs-xtce itself is in
+<code>vendor/tcs-xtce</code>.</p>
 <p>Beside the light, between it and its <code>Status:</code> label, is
 the stage the light is at, in a word: <code>Unheard</code> before any
 beacon has arrived, <code>Heard</code> while beacons are arriving,
@@ -409,8 +409,8 @@ two halves written again in Python: <code>python/tcslib/beacon.py</code>
 after <code>tcslib::beacon</code>,
 <code>python/tcsui/beacon_panel.py</code> after <code>tcsui</code>, and
 <code>python/tcslibgs</code> for the ping format, the beacon’s layout
-and the configuration. Beacons are unpacked with tcsxtce’s Python
-runtime, from <code>vendor/tcsxtce</code> in this tree.
+and the configuration. Beacons are unpacked with tcs-xtce’s Python
+runtime, from <code>vendor/tcs-xtce</code> in this tree.
 <code>ping_ground.py</code> here is the ping’s own part, with no window.
 The Rust crate beside them is the tests that hold the Python to the
 Rust; <code>cargo test</code> runs them.</p>

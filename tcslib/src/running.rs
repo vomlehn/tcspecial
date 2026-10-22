@@ -77,9 +77,9 @@ fn a_free_port() -> u16 {
         .port()
 }
 
-/// How many allocations unpacking one beacon makes: tcsxtce's Rust decoder
+/// How many allocations unpacking one beacon makes: tcs-xtce's Rust decoder
 /// reads the name and the space as Strings and the digest as a Vec. See
-/// `tcslibgs::Beacon::read`. Should tcsxtce come to decode into fixed
+/// `tcslibgs::Beacon::read`. Should tcs-xtce come to decode into fixed
 /// storage, as its C decoder does, this is nought and the test below says so.
 const UNPACKING_ALLOCATES: usize = 3;
 

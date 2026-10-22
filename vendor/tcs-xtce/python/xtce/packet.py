@@ -1,6 +1,6 @@
 """Runtime for packet codecs generated from a mission's XTCE document.
 
-``tcsxtce`` (in ``generator/``) turns the containers and meta-commands of a
+``tcs-xtce`` (in ``generator/``) turns the containers and meta-commands of a
 mission database into Python dataclasses derived from :class:`Packet`.  The
 generated code reads packets with a :class:`BitReader` and writes them with a
 :class:`BitWriter` into a :class:`~xtce.ManagedBuffer`; this module provides
@@ -35,8 +35,8 @@ class PacketError(ValueError):
 
     ``kind`` names the error and is the same in every runtime: ``Truncated``,
     ``BadPosition``, ``NoMatch``, ``Mismatch``, ``OutOfRange``,
-    ``InvalidString``, ``TooLong``, ``Calibration``, ``NotInvertible`` or
-    ``Missing``.
+    ``InvalidString``, ``TooLong``, ``Calibration``, ``NotInvertible``,
+    ``Missing``, ``BadSize`` or ``BadLength``.
     """
 
     MESSAGES = {
@@ -50,6 +50,8 @@ class PacketError(ValueError):
         "Calibration": "{0} is outside its calibration range",
         "NotInvertible": "the calibrator of {0} cannot be inverted for encoding",
         "Missing": "{0} is required by its include condition",
+        "BadSize": "invalid size or count for {0}",
+        "BadLength": "{0} does not match the length of the packet",
     }
 
     def __init__(self, kind: str, *what: str) -> None:
@@ -154,21 +156,25 @@ def _position(base: int, offset: int, field: str) -> int:
 class BitReader:
     """Reads big-endian bit fields from a bytes-like object."""
 
-    __slots__ = ("data", "pos", "nbits")
+    __slots__ = ("data", "pos", "nbits", "end")
 
     def __init__(self, data) -> None:
         self.data = data
         self.pos = 0
         self.nbits = len(data) * 8
+        self.end = 0  # the furthest bit read
 
     def position(self) -> int:
         return self.pos
 
     def seek(self, start: int, offset: int, field: str) -> None:
+        """Move to ``offset`` bits from ``start``.  Bits skipped over count
+        as part of the packet, as the writer fills them."""
         self.pos = _position(start, offset, field)
+        self.end = max(self.end, self.pos)
 
     def skip(self, offset: int, field: str) -> None:
-        self.pos = _position(self.pos, offset, field)
+        self.seek(self.pos, offset, field)
 
     def uint(self, bits: int, field: str) -> int:
         end = self.pos + bits
@@ -177,11 +183,46 @@ class BitReader:
         first, last = self.pos >> 3, (end + 7) >> 3
         v = int.from_bytes(self.data[first:last], "big") >> (last * 8 - end)
         self.pos = end
+        self.end = max(self.end, end)
         return v & ((1 << bits) - 1)
 
     def uint_order(self, bits: int, le: bool, field: str) -> int:
         v = self.uint(bits, field)
         return int.from_bytes(v.to_bytes(bits // 8, "big"), "little") if le else v
+
+    def pad(self, bits: int, field: str) -> None:
+        """Skip ``bits`` bits of padding, which must be in the packet."""
+        if self.pos + bits > self.nbits:
+            raise PacketError("Truncated", field)
+        self.pos += bits
+        self.end = max(self.end, self.pos)
+
+    def limit(self, v: int, adjust: int, field: str) -> None:
+        """End the packet where the packet length field ``field``, whose
+        value ``v`` was just read, says: ``v - adjust`` bytes after the
+        field.  Raises ``Truncated`` if the data is shorter."""
+        after = v - adjust
+        if after < 0:
+            raise PacketError("BadLength", field)
+        total = (self.pos + 7) // 8 + after
+        if total * 8 > self.nbits:
+            raise PacketError("Truncated", field)
+        self.nbits = total * 8
+
+    def finish(self, field: str) -> None:
+        """Check that the packet's entries reach the end that the packet
+        length field ``field`` gave."""
+        if (self.end + 7) // 8 * 8 != self.nbits:
+            raise PacketError("BadLength", field)
+
+    def rest_bytes(self, max_: int, field: str) -> int:
+        """The bytes from the current position to the end of the packet, for
+        a field that takes the rest of it.  Raises ``BadSize`` unless they
+        are whole bytes, at most ``max_`` of them."""
+        bits = max(self.nbits - self.pos, 0)
+        if bits % 8 or bits // 8 > max_:
+            raise PacketError("BadSize", field)
+        return bits // 8
 
     def bytes(self, n: int, field: str) -> bytes:
         if self.pos + n * 8 > self.nbits:
@@ -189,6 +230,7 @@ class BitReader:
         if self.pos % 8 == 0:
             start = self.pos >> 3
             self.pos += n * 8
+            self.end = max(self.end, self.pos)
             return bytes(self.data[start : start + n])
         return self.uint(n * 8, field).to_bytes(n, "big") if n else b""
 
@@ -233,6 +275,22 @@ class BitWriter:
         if le:
             v = int.from_bytes(v.to_bytes(bits // 8, "big"), "little")
         self.uint(bits, v)
+
+    def patch_length(self, at: int, bits: int, le: bool, adjust: int, field: str) -> None:
+        """Fill in the packet length field ``field`` of ``bits`` bits at bit
+        ``at``, once the whole packet is written: the number of bytes after
+        the field plus ``adjust``."""
+        v = len(self.buf) - (at + bits + 7) // 8 + adjust
+        if not 0 <= v < 1 << bits:
+            raise PacketError("OutOfRange", field)
+        end = self.pos
+        self.pos = at
+        self.uint_order(bits, le, v)
+        self.pos = end
+
+    def zeros(self, bits: int) -> None:
+        if bits:
+            self.uint(bits, 0)
 
     def bytes(self, data) -> None:
         if data:
@@ -282,24 +340,6 @@ def from_unsigned(v: int, bits: int, field: str) -> int:
     return v
 
 
-def packed_get(b: bytearray, offset: int, width: int) -> int:
-    """Read ``width`` bits at bit ``offset`` of bit-packed storage.
-
-    Bit 0 is the least significant bit of byte 0, and a value is stored least
-    significant bit first, crossing byte boundaries as needed.  Packet classes
-    generated with ``--bit-packing`` keep their integer, enumerated and
-    boolean fields this way.
-    """
-    return (int.from_bytes(b, "little") >> offset) & ((1 << width) - 1)
-
-
-def packed_set(b: bytearray, offset: int, width: int, raw: int) -> None:
-    """Store the low ``width`` bits of ``raw`` at bit ``offset`` of ``b``."""
-    m = ((1 << width) - 1) << offset
-    v = (int.from_bytes(b, "little") & ~m) | ((raw << offset) & m)
-    b[:] = v.to_bytes(len(b), "little")
-
-
 def int_to_float(raw: int, bits: int, enc: str) -> float:
     return float(to_signed(raw, bits, enc))
 
@@ -323,6 +363,17 @@ def float_to_int(x: float, bits: int, enc: str, field: str) -> int:
     if abs(r) >= 1 << 64 or (enc != "unsigned" and not -(1 << 63) <= r < 1 << 63):
         raise PacketError("OutOfRange", field)
     return from_signed(r, bits, enc, field)
+
+
+def round_to_int(y: float, lo: float, lim: float, field: str) -> int:
+    """Round a calibrated value (half away from zero) to an integer from
+    ``lo`` up to but not including ``lim``; raises ``OutOfRange`` otherwise."""
+    if not math.isfinite(y):
+        raise PacketError("OutOfRange", field)
+    r = _round(y)
+    if not lo <= r < lim:
+        raise PacketError("OutOfRange", field)
+    return r
 
 
 # -- floats ---------------------------------------------------------------------
@@ -389,6 +440,41 @@ def spline_inverse(y: float, points, extrapolate: bool, field: str) -> float:
     if (y < points[0][1]) == increasing:
         return _lerp(y, flip[0], flip[1])
     return _lerp(y, flip[-2], flip[-1])
+
+
+# -- sizes from other fields ----------------------------------------------------------
+
+
+def dynamic_size(x, slope: float, intercept: float, unit: int, max_: int, field: str) -> int:
+    """A size or count that another field gives (an XTCE ``DynamicValue``):
+    ``(slope * x + intercept) / unit``, where ``x`` is that field's value and
+    ``unit`` is 8 for a size in bits used in whole bytes.  Raises ``BadSize``
+    unless the result is a whole number from 0 to ``max_``."""
+    y = slope * float(x) + intercept
+    if not (y >= 0.0) or not y.is_integer() or not (y / unit).is_integer() or y / unit > max_:
+        raise PacketError("BadSize", field)
+    return int(y / unit)
+
+
+def read_list(r: "BitReader", n: int, gap: int, field: str, read) -> list:
+    """``n`` values read by ``read()``, with ``gap`` bits between them."""
+    out = []
+    for i in range(n):
+        if i and gap:
+            r.skip(gap, field)
+        out.append(read())
+    return out
+
+
+def check_size(v, n: int, field: str) -> None:
+    """Raises ``BadSize`` unless ``v`` has ``n`` elements or bytes."""
+    if len(v) != n:
+        raise PacketError("BadSize", field)
+
+
+def sized(spec: tuple, n: int) -> tuple:
+    """The spec of a string whose size another field gives: exactly ``n`` bytes."""
+    return (n * 8, n * 8, spec[2], spec[3])
 
 
 # -- strings and binary -------------------------------------------------------------
@@ -464,6 +550,33 @@ def write_binary(w: BitWriter, b: bytes, n: int, field: str) -> None:
     w.bytes(b)
 
 
+def string_from_bytes(b: bytes, field: str) -> str:
+    """The string a string field encoded as binary holds: all of its bytes,
+    which must be UTF-8."""
+    try:
+        return b.decode("utf-8")
+    except UnicodeDecodeError:
+        raise PacketError("InvalidString", field) from None
+
+
+def bool_from_string(s: str, one: str, zero: str, field: str) -> bool:
+    """The value of a boolean encoded as one of two strings; raises
+    ``OutOfRange`` for any other string."""
+    if s == one:
+        return True
+    if s == zero:
+        return False
+    raise PacketError("OutOfRange", field)
+
+
+def write_rest(w: BitWriter, b: bytes, max_: int, field: str) -> None:
+    """Write a binary field that takes the rest of the packet: all of ``b``,
+    which must be at most ``max_`` bytes."""
+    if len(b) > max_:
+        raise PacketError("TooLong", field)
+    w.bytes(b)
+
+
 def enum_value(cls, v: int):
     """``cls(v)`` for an IntEnum, keeping values the enumeration does not list."""
     try:
@@ -499,6 +612,10 @@ def describe_str(s: str) -> str:
 
 def describe_optional(v, describe) -> str:
     return "none" if v is None else describe(v)
+
+
+def describe_list(v, describe) -> str:
+    return "[" + ", ".join(describe(x) for x in v) + "]"
 
 
 def describe_bytes(b: bytes) -> str:

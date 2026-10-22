@@ -12,7 +12,7 @@
        digest          16 bytes, the MD5 of the configuration tcspecial read
        sequence        4 bytes, unsigned, most significant byte first
 
-     The name and the space are constants: tcsxtce writes them when a beacon
+     The name and the space are constants: tcs-xtce writes them when a beacon
      is packed and refuses a datagram without them when one is unpacked, so
      they are not fields of the generated Beacon. The sequence counts the
      beacons this tcspecial has sent, from one, so that the ground can tell a

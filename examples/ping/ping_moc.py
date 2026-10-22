@@ -339,28 +339,29 @@ def run_the_window(setup, beacons, pinger):
     window.title("tcspecial ping")
     window.resizable(False, False)
 
+    # Two boxes, the beacon's and the ping's, with one size of space between
+    # them and round them: see tcsui.theme.
+    between = theme.BETWEEN
     beacon = BeaconPanel(window)
-    beacon.pack(fill="x", padx=10, pady=(10, 5))
+    beacon.pack(fill="x", padx=between, pady=(between, between // 2))
 
-    # Laid out as PingPanel in tcsui/ui/ping.slint, which tcsmoc shows: a box
-    # titled Ping, sent and received each a message and when on one row, the
-    # round trip large and its two halves under it, and a line about them
-    # beside the button.
-    # Titled with the node, as tcsmoc's is, so that the box says what it is
-    # pinging.
+    # The rows of PingPanel in tcsui/ui/ping.slint, which tcsmoc shows, laid
+    # out as the beacon box is: a label on the left of each row at its own
+    # width and every value starting at one place after them, all left
+    # justified, so that the two boxes read alike. Under them a line about the
+    # times, and under that the button, centred. Titled with the node, as
+    # tcsmoc's is, so that the box says what it is pinging.
     panel = ttk.LabelFrame(
-        window, text=f"Pinging {setup.node}" if setup else "Ping", padding=(10, 6)
+        window, text=f"Pinging {setup.node}" if setup else "Ping", padding=theme.INSIDE
     )
-    panel.pack(fill="x", padx=10, pady=(5, 10))
+    panel.pack(fill="x", padx=between, pady=(between // 2, between))
 
-    def heading(row, text):
-        ttk.Label(panel, text=text, style="Heading.TLabel").grid(
-            row=row, column=0, columnspan=2, sticky="w", pady=(6 if row else 0, 2)
-        )
+    def row(number, label):
+        ttk.Label(panel, text=label).grid(row=number, column=0, sticky="w", pady=2)
 
-    def value(row, column, width=None, style="Value.TLabel"):
-        label = ttk.Label(panel, style=style, width=width)
-        label.grid(row=row, column=column, sticky="w", padx=(0, 12))
+    def value(number, column, width=None):
+        label = ttk.Label(panel, style="Value.TLabel", width=width)
+        label.grid(row=number, column=column, sticky="w", padx=(between, 0), pady=2)
         return label
 
     # The message column is as wide as an answer will be, so that the window
@@ -368,31 +369,24 @@ def run_the_window(setup, beacons, pinger):
     # answer arrives.
     widest = len("ping #000000 0000000000.000000000 0000000000.000000000")
 
-    heading(0, "Sent")
-    sent = value(1, 0, widest)
-    sent_time = value(1, 1)
-    heading(2, "Received")
-    received = value(3, 0, widest)
-    received_time = value(3, 1)
-    heading(4, "Times")
+    # Sent and received, each a message and when, on one row: the two read as
+    # one thing, sent then and saying this.
+    row(0, "Sent:")
+    sent = value(0, 1, widest)
+    sent_time = value(0, 2)
+    row(1, "Received:")
+    received = value(1, 1, widest)
+    received_time = value(1, 2)
 
-    # The round trip is what a ping is for, so it is the large figure; the
-    # two halves are under it, smaller, because each is read across two
-    # clocks and means less alone.
-    trip = ttk.Frame(panel)
-    trip.grid(row=5, column=0, columnspan=2, sticky="w")
-    ttk.Label(trip, text="Round trip").pack(side="left", padx=(0, 12))
-    round_trip = ttk.Label(trip, style="Figure.TLabel")
-    round_trip.pack(side="left")
-
-    halves = ttk.Frame(panel)
-    halves.grid(row=6, column=0, columnspan=2, sticky="w", pady=(2, 0))
-    ttk.Label(halves, text="MOC to tcspecial").pack(side="left", padx=(0, 12))
-    up = ttk.Label(halves, style="Value.TLabel")
-    up.pack(side="left", padx=(0, 24))
-    ttk.Label(halves, text="tcspecial to MOC").pack(side="left", padx=(0, 12))
-    down = ttk.Label(halves, style="Value.TLabel")
-    down.pack(side="left")
+    # The round trip is what a ping is for, so it comes first; the two halves
+    # are under it, because each is read across two clocks and means less
+    # alone. All three in the one plain size every value is in.
+    row(2, "Round trip:")
+    round_trip = value(2, 1)
+    row(3, "MOC to tcspecial:")
+    up = value(3, 1)
+    row(4, "tcspecial to MOC:")
+    down = value(4, 1)
 
     def show():
         exchange = pinger.exchange()
@@ -408,26 +402,32 @@ def run_the_window(setup, beacons, pinger):
         pinger.ping()
         show()
 
-    # What the two one-way times are, which is the thing about them a reader
-    # would otherwise get wrong -- in a line, beside the button that starts
-    # it all.
-    foot = ttk.Frame(panel)
-    foot.grid(row=7, column=0, columnspan=2, sticky="ew", pady=(10, 0))
-    foot.columnconfigure(0, weight=1)
+    # Which clock the times are in, on a line of its own under them.
     ttk.Label(
-        foot,
-        text="Times are UTC. Each one-way time spans two clocks; "
-        "the two add up to the round trip.",
+        panel,
+        text="Times are UTC.",
         style="Note.TLabel",
-    ).grid(row=0, column=0, sticky="w")
+    ).grid(row=5, column=0, columnspan=3, sticky="w", pady=(theme.INSIDE, 0))
     # The default button, which Enter or Space presses wherever the focus
-    # is. It never takes the focus itself, so that Space on it is not a
-    # second ping.
-    ttk.Button(foot, text="Send ping", command=send, default="active", takefocus=False).grid(
-        row=0, column=1, sticky="e", padx=(12, 0)
+    # is, centred under everything else, as the beacon example's is. It never
+    # takes the focus itself, so that Space on it is not a second ping.
+    ttk.Button(panel, text="Send ping", command=send, default="active", takefocus=False).grid(
+        row=6, column=0, columnspan=3, pady=(theme.INSIDE, 0)
     )
     for key in ("<Return>", "<KP_Enter>", "<space>"):
         window.bind(key, send)
+
+    # The label columns of the two boxes as wide as each other, the wider of
+    # the two, so that every value in the window starts at one place and not
+    # one place in each box.
+    labels = [
+        label
+        for label in beacon.grid_slaves(column=0) + panel.grid_slaves(column=0)
+        if int(label.grid_info()["columnspan"]) == 1
+    ]
+    label_width = max(label.winfo_reqwidth() for label in labels)
+    for box in (beacon, panel):
+        box.columnconfigure(0, minsize=label_width)
 
     show()
 

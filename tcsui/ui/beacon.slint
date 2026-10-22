@@ -31,15 +31,15 @@ export component BeaconPanel inherits TitledBox {
     // configuration it is serving, and the digest of the files it read.
     in property <string> last-message: "<none>";
     // Which stage the indicator is at, in a word --
-    // tcslib::beacon::Stage::label -- shown between the label and the
-    // indicator, which says the same thing in colour. Empty is a window that
-    // does not show it, and the row is then the label and the indicator
-    // alone.
+    // tcslib::beacon::Stage::label -- shown after the indicator, which says
+    // the same thing in colour: the eye goes to the colour first, and the
+    // word says what it means. Empty is a window that does not show it, and
+    // the row is then the label and the indicator alone.
     in property <string> stage: "";
     // Every word the stage can be, a line each, so that its line is as wide
-    // as the widest of them and the indicator after it does not move as the
-    // stage changes. Stage::label's words: the beacon example's window test
-    // sets each of them and checks that the indicator stays put.
+    // as the widest of them and the row does not change width as the stage
+    // changes. Stage::label's words: the beacon example's window test sets
+    // each of them and checks that nothing moves.
     in property <string> stages: "Unheard\nHeard\nAging\nWaiting";
     // Every shape a beacon's message can take at its widest, a line each, so
     // that its line is as wide as the widest and the panel does not grow when
@@ -75,11 +75,6 @@ export component BeaconPanel inherits TitledBox {
                 alignment: start;
                 spacing: 8px;
                 horizontal-stretch: 1;
-                if root.stage != "": Text {
-                    text: root.stage;
-                    min-width: widest-stage.preferred-width;
-                    vertical-alignment: center;
-                }
                 Rectangle {
                     width: Fonts.window * 1.5;
                     height: self.width;
@@ -87,6 +82,11 @@ export component BeaconPanel inherits TitledBox {
                     background: indicator-color;
                     border-color: #808080;
                     border-width: 1px;
+                }
+                if root.stage != "": Text {
+                    text: root.stage;
+                    min-width: widest-stage.preferred-width;
+                    vertical-alignment: center;
                 }
                 // What the values are held to: the widest each will be,
                 // measured rather than stated in pixels, the text being

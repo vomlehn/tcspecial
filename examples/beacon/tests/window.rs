@@ -130,8 +130,8 @@ fn the_stage_line_follows_the_stage() {
     assert_eq!(seen, ["Heard", "Aging", "Waiting"]);
     assert!(on_screen(&window).iter().any(|line| line == "Waiting"));
 
-    // Where it is: on the Status row, after the label and before the
-    // indicator, with no label of its own.
+    // Where it is: on the Status row, after the label and the indicator,
+    // with no label of its own.
     assert!(
         !on_screen(&window)
             .iter()
@@ -155,22 +155,27 @@ fn the_stage_line_follows_the_stage() {
         (middle(&stage) - middle(&status)).abs() <= 2.0,
         "the stage is not on the Status row"
     );
-    // The indicator is the round thing on that row, after the stage.
+    // The indicator is the round thing on that row, between the label and
+    // the stage.
     let indicator = ElementHandle::find_by_element_type_name(&window, "Rectangle")
         .filter(|e| (middle(e) - middle(&status)).abs() <= 2.0)
         .filter(|e| e.size().width > 0.0 && (e.size().width - e.size().height).abs() < 0.5)
-        .max_by(|a, b| a.absolute_position().x.total_cmp(&b.absolute_position().x))
+        .min_by(|a, b| a.absolute_position().x.total_cmp(&b.absolute_position().x))
         .expect("the indicator");
     assert!(
-        indicator.absolute_position().x >= stage.absolute_position().x + stage.size().width,
-        "the indicator is not after the stage"
+        indicator.absolute_position().x > status_right,
+        "the indicator is not after the Status label"
+    );
+    assert!(
+        stage.absolute_position().x >= indicator.absolute_position().x + indicator.size().width,
+        "the stage is not after the indicator"
     );
 }
 
 /// Everything is left justified: the labels start at one place, the values
-/// after them all start at another, just past the widest label, and neither
-/// moves as the stage changes -- the stage's line is as wide as its widest
-/// word, so the indicator after it stays put.
+/// after them all start at another, just past the widest label -- the
+/// indicator being the Status row's -- and nothing moves as the stage
+/// changes.
 #[test]
 fn the_values_line_up_after_their_labels() {
     use beacon_example::prepare;
@@ -208,7 +213,11 @@ fn the_values_line_up_after_their_labels() {
     for word in &words {
         window.set_stage(word.as_str().into());
         let labels = [x_of("Status:"), x_of("Last rcvd:"), x_of("Last msg:")];
-        let values = [x_of(word), x_of(NO_TRANSFER_TIME), x_of(NO_BEACON_MESSAGE)];
+        let values = [
+            indicator_x(),
+            x_of(NO_TRANSFER_TIME),
+            x_of(NO_BEACON_MESSAGE),
+        ];
         assert!(
             labels.iter().all(|&x| x == labels[0]),
             "{word}: the labels start at {labels:?}"
@@ -221,7 +230,7 @@ fn the_values_line_up_after_their_labels() {
             (labels[0] - panel.absolute_position().x) < values[0] - labels[0],
             "{word}: the labels are not at the left of the panel"
         );
-        let now = (labels[0], values[0], indicator_x());
+        let now = (labels[0], values[0], x_of(word));
         assert_eq!(*seen.get_or_insert(now), now, "{word}: something moved");
     }
 

@@ -1,22 +1,18 @@
-// A box with a title: a border, and a bold heading inside it saying what the
-// box holds.
+// A box with a title: a bold heading saying what the box holds, and under it
+// a border round what it holds.
 //
 // The beacon and ping panels are each one, so that a panel says what it is
 // and stands apart from whatever sits beside it -- in tcsmoc, the beacon's box
 // beside the command link's. Not std-widgets' GroupBox, which in the Fluent
 // style draws a title and no border: a box that is not drawn does not keep
 // two things apart. The Python windows draw the same thing with ttk's
-// LabelFrame.
+// LabelFrame, which puts the title above the border, so this does too: the
+// two kinds of window then show one box the same way.
 
-export component TitledBox inherits Rectangle {
+export component TitledBox {
     in property <string> title;
 
-    border-width: 1px;
-    border-color: #808080;
-    border-radius: 4px;
-
     VerticalLayout {
-        padding: 8px;
         spacing: 4px;
 
         Text {
@@ -24,6 +20,17 @@ export component TitledBox inherits Rectangle {
             font-weight: 700;
         }
 
-        @children
+        Rectangle {
+            border-width: 1px;
+            border-color: #808080;
+            border-radius: 4px;
+
+            VerticalLayout {
+                padding: 8px;
+                spacing: 4px;
+
+                @children
+            }
+        }
     }
 }

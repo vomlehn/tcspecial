@@ -37,7 +37,7 @@ class palette:
     #: that grey means only that nothing has been heard yet.
     OFF = "#ffffff"
     #: All is well: the spacecraft is being heard from.
-    WELL = "#00ff00"
+    WELL = "#22c55e"
     #: Worth looking at. A golden yellow rather than pure yellow, which against
     #: the white of a blink's dark half could hardly be seen blinking.
     WATCH = "#ffe100"
@@ -115,7 +115,7 @@ class BeaconPanel(ttk.LabelFrame):
     """
 
     def __init__(self, parent, **options):
-        super().__init__(parent, text="Beacon", padding=(10, 6), **options)
+        super().__init__(parent, text="Beacon", padding=theme.INSIDE, **options)
         self.columnconfigure(1, weight=1)
 
         ttk.Label(self, text="Status:").grid(row=0, column=0, sticky="w", pady=2)
@@ -132,15 +132,15 @@ class BeaconPanel(ttk.LabelFrame):
         self._oval = self._indicator.create_oval(
             1, 1, size - 1, size - 1, fill=NOTHING_YET.indicator, outline="#808080"
         )
-        self._indicator.grid(row=0, column=1, sticky="w", padx=12, pady=2)
+        self._indicator.grid(row=0, column=1, sticky="w", padx=(theme.BETWEEN, 0), pady=2)
 
         ttk.Label(self, text="Last rcvd:").grid(row=1, column=0, sticky="w", pady=2)
         self._received = ttk.Label(self, text=NOTHING_YET.received)
-        self._received.grid(row=1, column=1, sticky="w", padx=12, pady=2)
+        self._received.grid(row=1, column=1, sticky="w", padx=(theme.BETWEEN, 0), pady=2)
 
         ttk.Label(self, text="Last msg:").grid(row=2, column=0, sticky="w", pady=2)
         self._message = ttk.Label(self, text=NOTHING_YET.message)
-        self._message.grid(row=2, column=1, sticky="w", padx=12, pady=2)
+        self._message.grid(row=2, column=1, sticky="w", padx=(theme.BETWEEN, 0), pady=2)
 
     def show(self, shown):
         """Put what a pass of the beacon loop reported on the panel: all three

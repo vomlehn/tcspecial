@@ -1,0 +1,45 @@
+// A button drawn as the Tk windows draw theirs: a light grey face that stands
+// off a white window, darker under the pointer and darker again pressed, in a
+// one-pixel frame darker than the face. The colours are tcsui.theme's in
+// Python, so that a button looks the same in either kind of window.
+//
+// Imported by path, as the panels are:
+//
+//     import { PlainButton } from "../../tcsui/ui/button.slint";
+
+export component PlainButton {
+    in property <string> text;
+    callback clicked();
+
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-action-default => {
+        root.clicked();
+    }
+
+    // As the Tk button is padded: twelve pixels either side of the label and
+    // four above and below it.
+    min-width: label.preferred-width + 24px;
+    min-height: label.preferred-height + 8px;
+    preferred-width: self.min-width;
+    preferred-height: self.min-height;
+
+    face := Rectangle {
+        background: touch.pressed ? #d3d9df : touch.has-hover ? #e2e6ea : #f1f3f5;
+        border-color: #9aa1a9;
+        border-width: 1px;
+
+        label := Text {
+            text: root.text;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+
+        touch := TouchArea {
+            mouse-cursor: pointer;
+            clicked => {
+                root.clicked();
+            }
+        }
+    }
+}

@@ -17,6 +17,28 @@ from tcsui import fonts
 #: The theme every window is drawn in.
 THEME = "clam"
 
+#: The window's background, and every box's: white rather than the theme's
+#: grey, which is the one colour the beacon indicator keeps for "nothing heard
+#: yet" and would leave an unheard indicator nearly the colour of its window.
+BACKGROUND = "#ffffff"
+
+#: A box's edge: one flat pixel, the colour tcsui's TitledBox draws in, rather
+#: than the theme's raised bevel.
+BORDER = "#808080"
+
+#: A button's face, a light grey that stands off the white so the button reads
+#: as a thing to press, darker under the pointer and darker again pressed, in
+#: a frame darker than the face.
+BUTTON = "#f1f3f5"
+BUTTON_ACTIVE = "#e2e6ea"
+BUTTON_PRESSED = "#d3d9df"
+BUTTON_BORDER = "#9aa1a9"
+
+#: The space inside a box, and between one box and the next or the window's
+#: edge: two sizes for the whole window, so that it looks the same throughout.
+INSIDE = 8
+BETWEEN = 12
+
 
 def use_in(window):
     """Draw this window, and every window the application opens after it, in
@@ -24,26 +46,44 @@ def use_in(window):
     it, as :func:`tcsui.fonts.use_in` is."""
     style = ttk.Style(window)
     style.theme_use(THEME)
+    style.configure(".", background=BACKGROUND)
+    style.configure(
+        "TLabelframe", background=BACKGROUND, bordercolor=BORDER, relief="solid", borderwidth=1
+    )
+    style.configure("TLabelframe.Label", background=BACKGROUND)
+    style.configure(
+        "TButton",
+        background=BUTTON,
+        bordercolor=BUTTON_BORDER,
+        lightcolor=BUTTON,
+        darkcolor=BUTTON,
+        relief="solid",
+        borderwidth=1,
+        padding=(12, 4),
+    )
+    style.map(
+        "TButton",
+        background=[("pressed", BUTTON_PRESSED), ("active", BUTTON_ACTIVE)],
+        lightcolor=[("pressed", BUTTON_PRESSED), ("active", BUTTON_ACTIVE)],
+        darkcolor=[("pressed", BUTTON_PRESSED), ("active", BUTTON_ACTIVE)],
+    )
     window.configure(background=background(window))
-    # The kinds of text a panel holds, in the sizes the Slint panels set
-    # them in, each a multiple of the one size every window is set in:
+    # The kinds of text a panel holds, all in the one size every window is
+    # set in:
     #
-    # * a heading over one part of a panel, bold;
-    # * a value that changes, in the window's own face, whose digits are all
-    #   one width, so that a field does not shift as they change;
-    # * the figure a panel is read for, a value larger than the rest;
-    # * a note about what the panel shows, grey -- and no smaller, nothing in
-    #   any window being smaller than the one size.
+    # * a value that changes, plain, in the window's own face, whose digits
+    #   are all one width, so that a field does not shift as they change;
+    # * a button, plain, as every value is;
+    # * a note about what the panel shows, grey.
     #
     # By the families Tk's named fonts are in: a named font's name in a font
     # description is read as a family nobody has, and quietly becomes another.
     points = fonts.POINTS
     text = tkinter.font.nametofont("TkDefaultFont", root=window).actual("family")
-    style.configure("Heading.TLabel", font=(text, points, "bold"))
     # A box's title, bold, as tcsui's TitledBox sets it.
     style.configure("TLabelframe.Label", font=(text, points, "bold"))
     style.configure("Value.TLabel", font=(text, points))
-    style.configure("Figure.TLabel", font=(text, round(points * 1.5)))
+    style.configure("TButton", font=(text, points))
     style.configure("Note.TLabel", font=(text, points), foreground="#4b5563")
 
 

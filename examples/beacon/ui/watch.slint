@@ -8,13 +8,18 @@
 // the panel shows can be made to change: start the vehicle and its beacons
 // arrive, stop it and they cease.
 
-import { Button } from "std-widgets.slint";
 import { BeaconPanel } from "../../../tcsui/ui/beacon.slint";
+import { PlainButton } from "../../../tcsui/ui/button.slint";
 import { Fonts } from "../../../tcsui/ui/fonts.slint";
 
 export component WatchWindow inherits Window {
     default-font-size: Fonts.window;
-    title: "Beacon";
+    // Named for the program, as the ping example's window is, rather than
+    // for the one box in it, which says Beacon itself.
+    title: "tcspecial beacon";
+    // White, as the Tk windows are: see tcsui.theme in Python. Not grey,
+    // which the indicator keeps for nothing heard yet.
+    background: #ffffff;
     // Just large enough for what it holds -- the panel and the button below
     // it -- and the border round them, `content.padding`. The panel is as
     // wide as its widest message, `messages`, so the window opens at the
@@ -52,11 +57,11 @@ export component WatchWindow inherits Window {
     callback tcspecial-clicked();
 
     // The button with each of its labels, never shown: here to be measured.
-    start-probe := Button {
+    start-probe := PlainButton {
         visible: false;
         text: root.start-label;
     }
-    stop-probe := Button {
+    stop-probe := PlainButton {
         visible: false;
         text: root.stop-label;
     }
@@ -90,7 +95,7 @@ export component WatchWindow inherits Window {
         HorizontalLayout {
             alignment: center;
 
-            tcspecial-button := Button {
+            tcspecial-button := PlainButton {
                 width: root.button-needs;
                 text: root.tcspecial-label;
                 clicked => {

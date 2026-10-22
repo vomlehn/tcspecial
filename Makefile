@@ -578,11 +578,25 @@ install-data:
 	@echo "✓ $(GUI_NAME) data installed"
 
 # Check code quality
+#
+# With tcspecial built with no optional payload type and with each one alone
+# as well as with all of them: a gate that leaves a reference to a type's
+# module outside it breaks only the builds without that type, which a
+# workspace built with every type never makes. The types are what a build
+# with the defaults says it contains, which is every type, so that the list
+# is not written down a second time here; see "Which Node Types Are Built" in
+# docs/design.rst.
 .PHONY: check
 check:
 	@echo "Running cargo check..."
 	cd $(RUST) && cargo check
 	cd $(RUST) && cargo clippy -- -D warnings
+	cd $(RUST) && cargo clippy -p $(PROJECT_NAME) --no-default-features -- -D warnings
+	cd $(RUST) && for type in $$(cargo run -q -p $(PROJECT_NAME) --bin $(PROJECT_NAME) -- --types | tr , ' '); do \
+		echo "tcspecial with $$type alone"; \
+		cargo clippy -q -p $(PROJECT_NAME) --no-default-features --features $$type \
+			-- -D warnings || exit 1; \
+	done
 	cd $(RUST) && cargo fmt -- --check
 
 # Format code

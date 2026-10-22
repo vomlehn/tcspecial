@@ -6030,9 +6030,7 @@ reach the handler that opens them.
 
 Which Node Types Are Built
 --------------------------
-**Specified, not yet implemented.**
-
-Every node type is built into every tcspecial today, which assumes that every
+Every node type was built into every tcspecial, which assumed that every
 platform offers every interface: a GPIO character device, an IIO buffer, an
 rpmsg channel, SocketCAN. Not every platform does, and a vehicle that flies a
 serial line and an I2C bus has no use for the rest. So which payload types a
@@ -6042,11 +6040,12 @@ what was chosen.
 Requirement
     Each payload type is a Cargo feature of the ``tcspecial`` crate, declared
     in ``tcspecial/Cargo.toml`` and named as the type is written in a
-    configuration: ``device_file``, ``serial``, ``i2c``, ``spi``, ``can``,
+    configuration: ``device-file``, ``serial``, ``i2c``, ``spi``, ``can``,
     ``iio``, ``rpmsg``, ``gpio`` and ``hdlc``, with ``raw`` for the raw
     protocol of the network type. One word for a type in the configuration,
     the build and the refusal means none of them has to be translated into
-    another.
+    another. The words are ``tcslibgs::graph::built::OPTIONAL_TYPES``, and a
+    test holds the features in ``Cargo.toml`` to them.
 
 Requirement
     A feature includes or leaves out that type's module in
@@ -6075,7 +6074,7 @@ Requirement
 
 Requirement
     The types a build contains are listed in one place, made from those
-    features in ``tcspecial::node::payload``. The open that reaches a
+    features: ``tcspecial::node::payload::BUILT``. The open that reaches a
     payload, the check made as a configuration is loaded and the startup
     summary all read that list, so the three cannot disagree about what was
     built.
@@ -6085,8 +6084,14 @@ Requirement
     refused as it is loaded, before anything is opened, naming the node, its
     type and the feature that would build it. For example::
 
-       temp_1: an i2c node, and this tcspecial was built without i2c: build it
-       with --features i2c, or take the node out of the configuration.
+       "temp_1" is an i2c node, and the tcspecial it is for is built without
+       i2c: build tcspecial with --features i2c, or take the node out of the
+       configuration
+
+    The rule and its sentence are ``tcslibgs::graph::built``, which tcspecial
+    asks through ``tcsverify::verify_built`` with the types it contains. An
+    open of a type the build lacks says the same, though the load means none
+    is ever reached.
 
     A configuration refused on the ground costs a rebuild, where one that
     reached a node it could not open would have failed in flight.
@@ -6102,9 +6107,11 @@ Requirement
 
 Requirement
     Tcspecial says which types it contains. ``tcspecial --types`` prints them
-    and exits, and the startup summary says them, so that what a build holds
-    can be read off the binary that will fly rather than recalled from how it
-    was built.
+    on one line, separated by commas, and exits; the startup summary says
+    them as ``payload types built:``, before the configuration is checked, so
+    that a node refused for its type is read beside the list. What a build
+    holds is then read off the binary that will fly rather than recalled from
+    how it was built.
 
 Requirement
     Tcsverify can hold a configuration to a build: ``--types=serial,i2c``
@@ -6112,12 +6119,18 @@ Requirement
     each node of another type as that tcspecial would refuse it, in the same
     words. A configuration can then be checked against the vehicle it is for
     on the ground, without the vehicle. The words are the ones the features
-    are named by, and a word that names no type is refused, listing those
-    that do.
+    are named by, in the form ``tcspecial --types`` prints, so that one can
+    be handed to the other::
+
+       tcsverify --types=$(tcspecial --types) x.yaml
+
+    A word that names no type is refused, listing those that do. Without
+    ``--types``, every type is taken to be built.
 
 Requirement
     A crate that uses tcspecial as a library depends on it with
-    ``default-features = false`` and names the types it uses. Cargo turns on,
+    ``default-features = false`` and names the types it uses; tcsmoc uses
+    none. Cargo turns on,
     for a crate built in one command, every feature any crate in that command
     asks for, so tcsmoc depending on tcspecial with its defaults would put
     every type back into a ``cargo build`` that named both. A build for a
@@ -6125,8 +6138,9 @@ Requirement
     workspace is to depend on a type it does not use.
 
 Requirement
-    ``make check`` builds tcspecial with no optional types and with each type
-    alone. A gate that leaves a reference to a type's module outside it --
+    ``make check`` runs clippy over tcspecial with no optional types and
+    with each type alone, taking the types from ``tcspecial --types`` of a
+    build with the defaults rather than from a list of its own. A gate that leaves a reference to a type's module outside it --
     the open in ``endpoint.rs`` naming the I2C endpoint whatever was built,
     say -- breaks only the builds without that type, which a workspace built
     with every type never makes.

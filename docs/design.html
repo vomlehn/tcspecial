@@ -6232,8 +6232,7 @@ reach the handler that opens them.</p>
 </div>
 <div class="section" id="which-node-types-are-built">
 <h2><a class="toc-backref" href="#toc-entry-64">Which Node Types Are Built</a></h2>
-<p><strong>Specified, not yet implemented.</strong></p>
-<p>Every node type is built into every tcspecial today, which assumes that every
+<p>Every node type was built into every tcspecial, which assumed that every
 platform offers every interface: a GPIO character device, an IIO buffer, an
 rpmsg channel, SocketCAN. Not every platform does, and a vehicle that flies a
 serial line and an I2C bus has no use for the rest. So which payload types a
@@ -6243,11 +6242,12 @@ what was chosen.</p>
 <dt>Requirement</dt>
 <dd>Each payload type is a Cargo feature of the <tt class="docutils literal">tcspecial</tt> crate, declared
 in <tt class="docutils literal">tcspecial/Cargo.toml</tt> and named as the type is written in a
-configuration: <tt class="docutils literal">device_file</tt>, <tt class="docutils literal">serial</tt>, <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, <tt class="docutils literal">can</tt>,
+configuration: <tt class="docutils literal"><span class="pre">device-file</span></tt>, <tt class="docutils literal">serial</tt>, <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, <tt class="docutils literal">can</tt>,
 <tt class="docutils literal">iio</tt>, <tt class="docutils literal">rpmsg</tt>, <tt class="docutils literal">gpio</tt> and <tt class="docutils literal">hdlc</tt>, with <tt class="docutils literal">raw</tt> for the raw
 protocol of the network type. One word for a type in the configuration,
 the build and the refusal means none of them has to be translated into
-another.</dd>
+another. The words are <tt class="docutils literal"><span class="pre">tcslibgs::graph::built::OPTIONAL_TYPES</span></tt>, and a
+test holds the features in <tt class="docutils literal">Cargo.toml</tt> to them.</dd>
 <dt>Requirement</dt>
 <dd>A feature includes or leaves out that type's module in
 <tt class="docutils literal"><span class="pre">tcspecial::node::payload</span></tt> and nothing else. The rules for the type in
@@ -6274,7 +6274,7 @@ cargo build -p tcspecial --release --no-default-features --features serial,i2c
 </dd>
 <dt>Requirement</dt>
 <dd>The types a build contains are listed in one place, made from those
-features in <tt class="docutils literal"><span class="pre">tcspecial::node::payload</span></tt>. The open that reaches a
+features: <tt class="docutils literal"><span class="pre">tcspecial::node::payload::BUILT</span></tt>. The open that reaches a
 payload, the check made as a configuration is loaded and the startup
 summary all read that list, so the three cannot disagree about what was
 built.</dd>
@@ -6283,9 +6283,14 @@ built.</dd>
 refused as it is loaded, before anything is opened, naming the node, its
 type and the feature that would build it. For example:</p>
 <pre class="literal-block">
-temp_1: an i2c node, and this tcspecial was built without i2c: build it
-with --features i2c, or take the node out of the configuration.
+&quot;temp_1&quot; is an i2c node, and the tcspecial it is for is built without
+i2c: build tcspecial with --features i2c, or take the node out of the
+configuration
 </pre>
+<p>The rule and its sentence are <tt class="docutils literal"><span class="pre">tcslibgs::graph::built</span></tt>, which tcspecial
+asks through <tt class="docutils literal"><span class="pre">tcsverify::verify_built</span></tt> with the types it contains. An
+open of a type the build lacks says the same, though the load means none
+is ever reached.</p>
 <p class="last">A configuration refused on the ground costs a rebuild, where one that
 reached a node it could not open would have failed in flight.</p>
 </dd>
@@ -6299,28 +6304,38 @@ what is possible, and a build that contained a type its platform lacked
 would fail only when a node of it was opened.</dd>
 <dt>Requirement</dt>
 <dd>Tcspecial says which types it contains. <tt class="docutils literal">tcspecial <span class="pre">--types</span></tt> prints them
-and exits, and the startup summary says them, so that what a build holds
-can be read off the binary that will fly rather than recalled from how it
-was built.</dd>
+on one line, separated by commas, and exits; the startup summary says
+them as <tt class="docutils literal">payload types built:</tt>, before the configuration is checked, so
+that a node refused for its type is read beside the list. What a build
+holds is then read off the binary that will fly rather than recalled from
+how it was built.</dd>
 <dt>Requirement</dt>
-<dd>Tcsverify can hold a configuration to a build: <tt class="docutils literal"><span class="pre">--types=serial,i2c</span></tt>
+<dd><p class="first">Tcsverify can hold a configuration to a build: <tt class="docutils literal"><span class="pre">--types=serial,i2c</span></tt>
 checks it as a tcspecial containing only those types would, and reports
 each node of another type as that tcspecial would refuse it, in the same
 words. A configuration can then be checked against the vehicle it is for
 on the ground, without the vehicle. The words are the ones the features
-are named by, and a word that names no type is refused, listing those
-that do.</dd>
+are named by, in the form <tt class="docutils literal">tcspecial <span class="pre">--types</span></tt> prints, so that one can
+be handed to the other:</p>
+<pre class="literal-block">
+tcsverify --types=$(tcspecial --types) x.yaml
+</pre>
+<p class="last">A word that names no type is refused, listing those that do. Without
+<tt class="docutils literal"><span class="pre">--types</span></tt>, every type is taken to be built.</p>
+</dd>
 <dt>Requirement</dt>
 <dd>A crate that uses tcspecial as a library depends on it with
-<tt class="docutils literal"><span class="pre">default-features</span> = false</tt> and names the types it uses. Cargo turns on,
+<tt class="docutils literal"><span class="pre">default-features</span> = false</tt> and names the types it uses; tcsmoc uses
+none. Cargo turns on,
 for a crate built in one command, every feature any crate in that command
 asks for, so tcsmoc depending on tcspecial with its defaults would put
 every type back into a <tt class="docutils literal">cargo build</tt> that named both. A build for a
 target is therefore made with <tt class="docutils literal"><span class="pre">-p</span> tcspecial</tt>, and nothing in the
 workspace is to depend on a type it does not use.</dd>
 <dt>Requirement</dt>
-<dd><tt class="docutils literal">make check</tt> builds tcspecial with no optional types and with each type
-alone. A gate that leaves a reference to a type's module outside it --
+<dd><tt class="docutils literal">make check</tt> runs clippy over tcspecial with no optional types and
+with each type alone, taking the types from <tt class="docutils literal">tcspecial <span class="pre">--types</span></tt> of a
+build with the defaults rather than from a list of its own. A gate that leaves a reference to a type's module outside it --
 the open in <tt class="docutils literal">endpoint.rs</tt> naming the I2C endpoint whatever was built,
 say -- breaks only the builds without that type, which a workspace built
 with every type never makes.</dd>

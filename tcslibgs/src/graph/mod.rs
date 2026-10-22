@@ -45,6 +45,7 @@
 //! configuration can be flown, and `tcsverify` runs it on the ground against
 //! the same code that runs again aboard.
 
+pub mod built;
 pub mod check;
 pub mod interface;
 pub mod mirror;

@@ -2724,6 +2724,16 @@ the first two: a payload simulator file has none. It does not fly, so there is
 nothing at the other end to compare one with, and it is not a configuration to
 be digested.
 
+``--types=`` checks a configuration for a tcspecial built with only the
+payload types it names, separated by commas, and reports each node of another
+type as that tcspecial would refuse it. It takes what ``tcspecial --types``
+prints, so a configuration can be held to the binary that will fly::
+
+   $ cargo run --bin tcsverify -- --types=$(tcspecial --types) examples/thermostat/thermostat.yaml
+
+Without it, every type is taken to be built. See `Building tcspecial for a
+vehicle`_.
+
 The digest is of what a file **says** and not of its bytes, so ``md5sum`` of
 the same file answers something else. Comments, indentation, the order of the
 sections and the order of a node's attributes are spelling; the two spellings
@@ -3086,6 +3096,50 @@ overrides the quieter default as well.
    $ make runmocy RUST_LOG=debug
    $ RUST_LOG=tcspecial::ci=trace \
        cargo run --bin tcspecial -- tests/manual/thermostat.yaml
+
+Building tcspecial for a vehicle
+--------------------------------
+
+A tcspecial contains the payload types it was built with, and no others.
+Each type is a Cargo feature named as a configuration writes the type --
+``device-file``, ``serial``, ``i2c``, ``spi``, ``can``, ``iio``, ``rpmsg``,
+``gpio`` and ``hdlc``, and ``raw`` for raw network sockets -- and a build
+with the defaults has all of them, which is what ``cargo build --workspace``
+and the tests make. A build for a vehicle names the types it flies:
+
+.. code-block:: console
+
+   $ cargo build -p tcspecial --release --no-default-features --features serial,i2c
+
+Build it with ``-p tcspecial`` and nothing else beside it: Cargo turns on,
+for everything built in one command, every feature anything in that command
+asks for.
+
+The network type over UDP, TCP and Unix-domain sockets is in every build,
+because the link to the ground is UDP, and so is every node that reaches no
+interface: computations, logs, tees, null nodes, the ping node and the app
+nodes. ``i2c``, ``spi``, ``can``, ``iio``, ``rpmsg``, ``gpio`` and ``hdlc``
+are Linux interfaces, and asking for one when building for another operating
+system stops the build, saying which.
+
+A build says what it contains:
+
+.. code-block:: console
+
+   $ tcspecial --types
+   serial,i2c
+
+and says it again as it starts, as ``payload types built:``. A configuration
+with a node of a type the build lacks is refused before anything is opened:
+
+.. code-block:: console
+
+   "heaters_1" is a gpio node, and the tcspecial it is for is built without
+   gpio: build tcspecial with --features gpio, or take the node out of the
+   configuration
+
+``tcsverify --types=`` asks the same question on the ground, without the
+vehicle; see `Checking a set without running it`_.
 
 Testing
 =======

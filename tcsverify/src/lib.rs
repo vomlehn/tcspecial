@@ -290,9 +290,31 @@ impl Report {
 /// passes or fails -- [`Report::status`] -- as tcsverify would under them.
 /// [`Limits::EVERYTHING`] looks at everything.
 pub fn verify(payload_path: &Path, sim_path: Option<&Path>, limits: Limits) -> Report {
+    verify_built(
+        payload_path,
+        sim_path,
+        limits,
+        &tcslibgs::graph::built::OPTIONAL_TYPES,
+    )
+}
+
+/// Check a configuration as [`verify`] does, for a tcspecial containing only
+/// the optional payload types `built` names.
+///
+/// Each node of a type `built` leaves out is reported as that tcspecial would
+/// refuse it, in the same words: see [`tcslibgs::graph::built`]. Tcspecial
+/// asks this with the types it was built with, and tcsverify with the types
+/// `--types` names, so a configuration can be held to a vehicle's build on
+/// the ground. [`verify`] is this with every type.
+pub fn verify_built(
+    payload_path: &Path,
+    sim_path: Option<&Path>,
+    limits: Limits,
+    built: &[&str],
+) -> Report {
     let mut report = Report::under(limits);
 
-    let graph = check_graph(payload_path, &mut report);
+    let graph = check_graph(payload_path, built, &mut report);
     if let Some(sim_path) = sim_path {
         // Against the graph's payloads, and only when the graph read: see the
         // module comment.
@@ -320,13 +342,21 @@ pub fn verify(payload_path: &Path, sim_path: Option<&Path>, limits: Limits) -> R
 /// said once and is already among its own findings.
 ///
 /// `limits` are the whole run's, both files and the comparison together: a
-/// run that reaches its limit on the first file looks no further.
-pub fn verify_pair(first: &Path, second: &Path, sim_path: &Path, limits: Limits) -> Report {
-    let mut report = verify(first, Some(sim_path), limits);
+/// run that reaches its limit on the first file looks no further. `built` is
+/// the optional payload types of the tcspecial the two are checked for, as in
+/// [`verify_built`].
+pub fn verify_pair(
+    first: &Path,
+    second: &Path,
+    sim_path: &Path,
+    limits: Limits,
+    built: &[&str],
+) -> Report {
+    let mut report = verify_built(first, Some(sim_path), limits, built);
     if report.halted {
         return report;
     }
-    let then = verify(second, Some(sim_path), limits);
+    let then = verify_built(second, Some(sim_path), limits, built);
     report.joined = report.joined && then.joined;
     // Added under this run's limit, which is what stops it once the two
     // files together have reached it.
@@ -593,7 +623,7 @@ fn line_of_path(text: &str, path: &[String]) -> usize {
 ///
 /// Hands back the graph, for a simulator file to be joined to, when it read at
 /// all.
-fn check_graph(path: &Path, report: &mut Report) -> Option<tcslibgs::graph::Graph> {
+fn check_graph(path: &Path, built: &[&str], report: &mut Report) -> Option<tcslibgs::graph::Graph> {
     let graph = match tcslibgs::graph::Graph::load(path) {
         Ok(graph) => graph,
         Err(e) => {
@@ -618,7 +648,14 @@ fn check_graph(path: &Path, report: &mut Report) -> Option<tcslibgs::graph::Grap
         located.push((file.clone(), crate::locate::Where::of(&text, format)));
     }
 
-    for problem in graph.check() {
+    // The build's types after the graph's own rules, being asked of a graph
+    // that is otherwise right: a node of a misspelled type is reported as
+    // unknown and needs no build.
+    let problems = graph
+        .check()
+        .into_iter()
+        .chain(tcslibgs::graph::built::not_built(&graph.nodes, built));
+    for problem in problems {
         if !report.room() {
             break;
         }
@@ -760,6 +797,7 @@ fn line_of(e: &TcsError) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tcslibgs::graph::built::OPTIONAL_TYPES as ALL;
 
     /// The thermostat example's two spellings and its simulator file, copied
     /// to a directory of their own, with `change` made to the XML.
@@ -782,15 +820,53 @@ mod tests {
         (dir, xml, yaml, sim)
     }
 
+    /// A configuration checked for a build without one of its types reports
+    /// each node of that type, at the line the node is written on, in the
+    /// words tcspecial uses to refuse it -- and nothing else.
+    #[test]
+    fn a_node_of_a_type_not_built_is_reported_where_it_is_written() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/thermostat");
+        let yaml = root.join("thermostat.yaml");
+        let report = verify_built(&yaml, None, Limits::EVERYTHING, &["i2c", "spi"]);
+        let found: Vec<(usize, &str)> = report
+            .findings
+            .iter()
+            .map(|finding| (finding.line, finding.message.as_str()))
+            .collect();
+        let text = std::fs::read_to_string(&yaml).expect("the example");
+        let line_of = |name: &str| {
+            1 + text
+                .lines()
+                .position(|line| line.trim() == format!("- name: {name}"))
+                .expect("the node is in the example")
+        };
+        assert_eq!(
+            found,
+            vec![
+                (
+                    line_of("heaters_1"),
+                    tcslibgs::graph::built::not_built_message("heaters_1", "gpio").as_str()
+                ),
+                (
+                    line_of("heaters_2"),
+                    tcslibgs::graph::built::not_built_message("heaters_2", "gpio").as_str()
+                ),
+            ]
+        );
+        assert!(report.found_errors(), "a build that cannot fly it fails");
+        // Every type built is what verify asks for, and finds nothing.
+        assert!(verify(&yaml, None, Limits::EVERYTHING).findings.is_empty());
+    }
+
     /// Two spellings of one configuration: each checked, nothing different.
     #[test]
     fn two_spellings_of_one_configuration_compare_alike() {
         let (_dir, xml, yaml, sim) = thermostat_pair(|xml| xml);
-        let report = verify_pair(&xml, &yaml, &sim, Limits::EVERYTHING);
+        let report = verify_pair(&xml, &yaml, &sim, Limits::EVERYTHING, &ALL);
         assert!(report.findings.is_empty(), "{:?}", report.said());
         assert!(report.joined, "both were checked with the simulator file");
         // Either order.
-        assert!(verify_pair(&yaml, &xml, &sim, Limits::EVERYTHING)
+        assert!(verify_pair(&yaml, &xml, &sim, Limits::EVERYTHING, &ALL)
             .findings
             .is_empty());
     }
@@ -801,7 +877,7 @@ mod tests {
     fn a_value_one_spelling_changes_is_reported() {
         let (_dir, xml, yaml, sim) =
             thermostat_pair(|xml| xml.replacen("<setpoint>293.15", "<setpoint>290", 1));
-        let report = verify_pair(&yaml, &xml, &sim, Limits::EVERYTHING);
+        let report = verify_pair(&yaml, &xml, &sim, Limits::EVERYTHING, &ALL);
         let said = report.said();
         assert_eq!(report.findings.len(), 1, "{said:?}");
         let finding = &report.findings[0];

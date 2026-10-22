@@ -26,5 +26,42 @@ nix = { version = "0.27", features = ["poll", "fs"] }
 socket2 = "0.6.2"
 tcslog = "0.3.1"
 
+# Which payload types this tcspecial contains, each named as a configuration
+# writes the type. Every one by default, so that a workspace build and its
+# tests are what they always were; a build for a vehicle names the types it
+# flies, and a configuration with a node of another type is refused as it is
+# loaded:
+#
+#   cargo build -p tcspecial --release --no-default-features --features serial,i2c
+#
+# The network type over UDP, TCP and Unix-domain sockets is in every build --
+# the link to the ground is UDP -- and so is every node that reaches no
+# interface. `raw` is the raw protocol of the network type. The words are
+# tcslibgs::graph::built::OPTIONAL_TYPES, which a test holds these to; see
+# "Which Node Types Are Built" in docs/design.rst.
+[features]
+default = [
+    "device-file",
+    "serial",
+    "i2c",
+    "spi",
+    "can",
+    "iio",
+    "rpmsg",
+    "gpio",
+    "hdlc",
+    "raw",
+]
+device-file = []
+serial = []
+i2c = []
+spi = []
+can = []
+iio = []
+rpmsg = []
+gpio = []
+hdlc = []
+raw = []
+
 [dev-dependencies]
 tempfile = "3.27.0"

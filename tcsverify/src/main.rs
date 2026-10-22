@@ -59,6 +59,11 @@ configuration.
   --warnings=<what>  on: print warnings, not counting them (the default);
                      off: print none; errors: print them and count them
                      against the limit as errors are
+  --types=<types>    check the configuration for a tcspecial built with
+                     only these payload types, separated by commas --
+                     what `tcspecial --types` prints -- reporting each
+                     node of another type as that tcspecial would refuse
+                     it. Without it, every type is taken to be built
   -h, --help         print this message and exit
 
 Exit status: 0 no error was printed -- a run that stopped before it found
@@ -78,6 +83,10 @@ const ERROR_LIMIT_FLAG: &str = "--error-limit=";
 /// What is done with warnings: printed and not counted unless asked.
 const WARNINGS_FLAG: &str = "--warnings=";
 
+/// Which payload types the tcspecial being checked for contains: every one
+/// unless asked.
+const TYPES_FLAG: &str = "--types=";
+
 /// Whether to print each configuration's digest as well as its problems.
 ///
 /// Takes no value, where the other two do: there is one digest of a
@@ -88,6 +97,7 @@ fn main() -> ExitCode {
     let mut files: Vec<PathBuf> = Vec::new();
     let mut limits = tcsverify::Limits::EVERYTHING;
     let mut digest = false;
+    let mut built: Vec<&str> = tcslibgs::graph::built::OPTIONAL_TYPES.to_vec();
     for arg in std::env::args_os().skip(1) {
         let said = arg.to_string_lossy();
         // Asked for, so on stdout and a success: the message is the answer.
@@ -103,6 +113,10 @@ fn main() -> ExitCode {
             error_limit(value).map(|limit| limits.error_limit = limit)
         } else if let Some(value) = said.strip_prefix(WARNINGS_FLAG) {
             warnings(value).map(|warnings| limits.warnings = warnings)
+        } else if let Some(value) = said.strip_prefix(TYPES_FLAG) {
+            tcslibgs::graph::built::types_from(value)
+                .map(|types| built = types)
+                .map_err(|why| format!("{TYPES_FLAG}{value}: {why}"))
         } else {
             files.push(PathBuf::from(&arg));
             continue;
@@ -114,14 +128,14 @@ fn main() -> ExitCode {
     }
 
     let report = match files.as_slice() {
-        [payload] => tcsverify::verify(payload, None, limits),
-        [payload, sim] => tcsverify::verify(payload, Some(sim), limits),
+        [payload] => tcsverify::verify_built(payload, None, limits, &built),
+        [payload, sim] => tcsverify::verify_built(payload, Some(sim), limits, &built),
         [first, second, sim] => {
             if let Err(why) = one_of_each(first, second) {
                 eprintln!("tcsverify: {why}\n\n{USAGE}");
                 return ExitCode::from(2);
             }
-            tcsverify::verify_pair(first, second, sim, limits)
+            tcsverify::verify_pair(first, second, sim, limits, &built)
         }
         _ => {
             eprintln!("{USAGE}");

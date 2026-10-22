@@ -11,7 +11,11 @@ tcslib = { path = "../tcslib" }
 # The panels this window is made of, and what to show on them.
 tcsui = { path = "../tcsui" }
 tcslibgs = { path = "../tcslibgs" }
-tcspecial = { path = "../tcspecial" }
+# No payload types: nothing here reaches a payload through tcspecial's code.
+# With its defaults this would turn every type back on in any build that
+# named tcsmoc and tcspecial together, which is how a vehicle's build would
+# come to contain types it was built without.
+tcspecial = { path = "../tcspecial", default-features = false }
 # Asked about the payload set before anything opens: see main.
 tcsverify = { path = "../tcsverify" }
 slint = "1.3"

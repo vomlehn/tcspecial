@@ -1806,7 +1806,8 @@ it and tcspecial digest the configuration files they read, and tcspecial
 sends its digest in every beacon. If tcspecial's digest is not the one tcsmoc
 computed -- the vehicle is serving a different configuration, so its sources
 may not send where the panels say -- tcsmoc says so and asks whether to
-continue anyway; Quit stops tcspecial and tcssim and exits.
+continue anyway, in front of its panels, which are greyed and take no presses
+until it is answered; Quit stops tcspecial and tcssim and exits.
 
 It also commands the vehicle, on the two links the ``tcspecial`` section
 states. Connect brings the link up and sends a ``CONNECT``, which is how the

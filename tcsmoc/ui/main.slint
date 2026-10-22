@@ -321,6 +321,71 @@ component DHPanel inherits Rectangle {
 
 export enum MenuAction { ping, arm-restart, restart, query, query-dh, start-dh, stop-dh }
 
+// Asked when tcspecial announces a configuration other than the one this MOC
+// read: the digest in its beacons, computed from the files it read, is not the
+// digest this MOC computed from the files it read. Then the panels may say a
+// source's data arrives where the vehicle does not send it, so the operator
+// decides whether to go on.
+//
+// Asked inside the main window, in front of its panels, rather than in a
+// window of its own: the main window takes no presses while it is up, and a
+// window of its own cannot be kept in front of the main one on every desktop
+// -- Wayland lets no program hold its windows on top -- so a question behind
+// the window waiting for it would leave nothing anybody could press.
+component DiffersPanel inherits Rectangle {
+    background: Colors.window;
+    border-width: 1px;
+    border-color: #808080;
+    border-radius: 4px;
+    drop-shadow-blur: 16px;
+    drop-shadow-color: #00000040;
+    drop-shadow-offset-y: 4px;
+    min-width: 420px;
+    preferred-width: 560px;
+
+    // Both digests, and which file this MOC read.
+    in property <string> message: "";
+
+    callback continue-anyway();
+    callback quit();
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 10px;
+
+        Copyable {
+            text: "tcspecial is serving a different configuration";
+            font-size: Fonts.window;
+            font-weight: 700;
+            color: #c0392b;
+        }
+        Copyable {
+            text: root.message;
+            font-size: Fonts.window;
+        }
+        Copyable {
+            text: "The panels may show sources where the vehicle does not send them. Continue anyway?";
+            font-size: Fonts.window;
+            color: #6b7280;
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            CopyButton {
+                said: "tcspecial is serving a different configuration\n" + root.message;
+            }
+            Rectangle { }
+            Button {
+                text: "Quit";
+                clicked => { root.quit(); }
+            }
+            Button {
+                text: "Continue anyway";
+                clicked => { root.continue-anyway(); }
+            }
+        }
+    }
+}
+
 // What a panel comes to, asked of a window that is never opened.
 //
 // A panel laid out alone reports what it wants; one in the grid is stretched
@@ -354,11 +419,18 @@ export component MainWindow inherits Window {
     min-height: 640px;
     background: Colors.window;
 
-    // Whether this window takes no presses: true while a question in a window
-    // of its own is waiting to be answered -- see DiffersWindow below, and
-    // `ask_whether_to_continue` in main.rs, which sets it. The panels stay
-    // there to be read; nothing can be commanded behind the question.
+    // Whether this window takes no presses: true while a question is waiting
+    // to be answered -- see DiffersPanel, and `ask_whether_to_continue` in
+    // main.rs, which sets it. The panels stay there to be read, greyed by the
+    // veil over them; nothing can be commanded behind the question.
     in property <bool> inert: false;
+
+    // The question about a configuration other than the one this MOC read,
+    // asked in front of the panels inside this window: see DiffersPanel.
+    in property <bool> differs-up: false;
+    in property <string> differs-message: "";
+    callback differs-continue-anyway();
+    callback differs-quit();
 
     in-out property <string> ci-status: "Disconnected";
     in-out property <string> ci-address: "127.0.0.1:4000";
@@ -755,74 +827,34 @@ export component MainWindow inherits Window {
         }
     }
 
-    // What makes it inert: an area over the whole window that takes presses
-    // and does nothing with them, there only while it is wanted.
-    if root.inert: TouchArea {
+    // What makes it inert: a veil over the whole window that takes presses
+    // and does nothing with them, there only while it is wanted. Grey and
+    // part clear, so that everything under it is greyed: still there to be
+    // read, and plainly not taking presses.
+    if root.inert: Rectangle {
         x: 0;
         y: 0;
         width: 100%;
         height: 100%;
+        background: #e5e7ebb3;
+
+        TouchArea { }
+    }
+
+    // And in front of the veil, the question it is waiting for: never behind
+    // the window, being in it. Centred, and no wider than the window leaves
+    // room for.
+    if root.differs-up: DiffersPanel {
+        width: min(self.preferred-width, root.width - 32px);
+        height: self.preferred-height;
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        message: root.differs-message;
+        continue-anyway => { root.differs-continue-anyway(); }
+        quit => { root.differs-quit(); }
     }
 }
 
-// Asked when tcspecial announces a configuration other than the one this MOC
-// read: the digest in its beacons, computed from the files it read, is not the
-// digest this MOC computed from the files it read. Then the panels may say a
-// source's data arrives where the vehicle does not send it, so the operator
-// decides whether to go on.
-export component DiffersWindow inherits Window {
-    default-font-size: Fonts.window;
-    title: "tcsmoc: configurations differ";
-    background: Colors.window;
-    min-width: 420px;
-    preferred-width: 560px;
-    // In front of the panels until it is answered: the main window takes no
-    // presses while it is up, and a question behind it would leave nothing
-    // anybody could press.
-    always-on-top: true;
-
-    // Both digests, and which file this MOC read.
-    in property <string> message: "";
-
-    callback continue-anyway();
-    callback quit();
-
-    VerticalLayout {
-        padding: 16px;
-        spacing: 10px;
-
-        Copyable {
-            text: "tcspecial is serving a different configuration";
-            font-size: Fonts.window;
-            font-weight: 700;
-            color: #c0392b;
-        }
-        Copyable {
-            text: root.message;
-            font-size: Fonts.window;
-        }
-        Copyable {
-            text: "The panels may show sources where the vehicle does not send them. Continue anyway?";
-            font-size: Fonts.window;
-            color: #6b7280;
-        }
-        HorizontalLayout {
-            spacing: 8px;
-            CopyButton {
-                said: "tcspecial is serving a different configuration\n" + root.message;
-            }
-            Rectangle { }
-            Button {
-                text: "Quit";
-                clicked => { root.quit(); }
-            }
-            Button {
-                text: "Continue anyway";
-                clicked => { root.continue-anyway(); }
-            }
-        }
-    }
-}
 
 // The ping panel, in a window of its own beside the MOC's, opened by Ping
 // node. A window rather than a row of the main one, because the main

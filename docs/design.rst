@@ -4258,10 +4258,10 @@ front of the veil, and the menu items are disabled, the keyboard being another
 way to them. The drawing is still there to be read through the veil, being
 what the question is about. What goes wrong *while somebody works* is still
 said in the alert's own window, the main window not waiting for it. tcsmoc
-does much the same for the question it asks when tcspecial serves a different
-configuration, in a window of its own, and tcsmoc and tcssim show what they
-found at startup in a window that stays on top and is closed before their main
-windows open.
+does the same for the question it asks when tcspecial serves a different
+configuration: asked inside its main window, in front of a veil that greys the
+panels. tcsmoc and tcssim show what they found at startup in a window that
+stays on top and is closed before their main windows open.
 
 **Everything a popup says can be copied.** A message is often the thing
 somebody has to pass on, and one that can only be read has to be typed out

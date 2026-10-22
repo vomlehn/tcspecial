@@ -1944,7 +1944,9 @@ thermostat's setpoint, and the running vehicle applies it: a ``SET_NODE``
 naming that node and that attribute is taken on the node command link, the
 value reaches the thermostat between stages of a pass, and the next pass
 decides by it. An attribute no binding mentions is refused, which is the
-point of writing the bindings down.
+point of writing the bindings down, and the refusal says why: tcsmoc shows
+the reason the vehicle sends -- ``no command binding says the ground may set
+"thermostat.half-band": it is spelled half_band`` -- beside the status.
 
 The simulator file beside it declares a thermal mass, ``cabin``, and attaches
 the three sensors to it, so that what they report is one temperature rather

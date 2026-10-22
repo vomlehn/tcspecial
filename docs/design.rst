@@ -2657,8 +2657,20 @@ Requirement
 Requirement
     An attribute no binding mentions and a value the node will not take are
     both ``InvalidParameter``. From the ground's side they are the same thing
-    -- the configuration does not allow what was asked -- and the two are told
-    apart in the vehicle's log rather than on the wire.
+    -- the configuration does not allow what was asked -- and what tells the
+    two apart is the reason, which the answer carries as well as the
+    vehicle's log: an operator told only the status would have to read a log
+    aboard to find out which word to change.
+
+Requirement
+    The answer to a ``SET_NODE`` carries why it was refused, as text of at
+    most ``REASON_BYTES``, 160, in ``tcslibgs::telemetry``: the attribute no
+    binding names, with its spelling where that was what was wrong; what the
+    node would not take; the id no node has. A longer reason is cut at a
+    character and ends ``...``, the whole of it being in the log. Held in
+    room of that size, so that the vehicle makes an answer without
+    allocating, as it reads a command. Empty for a ``SET_NODE`` that was
+    done, and read as empty from a vehicle that sends none.
 
 Requirement
     Nothing is half applied. The value is read and checked before anything
@@ -7432,9 +7444,8 @@ Requirement
     node's attribute, an attribute of the ``tcspecial`` section --
     ``log.segment-size`` is answered *it is spelled log.segment_size* -- and
     the attribute a ``SET_NODE`` names, which is told the spelling a command
-    binding gives it. A refused ``SET_NODE`` reaches the ground as
-    ``InvalidParameter``, and the hint is in the vehicle's log beside the
-    rest of the reason.
+    binding gives it. A refused ``SET_NODE``'s hint reaches the ground in
+    the answer's reason, and the vehicle's log.
 
 Simulator Configuration Files
 =============================

@@ -216,6 +216,12 @@ int tcs_client_configure(tcs_client *client, uint64_t beacon_interval_us, tcs_st
 int tcs_client_set_node(tcs_client *client, uint32_t node, const char *attribute,
                         const uint8_t *value, size_t length, tcs_status *status);
 
+/* Why the vehicle refused the last SET_NODE this client sent -- which
+ * attribute no binding names, and its spelling where that was what was wrong;
+ * what the node would not take -- or "" where it did not. The client's, good
+ * until its next SET_NODE; at most TCS_TEXT_BYTES, its NUL included. */
+const char *tcs_client_reason(const tcs_client *client);
+
 /* How many bytes of a transfer a sample holds: the head of it. */
 #define TCS_SAMPLE_BYTES 8
 

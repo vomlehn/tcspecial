@@ -545,22 +545,27 @@ fn set_a_nodes_attribute(
     };
 
     let said = match answer {
-        Ok((status, answered)) if answered != node => format!(
+        Ok((status, answered, _)) if answered != node => format!(
             "SET_NODE {node} ({name}) was answered about {answered}: the two ends \
              are not reading the same configuration ({status:?})"
         ),
-        Ok((status, _)) if status.is_success() => {
+        Ok((status, _, _)) if status.is_success() => {
             format!(
                 "SET_NODE {node} ({name}).{} = {value}: {status:?}",
                 attribute.trim()
             )
         }
-        // What was refused and why are two things, and only the first is on
-        // the wire: an attribute no binding mentions and a value the node
-        // will not take are both InvalidParameter, and the vehicle's log says
-        // which. Said here as the two possibilities, because an operator with
-        // the window and no log should still know where to look.
-        Ok((status, _)) => format!(
+        // An attribute no binding mentions and a value the node will not take
+        // are both InvalidParameter, so the status says that it was refused
+        // and the reason the vehicle sends says why: which word to change.
+        Ok((status, _, reason)) if !reason.is_empty() => format!(
+            "SET_NODE {node} ({name}).{} = {value} was refused: {status:?} -- {reason}",
+            attribute.trim()
+        ),
+        // A vehicle that sends no reason: said as the two possibilities,
+        // because an operator with the window and no log should still know
+        // where to look.
+        Ok((status, _, _)) => format!(
             "SET_NODE {node} ({name}).{} = {value} was refused: {status:?} -- no \
              binding names that attribute, or the node will not take that value",
             attribute.trim()
@@ -1951,7 +1956,7 @@ payloads:
                     Command::SetNode(cmd) => {
                         *setting.lock().expect("the record") =
                             Some((cmd.attribute.to_string(), cmd.value.to_vec()));
-                        Telemetry::SetNode(tcslibgs::NodeTelemetry::set(
+                        Telemetry::SetNode(tcslibgs::SetNodeTelemetry::new(
                             seq,
                             tcslibgs::CommandStatus::Success,
                             cmd.node,

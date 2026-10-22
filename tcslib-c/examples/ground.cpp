@@ -152,7 +152,11 @@ int main(int argc, char **argv)
         if (tcs_client_set_node(client.get(), node, "count", one, sizeof one, &status) != 0) {
             return fail("set");
         }
-        std::printf("set %s count: %s\n", node_name.c_str(), outcome(status));
+        // Why, where it was refused: the status alone is the same for every
+        // refusal, and the reason is what says which word to change.
+        const char *reason = tcs_client_reason(client.get());
+        std::printf("set %s count: %s%s%s\n", node_name.c_str(), outcome(status),
+                    *reason ? " -- " : "", reason);
 
         tcs_sample taken{}, given{};
         if (tcs_client_query_node_sample(client.get(), node, &status, &taken, &given) != 0) {

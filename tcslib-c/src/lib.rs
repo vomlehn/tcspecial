@@ -727,6 +727,9 @@ pub extern "C" fn tcs_status_name(status: c_int) -> *const c_char {
 pub struct tcs_client {
     client: TcsClient,
     digest: ConfigDigest,
+    /// Why the vehicle refused the last SET_NODE, or nothing: see
+    /// [`tcs_client_reason`].
+    reason: Text<TEXT_BYTES>,
 }
 
 /// Open the command links the configuration states.
@@ -754,6 +757,7 @@ pub unsafe extern "C" fn tcs_client_open(
         Ok(Box::into_raw(Box::new(tcs_client {
             client,
             digest: configuration.digest,
+            reason: Text::EMPTY,
         })))
     })
 }
@@ -998,10 +1002,14 @@ pub unsafe extern "C" fn tcs_client_set_node(
             std::slice::from_raw_parts(value, length)
         };
         let asked = NodeId(node);
-        let (answered, about) = link
+        // Nothing until there is an answer, so that a SET_NODE that never got
+        // one does not leave the last one's reason looking like its own.
+        link.reason.set("");
+        let (answered, about, reason) = link
             .client
             .set_node(asked, attribute, value)
             .map_err(|e| fail(format_args!("SET_NODE {node} {attribute}: {e}")))?;
+        link.reason.set(reason);
         if about != asked {
             return Err(fail(format_args!(
                 "SET_NODE {node} was answered about node {}: the two ends are not reading \
@@ -1011,6 +1019,20 @@ pub unsafe extern "C" fn tcs_client_set_node(
         }
         *out = status_number(answered);
         Ok(0)
+    })
+}
+
+/// Why the vehicle refused the last SET_NODE this client sent, or "" where it
+/// did not.
+///
+/// # Safety
+///
+/// `client` is a handle [`tcs_client_open`] returned and not yet closed. The
+/// text is the client's, good until the next SET_NODE on it.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_client_reason(client: *const tcs_client) -> *const c_char {
+    guard(std::ptr::null(), || {
+        Ok(handle_of(client, "the client")?.reason.as_ptr())
     })
 }
 

@@ -2957,8 +2957,19 @@ refused by the vehicle as it is read, rather than cut short.</dd>
 <dt>Requirement</dt>
 <dd>An attribute no binding mentions and a value the node will not take are
 both <tt class="docutils literal">InvalidParameter</tt>. From the ground's side they are the same thing
--- the configuration does not allow what was asked -- and the two are told
-apart in the vehicle's log rather than on the wire.</dd>
+-- the configuration does not allow what was asked -- and what tells the
+two apart is the reason, which the answer carries as well as the
+vehicle's log: an operator told only the status would have to read a log
+aboard to find out which word to change.</dd>
+<dt>Requirement</dt>
+<dd>The answer to a <tt class="docutils literal">SET_NODE</tt> carries why it was refused, as text of at
+most <tt class="docutils literal">REASON_BYTES</tt>, 160, in <tt class="docutils literal"><span class="pre">tcslibgs::telemetry</span></tt>: the attribute no
+binding names, with its spelling where that was what was wrong; what the
+node would not take; the id no node has. A longer reason is cut at a
+character and ends <tt class="docutils literal">...</tt>, the whole of it being in the log. Held in
+room of that size, so that the vehicle makes an answer without
+allocating, as it reads a command. Empty for a <tt class="docutils literal">SET_NODE</tt> that was
+done, and read as empty from a vehicle that sends none.</dd>
 <dt>Requirement</dt>
 <dd>Nothing is half applied. The value is read and checked before anything
 changes, so a command that is refused leaves the node running on what it
@@ -5868,7 +5879,7 @@ every datagram of it, its own included, so a stand-in beside tcspecial
 would be each end reading its own words back. The</dd>
 </dl>
 <div class="system-message">
-<p class="system-message-title">System Message: WARNING/2 (<tt class="docutils">design.rst</tt>, line 5801)</p>
+<p class="system-message-title">System Message: WARNING/2 (<tt class="docutils">design.rst</tt>, line 5813)</p>
 Definition list ends without a blank line; unexpected unindent.</div>
 <p>tables below are what Linux offers beyond them: the families and types a
 network node could be given, and the semantics each would have, so that one
@@ -7615,9 +7626,8 @@ choose between them. See <tt class="docutils literal"><span class="pre">tcslibgs
 node's attribute, an attribute of the <tt class="docutils literal">tcspecial</tt> section --
 <tt class="docutils literal"><span class="pre">log.segment-size</span></tt> is answered <em>it is spelled log.segment_size</em> -- and
 the attribute a <tt class="docutils literal">SET_NODE</tt> names, which is told the spelling a command
-binding gives it. A refused <tt class="docutils literal">SET_NODE</tt> reaches the ground as
-<tt class="docutils literal">InvalidParameter</tt>, and the hint is in the vehicle's log beside the
-rest of the reason.</dd>
+binding gives it. A refused <tt class="docutils literal">SET_NODE</tt>'s hint reaches the ground in
+the answer's reason, and the vehicle's log.</dd>
 </dl>
 </div>
 </div>

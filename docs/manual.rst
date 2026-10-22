@@ -45,7 +45,7 @@ included from C++ as it stands, and nothing in it is C that C++ will not
 compile.
 
 **cFS and F´.** Work is under way on using TCSpecial, its telemetry log tcslog
-and its packet compiler tcsxtce with the two flight software frameworks most
+and its packet compiler tcs-xtce with the two flight software frameworks most
 missions are built on, NASA's core Flight System and JPL's F´. What each
 project brings to them, what has to change to fit, and in what order, is in
 ``third-party.rst``, beside this manual.
@@ -2034,7 +2034,7 @@ version's major, minor and patch a byte each, a space, the sixteen bytes of
 the configuration's MD5 digest, and the beacon's number in four bytes, most
 significant first. The layout is described in XTCE, in
 ``tcslibgs/xtce/beacon.xml``, and tcspecial packs each beacon, and
-``tcslib::beacon`` unpacks it, with the code tcsxtce generates from that file:
+``tcslib::beacon`` unpacks it, with the code tcs-xtce generates from that file:
 ``tcslibgs::Beacon``. The example's test packs the beacon it sends the same
 way. Nothing about the layout is written by hand, so to change it, change the
 XML and run ``make beacon-packet`` in ``tcslibgs/``.
@@ -2084,7 +2084,7 @@ device id. Each time is seconds since the UNIX epoch to the nanosecond:
 The ground station is a Python 3 program, ``ping_moc.py``, that uses nothing
 outside the standard library to read the XML spelling of its configuration --
 its window is tkinter -- and PyYAML to read the YAML one. It unpacks beacons
-with tcsxtce's Python runtime, which is in this tree, in ``vendor/tcsxtce``,
+with tcs-xtce's Python runtime, which is in this tree, in ``vendor/tcs-xtce``,
 and found from there. It shows the beacon
 panel, the last ping sent and when, the last answer received and when, and
 three times:
@@ -3551,8 +3551,8 @@ graph, and ``Cargo.lock`` says which version of each is built.
 
 Every one is fetched from `crates.io <https://crates.io>`_, the Rust package
 registry, which is where ``cargo build`` downloads it from, but one: ``xtce``,
-tcsxtce's runtime, which packs and unpacks the beacon, is taken from a copy in
-``vendor/tcsxtce`` until tcsxtce is published, and is not listed below. Each
+tcs-xtce's runtime, which packs and unpacks the beacon, is taken from a copy in
+``vendor/tcs-xtce`` until tcs-xtce is published, and is not listed below. Each
 name below links to its page there, the version links to its documentation on
 `docs.rs <https://docs.rs>`_, and the last column to the repository its source
 is developed in.

@@ -75,9 +75,11 @@ class ManagedBuffer:
                 self.reserve(chunk)
             view = memoryview(self._data)[self._len :]
             try:
-                n = stream.readinto(view) if hasattr(stream, "readinto") else None
-                if n is None:
-                    block = stream.read(chunk)
+                if hasattr(stream, "readinto"):
+                    n = stream.readinto(view)
+                else:
+                    # Ask for no more than fits, so the block can be copied in.
+                    block = stream.read(len(view))
                     n = len(block)
                     view[:n] = block
             finally:

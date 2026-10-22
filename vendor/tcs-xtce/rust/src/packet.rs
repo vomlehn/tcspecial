@@ -1,6 +1,6 @@
 //! Runtime for packet codecs generated from a mission's XTCE document.
 //!
-//! `tcsxtce` (in `generator/`) turns the containers and meta-commands of a
+//! `tcs-xtce` (in `generator/`) turns the containers and meta-commands of a
 //! mission database into Rust structs that implement [`Packet`].  The
 //! generated code reads packets with a [`BitReader`] and writes them with a
 //! [`BitWriter`] into a managed [`Buffer`]; this module provides those and
@@ -42,6 +42,11 @@ pub enum PacketError {
     NotInvertible { field: &'static str },
     /// An optional field is `None` although its include condition holds.
     Missing { field: &'static str },
+    /// The size or count that another field gives `field` is not a whole
+    /// number in range, or `field` does not have that size or count.
+    BadSize { field: &'static str },
+    /// The packet length field `field` does not match the packet's length.
+    BadLength { field: &'static str },
 }
 
 impl PacketError {
@@ -58,6 +63,8 @@ impl PacketError {
             Self::Calibration { .. } => "Calibration",
             Self::NotInvertible { .. } => "NotInvertible",
             Self::Missing { .. } => "Missing",
+            Self::BadSize { .. } => "BadSize",
+            Self::BadLength { .. } => "BadLength",
         }
     }
 }
@@ -86,6 +93,10 @@ impl fmt::Display for PacketError {
             }
             Self::Missing { field } => {
                 write!(f, "{field} is required by its include condition")
+            }
+            Self::BadSize { field } => write!(f, "invalid size or count for {field}"),
+            Self::BadLength { field } => {
+                write!(f, "{field} does not match the length of the packet")
             }
         }
     }
@@ -201,11 +212,16 @@ fn position(base: usize, offset: i64, field: &'static str) -> Result<usize> {
 pub struct BitReader<'a> {
     data: &'a [u8],
     pos: usize,
+    end: usize, // the furthest bit read
 }
 
 impl<'a> BitReader<'a> {
     pub fn new(data: &'a [u8]) -> Self {
-        Self { data, pos: 0 }
+        Self {
+            data,
+            pos: 0,
+            end: 0,
+        }
     }
 
     /// Current position in bits from the start of the packet.
@@ -213,9 +229,11 @@ impl<'a> BitReader<'a> {
         self.pos
     }
 
-    /// Moves to `offset` bits from `start`.
+    /// Moves to `offset` bits from `start`.  Bits skipped over count as
+    /// part of the packet, as the writer fills them.
     pub fn seek(&mut self, start: usize, offset: i64, field: &'static str) -> Result<()> {
         self.pos = position(start, offset, field)?;
+        self.end = self.end.max(self.pos);
         Ok(())
     }
 
@@ -225,7 +243,7 @@ impl<'a> BitReader<'a> {
     }
 
     fn need(&self, bits: usize, field: &'static str) -> Result<()> {
-        if self.pos + bits > self.data.len() * 8 {
+        if bits > (self.data.len() * 8).saturating_sub(self.pos) {
             Err(PacketError::Truncated { field })
         } else {
             Ok(())
@@ -246,6 +264,7 @@ impl<'a> BitReader<'a> {
             self.pos += take as usize;
             left -= take;
         }
+        self.end = self.end.max(self.pos);
         Ok(v)
     }
 
@@ -255,12 +274,57 @@ impl<'a> BitReader<'a> {
         Ok(if le { swap_bytes(v, bits) } else { v })
     }
 
+    /// Skips `bits` bits of padding, which must be in the packet.
+    pub fn pad(&mut self, bits: usize, field: &'static str) -> Result<()> {
+        self.need(bits, field)?;
+        self.pos += bits;
+        self.end = self.end.max(self.pos);
+        Ok(())
+    }
+
+    /// Ends the packet where the packet length field `field`, whose value
+    /// `v` was just read, says: `v - adjust` bytes after the field.  Fails
+    /// with `Truncated` if `data` is shorter.
+    pub fn limit(&mut self, v: u64, adjust: i64, field: &'static str) -> Result<()> {
+        let after = v as i128 - adjust as i128;
+        if after < 0 {
+            return Err(PacketError::BadLength { field });
+        }
+        let total = self.pos.div_ceil(8) as i128 + after;
+        if total > self.data.len() as i128 {
+            return Err(PacketError::Truncated { field });
+        }
+        self.data = &self.data[..total as usize];
+        Ok(())
+    }
+
+    /// Checks that the packet's entries reach the end that the packet
+    /// length field `field` gave.
+    pub fn finish(&self, field: &'static str) -> Result<()> {
+        if self.end.div_ceil(8) != self.data.len() {
+            return Err(PacketError::BadLength { field });
+        }
+        Ok(())
+    }
+
+    /// The bytes from the current position to the end of the packet, for a
+    /// field that takes the rest of it.  Fails with `BadSize` unless they
+    /// are whole bytes, at most `max` of them.
+    pub fn rest_bytes(&self, max: usize, field: &'static str) -> Result<usize> {
+        let bits = (self.data.len() * 8).saturating_sub(self.pos);
+        if bits % 8 != 0 || bits / 8 > max {
+            return Err(PacketError::BadSize { field });
+        }
+        Ok(bits / 8)
+    }
+
     /// Reads `n` whole bytes (which need not be byte aligned).
     pub fn bytes(&mut self, n: usize, field: &'static str) -> Result<Vec<u8>> {
-        self.need(n * 8, field)?;
+        self.need(n.checked_mul(8).unwrap_or(usize::MAX), field)?;
         if self.pos % 8 == 0 {
             let start = self.pos / 8;
             self.pos += n * 8;
+            self.end = self.end.max(self.pos);
             return Ok(self.data[start..start + n].to_vec());
         }
         (0..n)
@@ -323,10 +387,71 @@ impl<'a> BitWriter<'a> {
         self.uint(bits, if le { swap_bytes(v, bits) } else { v });
     }
 
+    /// Writes whole bytes (which need not be byte aligned).
     pub fn bytes(&mut self, data: &[u8]) {
-        for &b in data {
-            self.uint(8, b as u64);
+        if data.is_empty() {
+            return;
         }
+        if self.pos % 8 != 0 {
+            for &b in data {
+                self.uint(8, b as u64);
+            }
+            return;
+        }
+        let start = self.pos / 8;
+        self.span(start, data.len()).copy_from_slice(data);
+        self.pos += data.len() * 8;
+    }
+
+    /// Fills in the packet length field `field` of `bits` bits at bit `at`,
+    /// once the whole packet is written: the number of bytes after the
+    /// field plus `adjust`.
+    pub fn patch_length(
+        &mut self,
+        at: usize,
+        bits: u32,
+        le: bool,
+        adjust: i64,
+        field: &'static str,
+    ) -> Result<()> {
+        let v = self.buf.len() as i128 - (at + bits as usize).div_ceil(8) as i128 + adjust as i128;
+        if v < 0 || v > mask(bits) as i128 {
+            return Err(PacketError::OutOfRange { field });
+        }
+        let end = self.pos;
+        self.pos = at;
+        self.uint_order(bits, le, v as u64);
+        self.pos = end;
+        Ok(())
+    }
+
+    /// Writes `bits` zero bits, overwriting whatever a seek left there.
+    pub fn zeros(&mut self, bits: usize) {
+        if bits == 0 {
+            return;
+        }
+        let lead = ((8 - self.pos % 8) % 8).min(bits);
+        if lead > 0 {
+            self.uint(lead as u32, 0);
+        }
+        let whole = (bits - lead) / 8;
+        if whole > 0 {
+            let start = self.pos / 8;
+            self.span(start, whole).fill(0);
+            self.pos += whole * 8;
+        }
+        let tail = (bits - lead) % 8;
+        if tail > 0 {
+            self.uint(tail as u32, 0);
+        }
+    }
+
+    /// Bytes `start..start + n` of the buffer, growing it to cover them.
+    fn span(&mut self, start: usize, n: usize) -> &mut [u8] {
+        if self.buf.len() < start + n {
+            self.buf.resize(start + n);
+        }
+        &mut self.buf.as_mut_bytes()[start..start + n]
     }
 }
 
@@ -419,39 +544,6 @@ pub fn from_unsigned(v: u64, bits: u32, field: &'static str) -> Result<u64> {
     }
 }
 
-/// Reads `width` (1 to 64) bits at bit `offset` of bit-packed storage.
-///
-/// Bit 0 is the least significant bit of byte 0, and a value is stored least
-/// significant bit first, crossing byte boundaries as needed.  Packet structs
-/// generated with `--bit-packing` keep their integer, enumerated and boolean
-/// fields this way.
-pub fn packed_get(bytes: &[u8], offset: usize, width: u32) -> u64 {
-    let (mut v, mut done, mut pos) = (0u64, 0u32, offset);
-    while done < width {
-        let shift = (pos % 8) as u32;
-        let take = (8 - shift).min(width - done);
-        v |= ((bytes[pos / 8] as u64 >> shift) & mask(take)) << done;
-        done += take;
-        pos += take as usize;
-    }
-    v
-}
-
-/// Stores the low `width` bits of `raw` at bit `offset` of bit-packed
-/// storage, laid out as for [`packed_get`].
-pub fn packed_set(bytes: &mut [u8], offset: usize, width: u32, raw: u64) {
-    let (mut done, mut pos) = (0u32, offset);
-    while done < width {
-        let shift = (pos % 8) as u32;
-        let take = (8 - shift).min(width - done);
-        let m = (mask(take) << shift) as u8;
-        let bits = (((raw >> done) & mask(take)) << shift) as u8;
-        bytes[pos / 8] = (bytes[pos / 8] & !m) | bits;
-        done += take;
-        pos += take as usize;
-    }
-}
-
 /// Decodes a raw integer as unsigned or signed, as a float.
 pub fn int_to_f64(raw: u64, bits: u32, enc: IntEncoding) -> f64 {
     match enc {
@@ -476,6 +568,17 @@ pub fn f64_to_int(x: f64, bits: u32, enc: IntEncoding, field: &'static str) -> R
             return Err(PacketError::OutOfRange { field });
         }
         from_signed(r as i64, bits, enc, field)
+    }
+}
+
+/// Rounds a calibrated value (half away from zero) to an integer from `lo`
+/// up to but not including `lim`; fails with `OutOfRange` otherwise.
+pub fn round_to_int(y: f64, lo: f64, lim: f64, field: &'static str) -> Result<f64> {
+    let r = y.round();
+    if r >= lo && r < lim {
+        Ok(r)
+    } else {
+        Err(PacketError::OutOfRange { field })
     }
 }
 
@@ -583,6 +686,28 @@ pub fn spline_inverse(
     })
 }
 
+// --- sizes from other fields -------------------------------------------------------
+
+/// A size or count that another field gives (an XTCE `DynamicValue`):
+/// `(slope * x + intercept) / unit`, where `x` is that field's value and
+/// `unit` is 8 for a size in bits used in whole bytes.  Fails with `BadSize`
+/// unless the result is a whole number from 0 to `max`.
+pub fn dynamic_size(
+    x: f64,
+    slope: f64,
+    intercept: f64,
+    unit: u32,
+    max: usize,
+    field: &'static str,
+) -> Result<usize> {
+    let y = slope * x + intercept;
+    let unit = unit as f64;
+    if !(y >= 0.0) || y.fract() != 0.0 || (y / unit).fract() != 0.0 || y / unit > max as f64 {
+        return Err(PacketError::BadSize { field });
+    }
+    Ok((y / unit) as usize)
+}
+
 // --- strings ----------------------------------------------------------------------
 
 /// Layout of a string field.  Exactly one of `terminator` and `size_tag_bits`
@@ -595,6 +720,25 @@ pub struct StringSpec {
     pub max_bits: usize,
     pub terminator: Option<u8>,
     pub size_tag_bits: u32,
+}
+
+impl StringSpec {
+    /// The spec of a string whose size another field gives: it occupies
+    /// exactly `bytes` bytes.
+    pub fn sized(&self, bytes: usize) -> StringSpec {
+        StringSpec {
+            fixed_bits: Some(bytes * 8),
+            max_bits: bytes * 8,
+            ..*self
+        }
+    }
+}
+
+/// Whether `n` bytes after a `tag`-bit size tag fit in `bits` bits.  Avoids
+/// `n * 8`, which can overflow `usize` for a size tag read from a packet.
+fn fits(n: u64, tag: u32, bits: usize) -> bool {
+    let tag = tag as usize;
+    tag <= bits && n <= ((bits - tag) / 8) as u64
 }
 
 pub fn read_string(
@@ -612,11 +756,11 @@ pub fn read_string(
             b
         }
         (Some(bits), None) => {
-            let n = r.uint(spec.size_tag_bits, field)? as usize;
-            if n * 8 + spec.size_tag_bits as usize > bits {
+            let n = r.uint(spec.size_tag_bits, field)?;
+            if !fits(n, spec.size_tag_bits, bits) {
                 return Err(PacketError::TooLong { field });
             }
-            let b = r.bytes(n, field)?;
+            let b = r.bytes(n as usize, field)?;
             r.seek(start, bits as i64, field)?;
             b
         }
@@ -634,11 +778,11 @@ pub fn read_string(
             }
         }
         (None, None) => {
-            let n = r.uint(spec.size_tag_bits, field)? as usize;
-            if n * 8 + spec.size_tag_bits as usize > spec.max_bits {
+            let n = r.uint(spec.size_tag_bits, field)?;
+            if !fits(n, spec.size_tag_bits, spec.max_bits) {
                 return Err(PacketError::TooLong { field });
             }
-            r.bytes(n, field)?
+            r.bytes(n as usize, field)?
         }
     };
     String::from_utf8(bytes).map_err(|_| PacketError::InvalidString { field })
@@ -671,9 +815,7 @@ pub fn write_string(
                 w.uint(8, term as u64);
             }
             if let Some(bits) = spec.fixed_bits {
-                for _ in b.len() + 1..bits / 8 {
-                    w.uint(8, 0);
-                }
+                w.zeros((bits / 8).saturating_sub(b.len() + 1) * 8);
             }
         }
         None => {
@@ -684,13 +826,17 @@ pub fn write_string(
             w.uint(spec.size_tag_bits, b.len() as u64);
             w.bytes(b);
             if let Some(bits) = spec.fixed_bits {
-                for _ in 0..bits - tag - b.len() * 8 {
-                    w.uint(1, 0);
-                }
+                w.zeros(bits - tag - b.len() * 8);
             }
         }
     }
     Ok(())
+}
+
+/// The string a string field encoded as binary holds: all of its bytes,
+/// which must be UTF-8.
+pub fn string_from_bytes(b: Vec<u8>, field: &'static str) -> Result<String> {
+    String::from_utf8(b).map_err(|_| PacketError::InvalidString { field })
 }
 
 /// Writes a fixed-size binary field.
@@ -701,6 +847,16 @@ pub fn write_binary(w: &mut BitWriter<'_>, b: &[u8], n: usize, field: &'static s
         } else {
             PacketError::OutOfRange { field }
         });
+    }
+    w.bytes(b);
+    Ok(())
+}
+
+/// Writes a binary field that takes the rest of the packet: all of `b`,
+/// which must be at most `max` bytes.
+pub fn write_rest(w: &mut BitWriter<'_>, b: &[u8], max: usize, field: &'static str) -> Result<()> {
+    if b.len() > max {
+        return Err(PacketError::TooLong { field });
     }
     w.bytes(b);
     Ok(())
@@ -775,20 +931,84 @@ mod tests {
     }
 
     #[test]
-    fn packed_bits() {
-        // A 3-bit then a 5-bit value fill one byte, least significant bit first.
-        let mut b = [0u8; 1];
-        packed_set(&mut b, 0, 3, 0b101);
-        packed_set(&mut b, 3, 5, 0b10011);
-        assert_eq!(b, [0b1001_1101]);
-        assert_eq!(packed_get(&b, 0, 3), 0b101);
-        assert_eq!(packed_get(&b, 3, 5), 0b10011);
-        // Values cross byte boundaries, and setting one leaves the others.
-        let mut b = [0xffu8; 10];
-        packed_set(&mut b, 5, 64, 0x0123_4567_89ab_cdef);
-        assert_eq!(packed_get(&b, 5, 64), 0x0123_4567_89ab_cdef);
-        assert_eq!(packed_get(&b, 0, 5), 0x1f);
-        assert_eq!(packed_get(&b, 69, 11), 0x7ff);
+    fn bytes_and_zeros_overwrite() {
+        // Aligned and unaligned, and over bits written before a seek back.
+        let mut buf = Buffer::with_capacity(16);
+        let mut w = BitWriter::new(&mut buf);
+        w.bytes(&[0xff; 6]);
+        w.seek(0, 0, "x").unwrap();
+        w.bytes(&[0x12, 0x34]);
+        w.uint(3, 0b101);
+        w.bytes(&[0xab]);
+        w.zeros(13);
+        w.uint(4, 0);
+        assert_eq!(buf.as_bytes(), &[0x12, 0x34, 0xb5, 0x60, 0x00, 0x0f]);
+        let mut w = BitWriter::new(&mut buf);
+        w.uint(4, 0xf);
+        w.zeros(2);
+        // Writing nothing past the end does not extend the packet.
+        w.skip(18, "x").unwrap();
+        w.zeros(0);
+        w.bytes(&[]);
+        assert_eq!(buf.as_bytes(), &[0xf0]);
+    }
+
+    #[test]
+    fn huge_lengths_are_truncated() {
+        // n * 8 would overflow usize; this must be an error, not a panic.
+        let data = [0u8; 4];
+        let mut r = BitReader::new(&data);
+        assert_eq!(
+            r.bytes(1 << 61, "x"),
+            Err(PacketError::Truncated { field: "x" })
+        );
+        assert_eq!(
+            r.bytes(usize::MAX, "x"),
+            Err(PacketError::Truncated { field: "x" })
+        );
+        // A 32-bit size tag claiming 4 GiB is too long for a 64-bit field.
+        let data = [0xff, 0xff, 0xff, 0xff, 0, 0, 0, 0];
+        let spec = StringSpec {
+            fixed_bits: Some(64),
+            max_bits: 64,
+            terminator: None,
+            size_tag_bits: 32,
+        };
+        assert_eq!(
+            read_string(&mut BitReader::new(&data), &spec, "s"),
+            Err(PacketError::TooLong { field: "s" })
+        );
+    }
+
+    #[test]
+    fn binary32_rounding() {
+        // The C and Python runtimes must give the same bits.
+        assert_eq!(float_to_raw(3.4028235e38, 32), 0x7f7f_ffff);
+        assert_eq!(float_to_raw(-3.4028235e38, 32), 0xff7f_ffff);
+        assert_eq!(float_to_raw(3.402_823_567_797_336_2e38, 32), 0x7f7f_ffff);
+        assert_eq!(float_to_raw(3.402_823_567_797_336_6e38, 32), 0x7f80_0000);
+        assert_eq!(float_to_raw(1e39, 32), 0x7f80_0000);
+        assert_eq!(float_to_raw(-1e39, 32), 0xff80_0000);
+    }
+
+    #[test]
+    fn dynamic_sizes() {
+        assert_eq!(dynamic_size(5.0, 1.0, -1.0, 1, 10, "f"), Ok(4));
+        assert_eq!(dynamic_size(24.0, 1.0, 0.0, 8, 3, "f"), Ok(3));
+        assert_eq!(dynamic_size(3.0, 8.0, 0.0, 8, 3, "f"), Ok(3));
+        for (x, slope, unit, max) in [
+            (0.0, 1.0, 1, 10),      // negative after the intercept
+            (12.0, 1.0, 1, 10),     // more than max
+            (5.0, 0.5, 1, 10),      // not whole
+            (12.0, 1.0, 8, 10),     // not whole bytes
+            (f64::NAN, 1.0, 1, 10), // not a number
+        ] {
+            let intercept = if x == 0.0 { -1.0 } else { 0.0 };
+            assert_eq!(
+                dynamic_size(x, slope, intercept, unit, max, "f"),
+                Err(PacketError::BadSize { field: "f" })
+            );
+        }
     }
 
     #[test]

@@ -14,7 +14,7 @@ Third-Party Integration
 Introduction
 ============
 This is how the tcs projects -- tcspecial, tcslog, tcslog-tools and
-tcsxtce -- would work with the two open-source flight software frameworks
+tcs-xtce -- would work with the two open-source flight software frameworks
 most missions build on: NASA's core Flight System, **cFS**, and JPL's
 **F´** (F Prime). It says what each project brings that the frameworks do not
 have, what has to change in each to fit, what that costs, and an order to do
@@ -47,11 +47,11 @@ The Projects
     Ground software. ``tcslog-dump`` and ``tcslog-dumphdr``, which read a log
     whichever language wrote it. https://github.com/vomlehn/tcslog-tools
 
-``tcsxtce``
+``tcs-xtce``
     Flight software. It compiles an XTCE description of telemetry and
     commands into code that packs and unpacks them, byte for byte the same in
     Rust, C/C++ and Python, with bit packing. tcspecial's beacon is already
-    packed with it; see ``vendor/tcsxtce``. https://github.com/vomlehn/tcsxtce
+    packed with it; see ``vendor/tcs-xtce``. https://github.com/vomlehn/tcs-xtce
 
 The Frameworks
 --------------
@@ -149,8 +149,8 @@ tcslog-tools
 The ground's half of the log: reading a log back, and recovering what a
 damaged one still holds, whichever language wrote it.
 
-tcsxtce
--------
+tcs-xtce
+--------
 
 Packet formats are stated once, in a standard
     XTCE is an OMG standard for telemetry and command definitions. Yamcs
@@ -182,7 +182,7 @@ while ground systems expect binary formats from a dictionary. The beacon has
 already moved; the rest should follow.
 
 * Describe every tcspecial command and answer in XTCE, on a base container
-  holding the CCSDS primary header. tcsxtce's container inheritance and
+  holding the CCSDS primary header. tcs-xtce's container inheritance and
   restriction criteria already handle this; its demonstration mission is
   CCSDS.
 * Retire the JSON on the link. The link to the MOC stays UDP.
@@ -190,8 +190,8 @@ already moved; the rest should follow.
   so that the ground knows which formats are flying as well as which
   devices.
 
-2. tcsxtce Fits the Frameworks
-------------------------------
+2. tcs-xtce Fits the Frameworks
+-------------------------------
 
 * **A Rust decoder that does not allocate.** It decodes fixed-size strings and
   binary into ``String`` and ``Vec``, which is three allocations for every
@@ -216,7 +216,7 @@ Small, and independent of the rest.
 * **F´.** A ``TcsLogger`` component that takes telemetry and events on its
   ports and hands each filled segment to FileDownlink.
 * **The ground.** tcslog-tools learns to decode records with the definitions
-  tcsxtce generates, so that what was stored reaches the ground archive as
+  tcs-xtce generates, so that what was stored reaches the ground archive as
   telemetry.
 
 4. tcspecial in cFS and F´
@@ -269,7 +269,7 @@ b. **A library.** tcspecial split in three:
   RTEMS and VxWorks have Rust targets, but less mature ones, and tcspecial's
   device nodes assume Linux interfaces: IIO, rpmsg, raw sockets. A mission
   that must run an RTOS would run tcspecial on a Linux companion processor,
-  with only tcslog and tcsxtce's C codecs inside the RTOS.
+  with only tcslog and tcs-xtce's C codecs inside the RTOS.
 
 Risks
 =====
@@ -297,7 +297,7 @@ Two frameworks
 Order of Work
 =============
 
-1. tcsxtce's Rust decoder without allocation. Small, and everything after it
+1. tcs-xtce's Rust decoder without allocation. Small, and everything after it
    benefits.
 2. tcslog in cFS and F´ (section 3). Self-contained, and shows the approach
    working.

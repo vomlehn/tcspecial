@@ -8,7 +8,7 @@
 //!
 //! The beacon is sent by this test rather than by tcspecial. What tcspecial
 //! does with the same two addresses is its own tests' business; the datagram
-//! is the same either way, being the one `tcslibgs` packs with tcsxtce.
+//! is the same either way, being the one `tcslibgs` packs with tcs-xtce.
 
 use std::net::UdpSocket;
 use std::path::{Path, PathBuf};
@@ -95,7 +95,7 @@ fn a_beacon_from_the_configured_address_is_heard() {
     };
 
     let version = ConfigVersion::of_this_build();
-    // Packed by tcsxtce, from the layout in tcslibgs/xtce/beacon.xml, as
+    // Packed by tcs-xtce, from the layout in tcslibgs/xtce/beacon.xml, as
     // tcspecial packs every beacon it sends.
     let beacon = Beacon::new(7, version, ConfigDigest([0x5a; 16])).to_bytes();
     vehicle.send_to(&beacon, at).expect("the vehicle beacons");

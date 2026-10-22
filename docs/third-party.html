@@ -383,12 +383,12 @@ is intended, not what is done.</p>
 <li><a class="reference internal" href="#tcspecial" id="toc-entry-5">tcspecial</a></li>
 <li><a class="reference internal" href="#tcslog" id="toc-entry-6">tcslog</a></li>
 <li><a class="reference internal" href="#tcslog-tools" id="toc-entry-7">tcslog-tools</a></li>
-<li><a class="reference internal" href="#tcsxtce" id="toc-entry-8">tcsxtce</a></li>
+<li><a class="reference internal" href="#tcs-xtce" id="toc-entry-8">tcs-xtce</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#what-has-to-change" id="toc-entry-9">What Has to Change</a><ul>
 <li><a class="reference internal" href="#commands-and-telemetry-in-xtce" id="toc-entry-10">1. Commands and Telemetry in XTCE</a></li>
-<li><a class="reference internal" href="#tcsxtce-fits-the-frameworks" id="toc-entry-11">2. tcsxtce Fits the Frameworks</a></li>
+<li><a class="reference internal" href="#tcs-xtce-fits-the-frameworks" id="toc-entry-11">2. tcs-xtce Fits the Frameworks</a></li>
 <li><a class="reference internal" href="#tcslog-in-cfs-and-f" id="toc-entry-12">3. tcslog in cFS and F´</a></li>
 <li><a class="reference internal" href="#tcspecial-in-cfs-and-f" id="toc-entry-13">4. tcspecial in cFS and F´</a></li>
 <li><a class="reference internal" href="#building-and-the-target" id="toc-entry-14">5. Building, and the Target</a></li>
@@ -402,7 +402,7 @@ is intended, not what is done.</p>
 <div class="section" id="introduction">
 <h1><a class="toc-backref" href="#toc-entry-1">Introduction</a></h1>
 <p>This is how the tcs projects -- tcspecial, tcslog, tcslog-tools and
-tcsxtce -- would work with the two open-source flight software frameworks
+tcs-xtce -- would work with the two open-source flight software frameworks
 most missions build on: NASA's core Flight System, <strong>cFS</strong>, and JPL's
 <strong>F´</strong> (F Prime). It says what each project brings that the frameworks do not
 have, what has to change in each to fit, what that costs, and an order to do
@@ -429,11 +429,11 @@ lost or damaged segments. Rust, C/C++ and Python 3.
 <dt><tt class="docutils literal"><span class="pre">tcslog-tools</span></tt></dt>
 <dd>Ground software. <tt class="docutils literal"><span class="pre">tcslog-dump</span></tt> and <tt class="docutils literal"><span class="pre">tcslog-dumphdr</span></tt>, which read a log
 whichever language wrote it. <a class="reference external" href="https://github.com/vomlehn/tcslog-tools">https://github.com/vomlehn/tcslog-tools</a></dd>
-<dt><tt class="docutils literal">tcsxtce</tt></dt>
+<dt><tt class="docutils literal"><span class="pre">tcs-xtce</span></tt></dt>
 <dd>Flight software. It compiles an XTCE description of telemetry and
 commands into code that packs and unpacks them, byte for byte the same in
 Rust, C/C++ and Python, with bit packing. tcspecial's beacon is already
-packed with it; see <tt class="docutils literal">vendor/tcsxtce</tt>. <a class="reference external" href="https://github.com/vomlehn/tcsxtce">https://github.com/vomlehn/tcsxtce</a></dd>
+packed with it; see <tt class="docutils literal"><span class="pre">vendor/tcs-xtce</span></tt>. <a class="reference external" href="https://github.com/vomlehn/tcs-xtce">https://github.com/vomlehn/tcs-xtce</a></dd>
 </dl>
 </div>
 <div class="section" id="the-frameworks">
@@ -524,8 +524,8 @@ what either framework needs.</dd>
 <p>The ground's half of the log: reading a log back, and recovering what a
 damaged one still holds, whichever language wrote it.</p>
 </div>
-<div class="section" id="tcsxtce">
-<h2><a class="toc-backref" href="#toc-entry-8">tcsxtce</a></h2>
+<div class="section" id="tcs-xtce">
+<h2><a class="toc-backref" href="#toc-entry-8">tcs-xtce</a></h2>
 <dl class="docutils">
 <dt>Packet formats are stated once, in a standard</dt>
 <dd>XTCE is an OMG standard for telemetry and command definitions. Yamcs
@@ -555,7 +555,7 @@ while ground systems expect binary formats from a dictionary. The beacon has
 already moved; the rest should follow.</p>
 <ul class="simple">
 <li>Describe every tcspecial command and answer in XTCE, on a base container
-holding the CCSDS primary header. tcsxtce's container inheritance and
+holding the CCSDS primary header. tcs-xtce's container inheritance and
 restriction criteria already handle this; its demonstration mission is
 CCSDS.</li>
 <li>Retire the JSON on the link. The link to the MOC stays UDP.</li>
@@ -564,8 +564,8 @@ so that the ground knows which formats are flying as well as which
 devices.</li>
 </ul>
 </div>
-<div class="section" id="tcsxtce-fits-the-frameworks">
-<h2><a class="toc-backref" href="#toc-entry-11">2. tcsxtce Fits the Frameworks</a></h2>
+<div class="section" id="tcs-xtce-fits-the-frameworks">
+<h2><a class="toc-backref" href="#toc-entry-11">2. tcs-xtce Fits the Frameworks</a></h2>
 <ul class="simple">
 <li><strong>A Rust decoder that does not allocate.</strong> It decodes fixed-size strings and
 binary into <tt class="docutils literal">String</tt> and <tt class="docutils literal">Vec</tt>, which is three allocations for every
@@ -591,7 +591,7 @@ file writing DS does.</li>
 <li><strong>F´.</strong> A <tt class="docutils literal">TcsLogger</tt> component that takes telemetry and events on its
 ports and hands each filled segment to FileDownlink.</li>
 <li><strong>The ground.</strong> tcslog-tools learns to decode records with the definitions
-tcsxtce generates, so that what was stored reaches the ground archive as
+tcs-xtce generates, so that what was stored reaches the ground archive as
 telemetry.</li>
 </ul>
 </div>
@@ -645,7 +645,7 @@ bridge such as Corrosion.</li>
 RTEMS and VxWorks have Rust targets, but less mature ones, and tcspecial's
 device nodes assume Linux interfaces: IIO, rpmsg, raw sockets. A mission
 that must run an RTOS would run tcspecial on a Linux companion processor,
-with only tcslog and tcsxtce's C codecs inside the RTOS.</li>
+with only tcslog and tcs-xtce's C codecs inside the RTOS.</li>
 </ul>
 </div>
 </div>
@@ -674,7 +674,7 @@ apart.</dd>
 <div class="section" id="order-of-work">
 <h1><a class="toc-backref" href="#toc-entry-16">Order of Work</a></h1>
 <ol class="arabic simple">
-<li>tcsxtce's Rust decoder without allocation. Small, and everything after it
+<li>tcs-xtce's Rust decoder without allocation. Small, and everything after it
 benefits.</li>
 <li>tcslog in cFS and F´ (section 3). Self-contained, and shows the approach
 working.</li>

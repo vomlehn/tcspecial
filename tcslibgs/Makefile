@@ -27,11 +27,11 @@ README.html: README.md
 	pandoc --standalone --metadata pagetitle=tcslibgs README.md -o README.html
 
 # The beacon's layout is stated once, in xtce/beacon.xml, and the code that
-# packs and unpacks it is generated from that by tcsxtce, vendored in
-# vendor/tcsxtce: Rust for tcspecial and tcslib, and Python for the Python
+# packs and unpacks it is generated from that by tcs-xtce, vendored in
+# vendor/tcs-xtce: Rust for tcspecial and tcslib, and Python for the Python
 # ground station. Both are committed, so that building needs no Python; run
 # this after changing the XML, and commit what it writes.
-TCSXTCE := cd ../vendor/tcsxtce/generator && python3 -m tcsxtce
+TCS_XTCE := cd ../vendor/tcs-xtce/generator && python3 -m tcs_xtce
 BEACON_XML := xtce/beacon.xml
 BEACON_RS := src/beacon_packet.rs
 BEACON_PY := ../python/tcslibgs/beacon_packet.py
@@ -40,11 +40,11 @@ BEACON_PY := ../python/tcslibgs/beacon_packet.py
 beacon-packet: $(BEACON_RS) $(BEACON_PY)
 
 $(BEACON_RS): $(BEACON_XML)
-	$(TCSXTCE) ../../../tcslibgs/$(BEACON_XML) ../../../tcslibgs/$(BEACON_RS) \
+	$(TCS_XTCE) ../../../tcslibgs/$(BEACON_XML) ../../../tcslibgs/$(BEACON_RS) \
 		--lang rust --source-name tcslibgs/$(BEACON_XML)
 
 $(BEACON_PY): $(BEACON_XML)
-	$(TCSXTCE) ../../../tcslibgs/$(BEACON_XML) ../../../tcslibgs/$(BEACON_PY) \
+	$(TCS_XTCE) ../../../tcslibgs/$(BEACON_XML) ../../../tcslibgs/$(BEACON_PY) \
 		--lang python --source-name tcslibgs/$(BEACON_XML)
 
 .PHONY: clean

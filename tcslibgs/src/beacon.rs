@@ -7,7 +7,7 @@
 //! rather than having to ask before it can know.
 //!
 //! The layout is stated once, in XTCE, in `tcslibgs/xtce/beacon.xml`, and
-//! packed and unpacked by the code tcsxtce generates from it: the Rust in
+//! packed and unpacked by the code tcs-xtce generates from it: the Rust in
 //! `beacon_packet.rs` here, and the Python in `python/tcslibgs/`. Neither is
 //! written by hand, so the two ends, and the two languages, cannot come to
 //! disagree about where a byte goes.
@@ -64,12 +64,12 @@ impl Beacon {
         if datagram.len() != BEACON_BYTES {
             return Err(BeaconError::Length(datagram.len()));
         }
-        // This allocates, three times a beacon: tcsxtce's Rust decoder hands
+        // This allocates, three times a beacon: tcs-xtce's Rust decoder hands
         // back the name and the space it checks as Strings and the digest as
         // a Vec. It is the only decoder of the layout there is, and the
         // layout is stated once, so it is used as it stands; each allocation
         // is freed before this returns, and a beacon arrives once an
-        // interval. tcsxtce's C decoder fills fixed arrays instead, and its
+        // interval. tcs-xtce's C decoder fills fixed arrays instead, and its
         // Rust one would be worth the same.
         let packet = beacon_packet::Beacon::decode(datagram).map_err(BeaconError::Packet)?;
         let mut digest = [0u8; 16];
@@ -98,7 +98,7 @@ impl Beacon {
 /// Packs beacons into a buffer it keeps, for a loop that sends them.
 ///
 /// Everything a beacon is packed with is made here, once: the buffer, sized
-/// for a beacon, and the packet tcsxtce packs from, whose digest is a vector
+/// for a beacon, and the packet tcs-xtce packs from, whose digest is a vector
 /// that each beacon is copied into rather than one made for it.
 #[derive(Debug, Clone)]
 pub struct BeaconPacker {

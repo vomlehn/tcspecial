@@ -31,11 +31,11 @@ members = [
     # Python to the Rust it is written after.
     "examples/ping",
 ]
-# tcsxtce's Rust runtime, which packs and unpacks the beacon, copied in from
-# tcsxtce until it is published: see vendor/tcsxtce/README.md. Not a member,
+# tcs-xtce's Rust runtime, which packs and unpacks the beacon, copied in from
+# tcs-xtce until it is published: see vendor/tcs-xtce/README.md. Not a member,
 # so that the workspace's tests, lints and formatting are of this tree's own
 # code and not of the 27,000 lines it generated from the XTCE schema.
-exclude = ["vendor/tcsxtce/rust"]
+exclude = ["vendor/tcs-xtce/rust"]
 
 [workspace.package]
 version = "0.1.0"

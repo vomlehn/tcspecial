@@ -13,7 +13,7 @@
 
 /// The beacon, as it goes on the link.
 pub mod beacon;
-/// The beacon's packing code, which tcsxtce generated from
+/// The beacon's packing code, which tcs-xtce generated from
 /// `xtce/beacon.xml`: used through [`beacon`].
 mod beacon_packet;
 pub mod commands;

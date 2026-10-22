@@ -10,7 +10,7 @@ and.
 
 Work is under way on integrating TCSpecial, with its telemetry log
 [tcslog](https://github.com/vomlehn/tcslog) and its packet compiler
-[tcsxtce](https://github.com/vomlehn/tcsxtce), with NASA's core Flight System
+[tcs-xtce](https://github.com/vomlehn/tcs-xtce), with NASA's core Flight System
 (cFS) and JPL's F´ (F Prime): see docs/third-party.rst.
 
 > **Note:** integration with cFS and F´ is a work in progress. None of it is

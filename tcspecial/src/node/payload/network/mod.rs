@@ -7,6 +7,9 @@
 // beside network in node/, because the configuration already treats them as
 // one type with a protocol attribute -- a network node states which transport
 // it runs over, where every other type is addressed by what it is.
+// Its own feature: a raw socket needs CAP_NET_RAW and is a thing a vehicle
+// may well not want to contain. See `super::BUILT`.
+#[cfg(feature = "raw")]
 pub mod raw;
 pub mod tcp;
 pub mod udp;

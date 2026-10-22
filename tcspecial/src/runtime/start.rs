@@ -67,8 +67,14 @@ pub fn run_graph(path: &str) -> Result<(), Vec<String>> {
 
     // The same checks the ground tool runs, against the same code. A
     // configuration that arrived here unchecked is exactly the configuration
-    // that should not open a bus.
-    let problems = graph.check();
+    // that should not open a bus. With them, whether this build contains every
+    // type the configuration has, which is tcsverify's `--types` with the
+    // types this was built with.
+    let mut problems = graph.check();
+    problems.extend(tcslibgs::graph::built::not_built(
+        &graph.nodes,
+        crate::node::payload::BUILT,
+    ));
     if !problems.is_empty() {
         return Err(problems
             .iter()

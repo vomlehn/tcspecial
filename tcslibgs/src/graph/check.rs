@@ -82,6 +82,16 @@ pub enum Problem {
     /// node the flight software has no way to open -- most likely a misspelled
     /// type, which no amount of finishing will make work.
     UnknownType { node: String, node_type: String },
+    /// A node of a payload type the tcspecial it is for was built without.
+    ///
+    /// Not found by [`Graph::check`](super::Graph::check), which knows nothing
+    /// of any build: asked of a graph with the types a build contains, by
+    /// tcspecial as it loads and by tcsverify's `--types`. See
+    /// [`crate::graph::built`].
+    NotBuilt {
+        node: String,
+        node_type: &'static str,
+    },
     /// A link naming a node that is not in the configuration.
     ///
     /// `from` is the node the link leaves, which is where the link is written:
@@ -294,6 +304,7 @@ impl Problem {
             Problem::DuplicateNode { name } => About::Node(name.clone()),
             Problem::NamelessNode => About::Section("nodes"),
             Problem::UnknownType { node, .. } => About::Node(node.clone()),
+            Problem::NotBuilt { node, .. } => About::Node(node.clone()),
             Problem::DuplicateGroup { name } => About::NodeGroup(name.clone()),
             Problem::EmptyGroup { group } => About::NodeGroup(group.clone()),
             Problem::BadInterval { group, .. } => About::NodeGroup(group.clone()),
@@ -376,6 +387,9 @@ impl Problem {
                 format!("group \"{group}\" has no nodes in it")
             }
             Problem::NamelessNode => "a node has no name".to_string(),
+            Problem::NotBuilt { node, node_type } => {
+                crate::graph::built::not_built_message(node, node_type)
+            }
             Problem::UnknownType { node, node_type } => {
                 use crate::graph::{types_in, Section};
                 let listed = |section| types_in(section).join(", ");

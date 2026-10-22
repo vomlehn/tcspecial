@@ -24,19 +24,38 @@ use std::os::unix::io::RawFd;
 use nix::poll::{poll, PollFd, PollFlags};
 use tcslibgs::{EndpointConfig, NetworkConfig, NetworkProtocol, SendsFrom, TcsError, TcsResult};
 
+#[cfg(feature = "can")]
 use crate::node::payload::can::CanEndpoint;
+#[cfg(feature = "device-file")]
 use crate::node::payload::device_file::DeviceEndpoint;
+#[cfg(feature = "gpio")]
 use crate::node::payload::gpio::GpioEndpoint;
+#[cfg(feature = "hdlc")]
 use crate::node::payload::hdlc::HdlcEndpoint;
+#[cfg(feature = "i2c")]
 use crate::node::payload::i2c::I2cEndpoint;
+#[cfg(feature = "iio")]
 use crate::node::payload::iio::IioEndpoint;
+#[cfg(feature = "raw")]
 use crate::node::payload::network::raw::RawEndpoint;
 use crate::node::payload::network::tcp::TcpEndpoint;
 use crate::node::payload::network::udp::UdpEndpoint;
 use crate::node::payload::network::unix::{UnixDatagramEndpoint, UnixStreamEndpoint};
+#[cfg(feature = "rpmsg")]
 use crate::node::payload::rpmsg::RpmsgEndpoint;
+#[cfg(feature = "serial")]
 use crate::node::payload::serial::SerialEndpoint;
+#[cfg(feature = "spi")]
 use crate::node::payload::spi::SpiEndpoint;
+
+/// An open refused because this build does not contain the type.
+///
+/// In the words the load uses: see [`tcslibgs::graph::built::not_built_message`].
+/// Only a build that leaves a type out can reach it.
+#[allow(dead_code)]
+fn not_built(what: &str, node_type: &str) -> TcsError {
+    TcsError::Config(tcslibgs::graph::built::not_built_message(what, node_type))
+}
 
 /// Say what could not be bound, and what that usually means.
 ///
@@ -214,13 +233,17 @@ pub fn bind_endpoint_pair(
                 let writer = reader.try_clone()?;
                 Ok((Box::new(reader), Box::new(writer)))
             }
+            #[cfg(feature = "raw")]
             NetworkProtocol::Raw(_) => {
                 let reader = RawEndpoint::connect(what, net_config)?;
                 let writer = reader.try_clone()?;
                 Ok((Box::new(reader), Box::new(writer)))
             }
+            #[cfg(not(feature = "raw"))]
+            NetworkProtocol::Raw(_) => Err(not_built(what, tcslibgs::RAW)),
             _ => Err(TcsError::Config("Unsupported network protocol".to_string())),
         },
+        #[cfg(feature = "device-file")]
         EndpointConfig::Device(dev_config) => {
             let reader = DeviceEndpoint::new(what, dev_config)?;
             let writer = reader.try_clone()?;
@@ -229,16 +252,19 @@ pub fn bind_endpoint_pair(
         // Each of these is a device file with terms of its own, applied when
         // it is opened: see the file for the kind. The duplicate carries what
         // was set rather than setting it again.
+        #[cfg(feature = "serial")]
         EndpointConfig::Serial(serial_config) => {
             let reader = SerialEndpoint::new(what, serial_config)?;
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }
+        #[cfg(feature = "i2c")]
         EndpointConfig::I2c(i2c_config) => {
             let reader = I2cEndpoint::new(what, i2c_config)?;
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }
+        #[cfg(feature = "spi")]
         EndpointConfig::Spi(spi_config) => {
             let reader = SpiEndpoint::new(what, spi_config)?;
             let writer = reader.try_clone()?;
@@ -249,6 +275,7 @@ pub fn bind_endpoint_pair(
         // a second socket on the bus would be a second member of it with a
         // filter of its own. Neither bound to an address nor connected to
         // one, so both factories do the same thing with it.
+        #[cfg(feature = "can")]
         EndpointConfig::Can(can_config) => {
             let reader = CanEndpoint::new(what, can_config)?;
             let writer = reader.try_clone()?;
@@ -256,6 +283,7 @@ pub fn bind_endpoint_pair(
         }
         // A sensor's buffer: opened and read, and the writer it is paired
         // with has nothing to write. See endpoint_iio.
+        #[cfg(feature = "iio")]
         EndpointConfig::Iio(iio_config) => {
             let reader = IioEndpoint::new(what, iio_config)?;
             let writer = reader.try_clone()?;
@@ -263,6 +291,7 @@ pub fn bind_endpoint_pair(
         }
         // A channel to another core: a character device carrying whole
         // messages both ways. See endpoint_rpmsg.
+        #[cfg(feature = "rpmsg")]
         EndpointConfig::Rpmsg(rpmsg_config) => {
             let reader = RpmsgEndpoint::new(what, rpmsg_config)?;
             let writer = reader.try_clone()?;
@@ -273,6 +302,7 @@ pub fn bind_endpoint_pair(
         // to one request at a time. Which half of the pair does anything
         // follows from the configured direction, and the other half says so.
         // See node/gpio.
+        #[cfg(feature = "gpio")]
         EndpointConfig::Gpio(gpio_config) => {
             let reader = GpioEndpoint::new(what, gpio_config)?;
             let writer = reader.try_clone()?;
@@ -281,11 +311,18 @@ pub fn bind_endpoint_pair(
         // A synchronous line, which the kernel drives as a network interface:
         // the line is set up once and the pair shares the socket its frames
         // come and go on. See node/hdlc.
+        #[cfg(feature = "hdlc")]
         EndpointConfig::Hdlc(hdlc_config) => {
             let reader = HdlcEndpoint::new(what, hdlc_config)?;
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }
+        // A type this build does not contain. A configuration with one is
+        // refused as it is loaded, so this is reached only by an open nothing
+        // checked first; it says what the load would have. Unreachable in a
+        // build with every type, which is what the allow is for.
+        #[allow(unreachable_patterns)]
+        other => Err(not_built(what, other.kind().spelling())),
     }
 }
 
@@ -419,12 +456,16 @@ pub fn hearing_endpoint_pair(
             // Connected, whichever way the payload is used: a raw socket has
             // no port to wait at, and a connected one hears only its payload.
             // See node/payload/network/raw.
+            #[cfg(feature = "raw")]
             NetworkProtocol::Raw(_) => {
                 let reader = RawEndpoint::connect(what, net_config)?;
                 let writer = reader.try_clone()?;
                 Ok((Box::new(reader), Box::new(writer)))
             }
+            #[cfg(not(feature = "raw"))]
+            NetworkProtocol::Raw(_) => Err(not_built(what, tcslibgs::RAW)),
         },
+        #[cfg(feature = "device-file")]
         EndpointConfig::Device(dev_config) => {
             let reader = DeviceEndpoint::new(what, dev_config)?;
             let writer = reader.try_clone()?;
@@ -433,16 +474,19 @@ pub fn hearing_endpoint_pair(
         // Each of these is a device file with terms of its own, applied when
         // it is opened: see the file for the kind. The duplicate carries what
         // was set rather than setting it again.
+        #[cfg(feature = "serial")]
         EndpointConfig::Serial(serial_config) => {
             let reader = SerialEndpoint::new(what, serial_config)?;
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }
+        #[cfg(feature = "i2c")]
         EndpointConfig::I2c(i2c_config) => {
             let reader = I2cEndpoint::new(what, i2c_config)?;
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }
+        #[cfg(feature = "spi")]
         EndpointConfig::Spi(spi_config) => {
             let reader = SpiEndpoint::new(what, spi_config)?;
             let writer = reader.try_clone()?;
@@ -453,6 +497,7 @@ pub fn hearing_endpoint_pair(
         // a second socket on the bus would be a second member of it with a
         // filter of its own. Neither bound to an address nor connected to
         // one, so both factories do the same thing with it.
+        #[cfg(feature = "can")]
         EndpointConfig::Can(can_config) => {
             let reader = CanEndpoint::new(what, can_config)?;
             let writer = reader.try_clone()?;
@@ -460,6 +505,7 @@ pub fn hearing_endpoint_pair(
         }
         // A sensor's buffer: opened and read, and the writer it is paired
         // with has nothing to write. See endpoint_iio.
+        #[cfg(feature = "iio")]
         EndpointConfig::Iio(iio_config) => {
             let reader = IioEndpoint::new(what, iio_config)?;
             let writer = reader.try_clone()?;
@@ -467,6 +513,7 @@ pub fn hearing_endpoint_pair(
         }
         // A channel to another core: a character device carrying whole
         // messages both ways. See endpoint_rpmsg.
+        #[cfg(feature = "rpmsg")]
         EndpointConfig::Rpmsg(rpmsg_config) => {
             let reader = RpmsgEndpoint::new(what, rpmsg_config)?;
             let writer = reader.try_clone()?;
@@ -477,6 +524,7 @@ pub fn hearing_endpoint_pair(
         // to one request at a time. Which half of the pair does anything
         // follows from the configured direction, and the other half says so.
         // See node/gpio.
+        #[cfg(feature = "gpio")]
         EndpointConfig::Gpio(gpio_config) => {
             let reader = GpioEndpoint::new(what, gpio_config)?;
             let writer = reader.try_clone()?;
@@ -485,11 +533,18 @@ pub fn hearing_endpoint_pair(
         // A synchronous line, which the kernel drives as a network interface:
         // the line is set up once and the pair shares the socket its frames
         // come and go on. See node/hdlc.
+        #[cfg(feature = "hdlc")]
         EndpointConfig::Hdlc(hdlc_config) => {
             let reader = HdlcEndpoint::new(what, hdlc_config)?;
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }
+        // A type this build does not contain. A configuration with one is
+        // refused as it is loaded, so this is reached only by an open nothing
+        // checked first; it says what the load would have. Unreachable in a
+        // build with every type, which is what the allow is for.
+        #[allow(unreachable_patterns)]
+        other => Err(not_built(what, other.kind().spelling())),
     }
 }
 

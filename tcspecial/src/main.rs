@@ -6,6 +6,11 @@
 //! `-q` or `--quiet` leaves the startup summary unsaid and logs warnings and
 //! worse rather than information, for a program that starts tcspecial to
 //! show something else. What stops a start is said either way.
+//!
+//! `--types` prints the payload types this build contains, separated by
+//! commas, and exits: what `tcsverify --types=` takes, so that a
+//! configuration can be checked on the ground against the binary that will
+//! fly, with `tcsverify --types=$(tcspecial --types) <configuration>`.
 
 use std::env;
 use std::process;
@@ -19,8 +24,17 @@ fn main() {
     // process was started with and nothing it opened itself.
     runtime::restart::note_how_started();
 
-    // The one flag, taken out before the configuration is read from what is
-    // left, so that it may come before or after the file.
+    // What this build contains, asked of the binary rather than recalled
+    // from how it was built: on stdout, because it is the answer, and nothing
+    // else is done. Before anything is read, so that it can be asked of a
+    // tcspecial with no configuration to hand.
+    if env::args().skip(1).any(|arg| arg == "--types") {
+        println!("{}", tcspecial::node::payload::BUILT.join(","));
+        return;
+    }
+
+    // The flag that changes how it runs, taken out before the configuration
+    // is read from what is left, so that it may come before or after the file.
     let (quiet, args): (Vec<String>, Vec<String>) =
         env::args().partition(|arg| arg == "-q" || arg == "--quiet");
     let quiet = !quiet.is_empty();
@@ -62,6 +76,17 @@ fn main() {
         }
     };
     runtime::start::summary(format!("payload configuration: {payload_path}"));
+    // Before the configuration is checked, so that a node refused because
+    // this build lacks its type is read beside the list of what it has.
+    let built = tcspecial::node::payload::BUILT;
+    runtime::start::summary(format!(
+        "payload types built: {}",
+        if built.is_empty() {
+            "none but the network type".to_string()
+        } else {
+            built.join(", ")
+        }
+    ));
 
     // What tcsverify says about this file, asked before anything else is read
     // from it and said in tcsverify's own words: every problem at once, each
@@ -72,10 +97,15 @@ fn main() {
     // Refused on a warning as well: a node whose attributes are not all in is
     // a node that cannot be opened, so aboard it is not a question of degree
     // -- see `tcslibgs::graph::check::Severity`.
-    let report = tcsverify::verify(
+    //
+    // Against the types this build contains, so that a configuration with a
+    // node of another type is refused here, before anything is opened, in
+    // the words tcsverify's `--types` uses on the ground.
+    let report = tcsverify::verify_built(
         std::path::Path::new(&payload_path),
         None,
         tcsverify::Limits::EVERYTHING,
+        built,
     );
     for (_, line) in report.lines() {
         error!("{}", line);

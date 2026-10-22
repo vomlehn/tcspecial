@@ -14,14 +14,19 @@ pub mod telemetry_log;
 pub use beacon_send::*;
 pub use config::*;
 pub use endpoint::*;
+#[cfg(feature = "device-file")]
 pub use node::payload::device_file::*;
+#[cfg(feature = "i2c")]
 pub use node::payload::i2c::*;
+#[cfg(feature = "raw")]
 pub use node::payload::network::raw::*;
 pub use node::payload::network::tcp::*;
 pub use node::payload::network::udp::*;
 pub use node::payload::network::unix::*;
 pub use node::payload::network::*;
+#[cfg(feature = "serial")]
 pub use node::payload::serial::*;
+#[cfg(feature = "spi")]
 pub use node::payload::spi::*;
 pub use telemetry_log::*;
 

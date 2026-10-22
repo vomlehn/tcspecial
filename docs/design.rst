@@ -116,13 +116,26 @@ OC
     UDP address, and the OC's own address is learnt from what it sends rather
     than configured.
 
-gateway
+commander
     Whatever tcspecial answers to: what commands it, and what its telemetry
     goes to. The ground over a radio is one, a cFS flight computer on its
     software bus another, and an F´ flight computer through a bridge
     component the third. "MOC" was the word while the ground was the only
-    one, and is still the word for the ground itself. See `Gateways: what
-    the vehicle answers to`_.
+    one, and is still the word for the ground itself, which is one kind of
+    commander.
+
+gateway
+    The node through which tcspecial reaches its commander, and the link it
+    holds: ``gateway_radio``, ``gateway_cfs`` or ``gateway_fprime``. It was
+    also the word for the commander itself, which left one word for both ends
+    of a link. See `Gateways: what the vehicle answers to`_.
+
+test harness
+    Whatever sets up a test run and takes it down: it starts the simulator,
+    waits for it to be ready, starts tcspecial, and stops what it started.
+    Tcsmoc is one, besides being a ground station; with cFS or F´ as the
+    commander, the harness is not the commander at all. See `Waiting for the
+    Simulator`_.
 
 link
     A configured pairing of two endpoints that data passes between. Used of
@@ -146,6 +159,17 @@ simulator configuration file
     a packet and how it divides one into segments. Properties of a simulation
     rather than of a payload, which is why they are not in the payload
     configuration.
+
+stand-in
+    What a payload endpoint reaches when it does not reach the payload: a
+    pseudo-terminal or a socket that tcssim answers, or a kernel's simulated
+    bus, chip or interface -- ``i2c-stub``, ``gpio-sim``, ``iio_dummy``,
+    ``vcan``. See `How a Stand-in Is Recognised`_.
+
+simulation mode
+    How many of a run's payloads may be stand-ins: ``none``, ``some`` or
+    ``all``, given to each program as ``--simulate``. See `Simulation
+    Modes`_.
 
 The Node Architecture
 =====================
@@ -702,7 +726,8 @@ computer running cFS or F´ does not have: there, each instrument is an
 application or a component written, built and tested for it. So tcspecial is
 also to run as the payload processor beside such a computer, answering to it
 rather than to the ground, and the computer answers to the ground in turn.
-Whatever tcspecial answers to is its gateway, and there are three kinds:
+Whatever tcspecial answers to is its commander, reached through a gateway
+node, and there are three kinds of gateway:
 
 .. list-table::
    :header-rows: 1
@@ -5605,6 +5630,13 @@ see `Payloads`_ -- and it states what tcspecial itself is configured with in
 its ``tcspecial`` section: where commands are taken, where beacons go, the
 beacon interval, and where the telemetry log is written.
 
+How many of the payloads it reaches may be stand-ins is said on the command
+line too, by ``--simulate``, and is not part of the configuration; see
+`Simulation Modes`_.
+
+Which payload types it can reach at all is decided when it is built; see
+`Which Node Types Are Built`_.
+
 It read two. The second was its own, ``tcspecial/src/tcspecial.yaml``, named
 by ``TCSPECIAL_CONFIG_PATH``. A configuration must have the section, so a
 second file could only disagree with the one being flown.
@@ -5996,6 +6028,108 @@ and read as it comes. The other three are device files too, and were device
 endpoints until each was given a type of its own, which is what let their terms
 reach the handler that opens them.
 
+Which Node Types Are Built
+--------------------------
+**Specified, not yet implemented.**
+
+Every node type is built into every tcspecial today, which assumes that every
+platform offers every interface: a GPIO character device, an IIO buffer, an
+rpmsg channel, SocketCAN. Not every platform does, and a vehicle that flies a
+serial line and an I2C bus has no use for the rest. So which payload types a
+tcspecial contains is chosen when it is built, and a configuration is held to
+what was chosen.
+
+Requirement
+    Each payload type is a Cargo feature of the ``tcspecial`` crate, declared
+    in ``tcspecial/Cargo.toml`` and named as the type is written in a
+    configuration: ``device_file``, ``serial``, ``i2c``, ``spi``, ``can``,
+    ``iio``, ``rpmsg``, ``gpio`` and ``hdlc``, with ``raw`` for the raw
+    protocol of the network type. One word for a type in the configuration,
+    the build and the refusal means none of them has to be translated into
+    another.
+
+Requirement
+    A feature includes or leaves out that type's module in
+    ``tcspecial::node::payload`` and nothing else. The rules for the type in
+    ``tcslibgs::node`` are built whatever tcspecial is built with: tcsverify
+    and tcsgui run on the ground and check configurations for any vehicle, so
+    what a configuration may say about a type cannot depend on how one
+    vehicle's tcspecial was built. Tcssim is built with every type, since it
+    runs on a development host and not on the target.
+
+Requirement
+    Some of tcspecial is in every build. The network type over UDP, TCP and
+    Unix-domain sockets is, because the link to the ground is UDP and a
+    tcspecial that could not reach the ground would be no tcspecial at all;
+    so are the nodes that reach no interface -- computations, logs, tees,
+    null nodes, the ping node and the app nodes -- which run wherever
+    tcspecial does.
+
+Requirement
+    The default features are every type. ``cargo build --workspace``,
+    ``cargo test`` and the programs started by tcsmoc are then what they were
+    before the types were made optional, and a build for a target says what
+    it flies::
+
+       cargo build -p tcspecial --release --no-default-features --features serial,i2c
+
+Requirement
+    The types a build contains are listed in one place, made from those
+    features in ``tcspecial::node::payload``. The open that reaches a
+    payload, the check made as a configuration is loaded and the startup
+    summary all read that list, so the three cannot disagree about what was
+    built.
+
+Requirement
+    A configuration with a node of a type the build does not contain is
+    refused as it is loaded, before anything is opened, naming the node, its
+    type and the feature that would build it. For example::
+
+       temp_1: an i2c node, and this tcspecial was built without i2c: build it
+       with --features i2c, or take the node out of the configuration.
+
+    A configuration refused on the ground costs a rebuild, where one that
+    reached a node it could not open would have failed in flight.
+
+Requirement
+    A type the platform cannot have is a compile error. GPIO character
+    devices, IIO, rpmsg, ``spidev``, ``i2c-dev``, SocketCAN and generic HDLC
+    are Linux interfaces, and enabling one of those features for another
+    operating system stops the build at a ``compile_error!`` naming the type
+    and the platform. A feature says what was chosen and the platform says
+    what is possible, and a build that contained a type its platform lacked
+    would fail only when a node of it was opened.
+
+Requirement
+    Tcspecial says which types it contains. ``tcspecial --types`` prints them
+    and exits, and the startup summary says them, so that what a build holds
+    can be read off the binary that will fly rather than recalled from how it
+    was built.
+
+Requirement
+    Tcsverify can hold a configuration to a build: ``--types=serial,i2c``
+    checks it as a tcspecial containing only those types would, and reports
+    each node of another type as that tcspecial would refuse it, in the same
+    words. A configuration can then be checked against the vehicle it is for
+    on the ground, without the vehicle. The words are the ones the features
+    are named by, and a word that names no type is refused, listing those
+    that do.
+
+Requirement
+    A crate that uses tcspecial as a library depends on it with
+    ``default-features = false`` and names the types it uses. Cargo turns on,
+    for a crate built in one command, every feature any crate in that command
+    asks for, so tcsmoc depending on tcspecial with its defaults would put
+    every type back into a ``cargo build`` that named both. A build for a
+    target is therefore made with ``-p tcspecial``, and nothing in the
+    workspace is to depend on a type it does not use.
+
+Requirement
+    ``make check`` builds tcspecial with no optional types and with each type
+    alone. A gate that leaves a reference to a type's module outside it --
+    the open in ``endpoint.rs`` naming the I2C endpoint whatever was built,
+    say -- breaks only the builds without that type, which a workspace built
+    with every type never makes.
 
 tcslib
 ------
@@ -7474,8 +7608,20 @@ file's is, so a simulator configuration may be written in YAML or XML.
 
 File Structure
 --------------
-A simulator configuration file has two sections, both optional, and a
-description of its own.
+A simulator configuration file has a description of its own, a ``tcssim``
+section, which is required, and two sections that are optional.
+
+tcssim
+    What the simulator itself is configured with. Today that is one address:
+
+    .. code-block:: yaml
+
+       tcssim:
+         ready: "127.0.0.1:4800"
+
+    ``ready`` is the UDP address of the readiness socket, where the simulator
+    says whether it has made its stand-ins; see `Waiting for the
+    Simulator`_. It is required, and every shipped simulator file states one.
 
 simulated payload groups
     Named groups of settings. A group carries what several simulated payloads
@@ -7965,6 +8111,289 @@ what is wrong with them.
                               :    |    +-----------------+  |     |                 |
                               :    +-------------------------+     +-----------------+
 
+Simulation Modes
+----------------
+**Specified, not yet implemented.**
+
+Tcspecial reaches each payload through whatever is at the end of its endpoint,
+and nothing in a configuration says whether that is the payload or a stand-in
+for it. ``/dev/i2c-7`` is an ``i2c-stub`` on one host and a real bus on
+another, and a configuration that names the wrong bus number drives real
+hardware while every file involved reads as a simulation. A simulation mode
+says which kind of run a run is meant to be, and the programs check it against
+what they find rather than against what a file says.
+
+Requirement
+    Tcspecial, tcssim and tcsmoc each take ``--simulate=<mode>``, and the mode
+    is one of three:
+
+    * ``none``: no payload may be a stand-in. This is the flight setting.
+    * ``some``: at least one payload is a stand-in and at least one is not.
+      This is for debugging a configuration against part of its hardware.
+    * ``all``: every payload is a stand-in. This is for a run that must not
+      exercise hardware at all, because a device switched on when nobody
+      meant it to be can do damage that nothing afterwards undoes.
+
+Requirement
+    The mode is ``none`` when the flag is not given, in all three programs. A
+    flight launch that leaves the flag out then gets the flight setting, and a
+    test run that leaves it out is refused at its first stand-in, saying which
+    flag it wants. Of the two mistakes, that is the cheap one.
+
+Requirement
+    The mode is a flag and not part of the configuration. The configuration
+    flown is then the configuration tested, byte for byte, and its digest is
+    the same under every mode, so a ``CONNECT`` agrees about it whichever mode
+    the ground station was started in.
+
+Requirement
+    A mode that is not one of the three, or the flag given twice, is refused,
+    naming the three modes. A second ``--simulate`` is more likely a mistake
+    about which run this is than something meant to override the first.
+
+Requirement
+    A payload, for the mode, is a node of an interface type other than the
+    gateway: what the configuration reaches over a socket, a line, a bus or a
+    device file. Computations, logs, tees and app nodes are counted under no
+    mode, because none of them has hardware behind it to stand in for -- an app
+    node's program is the thing itself. The gateway is not counted either: it
+    is the link the run is commanded over, which is set up by whoever started
+    the ground station, and not one of the payloads the configuration serves.
+
+How a Stand-in Is Recognised
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Requirement
+    Tcspecial decides for itself whether each payload is a stand-in, from the
+    endpoint it is configured to reach, and does not take the simulator file's
+    word for it. The simulator file says what tcssim will stand in for. It
+    cannot say what a path, a bus number or an address in the configuration
+    actually reaches, and that is where the mistake this exists to catch is
+    made.
+
+Requirement
+    Each payload is judged before its endpoint is opened, from what is at the
+    path, the bus, the interface or the address, and the run is refused before
+    anything is opened if the mode is not met. Opening is not always harmless:
+    a serial port raises its modem lines as it is opened, and a GPIO line
+    requested as an output is driven the moment the request is granted. A
+    check made after opening would already have done what ``all`` exists to
+    prevent.
+
+Requirement
+    A path with nothing at it is not a stand-in. The simulator makes its
+    stand-ins before tcspecial starts and says when it has, so a stand-in
+    tcspecial does not find is one that was not made; see `Waiting for the
+    Simulator`_.
+
+Requirement
+    A payload is a stand-in when its endpoint is one of the things the
+    simulator, or the stub scripts in ``bin/``, make:
+
+    .. code-block:: text
+
+       network      the address is a loopback address or a Unix-domain path,
+                    so the far end is on this host
+       i2c          the bus's adapter is the kernel's i2c-stub
+       gpio         the chip belongs to the kernel's gpio-sim
+       can          the interface is a vcan
+       iio          the device belongs to the kernel's iio_dummy, or the path
+                    resolves to a pseudo-terminal
+       serial, spi,
+       rpmsg,
+       device-file  the path resolves to a pseudo-terminal's slave, which is
+                    what tcssim makes
+       hdlc         never: nothing stands in for a synchronous line
+
+Requirement
+    What cannot be told apart is real. Under ``all`` it is refused, and the
+    refusal says that tcspecial could not tell, which is a different thing
+    from having found hardware. Failing that way round is the point of the
+    mode: a stand-in mistaken for hardware costs a refused run, and hardware
+    mistaken for a stand-in costs the hardware.
+
+Requirement
+    The network judgement is the weakest of them, and is said to be here and
+    in the manual. An address on this host says only that the far end is on
+    this host, so a local program in front of real hardware passes it. A
+    datagram payload is judged by the address the handler binds, which under
+    ``all`` must be a loopback address, so that nothing off the host can be
+    the one that answers.
+
+Requirement
+    Each type's judgement is in that type's own module, ``tcslibgs::node``,
+    beside the type's other rules, and tcspecial and tcssim both call it. A
+    type cannot then be added without saying how its stand-in is told apart,
+    and the two programs cannot come to disagree about what a stand-in is.
+
+Requirement
+    A refusal names the node, what it reaches, what was found there and the
+    mode that forbids it, and says what would satisfy the mode. For example::
+
+       temp_1: /dev/i2c-1 is a real adapter (i915 gmbus), and --simulate=all
+       allows only stand-ins: point path at the i2c-stub bus, which
+       bin/mki2c makes.
+
+Requirement
+    Tcspecial says the mode, and what it judged each payload to be, in its
+    startup summary and in the telemetry log. The summary is for whoever is
+    watching the vehicle start, and the log is the record of the run, which
+    should say what kind of run it was.
+
+What Each Program Does With the Mode
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Tcspecial checks what it finds; tcssim checks what it has been asked to do.
+The two catch different mistakes, and only the first protects the hardware.
+
+Requirement
+    Tcssim checks the mode before it stands in for anything:
+
+    * Under ``none`` it refuses to start. There is nothing for it to do in a
+      run that may have no stand-ins, and a simulator answering in place of a
+      missing device is exactly what such a run must not have.
+    * Under ``some``, at least one payload is a stand-in and at least one is
+      not. A payload counts as a stand-in when its simulator file names it, or
+      when it already is one by the rules above -- a heater on a ``gpio-sim``
+      chip, say, which ``bin/mkgpio`` made and the simulator file leaves out.
+    * Under ``all``, every payload is a stand-in in one of those two ways.
+
+Requirement
+    Tcssim's check does not replace tcspecial's. It catches a simulator file
+    that forgot a payload before anything runs. Only tcspecial's check protects
+    the hardware, because only tcspecial opens it.
+
+Requirement
+    Tcsmoc takes the mode and gives the same one to both programs it starts,
+    so that the two cannot disagree in a run tcsmoc started. Each program run
+    by hand is given the flag by whoever runs it, as each is given its files.
+
+Requirement
+    Under ``none``, tcsmoc starts tcspecial and not tcssim. A run that is like
+    a flight then looks like one, with no simulator present to answer for a
+    device that is missing.
+
+Requirement
+    Tcspecial does not start tcssim, and so does not pass the mode on to it.
+    Flight software that cannot start a simulator cannot start one by mistake,
+    and the code for finding and launching one would be flown although it
+    served only testing.
+
+Waiting for the Simulator
+-------------------------
+**Specified, not yet implemented.**
+
+A stand-in has to exist before tcspecial looks for it. Tcssim makes a
+pseudo-terminal and links the payload's path to it, binds a socket, or loads
+the bank of an ``i2c-stub`` chip, and until it has, the path, the socket or
+the register is either missing or something that is not the stand-in. A
+tcspecial started first judges a payload by what is there before the
+simulator has put anything there, and a run that worked yesterday fails today
+because the two programs started in the other order. So the simulator is
+started first, and says when it is ready.
+
+Requirement
+    When a run has stand-ins that tcssim makes, tcssim is started before
+    tcspecial, and tcspecial is not started until tcssim has said it is
+    ready. Whatever starts the two programs -- the test harness -- is what
+    waits, and not tcspecial: flight software that knows nothing of a
+    simulator cannot wait for the wrong one, or be held up by one that is not
+    there.
+
+Requirement
+    Tcssim answers on a readiness socket: a UDP address its simulator file
+    states, in the ``tcssim`` section as ``ready``. The address is required
+    and has no default, so that the harness and the simulator read it from the
+    one place and cannot each assume a different one.
+
+Requirement
+    The exchange is a request and an answer, and nothing is held between
+    exchanges. The harness sends a request carrying a sequence number; tcssim
+    answers to the address the request came from, carrying the same number. A
+    harness can therefore be stopped and started again, and asked as often as
+    it likes, with nothing to reset: there is no connection to be left half
+    open, and no reconnection to race the noticing that the old one has gone.
+    A request that is lost is sent again, and a repeated one does no harm.
+
+Requirement
+    The messages are defined in ``tcslibgs``, beside the commands and
+    telemetry, and a ground station waits through one function in ``tcslib``,
+    with the same function in the Python ground station's library. Every
+    harness then waits the same way, and there is one statement of what the
+    messages are.
+
+Requirement
+    Tcssim binds the readiness socket before it makes any stand-in, and keeps
+    it bound for as long as it runs. A harness that asks while the simulator
+    is still starting is told so, rather than told nothing; and an address
+    already taken refuses tcssim's start, naming the address. That is how a
+    simulator left running from an earlier run is found: it holds the address,
+    and a second simulator started beside it is refused rather than left to
+    fight it for the payloads' paths.
+
+Requirement
+    The answer is the simulator's state now, which is one of three:
+
+    * ``starting``: it is still making stand-ins.
+    * ``ready``: every stand-in it will provide exists and answers -- each
+      link is made, each socket is bound or listening, and each ``i2c-stub``
+      chip is found and loaded. Ready says the stand-ins are there, not that
+      any packet has gone over them.
+    * ``failed``: it could not make a stand-in, with the payload and the
+      reason. A simulator that cannot start would otherwise look exactly
+      like one that is slow, and the harness would learn which only when it
+      gave up.
+
+    The state is the current one, so a stand-in that fails after the
+    simulator was ready changes the answer to ``failed``, and a harness that
+    asks an hour later is told the truth.
+
+Requirement
+    The answer also says what the simulator is set up for: the digest of the
+    tcspecial configuration it read, the digest of its simulator file, and its
+    ``--simulate`` mode. The harness compares the three with its own before
+    it starts tcspecial, and refuses to go on when any differs, saying which
+    and what each side has. A simulator started yesterday on another
+    configuration, or under another mode, then stops the run before tcspecial
+    reaches a single payload, which is the same reason ``CONNECT`` compares
+    digests with the vehicle.
+
+Requirement
+    The answer is read and written in fixed-size buffers. The reason a
+    ``failed`` answer carries is cut short where it would not fit, as every
+    other text the protocol carries is, so that answering is no allocation in
+    tcssim's running loop.
+
+Requirement
+    A harness waits for a time it is given and then gives up, saying what it
+    last heard: nothing at all, which is a simulator not running or an address
+    that is wrong, or ``starting``, which is a simulator that has not finished.
+    The two are different faults with different remedies.
+
+Requirement
+    Tcsmoc is a harness. Under ``some`` or ``all``, it first asks at the
+    readiness address. When a simulator answers with the same configuration,
+    simulator file and mode, tcsmoc uses that simulator, starts none, and
+    leaves it running when it exits, since it did not start it; when one
+    answers with something different, tcsmoc refuses, saying what differs;
+    and when nothing answers, it starts tcssim and waits for it to be ready.
+    In every case tcspecial is started only after a ``ready``. A simulator
+    started on its own can then outlive any number of ground station runs,
+    and a ground station started twice by mistake does not start a second
+    simulator.
+
+Requirement
+    ``tcssim --wait`` takes the same files and the same mode as the simulator
+    it waits for, and exits successfully once that simulator answers
+    ``ready`` with the same digests and mode. It exits with a failure,
+    saying why, on ``failed``, on a difference, or when its time runs out.
+    This is the harness for a run started by hand::
+
+       tcssim --simulate=all x.yaml x-sim.yaml &
+       tcssim --wait --simulate=all x.yaml x-sim.yaml && tcspecial --simulate=all x.yaml
+
+Requirement
+    Under ``none`` there is nothing to wait for: tcssim refuses to start, and
+    a harness neither starts one nor asks.
+
 tcssim
 ------
 Tcssim is a GUI simulating the payloads. It reads two files. The payload
@@ -7981,15 +8410,21 @@ Requirement
     payload, and are stated in the simulator configuration file.
 
 The two are joined by name: a simulated payload names the data handler it stands
-in for. Neither file is read in the order of the other, and neither may be
-silently short.
+in for. Neither file is read in the order of the other.
 
 Requirement
-    Every data handler of the tcspecial configuration has a simulated payload
-    naming it, and every simulated payload names a data handler of the
-    tcspecial configuration. Either type of mismatch is reported rather than
-    simulated around, because a misspelled name is otherwise indistinguishable
-    from a payload deliberately left out.
+    Every simulated payload names a data handler of the tcspecial
+    configuration. A name that matches none is reported rather than simulated
+    around, because a misspelled name is otherwise indistinguishable from a
+    payload deliberately left out.
+
+Requirement
+    A data handler the simulator file does not name is not simulated, and
+    whether a run may have one is for the simulation mode to say: under
+    ``all`` every payload must be a stand-in, and under ``none`` tcssim does
+    not run. See `Simulation Modes`_. Every handler was once required to be
+    named, which left no way to write a configuration that is part hardware
+    and part simulation.
 
 Which Types Can Be Simulated
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -8572,15 +9007,19 @@ Requirement
     reaches exactly the program it is given to.
 
 Requirement
-    One configuration file is named, and nothing else. A further argument is an
+    One configuration file is named, and no other file. A further path is an
     error rather than one with no effect, because it is more likely a mistake
-    about which file is being read than something meant to be ignored.
+    about which file is being read than something meant to be ignored. A flag
+    is not a path: tcspecial's ``--quiet`` and ``--types`` (see `Which Node
+    Types Are Built`_), and the ``--simulate`` all three programs take (see
+    `Simulation Modes`_), say how a program runs and not what it reads.
 
 Where the Addresses Are
 ~~~~~~~~~~~~~~~~~~~~~~~
 Requirement
     No address appears on tcspecial's command line. The configuration file is
-    its only argument.
+    the only thing it names, and its flags say how it runs, not where anything
+    is.
 
 Requirement
     The address and ports the command interpreter binds are in the
@@ -9243,6 +9682,10 @@ Requirement
     this desk -- can be asked of a file without running anything. It is of the
     graph a file parses into and not of the file's bytes, so the two spellings
     of one configuration answer alike.
+
+Requirement
+    ``--types=<types>`` checks a configuration as a tcspecial built with only
+    those payload types would; see `Which Node Types Are Built`_.
 
 Requirement
     The digest is taken of the configurations among the pathnames and of

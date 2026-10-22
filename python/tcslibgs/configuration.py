@@ -131,8 +131,8 @@ class Configuration:
 
     def beacon_interval(self):
         """How often tcspecial beacons, in nanoseconds: ``beacon.interval``,
-        read as :func:`parse_interval` reads it. What the beacon light ages
-        against -- see ``tcslib.beacon.Schedule.for_interval``."""
+        read as :func:`parse_interval` reads it. What the beacon indicator
+        ages against -- see ``tcslib.beacon.Schedule.for_interval``."""
         return parse_interval(self._said("beacon.interval"))
 
     def moc_nodes(self):

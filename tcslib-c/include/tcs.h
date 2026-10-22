@@ -98,7 +98,7 @@ const char *tcs_stage_label(tcs_stage stage);
 /* What one pass of the beacon watch found. */
 typedef struct tcs_pass {
     tcs_stage stage;
-    int lit;          /* whether a light showing the stage is lit now */
+    int lit;          /* whether an indicator showing the stage is lit now */
     int in_contact;   /* whether the spacecraft is being heard from */
     int heard;        /* whether any beacon has arrived */
     int64_t at_seconds; /* when the last one arrived: seconds since 1970, */
@@ -112,9 +112,9 @@ typedef struct tcs_beacons tcs_beacons;
 /* Listen where the configuration says beacons arrive. */
 tcs_beacons *tcs_beacons_listen(const tcs_configuration *configuration);
 
-/* Wait for a beacon, or for the moment the stage or the light would change
- * by itself, and say what is so now. Before any beacon has arrived it waits
- * for one. */
+/* Wait for a beacon, or for the moment the stage or the indicator would
+ * change by itself, and say what is so now. Before any beacon has arrived it
+ * waits for one. */
 int tcs_beacons_pass(tcs_beacons *beacons, tcs_pass *pass);
 
 /* What the last beacon said: "tcspecial v0.1.0 md5 ...", or "<none>". */

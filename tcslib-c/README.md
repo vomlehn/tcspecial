@@ -20,10 +20,10 @@ linkage throughout, and nothing in it that C++ will not compile.
   configuration's digest and each node's id.
 - **Beacons.** `tcs_beacons_listen` listens where the configuration says
   beacons arrive, and each `tcs_beacons_pass` says how long since the last
-  one: the stage (Unheard, Heard, Aging or Waiting), whether a light showing
-  it is lit, whether the spacecraft is being heard from, when the last beacon
-  arrived and what it said. Each pass also gives remarks, which are news, and
-  warnings, which are to be said whether or not anybody asked.
+  one: the stage (Unheard, Heard, Aging or Waiting), whether an indicator
+  showing it is lit, whether the spacecraft is being heard from, when the last
+  beacon arrived and what it said. Each pass also gives remarks, which are
+  news, and warnings, which are to be said whether or not anybody asked.
 - **The vehicle's data.** `tcs_moc_open` opens a `moc` node, and each
   `tcs_moc_receive` returns one datum and the name of the node that produced
   it.

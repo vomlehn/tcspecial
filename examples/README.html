@@ -333,8 +333,8 @@ with the ground’s own and says how stale the last one is. No window, no
 toolkit: a ground station with no screen – a logger, a test – uses
 exactly this.</li>
 <li><code>tcsui</code> holds the panel, as markup other windows import,
-and works out what to show on it: which colour the light is, and the two
-lines beside it.</li>
+and works out what to show on it: which colour the indicator is, and the
+two lines beside it.</li>
 <li><code>beacon</code>, the program here, reads the configuration to
 find where the beacons are, starts the loop on a thread, and puts each
 pass in the window. That is all of it, but for a button.</li>
@@ -348,13 +348,13 @@ significant first. The layout is described once, in XTCE, in
 from that file, <code>tcslibgs::Beacon</code>, and this example’s test
 packs the beacon it sends the same way. tcs-xtce itself is in
 <code>vendor/tcs-xtce</code>.</p>
-<p>Beside the light, between it and its <code>Status:</code> label, is
-the stage the light is at, in a word: <code>Unheard</code> before any
-beacon has arrived, <code>Heard</code> while beacons are arriving,
+<p>Beside the indicator, between it and its <code>Status:</code> label,
+is the stage the indicator is at, in a word: <code>Unheard</code> before
+any beacon has arrived, <code>Heard</code> while beacons are arriving,
 <code>Aging</code> once several are missing, and <code>Waiting</code>
 once nothing is being heard. It changes as the stage does.</p>
 <p>The button starts tcspecial on the same configuration and stops it,
-so that the light can be watched coming on with the first beacon and
+so that the indicator can be watched coming on with the first beacon and
 going out after the last. The window opens with it saying
 <code>Start tcspecial</code>, because tcspecial is not running. Pressed,
 it starts tcspecial and says <code>Stop tcspecial</code>; pressed again,

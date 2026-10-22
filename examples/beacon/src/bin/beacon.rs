@@ -18,10 +18,10 @@
 //!
 //! What is left is this program: read the configuration, start the loop, put
 //! each pass in the window. And a button that starts tcspecial on the same
-//! configuration and stops it again, so that the light can be watched coming
-//! on and going out: see [`beacon_example::Vehicle`]. tcsmoc does the same thing with the same two
-//! halves, in a panel beside its command link; an operator who has read one
-//! has read the other.
+//! configuration and stops it again, so that the indicator can be watched
+//! coming on and going out: see [`beacon_example::Vehicle`]. tcsmoc does the
+//! same thing with the same two halves, in a panel beside its command link;
+//! an operator who has read one has read the other.
 //!
 //! Arguments, all optional: the configuration; `--yaml` or `--xml`, but not
 //! both, saying which of the example's two files to read, YAML where neither
@@ -207,8 +207,8 @@ fn main() -> Result<(), slint::PlatformError> {
     }
 
     // One thread, for as long as the window is open. A pass waits for a
-    // beacon or for the moment the light would change by itself, so the light
-    // blinks whether or not anything arrives.
+    // beacon or for the moment the indicator would change by itself, so the
+    // indicator blinks whether or not anything arrives.
     thread::spawn(move || loop {
         let pass = beacons.pass();
 
@@ -223,7 +223,7 @@ fn main() -> Result<(), slint::PlatformError> {
         }
         // And what is wrong, whether or not it was asked for: a beacon from
         // where beacons do not come from, which is the one explanation of a
-        // light going red while the spacecraft is beaconing.
+        // indicator going red while the spacecraft is beaconing.
         for warning in &pass.warnings {
             eprintln!("{warning}");
         }

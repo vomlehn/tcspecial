@@ -1278,8 +1278,8 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
         Ok(interval) => interval.unwrap_or(tcslib::beacon::STANDARD_INTERVAL),
         Err(e) => {
             startup.warning(format!(
-                "The beacon interval cannot be read, so the beacon light ages as \
-                 though it were {:?}: {e}",
+                "The beacon interval cannot be read, so the beacon indicator \
+                 ages as though it were {:?}: {e}",
                 tcslib::beacon::STANDARD_INTERVAL
             ));
             tcslib::beacon::STANDARD_INTERVAL

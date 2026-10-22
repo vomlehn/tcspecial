@@ -154,8 +154,8 @@ impl BeaconReceive {
     }
 }
 
-/// Put the beacon's state in the window: the light's colour, when the last
-/// beacon arrived, and what it said.
+/// Put the beacon's state in the window: the indicator's colour, when the
+/// last beacon arrived, and what it said.
 ///
 /// All three at once, from the one reading of what the last beacon was: a
 /// colour that said beacons were arriving beside a time that said none had

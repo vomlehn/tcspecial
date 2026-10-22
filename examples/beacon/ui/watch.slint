@@ -32,9 +32,9 @@ export component WatchWindow inherits Window {
     in-out property <color> indicator-color: #c0c0c0;
     in-out property <string> last-received: "--:--:--";
     in-out property <string> last-message: "<none>";
-    // Which stage the light is at, in words, as the beacon loop reports it:
-    // Unheard until a beacon arrives, then Heard, Aging and Waiting as the
-    // last one grows older. The words are tcslib::beacon::Stage::label's,
+    // Which stage the indicator is at, in words, as the beacon loop reports
+    // it: Unheard until a beacon arrives, then Heard, Aging and Waiting as
+    // the last one grows older. The words are tcslib::beacon::Stage::label's,
     // set with every pass; this is only what shows before the first.
     in-out property <string> stage: "Unheard";
     // A beacon's message at its full length, which the window is as wide as
@@ -83,9 +83,9 @@ export component WatchWindow inherits Window {
         // the vehicle rather than a line of what the vehicle said.
         spacing: 12px;
 
-        // The stage beside the light, which shows it in colour: the light
-        // says how stale the beacons are at a glance, and the word says it
-        // to someone reading.
+        // The stage beside the indicator, which shows it in colour: the
+        // indicator says how stale the beacons are at a glance, and the word
+        // says it to someone reading.
         panel := BeaconPanel {
             indicator-color: root.indicator-color;
             last-received: root.last-received;

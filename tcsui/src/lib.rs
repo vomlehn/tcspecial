@@ -3,12 +3,12 @@
 //! The other half of [`tcslib::beacon`]. That one listens and says what is
 //! true of the spacecraft -- how stale the last beacon is, what it said, and
 //! whether anything is being heard from; this one says what that looks like:
-//! which colour the light is, and the two lines of text beside it.
+//! which colour the indicator is, and the two lines of text beside it.
 //!
 //! They are apart because the facts outlast any one window. A ground station
 //! with no window wants the facts with no toolkit linked in, and two stations
 //! that do have windows want the same panel rather than two that have drifted:
-//! an operator who has read one has read the other, where a light in a
+//! an operator who has read one has read the other, where an indicator in a
 //! different place or a label in different words would be two things to learn
 //! about one spacecraft.
 //!
@@ -30,7 +30,7 @@ use std::time::SystemTime;
 use slint::Color;
 use tcslib::beacon::{received_at, Pass, Showing, Stage};
 
-/// The colours a light is drawn in.
+/// The colours an indicator is drawn in.
 ///
 /// Complete rather than only what is used: a palette is read as a whole, and a
 /// colour that is here and unused is one a reader can see is spare.
@@ -43,11 +43,11 @@ pub mod palette {
         Color::from_rgb_u8(196, 196, 196)
     }
 
-    /// A light that has shown a colour and is not showing one now: the dark
-    /// half of a blink, once a beacon has arrived. White and not grey, so
-    /// that grey keeps the one meaning it had -- nothing has been heard yet --
-    /// and a light that has been heard from never goes back to looking as if
-    /// it had not.
+    /// An indicator that has shown a colour and is not showing one now: the
+    /// dark half of a blink, once a beacon has arrived. White and not grey,
+    /// so that grey keeps the one meaning it had -- nothing has been heard
+    /// yet -- and an indicator that has been heard from never goes back to
+    /// looking as if it had not.
     pub fn off() -> Color {
         Color::from_rgb_u8(255, 255, 255)
     }
@@ -59,15 +59,15 @@ pub mod palette {
 
     /// Worth looking at.
     ///
-    /// A golden yellow, `#ffe100`, rather than pure yellow. A blinking light
-    /// alternates with [`off`], which is white, and pure yellow is so nearly
-    /// as light as white -- a contrast of 1.07 to one -- that its blink could
-    /// hardly be seen, the one stage that asks to be looked at being the
-    /// hardest to see. This is 1.31 to one, enough for the blink to show,
-    /// and is still read as yellow rather than amber: a yellow with more red
-    /// in it, which would blink more plainly, was read as on its way to
-    /// orange, and so to something nearer red. The price is a blink a little
-    /// less plain than green's, at 1.37.
+    /// A golden yellow, `#ffe100`, rather than pure yellow. A blinking
+    /// indicator alternates with [`off`], which is white, and pure yellow is
+    /// so nearly as light as white -- a contrast of 1.07 to one -- that its
+    /// blink could hardly be seen, the one stage that asks to be looked at
+    /// being the hardest to see. This is 1.31 to one, enough for the blink to
+    /// show, and is still read as yellow rather than amber: a yellow with
+    /// more red in it, which would blink more plainly, was read as on its way
+    /// to orange, and so to something nearer red. The price is a blink a
+    /// little less plain than green's, at 1.37.
     pub fn watch() -> Color {
         Color::from_rgb_u8(255, 225, 0)
     }
@@ -78,26 +78,26 @@ pub mod palette {
     }
 }
 
-/// What a light shows for a stage of staleness, `heard` saying whether a
+/// What an indicator shows for a stage of staleness, `heard` saying whether a
 /// beacon has ever arrived.
 ///
 /// Green while the spacecraft is being heard from, yellow once it is late
 /// enough that contact is not claimed, red once nothing is being heard, and
 /// grey before anything has arrived. Grey is for that and nothing else: once
-/// a beacon has arrived the light has shown a colour, and wherever it shows
-/// none after that it is white. So the dark half of a blink is white -- a
-/// blinking light is one colour going dark and back, rather than two colours
-/// alternating, because two would read as two different things being said --
-/// and so is a last beacon that a moved clock puts in the future.
+/// a beacon has arrived the indicator has shown a colour, and wherever it
+/// shows none after that it is white. So the dark half of a blink is white --
+/// a blinking indicator is one colour going dark and back, rather than two
+/// colours alternating, because two would read as two different things being
+/// said -- and so is a last beacon that a moved clock puts in the future.
 ///
 /// `heard` is [`Pass::at`] having a time in it, which it keeps for good once
 /// a beacon arrives. A beacon arriving is always shown in a colour, being
-/// [`Stage::Heard`], so the light has been coloured exactly when `heard` is
-/// true and no state of its own need be kept.
+/// [`Stage::Heard`], so the indicator has been coloured exactly when `heard`
+/// is true and no state of its own need be kept.
 ///
 /// No red for the stages in between, and no green for the last: red is for a
-/// condition somebody must act on, and a light that is red whenever a
-/// datagram is late is a light nobody reads.
+/// condition somebody must act on, and an indicator that is red whenever a
+/// datagram is late is an indicator nobody reads.
 pub fn indicator(showing: &Showing, heard: bool) -> Color {
     let dark = if heard {
         palette::off()
@@ -123,13 +123,13 @@ pub fn indicator(showing: &Showing, heard: bool) -> Color {
 /// question, so they are worked out together and set together.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Shown {
-    /// The light's colour.
+    /// The indicator's colour.
     pub indicator: Color,
     /// When the last beacon arrived, as a time of day, or the placeholder.
     pub received: String,
     /// What that beacon said.
     pub message: String,
-    /// Which stage the light is at, in words: see
+    /// Which stage the indicator is at, in words: see
     /// [`tcslib::beacon::Stage::label`]. Read from the same reading as the
     /// colour, so the two cannot disagree.
     pub stage: String,
@@ -248,14 +248,14 @@ mod tests {
         );
     }
 
-    /// The standard schedule's light ages green, yellow, red, and blinks
+    /// The standard schedule's indicator ages green, yellow, red, and blinks
     /// through white; grey is for before anything has arrived.
     ///
-    /// The colours are the point of the panel: an operator reads the light
-    /// and not the stage behind it, so what each stage looks like is worth
-    /// holding to.
+    /// The colours are the point of the panel: an operator reads the
+    /// indicator and not the stage behind it, so what each stage looks like
+    /// is worth holding to.
     #[test]
-    fn the_light_ages_through_the_palette() {
+    fn the_indicator_ages_through_the_palette() {
         let schedule = Schedule::standard();
 
         // Nothing heard: the colour of knowing nothing, which is not green.
@@ -298,7 +298,7 @@ mod tests {
         );
 
         // The dark half of a blink is white rather than a second colour: the
-        // light is one colour going dark and back. And not grey, a beacon
+        // indicator is one colour going dark and back. And not grey, a beacon
         // having arrived: grey would say nothing had been heard.
         let blinking = schedule.at(Duration::from_millis(11_500));
         assert!(!blinking.lit, "ten to twenty seconds is the blinking stage");
@@ -306,14 +306,14 @@ mod tests {
         assert_ne!(palette::off(), palette::unknown());
     }
 
-    /// Once a beacon has arrived the light is never grey again: wherever it
-    /// shows no colour, it is white.
+    /// Once a beacon has arrived the indicator is never grey again: wherever
+    /// it shows no colour, it is white.
     ///
-    /// Grey says nothing has been heard. A light that went grey after being
-    /// green would say the spacecraft had never been heard from, which is not
-    /// so, and would look like the window had just opened.
+    /// Grey says nothing has been heard. An indicator that went grey after
+    /// being green would say the spacecraft had never been heard from, which
+    /// is not so, and would look like the window had just opened.
     #[test]
-    fn once_heard_the_light_is_never_grey_again() {
+    fn once_heard_the_indicator_is_never_grey_again() {
         let schedule = Schedule::standard();
 
         // Nothing has arrived: grey, as the window opens.

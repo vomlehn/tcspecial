@@ -8416,17 +8416,17 @@ Requirement
     The beacons also say whether the spacecraft is being heard from at all,
     which the panels act on. Contact is held for as long as the last beacon's
     age is within the leading run of stages that count as being heard from --
-    blinking or steady, a light that has begun to blink being beacons that are
-    arriving and aging rather than gone -- and is lost past that run, when no
-    beacon has ever arrived, and when the system clock has moved so that the
-    last one is in the future. One reading serves both the light and the
-    panels, so the two cannot say different things about one beacon.
+    blinking or steady, an indicator that has begun to blink being beacons
+    that are arriving and aging rather than gone -- and is lost past that run,
+    when no beacon has ever arrived, and when the system clock has moved so
+    that the last one is in the future. One reading serves both the indicator
+    and the panels, so the two cannot say different things about one beacon.
 
 Requirement
-    The light is grey before any beacon has arrived, and never again after
+    The indicator is grey before any beacon has arrived, and never again after
     one has. Wherever it shows no colour once a beacon has arrived -- the dark
     half of a blink, a last beacon a moved clock puts in the future -- it is
-    white. Grey says nothing has been heard; a light that went from green
+    white. Grey says nothing has been heard; an indicator that went from green
     back to grey would say the spacecraft had never been heard from, and look
     like a window that had just opened. ``tcsui::indicator`` is the rule, and
     the Python panel says it again with the same tests.
@@ -8447,9 +8447,9 @@ Requirement
 Requirement
     How stale the last beacon is, is a named stage and not a colour. A stage
     is what is true of the spacecraft; a colour is one way of saying it, and
-    the stages are what both the light and the panels are worked out from. The
-    stages and their timings are one schedule, which is the library's, so two
-    ground stations watching one spacecraft cannot differ about how late a
+    the stages are what both the indicator and the panels are worked out from.
+    The stages and their timings are one schedule, which is the library's, so
+    two ground stations watching one spacecraft cannot differ about how late a
     beacon is.
 
 Requirement
@@ -8457,8 +8457,8 @@ Requirement
     what to show on it worked out beside it: ``tcsui``. Two windows show it --
     this one, beside its command link, and the ``beacon`` example, which shows
     it and nothing else -- and an operator who has read one has read the
-    other, where a light in a different place or a label in different words
-    would be two things to learn about one spacecraft.
+    other, where an indicator in a different place or a label in different
+    words would be two things to learn about one spacecraft.
 
 Requirement
     What is left in a ground program is the wiring: read the configuration to
@@ -8540,9 +8540,9 @@ Requirement
     A panel says when its source's data last arrived and nothing more about
     whether that was recent enough. Nothing in a configuration states how
     often a node's data should arrive -- a thermostat's heaters hear from it
-    when a decision changes, which may be hours apart -- so a light that
-    judged it would be a light whose colour means nothing, and one that never
-    changes is worse than none.
+    when a decision changes, which may be hours apart -- so an indicator that
+    judged it would be an indicator whose colour means nothing, and one that
+    never changes is worse than none.
 
 Requirement
     Query all still asks the spacecraft directly, and sets both the status and

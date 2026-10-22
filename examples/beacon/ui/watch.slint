@@ -16,12 +16,11 @@ export component WatchWindow inherits Window {
     default-font-size: Fonts.window;
     title: "Beacon";
     // Just large enough for what it holds -- the panel and the button below
-    // it -- and the border round them, `content.padding`: as wide as the
-    // panel is with a beacon's message in it, as though one had already
-    // arrived, so that the window opens at the width it keeps and does not
-    // grow when the first beacon comes. See `widest`. Measured rather than
-    // stated, the text being whatever size Fonts.window makes it.
-    width: max(content.preferred-width, widest.preferred-width + 2 * content.padding);
+    // it -- and the border round them, `content.padding`. The panel is as
+    // wide as its widest message, `messages`, so the window opens at the
+    // width it keeps and does not grow when the first beacon comes. Measured
+    // rather than stated, the text being whatever size Fonts.window makes it.
+    width: content.preferred-width;
     height: content.preferred-height;
 
     // How large the window is, for a test to hold it to what it holds.
@@ -37,12 +36,11 @@ export component WatchWindow inherits Window {
     // the last one grows older. The words are tcslib::beacon::Stage::label's,
     // set with every pass; this is only what shows before the first.
     in-out property <string> stage: "Unheard";
-    // A beacon's message at its full length, which the window is as wide as
-    // before any has arrived: tcspecial at version 0.0.0 and a full MD5
-    // digest. Rust sets it from tcslib::beacon::what_it_read, which writes
-    // every beacon's message, so the format is stated once; this is the same
-    // text, for a window nobody has handed it to.
-    in property <string> widest-message: "tcspecial v0.0.0 md5 d41d8cd98f00b204e9800998ecf8427e";
+    // Every shape a beacon's message takes at its widest, a line each, which
+    // the panel's message line is held to: see beacon_example::widest_messages,
+    // which writes them with tcslib::beacon::what_it_read, so the format is
+    // stated once.
+    in property <string> messages: "";
     // What the button says: what a click will do to the vehicle. It opens
     // saying start, tcspecial not being running until somebody starts it.
     in-out property <string> tcspecial-label: "Start tcspecial";
@@ -66,15 +64,6 @@ export component WatchWindow inherits Window {
     out property <length> button-width: tcspecial-button.width;
     out property <length> button-needs: max(start-probe.preferred-width, stop-probe.preferred-width);
 
-    // The panel with that message in it. Never shown; it is here to be
-    // measured, and says everything the real one does but the message.
-    widest := BeaconPanel {
-        visible: false;
-        last-received: root.last-received;
-        last-message: root.widest-message;
-        stage: root.stage;
-    }
-
     content := VerticalLayout {
         // The border, for looks: the panel's edge drawn against the window's
         // would read as the window cut short.
@@ -91,11 +80,13 @@ export component WatchWindow inherits Window {
             last-received: root.last-received;
             last-message: root.last-message;
             stage: root.stage;
+            messages: root.messages;
         }
 
         // In a row of its own and centred in it, so that the button is as
         // wide as its label and not as the window: a button the width of the
-        // window reads as a bar rather than as a thing to press.
+        // window reads as a bar rather than as a thing to press. The one thing
+        // in the window that is not left justified.
         HorizontalLayout {
             alignment: center;
 

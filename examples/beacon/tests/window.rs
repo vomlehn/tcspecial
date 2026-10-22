@@ -166,3 +166,81 @@ fn the_stage_line_follows_the_stage() {
         "the indicator is not after the stage"
     );
 }
+
+/// Everything is left justified: the labels start at one place, the values
+/// after them all start at another, just past the widest label, and neither
+/// moves as the stage changes -- the stage's line is as wide as its widest
+/// word, so the indicator after it stays put.
+#[test]
+fn the_values_line_up_after_their_labels() {
+    use beacon_example::prepare;
+    use tcslib::beacon::Stage;
+
+    i_slint_backend_testing::init_no_event_loop();
+    let window = WatchWindow::new().expect("the window opens");
+    prepare(&window);
+    window.show().expect("it is shown");
+
+    // The panel's own copy of the stage's words is Stage::label's.
+    let words: Vec<String> = [Stage::Unheard, Stage::Heard, Stage::Aging, Stage::Waiting]
+        .iter()
+        .map(|stage| stage.label().to_string())
+        .collect();
+    let panel = ElementHandle::find_by_element_id(&window, "WatchWindow::panel")
+        .next()
+        .expect("the window has the panel");
+    let x_of = |text: &str| {
+        ElementHandle::find_by_element_type_name(&window, "Text")
+            .filter(|e| e.accessible_label().as_deref() == Some(text))
+            .map(|e| e.absolute_position().x)
+            .next()
+            .unwrap_or_else(|| panic!("no {text:?} on the window"))
+    };
+    let indicator_x = || {
+        ElementHandle::find_by_element_type_name(&window, "Rectangle")
+            .filter(|e| e.size().width > 0.0 && (e.size().width - e.size().height).abs() < 0.5)
+            .map(|e| e.absolute_position().x)
+            .next()
+            .expect("the indicator")
+    };
+
+    let mut seen = None;
+    for word in &words {
+        window.set_stage(word.as_str().into());
+        let labels = [x_of("Status:"), x_of("Last rcvd:"), x_of("Last msg:")];
+        let values = [x_of(word), x_of(NO_TRANSFER_TIME), x_of(NO_BEACON_MESSAGE)];
+        assert!(
+            labels.iter().all(|&x| x == labels[0]),
+            "{word}: the labels start at {labels:?}"
+        );
+        assert!(
+            values.iter().all(|&x| x == values[0]),
+            "{word}: the values start at {values:?}"
+        );
+        assert!(
+            (labels[0] - panel.absolute_position().x) < values[0] - labels[0],
+            "{word}: the labels are not at the left of the panel"
+        );
+        let now = (labels[0], values[0], indicator_x());
+        assert_eq!(*seen.get_or_insert(now), now, "{word}: something moved");
+    }
+
+    // And the values start just past the widest label and the column's
+    // spacing, not halfway across a wide panel.
+    let widest_label = ["Status:", "Last rcvd:", "Last msg:"]
+        .iter()
+        .map(|text| {
+            ElementHandle::find_by_element_type_name(&window, "Text")
+                .filter(|e| e.accessible_label().as_deref() == Some(*text))
+                .map(|e| e.size().width)
+                .next()
+                .expect("the label")
+        })
+        .fold(0.0f32, f32::max);
+    let (labels, values, _) = seen.expect("a stage was shown");
+    assert!(
+        values - labels <= widest_label + 12.0 + 1.0,
+        "the values start {} past the labels, the widest label being {widest_label}",
+        values - labels
+    );
+}

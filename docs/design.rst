@@ -5809,8 +5809,9 @@ Requirement
     capability is what is missing and how to give it. The simulator does not
     stand in for a raw node: on one host every raw socket of a protocol hears
     every datagram of it, its own included, so a stand-in beside tcspecial
-    would be each end reading its own words back. The
-tables below are what Linux offers beyond them: the families and types a
+    would be each end reading its own words back.
+
+The tables below are what Linux offers beyond them: the families and types a
 network node could be given, and the semantics each would have, so that one
 added later is added knowing which of the two kinds of endpoint above it is.
 

@@ -207,9 +207,10 @@ struct Views {
     /// is about, and a second question about another node would leave a person
     /// answering whichever window happened to be on top.
     deleting: Option<DeleteWindow>,
-    /// The question about two nodes that share a name, while it is being
-    /// asked. See `settle_names`.
-    names: Option<ProblemsWindow>,
+    /// The question about the problems the file opened with, while it is
+    /// being asked: the main window, which asks it in front of its own
+    /// drawing. See `settle_problems`.
+    names: Option<slint::Weak<MainWindow>>,
     /// The window that says what went wrong, and what it last said.
     ///
     /// One window, re-pointed: two of them side by side would be two copies of
@@ -359,6 +360,18 @@ impl Views {
 
     /// Put one of those in front of somebody.
     fn say(&self, heading: &str, said: &str, advice: &str) {
+        // As the editor starts, in front of the main window's drawing and
+        // inside it, as the question about the file's problems is: the main
+        // window is inert until it is read, and a window of its own cannot be
+        // kept in front of the main one on every desktop. See `alert-up` in
+        // the markup.
+        if let Some(top) = self.top.upgrade().filter(|top| top.get_inert()) {
+            top.set_alert_heading(heading.into());
+            top.set_alert_trouble(said.into());
+            top.set_alert_advice(advice.into());
+            top.set_alert_up(true);
+            return;
+        }
         let Some(window) = &self.alert else { return };
         window.set_heading(heading.into());
         window.set_trouble(said.into());
@@ -669,13 +682,15 @@ fn main() -> Result<(), slint::PlatformError> {
     closing(&ui, &views);
 
     // The main window first, so that whatever came up as the editor started
-    // is read over a drawing rather than instead of one -- and so that those
-    // windows are in front of it: a window shown later is a window on top.
-    // Nothing is painted until the event loop runs, which is after all of
-    // this, so it is shown before it is filled and is never seen empty.
+    // is read over a drawing rather than instead of one. Nothing is painted
+    // until the event loop runs, which is after all of this, so it is shown
+    // before it is filled and is never seen empty.
     //
-    // It takes no presses while any of them is up. See `inert` in the markup,
-    // set below once what came up is known.
+    // It takes no presses while any of that is up, and is inert from the
+    // start, until what came up is known: an alert said while it is inert is
+    // said in front of its drawing, inside it, which is what `Views::say`
+    // asks it. See `inert` in the markup, set again below.
+    ui.set_inert(true);
     ui.show()?;
 
     settled(&editor, &views);
@@ -2287,17 +2302,16 @@ fn settle_problems(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
         return;
     }
 
-    let window = match ProblemsWindow::new() {
-        Ok(window) => {
-            session!(&window);
-            window
-        }
-        Err(e) => {
-            // Every one of these is still reported as a fault, so this
-            // failing is a quieter editor rather than a broken one.
-            eprintln!("tcsgui: the problems cannot be asked about: {e}");
-            return;
-        }
+    // Asked inside the main window, in front of its drawing, rather than in a
+    // window of its own: a window of its own cannot be kept in front of the
+    // main one on every desktop, and a question behind the window waiting for
+    // it is one nobody finds. See ProblemsPanel in the markup.
+    let top = views.borrow().top.upgrade();
+    let Some(window) = top else {
+        // Every one of these is still reported as a fault, so this failing is
+        // a quieter editor rather than a broken one.
+        eprintln!("tcsgui: the problems cannot be asked about: the main window has gone");
+        return;
     };
 
     // What the fields hold, by the position of the node each is for: its own
@@ -2322,7 +2336,7 @@ fn settle_problems(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
         window
             .upgrade()
             .expect("the window exists")
-            .on_typed(move |row, said| {
+            .on_problems_typed(move |row, said| {
                 let Some(at) = showing.borrow().get(row as usize).and_then(|t| t.at) else {
                     return;
                 };
@@ -2350,7 +2364,7 @@ fn settle_problems(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
         window
             .upgrade()
             .expect("the window exists")
-            .on_derive(move |row| {
+            .on_problems_derive(move |row| {
                 let Some(at) = showing.borrow().get(row as usize).and_then(|t| t.at) else {
                     return;
                 };
@@ -2374,7 +2388,7 @@ fn settle_problems(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
         let views = views.clone();
         let proposed = proposed.clone();
         let showing = showing.clone();
-        window.on_confirmed(move || {
+        window.on_problems_confirmed(move || {
             let asked = proposed.borrow().clone();
             if names_settle(editor.borrow().document(), &asked).is_err() {
                 return;
@@ -2395,7 +2409,7 @@ fn settle_problems(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
         let editor = editor.clone();
         let views = views.clone();
         let showing = showing.clone();
-        window.on_edit(move |row| {
+        window.on_problems_edit(move |row| {
             let node = showing
                 .borrow()
                 .get(row as usize)
@@ -2410,7 +2424,7 @@ fn settle_problems(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
         let views = views.clone();
         let showing = showing.clone();
         let proposed = proposed.clone();
-        window.on_remove(move |row| {
+        window.on_problems_remove(move |row| {
             let node = showing
                 .borrow()
                 .get(row as usize)
@@ -2430,7 +2444,7 @@ fn settle_problems(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
         let views = views.clone();
         let showing = showing.clone();
         let proposed = proposed.clone();
-        window.on_acted(move |row| {
+        window.on_problems_acted(move |row| {
             let fix = showing.borrow().get(row as usize).map(|t| t.fix.clone());
             match fix {
                 // A group nothing is in: taking it out is the whole of the
@@ -2469,7 +2483,7 @@ fn settle_problems(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
         // Doing nothing about this one. The problem stays, drawn in red on
         // its own node and counted in the alert, and every node is on the
         // canvas.
-        window.on_left(move || hide_problems(&views));
+        window.on_problems_left(move || hide_problems(&views));
     }
     {
         let editor = editor.clone();
@@ -2479,7 +2493,7 @@ fn settle_problems(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
         // nothing says any of this again for the rest of the session. The
         // faults are still faults -- red on their nodes, refused by
         // tcsverify -- but the editor stops asking.
-        window.on_ignored(move || {
+        window.on_problems_ignored(move || {
             ignore_faults(&editor, &views);
             hide_problems(&views);
         });
@@ -2492,24 +2506,8 @@ fn settle_problems(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
         // takes: nothing has been edited yet, so it ends there and then, and
         // a session that somehow has something unwritten is offered the same
         // chance to write it.
-        window.on_quit(move || leave(&editor, &views));
+        window.on_problems_quit(move || leave(&editor, &views));
     }
-    {
-        let editor = editor.clone();
-        let views = views.clone();
-        // Closed by the window manager, which is ignoring the rest of them:
-        // the same as the button that says so, the faults included. Taking
-        // the window away without that would be a close box that asks the
-        // question again at the next drawing -- so somebody who answers a
-        // window by closing it would be answering it over and over, which is
-        // not what closing a window means anywhere else.
-        window.window().on_close_requested(move || {
-            ignore_faults(&editor, &views);
-            hide_problems(&views);
-            slint::CloseRequestResponse::HideWindow
-        });
-    }
-
     say_problems(
         &window,
         editor.borrow().document(),
@@ -2517,11 +2515,8 @@ fn settle_problems(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
         &proposed.borrow(),
         true,
     );
-    if let Err(e) = window.show() {
-        eprintln!("tcsgui: the problems cannot be asked about: {e}");
-        return;
-    }
-    views.borrow_mut().names = Some(window);
+    window.set_problems_up(true);
+    views.borrow_mut().names = Some(window.as_weak());
 }
 
 /// What is left to ask about after something was done about one of them.
@@ -2543,7 +2538,7 @@ fn again(
         .filter_map(|trouble| trouble.at.map(|at| (at, trouble.node.clone())))
         .collect();
 
-    let window = views.borrow().names.as_ref().map(|window| window.as_weak());
+    let window = views.borrow().names.clone();
     if left.is_empty() {
         hide_problems(views);
     } else if let Some(window) = window.and_then(|window| window.upgrade()) {
@@ -2566,7 +2561,7 @@ fn again(
 /// it, and a field that had to be pressed again for every letter is the bug
 /// this editor has already had once. See `refilled`.
 fn say_problems(
-    window: &ProblemsWindow,
+    window: &MainWindow,
     document: &Document,
     showing: &[Trouble],
     proposed: &BTreeMap<usize, String>,
@@ -2589,24 +2584,24 @@ fn say_problems(
                 action: trouble.offer().into(),
             })
             .collect();
-        window.set_any_nameable(rows.iter().any(|row| row.nameable));
+        window.set_problems_any_nameable(rows.iter().any(|row| row.nameable));
         // What the Copy button copies: the window's heading, then every
         // problem, one to a line.
         let mut everything =
             vec!["This configuration has problems the vehicle would not fly with".to_string()];
         everything.extend(rows.iter().map(|row| row.said.to_string()));
-        window.set_everything(everything.join("\n").into());
-        window.set_rows(ModelRc::from(Rc::new(VecModel::from(rows))));
+        window.set_problems_everything(everything.join("\n").into());
+        window.set_problems_rows(ModelRc::from(Rc::new(VecModel::from(rows))));
     }
 
     match names_settle(document, proposed) {
         Ok(()) => {
-            window.set_ready(true);
-            window.set_trouble(Default::default());
+            window.set_problems_ready(true);
+            window.set_problems_trouble(Default::default());
         }
         Err(why) => {
-            window.set_ready(false);
-            window.set_trouble(why.into());
+            window.set_problems_ready(false);
+            window.set_problems_trouble(why.into());
         }
     }
 }
@@ -2658,8 +2653,8 @@ fn ignore_faults(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
 fn hide_problems(views: &Rc<RefCell<Views>>) {
     listen_when_read(views, Some(Startup::Problems));
     let window = views.borrow_mut().names.take();
-    if let Some(window) = window {
-        let _ = window.hide();
+    if let Some(window) = window.and_then(|window| window.upgrade()) {
+        window.set_problems_up(false);
     }
 }
 
@@ -2703,9 +2698,15 @@ fn hide_what_is_wrong(views: &Rc<RefCell<Views>>) {
         )
     };
     // Each held only long enough to be hidden: the three are three types, so
-    // they are hidden one at a time rather than walked over as one list.
-    if let Some(window) = names {
-        let _ = window.hide();
+    // they are hidden one at a time rather than walked over as one list. The
+    // question, and an alert said as the editor started, are in the main
+    // window itself, so they are taken down there.
+    if let Some(window) = names.and_then(|window| window.upgrade()) {
+        window.set_problems_up(false);
+    }
+    let top = views.borrow().top.upgrade();
+    if let Some(top) = top {
+        top.set_alert_up(false);
     }
     if let Some(window) = alert {
         let _ = window.hide();
@@ -2730,16 +2731,13 @@ enum Startup {
 /// leaving out `going`, which is on its way.
 fn startup_waiting(views: &Rc<RefCell<Views>>, going: Option<Startup>) -> bool {
     let views = views.borrow();
-    let problems = going != Some(Startup::Problems)
-        && views
-            .names
-            .as_ref()
-            .is_some_and(|window| window.window().is_visible());
+    let problems = going != Some(Startup::Problems) && views.names.is_some();
     let alert = going != Some(Startup::Alert)
-        && views
+        && (views
             .alert
             .as_ref()
-            .is_some_and(|window| window.window().is_visible());
+            .is_some_and(|window| window.window().is_visible())
+            || views.top.upgrade().is_some_and(|top| top.get_alert_up()));
     problems || alert
 }
 
@@ -2779,9 +2777,6 @@ fn listen_when_read(views: &Rc<RefCell<Views>>, going: Option<Startup>) {
 /// ordinary windows, the alert coming back later as one among the others.
 fn on_top(views: &Rc<RefCell<Views>>, wanted: bool) {
     let views = views.borrow();
-    if let Some(window) = views.names.as_ref() {
-        window.set_on_top(wanted);
-    }
     if let Some(window) = views.alert.as_ref() {
         window.set_on_top(wanted);
     }
@@ -2838,6 +2833,20 @@ fn alerting(views: &Rc<RefCell<Views>>) {
         });
     }
     views.borrow_mut().alert = Some(window);
+
+    // And the same answer to the alert the main window shows in front of
+    // itself as the editor starts: see `Views::say`.
+    let top = views.borrow().top.upgrade();
+    if let Some(top) = top {
+        let views = views.clone();
+        top.on_alert_acknowledged(move || {
+            listen_when_read(&views, Some(Startup::Alert));
+            let top = views.borrow().top.upgrade();
+            if let Some(top) = top {
+                top.set_alert_up(false);
+            }
+        });
+    }
 }
 
 /// The offer and not the saving: somebody who has been told the device is full
@@ -5354,17 +5363,17 @@ mod tests {
         assert!(said(&["a.yaml", "b.yaml", "c.yaml"]).is_err());
     }
 
-    /// In a read-only session the problems window's Edit and Delete are
+    /// In a read-only session the problems question's Edit and Delete are
     /// greyed, and what would rename or act on a node is greyed with them;
-    /// the ways out of the window are not.
+    /// the ways out of the question are not.
     #[test]
     fn a_read_only_session_greys_what_would_edit() {
-        use i_slint_backend_testing::ElementHandle;
+        use i_slint_backend_testing::ElementQuery;
 
         i_slint_backend_testing::init_no_event_loop();
-        let window = ProblemsWindow::new().expect("a window");
+        let window = MainWindow::new().expect("a window");
         window.global::<Session>().set_read_only(true);
-        window.set_rows(ModelRc::from(Rc::new(VecModel::from(vec![ProblemRow {
+        window.set_problems_rows(ModelRc::from(Rc::new(VecModel::from(vec![ProblemRow {
             said: "\"twice\" is the name of two nodes".into(),
             node: "twice".into(),
             now: "twice".into(),
@@ -5372,13 +5381,20 @@ mod tests {
             there: true,
             action: "".into(),
         }]))));
-        window.set_any_nameable(true);
-        window.set_ready(true);
+        window.set_problems_any_nameable(true);
+        window.set_problems_ready(true);
+        window.set_problems_up(true);
         window.show().expect("the window shows");
 
+        // The buttons in the question, which is in the main window: the
+        // window has an Edit and a Delete of its own elsewhere.
         let enabled = |label: &str| {
-            ElementHandle::find_by_accessible_label(&window, label)
-                .next()
+            let wanted = label.to_string();
+            ElementQuery::from_root(&window)
+                .match_inherits("ProblemsPanel")
+                .match_descendants()
+                .match_predicate(move |e| e.accessible_label().as_deref() == Some(wanted.as_str()))
+                .find_first()
                 .unwrap_or_else(|| panic!("there is no {label} button"))
                 .accessible_enabled()
         };
@@ -5401,8 +5417,9 @@ mod tests {
     ///
     /// Asked of the markup, as the other rules about the window are: a
     /// `Text` in one of these is a message somebody would have to type out
-    /// again to pass it on. And the two that can come up as the editor starts
-    /// can be held in front of the main window while it waits for them.
+    /// again to pass it on. The alert's and the question's words are in their
+    /// panels, which the main window shows in front of itself as the editor
+    /// starts; and the alert's own window can still be held in front.
     #[test]
     fn every_popup_can_be_copied_from() {
         let markup = std::fs::read_to_string(
@@ -5412,14 +5429,17 @@ mod tests {
         let window = |name: &str| -> &str {
             let start = markup
                 .find(&format!("export component {name} inherits Window {{"))
+                .or_else(|| markup.find(&format!("component {name} inherits Rectangle {{")))
                 .unwrap_or_else(|| panic!("there is no {name}"));
             let rest = &markup[start..];
             &rest[..rest.find("\n}\n").expect("the end of it")]
         };
+        // The alert's and the question's words are in their panels, which
+        // the alert's window and the main window both show.
         for name in [
-            "AlertWindow",
+            "AlertPanel",
             "ConcernsWindow",
-            "ProblemsWindow",
+            "ProblemsPanel",
             "DeleteWindow",
             "LeaveWindow",
         ] {
@@ -5431,12 +5451,14 @@ mod tests {
             assert!(said.contains("Copyable {"), "{name} says nothing");
             assert!(said.contains("CopyButton {"), "{name} has no Copy button");
         }
-        for name in ["AlertWindow", "ProblemsWindow"] {
-            assert!(
-                window(name).contains("always-on-top: root.on-top;"),
-                "{name} cannot be held in front of the main window"
-            );
-        }
+        assert!(
+            window("AlertWindow").contains("AlertPanel {"),
+            "the alert's window does not show what it says"
+        );
+        assert!(
+            window("AlertWindow").contains("always-on-top: root.on-top;"),
+            "AlertWindow cannot be held in front of the main window"
+        );
     }
 
     /// A line between two lists cannot squeeze either of them away.
@@ -8072,14 +8094,16 @@ mod tests {
         );
     }
 
-    /// An inert main window has something over it that takes the presses.
+    /// An inert main window has a veil over it that greys it and takes the
+    /// presses, and the questions are in front of the veil.
     ///
     /// `inert` is set from Rust and what it does is in the markup, so this
-    /// reads the markup: an area over the whole window, and the last thing in
-    /// it, which is what puts it over the surface and over the menus. A menu
-    /// is a way of editing too, and a window that stopped presses reaching
-    /// the canvas but not the menus would be inert in the half nobody would
-    /// test by hand.
+    /// reads the markup: a veil over the whole window, after the surface,
+    /// which is what puts it over the surface and over the menus. A menu is a
+    /// way of editing too, and a window that stopped presses reaching the
+    /// canvas but not the menus would be inert in the half nobody would test
+    /// by hand. The question and the alert come after the veil, so they are
+    /// in front of it and take their own presses.
     #[test]
     fn an_inert_main_window_has_an_area_over_it() {
         let markup = std::fs::read_to_string(
@@ -8097,8 +8121,8 @@ mod tests {
             .expect("the main window has a body");
 
         let overlay = body
-            .find("if root.inert: TouchArea {")
-            .expect("an inert main window has an area over it");
+            .find("if root.inert: Rectangle {")
+            .expect("an inert main window has a veil over it");
         let surface = body
             .find("surface := Surface {")
             .expect("the main window has its surface");
@@ -8107,12 +8131,28 @@ mod tests {
             "the area that takes the presses is written before the surface, \
              so the surface is over it and takes them instead"
         );
-        for said in ["width: 100%;", "height: 100%;"] {
+        let veil = &body[overlay..];
+        let veil = &veil[..veil.find("\n    }\n").expect("the end of the veil")];
+        for said in [
+            "width: 100%;",
+            "height: 100%;",
+            "background:",
+            "TouchArea {",
+        ] {
             assert!(
-                body[overlay..].contains(said),
-                "the area over an inert window does not say {said:?}, so it \
-                 covers only part of it"
+                veil.contains(said),
+                "the veil over an inert window does not say {said:?}, so it \
+                 does not grey all of it and take its presses"
             );
+        }
+        for dialog in [
+            "if root.problems-up: ProblemsPanel {",
+            "if root.alert-up: AlertPanel {",
+        ] {
+            let at = body
+                .find(dialog)
+                .unwrap_or_else(|| panic!("the main window does not ask {dialog:?}"));
+            assert!(at > overlay, "{dialog:?} is behind the veil");
         }
     }
 
@@ -8759,7 +8799,7 @@ mod tests {
         the_line_being_drawn_follows_the_pointer();
         deleting_a_node_asks_first();
         the_main_window_is_inert_until_what_came_up_is_read();
-        closing_the_question_ignores_the_rest();
+        ignoring_them_all_gives_the_presses_back();
         the_question_offers_a_way_out_of_the_editor();
         closing_the_main_window_closes_what_says_what_is_wrong();
         an_emptied_field_takes_the_attribute_off();
@@ -8928,87 +8968,60 @@ mod tests {
         let question = views
             .borrow()
             .names
-            .as_ref()
-            .map(|window| window.as_weak())
+            .clone()
             .and_then(|window| window.upgrade())
             .expect("the question");
-        question.invoke_left();
+        assert!(
+            question.get_problems_up(),
+            "the question is asked in front of the drawing"
+        );
+        question.invoke_problems_left();
 
         assert!(views.borrow().names.is_none(), "the question has gone");
+        assert!(!ui.get_problems_up(), "and is no longer in front of it");
         assert!(ui.window().is_visible(), "the main window is still up");
         assert!(!ui.get_inert(), "and takes presses again");
         let _ = ui.hide();
     }
 
-    /// Closing the question with its own close box ignores the rest of them.
+    /// Ignoring them all takes the question away for good and gives the
+    /// presses back.
     ///
-    /// What the window manager's close box means everywhere else: the question
-    /// has been answered and will not be asked again. The button that says so
-    /// is "Ignore them all", and this is that button -- so the two are held
-    /// against each other rather than against a list of what each does, and a
-    /// change to what the button does is a change to the close box.
-    fn closing_the_question_ignores_the_rest() {
+    /// The question is asked inside the main window, so it has no close box
+    /// of its own: "Ignore them all" is the way to answer every one of them
+    /// at once, and it leaves the faults counted as said, the question gone
+    /// and the drawing taking presses again.
+    fn ignoring_them_all_gives_the_presses_back() {
         use std::rc::Rc;
 
-        // What the editor is left holding after the question is answered this
-        // way: which faults are being ignored, and whether the window has
-        // gone and the main window taken its presses back.
-        let answered = |how: &dyn Fn(&ProblemsWindow)| {
-            let where_ = tempfile::tempdir().expect("a directory");
-            let path = where_.path().join("vehicle.yaml");
-            std::fs::write(
-                &path,
-                "payload_groups:\n  - name: idle\n    interval: 3 s\n",
-            )
-            .expect("a configuration with a group nothing is in");
-            let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.yaml");
+        std::fs::write(
+            &path,
+            "payload_groups:\n  - name: idle\n    interval: 3 s\n",
+        )
+        .expect("a configuration with a group nothing is in");
+        let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
 
-            let ui = MainWindow::new().expect("a window");
-            let views = views_for(&ui);
-            ui.show().expect("the window shows");
-            alerting(&views);
-            settled(&editor, &views);
-            views.borrow().refresh(&editor.borrow());
-            settle_problems(&editor, &views);
-            ui.set_inert(startup_waiting(&views, None));
+        let ui = MainWindow::new().expect("a window");
+        let views = views_for(&ui);
+        ui.show().expect("the window shows");
+        alerting(&views);
+        settled(&editor, &views);
+        views.borrow().refresh(&editor.borrow());
+        settle_problems(&editor, &views);
+        ui.set_inert(startup_waiting(&views, None));
 
-            let question = views
-                .borrow()
-                .names
-                .as_ref()
-                .map(|window| window.as_weak())
-                .and_then(|window| window.upgrade())
-                .expect("the question");
-            how(&question);
+        ui.invoke_problems_ignored();
 
-            let left = (
-                views.borrow().faulted.borrow().clone(),
-                views.borrow().names.is_none(),
-                ui.get_inert(),
-            );
-            let _ = ui.hide();
-            left
-        };
-
-        let by_button = answered(&|question| question.invoke_ignored());
-        let by_close_box = answered(&|question| {
-            question
-                .window()
-                .dispatch_event(slint::platform::WindowEvent::CloseRequested)
-        });
-
-        assert_eq!(
-            by_button, by_close_box,
-            "closing the question should leave what the button that ignores \
-             them all leaves"
+        assert!(
+            !views.borrow().faulted.borrow().is_empty(),
+            "the faults are being ignored"
         );
-        // And what that is, so this says something whichever way they agree:
-        // the question gone, the faults ignored, and the drawing taking
-        // presses again.
-        let (ignored, gone, inert) = by_close_box;
-        assert!(!ignored.is_empty(), "the faults are being ignored");
-        assert!(gone, "the question has gone");
-        assert!(!inert, "and the main window takes presses again");
+        assert!(views.borrow().names.is_none(), "the question has gone");
+        assert!(!ui.get_problems_up(), "from in front of the drawing");
+        assert!(!ui.get_inert(), "and the main window takes presses again");
+        let _ = ui.hide();
     }
 
     /// The question offers a way out of the editor.
@@ -9041,8 +9054,7 @@ mod tests {
         let question = views
             .borrow()
             .names
-            .as_ref()
-            .map(|window| window.as_weak())
+            .clone()
             .and_then(|window| window.upgrade())
             .expect("the question");
         assert!(
@@ -9051,7 +9063,7 @@ mod tests {
              nothing unwritten"
         );
 
-        question.invoke_quit();
+        question.invoke_problems_quit();
 
         assert!(
             views.borrow().leaving.is_none(),
@@ -9103,6 +9115,7 @@ mod tests {
             .dispatch_event(slint::platform::WindowEvent::CloseRequested);
 
         assert!(views.borrow().names.is_none(), "the question has gone");
+        assert!(!ui.get_problems_up(), "from in front of the drawing");
         assert!(views.borrow().alert.is_none(), "the alert has gone");
         assert!(views.borrow().concerns.is_none(), "the list has gone");
         let _ = ui.hide();

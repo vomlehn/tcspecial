@@ -4245,17 +4245,23 @@ is shown. What the alert is for afterwards is what goes wrong *while somebody
 works*, which is news.
 
 **Whatever comes up as the editor starts is in front of the main window, and
-the main window takes nothing until it has been answered.** The main window is
-shown first and these after it, which puts them on top by the usual rule; but
-the rule is the window manager's, and one that gives the front to the larger
-window or the one that finished drawing last would put the question behind the
-drawing waiting for it. So while the main window waits, the question and the
-alert are asked to stay on top, and let go once it takes presses again. While
-it waits it takes no presses -- an area over the whole window holds them --
-and its menu items are disabled, the keyboard being another way to them. tcsmoc
-does the same for the question it asks when tcspecial serves a different
-configuration, and tcsmoc and tcssim show what they found at startup in a
-window that stays on top and is closed before their main windows open.
+the main window takes nothing until it has been answered.** The question about
+the file's problems, and an alert about a file that could not be read, are
+asked *inside* the main window, as a dialog in front of its drawing, rather
+than in windows of their own. A window of its own cannot be kept in front: the
+order of windows is the window manager's, and on Wayland no program can ask
+for its window to stay on top, so a question shown in a window of its own could
+land behind the drawing waiting for it, where nobody finds it and nothing in
+front of them takes a press. While the main window waits, a grey veil over the
+whole of it greys everything under it and holds its presses, the dialog is in
+front of the veil, and the menu items are disabled, the keyboard being another
+way to them. The drawing is still there to be read through the veil, being
+what the question is about. What goes wrong *while somebody works* is still
+said in the alert's own window, the main window not waiting for it. tcsmoc
+does much the same for the question it asks when tcspecial serves a different
+configuration, in a window of its own, and tcsmoc and tcssim show what they
+found at startup in a window that stays on top and is closed before their main
+windows open.
 
 **Everything a popup says can be copied.** A message is often the thing
 somebody has to pass on, and one that can only be read has to be typed out

@@ -1663,6 +1663,264 @@ component Surface inherits Rectangle {
     }
 }
 
+component AlertPanel inherits Rectangle {
+    // What the alert says, as a panel: the alert window's whole contents,
+    // and the dialog the main window shows over its veil when what went
+    // wrong is the file the editor started on. See AlertWindow and
+    // MainWindow.
+    background: Colors.window;
+    min-width: 360px;
+    min-height: 140px;
+    preferred-width: 460px;
+
+    // What went wrong, in the words the thing that failed used: a path, a
+    // reason from the operating system, the attribute a rule refused.
+    in property <string> trouble: "";
+    // What kind of thing it is, in one line, and what to do about it.
+    //
+    // Two kinds reach this window and they want different sentences: a command
+    // that failed -- a write, a generation -- and something wrong with the
+    // configuration itself. Both are errors and neither has thrown anything
+    // away, but "press Save" is advice about the first and nonsense about the
+    // second.
+    in property <string> heading: "Something did not work.";
+    in property <string> advice: "";
+
+    callback acknowledged();
+
+    VerticalLayout {
+        padding: Space.wide;
+        spacing: Space.step;
+
+        Copyable {
+            text: root.heading;
+            font-size: Type.strong;
+            font-weight: Type.bold;
+            wrap: word-wrap;
+        }
+        Copyable {
+            text: root.trouble;
+            color: #c0392b;
+            font-size: Type.body;
+            wrap: word-wrap;
+        }
+        if root.advice != "": Copyable {
+            // The one thing worth saying beside the reason, because it is the
+            // thing a person wants to know first and the answer is usually
+            // yes: the editor is still holding the session, so whatever the
+            // message says, nothing has been thrown away.
+            text: root.advice;
+            font-size: Type.small;
+            color: #6b7280;
+            wrap: word-wrap;
+        }
+
+        Rectangle { vertical-stretch: 1; }
+
+        HorizontalLayout {
+            spacing: Space.step;
+            CopyButton {
+                said: root.heading + "\n" + root.trouble
+                    + (root.advice != "" ? "\n" + root.advice : "");
+            }
+            Rectangle { }
+            Button {
+                text: "OK";
+                clicked => { root.acknowledged(); }
+            }
+        }
+    }
+}
+
+/// What to do about the problems a configuration opened with.
+///
+/// Shown when a file is opened that the editor can read and the vehicle could
+/// not fly: a node named twice, a node with no name, a type this build does
+/// not know, attributes that do not hold together. Each is said in the words
+/// of the rule it breaks, and each row offers what can be done about that
+/// kind of problem.
+///
+/// Doing nothing is one of the offers, and it is the one the window closes
+/// with. A problem left alone stays a problem -- it is drawn in red on the
+/// node it is about, counted in the alert, and `tcsverify` will refuse the
+/// file -- but the node is on the canvas in its own working pane either way,
+/// which is what lets somebody look at the drawing before deciding. An editor
+/// that would not show a configuration until it was correct would be an
+/// editor that cannot be used to correct one.
+///
+/// Where a name is the fix the row has a field and a suggestion, because that
+/// is the one kind of problem the editor can mend by itself. Everything else
+/// is somebody's decision: open the node and put it right, or take it out.
+component ProblemsPanel inherits Rectangle {
+    // A dialog drawn inside the main window, over the veil that greys the
+    // rest of it: see MainWindow. Inside rather than a window of its own,
+    // because a window of its own cannot be kept in front of the main one
+    // on every desktop -- Wayland lets no program hold its windows on top --
+    // and a question behind the window waiting for it is one nobody finds.
+    background: Colors.window;
+    border-width: 1px;
+    border-color: #808080;
+    border-radius: 4px;
+    drop-shadow-blur: 16px;
+    drop-shadow-color: #00000040;
+    drop-shadow-offset-y: 4px;
+    min-width: 520px;
+    min-height: 260px;
+    preferred-width: 680px;
+    preferred-height: 380px;
+
+    in property <[ProblemRow]> rows;
+    // Every row as one text, for the Copy button. Set from Rust beside the
+    // rows.
+    in property <string> everything: "";
+    // Whether the names as they stand would settle what they are offered for:
+    // all different, none empty, none belonging to a third node. Worked out in
+    // Rust, where it can be tested: see tcsgui::names_settle.
+    in property <bool> ready: false;
+    // And why not, where they do not: said once, under the list, rather than
+    // beside whichever row is at fault -- a sentence between rows would shift
+    // the list as somebody types.
+    in property <string> trouble: "";
+    // Whether any row offers a name at all, which is what decides whether the
+    // renaming button is there to be pressed.
+    in property <bool> any-nameable: false;
+
+    callback typed(int, string);
+    callback derive(int);
+    callback confirmed();
+    callback edit(int);
+    callback remove(int);
+    // The one other thing a row offers: see ProblemRow::action.
+    callback acted(int);
+    callback left();
+    // And the way out that answers all of them at once: see `ignored` in
+    // tcsgui::settle_problems.
+    callback ignored();
+    // Out of the editor, which is the one answer that is not about the
+    // configuration at all.
+    callback quit();
+
+    VerticalLayout {
+        padding: Space.wide;
+        spacing: Space.step;
+
+        Copyable {
+            text: "This configuration has problems the vehicle would not fly with";
+            font-size: Type.strong;
+            font-weight: Type.bold;
+            wrap: word-wrap;
+        }
+        Copyable {
+            text: "Each one is drawn in red on the node it is about. Put them "
+                + "right here, open a node to edit it, or leave them and look "
+                + "at the drawing first -- every node is on the canvas either "
+                + "way.";
+            font-size: Type.small;
+            color: #6b7280;
+            wrap: word-wrap;
+        }
+
+        ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                spacing: Space.step;
+                for row[i] in root.rows: HorizontalLayout {
+                    spacing: Space.step;
+                    alignment: start;
+
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        spacing: 1px;
+                        Copyable {
+                            text: row.said;
+                            font-size: Type.body;
+                            wrap: word-wrap;
+                        }
+                        if row.nameable: HorizontalLayout {
+                            spacing: Space.step;
+                            LineEdit {
+                                text: row.now;
+                                read-only: Session.read-only;
+                                font-size: Fonts.window;
+                                horizontal-stretch: 1;
+                                edited(said) => { root.typed(i, said); }
+                            }
+                            Button {
+                                text: "Suggest";
+                                enabled: !Session.read-only;
+                                clicked => { root.derive(i); }
+                            }
+                        }
+                    }
+                    if row.there: Button {
+                        text: "Edit";
+                        enabled: !Session.read-only;
+                        clicked => { root.edit(i); }
+                    }
+                    if row.there: Button {
+                        text: "Delete";
+                        enabled: !Session.read-only;
+                        clicked => { root.remove(i); }
+                    }
+                    if row.action != "": Button {
+                        text: row.action;
+                        enabled: !Session.read-only;
+                        clicked => { root.acted(i); }
+                    }
+                }
+                if root.rows.length == 0: Copyable {
+                    text: "Nothing is wrong.";
+                    font-size: Type.body;
+                    font-italic: true;
+                    color: #6b7280;
+                }
+            }
+        }
+
+        if root.trouble != "": Copyable {
+            text: root.trouble;
+            font-size: Type.small;
+            color: #c0392b;
+            wrap: word-wrap;
+        }
+
+        HorizontalLayout {
+            spacing: Space.step;
+            CopyButton { said: root.everything; }
+            Rectangle { }
+            // Out of the editor altogether, for a file that arrived in a
+            // state somebody would rather put right elsewhere: a question
+            // about a configuration should not be a reason to go looking for
+            // a way to close the window it came up over. Leftmost, away from
+            // the button that acts, because it is the one press here that
+            // cannot be undone by pressing something else.
+            Button {
+                text: "Quit";
+                clicked => { root.quit(); }
+            }
+            Button {
+                text: "Leave this one";
+                clicked => { root.left(); }
+            }
+            // Doing nothing about every one of them, which is the other way
+            // out and the one somebody opening a file to look at it wants:
+            // the problems stay, the nodes are drawn as they are, and nothing
+            // says any of it again this session. The window's own close box
+            // does this, for the reason the comment on it in main.rs gives.
+            Button {
+                text: "Ignore them all";
+                clicked => { root.ignored(); }
+            }
+            if root.any-nameable: Button {
+                text: "Rename";
+                primary: true;
+                enabled: root.ready && !Session.read-only;
+                clicked => { root.confirmed(); }
+            }
+        }
+    }
+}
+
 export component MainWindow inherits Window {
     default-font-size: Fonts.window;
     // Saying in the title bar when this session changes nothing, which is
@@ -1695,9 +1953,39 @@ export component MainWindow inherits Window {
     // looked at from the first moment, and nothing in it can be edited behind
     // the window that is asking. Set from Rust, which knows what came up: see
     // `startup_waiting` and `listen_when_read` in main.rs. Presses are held by
-    // the area over the window, at the end of it; the menu's items are
+    // the veil over the window, at the end of it, which greys everything
+    // under it so that it looks as inactive as it is; the menu's items are
     // disabled as well, the keyboard being another way to reach them.
     in property <bool> inert: false;
+
+    // The question about the problems the file opened with, asked in front
+    // of the drawing inside this window: see ProblemsPanel. Its properties
+    // and callbacks are the panel's, by the same names with "problems-" in
+    // front. Set and answered from Rust: see settle_problems in main.rs.
+    in property <bool> problems-up: false;
+    in property <[ProblemRow]> problems-rows;
+    in property <string> problems-everything: "";
+    in property <bool> problems-ready: false;
+    in property <string> problems-trouble: "";
+    in property <bool> problems-any-nameable: false;
+    callback problems-typed(int, string);
+    callback problems-derive(int);
+    callback problems-confirmed();
+    callback problems-edit(int);
+    callback problems-remove(int);
+    callback problems-acted(int);
+    callback problems-left();
+    callback problems-ignored();
+    callback problems-quit();
+
+    // And the alert, when what went wrong is the file the editor started on:
+    // said in front of the drawing in the same way. What goes wrong later is
+    // said in the alert's own window. See Views::say in main.rs.
+    in property <bool> alert-up: false;
+    in property <string> alert-heading: "";
+    in property <string> alert-trouble: "";
+    in property <string> alert-advice: "";
+    callback alert-acknowledged();
     // The line a gesture is drawing, as SVG path data in canvas coordinates,
     // and empty when no gesture is running. Dashed, and in pieces because a
     // path here has no dash pattern: see tcsgui::route::drawing.
@@ -1903,20 +2191,63 @@ export component MainWindow inherits Window {
         node-delete(n) => { root.node-delete(n); }
     }
 
-    // What makes it inert: an area over the whole window that takes presses
-    // and does nothing with them. Last, so it is over the surface and over
-    // the menus -- a menu is a way of editing too -- and there only while it
-    // is wanted, so the ordinary window has nothing in front of it.
+    // What makes it inert: a veil over the whole window that takes presses
+    // and does nothing with them. Last but for the dialogs, so it is over the
+    // surface and over the menus -- a menu is a way of editing too -- and
+    // there only while it is wanted, so the ordinary window has nothing in
+    // front of it.
     //
-    // Nothing is drawn over the drawing: it is not dimmed or greyed, because
-    // what it says is still true and still worth reading. What says the
-    // window is not taking presses is the window in front of it asking a
-    // question.
-    if root.inert: TouchArea {
+    // Grey and part clear, so that everything under it is greyed: still
+    // there to be read, the drawing being what the question is about, and
+    // plainly not taking presses.
+    if root.inert: Rectangle {
         x: 0;
         y: 0;
         width: 100%;
         height: 100%;
+        background: #e5e7ebb3;
+
+        TouchArea { }
+    }
+
+    // And in front of the veil, whichever is asking: never behind the window
+    // waiting for it, being in it. Centred, and no larger than the window
+    // leaves room for.
+    if root.problems-up: ProblemsPanel {
+        width: min(self.preferred-width, root.width - 2 * Space.wide);
+        height: min(self.preferred-height, root.height - 2 * Space.wide);
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        rows: root.problems-rows;
+        everything: root.problems-everything;
+        ready: root.problems-ready;
+        trouble: root.problems-trouble;
+        any-nameable: root.problems-any-nameable;
+        typed(row, said) => { root.problems-typed(row, said); }
+        derive(row) => { root.problems-derive(row); }
+        confirmed => { root.problems-confirmed(); }
+        edit(row) => { root.problems-edit(row); }
+        remove(row) => { root.problems-remove(row); }
+        acted(row) => { root.problems-acted(row); }
+        left => { root.problems-left(); }
+        ignored => { root.problems-ignored(); }
+        quit => { root.problems-quit(); }
+    }
+    if root.alert-up: AlertPanel {
+        width: min(self.preferred-width, root.width - 2 * Space.wide);
+        height: min(max(self.min-height, self.preferred-height), root.height - 2 * Space.wide);
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        border-width: 1px;
+        border-color: #808080;
+        border-radius: 4px;
+        drop-shadow-blur: 16px;
+        drop-shadow-color: #00000040;
+        drop-shadow-offset-y: 4px;
+        heading: root.alert-heading;
+        trouble: root.alert-trouble;
+        advice: root.alert-advice;
+        acknowledged => { root.alert-acknowledged(); }
     }
 }
 
@@ -2843,62 +3174,18 @@ export component AlertWindow inherits Window {
     in property <bool> on-top: false;
     always-on-top: root.on-top;
 
-    // What went wrong, in the words the thing that failed used: a path, a
-    // reason from the operating system, the attribute a rule refused.
     in property <string> trouble: "";
-    // What kind of thing it is, in one line, and what to do about it.
-    //
-    // Two kinds reach this window and they want different sentences: a command
-    // that failed -- a write, a generation -- and something wrong with the
-    // configuration itself. Both are errors and neither has thrown anything
-    // away, but "press Save" is advice about the first and nonsense about the
-    // second.
     in property <string> heading: "Something did not work.";
     in property <string> advice: "";
-
     callback acknowledged();
 
-    VerticalLayout {
-        padding: Space.wide;
-        spacing: Space.step;
-
-        Copyable {
-            text: root.heading;
-            font-size: Type.strong;
-            font-weight: Type.bold;
-            wrap: word-wrap;
-        }
-        Copyable {
-            text: root.trouble;
-            color: #c0392b;
-            font-size: Type.body;
-            wrap: word-wrap;
-        }
-        if root.advice != "": Copyable {
-            // The one thing worth saying beside the reason, because it is the
-            // thing a person wants to know first and the answer is usually
-            // yes: the editor is still holding the session, so whatever the
-            // message says, nothing has been thrown away.
-            text: root.advice;
-            font-size: Type.small;
-            color: #6b7280;
-            wrap: word-wrap;
-        }
-
-        Rectangle { vertical-stretch: 1; }
-
-        HorizontalLayout {
-            spacing: Space.step;
-            CopyButton {
-                said: root.heading + "\n" + root.trouble
-                    + (root.advice != "" ? "\n" + root.advice : "");
-            }
-            Rectangle { }
-            Button {
-                text: "OK";
-                clicked => { root.acknowledged(); }
-            }
-        }
+    // What it says, which the main window also shows in front of itself
+    // when the editor is starting: see AlertPanel.
+    AlertPanel {
+        trouble: root.trouble;
+        heading: root.heading;
+        advice: root.advice;
+        acknowledged => { root.acknowledged(); }
     }
 }
 
@@ -3011,192 +3298,6 @@ export component ConcernsWindow inherits Window {
 /// menu is a press somebody may have meant for Edit. Undo would put it back --
 /// a removal is one edit -- but an undo that has to be *discovered* is no
 /// answer to a node that has gone and taken four lines with it.
-/// What to do about the problems a configuration opened with.
-///
-/// Shown when a file is opened that the editor can read and the vehicle could
-/// not fly: a node named twice, a node with no name, a type this build does
-/// not know, attributes that do not hold together. Each is said in the words
-/// of the rule it breaks, and each row offers what can be done about that
-/// kind of problem.
-///
-/// Doing nothing is one of the offers, and it is the one the window closes
-/// with. A problem left alone stays a problem -- it is drawn in red on the
-/// node it is about, counted in the alert, and `tcsverify` will refuse the
-/// file -- but the node is on the canvas in its own working pane either way,
-/// which is what lets somebody look at the drawing before deciding. An editor
-/// that would not show a configuration until it was correct would be an
-/// editor that cannot be used to correct one.
-///
-/// Where a name is the fix the row has a field and a suggestion, because that
-/// is the one kind of problem the editor can mend by itself. Everything else
-/// is somebody's decision: open the node and put it right, or take it out.
-export component ProblemsWindow inherits Window {
-    default-font-size: Fonts.window;
-    title: "Problems in this configuration";
-    background: Colors.window;
-    min-width: 520px;
-    min-height: 260px;
-    preferred-width: 680px;
-    preferred-height: 380px;
-
-    // In front of the main window while the editor is starting: set from
-    // Rust for as long as the main window takes no presses, so the window
-    // asking is never behind the one waiting for it. See `on_top` in main.rs.
-    in property <bool> on-top: false;
-    always-on-top: root.on-top;
-
-    in property <[ProblemRow]> rows;
-    // Every row as one text, for the Copy button. Set from Rust beside the
-    // rows.
-    in property <string> everything: "";
-    // Whether the names as they stand would settle what they are offered for:
-    // all different, none empty, none belonging to a third node. Worked out in
-    // Rust, where it can be tested: see tcsgui::names_settle.
-    in property <bool> ready: false;
-    // And why not, where they do not: said once, under the list, rather than
-    // beside whichever row is at fault -- a sentence between rows would shift
-    // the list as somebody types.
-    in property <string> trouble: "";
-    // Whether any row offers a name at all, which is what decides whether the
-    // renaming button is there to be pressed.
-    in property <bool> any-nameable: false;
-
-    callback typed(int, string);
-    callback derive(int);
-    callback confirmed();
-    callback edit(int);
-    callback remove(int);
-    // The one other thing a row offers: see ProblemRow::action.
-    callback acted(int);
-    callback left();
-    // And the way out that answers all of them at once: see `ignored` in
-    // tcsgui::settle_problems.
-    callback ignored();
-    // Out of the editor, which is the one answer that is not about the
-    // configuration at all.
-    callback quit();
-
-    VerticalLayout {
-        padding: Space.wide;
-        spacing: Space.step;
-
-        Copyable {
-            text: "This configuration has problems the vehicle would not fly with";
-            font-size: Type.strong;
-            font-weight: Type.bold;
-            wrap: word-wrap;
-        }
-        Copyable {
-            text: "Each one is drawn in red on the node it is about. Put them "
-                + "right here, open a node to edit it, or leave them and look "
-                + "at the drawing first -- every node is on the canvas either "
-                + "way.";
-            font-size: Type.small;
-            color: #6b7280;
-            wrap: word-wrap;
-        }
-
-        ScrollView {
-            vertical-stretch: 1;
-            VerticalLayout {
-                spacing: Space.step;
-                for row[i] in root.rows: HorizontalLayout {
-                    spacing: Space.step;
-                    alignment: start;
-
-                    VerticalLayout {
-                        horizontal-stretch: 1;
-                        spacing: 1px;
-                        Copyable {
-                            text: row.said;
-                            font-size: Type.body;
-                            wrap: word-wrap;
-                        }
-                        if row.nameable: HorizontalLayout {
-                            spacing: Space.step;
-                            LineEdit {
-                                text: row.now;
-                                read-only: Session.read-only;
-                                font-size: Fonts.window;
-                                horizontal-stretch: 1;
-                                edited(said) => { root.typed(i, said); }
-                            }
-                            Button {
-                                text: "Suggest";
-                                enabled: !Session.read-only;
-                                clicked => { root.derive(i); }
-                            }
-                        }
-                    }
-                    if row.there: Button {
-                        text: "Edit";
-                        enabled: !Session.read-only;
-                        clicked => { root.edit(i); }
-                    }
-                    if row.there: Button {
-                        text: "Delete";
-                        enabled: !Session.read-only;
-                        clicked => { root.remove(i); }
-                    }
-                    if row.action != "": Button {
-                        text: row.action;
-                        enabled: !Session.read-only;
-                        clicked => { root.acted(i); }
-                    }
-                }
-                if root.rows.length == 0: Copyable {
-                    text: "Nothing is wrong.";
-                    font-size: Type.body;
-                    font-italic: true;
-                    color: #6b7280;
-                }
-            }
-        }
-
-        if root.trouble != "": Copyable {
-            text: root.trouble;
-            font-size: Type.small;
-            color: #c0392b;
-            wrap: word-wrap;
-        }
-
-        HorizontalLayout {
-            spacing: Space.step;
-            CopyButton { said: root.everything; }
-            Rectangle { }
-            // Out of the editor altogether, for a file that arrived in a
-            // state somebody would rather put right elsewhere: a question
-            // about a configuration should not be a reason to go looking for
-            // a way to close the window it came up over. Leftmost, away from
-            // the button that acts, because it is the one press here that
-            // cannot be undone by pressing something else.
-            Button {
-                text: "Quit";
-                clicked => { root.quit(); }
-            }
-            Button {
-                text: "Leave this one";
-                clicked => { root.left(); }
-            }
-            // Doing nothing about every one of them, which is the other way
-            // out and the one somebody opening a file to look at it wants:
-            // the problems stay, the nodes are drawn as they are, and nothing
-            // says any of it again this session. The window's own close box
-            // does this, for the reason the comment on it in main.rs gives.
-            Button {
-                text: "Ignore them all";
-                clicked => { root.ignored(); }
-            }
-            if root.any-nameable: Button {
-                text: "Rename";
-                primary: true;
-                enabled: root.ready && !Session.read-only;
-                clicked => { root.confirmed(); }
-            }
-        }
-    }
-}
-
 export component DeleteWindow inherits Window {
     default-font-size: Fonts.window;
     title: "Delete a node";

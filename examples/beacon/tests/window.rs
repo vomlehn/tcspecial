@@ -47,7 +47,7 @@ fn the_window_shows_what_a_pass_reported() {
     );
 
     // A beacon, as the loop would report it: the time it arrived, what it
-    // said, and a light that says the spacecraft is being heard from.
+    // said, and an indicator that says the spacecraft is being heard from.
     let said = "tcspecial v0.1.0 md5 0123456789abcdef";
     show(
         &window,
@@ -70,10 +70,10 @@ fn the_window_shows_what_a_pass_reported() {
     assert_eq!(
         window.get_indicator_color(),
         palette::well(),
-        "a beacon has just arrived, so the light says all is well"
+        "a beacon has just arrived, so the indicator says all is well"
     );
 
-    // And long enough after it, the light says so without anything else
+    // And long enough after it, the indicator says so without anything else
     // having to happen: the loop reports the age, and the age is what the
     // colour is worked out from.
     show(
@@ -91,7 +91,7 @@ fn the_window_shows_what_a_pass_reported() {
     );
 }
 
-/// The stage line says which stage the light is at, in a word, from the
+/// The stage line says which stage the indicator is at, in a word, from the
 /// window opening -- Unheard -- through every stage a beacon ages through.
 #[test]
 fn the_stage_line_follows_the_stage() {
@@ -115,7 +115,7 @@ fn the_stage_line_follows_the_stage() {
     assert_eq!(window.get_stage(), "Unheard");
 
     // A beacon, then a minute of it ageing: the line goes through the stages
-    // in order, and says each one the light is showing.
+    // in order, and says each one the indicator is showing.
     let at = Some(SystemTime::UNIX_EPOCH + Duration::from_secs(7322));
     let mut seen: Vec<String> = Vec::new();
     for ms in (0..60_000).step_by(100) {
@@ -130,8 +130,8 @@ fn the_stage_line_follows_the_stage() {
     assert_eq!(seen, ["Heard", "Aging", "Waiting"]);
     assert!(on_screen(&window).iter().any(|line| line == "Waiting"));
 
-    // Where it is: on the Status row, after the label and before the light,
-    // with no label of its own.
+    // Where it is: on the Status row, after the label and before the
+    // indicator, with no label of its own.
     assert!(
         !on_screen(&window)
             .iter()
@@ -155,14 +155,14 @@ fn the_stage_line_follows_the_stage() {
         (middle(&stage) - middle(&status)).abs() <= 2.0,
         "the stage is not on the Status row"
     );
-    // The light is the round thing on that row, after the stage.
-    let light = ElementHandle::find_by_element_type_name(&window, "Rectangle")
+    // The indicator is the round thing on that row, after the stage.
+    let indicator = ElementHandle::find_by_element_type_name(&window, "Rectangle")
         .filter(|e| (middle(e) - middle(&status)).abs() <= 2.0)
         .filter(|e| e.size().width > 0.0 && (e.size().width - e.size().height).abs() < 0.5)
         .max_by(|a, b| a.absolute_position().x.total_cmp(&b.absolute_position().x))
-        .expect("the light");
+        .expect("the indicator");
     assert!(
-        light.absolute_position().x >= stage.absolute_position().x + stage.size().width,
-        "the light is not after the stage"
+        indicator.absolute_position().x >= stage.absolute_position().x + stage.size().width,
+        "the indicator is not after the stage"
     );
 }

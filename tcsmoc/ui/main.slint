@@ -292,8 +292,8 @@ component DHPanel inherits Rectangle {
             // recent enough: nothing states how often a payload's data
             // should arrive. A node produces when something reaches it, and
             // a thermostat that emits only when its decision changes has no
-            // rate to be judged against. A light that could never change is
-            // worse than no light.
+            // rate to be judged against. An indicator that could never change
+            // is worse than no indicator.
             Text { text: "Last recv:"; font-size: Fonts.window; vertical-alignment: center; }
             Text { text: oc-time; font-size: Fonts.window; vertical-alignment: center; }
         }

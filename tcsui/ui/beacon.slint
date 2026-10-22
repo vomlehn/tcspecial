@@ -1,25 +1,26 @@
-// The beacon panel: a light, when the last beacon arrived, and what it said.
+// The beacon panel: an indicator, when the last beacon arrived, and what it
+// said.
 //
 // Shared markup rather than a copy in each window. Two programs show it --
 // tcsmoc, beside its command link, and the `beacon` example, which shows this
 // and nothing else -- and an operator who has read one has read the other:
-// a light in a different place or a label in different words would be two
-// things to learn about one spacecraft.
+// an indicator in a different place or a label in different words would be
+// two things to learn about one spacecraft.
 //
 // Imported by path, which is what Slint resolves relative to the importing
 // file:
 //
 //     import { BeaconPanel } from "../../tcsui/ui/beacon.slint";
 //
-// Nothing is computed here. What colour the light is and what the two lines
-// say are worked out in Rust, from what `tcslib::beacon` reports, and set as
-// properties: see the crate's `shown`.
+// Nothing is computed here. What colour the indicator is and what the two
+// lines say are worked out in Rust, from what `tcslib::beacon` reports, and
+// set as properties: see the crate's `shown`.
 
 import { Fonts } from "fonts.slint";
 import { TitledBox } from "titled.slint";
 
 export component BeaconPanel inherits TitledBox {
-    // The light's colour, which says how stale the last beacon is. Grey
+    // The indicator's colour, which says how stale the last beacon is. Grey
     // before any has arrived and never after: once one has, the dark half of
     // a blink is white. See `tcsui::indicator`.
     in property <color> indicator-color: #c0c0c0;
@@ -29,10 +30,11 @@ export component BeaconPanel inherits TitledBox {
     // What that beacon said: the build flying, the version of the
     // configuration it is serving, and the digest of the files it read.
     in property <string> last-message: "<none>";
-    // Which stage the light is at, in a word -- tcslib::beacon::Stage::label
-    // -- shown between the label and the light, which says the same thing in
-    // colour. Empty is a window that does not show it, and the row is then
-    // the label and the light alone.
+    // Which stage the indicator is at, in a word --
+    // tcslib::beacon::Stage::label -- shown between the label and the
+    // indicator, which says the same thing in colour. Empty is a window that
+    // does not show it, and the row is then the label and the indicator
+    // alone.
     in property <string> stage: "";
 
     // Titled and boxed, because this is not part of whatever sits beside it:
@@ -47,8 +49,9 @@ export component BeaconPanel inherits TitledBox {
 
         Row {
             Text { text: "Status:"; vertical-alignment: center; }
-            // Sized from the type rather than in pixels, so that the light
-            // stands as tall as the line beside it at any type size.
+            // Sized from the type rather than in pixels, so that the
+            // indicator stands as tall as the line beside it at any type
+            // size.
             HorizontalLayout {
                 alignment: start;
                 spacing: 8px;

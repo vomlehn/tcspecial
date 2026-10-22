@@ -103,7 +103,7 @@ nothing in it is its own:
   and says how stale the last one is. No window, no toolkit: a ground station
   with no screen -- a logger, a test -- uses exactly this.
 - `tcsui` holds the panel, as markup other windows import, and works out what
-  to show on it: which colour the light is, and the two lines beside it.
+  to show on it: which colour the indicator is, and the two lines beside it.
 - `beacon`, the program here, reads the configuration to find where the
   beacons are, starts the loop on a thread, and puts each pass in the window.
   That is all of it, but for a button.
@@ -116,19 +116,19 @@ in XTCE, in `tcslibgs/xtce/beacon.xml`; tcspecial packs every beacon and
 `tcslibgs::Beacon`, and this example's test packs the beacon it sends the same
 way. tcs-xtce itself is in `vendor/tcs-xtce`.
 
-Beside the light, between it and its `Status:` label, is the stage the light
-is at, in a word: `Unheard` before any beacon has arrived, `Heard` while
-beacons are arriving, `Aging` once several are missing, and `Waiting` once
-nothing is being heard. It changes as the stage does.
+Beside the indicator, between it and its `Status:` label, is the stage the
+indicator is at, in a word: `Unheard` before any beacon has arrived, `Heard`
+while beacons are arriving, `Aging` once several are missing, and `Waiting`
+once nothing is being heard. It changes as the stage does.
 
 The button starts tcspecial on the same configuration and stops it, so that
-the light can be watched coming on with the first beacon and going out after
-the last. The window opens with it saying `Start tcspecial`, because tcspecial
-is not running. Pressed, it starts tcspecial and says `Stop tcspecial`;
-pressed again, it stops tcspecial with `kill()` and says `Start tcspecial`,
-which is where it began. tcspecial is the binary beside `beacon`, run
-directly rather than through `cargo run`, so that the kill stops tcspecial
-itself. Closing the window stops it as well, and so does the watcher dying,
+the indicator can be watched coming on with the first beacon and going out
+after the last. The window opens with it saying `Start tcspecial`, because
+tcspecial is not running. Pressed, it starts tcspecial and says
+`Stop tcspecial`; pressed again, it stops tcspecial with `kill()` and says
+`Start tcspecial`, which is where it began. tcspecial is the binary beside
+`beacon`, run directly rather than through `cargo run`, so that the kill stops
+tcspecial itself. Closing the window stops it as well, and so does the watcher dying,
 which the kernel is told to see to; and a tcspecial that stops by itself puts
 the button back to `Start tcspecial`.
 

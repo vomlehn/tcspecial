@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="900" height="420" viewBox="0 0 900 420" role="img" aria-labelledby="title desc">
   <title id="title">The beacon example</title>
-  <desc id="desc">tcspecial sends a beacon every five seconds from 0.0.0.0:5650 to the ground station beacon, which receives it at 127.0.0.1:5750 and shows it on the beacon panel: a light saying how stale the last one is, the time it arrived, and what it said. The payload, sensor, is there because a configuration describes a vehicle; its readings go to the ground over its own telemetry link and have nothing to do with the beacon.</desc>
+  <desc id="desc">tcspecial sends a beacon every five seconds from 0.0.0.0:5650 to the ground station beacon, which receives it at 127.0.0.1:5750 and shows it on the beacon panel: an indicator saying how stale the last one is, the time it arrived, and what it said. The payload, sensor, is there because a configuration describes a vehicle; its readings go to the ground over its own telemetry link and have nothing to do with the beacon.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }

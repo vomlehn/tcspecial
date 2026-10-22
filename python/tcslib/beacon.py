@@ -51,7 +51,7 @@ SECOND = 1_000_000_000
 #: :meth:`Schedule.for_interval`.
 STANDARD_INTERVAL = 5 * SECOND
 
-#: How many beacons in a row have gone missing when the steady green light
+#: How many beacons in a row have gone missing when the steady green indicator
 #: starts to blink, when it turns yellow, and when it turns red:
 #: ``BLINKING_AFTER_MISSED``, ``AGING_AFTER_MISSED`` and
 #: ``WAITING_AFTER_MISSED`` in ``tcslib::beacon``.
@@ -128,7 +128,7 @@ class Contact(enum.Enum):
 
 @dataclass(frozen=True)
 class Blink:
-    """How long a light is on and off while it blinks, in nanoseconds."""
+    """How long an indicator is on and off while it blinks, in nanoseconds."""
 
     on: int
     off: int
@@ -153,7 +153,7 @@ class Showing:
 
     #: How stale the last beacon is.
     stage: Stage
-    #: Whether a light showing it is lit now.
+    #: Whether an indicator showing it is lit now.
     lit: bool
     #: How long until this changes by itself, in nanoseconds, where it will.
     #: ``None`` is a stage that will not change without a beacon.
@@ -182,14 +182,14 @@ class Schedule:
         a vehicle that beacons every ``interval`` nanoseconds.
 
         Counted in beacons missed -- see :func:`missed` -- because that is
-        what the light says: nought or one missed is steady green, two or
+        what the indicator says: nought or one missed is steady green, two or
         three blinking green, four to seven blinking yellow, eight or more
         blinking red. For a five-second beacon that is ten seconds steady,
         ten more blinking and twenty aging. Every blink is half a
         second on and half a second off, whatever the interval. An interval of
         nought gets the standard schedule. The last step never ends, and
-        blinks, because a light that has stopped changing is one an operator
-        stops reading.
+        blinks, because an indicator that has stopped changing is one an
+        operator stops reading.
         """
         if not interval:
             interval = STANDARD_INTERVAL
@@ -410,7 +410,7 @@ class Pass:
 
     #: What this pass found.
     arrived: Arrived
-    #: How stale the last beacon is now, and whether a light is lit.
+    #: How stale the last beacon is now, and whether an indicator is lit.
     showing: Showing
     #: When the last beacon arrived, if one ever has, in nanoseconds.
     at: int

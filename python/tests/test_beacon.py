@@ -274,7 +274,7 @@ def beacon_link():
 class PanelTest(unittest.TestCase):
     """What the panel shows for each stage: tcsui's palette."""
 
-    def test_the_light_ages_through_the_palette(self):
+    def test_the_indicator_ages_through_the_palette(self):
         from tcsui.beacon_panel import indicator, palette
 
         s = Schedule.standard()
@@ -292,7 +292,7 @@ class PanelTest(unittest.TestCase):
         self.assertEqual(indicator(s.at(40_700 * MS), True), palette.OFF)
         self.assertEqual(indicator(s.at(11_500 * MS), True), palette.OFF)
 
-    def test_once_heard_the_light_is_never_grey_again(self):
+    def test_once_heard_the_indicator_is_never_grey_again(self):
         from tcsui.beacon_panel import indicator, palette
 
         s = Schedule.standard()

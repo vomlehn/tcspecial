@@ -38,8 +38,8 @@ pub fn prepare(window: &WatchWindow) {
 
 /// Put what the beacon loop reported into the window.
 ///
-/// All four at once, from the one reading: a light that said beacons were
-/// arriving beside a time that said none had would be two answers to one
+/// All four at once, from the one reading: an indicator that said beacons
+/// were arriving beside a time that said none had would be two answers to one
 /// question. The window passes them down to the panel, which is `tcsui`'s.
 pub fn show(window: &WatchWindow, shown: &Shown) {
     window.set_indicator_color(shown.indicator);
@@ -69,9 +69,9 @@ pub const STOP: &str = "Stop tcspecial";
 /// The vehicle, as a program this window starts and stops.
 ///
 /// The beacon is what the vehicle sends of its own accord, so a button that
-/// starts it and stops it is the whole of what there is to watch: the light
-/// goes out a little after the vehicle stops, and comes back with its first
-/// beacon.
+/// starts it and stops it is the whole of what there is to watch: the
+/// indicator goes out a little after the vehicle stops, and comes back with
+/// its first beacon.
 ///
 /// The program is run itself and not through `cargo run`. Stopping is
 /// `Child::kill`, and killing cargo would leave the tcspecial it started

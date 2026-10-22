@@ -4,7 +4,7 @@
 pub mod constants {
     use tcslib::beacon::Schedule;
 
-    /// How the beacon's light ages, for beacons sent every `interval`:
+    /// How the beacon's indicator ages, for beacons sent every `interval`:
     /// `tcslib`'s schedule for that interval.
     ///
     /// Not this window's own any more. The stages and their timings are the

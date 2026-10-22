@@ -1997,7 +1997,7 @@ The beacon example
 .. figure:: ../examples/beacon/beacon.svg
    :alt: The beacon example: tcspecial sending a beacon every five seconds to
          the ground station beacon, which shows it on the beacon panel
-         -- a light, the time the last one arrived, and what it said.
+         -- an indicator, the time the last one arrived, and what it said.
    :width: 100%
 
    ``examples/beacon``: a beacon, and a window watching it.
@@ -2024,7 +2024,8 @@ none of it is the program's own:
   There is no toolkit in it, so a ground station with no screen -- a logger, a
   test -- uses exactly this.
 * ``tcsui`` holds the panel, as markup other windows import, and works out
-  what to show on it: which colour the light is, and the two lines beside it.
+  what to show on it: which colour the indicator is, and the two lines beside
+  it.
 * ``beacon``, the program in the example, reads the configuration to
   find where the beacons are, starts the loop on a thread of its own, and puts
   each pass in the window.
@@ -2044,17 +2045,18 @@ command link. That is the point of their being apart: what a beacon means is
 one thing wherever it is shown, and an operator who has read one window has
 read the other.
 
-Between the panel's ``Status:`` label and its light is the stage the light is
-at, in a word -- Unheard, Heard, Aging or Waiting, as the table under
-`Beaconing`_ gives them -- which changes as the stage does.
+Between the panel's ``Status:`` label and its indicator is the stage the
+indicator is at, in a word -- Unheard, Heard, Aging or Waiting, as the table
+under `Beaconing`_ gives them -- which changes as the stage does.
 
-Under the panel is a button that starts and stops tcspecial, so that the light
-can be watched coming on with the first beacon and going out after the last.
-The window opens with it saying **Start tcspecial**, because tcspecial is not
-running. Pressed, it starts tcspecial on the same configuration and says **Stop
-tcspecial**; pressed again, it stops tcspecial with ``kill()`` and says **Start
-tcspecial**, which is where it began. Closing the window stops tcspecial too, and
-a tcspecial that stops by itself puts the button back to **Start tcspecial**.
+Under the panel is a button that starts and stops tcspecial, so that the
+indicator can be watched coming on with the first beacon and going out after
+the last. The window opens with it saying **Start tcspecial**, because
+tcspecial is not running. Pressed, it starts tcspecial on the same
+configuration and says **Stop tcspecial**; pressed again, it stops tcspecial
+with ``kill()`` and says **Start tcspecial**, which is where it began. Closing
+the window stops tcspecial too, and a tcspecial that stops by itself puts the
+button back to **Start tcspecial**.
 
 ``make -C examples run-beacon`` builds both programs and opens the window. The
 watcher opens a window, so it wants a display.
@@ -3137,10 +3139,10 @@ the beacon box
 
   A datagram that reaches the beacon address from anywhere but where the
   configuration says beacons come from is not a beacon, and is ignored. That
-  is a warning, which every program that shows the light says on its console
-  whether or not it was asked to talk -- the ``beacon`` and ``ping``
+  is a warning, which every program that shows the indicator says on its
+  console whether or not it was asked to talk -- the ``beacon`` and ``ping``
   examples included, which are otherwise quiet without ``-v`` -- because it
-  is the one explanation of a light going red while the spacecraft is
+  is the one explanation of an indicator going red while the spacecraft is
   beaconing:
 
   .. code-block:: console
@@ -3156,7 +3158,7 @@ the beacon box
   the line says what is up there without anything having to connect first.
   The answer to a ``CONNECT`` says the same two in the same words: see `What each end read`_. A datagram the MOC cannot read is shown as
   what arrived, cut short, rather than left off the line: something else
-  sending to the group is worth seeing beside a green light.
+  sending to the group is worth seeing beside a green indicator.
 
 the ``Command`` menu
   The commands below.
@@ -3225,7 +3227,7 @@ When data last arrived
 panel says nothing more about whether that was recent enough. Nothing in a
 configuration states how often a node's data should arrive -- a node produces
 when something reaches it, and a thermostat that sends only when its decision
-changes may be silent for hours -- so a light that judged it would mean
+changes may be silent for hours -- so an indicator that judged it would mean
 nothing, and one that never changed would be worse than none.
 
 The MOC asks nothing to keep the panels current. Each source's data arrives on
@@ -3364,8 +3366,8 @@ receiving address, having read the same files. Tcsmoc displays the
 following beacon colors:
 
 steady grey
-  No beacon message has been received yet. The light is grey only then: once
-  a beacon has arrived it is never grey again.
+  No beacon message has been received yet. The indicator is grey only then:
+  once a beacon has arrived it is never grey again.
 
 steady white
   A beacon message was received, and the system time has since changed
@@ -3386,16 +3388,16 @@ blinking yellow
 blinking red
   The number of lost beacon messages indicates a likely issue.
 
-A blinking light alternates between its colour and white, half a second of
+A blinking indicator alternates between its colour and white, half a second of
 each.
 
-Which colour the light shows is decided by how many beacons have gone missing
-since the last one arrived. A beacon is missed once the configuration's
-``beacon.interval`` has passed without it, so the count goes up by one each
-interval, and a new beacon puts it back to nought:
+Which colour the indicator shows is decided by how many beacons have gone
+missing since the last one arrived. A beacon is missed once the
+configuration's ``beacon.interval`` has passed without it, so the count goes
+up by one each interval, and a new beacon puts it back to nought:
 
 ================  ===============  =======
-Beacons missed    Light            Stage
+Beacons missed    Indicator        Stage
 ================  ===============  =======
 none heard yet    steady grey      Unheard
 0 or 1            steady green     Heard
@@ -3404,18 +3406,18 @@ none heard yet    steady grey      Unheard
 8 or more         blinking red     Waiting
 ================  ===============  =======
 
-The stage is what is true of the spacecraft, and the light is one way of saying
-it: Unheard before any beacon has arrived, Heard while the spacecraft is being
-heard from, Aging once enough beacons are missing that contact is not claimed,
-and Waiting once nothing is being heard and the ground is waiting for the
-spacecraft to be heard from again.
+The stage is what is true of the spacecraft, and the indicator is one way of
+saying it: Unheard before any beacon has arrived, Heard while the spacecraft
+is being heard from, Aging once enough beacons are missing that contact is not
+claimed, and Waiting once nothing is being heard and the ground is waiting for
+the spacecraft to be heard from again.
 
-One beacon may be missed with the light still steady, because one lost
+One beacon may be missed with the indicator still steady, because one lost
 datagram is a network and not a spacecraft. For a five-second interval the
-light is steady for ten seconds, blinks green for ten more, is yellow for
+indicator is steady for ten seconds, blinks green for ten more, is yellow for
 twenty and red after that. The interval is the one the configuration states: a
 ``Config`` command that retimes the beacon aboard is not followed by the
-light, which goes on aging beacons against the configured interval.
+indicator, which goes on aging beacons against the configured interval.
 
 Beside the indicator is the time the last beacon arrived, shown the way every
 other time in the window is. It is the time the beacon reached the MOC rather

@@ -13,7 +13,7 @@
 //! * The facts: what a datagram turned out to be, what its number says about
 //!   the ones before it, whether the configuration it announces is the one
 //!   this station read, and how long ago the last one was.
-//! * The look: a colour, a light that blinks, a line of text in a box.
+//! * The look: a colour, an indicator that blinks, a line of text in a box.
 //!
 //! Only the first is here. The second needs a toolkit and a window to put it
 //! in, and lives in `tcsui`, whose panel shows what this reports. They are
@@ -59,17 +59,17 @@ pub use tcslibgs::BeaconLink as Link;
 /// [`Schedule::for_interval`].
 pub const STANDARD_INTERVAL: Duration = Duration::from_secs(5);
 
-/// How many beacons in a row have gone missing when the steady green light
-/// starts to blink. One missed leaves it steady: one lost datagram is a
-/// network and not a spacecraft.
+/// How many beacons in a row have gone missing when the steady green
+/// indicator starts to blink. One missed leaves it steady: one lost datagram
+/// is a network and not a spacecraft.
 pub const BLINKING_AFTER_MISSED: u32 = 2;
 
-/// How many beacons in a row have gone missing when the light turns yellow,
-/// [`Stage::Aging`]: too many to be a network, and worth an operator's
-/// attention.
+/// How many beacons in a row have gone missing when the indicator turns
+/// yellow, [`Stage::Aging`]: too many to be a network, and worth an
+/// operator's attention.
 pub const AGING_AFTER_MISSED: u32 = 4;
 
-/// How many beacons in a row have gone missing when the light turns red,
+/// How many beacons in a row have gone missing when the indicator turns red,
 /// [`Stage::Waiting`]: the spacecraft is not being heard from.
 pub const WAITING_AFTER_MISSED: u32 = 8;
 
@@ -91,8 +91,8 @@ pub fn missed(elapsed: Duration, interval: Duration) -> u128 {
 ///
 /// Named by what is true of the spacecraft rather than by what the window
 /// does about it. A colour is a way of saying one of these, and not the only
-/// one: a program acts on [`Contact`], an operator reads a light, and a log
-/// line would write the word.
+/// one: a program acts on [`Contact`], an operator reads an indicator, and a
+/// log line would write the word.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Stage {
     /// No beacon has arrived, or the last one is in the future -- a clock
@@ -104,8 +104,8 @@ pub enum Stage {
     /// Recently enough allows for a beacon that did not arrive, one lost
     /// datagram being a network rather than a spacecraft. The standard
     /// schedule holds this stage for twice the beacon interval, steady at
-    /// first and then blinking -- a light that has begun to blink says the
-    /// beacons are aging, which is worth noticing before it is worth
+    /// first and then blinking -- an indicator that has begun to blink says
+    /// the beacons are aging, which is worth noticing before it is worth
     /// doubting.
     Heard,
     /// Late enough that contact is not claimed, and not so late that it is
@@ -127,7 +127,8 @@ impl Stage {
     /// act on: a panel may go on showing what a command implied only while the
     /// spacecraft is still being heard from, because a status nobody can
     /// confirm is a status nobody knows. An aging beacon is not a confirmed
-    /// one, so the line is drawn where the light stops saying all is well.
+    /// one, so the line is drawn where the indicator stops saying all is
+    /// well.
     pub fn in_contact(self) -> bool {
         matches!(self, Stage::Heard)
     }
@@ -167,7 +168,7 @@ impl Contact {
     }
 }
 
-/// How long a light is on and off while it blinks.
+/// How long an indicator is on and off while it blinks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Blink {
     pub on: Duration,
@@ -184,8 +185,8 @@ pub struct Step {
     /// Whether what shows it blinks, and how fast. `None` is steady.
     ///
     /// Here rather than in the window because the blink decides when there is
-    /// something to do: a station whose light blinks must wake to blink it,
-    /// so the rate is what a read timeout is worked out from.
+    /// something to do: a station whose indicator blinks must wake to blink
+    /// it, so the rate is what a read timeout is worked out from.
     pub blink: Option<Blink>,
 }
 
@@ -200,8 +201,8 @@ pub struct Schedule {
 pub struct Showing {
     /// How stale the last beacon is.
     pub stage: Stage,
-    /// Whether a light showing it is lit now. A steady stage is always lit;
-    /// a blinking one is lit for `on` and dark for `off`.
+    /// Whether an indicator showing it is lit now. A steady stage is always
+    /// lit; a blinking one is lit for `on` and dark for `off`.
     pub lit: bool,
     /// How long until this changes by itself, where it will.
     ///
@@ -236,11 +237,11 @@ impl Schedule {
     /// a vehicle that beacons every `interval`.
     ///
     /// Counted in beacons missed -- see [`missed`] -- because that is what
-    /// the light says: a second late means one thing for a vehicle that
+    /// the indicator says: a second late means one thing for a vehicle that
     /// beacons every second and another for one that beacons every minute,
     /// and a number of beacons means the same for both.
     ///
-    /// | Beacons missed | Stage            | Light           |
+    /// | Beacons missed | Stage            | Indicator       |
     /// |----------------|------------------|-----------------|
     /// | 0 or 1         | [`Stage::Heard`]  | steady green    |
     /// | 2 or 3         | [`Stage::Heard`]  | blinking green  |
@@ -252,17 +253,17 @@ impl Schedule {
     /// seconds steady, ten more blinking and twenty aging.
     ///
     /// Every blink is half a second on and half a second off, whatever the
-    /// interval: how fast a light flashes is for the eye, not for the beacon,
-    /// so a blinking light changes twice a second at every stage and the
-    /// colour alone says which stage it is.
+    /// interval: how fast an indicator flashes is for the eye, not for the
+    /// beacon, so a blinking indicator changes twice a second at every stage
+    /// and the colour alone says which stage it is.
     ///
     /// An interval of nought is no interval to count in, and gets the
     /// standard schedule.
     ///
     /// The last step never ends. A schedule whose steps ran out would leave
     /// the oldest reading looking like the newest -- see [`Schedule::at`] --
-    /// so the last one holds for ever, and blinks, because a light that has
-    /// stopped changing is one an operator stops reading.
+    /// so the last one holds for ever, and blinks, because an indicator that
+    /// has stopped changing is one an operator stops reading.
     pub fn for_interval(interval: Duration) -> Schedule {
         let interval = if interval.is_zero() {
             STANDARD_INTERVAL
@@ -572,7 +573,7 @@ fn write_differs(theirs: ConfigDigest, ours: ConfigDigest, out: &mut String) {
 /// A datagram this cannot read is shown as what arrived, cut short. Something
 /// else is sending to this address, or something is sending a beacon this
 /// build does not understand, and either is worth seeing on the line rather
-/// than hidden behind a green light.
+/// than hidden behind a green indicator.
 pub fn message_of(datagram: &[u8]) -> String {
     let mut said = String::new();
     write_message(datagram, &Beacon::read(datagram), &mut said);
@@ -656,7 +657,7 @@ pub enum Arrived {
 pub struct Pass {
     /// What this pass found.
     pub arrived: Arrived,
-    /// How stale the last beacon is now, and whether a light is lit.
+    /// How stale the last beacon is now, and whether an indicator is lit.
     pub showing: Showing,
     /// When the last beacon arrived, if one ever has.
     ///
@@ -683,7 +684,7 @@ pub struct Pass {
     pub remarks: Vec<String>,
     /// What is wrong, which a console says whether or not it was asked to
     /// talk: a beacon from somewhere the configuration does not say they
-    /// come from, which is the one thing that explains a light going red
+    /// come from, which is the one thing that explains an indicator going red
     /// while the spacecraft is beaconing, and which nothing in the window
     /// says.
     pub warnings: Vec<String>,
@@ -774,9 +775,10 @@ impl Beacons {
     /// Wait for a beacon, or for the moment what is shown would change.
     ///
     /// One pass of the loop. It returns on a datagram, on the socket's
-    /// timeout -- which is [`Showing::until`], so that a light blinks whether
-    /// or not anything arrives -- or on a failure of the socket, which is
-    /// reported as [`Arrived::Broken`] and says nothing about the spacecraft.
+    /// timeout -- which is [`Showing::until`], so that an indicator blinks
+    /// whether or not anything arrives -- or on a failure of the socket,
+    /// which is reported as [`Arrived::Broken`] and says nothing about the
+    /// spacecraft.
     ///
     /// The pass is the watcher's, kept from one pass to the next and made
     /// again in its place; a caller that wants one to keep clones it.
@@ -981,7 +983,7 @@ mod tests {
     /// of stages counts.
     ///
     /// The standard schedule holds the heard stage steady for two intervals
-    /// and then blinks it for two more: a blinking light says beacons are
+    /// and then blinks it for two more: a blinking indicator says beacons are
     /// arriving and aging, not that they have stopped. The schedule here is
     /// shaped the same way, with figures of its own. The run stops at the
     /// first stage that is not one of contact, whatever comes after it.
@@ -1038,9 +1040,9 @@ mod tests {
     /// A blinking stage is lit and dark in turn, and says when it next
     /// changes.
     ///
-    /// The second half is what a socket's read timeout is set to: a light that
-    /// blinks has to be woken up to blink, so a pass that found nothing must
-    /// still be told when the next thing happens.
+    /// The second half is what a socket's read timeout is set to: an
+    /// indicator that blinks has to be woken up to blink, so a pass that
+    /// found nothing must still be told when the next thing happens.
     #[test]
     fn a_blinking_stage_says_when_it_next_changes() {
         let schedule = Schedule::of(vec![
@@ -1076,8 +1078,8 @@ mod tests {
         assert!(!dark.lit, "the second half of the cycle is dark");
         assert_eq!(dark.until, Some(Duration::from_millis(400)));
 
-        // And it goes on blinking however old the beacon is, because a light
-        // that stopped changing is one an operator stops reading.
+        // And it goes on blinking however old the beacon is, because an
+        // indicator that stopped changing is one an operator stops reading.
         let old = schedule.at(Duration::from_secs(3_600));
         assert_eq!(old.stage, Stage::Waiting);
         assert!(old.until.is_some());
@@ -1160,8 +1162,8 @@ mod tests {
         );
     }
 
-    /// What the light shows is decided by the number of beacons missed and
-    /// nothing else: at every interval, a moment either side of each
+    /// What the indicator shows is decided by the number of beacons missed
+    /// and nothing else: at every interval, a moment either side of each
     /// threshold falls on the side the count says.
     #[test]
     fn the_stage_is_the_number_of_beacons_missed() {
@@ -1186,7 +1188,7 @@ mod tests {
                     let showing = schedule.at(elapsed);
                     let (stage, blinks) = stage_for(missed(elapsed, interval));
                     assert_eq!(showing.stage, stage, "{elapsed:?} at {interval:?}");
-                    // A blinking step's light is dark for half of every
+                    // A blinking step's indicator is dark for half of every
                     // second, which a steady one never is.
                     if !blinks {
                         assert!(showing.lit, "{elapsed:?} at {interval:?}");
@@ -1261,7 +1263,7 @@ mod tests {
         );
 
         // Something else sending to this address is shown rather than hidden:
-        // a green light beside a line that said nothing would be a window
+        // a green indicator beside a line that said nothing would be a window
         // reporting a beacon it had not had.
         let shown = message_of(b"hello");
         assert!(

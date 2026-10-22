@@ -10,30 +10,31 @@ use tcsui::Shown;
 
 slint::include_modules!();
 
-/// A beacon's message at its full length: tcspecial at version 0.0.0, and a
-/// full MD5 digest -- the digest of nothing, `d41d8cd9...`. The window is as
-/// wide as this before any beacon has arrived, so that it opens at the width
-/// a beacon will want and keeps it.
+/// Every shape a beacon's message takes at its widest: tcspecial at version
+/// 255.255.255, each part being a byte, and an MD5 digest written in one hex
+/// digit throughout, once for each digit -- which digit is widest is the
+/// font's to say, so the window measures them all -- and what the panel says
+/// before any beacon has arrived. The panel's message line is as wide as the
+/// widest of these, so that the window opens at the width a beacon will want
+/// and keeps it.
 ///
 /// Written by [`tcslib::beacon::what_it_read`], which writes every beacon's
 /// message, so a change to the format changes the width with it.
-pub fn widest_message() -> String {
+pub fn widest_messages() -> Vec<String> {
     use tcslibgs::config_digest::{ConfigDigest, ConfigVersion};
 
-    let nothing = [
-        0xd4, 0x1d, 0x8c, 0xd9, 0x8f, 0x00, 0xb2, 0x04, 0xe9, 0x80, 0x09, 0x98, 0xec, 0xf8, 0x42,
-        0x7e,
-    ];
-    tcslib::beacon::what_it_read(
-        ConfigVersion::of_text("0.0.0").expect("0.0.0 is a version"),
-        ConfigDigest(nothing),
-    )
+    let version = ConfigVersion::of_text("255.255.255").expect("255.255.255 is a version");
+    let mut messages: Vec<String> = (0..16u8)
+        .map(|digit| tcslib::beacon::what_it_read(version, ConfigDigest([digit * 0x11; 16])))
+        .collect();
+    messages.push(tcslib::beacon::NO_BEACON_MESSAGE.to_string());
+    messages
 }
 
 /// Make the window ready to watch: sized for a beacon's message, as though
-/// one had arrived. See [`widest_message`].
+/// one had arrived. See [`widest_messages`].
 pub fn prepare(window: &WatchWindow) {
-    window.set_widest_message(widest_message().into());
+    window.set_messages(widest_messages().join("\n").into());
 }
 
 /// Put what the beacon loop reported into the window.

@@ -36,6 +36,17 @@ export component BeaconPanel inherits TitledBox {
     // does not show it, and the row is then the label and the indicator
     // alone.
     in property <string> stage: "";
+    // Every word the stage can be, a line each, so that its line is as wide
+    // as the widest of them and the indicator after it does not move as the
+    // stage changes. Stage::label's words: the beacon example's window test
+    // sets each of them and checks that the indicator stays put.
+    in property <string> stages: "Unheard\nHeard\nAging\nWaiting";
+    // Every shape a beacon's message can take at its widest, a line each, so
+    // that its line is as wide as the widest and the panel does not grow when
+    // a beacon arrives. Empty is a panel that does not hold the line to a
+    // width, and wraps the message where the panel is narrower than it, as
+    // tcsmoc's is.
+    in property <string> messages: "";
 
     // Titled and boxed, because this is not part of whatever sits beside it:
     // the beacon has a socket of its own and keeps arriving after a
@@ -43,20 +54,30 @@ export component BeaconPanel inherits TitledBox {
     // to be puzzled by. The title says what the box is, so the rows need not.
     title: "Beacon";
 
+    // Labels on the left at their own width, and each value starting at the
+    // same place after them, all of it left justified: the label column does
+    // not stretch, so a wider panel puts its room after the values rather
+    // than between them and their labels.
     GridLayout {
         spacing-horizontal: 12px;
         spacing-vertical: 4px;
 
         Row {
-            Text { text: "Status:"; vertical-alignment: center; }
+            Text {
+                text: "Status:";
+                vertical-alignment: center;
+                horizontal-stretch: 0;
+            }
             // Sized from the type rather than in pixels, so that the
             // indicator stands as tall as the line beside it at any type
             // size.
             HorizontalLayout {
                 alignment: start;
                 spacing: 8px;
+                horizontal-stretch: 1;
                 if root.stage != "": Text {
                     text: root.stage;
+                    min-width: widest-stage.preferred-width;
                     vertical-alignment: center;
                 }
                 Rectangle {
@@ -67,25 +88,66 @@ export component BeaconPanel inherits TitledBox {
                     border-color: #808080;
                     border-width: 1px;
                 }
+                // What the values are held to: the widest each will be,
+                // measured rather than stated in pixels, the text being
+                // whatever size Fonts.window makes it. Each is one Text
+                // holding every shape on a line of its own, so as wide as its
+                // widest line, and never drawn. They are in a box of no size
+                // at the end of this row, where they take up no room: a
+                // layout holds a box to the size it is given, where one
+                // outside a layout would be as tall as the column of lines.
+                // The time is in the window's own face, whose digits are all
+                // one width.
+                Rectangle {
+                    width: 0;
+                    height: 0;
+                    widest-stage := Text {
+                        visible: false;
+                        text: root.stages;
+                    }
+                    widest-received := Text {
+                        visible: false;
+                        text: "--:--:--\n00:00:00";
+                    }
+                    widest-message := Text {
+                        visible: false;
+                        text: root.messages;
+                    }
+                }
             }
         }
 
         Row {
-            Text { text: "Last rcvd:"; vertical-alignment: center; }
-            Text { text: last-received; vertical-alignment: center; }
+            Text {
+                text: "Last rcvd:";
+                vertical-alignment: center;
+                horizontal-stretch: 0;
+            }
+            Text {
+                text: last-received;
+                min-width: widest-received.preferred-width;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+            }
         }
 
         // What that beacon said, under when it arrived: the two read as one
         // message, received then and saying this.
         Row {
-            Text { text: "Last msg:"; vertical-alignment: center; }
+            Text {
+                text: "Last msg:";
+                vertical-alignment: center;
+                horizontal-stretch: 0;
+            }
             // Wrapped at its spaces where the box is narrower than the line,
             // as it is beside tcsmoc's command link: the digest goes to a
             // line of its own rather than off the edge of the window.
             Text {
                 text: last-message;
+                min-width: widest-message.preferred-width;
                 vertical-alignment: center;
                 wrap: word-wrap;
+                horizontal-stretch: 1;
             }
         }
     }

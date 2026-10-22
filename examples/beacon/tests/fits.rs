@@ -50,21 +50,11 @@ fn fits_exactly(window: &WatchWindow, what: &str) {
 
 #[test]
 fn the_window_is_just_large_enough_for_what_it_holds() {
-    use beacon_example::{prepare, widest_message};
+    use beacon_example::{prepare, widest_messages};
 
     i_slint_backend_testing::init_no_event_loop();
 
     let window = WatchWindow::new().expect("the window opens");
-    assert_eq!(
-        window.get_widest_message(),
-        widest_message(),
-        "the markup's own copy of the widest message is not the one the \
-         library writes"
-    );
-    assert_eq!(
-        widest_message(),
-        "tcspecial v0.0.0 md5 d41d8cd98f00b204e9800998ecf8427e"
-    );
     prepare(&window);
     window.show().expect("it is shown");
     assert!(window.get_border() > 0.0, "there is a border");
@@ -73,15 +63,34 @@ fn the_window_is_just_large_enough_for_what_it_holds() {
     fits_exactly(&window, "before any beacon");
     let before = window.get_window_width();
 
-    // And a message of that length arriving changes nothing: the window
-    // opened at the width it keeps.
-    window.set_last_message(widest_message().into());
-    assert_eq!(
-        window.get_window_width(),
-        before,
-        "the window grew when a beacon's message arrived"
-    );
-    fits_exactly(&window, "with a beacon's message");
+    // And a message of any of those shapes arriving changes nothing: the
+    // window opened at the width it keeps.
+    for message in widest_messages() {
+        window.set_last_message(message.as_str().into());
+        assert_eq!(
+            window.get_window_width(),
+            before,
+            "the window grew when {message:?} arrived"
+        );
+        fits_exactly(&window, &format!("with {message:?}"));
+    }
+}
+
+/// The widest messages are the widest a beacon can say: the largest version,
+/// every hex digit, and what the panel says before any beacon.
+#[test]
+fn the_widest_messages_are_the_widest_a_beacon_says() {
+    use beacon_example::widest_messages;
+    use tcslib::beacon::NO_BEACON_MESSAGE;
+
+    let messages = widest_messages();
+    assert_eq!(messages.len(), 17);
+    assert!(messages.contains(&NO_BEACON_MESSAGE.to_string()));
+    for digit in "0123456789abcdef".chars() {
+        let digest: String = std::iter::repeat_n(digit, 32).collect();
+        let message = format!("tcspecial v255.255.255 md5 {digest}");
+        assert!(messages.contains(&message), "no {message:?}");
+    }
 }
 
 /// The button is as wide as the longer of its two labels, and not as the

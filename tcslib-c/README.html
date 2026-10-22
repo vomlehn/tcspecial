@@ -275,14 +275,15 @@ break, but it has also not checked the header.</li>
 <li><strong>Fixed-size text.</strong> What the library hands back is
 held in buffers of fixed size, stated in the header:
 <code>TCS_ERROR_BYTES</code> (512) for <code>tcs_last_error()</code>,
-<code>TCS_TEXT_BYTES</code> (256) for what a beacon said and each remark
-and warning, and at most <code>TCS_MAX_REMARKS</code> (8) remarks and as
-many warnings a pass. Text too long is cut short at a character and ends
-“…”; a pass with more to say keeps seven and says how many more there
-were. A SET_NODE carries an attribute of at most
-<code>TCS_ATTRIBUTE_BYTES</code> (64) and a value of at most
-<code>TCS_VALUE_BYTES</code> (256); longer is refused, and not
-sent.</li>
+<code>TCS_TEXT_BYTES</code> (256) for what a beacon said, each remark
+and warning, and why the vehicle refused a SET_NODE
+(<code>tcs_client_reason</code>), and at most
+<code>TCS_MAX_REMARKS</code> (8) remarks and as many warnings a pass.
+Text too long is cut short at a character and ends “…”; a pass with more
+to say keeps seven and says how many more there were. A SET_NODE carries
+an attribute of at most <code>TCS_ATTRIBUTE_BYTES</code> (64) and a
+value of at most <code>TCS_VALUE_BYTES</code> (256); longer is refused,
+and not sent.</li>
 <li><strong>Where it still allocates.</strong> Avoiding dynamic
 allocation is a rule of this repository. This layer allocates nothing of
 its own as a station runs; what remains is said in the source where it

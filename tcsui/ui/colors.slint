@@ -1,0 +1,13 @@
+// The colours every window of these programs is drawn on.
+//
+// One statement of them, as fonts.slint is of the type, which every window
+// reads -- tcsmoc's, tcssim's, tcsgui's, tcsverify's startup window and the
+// beacon example's -- so that the programs look like one set. The Python
+// windows read the same white from python/tcsui/theme.py.
+
+export global Colors {
+    // A window's background: white. Not grey, which the beacon indicator
+    // keeps for nothing heard yet, and not a near-white, so that every
+    // window, Slint or Tk, is the same colour.
+    out property <color> window: #ffffff;
+}

@@ -1,6 +1,7 @@
 import { Button, GroupBox, LineEdit, VerticalBox, HorizontalBox, SpinBox, ScrollView, GridBox } from "std-widgets.slint";
 import { Copyable, CopyButton } from "../../tcsverify/ui/copy.slint";
 import { Fonts } from "../../tcsui/ui/fonts.slint";
+import { Colors } from "../../tcsui/ui/colors.slint";
 // What was found wrong as the program started, shown before this window: the
 // one window tcsmoc and tcssim share, beside tcsverify, whose report it shows.
 export { StartupWindow, StartupLine } from "../../tcsverify/ui/startup.slint";
@@ -382,7 +383,7 @@ export component PanelProbe inherits Window {
 export component MainWindow inherits Window {
     default-font-size: Fonts.window;
     title: "TCSpecial Payload Simulator";
-    background: white;
+    background: Colors.window;
 
     // One row of panels and the chrome, which is the least the window is ever
     // opened at -- a tcspecial configuration of one payload. How much more it

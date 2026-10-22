@@ -4058,7 +4058,7 @@ holds happen to share one, teal, and the other two need not. Which pane a node
 belongs in is said by the family's own hue -- ``family_hue`` -- and a pane's
 job is to be a quiet ground that the other two are not. What a pane is still
 held to is the rest of it: above 82 of lightness, under a chroma of 14, 8
-clear of both link lines, 10 clear of the window's near-white chrome, and
+clear of both link lines, 10 clear of the window's white chrome, and
 light enough that its own family's lightest body keeps three to one against it
 and sits 25 points below it. The contrasts across all fifteen bodies run 3.2
 to 9.4 to one, and the scheme floor for everything a reader must tell apart is

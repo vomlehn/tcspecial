@@ -13,6 +13,7 @@
 import { Button, ScrollView } from "std-widgets.slint";
 import { Copyable, CopyButton } from "copy.slint";
 import { Fonts } from "../../tcsui/ui/fonts.slint";
+import { Colors } from "../../tcsui/ui/colors.slint";
 
 export struct StartupLine {
     // One line of the report, as tcsverify prints it.
@@ -25,7 +26,7 @@ export struct StartupLine {
 export component StartupWindow inherits Window {
     default-font-size: Fonts.window;
     title: root.program;
-    background: #fbfbfa;
+    background: Colors.window;
     min-width: 420px;
     min-height: 180px;
     preferred-width: 640px;

@@ -5,6 +5,7 @@ import { Copyable, CopyButton } from "../../tcsverify/ui/copy.slint";
 import { BeaconPanel } from "../../tcsui/ui/beacon.slint";
 import { PingPanel } from "../../tcsui/ui/ping.slint";
 import { Fonts } from "../../tcsui/ui/fonts.slint";
+import { Colors } from "../../tcsui/ui/colors.slint";
 // What was found wrong as the program started, shown before this window: the
 // one window tcsmoc and tcssim share, beside tcsverify, whose report it shows.
 export { StartupWindow, StartupLine } from "../../tcsverify/ui/startup.slint";
@@ -351,7 +352,7 @@ export component MainWindow inherits Window {
     // opened at -- a tcspecial configuration of one handler. How much more it
     // opens at is Rust's to say: see rows_of_room() in main.rs.
     min-height: 640px;
-    background: white;
+    background: Colors.window;
 
     // Whether this window takes no presses: true while a question in a window
     // of its own is waiting to be answered -- see DiffersWindow below, and
@@ -772,7 +773,7 @@ export component MainWindow inherits Window {
 export component DiffersWindow inherits Window {
     default-font-size: Fonts.window;
     title: "tcsmoc: configurations differ";
-    background: #fbfbfa;
+    background: Colors.window;
     min-width: 420px;
     preferred-width: 560px;
     // In front of the panels until it is answered: the main window takes no
@@ -830,6 +831,7 @@ export component DiffersWindow inherits Window {
 export component PingWindow inherits Window {
     default-font-size: Fonts.window;
     title: "tcsmoc: ping";
+    background: Colors.window;
     in property <string> node: "ping";
     in property <string> sent;
     in property <string> sent-time;

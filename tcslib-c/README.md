@@ -98,8 +98,9 @@ The header alone is also compiled as C99 and as C++11.
   checked the header.
 - **Fixed-size text.** What the library hands back is held in buffers of
   fixed size, stated in the header: `TCS_ERROR_BYTES` (512) for
-  `tcs_last_error()`, `TCS_TEXT_BYTES` (256) for what a beacon said and each
-  remark and warning, and at most `TCS_MAX_REMARKS` (8) remarks and as many
+  `tcs_last_error()`, `TCS_TEXT_BYTES` (256) for what a beacon said, each
+  remark and warning, and why the vehicle refused a SET_NODE
+  (`tcs_client_reason`), and at most `TCS_MAX_REMARKS` (8) remarks and as many
   warnings a pass. Text too long is cut short at a character and ends "...";
   a pass with more to say keeps seven and says how many more there were. A
   SET_NODE carries an attribute of at most `TCS_ATTRIBUTE_BYTES` (64) and a

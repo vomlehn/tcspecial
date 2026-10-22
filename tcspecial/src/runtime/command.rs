@@ -43,6 +43,7 @@
 //! the node is in the middle of. Work that has to happen between stages of a
 //! pass belongs to the pass, and the answer goes out when the work is done.
 
+use std::fmt::Write as _;
 use std::net::{SocketAddr, UdpSocket};
 use std::os::unix::io::AsRawFd;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -58,7 +59,7 @@ use tcslibgs::config_digest::{ConfigDigest, ConfigVersion};
 use tcslibgs::{
     answer_to, came_from, ArmKey, CIConfig, Command, CommandLink, CommandStatus, ConfigTelemetry,
     ConnectTelemetry, HostPort, NodeTelemetry, PingTelemetry, QueryNodeSampleTelemetry,
-    QueryNodeTelemetry, TcsError, TcsResult, Telemetry,
+    QueryNodeTelemetry, Reason, SetNodeTelemetry, TcsError, TcsResult, Telemetry,
 };
 
 use crate::beacon_send::BeaconSend;
@@ -460,8 +461,10 @@ impl Serving {
             }
 
             Command::SetNode(cmd) => {
-                let status = self.set_attribute(cmd.node, cmd.attribute, cmd.value);
-                Telemetry::SetNode(NodeTelemetry::set(sequence, status, cmd.node))
+                let (status, reason) = self.set_attribute(cmd.node, cmd.attribute, cmd.value);
+                Telemetry::SetNode(
+                    SetNodeTelemetry::new(sequence, status, cmd.node).because(reason),
+                )
             }
 
             // The two queries are answered on this thread and hand nothing
@@ -636,22 +639,31 @@ impl Serving {
     /// stopped can be reconfigured before it is started again.
     ///
     /// `InvalidParameter` for an attribute no binding mentions and for a
-    /// value the node will not take. The two are told apart in the log and
-    /// not on the wire: both are the ground asking for something the
-    /// configuration does not allow, and the status an operator acts on is
-    /// the same.
+    /// value the node will not take: both are the ground asking for something
+    /// the configuration does not allow, and the status an operator acts on
+    /// is the same. Which it was is the reason, which the answer carries as
+    /// well as the log, so that the operator is told what to change without
+    /// reading a log aboard.
     ///
-    /// Allocates nothing of its own: the node goes by its shared name, and
-    /// the attribute and the value in the room the SET_NODE was read into.
+    /// Allocates nothing of its own: the node goes by its shared name, the
+    /// attribute and the value in the room the SET_NODE was read into, and
+    /// the reason is written into room the answer holds. What says why a
+    /// node refused is the node's own message, made where it refused.
     fn set_attribute(
         &self,
         node: tcslibgs::NodeId,
         attribute: tcslibgs::Attribute,
         value: tcslibgs::Value,
-    ) -> CommandStatus {
+    ) -> (CommandStatus, Reason) {
         let Some(state) = self.states.at(node) else {
             self.no_such_node(node);
-            return CommandStatus::NotFound;
+            let mut reason = Reason::default();
+            let _ = write!(
+                reason,
+                "there is no node {node} in this configuration, which has {}",
+                self.states.len()
+            );
+            return (CommandStatus::NotFound, reason);
         };
         let name = state.shared_name();
 
@@ -660,10 +672,10 @@ impl Serving {
             attribute,
             value,
         }) {
-            Ok(()) => CommandStatus::Success,
+            Ok(()) => (CommandStatus::Success, Reason::default()),
             Err(why) => {
                 error!("\"{name}\".{attribute} could not be set: {why}");
-                CommandStatus::InvalidParameter
+                (CommandStatus::InvalidParameter, Reason::of(&why))
             }
         }
     }
@@ -1009,6 +1021,7 @@ mod tests {
             Some(Telemetry::SetNode(tm)) => {
                 assert_eq!(tm.header.status, CommandStatus::Success);
                 assert_eq!(tm.node, average, "the answer says which node");
+                assert!(tm.reason.is_empty(), "a SET_NODE done says nothing of why");
             }
             other => panic!("expected a set answer, got {other:?}"),
         }
@@ -1030,6 +1043,12 @@ mod tests {
                     "an attribute no binding mentions"
                 );
                 assert_eq!(tm.node, average);
+                // And why, as the pass said it: the ground is told which word
+                // to change, not only that something was refused.
+                assert_eq!(
+                    tm.reason.as_str(),
+                    "no command binding says the ground may set \"average.address\""
+                );
             }
             other => panic!("expected a set answer, got {other:?}"),
         }
@@ -1047,6 +1066,11 @@ mod tests {
             Some(Telemetry::SetNode(tm)) => {
                 assert_eq!(tm.header.status, CommandStatus::NotFound);
                 assert_eq!(tm.node, nowhere, "the id the command carried");
+                assert!(
+                    tm.reason.as_str().contains("no node #99"),
+                    "the reason names the id: {}",
+                    tm.reason
+                );
             }
             other => panic!("expected a set answer, got {other:?}"),
         }

@@ -23,9 +23,9 @@ use std::time::Duration;
 use tcslibgs::config_digest::{digest_of_file, ConfigVersion};
 use tcslibgs::node::vehicle::ping;
 use tcslibgs::{
-    Beacon, CommandStatus, ConfigTelemetry, ConnectTelemetry, DHSample, NodeCounts, NodeTelemetry,
-    PingTelemetry, QueryNodeSampleTelemetry, QueryNodeTelemetry, RestartArmTelemetry,
-    RestartTelemetry, Telemetry, Timestamp,
+    Beacon, CommandStatus, ConfigTelemetry, ConnectTelemetry, DHSample, NodeCounts, PingTelemetry,
+    QueryNodeSampleTelemetry, QueryNodeTelemetry, Reason, RestartArmTelemetry, RestartTelemetry,
+    SetNodeTelemetry, Telemetry, Timestamp,
 };
 
 fn here() -> PathBuf {
@@ -225,53 +225,57 @@ vehicle:
                         serde_json::from_slice(&buffer[..size]).expect("a command");
                     let seq = command.sequence();
                     answered.push(command.cmd_type());
-                    let answer =
-                        match &command {
-                            tcslibgs::Command::Connect(_) => {
-                                Telemetry::Connect(ConnectTelemetry::new(seq, version, digest))
-                            }
-                            tcslibgs::Command::Ping(_) => {
-                                Telemetry::Ping(PingTelemetry::new(seq, CommandStatus::Success))
-                            }
-                            tcslibgs::Command::QueryNode(cmd) => {
-                                Telemetry::QueryNode(QueryNodeTelemetry::new(
-                                    seq,
-                                    CommandStatus::Success,
-                                    cmd.node,
-                                    true,
-                                    NodeCounts::default(),
-                                ))
-                            }
-                            tcslibgs::Command::SetNode(cmd) => Telemetry::SetNode(
-                                NodeTelemetry::set(seq, CommandStatus::Success, cmd.node),
-                            ),
-                            tcslibgs::Command::QueryNodeSample(cmd) => {
-                                // What it took: "ping", four bytes of a transfer
-                                // of six; and nothing given.
-                                let mut taken = DHSample::new();
-                                taken.time = Some(Timestamp { micros: 1_000_000 });
-                                taken.len = 4;
-                                taken.total = 6;
-                                taken.bytes[..4].copy_from_slice(b"ping");
-                                Telemetry::QueryNodeSample(QueryNodeSampleTelemetry::new(
-                                    seq,
-                                    CommandStatus::Success,
-                                    cmd.node,
-                                    taken,
-                                    DHSample::new(),
-                                ))
-                            }
-                            tcslibgs::Command::Config(_) => {
-                                Telemetry::Config(ConfigTelemetry::new(seq, CommandStatus::Success))
-                            }
-                            tcslibgs::Command::RestartArm(_) => Telemetry::RestartArm(
-                                RestartArmTelemetry::new(seq, CommandStatus::Success),
-                            ),
-                            tcslibgs::Command::Restart(_) => Telemetry::Restart(
-                                RestartTelemetry::new(seq, CommandStatus::Success),
-                            ),
-                            other => panic!("the ground station sent {:?}", other.cmd_type()),
-                        };
+                    let answer = match &command {
+                        tcslibgs::Command::Connect(_) => {
+                            Telemetry::Connect(ConnectTelemetry::new(seq, version, digest))
+                        }
+                        tcslibgs::Command::Ping(_) => {
+                            Telemetry::Ping(PingTelemetry::new(seq, CommandStatus::Success))
+                        }
+                        tcslibgs::Command::QueryNode(cmd) => {
+                            Telemetry::QueryNode(QueryNodeTelemetry::new(
+                                seq,
+                                CommandStatus::Success,
+                                cmd.node,
+                                true,
+                                NodeCounts::default(),
+                            ))
+                        }
+                        // Refused as the vehicle refuses one, with its
+                        // reason: which the ground station prints.
+                        tcslibgs::Command::SetNode(cmd) => Telemetry::SetNode(
+                            SetNodeTelemetry::new(seq, CommandStatus::InvalidParameter, cmd.node)
+                                .because(Reason::of(
+                                    "no command binding says the ground may set \"ping.count\"",
+                                )),
+                        ),
+                        tcslibgs::Command::QueryNodeSample(cmd) => {
+                            // What it took: "ping", four bytes of a transfer
+                            // of six; and nothing given.
+                            let mut taken = DHSample::new();
+                            taken.time = Some(Timestamp { micros: 1_000_000 });
+                            taken.len = 4;
+                            taken.total = 6;
+                            taken.bytes[..4].copy_from_slice(b"ping");
+                            Telemetry::QueryNodeSample(QueryNodeSampleTelemetry::new(
+                                seq,
+                                CommandStatus::Success,
+                                cmd.node,
+                                taken,
+                                DHSample::new(),
+                            ))
+                        }
+                        tcslibgs::Command::Config(_) => {
+                            Telemetry::Config(ConfigTelemetry::new(seq, CommandStatus::Success))
+                        }
+                        tcslibgs::Command::RestartArm(_) => Telemetry::RestartArm(
+                            RestartArmTelemetry::new(seq, CommandStatus::Success),
+                        ),
+                        tcslibgs::Command::Restart(_) => {
+                            Telemetry::Restart(RestartTelemetry::new(seq, CommandStatus::Success))
+                        }
+                        other => panic!("the ground station sent {:?}", other.cmd_type()),
+                    };
                     let data = serde_json::to_vec(&answer).expect("telemetry");
                     link.send_to(&data, from).expect("an answer");
 
@@ -327,7 +331,8 @@ vehicle:
         "connect: agrees".to_string(),
         "ping: answered".to_string(),
         "query ping (node 1): Success, running".to_string(),
-        "set ping count: done".to_string(),
+        "set ping count: refused -- no command binding says the ground may set \"ping.count\""
+            .to_string(),
         "sample ping: took \"ping\" of 6 bytes, gave nothing".to_string(),
         "configure: beacon every 5 s, done".to_string(),
         "restart: armed done, restarted done".to_string(),

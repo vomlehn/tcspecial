@@ -20,7 +20,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 use tcslibgs::{
     ArmKey, BeaconInterval, Command, CommandLink, CommandStatus, ConfigCommand, ConfigDigest,
-    ConfigVersion, ConnectCommand, DHSample, NodeCommand, NodeCounts, NodeId, PingCommand,
+    ConfigVersion, ConnectCommand, DHSample, NodeCommand, NodeCounts, NodeId, PingCommand, Reason,
     RestartArmCommand, RestartCommand, SetNodeCommand, TcsError, TcsResult, Telemetry, Timestamp,
 };
 
@@ -331,18 +331,23 @@ impl TcsClient {
     /// An attribute longer than `ATTRIBUTE_BYTES` or a value longer than
     /// `VALUE_BYTES` is a `TcsError::Command` and is not sent: the vehicle
     /// would refuse it unanswered.
+    ///
+    /// The answer says why where the vehicle refused it -- which attribute no
+    /// binding names, with its spelling where that was what was wrong; what
+    /// the node would not take -- and is empty where it did not: see
+    /// [`tcslibgs::SetNodeTelemetry::reason`].
     pub fn set_node(
         &mut self,
         node: NodeId,
         attribute: &str,
         value: &[u8],
-    ) -> TcsResult<(CommandStatus, NodeId)> {
+    ) -> TcsResult<(CommandStatus, NodeId, Reason)> {
         let seq = self.next_sequence();
         let cmd = Command::SetNode(
             SetNodeCommand::new(seq, node, attribute, value).map_err(TcsError::Command)?,
         );
         match self.send_command(cmd)? {
-            Telemetry::SetNode(tm) => Ok((tm.header.status, tm.node)),
+            Telemetry::SetNode(tm) => Ok((tm.header.status, tm.node, tm.reason)),
             _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
         }
     }

@@ -2253,7 +2253,9 @@ thermostat's setpoint, and the running vehicle applies it: a <tt class="docutils
 naming that node and that attribute is taken on the node command link, the
 value reaches the thermostat between stages of a pass, and the next pass
 decides by it. An attribute no binding mentions is refused, which is the
-point of writing the bindings down.</p>
+point of writing the bindings down, and the refusal says why: tcsmoc shows
+the reason the vehicle sends -- <tt class="docutils literal">no command binding says the ground may set
+<span class="pre">&quot;thermostat.half-band&quot;:</span> it is spelled half_band</tt> -- beside the status.</p>
 <p>The simulator file beside it declares a thermal mass, <tt class="docutils literal">cabin</tt>, and attaches
 the three sensors to it, so that what they report is one temperature rather
 than three streams of noise, which is what a thermal mass is for: see <strong>The

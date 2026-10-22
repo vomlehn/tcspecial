@@ -18,7 +18,8 @@ use tcslib::{TcsClient, UdpConnection};
 use tcslibgs::{
     ArmKey, BeaconInterval, Command, CommandStatus, ConfigDigest, ConfigTelemetry, ConfigVersion,
     ConnectTelemetry, DHSample, NodeCounts, NodeId, NodeTelemetry, PingTelemetry,
-    QueryNodeSampleTelemetry, QueryNodeTelemetry, RestartArmTelemetry, RestartTelemetry, Telemetry,
+    QueryNodeSampleTelemetry, QueryNodeTelemetry, Reason, RestartArmTelemetry, RestartTelemetry,
+    SetNodeTelemetry, Telemetry,
 };
 
 fn stub_sample(first: u8) -> DHSample {
@@ -81,9 +82,15 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
                     CommandStatus::Success,
                     cmd.node,
                 )),
-                Command::SetNode(cmd) => {
-                    Telemetry::SetNode(NodeTelemetry::set(seq, CommandStatus::Success, cmd.node))
+                // A setpoint is taken, and anything else refused as the
+                // vehicle refuses it: with a reason.
+                Command::SetNode(cmd) if cmd.attribute == "setpoint" => {
+                    Telemetry::SetNode(SetNodeTelemetry::new(seq, CommandStatus::Success, cmd.node))
                 }
+                Command::SetNode(cmd) => Telemetry::SetNode(
+                    SetNodeTelemetry::new(seq, CommandStatus::InvalidParameter, cmd.node)
+                        .because(Reason::of("it is spelled half_band")),
+                ),
                 Command::QueryNode(cmd) => Telemetry::QueryNode(QueryNodeTelemetry::new(
                     seq,
                     CommandStatus::Success,
@@ -172,14 +179,26 @@ fn what_a_node_has_moved_comes_back() {
 /// A node's attribute is set by the node's id and the attribute's name.
 #[test]
 fn a_nodes_attribute_is_set_by_id_and_name() {
-    let (addr, stub) = stub_spacecraft(1);
+    let (addr, stub) = stub_spacecraft(2);
     let mut client = client_to(&addr);
 
-    let (status, node) = client
+    let (status, node, reason) = client
         .set_node(NodeId::of(4), "setpoint", b"295.0")
         .expect("an answer");
     assert!(status.is_success());
     assert_eq!(node, NodeId::of(4));
+    assert!(
+        reason.is_empty(),
+        "a SET_NODE done says nothing of why: {reason}"
+    );
+
+    // And one refused says why, so that the operator is told which word to
+    // change.
+    let (status, _, reason) = client
+        .set_node(NodeId::of(4), "half-band", b"1.0")
+        .expect("an answer");
+    assert_eq!(status, CommandStatus::InvalidParameter);
+    assert_eq!(reason.as_str(), "it is spelled half_band");
 
     stub.join().expect("the stand-in answered");
 }

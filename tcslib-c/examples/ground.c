@@ -140,7 +140,10 @@ int main(int argc, char **argv)
         if (tcs_client_set_node(client, node, "count", one, sizeof one, &status) != 0) {
             return fail("set");
         }
-        printf("set %s count: %s\n", node_name, outcome(status));
+        /* Why, where it was refused: the status alone is the same for every
+         * refusal, and the reason is what says which word to change. */
+        printf("set %s count: %s%s%s\n", node_name, outcome(status),
+               *tcs_client_reason(client) ? " -- " : "", tcs_client_reason(client));
 
         tcs_sample taken, given;
         if (tcs_client_query_node_sample(client, node, &status, &taken, &given) != 0) {

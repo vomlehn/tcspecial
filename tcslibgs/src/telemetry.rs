@@ -216,20 +216,172 @@ impl NodeTelemetry {
         Self::of(sequence, TelemetryType::StopNode, status, node)
     }
 
-    /// And to a setting.
-    ///
-    /// The node and not the attribute: the sequence number pairs the answer
-    /// with the command, which carries both, and what the ground shows is the
-    /// name it has from the configuration it read.
-    pub fn set(sequence: u32, status: CommandStatus, node: NodeId) -> Self {
-        Self::of(sequence, TelemetryType::SetNode, status, node)
-    }
-
     fn of(sequence: u32, tm_type: TelemetryType, status: CommandStatus, node: NodeId) -> Self {
         Self {
             header: TelemetryHeader::new(sequence, tm_type, status),
             node,
         }
+    }
+}
+
+/// The answer to a SET_NODE: the status, the node, and why it was refused.
+///
+/// The node and not the attribute: the sequence number pairs the answer with
+/// the command, which carries both, and what the ground shows is the name it
+/// has from the configuration it read.
+///
+/// The reason is what the vehicle's log says of a refusal -- an attribute no
+/// binding names, with its spelling where it was written with hyphens for
+/// underscores; a value the node will not take -- because the status alone
+/// is `InvalidParameter` for every one of them, and an operator who is told
+/// only that has to go and read a log on the vehicle to find out which word
+/// to change. Empty for a SET_NODE that was done.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SetNodeTelemetry {
+    pub header: TelemetryHeader,
+    /// The node the command named, as [`NodeTelemetry::node`].
+    pub node: NodeId,
+    /// Why it was refused, or nothing. Defaulted where it is read, so that an
+    /// answer from a vehicle that sends none still reads, as no reason.
+    #[serde(default)]
+    pub reason: Reason,
+}
+
+impl SetNodeTelemetry {
+    /// The answer, with no reason: see [`SetNodeTelemetry::because`].
+    pub fn new(sequence: u32, status: CommandStatus, node: NodeId) -> Self {
+        Self {
+            header: TelemetryHeader::new(sequence, TelemetryType::SetNode, status),
+            node,
+            reason: Reason::default(),
+        }
+    }
+
+    /// And why it was refused.
+    pub fn because(self, reason: Reason) -> Self {
+        Self { reason, ..self }
+    }
+}
+
+/// The longest reason a refusal carries, in bytes.
+///
+/// Room for what the vehicle says of a refused SET_NODE, which is a sentence
+/// naming the node and the attribute and what to do: one longer is cut, at a
+/// character, and ends `...`. The whole of it is in the vehicle's log.
+pub const REASON_BYTES: usize = 160;
+
+/// Text of at most [`REASON_BYTES`], held in place: why a command was refused.
+///
+/// Held rather than a `String` so that the vehicle makes an answer without
+/// allocating, as it reads a command: a reason is written into one with
+/// `write!`, and what does not fit is cut. A string on the wire.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct Reason {
+    bytes: [u8; REASON_BYTES],
+    len: u8,
+    /// Whether it ends in the mark, after which nothing more is written.
+    cut: bool,
+}
+
+impl Default for Reason {
+    fn default() -> Reason {
+        Reason {
+            bytes: [0; REASON_BYTES],
+            len: 0,
+            cut: false,
+        }
+    }
+}
+
+impl Reason {
+    /// This text, cut to fit where it does not: see [`REASON_BYTES`].
+    pub fn of(text: &str) -> Reason {
+        let mut reason = Reason::default();
+        let _ = std::fmt::Write::write_str(&mut reason, text);
+        reason
+    }
+
+    pub fn as_str(&self) -> &str {
+        // Written only whole characters at a time: see `write_str`.
+        std::str::from_utf8(&self.bytes[..usize::from(self.len)]).unwrap_or_default()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+}
+
+/// Written into with `write!`, which is how the vehicle makes one: whatever
+/// does not fit is cut at a character, and the reason ends `...` so that a
+/// reader knows it was. Never an error, so a reason being long is never what
+/// keeps an answer from going.
+impl std::fmt::Write for Reason {
+    fn write_str(&mut self, text: &str) -> std::fmt::Result {
+        const MARK: &str = "...";
+        if self.cut {
+            return Ok(());
+        }
+        let len = usize::from(self.len);
+        if len + text.len() <= REASON_BYTES {
+            self.bytes[len..len + text.len()].copy_from_slice(text.as_bytes());
+            self.len = (len + text.len()) as u8;
+            return Ok(());
+        }
+
+        // What is held and as much of this as leaves room for the mark,
+        // ending on a character either way: where what is held already
+        // reaches past that, it is what gives way.
+        let keep = REASON_BYTES - MARK.len();
+        let mut end = len.min(keep);
+        while !self.as_str().is_char_boundary(end) {
+            end -= 1;
+        }
+        let mut take = (keep - end).min(text.len());
+        while !text.is_char_boundary(take) {
+            take -= 1;
+        }
+        self.bytes[end..end + take].copy_from_slice(&text.as_bytes()[..take]);
+        self.bytes[end + take..end + take + MARK.len()].copy_from_slice(MARK.as_bytes());
+        self.len = (end + take + MARK.len()) as u8;
+        self.cut = true;
+        Ok(())
+    }
+}
+
+impl std::fmt::Debug for Reason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self.as_str(), f)
+    }
+}
+
+impl std::fmt::Display for Reason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl Serialize for Reason {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+/// Read as it is written: a reason longer than this end holds is cut, as the
+/// vehicle would have cut it, rather than refused -- a reason is something to
+/// show, and an answer refused for its length would show nothing.
+impl<'de> Deserialize<'de> for Reason {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct Text;
+        impl serde::de::Visitor<'_> for Text {
+            type Value = Reason;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(f, "a reason, as text")
+            }
+            fn visit_str<E: serde::de::Error>(self, text: &str) -> Result<Reason, E> {
+                Ok(Reason::of(text))
+            }
+        }
+        deserializer.deserialize_str(Text)
     }
 }
 
@@ -354,7 +506,9 @@ pub fn answer_to(command: &crate::commands::Command, status: CommandStatus) -> T
         Command::StopNode(cmd) => {
             Telemetry::StopNode(NodeTelemetry::stopped(sequence, status, cmd.node))
         }
-        Command::SetNode(cmd) => Telemetry::SetNode(NodeTelemetry::set(sequence, status, cmd.node)),
+        Command::SetNode(cmd) => {
+            Telemetry::SetNode(SetNodeTelemetry::new(sequence, status, cmd.node))
+        }
         // A refused query measured nothing, so it carries no counts and no
         // samples: the status is the whole of what it says.
         Command::QueryNode(cmd) => {
@@ -380,7 +534,7 @@ pub enum Telemetry {
     Config(ConfigTelemetry),
     StartNode(NodeTelemetry),
     StopNode(NodeTelemetry),
-    SetNode(NodeTelemetry),
+    SetNode(SetNodeTelemetry),
     QueryNode(QueryNodeTelemetry),
     QueryNodeSample(QueryNodeSampleTelemetry),
 }
@@ -393,9 +547,8 @@ impl Telemetry {
             Telemetry::RestartArm(tm) => tm.header.sequence,
             Telemetry::Restart(tm) => tm.header.sequence,
             Telemetry::Config(tm) => tm.header.sequence,
-            Telemetry::StartNode(tm) | Telemetry::StopNode(tm) | Telemetry::SetNode(tm) => {
-                tm.header.sequence
-            }
+            Telemetry::StartNode(tm) | Telemetry::StopNode(tm) => tm.header.sequence,
+            Telemetry::SetNode(tm) => tm.header.sequence,
             Telemetry::QueryNode(tm) => tm.header.sequence,
             Telemetry::QueryNodeSample(tm) => tm.header.sequence,
         }
@@ -408,9 +561,8 @@ impl Telemetry {
             Telemetry::RestartArm(tm) => tm.header.tm_type,
             Telemetry::Restart(tm) => tm.header.tm_type,
             Telemetry::Config(tm) => tm.header.tm_type,
-            Telemetry::StartNode(tm) | Telemetry::StopNode(tm) | Telemetry::SetNode(tm) => {
-                tm.header.tm_type
-            }
+            Telemetry::StartNode(tm) | Telemetry::StopNode(tm) => tm.header.tm_type,
+            Telemetry::SetNode(tm) => tm.header.tm_type,
             Telemetry::QueryNode(tm) => tm.header.tm_type,
             Telemetry::QueryNodeSample(tm) => tm.header.tm_type,
         }
@@ -423,9 +575,8 @@ impl Telemetry {
             Telemetry::RestartArm(tm) => tm.header.status,
             Telemetry::Restart(tm) => tm.header.status,
             Telemetry::Config(tm) => tm.header.status,
-            Telemetry::StartNode(tm) | Telemetry::StopNode(tm) | Telemetry::SetNode(tm) => {
-                tm.header.status
-            }
+            Telemetry::StartNode(tm) | Telemetry::StopNode(tm) => tm.header.status,
+            Telemetry::SetNode(tm) => tm.header.status,
             Telemetry::QueryNode(tm) => tm.header.status,
             Telemetry::QueryNodeSample(tm) => tm.header.status,
         }
@@ -441,9 +592,8 @@ impl Telemetry {
             Telemetry::RestartArm(tm) => tm.header.timestamp,
             Telemetry::Restart(tm) => tm.header.timestamp,
             Telemetry::Config(tm) => tm.header.timestamp,
-            Telemetry::StartNode(tm) | Telemetry::StopNode(tm) | Telemetry::SetNode(tm) => {
-                tm.header.timestamp
-            }
+            Telemetry::StartNode(tm) | Telemetry::StopNode(tm) => tm.header.timestamp,
+            Telemetry::SetNode(tm) => tm.header.timestamp,
             Telemetry::QueryNode(tm) => tm.header.timestamp,
             Telemetry::QueryNodeSample(tm) => tm.header.timestamp,
         }
@@ -453,6 +603,63 @@ impl Telemetry {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A reason is kept whole where it fits, and cut at a character where it
+    /// does not, ending in a mark that says so -- whether it arrives in one
+    /// piece or in several, as `write!` hands it over.
+    #[test]
+    fn a_reason_is_cut_to_fit_at_a_character_and_says_so() {
+        use std::fmt::Write;
+
+        assert_eq!(
+            Reason::of("no binding names it").as_str(),
+            "no binding names it"
+        );
+        assert!(Reason::default().is_empty());
+
+        let long = "x".repeat(REASON_BYTES + 40);
+        let cut = Reason::of(&long);
+        assert_eq!(cut.as_str().len(), REASON_BYTES);
+        assert!(cut.as_str().ends_with("..."), "{cut}");
+
+        // A character of more than one byte where the cut falls is left out
+        // whole rather than split.
+        let wide = format!("{}é and more", "x".repeat(REASON_BYTES - 4));
+        let cut = Reason::of(&wide);
+        assert!(cut.as_str().len() <= REASON_BYTES);
+        assert!(cut.as_str().ends_with("..."), "{cut}");
+
+        // In pieces: what was held gives way to the mark, and nothing is
+        // written after it.
+        let mut pieces = Reason::default();
+        write!(pieces, "{}", "y".repeat(REASON_BYTES - 1)).unwrap();
+        write!(pieces, "zz").unwrap();
+        write!(pieces, "more").unwrap();
+        assert_eq!(pieces.as_str().len(), REASON_BYTES);
+        assert!(pieces.as_str().ends_with("y..."), "{pieces}");
+    }
+
+    /// A SET_NODE's answer carries its reason as text, and one with none
+    /// reads -- an answer from a vehicle that sends no reason included.
+    #[test]
+    fn a_set_node_answer_carries_its_reason() {
+        let refused = Telemetry::SetNode(
+            SetNodeTelemetry::new(7, CommandStatus::InvalidParameter, NodeId::of(2))
+                .because(Reason::of("it is spelled half_band")),
+        );
+        let json = serde_json::to_string(&refused).unwrap();
+        assert!(
+            json.contains("\"reason\":\"it is spelled half_band\""),
+            "{json}"
+        );
+        assert_eq!(serde_json::from_str::<Telemetry>(&json).unwrap(), refused);
+
+        let without = json.replace(",\"reason\":\"it is spelled half_band\"", "");
+        match serde_json::from_str::<Telemetry>(&without).unwrap() {
+            Telemetry::SetNode(tm) => assert!(tm.reason.is_empty()),
+            other => panic!("{other:?}"),
+        }
+    }
 
     #[test]
     fn test_telemetry_type_conversion() {
@@ -496,7 +703,7 @@ mod tests {
                 CommandStatus::NotFound,
                 NodeId::of(99),
             )),
-            Telemetry::SetNode(NodeTelemetry::set(
+            Telemetry::SetNode(SetNodeTelemetry::new(
                 13,
                 CommandStatus::Success,
                 NodeId::of(4),

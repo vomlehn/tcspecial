@@ -309,7 +309,7 @@ class PanelTest(unittest.TestCase):
         # tcsui::palette, byte for byte.
         self.assertEqual(palette.UNKNOWN, "#c4c4c4")
         self.assertEqual(palette.OFF, "#ffffff")
-        self.assertEqual(palette.WELL, "#00ff00")
+        self.assertEqual(palette.WELL, "#22c55e")
         self.assertEqual(palette.WATCH, "#ffe100")
         self.assertEqual(palette.WRONG, "#ff0000")
 

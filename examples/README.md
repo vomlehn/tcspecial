@@ -116,10 +116,13 @@ in XTCE, in `tcslibgs/xtce/beacon.xml`; tcspecial packs every beacon and
 `tcslibgs::Beacon`, and this example's test packs the beacon it sends the same
 way. tcs-xtce itself is in `vendor/tcs-xtce`.
 
-Beside the indicator, between it and its `Status:` label, is the stage the
-indicator is at, in a word: `Unheard` before any beacon has arrived, `Heard`
-while beacons are arriving, `Aging` once several are missing, and `Waiting`
-once nothing is being heard. It changes as the stage does.
+After the indicator, on its `Status:` row, is the stage the indicator is at,
+in a word: `Unheard` before any beacon has arrived, `Heard` while beacons are
+arriving, `Aging` once several are missing, and `Waiting` once nothing is
+being heard. It changes as the stage does.
+
+The window is white, as the ping example's is, and its button is drawn the
+way that window draws its own.
 
 The button starts tcspecial on the same configuration and stops it, so that
 the indicator can be watched coming on with the first beacon and going out

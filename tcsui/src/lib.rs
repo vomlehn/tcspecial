@@ -53,8 +53,13 @@ pub mod palette {
     }
 
     /// All is well: the spacecraft is being heard from.
+    ///
+    /// A deeper green, `#22c55e`, rather than pure green, which is harsh on a
+    /// white window and so nearly as light as white -- 1.37 to one -- that its
+    /// blink was faint. This is 2.28 to one, so the blink is plain, and still
+    /// less than red's, which is to be acted on.
     pub fn well() -> Color {
-        Color::from_rgb_u8(0, 255, 0)
+        Color::from_rgb_u8(0x22, 0xc5, 0x5e)
     }
 
     /// Worth looking at.
@@ -66,8 +71,8 @@ pub mod palette {
     /// being the hardest to see. This is 1.31 to one, enough for the blink to
     /// show, and is still read as yellow rather than amber: a yellow with
     /// more red in it, which would blink more plainly, was read as on its way
-    /// to orange, and so to something nearer red. The price is a blink a
-    /// little less plain than green's, at 1.37.
+    /// to orange, and so to something nearer red. The price is a blink less
+    /// plain than green's, at 2.28.
     pub fn watch() -> Color {
         Color::from_rgb_u8(255, 225, 0)
     }

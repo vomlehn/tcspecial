@@ -63,7 +63,7 @@
   <!-- Its beacon panel, drawn as it looks -->
   <rect class="socket" x="656" y="134" width="203" height="40" rx="6"/>
   <text class="label" x="668" y="159">Beacon:</text>
-  <circle class="indicator" cx="728" cy="155" r="7" fill="#00ff00"/>
+  <circle class="indicator" cx="728" cy="155" r="7" fill="#22c55e"/>
   <text class="detail" x="744" y="159">127.0.0.1:7510</text>
   <!-- Its ping panel -->
   <rect class="socket" x="656" y="184" width="203" height="122" rx="6"/>

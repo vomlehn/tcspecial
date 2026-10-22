@@ -2045,7 +2045,7 @@ command link. That is the point of their being apart: what a beacon means is
 one thing wherever it is shown, and an operator who has read one window has
 read the other.
 
-Between the panel's ``Status:`` label and its indicator is the stage the
+After the indicator, on the panel's ``Status:`` row, is the stage the
 indicator is at, in a word -- Unheard, Heard, Aging or Waiting, as the table
 under `Beaconing`_ gives them -- which changes as the stage does.
 
@@ -2102,13 +2102,17 @@ those clocks are, and either may come out negative; their sum is the round
 trip whatever the offset, which is how to tell a clock that is out from a link
 that is slow.
 
-The window is in two boxes, ``Beacon`` and one titled with the node being
-pinged. In the second, ``Sent`` and ``Received`` each show a message and its
-time on one row, and ``Times`` shows the round trip large with the two one-way
-times smaller beneath it. Before there is anything to show, each field shows
-the shape of what will be there -- ``<none>``, ``--:--:--.---------``,
-``--.------ ms`` -- as the beacon box does. tcsmoc's ping window is the same
-box. ``Send ping`` is the default button: Enter or Space presses it.
+The window is in two boxes on white, ``Beacon`` and one titled with the node
+being pinged, each with a flat border. Both are laid out alike: a label on the
+left of each row and every value starting at one place after the labels. In
+the second, ``Sent:`` and ``Received:`` each show a message and its time on one
+row, and ``Round trip:``, ``MOC to tcspecial:`` and ``tcspecial to MOC:`` the
+three times, with a line about the times under them and the ``Send ping``
+button centred at the bottom. Every field and button is in 12-point plain
+type. Before there is anything to show, each field shows the shape of what
+will be there -- ``<none>``, ``--:--:--.---------``, ``--.------ ms`` -- as the
+beacon box does. tcsmoc's ping window shows the same rows, laid out as its
+own. ``Send ping`` is the default button: Enter or Space presses it.
 
 Pressing ``Send ping`` clears the time received and the three
 times until that ping's own answer arrives -- an answer is matched to its ping

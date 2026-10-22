@@ -63,7 +63,7 @@
   <!-- The panel it shows, drawn as it looks -->
   <rect class="socket" x="676" y="170" width="183" height="46" rx="6"/>
   <text class="label" x="688" y="190">Beacon:</text>
-  <circle class="indicator" cx="748" cy="185" r="7" fill="#00ff00"/>
+  <circle class="indicator" cx="748" cy="185" r="7" fill="#22c55e"/>
   <text class="detail" x="688" y="208">last rcvd, last msg</text>
 
   <!-- Links -->

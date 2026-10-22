@@ -21,7 +21,7 @@ generator here on it to write `tcslibgs/src/beacon_packet.rs` and
 | `generator/` | `tcs_xtce`, the compiler, which runs as `python3 -m tcs_xtce` because a Python module's name cannot hold a hyphen, and the two packages it is built from: `xtcepkt` and `xtcegen` | `make beacon-packet`. It reads XTCE with `python/xtce/`. |
 
 Copied as they are, with nothing changed. To refresh the copy, copy those
-directories again from a tcs-xtce checkout (`rust/` without its `tests/` or
+directories again from a tcs-xtce checkout (`rust/` without its `tests/`, `examples/` or
 `target/`), leaving out `__pycache__`, then run `make beacon-packet` in
 `tcslibgs/` and `cargo test --workspace`.
 

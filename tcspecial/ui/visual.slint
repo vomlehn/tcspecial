@@ -1,0 +1,91 @@
+// The visual window: a running tcspecial's graph, drawn as tcsgui draws the
+// configuration, with each link lit as data crosses it.
+//
+// Built only into a tcspecial compiled with the `visual` feature, which never
+// flies. Everything on the canvas is tcsdiagram's -- the node shapes, the
+// link lines and the sheet they are drawn on -- so the drawing is the
+// editor's, and nothing here may be pressed: the window shows what the
+// vehicle is doing and changes none of it. What the window manager gives a
+// window, raising, lowering and closing, it keeps, and closing it stops
+// tcspecial.
+import { ScrollView } from "std-widgets.slint";
+import { Colors } from "../../tcsui/ui/colors.slint";
+import { Fonts } from "../../tcsui/ui/fonts.slint";
+import { Session, NodeView, LinkView, NodeShape, LinkLine, SheetGround } from "../../tcsdiagram/ui/diagram.slint";
+
+// Exported so that the Rust can say this session changes nothing, which is
+// what takes the press off every terminal.
+export { Session, NodeView, LinkView }
+
+export component VisualWindow inherits Window {
+    default-font-size: Fonts.window;
+
+    // The configuration being flown, for the title.
+    in property <string> configuration;
+
+    in property <[NodeView]> nodes;
+    in property <[LinkView]> links;
+
+    // The sheet and its panes, in sheet pixels: see tcsdiagram::pane.
+    in property <length> working-width;
+    in property <length> working-height;
+    in property <length> payload-divider;
+    in property <length> vehicle-divider;
+    in property <color> payload-ground;
+    in property <color> vehicle-ground;
+    in property <color> moc-ground;
+
+    // Said in the title as well as in the manual, because a window that looks
+    // like the editor and is not one should say what it is where it is seen.
+    title: "tcspecial " + configuration + " -- visual, not for flight";
+    preferred-width: root.working-width + 24px;
+    preferred-height: 720px;
+    background: Colors.window;
+
+    sheet := ScrollView {
+        width: 100%;
+        height: 100%;
+        content-width: root.working-width;
+        content-height: root.working-height;
+
+        canvas := Rectangle {
+            width: root.working-width;
+            height: root.working-height;
+            background: white;
+            border-width: 1px;
+            border-color: #d8d8d4;
+
+            SheetGround {
+                working-width: root.working-width;
+                payload-divider: root.payload-divider;
+                vehicle-divider: root.vehicle-divider;
+                payload-ground: root.payload-ground;
+                vehicle-ground: root.vehicle-ground;
+                moc-ground: root.moc-ground;
+            }
+
+            // The dividers, as lines. The editor's can be dragged; these are
+            // where the editor's are, and stay there.
+            Rectangle {
+                x: root.payload-divider;
+                width: 1px;
+                height: 100%;
+                background: #cbcdd1;
+            }
+            Rectangle {
+                x: root.vehicle-divider;
+                width: 1px;
+                height: 100%;
+                background: #cbcdd1;
+            }
+
+            // Links under nodes, as the editor draws them.
+            for l in links: LinkLine {
+                link: l;
+            }
+            for n in nodes: NodeShape {
+                node: n;
+            }
+        }
+    }
+}

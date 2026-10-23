@@ -7,6 +7,16 @@
 //! worse rather than information, for a program that starts tcspecial to
 //! show something else. What stops a start is said either way.
 //!
+//! `--visual` opens a window showing the graph as tcsgui draws it, each link
+//! lit as data crosses it, in a tcspecial built with the `visual` feature;
+//! one built without it says so and exits. Never in flight: see
+//! `tcspecial::visual`. It is refused under `--simulate=none`, the flight
+//! setting and the one a run without `--simulate` gets.
+//!
+//! `--simulate=<mode>` is the simulation mode, `none`, `some` or `all`: see
+//! `tcslibgs::simulate`. It is read and checked here; what it requires of the
+//! payloads is specified in `docs/design.rst` and not yet enforced.
+//!
 //! `--types` prints the payload types this build contains, separated by
 //! commas, and exits: what `tcsverify --types=` takes, so that a
 //! configuration can be checked on the ground against the binary that will
@@ -15,6 +25,8 @@
 use std::env;
 use std::process;
 
+#[cfg(feature = "visual")]
+use log::warn;
 use log::{debug, error, trace};
 use tcslibgs::config::{payload_path_from_args, PAYLOAD_CONFIG_PATH_VAR};
 use tcspecial::runtime;
@@ -33,10 +45,47 @@ fn main() {
         return;
     }
 
-    // The flag that changes how it runs, taken out before the configuration
-    // is read from what is left, so that it may come before or after the file.
+    // The flags that change how it runs, taken out before the configuration
+    // is read from what is left, so that they may come before or after the
+    // file.
     let (quiet, args): (Vec<String>, Vec<String>) =
         env::args().partition(|arg| arg == "-q" || arg == "--quiet");
+    let (visual, args): (Vec<String>, Vec<String>) =
+        args.into_iter().partition(|arg| arg == "--visual");
+    let visual = !visual.is_empty();
+    let (simulate, args) = match tcslibgs::simulate::take_mode(args) {
+        Ok(taken) => taken,
+        Err(e) => {
+            eprintln!("tcspecial: {e}");
+            process::exit(1);
+        }
+    };
+
+    // A window asked of a run in the flight setting is refused, whatever the
+    // build, before anything is read or opened. The flight setting is what a
+    // run that leaves --simulate out gets, so a window there would be a
+    // window opened in flight, and a run with real hardware and nothing
+    // standing in is either flight or a mistake about which run this is.
+    // First, so that what a flight launch meets does not depend on the build.
+    if visual && simulate.is_flight() {
+        eprintln!(
+            "tcspecial: --visual is for a run with stand-ins, and this one is \
+             --simulate={simulate}, the flight setting: give --simulate=some or \
+             --simulate=all with it"
+        );
+        process::exit(1);
+    }
+    // A window asked of a build that has none is refused at once, before
+    // anything is read or opened: a vehicle started without the window that
+    // was asked for is not what was asked for.
+    #[cfg(not(feature = "visual"))]
+    if visual {
+        eprintln!(
+            "tcspecial: --visual is only in a tcspecial built with the visual feature, \
+             which this one was not: build it with --features visual"
+        );
+        process::exit(1);
+    }
     let quiet = !quiet.is_empty();
     if quiet {
         runtime::start::be_quiet();
@@ -50,6 +99,14 @@ fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(level)).init();
 
     trace!("main: entered");
+
+    // A build with a window in it is never one to fly, and says so every
+    // time it starts, window or not: a warning, so that quiet says it too.
+    #[cfg(feature = "visual")]
+    warn!(
+        "this tcspecial was built with the visual feature and must not fly: \
+         build the flight software without it"
+    );
 
     debug!("starting");
 
@@ -121,5 +178,12 @@ fn main() {
     // The configuration is a graph, which is the only thing it can be: see
     // `runtime::start`. A file that is not one is refused above, by the same
     // checks tcsverify runs, so by here there is nothing to choose between.
+    //
+    // With the window, where one was asked for: the vehicle on a thread of
+    // its own beside it, and each stopping the other. See tcspecial::visual.
+    #[cfg(feature = "visual")]
+    if visual {
+        process::exit(tcspecial::visual::run(&payload_path));
+    }
     process::exit(runtime::start::run_or_report(&payload_path));
 }

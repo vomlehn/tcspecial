@@ -346,6 +346,16 @@ pub fn asked_to_stop() -> bool {
     STOPPING.load(Ordering::Relaxed)
 }
 
+/// Stop, as a signal stops the vehicle: the pass finished, the links closed,
+/// the log flushed.
+///
+/// For the visual window, whose close box stops the tcspecial it shows. The
+/// same flag an interrupt sets, so a window closed is a vehicle stopped the
+/// way a person at the console would have stopped it.
+pub fn stop_as_signalled() {
+    STOPPING.store(true, Ordering::Relaxed);
+}
+
 /// Stop, as a signal stops the vehicle, and then run again.
 ///
 /// What an armed RESTART asks for. The vehicle stops the way it always does

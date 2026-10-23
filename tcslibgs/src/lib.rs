@@ -36,6 +36,8 @@ pub mod protocol;
 /// configuration language read by two programs cannot live inside one of
 /// them.
 pub mod sim_config;
+/// The simulation mode, `--simulate`, as tcspecial, tcssim and tcsmoc take it.
+pub mod simulate;
 pub mod telemetry;
 pub mod trigger;
 pub mod types;

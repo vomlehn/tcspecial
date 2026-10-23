@@ -25,6 +25,13 @@ env_logger = "0.10"
 nix = { version = "0.27", features = ["poll", "fs"] }
 socket2 = "0.6.2"
 tcslog = "0.3.1"
+# For the visual window only: see the `visual` feature.
+slint = { version = "1.18", optional = true }
+tcsdiagram = { path = "../tcsdiagram", optional = true }
+
+[build-dependencies]
+# Compiles the visual window's markup, and only for a build that has it.
+slint-build = { version = "1.18", optional = true }
 
 # Which payload types this tcspecial contains, each named as a configuration
 # writes the type. Every one by default, so that a workspace build and its
@@ -52,6 +59,11 @@ default = [
     "hdlc",
     "raw",
 ]
+# The visual window, `tcspecial --visual`: the graph drawn as tcsgui draws it,
+# each link lit as data crosses it. Not a default and never in a build that
+# flies -- it brings a window toolkit into the flight software -- so a
+# tcspecial without it says so when it is asked for one. See src/visual.
+visual = ["dep:slint", "dep:slint-build", "dep:tcsdiagram"]
 device-file = []
 serial = []
 i2c = []

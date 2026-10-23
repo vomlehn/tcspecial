@@ -1168,4 +1168,61 @@ mod tests {
         assert!(!described.is_empty());
         assert_eq!(trouble, Vec::<String>::new());
     }
+
+    /// The compute fields are every computation's own terms.
+    ///
+    /// Here rather than beside the table in tcsdiagram's style.rs, because the
+    /// computations are read from this editor's description tree.
+    ///
+    /// The window asks a node of a described kind for what its description
+    /// lists -- a mean for a mean's attributes -- and falls back to this table
+    /// for a type the tree does not describe. So the table has to hold every
+    /// term any computation takes, or a compute node reached that way has
+    /// nowhere to type one: a hysteresis had nowhere to type its setpoint,
+    /// which is what this test was written for.
+    ///
+    /// The computations are read from the tree, so a fifth one arriving with
+    /// its own terms fails here until they are offered.
+    #[test]
+    fn the_compute_fields_are_every_computations_terms() {
+        let tree = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("share/nodes");
+        let (described, trouble) = read_tree(&tree);
+        assert!(trouble.is_empty(), "{trouble:?}");
+
+        let offered = tcsdiagram::style::NodeType::Compute.attributes();
+        let mut asked = 0;
+        for one in described.iter().filter(|one| one.node_type == "compute") {
+            let function = one
+                .sets
+                .get("function")
+                .unwrap_or_else(|| panic!("{}: a computation sets its function", one.node));
+            let terms = tcslibgs::node::vehicle::compute::attributes_of(function)
+                .unwrap_or_else(|| panic!("{function} is not a computation"));
+            for term in terms {
+                assert!(
+                    offered.iter().any(|(name, _)| name == term),
+                    "a {function} takes \"{term}\" and the compute fields do not offer it"
+                );
+                asked += 1;
+            }
+        }
+        assert!(asked > 4, "no computation was asked about");
+
+        // And nothing is offered that no computation takes: a field nobody
+        // can use is a field somebody fills in and wonders about.
+        let functions: Vec<&String> = described
+            .iter()
+            .filter(|one| one.node_type == "compute")
+            .filter_map(|one| one.sets.get("function"))
+            .collect();
+        for (name, _) in offered {
+            assert!(
+                functions.iter().any(|function| {
+                    tcslibgs::node::vehicle::compute::attributes_of(function)
+                        .is_some_and(|terms| terms.contains(name))
+                }),
+                "\"{name}\" is offered and no computation takes it"
+            );
+        }
+    }
 }

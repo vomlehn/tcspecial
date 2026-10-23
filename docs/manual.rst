@@ -3141,6 +3141,35 @@ with a node of a type the build lacks is refused before anything is opened:
 ``tcsverify --types=`` asks the same question on the ground, without the
 vehicle; see `Checking a set without running it`_.
 
+Watching tcspecial work
+-----------------------
+
+A tcspecial built with the ``visual`` feature can show what it is doing. Never
+build a tcspecial that flies this way: the feature is for a vehicle on a desk.
+
+.. code-block:: console
+
+   $ cargo build -p tcspecial --features visual
+   $ target/debug/tcspecial --visual --simulate=all examples/simple-app/simple-app.yaml
+
+The window draws the configuration as tcsgui does -- the three working panes,
+every node where the editor puts it, every link along its route -- and lights
+a link each time data is sent over it: a wide line, a shade lighter than the
+link's own colour, appears under it and goes a quarter of a second later. A
+link carrying a reading every second blinks once a second.
+
+Nothing in the window can be pressed. Close it to stop tcspecial, which stops
+as it does on an interrupt; if tcspecial stops first, the window closes.
+
+The window is for a run with stand-ins, so ``--visual`` wants
+``--simulate=some`` or ``--simulate=all`` beside it. Under
+``--simulate=none``, which is the flight setting and what a run without
+``--simulate`` gets, it is refused before anything is read: a window there
+would be a window opened in flight.
+
+A tcspecial built without the feature refuses ``--visual``, saying how to
+build one that has it.
+
 Testing
 =======
 Testing is done with two programs, and a third that checks the files they
@@ -3703,13 +3732,15 @@ that satisfies both.
    * - `slint <https://crates.io/crates/slint>`__
      - 1.3, 1.18
      - `1.18.1 <https://docs.rs/slint/1.18.1>`__
-     - tcsgui, tcsmoc, tcssim, tcsui, examples/beacon
+     - tcsgui, tcsmoc, tcssim, tcsui, examples/beacon, and tcspecial built
+       with ``visual``
      - The toolkit every window is drawn with.
      - `repository <https://github.com/slint-ui/slint>`__
    * - `slint-build <https://crates.io/crates/slint-build>`__
      - 1.3, 1.18
      - `1.18.1 <https://docs.rs/slint-build/1.18.1>`__
-     - tcsgui, tcsmoc, tcssim, examples/beacon (build scripts)
+     - tcsgui, tcsmoc, tcssim, examples/beacon, and tcspecial built with
+       ``visual`` (build scripts)
      - Compiles the ``.slint`` files that describe the windows.
      - `repository <https://github.com/slint-ui/slint>`__
    * - `socket2 <https://crates.io/crates/socket2>`__

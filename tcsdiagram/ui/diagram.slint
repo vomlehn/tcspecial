@@ -1,0 +1,1009 @@
+// How a configuration is drawn: one node, one link line, and the sheet they
+// are drawn on, with the globals and structs those take.
+//
+// Shared by the editor, tcsgui, and tcspecial's visual window, which draws a
+// running vehicle's graph as the editor draws the configuration. Each program
+// compiles this into its own build -- a Slint file is markup, imported by
+// path -- and fills these structs from tcsdiagram's NodeLook and LinkLook,
+// which hold every path, size and colour drawn here: arithmetic in a layout
+// language is hard to read and impossible to test.
+import { Fonts } from "../../tcsui/ui/fonts.slint";
+
+// Whether this session may change the configuration: false for one started
+// with `--read-only`, which shows everything and changes nothing. Set from
+// Rust on every window as it is made -- see `session!` in main.rs -- and read
+// by every control that would make an edit, which is greyed rather than
+// hidden: a session started to look should look like the editor, with what
+// it cannot do in its place and plainly not to be done.
+//
+// The greying is the window's half. The editor's is that it takes no edit
+// and writes no file in such a session, whatever asks: see
+// Editor::set_read_only.
+export global Session {
+    in property <bool> read-only: false;
+}
+
+// The two scales, stated once.
+//
+// Every padding, gap and text size in this window comes from here. They were
+// literals before -- 4, 6, 8 and 10 pixels of padding, six different text
+// sizes -- each chosen when the piece it was in got written, which is how a
+// window comes to look assembled rather than designed. A scale also answers
+// the question a literal provokes: "why is this one different" has an answer
+// when the answer is "it is the next step up".
+export global Space {
+    // Four steps, doubling. Enough for every gap this window needs and few
+    // enough to be remembered.
+    out property <length> tight: 4px;
+    out property <length> step: 8px;
+    out property <length> wide: 16px;
+    out property <length> room: 24px;
+}
+
+export global Type {
+    // The window's sizes. The per-node label sizes are not from here -- they
+    // are a channel for telling node types apart and live in style.rs -- but
+    // everything the window says in its own voice is.
+    //
+    // Small, body and strong are all the one size every window is set in,
+    // tcsui's Fonts.window: nothing a window says is smaller than that. They
+    // are kept as three names because they still say three things -- strong
+    // is set bold -- and a title is larger, which is how it is a title.
+    out property <length> small: Fonts.window;
+    out property <length> body: Fonts.window;
+    out property <length> strong: Fonts.window;
+    out property <length> title: 18px;
+
+    // And the two weights a system face is sure to have.
+    out property <int> regular: 400;
+    out property <int> bold: 700;
+}
+
+// What a node looks like on the canvas, and the rules the looks obey.
+//
+// Two rules, and both are enforced in Rust as well -- see style.rs, whose
+// tests fail if either is broken:
+//
+//   * nothing is told apart by colour alone. Every node type differs from
+//     every other in at least two of outline, the line around it, border
+//     width and size,
+//     so a reader who sees no colour still sees distinguishable shapes.
+//   * red means something is wrong. No type, no selection and no link is red.
+//
+// Everything here is drawn from Slint's own primitives: a Rectangle with
+// square corners, one with a border-radius, one with a radius of half its
+// width for a circle, and Rectangles a pixel or two wide for lines. No images
+// and no icon font, so nothing can fail to load.
+
+// One terminal of a node: whether this type has it, and where it is drawn.
+//
+// The geometry is computed in Rust -- see style::terminal_at -- for the reason
+// the link routes are: arithmetic in a layout language is hard to read and
+// impossible to test.
+export struct TerminalView {
+    shown: bool,
+    x: length,
+    y: length,
+    // Whether the arrow points right, which is to say towards the payloads,
+    // and so which arrow is drawn. See style::Corner::rightward.
+    rightward: bool,
+}
+
+export struct NodeView {
+    name: string,
+    // The type's spelling, which is the configuration's word for it.
+    node-type: string,
+    x: length,
+    y: length,
+    width: length,
+    height: length,
+    // square | rounded | parallelogram
+    outline: string,
+    // The shape to fill, as path data in this node's own coordinates. Empty
+    // for the rounded outline, which is a corner radius on a Rectangle, and
+    // emptiness is what says to draw it that way. Rust's arithmetic rather
+    // than markup's, for the same reason the link routes are: it comes from
+    // style::polygon_of, where it can be tested.
+    shape: string,
+    // The line to stroke: the same outline, broken into dashes where this
+    // type's edge is a broken one. Empty for the rounded outline, which
+    // strokes itself with a Rectangle's border.
+    edge: string,
+    // The second line of a doubled edge, inset. Empty unless this type's edge
+    // is doubled.
+    inner: string,
+    border: length,
+    // How far in from the sides anything drawn inside the shape has to stay:
+    // nothing, unless the outline leans. Rust's arithmetic, as the shape is:
+    // see style::room_of.
+    inset: length,
+    // How the label is set: the fifth channel that is not colour. A face, a
+    // size, a weight and an italic, chosen per type in style.rs.
+    face: string,
+    label-size: length,
+    label-weight: int,
+    label-italic: bool,
+    tint: color,
+    // What is written on the body: its outline, its name, its terminals, the
+    // marks in its corners.
+    //
+    // The body is painted in the node's own tint now, and the tints are the
+    // darkest of three tiers -- the working pane is the lightest, a link line
+    // is darker, and the bodies are darker still -- so what is drawn on a
+    // body has to be legible on the lightest and the darkest of them alike.
+    // One colour does that, and it is the one at the end of the scale. See
+    // tcsdiagram::look::MARK, tcsdiagram::look::tint_of and tcsdiagram::look::line_ink.
+    mark: color,
+    // Something is wrong with this node, which is what paints it red: the
+    // outline, the label and the terminals, so colour is never the only thing
+    // carrying it -- a faulty node is also drawn in the one shape no real type
+    // uses.
+    //
+    // What is wrong is not here. It was drawn under the name, which is a
+    // sentence inside a box forty-eight pixels tall and a paragraph in the
+    // middle of a diagram; it is said in the node's own window, and put in
+    // front of somebody once in the alert. See tcsgui::Views::alert_faults.
+    faulty: bool,
+    selected: bool,
+    // What a closed subdiagram holds: how many nodes, and how many lines
+    // cross its edge. Empty for every other type.
+    //
+    // A node's own comment is not here any more: a note somebody wrote about a
+    // sensor belongs in that node's window, beside the attributes it is about,
+    // and on the canvas it was a paragraph in the middle of a diagram.
+    summary: string,
+    // Whether this node is a diagram of its own and can be opened.
+    openable: bool,
+    // Which terminals this type has, drawn as a small rectangle in a corner
+    // with an arrow pointing the way the data goes. Only the ones the type
+    // actually has: a drawing that showed four on every node would be a
+    // drawing that says nothing about what may be linked to what.
+    //
+    // Two rows, which are the two streams. Along the top, left to right, what
+    // comes back from the payloads: it arrives at `payload-in` and leaves at
+    // `payload-out`. Along the bottom, right to left, what the ground sends: it
+    // arrives at `moc-in` and leaves at `moc-out`. The arrows therefore point
+    // the way the canvas itself is laid out -- the payloads are the leftmost
+    // working pane and the ground the rightmost -- so a reader who has worked
+    // that out once need not read the names again. The table is in style.rs, taken
+    // from tcslibgs::graph::terminals.
+    moc-in: TerminalView,
+    moc-out: TerminalView,
+    payload-in: TerminalView,
+    payload-out: TerminalView,
+    // How much room a terminal takes along an edge, which is what the label
+    // is padded by on whichever side carries one. From style.rs, like the
+    // sizes above, so that the one statement of how large a terminal is
+    // drawn is the one the box and the padding are both taken from.
+    terminal-column: length,
+}
+
+export struct LinkView {
+    // What it is drawn in, which says which stream it carries: the payload's
+    // own data in the payloads' family, what the ground sends in the ground's.
+    // One shade lighter than the lightest node of that panel, so a line reads
+    // as a line. See tcsdiagram::look::line_ink.
+    ink: color,
+    // The route, the arrowhead at its end, and the marker in the middle of its
+    // longest run, as SVG path data in canvas coordinates.
+    //
+    // Computed in Rust -- see route.rs -- because a route is arithmetic, and
+    // arithmetic in a layout language is hard to read and impossible to test.
+    // Three paths because one is stroked and the others filled, and a Path
+    // takes one of each.
+    route: string,
+    head: string,
+    marker: string,
+    // Where the label goes, which is the only geometry the markup still needs.
+    label-x: length,
+    label-y: length,
+    // A link into a named input is drawn wide, one into a node's only input
+    // narrow. A second channel beside the label, so a crowded diagram can be
+    // read without tracing every line to its end.
+    wide: bool,
+    label: string,
+    // What somebody wrote about this connection.
+    comment: string,
+    // Whether data has just crossed it: tcspecial's visual window lights a
+    // line while what was sent over it is less than LINE_BLINK old, and the
+    // editor never does. Lit, the line has a second one under it, three times
+    // as wide and in `glow`.
+    lit: bool,
+    // A shade lighter than `ink`, which is what a lit line's wide line is
+    // drawn in: the same family, so it still says which stream it is, and
+    // lighter, so the ordinary line on top of it is still the one a reader
+    // follows. See tcsdiagram::look::lighter.
+    glow: color,
+}
+
+// One terminal of a node: where a link may be attached.
+//
+// A rectangle with an arrow in it, and the arrow is the whole point -- the
+// name says which way the data travels and so does the arrow, so the drawing
+// and the file say the same thing. Drawn as one filled path in a viewbox the
+// size of the box, which is how everything else here is drawn: no image and no
+// icon font, so nothing can fail to load.
+component Terminal inherits Rectangle {
+    in property <color> ink;
+    // What is drawn on the node's body. See NodeView::mark.
+    in property <color> mark;
+    // Whether the arrow points right, which is to say towards the payloads.
+    in property <bool> rightward;
+    // Whether this is where data arrives. Both kinds answer a press, because
+    // a link may be drawn either way about: from the source that feeds it or
+    // from the sink that wants feeding. Which was pressed is what says which
+    // end of the link the other one is.
+    in property <bool> sink;
+
+
+    // A link is being drawn from this terminal, and then let go of -- at this
+    // point, measured from the terminal's own corner.
+    //
+    // The release is reported by the terminal the gesture *started* on, not by
+    // the one it finished over, because that is how a pointer works: a press
+    // grabs it, so every event until the release goes to the thing that was
+    // pressed. What is under the pointer at the end is a question about where
+    // the nodes are, and the answer is worked out in Rust where the geometry
+    // is -- see `terminal_under`.
+    callback grabbed();
+    callback released(length, length);
+    // And where the pointer is while it is held, so the line being drawn can
+    // follow it: reported by the terminal the gesture started on, as the
+    // release is, because a press grabs the pointer.
+    callback dragged(length, length);
+
+    width: 24px;
+    height: 10px;
+    border-width: 1px;
+    border-color: mark;
+    border-radius: 1px;
+    // Filled while the pointer is over it, as the old round handles were: a
+    // target that answers the pointer is a target somebody can see they have
+    // hit before they let go. Pale, because it is drawn on the body.
+    background: touch.has-hover ? mark.with-alpha(0.85) : mark.with-alpha(0.25);
+
+    touch := TouchArea {
+        width: 100%;
+        height: 100%;
+        mouse-cursor: MouseCursor.crosshair;
+        // No line drawn in a read-only session.
+        enabled: !Session.read-only;
+        pointer-event(event) => {
+            if (event.kind == PointerEventKind.down) {
+                grabbed();
+            }
+            if (event.kind == PointerEventKind.up) {
+                released(self.mouse-x, self.mouse-y);
+            }
+        }
+        moved => {
+            if (self.pressed) {
+                dragged(self.mouse-x, self.mouse-y);
+            }
+        }
+    }
+
+    // The arrow, which says which way the data on this terminal travels
+    // across the canvas: the payloads are the leftmost working pane and the
+    // ground the rightmost, so the payload's own data points right and what
+    // the ground sends points left.
+    Path {
+        width: 100%;
+        height: 100%;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 10;
+        fill: mark;
+        commands: rightward
+            ? "M 4 3.5 L 13 3.5 L 13 1 L 20 5 L 13 9 L 13 6.5 L 4 6.5 Z"
+            : "M 20 3.5 L 11 3.5 L 11 1 L 4 5 L 11 9 L 11 6.5 L 20 6.5 Z";
+    }
+}
+
+// One node.
+//
+// The outline is chosen by name rather than by a number so that the markup
+// reads as the table in style.rs does: a parallelogram is a payload, rounded
+// corners are a part of the vehicle, and the square one is the ground.
+export component NodeShape inherits Rectangle {
+    in property <NodeView> node;
+    // Whether this one can be dragged. False in the palette, where a press
+    // places a node rather than moving this one.
+    in property <bool> draggable: false;
+    // Whether the panel is showing this one.
+    in property <bool> selected: false;
+    // Told once, when the gesture finishes: one edit for one drag, so undo
+    // takes a node back to where it started rather than one pixel back.
+    callback dragged(length, length);
+    // This node is a diagram of its own and somebody asked to see it.
+    callback open-requested();
+    // A link is being drawn: pressed on the handle of one node, released over
+    // another.
+    // A link is being drawn: the terminal pressed is remembered, and where
+    // the pointer was let go of says what the other end is. The name of the
+    // terminal pressed is the whole of what the first half says; the second
+    // half is a point on the canvas.
+    callback link-from(string);
+    callback link-dropped(length, length);
+    // Where the pointer is while a line is being drawn from one of this
+    // node's terminals. See Terminal::dragged.
+    callback link-dragging(length, length);
+    // This node was pressed, so it is the one the panel should show.
+    callback chosen();
+    // What the menu a click opens asks for: the node's attributes, or the
+    // node's removal. See the menu itself, below the grip.
+    callback edit-requested();
+    callback delete-requested();
+
+    // The error colour, and the only place in this file it appears.
+    //
+    // A single definition so that "is anything red" is a question with one
+    // answer: if this is the only red, then red on the canvas means a fault
+    // and nothing else.
+    property <color> error-ink: #c0392b;
+
+    property <color> ink: node.faulty ? error-ink : node.tint;
+    // What is drawn on the body, as against what the body is painted: see
+    // NodeView::mark. A faulty node keeps it -- the body goes red and the
+    // marks stay pale, so the one thing that changed is the thing that is
+    // wrong.
+    property <color> mark: node.mark;
+
+    // How far a press may wander and still be a click rather than a drag.
+    // Three pixels: enough for a hand on a mouse, far less than anything
+    // somebody means as a move.
+    property <length> slop: 3px;
+
+    // While a drag is running the node follows the pointer by this much, and
+    // the document still says where it was: nothing is recorded until the
+    // gesture ends.
+    // Not in a read-only session, where a node stays where it is: a press
+    // still opens its window.
+    property <length> drag-x: draggable && !Session.read-only && grip.pressed
+        ? grip.mouse-x - grip.pressed-x
+        : 0px;
+    property <length> drag-y: draggable && !Session.read-only && grip.pressed
+        ? grip.mouse-y - grip.pressed-y
+        : 0px;
+
+    x: node.x;
+    y: node.y;
+    width: node.width;
+    height: node.height;
+    background: transparent;
+
+    // Everything that is drawn, offset by the drag.
+    //
+    // The drawn parts move and the node does not, which is what makes a drag
+    // measurable at all. `grip` below is a child of the node rather than of
+    // this, so its coordinates stay where the node was for as long as the
+    // gesture lasts -- and an offset measured in a frame that the offset
+    // itself moves cancels every movement it makes. A node bound the other way
+    // round sits exactly where it started, however far it is dragged, which is
+    // what it used to do.
+    //
+    // Nothing is lost by the grip staying put: a press grabs the pointer, so
+    // the events keep arriving wherever the pointer goes.
+    moving := Rectangle {
+        x: drag-x;
+        y: drag-y;
+        width: 100%;
+        height: 100%;
+        background: transparent;
+        // The node's box. Every outline arrives as path data -- the rounded
+        // one too, its corners drawn in pieces so it can take any edge -- and
+        // this Rectangle keeps the geometry and the shadow and draws neither
+        // border nor ground: the paths below it are the shape.
+        body := Rectangle {
+            width: 100%;
+            height: 100%;
+            // A hover state everywhere one is possible. The handles and the open
+            // mark had one and the node itself did not, which reads as half
+            // finished -- and a surface that answers the pointer is a surface
+            // whose parts look pressable before they are pressed.
+            border-width: node.shape != ""
+                ? 0px
+                : (grip.has-hover ? node.border + 1px : node.border);
+            border-color: mark;
+
+            // While it is being dragged, a node lifts off the canvas. Not
+            // decoration: a drag that has started and a press that has not look
+            // identical otherwise, and the one thing a person wants to know
+            // mid-gesture is whether the thing is moving.
+            drop-shadow-blur: grip.pressed ? 12px : 0px;
+            drop-shadow-color: grip.pressed ? #00000033 : transparent;
+            drop-shadow-offset-y: grip.pressed ? 3px : 0px;
+            // The rounded outline's own radius -- style::RADIUS -- so the ring
+            // a selected node is drawn in follows its corners.
+            border-radius: node.outline == "rounded" ? 9px : 0px;
+            background: node.shape != "" ? transparent : ink;
+
+            // The lift a dragged node gets, for the shapes drawn as paths: a
+            // second copy of the shape three pixels lower, because a Path has
+            // no drop-shadow of its own and the one thing a person wants to
+            // know mid-gesture is whether the thing is moving. Drawn first, so
+            // it is under the shape.
+            if node.shape != "" && grip.pressed: Path {
+                y: 3px;
+                width: 100%;
+                height: 100%;
+                viewbox-width: self.width / 1px;
+                viewbox-height: self.height / 1px;
+                commands: node.shape;
+                fill: #00000033;
+            }
+
+            // The body: the shape, filled and not stroked. One pixel to one
+            // coordinate -- the viewbox is the node's own size -- so nothing
+            // is stretched.
+            //
+            // Filled and stroked separately because the line may be broken: a
+            // dashed path is a row of short subpaths, and filling those would
+            // fill each dash rather than the shape.
+            if node.shape != "": Path {
+                width: 100%;
+                height: 100%;
+                viewbox-width: self.width / 1px;
+                viewbox-height: self.height / 1px;
+                commands: node.shape;
+                fill: ink;
+            }
+
+            // The outline, whole or broken as this type's edge says. The
+            // dashes are Rust's arithmetic: see style::edge_of.
+            if node.edge != "": Path {
+                width: 100%;
+                height: 100%;
+                viewbox-width: self.width / 1px;
+                viewbox-height: self.height / 1px;
+                commands: node.edge;
+                stroke: mark;
+                stroke-width: grip.has-hover ? node.border + 1px : node.border;
+                fill: transparent;
+            }
+
+            // And the second line of a doubled edge, four pixels inside the
+            // first: the channel that used to be a pattern in the body, moved
+            // out to the line around it where it competes with neither the
+            // name nor the colour.
+            if node.inner != "": Path {
+                width: 100%;
+                height: 100%;
+                viewbox-width: self.width / 1px;
+                viewbox-height: self.height / 1px;
+                commands: node.inner;
+                stroke: mark;
+                stroke-width: 1px;
+                fill: transparent;
+            }
+        }
+
+        // The name, and under it the type. The type is shown always and not only
+        // on hover: a diagram whose shapes have to be remembered is a diagram that
+        // is read wrongly under pressure.
+        //
+        // Padded away from whichever side carries terminals, and horizontally
+        // rather than vertically: the label stays where it was, in the middle
+        // of the node, and simply stops short of the corner boxes. Reserving
+        // a row at the top and the bottom instead would leave sixteen pixels
+        // for a name on the shortest node.
+        VerticalLayout {
+            padding: Space.tight;
+            padding-left: (node.moc-in.shown || node.payload-out.shown)
+                ? node.terminal-column : Space.tight;
+            padding-right: (node.moc-out.shown || node.payload-in.shown)
+                ? node.terminal-column : Space.tight;
+            spacing: 1px;
+            alignment: center;
+
+            Text {
+                text: node.name;
+                color: mark;
+                font-family: node.face == "mono" ? Fonts.mono : "";
+                font-size: node.label-size;
+                font-weight: node.label-weight;
+                font-italic: node.label-italic;
+                horizontal-alignment: center;
+                overflow: elide;
+            }
+            Text {
+                text: node.node-type;
+                color: mark;
+                font-family: node.face == "mono" ? Fonts.mono : "";
+                font-size: Type.small;
+                horizontal-alignment: center;
+                overflow: elide;
+            }
+            // What a closed subdiagram holds: how many nodes, and how many
+            // lines cross its edge. The two things worth knowing about a
+            // diagram you are not looking at.
+            //
+            // Not a node's comment, which this used to show as well. A note
+            // somebody wrote about a sensor belongs in that node's own window,
+            // beside the attributes it is about: on the canvas it was a
+            // paragraph in the middle of a diagram, and a diagram is read for
+            // its shape.
+            if node.summary != "": Text {
+                text: node.summary;
+                font-size: Type.small;
+                font-italic: true;
+                color: mark.with-alpha(0.75);
+                horizontal-alignment: center;
+                overflow: elide;
+            }
+        }
+
+        // A subdiagram is opened from a mark in its own corner.
+        //
+        // Not a double press on the box: a single press already drags it, and a
+        // gesture that means one thing or another depending on timing is a
+        // gesture that does the wrong one under pressure. A mark that says
+        // "there is more in here" is also the only hint a closed box gives that
+        // it can be opened at all.
+        // The middle of the top edge, which is the one place on a node that
+        // no terminal is in: the four of them hold the four corners.
+        if node.openable: Rectangle {
+            x: (root.width - 14px) / 2;
+            y: 4px;
+            width: 14px;
+            height: 14px;
+            border-width: 1px;
+            border-color: mark;
+            background: open-touch.has-hover ? mark.with-alpha(0.35) : transparent;
+
+            // Two narrow lines making a cross, which reads as "expand" without a
+            // word or an icon file.
+            Rectangle {
+                x: 3px;
+                y: 6px;
+                width: 8px;
+                height: 1px;
+                background: mark;
+            }
+            Rectangle {
+                x: 6px;
+                y: 3px;
+                width: 1px;
+                height: 8px;
+                background: mark;
+            }
+
+            open-touch := TouchArea {
+                width: 100%;
+                height: 100%;
+                mouse-cursor: MouseCursor.pointer;
+                clicked => { open-requested(); }
+            }
+        }
+
+        // The area a drag is taken from, over the whole node so that a press
+        // anywhere on it moves it.
+        //
+        // Last so it is above the shape and the label; a TouchArea under them
+        // would be a node that can only be dragged by its edges.
+        if selected: Rectangle {
+            x: -4px;
+            y: -4px;
+            width: parent.width + 8px;
+            height: parent.height + 8px;
+            border-width: 2px;
+            border-color: #333333;
+            border-radius: body.border-radius + 4px;
+            background: transparent;
+        }
+    }
+
+    // What a click on a node offers: a node's own commands, which have
+    // nowhere else to live -- a node is not in the menu bar, and the menu bar
+    // is for the configuration as a whole.
+    //
+    // Shown by the grip below, at the point that was pressed, and not by this
+    // area answering the pointer itself: the grip covers the whole node and
+    // takes every press, so a ContextMenuArea's own right-click handling
+    // never sees one. That is why a right click did nothing at all until the
+    // grip was taught to show this by name.
+    //
+    // First among the node's children, so the grip and the terminals are
+    // above it and a press reaches them.
+    menu := ContextMenuArea {
+        enabled: draggable;
+        Menu {
+            // Edit first, because it is what nearly every click wants, and it
+            // is what a click used to do on its own.
+            MenuItem {
+                title: "Edit";
+                enabled: !Session.read-only;
+                activated => { root.edit-requested(); }
+            }
+            MenuItem {
+                title: "Delete";
+                enabled: !Session.read-only;
+                activated => { root.delete-requested(); }
+            }
+        }
+    }
+
+    grip := TouchArea {
+        width: 100%;
+        height: 100%;
+        enabled: draggable;
+        mouse-cursor: draggable ? MouseCursor.grab : MouseCursor.default;
+        pointer-event(event) => {
+            if (event.kind == PointerEventKind.down
+                && event.button == PointerEventButton.right) {
+                // A right click asks what there is to do with this node,
+                // which is what a right click means everywhere else. On the
+                // press rather than the release, as a context menu is: by the
+                // time a button somebody is holding down comes up they are
+                // looking at the menu, not at the node.
+                menu.show({ x: self.mouse-x, y: self.mouse-y });
+            }
+            if (event.kind == PointerEventKind.down
+                && event.button == PointerEventButton.left) {
+                // Choosing and dragging are the same press: a node you have
+                // started to move is the node you are interested in, and
+                // making them separate gestures would mean pressing twice to
+                // do the obvious thing.
+                chosen();
+            }
+            if (event.kind == PointerEventKind.up
+                && event.button == PointerEventButton.left) {
+                // A left press that stayed put is a click, and it offers the
+                // same menu; one that moved is a drag, and the editor is told
+                // where the node went.
+                //
+                // "Stayed put" is within a few pixels, not exactly nowhere.
+                // The test here was that the release was at the very pixel of
+                // the press, which a hand on a mouse does not manage: every
+                // click carried a fraction of a pixel, every click was read as
+                // a drag, and the menu was unreachable by the gesture that was
+                // supposed to be its own. The same slack keeps a trembling
+                // click from recording a one-pixel move as an edit.
+                //
+                // Told apart here rather than in Rust because the menu has to
+                // be shown by the element that owns it, at the point that was
+                // pressed. Rust is told only about the drag, and still asks
+                // the same question of it -- a gesture that works out to no
+                // movement records no edit.
+                if (abs(self.mouse-x - self.pressed-x) <= root.slop
+                    && abs(self.mouse-y - self.pressed-y) <= root.slop) {
+                    menu.show({ x: self.mouse-x, y: self.mouse-y });
+                } else {
+                    dragged(self.mouse-x - self.pressed-x, self.mouse-y - self.pressed-y);
+                }
+            }
+        }
+    }
+
+    // The terminals: a link may be attached to each, and a type is drawn with
+    // the ones it has and no others. In its corners, inside the shape, so that
+    // the box a person presses and the box the line arrives at are the same
+    // box.
+    //
+    // After the grip and not inside `moving`, which is a choice about what a
+    // press on a corner means: the grip covers the whole node, so anything
+    // under it is a thing the pointer cannot reach, and a press on a terminal
+    // has to draw a link rather than start a drag. The drag offset is applied
+    // here by hand for the same reason -- these are outside the group that
+    // carries it, and a terminal that stayed put while its node moved would be
+    // a line attached to where the node used to be.
+    if node.moc-in.shown: Terminal {
+        x: node.moc-in.x + drag-x;
+        y: node.moc-in.y + drag-y;
+        rightward: node.moc-in.rightward;
+        dragged(x, y) => {
+            link-dragging(node.x + node.moc-in.x + x, node.y + node.moc-in.y + y);
+        }
+        sink: true;
+        ink: ink;
+        mark: mark;
+        grabbed => { link-from("moc-in"); }
+        released(x, y) => {
+            link-dropped(node.x + node.moc-in.x + x, node.y + node.moc-in.y + y);
+        }
+    }
+    if node.moc-out.shown: Terminal {
+        x: node.moc-out.x + drag-x;
+        y: node.moc-out.y + drag-y;
+        rightward: node.moc-out.rightward;
+        dragged(x, y) => {
+            link-dragging(node.x + node.moc-out.x + x, node.y + node.moc-out.y + y);
+        }
+        sink: false;
+        ink: ink;
+        mark: mark;
+        grabbed => { link-from("moc-out"); }
+        // Where the pointer was let go of, in the canvas's own coordinates:
+        // the node is placed at node.x and the terminal sits at its own offset
+        // inside it, so the two and the pointer's offset from the terminal's
+        // corner are the whole of it.
+        released(x, y) => {
+            link-dropped(node.x + node.moc-out.x + x, node.y + node.moc-out.y + y);
+        }
+    }
+    if node.payload-in.shown: Terminal {
+        x: node.payload-in.x + drag-x;
+        y: node.payload-in.y + drag-y;
+        rightward: node.payload-in.rightward;
+        dragged(x, y) => {
+            link-dragging(node.x + node.payload-in.x + x, node.y + node.payload-in.y + y);
+        }
+        sink: true;
+        ink: ink;
+        mark: mark;
+        grabbed => { link-from("payload-in"); }
+        released(x, y) => {
+            link-dropped(
+                node.x + node.payload-in.x + x,
+                node.y + node.payload-in.y + y
+            );
+        }
+    }
+    if node.payload-out.shown: Terminal {
+        x: node.payload-out.x + drag-x;
+        y: node.payload-out.y + drag-y;
+        rightward: node.payload-out.rightward;
+        dragged(x, y) => {
+            link-dragging(node.x + node.payload-out.x + x, node.y + node.payload-out.y + y);
+        }
+        sink: false;
+        ink: ink;
+        mark: mark;
+        grabbed => { link-from("payload-out"); }
+        released(x, y) => {
+            link-dropped(node.x + node.payload-out.x + x, node.y + node.payload-out.y + y);
+        }
+    }
+
+    // Selection, which is a third outline rather than a colour change: a
+    // selected node and a faulty one must not be confusable, and a selected
+    // faulty node has to show both.
+}
+
+// One link: its route and the arrow at the end of it.
+//
+// Both are path data from Rust, in canvas coordinates, so this spans the whole
+// canvas and gives its Paths a viewbox the same size -- one coordinate, one
+// pixel. The alternative was a bounding box per link and the arithmetic to go
+// with it, which is what route.rs now holds and tests instead.
+//
+// Stroked and filled are two Paths because Slint gives one Path one of each,
+// and an arrowhead wants to be filled while a line wants to be stroked.
+export component LinkLine inherits Rectangle {
+    in property <LinkView> link;
+    // The link's own, which says which stream it carries. See LinkView::ink.
+    in property <color> ink: link.ink;
+
+    width: 100%;
+    height: 100%;
+    background: transparent;
+
+    // The lit line, under the ordinary one: three times its width, a shade
+    // lighter, while data is crossing. First, so the line it lights is drawn
+    // over it and reads exactly as it does when nothing is moving.
+    //
+    // A line's width larger on every side than the line it lights, with the
+    // same viewbox. A Path fits its viewbox inside itself less half its
+    // stroke, so that the stroke falls inside it: a stroke three times as
+    // wide in a Path the same size is fitted into a smaller box, and is drawn
+    // beside the line rather than under it. Grown by the difference, the box
+    // it is fitted into is the line's own.
+    if link.lit: Path {
+        x: -(link.wide ? 5px : 2.5px);
+        y: -(link.wide ? 5px : 2.5px);
+        width: root.width + 2 * (link.wide ? 5px : 2.5px);
+        height: root.height + 2 * (link.wide ? 5px : 2.5px);
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: root.width / 1px;
+        viewbox-height: root.height / 1px;
+        commands: link.route;
+        stroke: link.glow;
+        stroke-width: 3 * (link.wide ? 5px : 2.5px);
+        fill: transparent;
+    }
+
+    line := Path {
+        width: 100%;
+        height: 100%;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: self.width / 1px;
+        viewbox-height: self.height / 1px;
+        commands: link.route;
+        stroke: ink;
+        // The wide and narrow weights: a link into a named input is wide, so
+        // a crowded diagram can be read without tracing every line to its
+        // end. Twice what they were, because a line is what a reader of a
+        // diagram follows and these are now carrying a colour as well.
+        stroke-width: link.wide ? 5px : 2.5px;
+        fill: transparent;
+    }
+
+    // Which way the data goes. Implied before this by which end the line left,
+    // which is to say not said at all: a reader had to open the file.
+    head := Path {
+        width: 100%;
+        height: 100%;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: self.width / 1px;
+        viewbox-height: self.height / 1px;
+        commands: link.head;
+        fill: ink;
+    }
+
+    // And again out in the middle of the run, where there is room to see it.
+    // The head sits where the line meets a node, which is the one place a
+    // diagram is already crowded and the one place two links between the same
+    // pair of nodes look alike; this is what tells them apart at a glance.
+    if link.marker != "": Path {
+        width: 100%;
+        height: 100%;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: self.width / 1px;
+        viewbox-height: self.height / 1px;
+        commands: link.marker;
+        fill: ink;
+    }
+
+    // Which input the link arrives at, where it says so. Text rather than
+    // only a line weight, because a name is what the configuration file will
+    // show and the two should agree.
+    if link.label != "": Text {
+        x: link.label-x;
+        y: link.label-y - 14px;
+        text: link.label;
+        font-size: Type.small;
+        color: ink;
+    }
+    // And what somebody wrote about the connection, under the line.
+    if link.comment != "": Text {
+        x: link.label-x;
+        y: link.label-y + 4px;
+        text: link.comment;
+        font-size: Type.small;
+        font-italic: true;
+        color: #6b7280;
+    }
+}
+
+// The ground a page is drawn on: a faint grid, and a band at the head of each
+// working pane saying which it is.
+//
+// One sheet for all three panes. The panes are columns of it rather than
+// panes of their own, which is what makes them the same length and makes them
+// scroll together; the dividers between them are the window's, drawn over the
+// sheet, because a window that moves them is a window that has them. Fills
+// what it is put in, which is the canvas of whichever window draws a page.
+export component SheetGround inherits Rectangle {
+    // How wide the sheet is, and where its two dividers are, in sheet pixels.
+    in property <length> working-width;
+    in property <length> payload-divider;
+    in property <length> vehicle-divider;
+    // What each pane's band is painted. See tcsdiagram::look::ground_of.
+    in property <color> payload-ground;
+    in property <color> vehicle-ground;
+    in property <color> moc-ground;
+
+    width: 100%;
+    height: 100%;
+    background: transparent;
+
+    // How deep the three heading bands are: what the tallest
+    // of the three labels needs, and the same for all three.
+    // Asked of the labels, so a change to the type scale is a
+    // change to the bands as well.
+    property <length> heading-tall:
+        max(moc-heading.preferred-height,
+            max(vehicle-heading.preferred-height,
+                payload-heading.preferred-height))
+        + 2 * Space.tight;
+
+    // A faint grid, every five millimetres: the lines a node's
+    // terminals are on, which is what lines up across a drawing.
+    //
+    // It gives the surface some depth and makes the alignment
+    // visible -- a diagram whose nodes line up looks deliberate,
+    // and a grid is what says they are lined up rather than
+    // nearly. Coarse on purpose: a line at every millimetre would
+    // be thousands of elements and a texture rather than a guide.
+    // A millimetre is 96/25.4 of the canvas's pixels, as it is in
+    // tcsdiagram::pane::PX_PER_MM; the sheet is 254 mm across and 635
+    // down, so 51 lines across and 127 down.
+    for n in 51: Rectangle {
+        x: round(n * 5 * 96 / 25.4) * 1px;
+        y: 0;
+        width: 1px;
+        height: 100%;
+        background: #f3f4f6;
+    }
+    for n in 127: Rectangle {
+        x: 0;
+        y: round(n * 5 * 96 / 25.4) * 1px;
+        width: 100%;
+        height: 1px;
+        background: #f3f4f6;
+    }
+
+    // And which pane is which, left to right: a band at the top
+    // of each working pane with one word in it. The rule about
+    // what may go where is worth that word -- what the vehicle
+    // carries on the left, its own graph in the middle, and the
+    // ground link on the right.
+    //
+    // A band apiece rather than one across the canvas, because
+    // each is its own pane's: it spans that pane, from its left
+    // edge to the divider, and is painted in that pane's tint. So
+    // the colour that says which pane a node belongs in is at the
+    // head of the pane it belongs to, and the panes themselves are
+    // the one ground -- a sheet of paper with three headed columns
+    // on it, rather than three washes of colour.
+    //
+    // All three the same depth, which is what the tallest of the
+    // three labels needs: three bands of three depths would read
+    // as three panes that had been drawn separately, and the depth
+    // is asked of the labels rather than chosen so that a larger
+    // type scale moves them all together.
+    //
+    // Over the grid and *under* the nodes, which is the order they
+    // are written in here. A node may cover a band: the label is
+    // there to be found when the pane is empty and when somebody
+    // has lost their bearings, and a pane that reserved a row for
+    // it would be a pane with a row nothing can be put in.
+    //
+    // Light grey and italic, which is this window's way of saying
+    // "not part of the drawing": a label in the colour and the
+    // face of a node would read as something placed. The same grey
+    // as the hint below.
+    Rectangle {
+        x: 0;
+        y: 0;
+        width: root.payload-divider;
+        height: root.heading-tall;
+        background: root.payload-ground;
+
+        payload-heading := Text {
+            x: Space.step;
+            y: Space.tight;
+            text: "Payloads";
+            font-size: Type.small;
+            font-italic: true;
+            color: #9ca3af;
+        }
+    }
+    Rectangle {
+        x: root.payload-divider;
+        y: 0;
+        width: root.vehicle-divider - root.payload-divider;
+        height: root.heading-tall;
+        background: root.vehicle-ground;
+
+        vehicle-heading := Text {
+            x: Space.step;
+            y: Space.tight;
+            text: "Vehicle";
+            font-size: Type.small;
+            font-italic: true;
+            color: #9ca3af;
+        }
+    }
+    Rectangle {
+        x: root.vehicle-divider;
+        y: 0;
+        width: root.working-width - root.vehicle-divider;
+        height: root.heading-tall;
+        background: root.moc-ground;
+
+        moc-heading := Text {
+            x: Space.step;
+            y: Space.tight;
+            text: "MOC";
+            font-size: Type.small;
+            font-italic: true;
+            color: #9ca3af;
+        }
+    }
+}

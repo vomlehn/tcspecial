@@ -991,6 +991,12 @@ impl Fabric {
                             passing: *passing,
                             delivery: at,
                         });
+                        // Shown, where a window was asked for: one store, and
+                        // nothing that allocates or waits. See crate::visual.
+                        #[cfg(feature = "visual")]
+                        if let Some(line) = delivery.line {
+                            crate::visual::sent(line);
+                        }
                     }
                 }
                 for &to in &self.busy {

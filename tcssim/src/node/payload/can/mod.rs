@@ -411,6 +411,7 @@ mod tests {
             segment_interval_ms: Arc::new(AtomicU32::new(0)),
             sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             standing: Default::default(),
+            driven: false,
         }
     }
 

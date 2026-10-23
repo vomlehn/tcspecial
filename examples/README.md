@@ -14,13 +14,17 @@ on its own account, and so does `ping`, whose ground station is Python 3.
 
 A configuration and its simulator file are matched by payload name. The
 simulator file can't name a payload the configuration doesn't have, nor one
-the simulator would not stand in for: a payload that is only driven, such as
-`tees`' heater, which nothing reads back, or one that is a program, which
-tcspecial runs itself. `tcsverify` refuses either, as tcssim does.
+the simulator would not stand in for: a payload that is a program, which
+tcspecial runs itself. `tcsverify` refuses either, as tcssim does. A payload
+that is only driven, such as `tees`' heater, is simulated like any other: its
+stand-in counts what the vehicle sends it.
 
 The YAML and XML files must say the same thing, so change both together.
 
-Every simulator file has a `tcssim` section giving the address at which
+Every payload a simulator file names says `simulate: true` -- itself or in
+its group, not both -- for tcssim to stand in for it; `simulate: false` would
+leave it to the real device. Every simulator file also has a `tcssim` section
+giving the address at which
 tcssim says it has made its stand-ins, a port no other example uses, so that
 tcsmoc starts tcspecial only once they are there. The `make run-*` targets
 give every program `--simulate=all`, the run being one with stand-ins only: a

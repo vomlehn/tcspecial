@@ -10,15 +10,11 @@
 # temperature agree, so the vote produces a temperature and the thermostat
 # decides on it.
 #
-# The heaters are not attached to the mass, and that is the half this file
-# cannot close. They are discrete lines, and a line is a wire: the simulator
-# stands in for one through the kernel's gpio-sim, which it can drive and
-# cannot yet be driven through, so there is nothing here to notice that the
-# vehicle switched the heaters on. What the mass does is cool towards its
-# environment, and what the example shows is the vehicle deciding to heat it.
-# A loop that closes needs heaters of a kind the simulator can be driven
-# through, which today means a socket; the simulator's own tests close one
-# that way.
+# The heaters are discrete lines on the kernel's gpio-sim, which the vehicle
+# drives and tcssim watches: each time the vehicle switches them, their panel
+# counts it. They are not attached to the mass, so what the mass does is cool
+# towards its environment, and what the example shows is the vehicle deciding
+# to heat it. Saying heats: cabin, with a rate, on each would close the loop.
 description: Simulator settings for the payloads of thermostat.yaml
 
 # Where tcssim answers whether it has made its stand-ins, which whatever
@@ -42,6 +38,7 @@ simulated_payload_groups:
   # nothing about the format, the scale or the offset, because a scale written
   # in two files is a scale that can disagree with itself.
   - name: cabin_temps
+    simulate: true
     packet_interval: 100 ms
     reads: cabin
 
@@ -57,3 +54,13 @@ simulated_payloads:
   - name: temp_3
     type: spi
     group: cabin_temps
+
+  # Driven and never read: their stand-ins send nothing and count each time
+  # the vehicle moves their lines.
+  - name: heaters_1
+    simulate: true
+    type: gpio
+
+  - name: heaters_2
+    simulate: true
+    type: gpio

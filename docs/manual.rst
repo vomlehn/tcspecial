@@ -401,6 +401,49 @@ Read them as a statement of what the configuration will be rather than as a
 feature to rely on. They may change in ways the five supported types --
 ``network``, ``device-file``, ``serial``, ``i2c`` and ``spi`` -- will not.
 
+Lunar lander interfaces tcspecial speaks
+----------------------------------------
+These are the payload interfaces the Moon's landers offer that tcspecial
+supports, with the payload type that speaks each. Landers are named by series
+-- Apollo 11 to 17 are "Apollo", Peregrine and Griffin are "Astrobotic" --
+and what each lander offers is from its published payload description. The
+design document has the whole table, the interfaces tcspecial does not yet
+support included -- SpaceWire, MIL-STD-1553B and time at the tone among them
+-- and where each row comes from.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 30 40
+
+   * - interface
+     - payload type
+     - landers
+   * - RS-422 asynchronous serial
+     - ``serial``
+     - Astrobotic, Chang'e, Intuitive Machines, Masten
+   * - RS-422 carrying SLIP and UDP
+     - ``network``, over UDP, with the line made an IP interface by
+       ``slattach``
+     - Astrobotic
+   * - Ethernet
+     - ``network``
+     - Intuitive Machines
+   * - 802.11 wireless LAN, to a payload deployed from the lander
+     - ``network``, once the link is up
+     - Astrobotic, Firefly
+   * - CAN
+     - ``can``
+     - Intuitive Machines
+   * - Analog telemetry channels
+     - ``iio``, where the converter is an IIO device
+     - Apollo, Luna, Surveyor
+   * - Discrete commands and status lines
+     - ``gpio``
+     - Apollo, Luna, Surveyor
+   * - Serial data clocked out by the lander
+     - ``spi``, which clocks the same way and is a different protocol
+     - Apollo
+
 Attributes Every Payload Has
 ----------------------------
 .. code-block:: text
@@ -1938,7 +1981,8 @@ is the transitions alone.
 
 Every payload here has lines, so none has a telemetry link of its own: the
 sensors' readings reach the ground through their conversions, and the heaters
-are driven and never read.
+are driven and never read. Tcssim watches the heaters' lines on the
+``gpio-sim`` chip and counts each time the vehicle switches them.
 
 The command binding on the ``moc`` node says the ground may set the
 thermostat's setpoint, and the running vehicle applies it: a ``SET_NODE``
@@ -2242,8 +2286,8 @@ often it produces a packet, and how it divides one into segments. Only tcssim
 acts on it; tcsmoc reads it too, to show what the tcssim it started is
 simulating, and does without it if it is not there.
 
-Every setting is optional, and **a setting written empty is a setting not
-stated**: ``packet_interval: ""`` and no ``packet_interval`` at all mean
+Every setting but ``simulate`` is optional, and **a setting written empty is a
+setting not stated**: ``packet_interval: ""`` and no ``packet_interval`` at all mean
 the same thing. That is what lets tcsgui write one of these files as a form --
 every payload of the configuration, every setting of a payload, blank until
 somebody fills one in -- and have the file load all the same. A value that is
@@ -2253,10 +2297,13 @@ there and wrong is still refused, naming it.
 
    simulated_payload_groups        optional
      name                 the name payloads refer to
+     simulate             true or false, for every payload in the group
      ...                  any of the settings below
 
    simulated_payloads
      name                 the payload this one stands in for
+     simulate             true for tcssim to stand in for it, false for the
+                          real device: required, here or in its group
      type                 the type of payload it is, as the tcspecial
                           configuration says
      protocol             which transport, for a network payload
@@ -2265,6 +2312,50 @@ there and wrong is still refused, naming it.
      payload_port         which port it answers from, likewise
      group                the group to take unstated settings from, if any
      ...                  any of the settings below
+
+**Simulated or real: simulate**
+
+Every payload the file names says whether it is simulated, with ``simulate``:
+``true`` has tcssim stand in for it, and ``false`` leaves it to the real
+device, for which tcssim makes nothing. It is said once -- in the payload, or
+in the group it names -- and never in both, even where the two would agree: a
+payload does not override its group's. A payload the file does not name is
+real too.
+
+.. code-block:: yaml
+
+   simulated_payload_groups:
+     - name: cabin_temps
+       simulate: true          # temp_1, temp_2 and temp_3 are simulated
+       packet_interval: 100 ms
+
+   simulated_payloads:
+     - name: temp_1
+       group: cabin_temps
+     - name: heaters_1
+       simulate: false         # the real heater
+
+Before it stands in for anything, tcssim compares each payload's ``simulate``
+with what is at the payload's endpoint, by the same rules tcspecial judges a
+stand-in by (see `Stand-ins or hardware: --simulate`_), and will not start on
+a disagreement: ``simulate: true`` where the configuration points at real
+hardware, or ``simulate: false`` where it points at a stand-in. A stand-in
+tcssim makes itself, a pseudo-terminal or a socket, is not there yet, and
+that is no disagreement; one the scripts in ``bin/`` make has to be. A
+payload the file does not name whose endpoint is a stand-in all the same is
+refused too: tcssim controls and shows every simulated device, so each one
+is named.
+
+Each simulated payload has the same panel, whatever stands in for it: its
+button, which has it take part or not, and what it sent and what reached it.
+Where the operating system makes the stand-in, tcssim watches it -- the
+lines of a ``gpio-sim`` chip, the registers of an ``i2c-stub`` chip -- and
+counts what the vehicle does to it. Two things cannot be seen: a read of an
+``i2c-stub`` chip, which changes nothing, and the samples an ``iio_dummy``
+sensor's kernel trigger makes. A payload that is only driven, such as a
+heater, sends nothing, counts what the vehicle sends it, and takes no packet
+interval. Switched off, a payload sends nothing, answers nothing and acts on
+nothing -- a heater warms no mass -- and still counts what reaches it.
 
 **What it stands in for**
 
@@ -2764,8 +2855,7 @@ exits 2.
 Both files of the set are checked, and the second against the first: every
 payload simulated, every simulated payload a payload, and every setting one
 that payload can have. And none simulated that the simulator would not stand
-in for: a payload that is only driven, unless it heats a thermal mass, or one
-that is a program, which tcspecial runs itself. That is the question tcssim
+in for: a payload that is a program, which tcspecial runs itself. That is the question tcssim
 and tcsmoc ask before a simulator is started, so a set tcsverify passes is one
 they start. A tcspecial configuration with problems of its own is
 not joined to -- there would be nothing to join to, and a join against half of
@@ -3135,6 +3225,25 @@ the judgements: it says only that the far end is on this host, and a program
 on this host in front of real hardware passes it. A synchronous HDLC line is
 never a stand-in, and anything that cannot be told -- nothing at the path, a
 host name -- is taken for hardware.
+
+Four types have nothing in the operating system that stands in for them
+faithfully: an HDLC line has no virtual interface at all, and a
+pseudo-terminal carries a SPI peripheral's, an rpmsg channel's or an IIO
+sensor's bytes without its clock, its channel or its sysfs. A node of one of
+those types may give ``stand_in``, a loopback address and port. Under
+``--simulate=some`` or ``all`` tcspecial reaches it there over UDP instead of
+opening the device, and tcssim answers there; under ``none`` the device is
+opened, so the configuration that flies is the one that was tested:
+
+.. code-block:: yaml
+
+   payloads:
+     - name: link
+       type: hdlc
+       interface: hdlc0
+       standard: v35
+       clock_type: external
+       stand_in: "127.0.0.1:7950"
 
 The Makefiles' run targets give every program ``--simulate=$(SIMULATE)``,
 which is ``all`` unless the command line says otherwise:

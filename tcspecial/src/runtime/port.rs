@@ -282,16 +282,21 @@ impl EndpointPort {
     pub fn open(node: &Node, routes: &Routes, abandon: &Abandon) -> Result<EndpointPort, String> {
         let uses = Use::of(routes, &node.name)?;
         let reach = reach_of(node)?;
+        // Its endpoint, or where it is reached when simulated: a node of a
+        // type the operating system cannot stand in for, in a run with
+        // stand-ins, is reached over UDP at its stand_in, by the same rule of
+        // which end speaks first that a UDP payload has.
+        let endpoint = reach.opened(crate::runtime::start::mode());
 
         let opened = if tcslibgs::gateway::is_gateway(&node.node_type) {
-            EndpointPort::bind(&node.name, &reach.endpoint, uses)
+            EndpointPort::bind(&node.name, &endpoint, uses)
         } else if !speaks_first(uses.produces(), reach.trigger.is_some()) {
             // Spoken to first -- driven, or asked -- so there is nobody to
             // learn from before the first write: what the node says is where
             // the device is, and this sends there.
-            EndpointPort::reaching(&node.name, &reach.endpoint, uses)
+            EndpointPort::reaching(&node.name, &endpoint, uses)
         } else {
-            EndpointPort::hearing(&node.name, &reach.endpoint, uses, reach.sends_from.as_ref())
+            EndpointPort::hearing(&node.name, &endpoint, uses, reach.sends_from.as_ref())
         };
         let mut port = opened.map_err(|e| format!("{e}"))?;
 

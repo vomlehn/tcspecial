@@ -925,6 +925,7 @@ impl NodeType {
                 ("bit_order", false),
                 ("cs_active", false),
                 ("init", false),
+                ("stand_in", false),
             ],
             NodeType::Serial => &[
                 ("path", true),
@@ -962,6 +963,7 @@ impl NodeType {
                 ("read_delay", false),
                 ("poll_interval", false),
                 ("init", false),
+                ("stand_in", false),
             ],
             NodeType::Can => &[
                 ("interface", true),
@@ -982,6 +984,7 @@ impl NodeType {
                 ("trigger_interval", false),
                 ("read_delay", false),
                 ("poll_interval", false),
+                ("stand_in", false),
             ],
             NodeType::Rpmsg => &[
                 ("path", true),
@@ -992,6 +995,7 @@ impl NodeType {
                 ("read_delay", false),
                 ("poll_interval", false),
                 ("init", false),
+                ("stand_in", false),
             ],
             NodeType::Network => &[
                 ("protocol", true),

@@ -75,7 +75,17 @@ pub fn judged(host: &crate::simulate::Host, path: &str) -> crate::simulate::Judg
     }
     match host.device_of(path) {
         Ok(device) => sensor_judged(host, path, &device),
-        Err(found) => crate::simulate::Judged::cannot_tell(found, "path", TO_STAND_IN),
+        Err(found) => found.judged("path", TO_STAND_IN),
+    }
+}
+
+/// Whether the device at `path` is a sensor of the kernel's `iio_dummy`, made
+/// by `bin/mkiio`: a stand-in the kernel makes, which the simulator finds
+/// rather than makes, as it finds an I2C stub.
+pub fn is_dummy(host: &crate::simulate::Host, path: &str) -> bool {
+    match host.device_of(path) {
+        Ok(device) => sensor_judged(host, path, &device).is_stand_in(),
+        Err(_) => false,
     }
 }
 

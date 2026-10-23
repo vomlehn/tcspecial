@@ -47,6 +47,7 @@ const I2C_SLAVE: libc::c_ulong = 0x0703;
 const I2C_SMBUS: libc::c_ulong = 0x0720;
 
 const I2C_SMBUS_WRITE: u8 = 0;
+const I2C_SMBUS_READ: u8 = 1;
 const I2C_SMBUS_I2C_BLOCK_DATA: u32 = 8;
 
 /// The most bytes one SMBus block transfer carries, so the most a segment of a
@@ -225,6 +226,65 @@ fn block_write(fd: RawFd, bytes: &mut SmbusData) -> std::io::Result<()> {
     Ok(())
 }
 
+/// One SMBus block read of the data register's bank: what is in it now,
+/// `I2C_SMBUS_BLOCK_MAX` bytes of it.
+fn block_read(fd: RawFd, bytes: &mut SmbusData) -> std::io::Result<()> {
+    bytes.block[0] = I2C_SMBUS_BLOCK_MAX as u8;
+    let mut transfer = SmbusTransfer {
+        read_write: I2C_SMBUS_READ,
+        command: DATA_REGISTER,
+        size: I2C_SMBUS_I2C_BLOCK_DATA,
+        data: bytes as *mut SmbusData,
+    };
+
+    // SAFETY: as for `block_write`.
+    if unsafe { libc::ioctl(fd, I2C_SMBUS, &mut transfer) } < 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    Ok(())
+}
+
+/// What the bank holds, as last looked at, so that what the vehicle writes to
+/// it can be told from what this end wrote.
+///
+/// The bank has no direction -- both masters read and write the same bytes --
+/// so a write of the vehicle's is a change this end did not make: looked for
+/// at the start of each pass, against what the bank held after this end's own
+/// last write. A read of the vehicle's changes nothing and cannot be seen.
+struct Watched {
+    held: SmbusData,
+    known: bool,
+}
+
+impl Watched {
+    fn new() -> Watched {
+        Watched {
+            held: SmbusData {
+                block: [0u8; I2C_SMBUS_BLOCK_MAX + 2],
+            },
+            known: false,
+        }
+    }
+
+    /// Look at the bank: what it holds now, and whether that is a change
+    /// this end did not make.
+    fn changed(&mut self, fd: RawFd) -> Option<SmbusData> {
+        let mut now = SmbusData {
+            block: [0u8; I2C_SMBUS_BLOCK_MAX + 2],
+        };
+        block_read(fd, &mut now).ok()?;
+        let changed = self.known && now.block[1..] != self.held.block[1..];
+        self.held.block = now.block;
+        self.known = true;
+        changed.then_some(now)
+    }
+
+    /// What this end just wrote, which is not the vehicle's.
+    fn after_our_write(&mut self, fd: RawFd) {
+        self.known = block_read(fd, &mut self.held).is_ok();
+    }
+}
+
 /// Run a simulated device on an I2C bus.
 ///
 /// As every other kind: a packet every packet interval, in segments, from
@@ -256,15 +316,23 @@ pub fn run_i2c_node(
     // random ask about.
     let mut sent = 0u64;
     let fd = bus.bus.as_raw_fd();
+    let mut watched = Watched::new();
 
     while running.load(Ordering::SeqCst) {
         let started = Instant::now();
         let pacing = Pacing::read(&config);
 
-        // Nothing is read back. A register bank has no direction: what the
-        // handler writes to it is what the simulator would read, and reading
-        // its own data back and counting it as received would be a lie about
-        // where it came from.
+        // What the vehicle wrote to the bank since this end last looked --
+        // an init, a trigger, a decision -- counted as received, as every
+        // other stand-in counts what arrives. What this end wrote itself is
+        // not counted: see `Watched`.
+        if let Some(now) = watched.changed(fd) {
+            let bytes = &now.block[1..];
+            let mut guard = stats.lock().unwrap();
+            guard.a_packet_has_come(bytes);
+            guard.bytes_recv += bytes.len() as u64;
+        }
+
         if pacing.a_packet_is_due(config.triggered, 0) {
             let late = lateness(&config, &mut rng);
             let packet = match a_packet(&config, &pacing, sent, &mut rng) {
@@ -303,6 +371,7 @@ pub fn run_i2c_node(
                     sent += 1;
                 }
             }
+            watched.after_our_write(fd);
         }
 
         wait_out_packet(&pacing, started, &running);

@@ -53,6 +53,18 @@ pub(crate) struct SimulatedLine {
     pub(crate) pull: PathBuf,
 }
 
+impl SimulatedLine {
+    /// The file that says what the line is: `1` or `0`, whichever drove it
+    /// last -- this end's pull, or the vehicle driving it as an output.
+    pub(crate) fn value(&self) -> PathBuf {
+        self.pull.with_file_name("value")
+    }
+}
+
+/// How often a driven chip's lines are looked at. Far quicker than any
+/// decision a vehicle makes about a heater, and slow enough to cost nothing.
+const WATCH_EVERY: std::time::Duration = std::time::Duration::from_millis(20);
+
 /// Find the simulated lines of `chip`, where the kernel has any.
 ///
 /// `devices` is where to look, given so that a test can hand over a tree of
@@ -136,6 +148,11 @@ pub fn run_gpio_node(
     };
     config.standing.made();
 
+    if config.driven {
+        watch_driven_lines(&config, &running, &stats, &lines);
+        return;
+    }
+
     // What each line is being pulled to, which is what moving it means.
     let mut high = false;
 
@@ -171,6 +188,56 @@ pub fn run_gpio_node(
         }
 
         wait_out_packet(&pacing, started, &running);
+    }
+}
+
+/// Watch the lines of a chip the vehicle drives -- a heater, a valve -- and
+/// count each time it moves them, as a datum received.
+///
+/// The vehicle drives them as outputs, and gpio-sim keeps what each line is
+/// in its `value`, so what the vehicle decided can be read back without being
+/// in its way. A move is the lines' values, one byte each, `1` or `0`; where
+/// they all agree it is a decision, and a heater of a thermal mass is driven
+/// by it, as a heater reached over a socket is.
+///
+/// Silent -- its panel's button off -- the device is switched off: a move is
+/// counted, as every stand-in counts what arrives, and heats nothing.
+fn watch_driven_lines(
+    config: &PayloadConfig,
+    running: &AtomicBool,
+    stats: &std::sync::Mutex<PayloadStats>,
+    lines: &[SimulatedLine],
+) {
+    use std::io::Read;
+
+    // Made here, before the loop, and reused: each line's file, and one byte
+    // a line for what it was and what it is.
+    let values: Vec<PathBuf> = lines.iter().map(SimulatedLine::value).collect();
+    let mut was: Vec<u8> = vec![0; lines.len()];
+    let mut now: Vec<u8> = vec![0; lines.len()];
+    let mut read = [0u8; 4];
+    let mut first = true;
+    while running.load(Ordering::SeqCst) {
+        let sending = Pacing::read(config).sending;
+        for (path, value) in values.iter().zip(now.iter_mut()) {
+            // Opened each time, as a sysfs attribute is read: its value is
+            // what it is when it is opened.
+            let high = std::fs::File::open(path)
+                .and_then(|mut file| file.read(&mut read))
+                .is_ok_and(|n| n > 0 && read[0] == b'1');
+            *value = if high { b'1' } else { b'0' };
+        }
+        if now != was && !first {
+            if sending && now.iter().all(|&v| v == now[0]) {
+                crate::thermal::driven(&config.thermal, &config.name, &now[..1]);
+            }
+            let mut guard = stats.lock().unwrap();
+            guard.a_packet_has_come(&now);
+            guard.bytes_recv += lines.len() as u64 * EVENT_BYTES;
+        }
+        first = false;
+        was.copy_from_slice(&now);
+        crate::payload::wait_while_running(WATCH_EVERY, running);
     }
 }
 
@@ -213,6 +280,69 @@ mod tests {
         // A chip nothing stands in for is not found, which is what the
         // message below is for.
         assert_eq!(lines_of(tree.path(), "/dev/gpiochip9", &[0]), None);
+    }
+
+    /// A chip the vehicle drives is watched: each time its lines move, a
+    /// datum is counted as received, and nothing is counted while they stay.
+    #[test]
+    fn a_driven_chip_counts_each_move_of_its_lines() {
+        use std::sync::atomic::{AtomicBool, AtomicU32};
+        use std::sync::{Arc, Mutex};
+
+        let tree = tempfile::tempdir().expect("a tree of our own");
+        let lines: Vec<SimulatedLine> = [0]
+            .iter()
+            .map(|n| {
+                let dir = tree.path().join(format!("sim_gpio{n}"));
+                std::fs::create_dir_all(&dir).unwrap();
+                std::fs::write(dir.join("value"), "0\n").unwrap();
+                SimulatedLine {
+                    pull: dir.join("pull"),
+                }
+            })
+            .collect();
+        let config = PayloadConfig {
+            thermal: None,
+            name: "heaters".to_string(),
+            protocol: crate::payload::PayloadProtocol::Gpio,
+            address: "/dev/gpiochip3".to_string(),
+            port: 0,
+            bus_address: 0,
+            can_id: 0,
+            can_fd: false,
+            gpio_lines: vec![0],
+            triggered: false,
+            faults: Default::default(),
+            own_address: None,
+            own_port: None,
+            packet_size: Arc::new(AtomicU32::new(0)),
+            segment_size: Arc::new(AtomicU32::new(0)),
+            packet_interval_ms: Arc::new(AtomicU32::new(0)),
+            segment_interval_ms: Arc::new(AtomicU32::new(0)),
+            sending: Arc::new(AtomicBool::new(true)),
+            standing: Default::default(),
+            driven: true,
+        };
+        let running = Arc::new(AtomicBool::new(true));
+        let stats = Arc::new(Mutex::new(PayloadStats::default()));
+        let watching = {
+            let (running, stats, lines) = (running.clone(), stats.clone(), lines.clone());
+            std::thread::spawn(move || watch_driven_lines(&config, &running, &stats, &lines))
+        };
+        let settle = || std::thread::sleep(WATCH_EVERY * 5);
+
+        settle();
+        assert_eq!(stats.lock().unwrap().packets_recv, 0, "nothing has moved");
+        for line in &lines {
+            std::fs::write(line.value(), "1\n").unwrap();
+        }
+        settle();
+        assert_eq!(stats.lock().unwrap().packets_recv, 1, "the line moved");
+        settle();
+        assert_eq!(stats.lock().unwrap().packets_recv, 1, "and stayed");
+
+        running.store(false, std::sync::atomic::Ordering::SeqCst);
+        watching.join().unwrap();
     }
 
     /// With no simulated chip at all, nothing is found.

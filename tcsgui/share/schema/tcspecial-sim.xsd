@@ -40,6 +40,9 @@
     <xs:choice minOccurs="0" maxOccurs="unbounded">
       <xs:element name="name" type="xs:string"/>
       <xs:element name="group" type="xs:string"/>
+      <!-- Whether the payload is simulated, true or false: from the payload
+           or its group, never both. -->
+      <xs:element name="simulate" type="xs:string"/>
       <xs:element name="type" type="kind"/>
       <xs:element name="protocol" type="xs:string"/>
       <xs:element name="payload_address" type="xs:string"/>

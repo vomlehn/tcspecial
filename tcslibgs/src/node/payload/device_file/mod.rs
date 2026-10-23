@@ -53,7 +53,7 @@ mod tests {
 
         assert_eq!(judged_of("/dev/null"), Verdict::Hardware);
         assert_eq!(judged_of(dir.path().to_str().unwrap()), Verdict::CannotTell);
-        assert_eq!(judged_of("/nonexistent/payload"), Verdict::CannotTell);
+        assert_eq!(judged_of("/nonexistent/payload"), Verdict::Absent);
 
         // SAFETY: the two descriptors openpty opened, closed once each.
         unsafe {

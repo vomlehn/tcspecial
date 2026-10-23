@@ -87,6 +87,10 @@ tcspecial, tcssim and tcsmoc take `--simulate=none|some|all`. Left out it is
 tcssim will not start, so a run on a desk gives `--simulate=all`, as the
 Makefiles' run targets do. tcspecial judges each payload a stand-in or not
 from what is at its endpoint (`tcslibgs::simulate`), never from a file.
+Which payloads are meant to be simulated is the simulator file's `simulate`,
+which tcssim holds to the same judgement; tcspecial never reads that file.
+An hdlc, spi, rpmsg or iio node may give `stand_in`, a loopback UDP address
+it is reached at instead of its device under `some` and `all`.
 
 The GUIs and tcspecial may be launched when what is being checked can only be
 seen by running them, but `cargo test` comes first. They bind fixed ports:

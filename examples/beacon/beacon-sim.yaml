@@ -16,6 +16,7 @@ tcssim:
 simulated_payloads:
   # One packet a second, sent whole.
   - name: sensor
+    simulate: true
     type: network
     protocol: udp
     packet_interval: 1 s

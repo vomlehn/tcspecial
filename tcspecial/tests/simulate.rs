@@ -80,3 +80,49 @@ fn a_stand_in_is_allowed_where_the_mode_allows_it() {
     let said = run(&["--simulate=some"]);
     assert!(said.contains("give --simulate=all"), "{said}");
 }
+
+/// A payload of a type the operating system cannot stand in for, with a
+/// stand_in, is judged where it will be reached: at its stand_in in a run
+/// with stand-ins, and as the device it is under the flight setting.
+#[test]
+fn a_stand_in_is_where_a_simulated_channel_is_reached() {
+    let dir = tempfile::tempdir().expect("a directory");
+    let path = dir.path().join("vehicle.yaml");
+    std::fs::write(
+        &path,
+        "tcspecial:
+  gateway: radio
+  beacon: { interval: \"5 s\", recv: \"127.0.0.1:1\", send: \"127.0.0.1:2\" }
+  payload_command: { dest_base: \"127.0.0.1:3\", source_base: \"127.0.0.1:4\" }
+  payload_telemetry: { dest_base: \"127.0.0.1:5\", source_base: \"127.0.0.1:6\" }
+  tcs_cmd: { recv: \"127.0.0.1:7\", send: \"127.0.0.1:8\" }
+payloads:
+  - name: channel
+    type: rpmsg
+    path: \"/nonexistent/rpmsg0\"
+    service: \"payload-telemetry\"
+    stand_in: \"127.0.0.1:9\"
+",
+    )
+    .expect("written");
+    let said = |mode: &str| {
+        let ran = Command::new(env!("CARGO_BIN_EXE_tcspecial"))
+            .arg(mode)
+            .arg(&path)
+            .env_remove("RUST_LOG")
+            .output()
+            .expect("tcspecial runs");
+        String::from_utf8_lossy(&ran.stderr).into_owned()
+    };
+
+    let all = said("--simulate=all");
+    assert!(
+        all.contains("channel: a stand-in: 127.0.0.1 is a loopback address"),
+        "{all}"
+    );
+    let none = said("--simulate=none");
+    assert!(
+        none.contains("channel: taken for hardware, as what could not be told: nothing is at /nonexistent/rpmsg0"),
+        "{none}"
+    );
+}

@@ -60,6 +60,14 @@
       "items": {
         "type": "object",
         "properties": {
+          "simulate": {
+            "type": [
+              "boolean",
+              "string",
+              "null"
+            ],
+            "description": "Whether the payloads that name this group are simulated: true for tcssim to stand in for them, false for the real devices. A payload in a group that states it does not state it too."
+          },
           "name": {
             "type": "string"
           },
@@ -232,6 +240,14 @@
       "items": {
         "type": "object",
         "properties": {
+          "simulate": {
+            "type": [
+              "boolean",
+              "string",
+              "null"
+            ],
+            "description": "Whether this payload is simulated: true for tcssim to stand in for it, false for the real device. Required, from this payload or from its group, and not from both: a payload does not override its group's. Empty is not stated."
+          },
           "name": {
             "type": "string"
           },

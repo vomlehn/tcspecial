@@ -52,7 +52,7 @@ use endpoint::{endpoint_description, payload_config_attached};
 use payload::{PayloadConfig, PayloadStats, SimulatedPayload};
 use tcslibgs::graph::Graph;
 use tcslibgs::ready::SetUpFor;
-use tcslibgs::simulate::{counted, judge, refusals, Host, Judged, Mode};
+use tcslibgs::simulate::{counted, disagreement, judge, refusals, Host, Judged, Mode};
 use tcslibgs::{ResolvedSim, SimConfigFile};
 use tcsverify::startup::Startup;
 
@@ -371,20 +371,6 @@ fn load(payload_path: &str, sim_path: &str, mode: Mode, startup: &mut Startup) -
         }
     };
 
-    // Whether what this simulator will stand in for, with what is a stand-in
-    // already, is what the mode allows. A simulator file that forgot a
-    // payload is caught here, before anything runs; only tcspecial's own
-    // check protects the hardware, because only tcspecial opens it.
-    if let Some(graph) = graph.as_ref() {
-        let refused = stand_ins_refused(graph, &sim_file, sim_path, mode);
-        if !refused.is_empty() {
-            for refusal in refused {
-                startup.error(format!("{payload_path}: {refusal}"));
-            }
-            return None;
-        }
-    }
-
     // Join the two by name. Every data handler needs settings and every
     // settings entry needs a handler, so this is where a file naming a payload
     // that does not exist, or leaving one undriven, is caught.
@@ -395,6 +381,24 @@ fn load(payload_path: &str, sim_path: &str, mode: Mode, startup: &mut Startup) -
             return None;
         }
     };
+
+    // Whether each payload's simulate agrees with what is at its endpoint,
+    // and whether what this simulator will stand in for, with what is a
+    // stand-in already, is what the mode allows. Asked once the file is known
+    // to say simulate once for every payload. A configuration pointing at
+    // hardware in a file that says it is simulated, or a simulator file that
+    // forgot a payload, is caught here, before anything runs; only
+    // tcspecial's own check protects the hardware, because only tcspecial
+    // opens it.
+    if let Some(graph) = graph.as_ref() {
+        let refused = stand_ins_refused(graph, &sim_file, sim_path, mode);
+        if !refused.is_empty() {
+            for refusal in refused {
+                startup.error(format!("{payload_path}: {refusal}"));
+            }
+            return None;
+        }
+    }
 
     // The thermal masses, built once and shared: the sensors attached to one
     // read the same state the heaters attached to it warm, which is the whole
@@ -444,11 +448,15 @@ fn load(payload_path: &str, sim_path: &str, mode: Mode, startup: &mut Startup) -
     Some((dh_configs, sim_file, sims, configs))
 }
 
-/// Every way the payloads of `graph` are not what `mode` allows, counting as
-/// a stand-in each payload the simulator file names, which tcssim will stand
-/// in for, and each that already is one by `tcslibgs::simulate`'s rules -- a
-/// heater on a gpio-sim chip, say, which bin/mkgpio made and the simulator
-/// file leaves out.
+/// Every way the payloads of `graph` disagree with what the simulator file
+/// says of them, or are not what `mode` allows.
+///
+/// Each payload is compared with what is at its endpoint: see
+/// `tcslibgs::simulate::disagreement`. One the file says is simulated is held
+/// to being reached at a stand-in, one it says is real to not being, and one
+/// it does not name is refused where it is a stand-in all the same, so that
+/// every simulated device is one tcssim controls and shows. For the mode, a
+/// payload is a stand-in when its simulate is true.
 fn stand_ins_refused(
     graph: &Graph,
     sim_file: &SimConfigFile,
@@ -456,32 +464,41 @@ fn stand_ins_refused(
     mode: Mode,
 ) -> Vec<String> {
     let host = Host::this();
+    let mut disagreements = Vec::new();
     let judged: Vec<(&str, Judged)> = graph
         .nodes
         .iter()
         .filter(|node| counted(node))
         .filter_map(|node| {
-            let named = sim_file
+            let found = judge(&host, node, mode)?;
+            let said = sim_file
                 .simulated_payloads
                 .iter()
-                .any(|simulated| simulated.name == node.name);
-            let judged = if named {
-                Judged::stand_in(
-                    format!("{sim_path} names it, for tcssim to stand in for"),
-                    "path",
-                    "",
-                )
-            } else {
-                judge(&host, node)?
+                .find(|simulated| simulated.name == node.name)
+                .and_then(|simulated| sim_file.simulate_of(simulated).ok());
+            disagreements.extend(disagreement(&node.name, &node.node_type, said, &found));
+            let judged = match said {
+                Some(true) => Judged::stand_in(
+                    format!("{sim_path} says simulate: true"),
+                    found.attribute,
+                    found.to_stand_in,
+                ),
+                _ => found,
             };
             Some((node.name.as_str(), judged))
         })
         .collect();
+    if !disagreements.is_empty() {
+        return disagreements;
+    }
     let pairs: Vec<(&str, &Judged)> = judged.iter().map(|(name, j)| (*name, j)).collect();
     refusals(mode, &pairs)
         .into_iter()
         .map(|refusal| match mode {
-            Mode::All => format!("{refusal}, or name it in {sim_path} for tcssim to stand in for"),
+            Mode::All => format!(
+                "{refusal}, or name it in {sim_path} with simulate: true for tcssim to \
+                 stand in for"
+            ),
             _ => refusal,
         })
         .collect()
@@ -912,6 +929,58 @@ mod tests {
         assert_eq!(dh_configs[0].name.0, "sensor");
         assert_eq!(sims.len(), 1);
         assert_eq!(configs.len(), 1);
+    }
+
+    /// A payload's simulate is held to what is at its endpoint: true where
+    /// the far end may be another host is refused, and so is false where it
+    /// is a stand-in -- here, a loopback address.
+    #[test]
+    fn simulate_is_held_to_what_is_at_the_endpoint() {
+        let dir = tempfile::tempdir().unwrap();
+        let configuration = |address: &str| {
+            let path = dir.path().join("set.yaml");
+            std::fs::write(
+                &path,
+                format!(
+                    "payloads:\n  - {{ name: sensor, type: network, protocol: udp, \
+                     address: \"{address}\", port: \"9\" }}\n"
+                ),
+            )
+            .unwrap();
+            tcslibgs::graph::Graph::load(&path).expect("it reads")
+        };
+        let sim = |simulate: bool| -> SimConfigFile {
+            tcslibgs::format::ConfigFormat::Yaml
+                .parse(&format!(
+                    "simulated_payloads:\n  - name: sensor\n    simulate: {simulate}\n"
+                ))
+                .unwrap()
+        };
+
+        assert!(
+            stand_ins_refused(&configuration("127.0.0.1"), &sim(true), "s.yaml", Mode::All)
+                .is_empty()
+        );
+        let said = stand_ins_refused(&configuration("10.0.0.5"), &sim(true), "s.yaml", Mode::All);
+        assert!(said[0].contains("says simulate: true"), "{said:?}");
+        let said = stand_ins_refused(
+            &configuration("127.0.0.1"),
+            &sim(false),
+            "s.yaml",
+            Mode::Some,
+        );
+        assert!(
+            said[0].contains("a stand-in, and the simulator file says simulate: false"),
+            "{said:?}"
+        );
+        assert!(stand_ins_refused(
+            &configuration("10.0.0.5"),
+            &sim(false),
+            "s.yaml",
+            Mode::Some
+        )
+        .iter()
+        .all(|refusal| !refusal.contains("simulate: false")));
     }
 
     /// One whose simulator file names nothing is refused, saying so: there is
@@ -1643,6 +1712,32 @@ mod tests {
     /// The examples, found rather than listed, so an example added to the
     /// repository is covered by these tests without anyone remembering to
     /// name it here.
+    /// Every shipped set's simulator file names every payload that is a
+    /// stand-in, so that tcssim controls and shows each of them. Only that is
+    /// asked here: whether a device path is real hardware depends on the host
+    /// the test runs on.
+    #[test]
+    fn every_shipped_stand_in_is_named() {
+        for (configuration, sim_path) in shipped_sets() {
+            let graph = tcslibgs::graph::Graph::load(&configuration).expect("it reads");
+            let sim_file = SimConfigFile::load(&sim_path).expect("it reads");
+            let refused: Vec<String> = stand_ins_refused(
+                &graph,
+                &sim_file,
+                &sim_path.display().to_string(),
+                Mode::All,
+            )
+            .into_iter()
+            .filter(|refusal| refusal.contains("does not name it"))
+            .collect();
+            assert!(
+                refused.is_empty(),
+                "{}: {refused:?}",
+                configuration.display()
+            );
+        }
+    }
+
     fn shipped_sets() -> Vec<(std::path::PathBuf, std::path::PathBuf)> {
         let root = repo_file("examples");
         let mut sets = Vec::new();
@@ -1694,6 +1789,8 @@ mod tests {
             mode: Default::default(),
             stale_interval: None,
             sends_from: None,
+            stand_in: None,
+            driven: false,
         }
     }
 
@@ -2072,6 +2169,8 @@ mod tests {
             mode: Default::default(),
             stale_interval: None,
             sends_from: None,
+            stand_in: None,
+            driven: false,
         };
 
         let info = payload_info_from(0, &dh, &sim(500, 250, 5));

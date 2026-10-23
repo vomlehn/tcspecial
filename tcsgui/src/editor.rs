@@ -846,8 +846,8 @@ tcsgui:
         let twice = where_.path().join("twicesim.yaml");
         std::fs::write(
             &twice,
-            "simulated_payloads:\n  - name: payload\n    packet_interval: 500 ms\n  \
-             - name: payload\n    packet_interval: 900 ms\n",
+            "simulated_payloads:\n  - name: payload\n    simulate: true\n    packet_interval: 500 ms\n  \
+             - name: payload\n    simulate: true\n    packet_interval: 900 ms\n",
         )
         .expect("a simulator file");
         let mut editor = Editor::open(&path, crate::pane::default_dividers());
@@ -867,7 +867,7 @@ tcsgui:
         let stray = where_.path().join("straysim.yaml");
         std::fs::write(
             &stray,
-            "simulated_payloads:\n  - name: payload\n  - name: paylod\n",
+            "simulated_payloads:\n  - name: payload\n    simulate: true\n  - name: paylod\n    simulate: true\n",
         )
         .expect("a simulator file");
         let mut editor = Editor::open(&path, crate::pane::default_dividers());
@@ -880,7 +880,7 @@ tcsgui:
         let good = where_.path().join("goodsim.yaml");
         std::fs::write(
             &good,
-            "simulated_payloads:\n  - name: payload\n    packet_interval: 500 ms\n",
+            "simulated_payloads:\n  - name: payload\n    simulate: true\n    packet_interval: 500 ms\n",
         )
         .expect("a simulator file");
         let mut editor = Editor::open(&path, crate::pane::default_dividers());

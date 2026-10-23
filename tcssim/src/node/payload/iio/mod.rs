@@ -47,6 +47,24 @@ pub fn run_iio_node(
     running: Arc<AtomicBool>,
     stats: Arc<std::sync::Mutex<PayloadStats>>,
 ) {
+    // A sensor of the kernel's iio_dummy, made by bin/mkiio, is a stand-in
+    // already, which the kernel fills from its own trigger: there is nothing
+    // to make, and no pseudo-terminal is put in its place. Its panel is
+    // there, as every simulated payload's is, and counts nothing -- the
+    // samples go from the kernel to the vehicle, and nothing of them passes
+    // here to be seen.
+    if tcslibgs::node::payload::iio::is_dummy(&tcslibgs::simulate::Host::this(), &config.address) {
+        eprintln!(
+            "{}: {} is a sensor of the kernel's iio_dummy, which stands in for itself",
+            config.name, config.address
+        );
+        config.standing.made();
+        while running.load(Ordering::SeqCst) {
+            crate::payload::wait_while_running(std::time::Duration::from_millis(100), &running);
+        }
+        return;
+    }
+
     let mut buffer = match SimulatedNode::open(
         &format!("{}: an IIO sample buffer", config.name),
         &config.address,
@@ -135,6 +153,7 @@ mod tests {
             segment_interval_ms: Arc::new(AtomicU32::new(0)),
             sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             standing: Default::default(),
+            driven: false,
         }
     }
 

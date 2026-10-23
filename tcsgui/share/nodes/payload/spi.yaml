@@ -83,3 +83,12 @@ attributes:
       bytes in brackets, or both one after another. A heater that must start off, a register
       to set before the part reads sensibly. A write that fails stops the
       node from starting.
+  - name: stand_in
+    required: false
+    about: >
+      Where the payload is reached over UDP when it is simulated, as a
+      loopback address and port: 127.0.0.1:7950. Under --simulate=some or
+      all tcspecial sends to and reads from that address instead of the
+      device, and tcssim answers there; under --simulate=none, the flight
+      setting, it is not used and the device is opened. For the types the
+      operating system has nothing faithful to stand in for.

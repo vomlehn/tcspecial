@@ -33,6 +33,21 @@ use crate::telemetry_log::TelemetryLog;
 /// Whether something has asked this process to stop.
 static STOPPING: AtomicBool = AtomicBool::new(false);
 
+/// The run's simulation mode, `--simulate`, once `run_graph` has been given
+/// it: none until then, the flight setting.
+///
+/// Held for the process, as the quiet flag is, because it is one fact about
+/// the whole run and is asked where a node is opened -- at the start and again
+/// on every START_NODE -- far below anything that could be handed it: see
+/// `EndpointPort::open`, where a node with a `stand_in` is reached over UDP
+/// when the run has stand-ins.
+static MODE: std::sync::OnceLock<Mode> = std::sync::OnceLock::new();
+
+/// The run's simulation mode: see [`MODE`].
+pub fn mode() -> Mode {
+    MODE.get().copied().unwrap_or(Mode::None)
+}
+
 /// Whether the startup summary is left unsaid: `-q` or `--quiet`.
 static QUIET: AtomicBool = AtomicBool::new(false);
 
@@ -65,6 +80,9 @@ pub fn summary(line: impl std::fmt::Display) {
 /// Every reason it could not start, rather than the first: a file with three
 /// problems in it is one trip to a desk, where one problem at a time is three.
 pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
+    // Set once: a RESTART runs this again in the same process, with the mode
+    // it was started with, and the first is the one that holds.
+    let _ = MODE.set(mode);
     let graph = Graph::load(path).map_err(|why| vec![format!("{path}: {why}")])?;
 
     // The same checks the ground tool runs, against the same code. A
@@ -187,7 +205,7 @@ fn judged_against(graph: &Graph, mode: Mode) -> Vec<String> {
     let judged: Vec<(&str, Judged)> = graph
         .nodes
         .iter()
-        .filter_map(|node| judge(&host, node).map(|judged| (node.name.as_str(), judged)))
+        .filter_map(|node| judge(&host, node, mode).map(|judged| (node.name.as_str(), judged)))
         .collect();
     summary(format!("simulation mode: {mode}"));
     for (name, judged) in &judged {

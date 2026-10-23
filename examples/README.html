@@ -202,16 +202,20 @@ watching something tcspecial sends on its own account, and so does
 <code>ping</code>, whose ground station is Python 3.</p>
 <p>A configuration and its simulator file are matched by payload name.
 The simulator file can’t name a payload the configuration doesn’t have,
-nor one the simulator would not stand in for: a payload that is only
-driven, such as <code>tees</code>’ heater, which nothing reads back, or
-one that is a program, which tcspecial runs itself.
-<code>tcsverify</code> refuses either, as tcssim does.</p>
+nor one the simulator would not stand in for: a payload that is a
+program, which tcspecial runs itself. <code>tcsverify</code> refuses
+either, as tcssim does. A payload that is only driven, such as
+<code>tees</code>’ heater, is simulated like any other: its stand-in
+counts what the vehicle sends it.</p>
 <p>The YAML and XML files must say the same thing, so change both
 together.</p>
-<p>Every simulator file has a <code>tcssim</code> section giving the
-address at which tcssim says it has made its stand-ins, a port no other
-example uses, so that tcsmoc starts tcspecial only once they are there.
-The <code>make run-*</code> targets give every program
+<p>Every payload a simulator file names says <code>simulate: true</code>
+– itself or in its group, not both – for tcssim to stand in for it;
+<code>simulate: false</code> would leave it to the real device. Every
+simulator file also has a <code>tcssim</code> section giving the address
+at which tcssim says it has made its stand-ins, a port no other example
+uses, so that tcsmoc starts tcspecial only once they are there. The
+<code>make run-*</code> targets give every program
 <code>--simulate=all</code>, the run being one with stand-ins only: a
 program started without <code>--simulate</code> gets the flight setting,
 <code>none</code>, and refuses every stand-in. See “Stand-ins or

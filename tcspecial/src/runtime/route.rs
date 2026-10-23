@@ -62,6 +62,13 @@ pub struct Delivery {
     /// configuration does not have: it is carried as "wherever its links go",
     /// which is what every delivery was before the streams were kept apart.
     pub stream: Option<Stream>,
+
+    /// Which line of the drawing this is: the configuration's links counted
+    /// one per destination, in the order the file holds them, which is the
+    /// order tcsgui draws them in and tcspecial's visual window lights them
+    /// by. `None` for a delivery that is not a line anyone drew -- a payload
+    /// nothing touches, to its link over `payload_telemetry`.
+    pub line: Option<usize>,
 }
 
 /// Which stream a link carries, where the configuration settles it.
@@ -170,6 +177,9 @@ impl Routes {
             })
             .collect();
 
+        // The lines of the drawing, counted as tcsgui reads them: one per
+        // destination, in the file's order.
+        let mut line = 0;
         for link in &graph.links {
             // The node it leaves, whatever terminal it leaves by. The routing
             // question is which node, so `n.payload-out` and `n` are one
@@ -203,7 +213,9 @@ impl Routes {
                         to,
                         input: input.clone(),
                         stream,
+                        line: Some(line),
                     });
+                line += 1;
 
                 if let Some(input) = input {
                     routes.sources.insert((node, input), from.clone());
@@ -227,6 +239,7 @@ impl Routes {
                     // What a payload reports, and only that: an app payload's
                     // other stream is what the ground sent it.
                     stream: Some(Stream::Groundward),
+                    line: None,
                 });
         }
 

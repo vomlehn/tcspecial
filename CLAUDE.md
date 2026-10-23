@@ -33,6 +33,10 @@ argue from this order and say so.
   and line. tcspecial, tcsmoc, tcssim and tcsgui all check through its
   `verify`, so they agree about what is wrong.
 - `tcsui` -- window pieces the ground programs share.
+- `tcsdiagram` -- how a configuration is drawn: the working panes, node
+  shapes, link routes and colours, as Rust and as `ui/diagram.slint`. tcsgui
+  draws with it, and so does tcspecial's visual window (`--visual`, in a
+  build with the `visual` feature, which never flies).
 - `tcsapp` and the `app_*` crates -- the file interfaces an app node's program
   runs with, and the five test apps.
 - `examples/` -- configurations and programs; see `examples/README.md`.

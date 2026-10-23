@@ -585,7 +585,8 @@ install-data:
 # workspace built with every type never makes. The types are what a build
 # with the defaults says it contains, which is every type, so that the list
 # is not written down a second time here; see "Which Node Types Are Built" in
-# docs/design.rst.
+# docs/design.rst. And with the visual window, which no default build has
+# and so nothing else would ever build.
 .PHONY: check
 check:
 	@echo "Running cargo check..."
@@ -597,6 +598,9 @@ check:
 		cargo clippy -q -p $(PROJECT_NAME) --no-default-features --features $$type \
 			-- -D warnings || exit 1; \
 	done
+	cd $(RUST) && cargo clippy -p $(PROJECT_NAME) --features visual --all-targets -- -D warnings
+	cd $(RUST) && cargo test -q -p $(PROJECT_NAME) --features visual --lib visual
+	cd $(RUST) && cargo test -q -p $(PROJECT_NAME) --features visual --test visual
 	cd $(RUST) && cargo fmt -- --check
 
 # Format code

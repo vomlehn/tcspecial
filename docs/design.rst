@@ -6145,6 +6145,77 @@ Requirement
     say -- breaks only the builds without that type, which a workspace built
     with every type never makes.
 
+
+The Visual Window
+-----------------
+A configuration is a drawing in tcsgui and a running process in tcspecial, and
+nothing showed the one as the other: what a vehicle on a desk was doing could
+be read only from its logs and from the ground station's panels. The visual
+window draws the running graph as the editor draws the configuration and lights
+each link as data crosses it.
+
+Requirement
+    ``tcspecial --visual`` opens the window, in a tcspecial built with the
+    Cargo feature ``visual``. A tcspecial built without it refuses the flag
+    before anything is read or opened, saying that the window is only in a
+    build with the feature and how to make one. The feature is not a default
+    and is never in a build that flies: it brings a window toolkit into the
+    flight software, and a build that has it says so as a warning every time
+    it starts, window or not.
+
+Requirement
+    ``--visual`` is refused under ``--simulate=none``, in every build and
+    before anything is read or opened, saying to give ``--simulate=some`` or
+    ``--simulate=all`` with it. ``none`` is the flight setting and what a run
+    that leaves ``--simulate`` out gets (see `Simulation Modes`_), so a window
+    there would be a window opened in flight; a run with no stand-ins that is
+    not flight is a mistake about which run it is. The refusal comes before
+    the build's own, so that what a flight launch meets does not depend on
+    how the binary was built.
+
+Requirement
+    The window shows the three working panes as tcsgui shows them, with every
+    node of the top file where tcsgui would place it and every link along the
+    route tcsgui gives it. Where the panes are divided is the person's own
+    tcsgui setting, read and never written, and the nodes are settled into
+    their panes by the rule the editor settles a file it opens with. A line to
+    a node in an included file is drawn to a stub, as the editor draws it.
+
+Requirement
+    The drawing is one drawing. What a node, a link and the sheet look like --
+    the shapes, the routes, the colours, the panes -- is the crate
+    ``tcsdiagram``, Rust that produces paths, sizes and colours and the markup
+    ``tcsdiagram/ui/diagram.slint`` that paints them, and both tcsgui and
+    tcspecial draw with it. Two copies of the drawing would be two answers to
+    where a node is.
+
+Requirement
+    A link is lit while data crosses it. Each datum sent over a link draws,
+    under the link's ordinary line, a second line three times as wide and a
+    shade lighter than the ordinary line's colour -- half way to white, so the
+    colour still says which way the data is travelling -- and the wide line is
+    taken away ``LINE_BLINK`` after the datum was sent: 0.25 seconds,
+    ``tcspecial::visual::LINE_BLINK``. The ordinary line is drawn whether or
+    not the wide one is, on top of it, exactly as tcsgui draws it.
+
+Requirement
+    The window takes no press: a node is not dragged, a terminal draws no
+    link, a menu does not open. It keeps what the window manager gives every
+    window -- raising, lowering and closing -- and closing it stops tcspecial,
+    as an interrupt would: the pass finished, the links closed, the log
+    flushed. A tcspecial that stops, or that never starts, closes the window.
+
+Requirement
+    What the vehicle does to be shown is one atomic store per datum sent, into
+    a slot of a table made before the vehicle starts. It allocates nothing,
+    takes no lock and waits for nothing, so a window that is slow to draw
+    cannot slow the vehicle. The window runs on the main thread, which a
+    window has to, and the vehicle on a thread of its own beside it; the
+    window looks at the table every 40 milliseconds, well inside
+    ``LINE_BLINK``. A delivery says which line of the drawing it travelled by
+    the line's place among the configuration's links counted one per
+    destination in the file's order, which is the order tcsgui draws them in.
+
 tcslib
 ------
 The TCSpecial library has a set of operations for global control and status
@@ -8127,7 +8198,11 @@ what is wrong with them.
 
 Simulation Modes
 ----------------
-**Specified, not yet implemented.**
+**Specified, not yet implemented**, except that tcspecial reads
+``--simulate``, ``tcslibgs::simulate``, refusing a mode that is not one of
+the three or a flag given twice, and refuses ``--visual`` under ``none``: see
+`The Visual Window`_. What a mode requires of the payloads is not yet
+checked, and tcssim and tcsmoc do not yet take the flag.
 
 Tcspecial reaches each payload through whatever is at the end of its endpoint,
 and nothing in a configuration says whether that is the payload or a stand-in

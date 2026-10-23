@@ -184,7 +184,6 @@ impl Ends {
     /// not about which corner a stream leaves by. Every line the canvas draws
     /// leaves a terminal and arrives at one, so every line it draws says which
     /// way each of its ends points.
-    #[cfg(test)]
     pub fn forward(x1: f32, y1: f32, x2: f32, y2: f32) -> Ends {
         Ends {
             from: (x1, y1),
@@ -257,7 +256,6 @@ type Weighed = (Cost, Vec<(f32, f32)>);
 /// as many more turns as it takes to miss what is in the way. Where the two
 /// ends are at the same height and nothing is between them the route is one
 /// straight line, which is the common case and wants no corners at all.
-#[cfg(test)]
 pub fn route(ends: Ends, around: &[Obstacle]) -> String {
     drawn(&way(ends, around, &[]))
 }
@@ -316,7 +314,6 @@ pub fn arrow(ends: Ends) -> String {
 /// most room to is the segment with room for this. A route whose longest run
 /// has no room for one gets none -- see [`ROOM`] -- which is a short link,
 /// where the head at the end is already next to everything else about it.
-#[cfg(test)]
 pub fn marker(ends: Ends, around: &[Obstacle]) -> String {
     marker_on(&way(ends, around, &[]))
 }
@@ -352,7 +349,6 @@ pub fn marker_on(points: &[(f32, f32)]) -> String {
 /// used to be. A route that detours around a node has a middle nowhere near
 /// the straight line between its ends, and a label sitting there is a label
 /// beside a different link -- or beside nothing at all.
-#[cfg(test)]
 pub fn label_at(ends: Ends, around: &[Obstacle]) -> (f32, f32) {
     label_on(ends, &way(ends, around, &[]))
 }
@@ -437,7 +433,6 @@ pub fn drawing(anchor: (f32, f32), at: (f32, f32)) -> String {
 /// node's box -- a slanted outline does not reach its own box at the row a
 /// terminal sits in, so the line stops where the shape is, which is in from
 /// the side. See `style::room_at`.
-#[cfg(test)]
 pub fn runs_through(ends: Ends, around: &[Obstacle]) -> usize {
     let (from, to) = (ends.from, ends.to);
     let points = way(ends, around, &[]);
@@ -729,7 +724,7 @@ fn laned(tracks: Vec<f32>) -> Vec<f32> {
 ///
 /// In lane-widths rather than pixels so that the number is comparable with the
 /// bends it is weighed against: see [`Cost`].
-pub(crate) fn shared(points: &[(f32, f32)], taken: &[Vec<(f32, f32)>]) -> u32 {
+pub fn shared(points: &[(f32, f32)], taken: &[Vec<(f32, f32)>]) -> u32 {
     let mut along = 0.0;
     for mine in points.windows(2) {
         for theirs in taken.iter().flat_map(|route| route.windows(2)) {

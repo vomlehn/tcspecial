@@ -37,9 +37,7 @@ mod editor;
 mod history;
 mod journal;
 mod nodes;
-mod pane;
 mod read;
-mod route;
 mod save;
 mod settings;
 /// What the colours look like to a reader who cannot see all of them. Used by
@@ -47,7 +45,6 @@ mod settings;
 #[cfg(test)]
 mod sight;
 mod sim;
-mod style;
 mod subdiagram;
 
 use std::cell::RefCell;
@@ -55,6 +52,12 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use slint::{ModelRc, VecModel};
+// How a configuration is drawn, shared with tcspecial's visual window: the
+// panes, the node shapes, the routes, the colours and the settings that say
+// where the panes are divided. Named here so that `crate::pane` and the rest
+// read as they did while these were this program's own.
+use tcsdiagram::look::ground_of;
+use tcsdiagram::{look, pane, route, style};
 
 use document::{Document, Fault};
 use editor::Editor;
@@ -63,7 +66,7 @@ use pane::{
     confine, dividers_for, edges_of, is_payload, pane_of, percents_for, size_of, Dividers, Pane,
     WORKING_WIDTH,
 };
-use style::{Edge, Face, NodeType, Outline, Weight, ERROR_TINT};
+use style::NodeType;
 use subdiagram::{Home, Qualified};
 use tcslibgs::graph::check::Problem;
 
@@ -3815,36 +3818,13 @@ fn views_of(editor: &Editor, home: &Home, held: Option<&Link>) -> (Vec<NodeView>
         })
         .collect();
 
-    // What a line may not run through: every node on this page, where it is
-    // and how big it is. Worked out once for the page rather than once per
-    // link, and handed to the router, which knows about geometry and nothing
-    // about documents.
-    let obstacles: Vec<route::Obstacle> = document
-        .nodes_in(home)
-        .iter()
-        .map(|node| {
-            let (width, height) = size_of(&node.node_type);
-            route::Obstacle::new(
-                node.at.0 as f32,
-                node.at.1 as f32,
-                width as f32,
-                height as f32,
-            )
-        })
-        .collect();
-
+    // Every node, whichever page it is on, because a line to one on another
+    // page is drawn to a stub whose height is taken from it; and the lines
+    // with an end on this one. The drawing is tcsdiagram's, which tcspecial's
+    // visual window draws by too: see tcsdiagram::view::link_looks.
+    let sheet = on_sheet(document, home);
     let here = |name: &str| &Qualified::parse(name).in_ == home;
-    // Every route laid so far, in the order the file holds the links, so that
-    // each line is laid clear of the ones already on the canvas: two lines
-    // that run along one track are one line on the screen, and the one drawn
-    // first is not on it at all. See `route::lay`.
-    //
-    // In the file's order rather than by any rule of its own, so that the same
-    // configuration is drawn the same way every time it is opened -- a layout
-    // that depended on which link happened to be routed first would change
-    // under somebody who only reordered two lines in a text editor.
-    let mut taken: Vec<Vec<(f32, f32)>> = Vec::new();
-    let links: Vec<LinkView> = document
+    let lines: Vec<tcsdiagram::view::LineOnSheet> = document
         .links
         .iter()
         .filter(|link| here(&link.from) || here(&link.to))
@@ -3852,58 +3832,11 @@ fn views_of(editor: &Editor, home: &Home, held: Option<&Link>) -> (Vec<NodeView>
         // while its end was being dragged away would say the gesture had not
         // started. It comes back where the hand put it down, or where it was.
         .filter(|link| !held.is_some_and(|held| held.same_connection(link)))
-        .map(|link| {
-            let ends = ends_of(document, link, home);
-
-            // The label says which input it arrives at, and names the far
-            // node where that node is on another page.
-            let crossing = !here(&link.from) || !here(&link.to);
-            //
-            // A terminal is not one of those, and is not labelled: it is drawn
-            // as the corner the line is attached to and as the arrow in it,
-            // which says the same thing in the place a reader is already
-            // looking. A label reading "payload-in" beside every line would
-            // be the name of the thing the picture is showing.
-            let named_input = link
-                .input
-                .as_deref()
-                .filter(|input| tcslibgs::graph::terminals::stream_of(input).is_none());
-            let label = match (named_input, crossing) {
-                (Some(input), false) => input.to_string(),
-                (Some(input), true) => format!("{} . {input}", far_end(link, home)),
-                (None, true) => far_end(link, home),
-                (None, false) => String::new(),
-            };
-
-            // The line itself, laid once and clear of the lines already laid.
-            // Everything else about its drawing comes from these points, so
-            // the path, the marker and the label cannot disagree about where
-            // the line went.
-            let points = route::lay(ends, &obstacles, &taken);
-            let drawn = route::drawn_route(&points);
-            let marker = route::marker_on(&points);
-            // The label goes at the middle of the route's longest run, which
-            // is on the line wherever the line had to go.
-            let (label_x, label_y) = route::label_on(ends, &points);
-            taken.push(points);
-
-            LinkView {
-                // The route and the arrow, worked out where they can be
-                // tested: see route.rs.
-                route: drawn.into(),
-                head: route::arrow(ends).into(),
-                marker: marker.into(),
-                label_x,
-                label_y,
-                wide: named_input.is_some(),
-                // Which stream it carries, as a colour: see `line_ink`.
-                ink: colour(&line_ink(document.node(&link.from).and_then(|node| {
-                    style::terminal_for(&node.node_type, link.origin.as_deref(), false)
-                }))),
-                label: label.into(),
-                comment: link.comment.clone().unwrap_or_default().into(),
-            }
-        })
+        .map(line_on_sheet)
+        .collect();
+    let links: Vec<LinkView> = tcsdiagram::view::link_looks(&sheet, &lines)
+        .into_iter()
+        .map(link_view)
         .collect();
 
     (nodes, links)
@@ -3926,81 +3859,33 @@ fn views_of(editor: &Editor, home: &Home, held: Option<&Link>) -> (Vec<NodeView>
 /// test that no line runs through a node asks about the same geometry. Two
 /// copies of it would be a test of a drawing nobody sees.
 fn ends_of(document: &Document, link: &Link, home: &Home) -> route::Ends {
-    let here = |name: &str| &Qualified::parse(name).in_ == home;
-    let from = document.node(&link.from);
-    let to = document.node(&link.to);
-
-    let joined = |node: &document::Node, named: Option<&str>, sink: bool| {
-        let terminal = style::terminal_for(&node.node_type, named, sink)?;
-        style::attachment(&node.node_type, node.at, terminal)
-    };
-    // Which data sink the line arrives at, where the link does not say. The
-    // one that pairs with the source it left: a link leaving `moc-out`
-    // arrives at a `moc-in`, that being the same stream named at its other
-    // end -- see tcslibgs::graph::terminals::answers. Without this the drawing
-    // fell back to the groundward sink whatever the link carried, so a command
-    // from the ground was drawn arriving at the corner the readings leave by.
-    let pairing = |from: Option<&document::Node>, origin: Option<&str>| {
-        let from = from?;
-        let leaves = style::terminal_for(&from.node_type, origin, false)?;
-        tcslibgs::graph::terminals::answers(leaves)
-    };
-
-    let ((x1, y1), leaves_right) = match from {
-        Some(node) if here(&link.from) => joined(node, link.origin.as_deref(), false)
-            .unwrap_or_else(|| {
-                // A type this build does not know, drawn as a node with no
-                // terminals: the middle of its right edge, where every link
-                // used to leave.
-                let (w, h) = size_of(&node.node_type);
-                (
-                    (
-                        (node.at.0 + w as i32) as f32,
-                        (node.at.1 + h as i32 / 2) as f32,
-                    ),
-                    true,
-                )
-            }),
-        // Off this page: a stub at the left edge.
-        _ => (
-            (0.0, to.map(|n| n.at.1 as f32 + 24.0).unwrap_or(24.0)),
-            true,
-        ),
-    };
-    let ((x2, y2), arrives_right) = match to {
-        Some(node) if here(&link.to) => {
-            // What the link wrote, where that is a terminal this type has; the
-            // terminal that pairs with the source otherwise. A computation's
-            // own input -- `in0` -- is neither, and falls through to the
-            // pairing one: a mean's three lines arrive where its readings do.
-            let wanted = link
-                .input
-                .as_deref()
-                .filter(|input| {
-                    NodeType::ALL
-                        .iter()
-                        .find(|t| t.spelling() == node.node_type)
-                        .is_some_and(|t| t.terminals().has(input))
-                })
-                .or_else(|| pairing(from, link.origin.as_deref()));
-            joined(node, wanted, true).unwrap_or_else(|| {
-                let (_, h) = size_of(&node.node_type);
-                ((node.at.0 as f32, (node.at.1 + h as i32 / 2) as f32), true)
-            })
-        }
-        // Off this page: a stub to the right of its source.
-        _ => ((x1 + 72.0, y1), true),
-    };
-
-    route::Ends::new((x1, y1), (x2, y2), leaves_right, arrives_right)
+    tcsdiagram::view::ends(&on_sheet(document, home), &line_on_sheet(link))
 }
 
-/// The name of the end of `link` that is not on this page.
-fn far_end(link: &Link, home: &Home) -> String {
-    if &Qualified::parse(&link.from).in_ == home {
-        link.to.clone()
-    } else {
-        link.from.clone()
+/// Every node of the document as tcsdiagram draws it, each saying whether it
+/// is on `home`'s page.
+fn on_sheet<'a>(document: &'a Document, home: &Home) -> Vec<tcsdiagram::view::OnSheet<'a>> {
+    document
+        .nodes
+        .iter()
+        .map(|node| tcsdiagram::view::OnSheet {
+            // As a line names it: qualified by its page. See Document::node.
+            name: Qualified::of(&node.name, &node.home).absolute(),
+            node_type: &node.node_type,
+            at: node.at,
+            here: &node.home == home,
+        })
+        .collect()
+}
+
+/// One of the document's links as tcsdiagram draws it.
+fn line_on_sheet(link: &Link) -> tcsdiagram::view::LineOnSheet<'_> {
+    tcsdiagram::view::LineOnSheet {
+        from: &link.from,
+        origin: link.origin.as_deref(),
+        to: &link.to,
+        input: link.input.as_deref(),
+        comment: link.comment.as_deref(),
     }
 }
 
@@ -4717,6 +4602,9 @@ fn stated(sets: &str) -> Vec<(String, String)> {
 }
 
 /// What a node of this type looks like, as the window wants it.
+///
+/// The look is tcsdiagram's, which tcspecial's visual window draws from too;
+/// this adds what only the editor has, which is whether it is selected.
 fn view_of(
     name: &str,
     node_type: &str,
@@ -4727,305 +4615,68 @@ fn view_of(
     // `NodeView::summary`. A node's own comment is in its window.
     summary: Option<&str>,
 ) -> NodeView {
-    let found = NodeType::ALL.iter().find(|t| t.spelling() == node_type);
-    let appearance = found.map(|t| t.appearance());
-    let terminals = found.map(|t| t.terminals()).unwrap_or(style::Terminals {
-        sinks: &[],
-        sources: &[],
-    });
-
-    // A type this build does not know is drawn as a small open square, which
-    // is a shape no real type uses, and marked faulty. Showing it beats
-    // refusing to open the file: a configuration written for a later build is
-    // readable, and what cannot be placed is visibly what cannot be placed.
-    let (outline, edge, weight, size, tint, face, label_size, label_weight, label_italic) =
-        match appearance {
-            Some(a) => (
-                a.outline,
-                a.edge,
-                a.weight,
-                a.size,
-                tint_of(node_type),
-                a.face,
-                a.label_size,
-                a.label_weight,
-                a.label_italic,
-            ),
-            None => (
-                Outline::Square,
-                Edge::Single,
-                Weight::Narrow,
-                (104u32, 40u32),
-                ERROR_TINT.to_string(),
-                Face::Plain,
-                11,
-                400,
-                true,
-            ),
-        };
-
-    NodeView {
-        name: name.into(),
-        node_type: node_type.into(),
-        x: at.0 as f32,
-        y: at.1 as f32,
-        width: size.0 as f32,
-        height: size.1 as f32,
-        outline: match outline {
-            Outline::Square => "square",
-            Outline::Rounded => "rounded",
-            Outline::Parallelogram => "parallelogram",
-        }
-        .into(),
-        // The shape to fill, the line to stroke and the second line of a
-        // doubled edge, all as paths in the node's own coordinates, for every
-        // outline. See style::polygon_of, which all three come from.
-        shape: style::shape_of(outline, size).into(),
-        edge: style::edge_of(outline, edge, size).into(),
-        inner: style::inner_of(outline, edge, size).into(),
-        border: match weight {
-            Weight::Narrow => 1.0,
-            Weight::Wide => 3.0,
-        },
-        face: match face {
-            Face::Plain => "plain",
-            Face::Mono => "mono",
-        }
-        .into(),
-        label_size: label_size as f32,
-        label_weight: label_weight as i32,
-        label_italic,
-        tint: colour(&tint),
-        // What is drawn *on* the body, now that the body is painted in the
-        // tint: see NodeView::mark.
-        mark: colour(MARK),
-        faulty: fault.is_some(),
+    node_view(
+        tcsdiagram::view::node_look(name, node_type, at, fault.is_some(), summary),
         selected,
-        summary: summary.unwrap_or_default().into(),
-        // A diagram of its own can be opened; nothing else can.
-        openable: node_type == "subdiagram",
-        // The terminals this type has, each drawn in its own corner. A type
-        // this build does not know has none: the shape already says it cannot
-        // be placed, and four arrows on it would be four claims about a type
-        // nothing here can describe.
-        moc_in: terminal_view("moc-in", terminals, outline, size, at),
-        moc_out: terminal_view("moc-out", terminals, outline, size, at),
-        payload_in: terminal_view("payload-in", terminals, outline, size, at),
-        payload_out: terminal_view("payload-out", terminals, outline, size, at),
-        // The column the name is padded away from, plus whatever the outline
-        // is missing at its widest: a slanted shape moves its terminals in,
-        // and a name padded by the column alone would be padded into them.
-        terminal_column: (style::TERMINAL_COLUMN as i32 + style::room_of(outline, size)) as f32,
-        // The room anything drawn inside the shape has to leave at the sides,
-        // which is nothing unless the shape leans: see style::room_of.
-        inset: style::room_of(outline, size) as f32,
-    }
+    )
 }
 
-/// One terminal of a node, as the window wants it.
-///
-/// Whether this type has it and where it goes. The corner and the arrow are
-/// `style`'s to say -- see [`style::corner_of`] -- so that the rule "the
-/// vehicleward stream along the top going right, the groundward stream along
-/// the bottom going left" is stated once and tested where it is stated.
-fn terminal_view(
-    terminal: &str,
-    terminals: style::Terminals,
-    outline: Outline,
-    size: (u32, u32),
-    // Where the node is, which is what puts each terminal on the grid: see
-    // `style::terminal_at`.
-    at: (i32, i32),
-) -> TerminalView {
-    let corner = style::corner_of(terminal);
-    let (x, y) = corner
-        .map(|corner| style::terminal_at(outline, corner, size, at))
-        .unwrap_or_default();
-    TerminalView {
-        shown: terminals.has(terminal),
-        x: x as f32,
-        y: y as f32,
-        rightward: corner.is_some_and(|corner| corner.rightward),
-    }
-}
-
-/// What a line is drawn in, by the stream it carries.
-///
-/// A line used to be grey, whichever way its data went, so a reader tracing a
-/// control loop had to tell the two streams apart by which corner each line
-/// left -- which is reading a diagram by its arithmetic. Now the colour says
-/// it: a line carrying the payload's own data is of the payload family, and
-/// one carrying what the ground sends is of the ground's.
-///
-/// The middle of the three tiers the palette is built as, and a shade of the
-/// pane its data comes from: the payload stream leaves the payload pane and
-/// is drawn in a darker teal, the ground's stream leaves the moc pane and is
-/// drawn in a darker blue. A drawing then reads as one picture -- a pale
-/// sheet, lines on the sheet, solid blocks on the lines -- a line can never be
-/// mistaken for a node's own edge, and the colour of a line says which end of
-/// the canvas its data started at.
-///
-/// Written down rather than computed, because the palette is written down --
-/// the maths lives in `sight.rs`, which is test-only. What holds these to the
-/// tiers is `the_palette_runs_from_the_pane_through_the_line_to_the_bodies`,
-/// and what holds them apart from everything else is
-/// `no_two_colours_of_the_scheme_look_alike`.
-///
-/// Grey for a line whose stream cannot be told, which is a line this build
-/// does not understand: it is drawn, because a connection missing from a
-/// drawing is worse than one drawn in the wrong colour.
-fn line_ink(leaves_by: Option<&str>) -> String {
-    match leaves_by {
-        Some("payload-out") => PAYLOAD_LINE,
-        Some("moc-out") => MOC_LINE,
-        _ => "#6b7280",
-    }
-    .to_string()
-}
-
-/// What is written on a node: its outline, its name, its terminals.
-///
-/// White. A body is painted in its own tint now, and the tints are the darkest
-/// of the three tiers the palette is built as -- a working pane is the
-/// lightest shade of its family, a link line is darker, and the bodies are
-/// darker still -- so what is written on a body has to be legible on the
-/// lightest body and the darkest alike. White clears four and a half to one
-/// against every one of them, which is the threshold for text, and a test says
-/// so.
-///
-/// Not the pane's own ground, which was the first thing tried: the payload
-/// pane is the darkest of the three at 84 of lightness, and its own shade on
-/// its own lightest body is 3.4 to one -- under the floor for a name somebody
-/// has to read.
-pub const MARK: &str = "#ffffff";
-
-/// The payload stream's line: a darker shade of the payload pane, at 58.2 of
-/// lightness.
-///
-/// A line is drawn in the colour of the pane its data comes *from*, darker.
-/// The payload's own readings start in the payload pane and generally end at
-/// the ground, so the line is a teal taken from the teal pane they leave --
-/// which means a reader can see where a line's data came from without
-/// following it back. What it is darker *than* is also what it crosses, so the
-/// shade is where it is for the reason below.
-///
-/// Twenty-four points darker, not "a bit". That is what the two other rules
-/// leave: a line has to stay eight points above the lightest node body, which
-/// puts the floor at 57.4, and it has to be seen on a pane at 90 of lightness,
-/// which puts the lightest usable shade at 58.2 -- the two meet, and there is
-/// nothing in between. Anything lighter reaches 1.3 to 1 against its own pane
-/// and disappears; nothing in the gamut reaches 2.5 to one at all while
-/// staying clear of the bodies. See
-/// `tests::the_palette_runs_from_the_pane_through_the_line_to_the_bodies`.
-pub const PAYLOAD_LINE: &str = "#289aa2";
-
-/// And what the ground sends: a darker shade of the moc pane, at 58.2.
-///
-/// Thirty-two points darker, for the same reasons, and still a blue -- the
-/// ground's own hue, which is the one thing about the lines that did not have
-/// to change.
-pub const MOC_LINE: &str = "#0292e4";
-
-/// What a node of this type is painted.
-///
-/// A rung of its own panel's ramp. Each panel starts twelve CIE units below
-/// the line that carries its data -- the moc panel below the moc line, the
-/// payload panel below the payload line, and the vehicle panel below both,
-/// having no line of its own -- and steps three and a half units darker for
-/// each node, taking the panel's nodes in alphabetical order. A reader can
-/// then find a node in a panel by how dark it is, and the panel reads as one
-/// family rather than as a set of unrelated colours.
-///
-/// Twelve for the first step and not the eight the tiers ask, because the moc
-/// family's line and its bodies are the same hue: at the same hue a step in
-/// lightness *is* the difference, and twelve is the floor two colours of this
-/// scheme are held apart by.
-///
-/// The ramp stops at thirteen of lightness, which is where the three families
-/// stop being told apart: below it a dark blue, a dark green and a dark teal
-/// converge under deuteranopia. A panel
-/// with more nodes than its ramp has rungs starts again at the top, so two
-/// nodes of one panel may share a colour -- which is allowed here because
-/// colour is the redundant channel: every pair of types differs in two of
-/// outline, edge, border width, size and label, and
-/// `style::NodeType::appearance` is held to that by its own test.
-///
-/// What this gave up is the twelve units between *neighbours* in one panel.
-/// A ramp of ten in one hue family cannot keep it -- see `design.rst` -- so
-/// within a panel the steps are three to five units, which is "a shade
-/// darker", and across panels the closest pair is 30.9. The ramp is the
-/// information: a node's place in its panel is its colour's place in the
-/// ramp.
-///
-/// Searched offline and written down, as the palette before it was: the
-/// maths lives in `sight.rs`, which is test-only, and
-/// `tests::every_panel_is_a_ramp_from_its_own_line` holds these to the rule.
-fn tint_of(node_type: &str) -> String {
-    let pane = pane_of(node_type);
-    let rungs = match pane {
-        Pane::Moc => MOC_RUNGS,
-        Pane::Vehicle => VEHICLE_RUNGS,
-        Pane::Payloads => PAYLOAD_RUNGS,
+/// A node's look, as this window's markup takes it.
+fn node_view(look: tcsdiagram::view::NodeLook, selected: bool) -> NodeView {
+    let terminal = |look: tcsdiagram::view::TerminalLook| TerminalView {
+        shown: look.shown,
+        x: look.x,
+        y: look.y,
+        rightward: look.rightward,
     };
-    let order = ramp_order(pane);
-    // Where this type comes in its own panel, alphabetically. A type this
-    // build does not know is not in any panel and is drawn as a fault, so the
-    // first rung is as good an answer as any.
-    let at = order
-        .iter()
-        .position(|name| *name == node_type)
-        .unwrap_or(0);
-    rungs[at % rungs.len()].to_string()
+    NodeView {
+        name: look.name.into(),
+        node_type: look.node_type.into(),
+        x: look.x,
+        y: look.y,
+        width: look.width,
+        height: look.height,
+        outline: look.outline.into(),
+        shape: look.shape.into(),
+        edge: look.edge.into(),
+        inner: look.inner.into(),
+        border: look.border,
+        face: look.face.into(),
+        label_size: look.label_size,
+        label_weight: look.label_weight,
+        label_italic: look.label_italic,
+        tint: colour(&look.tint),
+        mark: colour(look.mark),
+        faulty: look.faulty,
+        selected,
+        summary: look.summary.into(),
+        openable: look.openable,
+        moc_in: terminal(look.moc_in),
+        moc_out: terminal(look.moc_out),
+        payload_in: terminal(look.payload_in),
+        payload_out: terminal(look.payload_out),
+        terminal_column: look.terminal_column,
+        inset: look.inset,
+    }
 }
 
-/// The ground link's panel: one node, so one rung.
-const MOC_RUNGS: &[&str] = &["#0073b5"];
-
-/// The vehicle's own graph, in the order the panel lists it: compute, log,
-/// null-moc (which took the null node's), ping, subdiagram.
-const VEHICLE_RUNGS: &[&str] = &["#547800", "#4b7000", "#446600", "#3d5d00"];
-
-/// And what it carries, which is the longest ramp: ten rungs from 46.2 of
-/// lightness down to 15.0, three and a half units apart, which is as far as
-/// the floor allows.
-const PAYLOAD_RUNGS: &[&str] = &[
-    "#007a7d", "#007173", "#00676a", "#005e61", "#005557", "#004c4e", "#004446", "#003b3d",
-    "#003335", "#002b2c",
-];
-
-/// Each panel's own node types in the order the ramp is walked: the types the
-/// rungs were chosen for first, alphabetically, and then the apps,
-/// alphabetically.
+/// A line's look, as this window's markup takes it.
 ///
-/// The apps came later than the rungs, and a type that comes later takes the
-/// colours from the top of the ramp again rather than its place in the
-/// alphabet: sorted in with the rest, app_all_pl and app_pl took the first two
-/// payload rungs and moved every device a rung or two down, so that a can
-/// node was no longer the colour a can node had been. Wrapping is allowed --
-/// see `tint_of` -- and moving a colour that is already in use is not.
-fn ramp_order(pane: Pane) -> Vec<&'static str> {
-    let mut types: Vec<NodeType> = NodeType::ALL
-        .iter()
-        .copied()
-        .filter(|t| pane_of(t.spelling()) == pane)
-        .collect();
-    types.sort_by_key(|t| (came_later(*t), t.spelling()));
-    types.iter().map(|t| t.spelling()).collect()
-}
-
-/// When a type came, for `ramp_order`: the types the rungs were chosen for,
-/// then the five apps, then the types that came after them. `null-moc` took
-/// the place and the colour of the `null` node it replaced, and the other
-/// three that replaced it come last, so that no colour already in use moved.
-fn came_later(node_type: NodeType) -> u8 {
-    match node_type {
-        NodeType::AppPayloadVeh
-        | NodeType::AppMocVeh
-        | NodeType::AppAllVeh
-        | NodeType::AppPl
-        | NodeType::AppAllPl => 1,
-        NodeType::NullPayload | NodeType::TeeMoc | NodeType::TeePayload => 2,
-        _ => 0,
+/// Never lit: a line is lit while data crosses it, which is something only a
+/// running vehicle has. See tcspecial's visual window.
+fn link_view(look: tcsdiagram::view::LinkLook) -> LinkView {
+    LinkView {
+        glow: colour(&look::lighter(&look.ink)),
+        ink: colour(&look.ink),
+        lit: false,
+        route: look.route.into(),
+        head: look.head.into(),
+        marker: look.marker.into(),
+        label_x: look.label_x,
+        label_y: look.label_y,
+        wide: look.wide,
+        label: look.label.into(),
+        comment: look.comment.into(),
     }
 }
 
@@ -5056,31 +4707,36 @@ fn family_hue(pane: Pane) -> f64 {
     }
 }
 
-fn ground_of(ground: style::Ground) -> String {
-    match ground {
-        style::Ground::Moc => "#dee2fc",
-        style::Ground::Vehicle => "#e8e4ca",
-        style::Ground::Payloads => "#bad2d0",
-    }
-    .to_string()
-}
-
-/// A hex string as a Slint colour.
+/// A hex string as a Slint colour. See tcsdiagram::look::rgb.
 fn colour(hex: &str) -> slint::Color {
-    let value = u32::from_str_radix(hex.trim_start_matches('#'), 16).unwrap_or(0x33_33_33);
-    slint::Color::from_argb_u8(
-        0xff,
-        ((value >> 16) & 0xff) as u8,
-        ((value >> 8) & 0xff) as u8,
-        (value & 0xff) as u8,
-    )
+    let (red, green, blue) = look::rgb(hex);
+    slint::Color::from_argb_u8(0xff, red, green, blue)
 }
 
 #[cfg(test)]
 mod tests {
+    /// The markup this binary was built from: its own window's, and the
+    /// drawing it shares with tcspecial's visual window, which the window
+    /// imports. One text, because a rule about the window is a rule about
+    /// what the two say together.
+    fn markup() -> String {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let read = |path: std::path::PathBuf| {
+            std::fs::read_to_string(&path).unwrap_or_else(|why| panic!("{}: {why}", path.display()))
+        };
+        read(root.join("ui/main.slint")) + &read(root.join("../tcsdiagram/ui/diagram.slint"))
+    }
+
+    // The palette, which moved to tcsdiagram with the drawing and is held to
+    // its rules here, where sight.rs is.
     use super::*;
     use document::Document;
     use slint::Model;
+    use style::ERROR_TINT;
+    use tcsdiagram::look::{
+        came_later, ramp_order, tint_of, MARK, MOC_LINE, MOC_RUNGS, PAYLOAD_LINE, PAYLOAD_RUNGS,
+        VEHICLE_RUNGS,
+    };
 
     /// Where the dividers sit until somebody moves them.
     ///
@@ -5283,10 +4939,7 @@ mod tests {
     /// restated them would pass while the window showed nothing.
     #[test]
     fn every_selection_list_shows_a_node_when_the_window_opens() {
-        let markup = std::fs::read_to_string(
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint"),
-        )
-        .expect("the markup this binary was built from");
+        let markup = markup();
 
         // The main window's preferred height, which is what it opens at.
         let tall: f32 = markup
@@ -8165,17 +7818,14 @@ mod tests {
     /// one the editor put there would be the editor covering a name nobody
     /// asked it to cover.
     ///
-    /// The bands are written down in `pane::NAMES` and drawn in `main.slint`,
-    /// so this reads the markup and holds the two against each other: a band
+    /// The bands are written down in `pane::NAMES` and drawn in tcsdiagram's
+    /// `diagram.slint`, so this reads the markup and holds the two against each other: a band
     /// made deeper in the window without this would leave the row reserved
     /// shallower than the row that is drawn, and a node would be placed over
     /// a name.
     #[test]
     fn nothing_placed_by_the_editor_covers_a_panes_name() {
-        let markup = std::fs::read_to_string(
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint"),
-        )
-        .expect("the markup this binary was built from");
+        let markup = markup();
         // The same markup with its line breaks and indentation taken out, so
         // that what is asked of it is what it says rather than how it is laid
         // out.
@@ -8207,7 +7857,7 @@ mod tests {
             ("moc-ground", "root.working-width - root.vehicle-divider;"),
         ] {
             let band = format!(
-                "y: 0; width: {width} height: canvas.heading-tall; \
+                "y: 0; width: {width} height: root.heading-tall; \
                  background: root.{ground};"
             );
             assert!(

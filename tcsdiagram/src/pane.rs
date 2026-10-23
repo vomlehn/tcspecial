@@ -63,19 +63,16 @@ pub fn grid_floor(v: i32) -> i32 {
 }
 
 /// The grid point after `v`, which is a step of one millimetre from a point.
-#[cfg(test)]
 pub fn grid_after(v: i32) -> i32 {
     grid_ceil(v + 1)
 }
 
 /// And the one before it.
-#[cfg(test)]
 pub fn grid_before(v: i32) -> i32 {
     grid_floor(v - 1)
 }
 
 /// Whether `v` is a grid point.
-#[cfg(test)]
 pub fn is_on_grid(v: i32) -> bool {
     on_grid(v) == v
 }
@@ -168,13 +165,11 @@ pub fn line_floor(v: i32) -> i32 {
 }
 
 /// Whether `v` is on one of those lines.
-#[cfg(test)]
 pub fn is_on_line(v: i32) -> bool {
     line_ceil(v) == v
 }
 
 /// Whether `v` is a place a node may be.
-#[cfg(test)]
 pub fn is_on_node_grid(v: i32) -> bool {
     is_on_grid(v) && is_node_mm(mm_of(v))
 }
@@ -244,7 +239,6 @@ pub fn dividers_for(moc_percent: i32, vehicle_percent: i32) -> Dividers {
 /// The defaults, for the tests that are about the panes rather than about
 /// moving a line between them. A running editor reads them from the settings
 /// instead -- see `settings::load` -- because somebody may have moved them.
-#[cfg(test)]
 pub fn default_dividers() -> Dividers {
     dividers_for(settings::DEFAULT_MOC, settings::DEFAULT_VEHICLE)
 }
@@ -311,7 +305,6 @@ impl Pane {
     /// The label in the pane's top left corner is in the markup, that being
     /// window text; these are the same words, for what the tests say when a
     /// pane rule is broken.
-    #[cfg(test)]
     pub fn label(self) -> &'static str {
         match self {
             Pane::Moc => "MOC",
@@ -527,6 +520,68 @@ pub fn size_of(node_type: &str) -> (u32, u32) {
         .find(|t| t.spelling() == node_type)
         .map(|t| t.appearance().size)
         .unwrap_or((104, 40))
+}
+
+/// Where a node is to be drawn, as [`settle`] moves it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Placing<'a> {
+    pub node_type: &'a str,
+    pub at: (i32, i32),
+}
+
+/// Put every node inside the pane its type belongs to, and on the grid.
+///
+/// What a configuration is drawn from when it is read: a file written before
+/// the canvas was divided, or by hand, or with the divider somewhere else, has
+/// nodes outside their own panes and off the grid, and a drawing has to say
+/// which of the two to believe. A node that has to move keeps its height and
+/// takes the near edge of its own pane, which is the smallest move that obeys
+/// the rule -- see [`confine`]. Where that lands it on top of another node it
+/// steps down the grid until it is clear: a payload column read out of a file
+/// where the payloads were in a row would otherwise become one node with
+/// eleven behind it.
+///
+/// Every node is checked against every other, whichever pane it is in, because
+/// a node of the other pane overlapping this one is just as unreadable.
+///
+/// Returns how many were moved. One rule for the editor, which settles what it
+/// opens, and for tcspecial's visual window, which draws what the editor would.
+pub fn settle(nodes: &mut [Placing], dividers: Dividers) -> usize {
+    let mut moved = 0;
+
+    for at in 0..nodes.len() {
+        let node = nodes[at];
+        let want = confine(node.node_type, dividers, node.at);
+        if want == node.at {
+            continue;
+        }
+
+        // Clear of the nodes that are already settled, and of the ones that
+        // were in the right place to begin with.
+        let (width, height) = size_of(node.node_type);
+        let mut want = want;
+        for _ in 0..200 {
+            let clashes = nodes.iter().enumerate().any(|(other, node)| {
+                if other == at {
+                    return false;
+                }
+                let (theirs, tall) = size_of(node.node_type);
+                want.0 < node.at.0 + theirs as i32
+                    && node.at.0 < want.0 + width as i32
+                    && want.1 < node.at.1 + tall as i32
+                    && node.at.1 < want.1 + height as i32
+            });
+            if !clashes {
+                break;
+            }
+            want.1 = node_ceil(want.1 + 32);
+        }
+
+        nodes[at].at = want;
+        moved += 1;
+    }
+
+    moved
 }
 
 #[cfg(test)]

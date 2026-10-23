@@ -4487,6 +4487,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "tcsdiagram"
+version = "0.1.0"
+dependencies = [
+ "tcslibgs",
+]
+
+[[package]]
 name = "tcsgui"
 version = "0.1.0"
 dependencies = [
@@ -4497,6 +4504,7 @@ dependencies = [
  "serde_norway",
  "slint",
  "slint-build",
+ "tcsdiagram",
  "tcslibgs",
  "tcsverify",
  "tempfile",
@@ -4576,8 +4584,11 @@ dependencies = [
  "nix 0.27.1",
  "serde",
  "serde_json",
+ "slint",
+ "slint-build",
  "socket2",
  "tcsapp",
+ "tcsdiagram",
  "tcslibgs",
  "tcslog",
  "tcsverify",

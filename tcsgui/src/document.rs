@@ -22,7 +22,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::journal::{Edit, Link};
-use crate::pane::{confine, is_payload, size_of};
+use crate::pane::{is_payload, size_of};
 use crate::style::NodeType;
 use crate::subdiagram::{file_for, Home, Qualified};
 use tcslibgs::endpoint_config::Scalar;
@@ -520,42 +520,21 @@ impl Document {
     ///
     /// Returns how many were moved, which is what a caller would log.
     pub fn settle(&mut self, dividers: crate::pane::Dividers) -> usize {
-        let mut moved = 0;
-
-        for at in 0..self.nodes.len() {
-            let node = &self.nodes[at];
-            let want = confine(&node.node_type, dividers, node.at);
-            if want == node.at {
-                continue;
-            }
-
-            // Clear of the nodes that are already settled, and of the ones
-            // that were in the right place to begin with. Checked against the
-            // whole document rather than against the pane, because a node of
-            // the other pane overlapping this one is just as unreadable.
-            let (width, height) = size_of(&self.nodes[at].node_type);
-            let mut want = want;
-            for _ in 0..200 {
-                let clashes = self.nodes.iter().enumerate().any(|(other, node)| {
-                    if other == at {
-                        return false;
-                    }
-                    let (theirs, tall) = size_of(&node.node_type);
-                    want.0 < node.at.0 + theirs as i32
-                        && node.at.0 < want.0 + width as i32
-                        && want.1 < node.at.1 + tall as i32
-                        && node.at.1 < want.1 + height as i32
-                });
-                if !clashes {
-                    break;
-                }
-                want.1 = crate::pane::node_ceil(want.1 + 32);
-            }
-
-            self.nodes[at].at = want;
-            moved += 1;
+        // The rule is tcsdiagram's, which tcspecial's visual window draws by
+        // as well: see pane::settle.
+        let mut placing: Vec<crate::pane::Placing> = self
+            .nodes
+            .iter()
+            .map(|node| crate::pane::Placing {
+                node_type: &node.node_type,
+                at: node.at,
+            })
+            .collect();
+        let moved = crate::pane::settle(&mut placing, dividers);
+        let settled: Vec<(i32, i32)> = placing.iter().map(|placing| placing.at).collect();
+        for (node, at) in self.nodes.iter_mut().zip(settled) {
+            node.at = at;
         }
-
         moved
     }
 

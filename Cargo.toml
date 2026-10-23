@@ -12,6 +12,9 @@ members = [
     # The window pieces the ground programs share: the panels, and what to
     # show on them. See tcsui.
     "tcsui",
+    # How a configuration is drawn -- the panes, the nodes, the links -- for
+    # the editor and for tcspecial's visual window alike. See tcsdiagram.
+    "tcsdiagram",
     # tcslib for C and C++: the ground station's library behind one header.
     # See tcslib-c.
     "tcslib-c",

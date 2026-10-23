@@ -8,6 +8,9 @@ build = "build.rs"
 
 [dependencies]
 tcslibgs = { path = "../tcslibgs" }
+# How a configuration is drawn: the panes, the node shapes, the routes and
+# the colours, shared with tcspecial's visual window. See tcsdiagram.
+tcsdiagram = { path = "../tcsdiagram" }
 # Asked about the files as the editor starts, so that what it says about them
 # is what tcsverify, tcspecial, tcsmoc and tcssim say: see `settle_problems`.
 tcsverify = { path = "../tcsverify" }

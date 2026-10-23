@@ -29,6 +29,9 @@ pub mod graph;
 pub mod node;
 pub mod parameters;
 pub mod protocol;
+/// Whether the simulator is ready: what a harness and tcssim say on tcssim's
+/// readiness socket.
+pub mod ready;
 /// The simulator's own configuration language.
 ///
 /// Here with the other three rather than in tcssim: both GUIs read it now --

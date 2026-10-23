@@ -287,9 +287,11 @@ pub fn run_can_node(
         Ok(bus) => bus,
         Err(e) => {
             eprintln!("{e}");
+            config.standing.failed(&e.to_string());
             return;
         }
     };
+    config.standing.made();
 
     let mut rng = rand::thread_rng();
     let mut sent = 0u64;
@@ -407,6 +409,8 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(8)),
             packet_interval_ms: Arc::new(AtomicU32::new(50)),
             segment_interval_ms: Arc::new(AtomicU32::new(0)),
+            sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            standing: Default::default(),
         }
     }
 

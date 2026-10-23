@@ -51,6 +51,12 @@ pub struct Simulator {
     pub path: PathBuf,
     /// What the file says it is, kept so that saving does not drop it.
     pub description: Option<String>,
+    /// The `tcssim` section -- where tcssim answers whether it is ready --
+    /// kept so that saving does not drop it, as the masses are. Without one
+    /// tcssim will not start, and an editor that wrote it away would be the
+    /// thing that broke a set that worked.
+    #[serde(default)]
+    pub tcssim: Settings,
     /// The thermal masses the file declares, by name.
     ///
     /// Kept so that saving does not drop them. The editor offers no window
@@ -116,6 +122,8 @@ struct Entry {
 struct File {
     #[serde(default)]
     description: Option<String>,
+    #[serde(default)]
+    tcssim: BTreeMap<String, Scalar>,
     #[serde(default)]
     thermal_mass: Vec<Entry>,
     #[serde(default)]
@@ -207,6 +215,11 @@ pub fn read(path: &Path) -> Result<Simulator, Trouble> {
     let file: File = format.parse(&text).map_err(|e| unreadable(&e))?;
 
     simulator.description = file.description;
+    simulator.tcssim = file
+        .tcssim
+        .into_iter()
+        .map(|(name, value)| (name, value.as_str().to_string()))
+        .collect();
 
     // Two entries of one name are refused rather than read. A name is how
     // this file is joined to the configuration, so two of them are two sets
@@ -284,6 +297,23 @@ pub fn to_yaml(simulator: &Simulator, payloads: &[String]) -> String {
 
     if let Some(description) = &simulator.description {
         out.push_str(&format!("\ndescription: {}\n", quoted(description)));
+    }
+
+    // What tcssim itself is told, as the file said it. Not written as a form:
+    // a section with nothing in it is one the simulator refuses, and what it
+    // must say -- an address no other run uses -- is not the editor's to
+    // invent.
+    let said: Vec<(&String, &str)> = simulator
+        .tcssim
+        .iter()
+        .map(|(field, value)| (field, value.trim()))
+        .filter(|(_, value)| !value.is_empty())
+        .collect();
+    if !said.is_empty() {
+        out.push_str("\ntcssim:\n");
+        for (field, value) in said {
+            out.push_str(&format!("  {field}: {}\n", quoted(value)));
+        }
     }
 
     // The masses first, because that is the order the file reads in: a mass
@@ -482,6 +512,9 @@ mod tests {
         // As a simulator file writes it, including a field from a later build
         // that this one knows nothing about.
         let given = concat!(
+            "tcssim:\n",
+            "  ready: \"127.0.0.1:7999\"\n",
+            "\n",
             "thermal_mass:\n",
             "  - name: cabin\n",
             "    environment: \"283.15\"\n",
@@ -506,6 +539,11 @@ mod tests {
         std::fs::write(&path, &written).expect("written");
         let back = read(&path).expect("it reads again");
         assert_eq!(back.masses, read_in.masses, "{written}");
+        assert_eq!(
+            back.tcssim.get("ready").map(String::as_str),
+            Some("127.0.0.1:7999"),
+            "{written}"
+        );
         assert_eq!(
             back.payloads["temp_1"].get("reads").map(String::as_str),
             Some("cabin"),

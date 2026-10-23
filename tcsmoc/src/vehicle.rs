@@ -47,9 +47,12 @@ use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use tcslib::moc::Moc;
 use tcslib::moc::DATUM_BYTES;
 use tcslib::ping::{Pinger, Uplink};
+use tcslib::simulator;
 use tcslibgs::graph::telemetry::{self, Telemetered, Via};
 use tcslibgs::graph::Graph;
+use tcslibgs::ready::SetUpFor;
 use tcslibgs::sim_config::SimConfigFile;
+use tcslibgs::simulate::Mode;
 use tcslibgs::{DHSample, Timestamp};
 use tcsui::PingShown;
 use tcsverify::startup::Startup;
@@ -229,6 +232,100 @@ fn anything_simulated(graph: &Graph, sim_path: Option<&str>) -> bool {
         .and_then(|path| SimConfigFile::load(path).ok())
         .and_then(|sim| tcslibgs::graph::simulated::handlers(graph, &sim).ok())
         .is_some_and(|handlers| !handlers.is_empty())
+}
+
+/// How long a simulator already running is given to answer before one is
+/// started: a simulator that is there answers at once.
+const ASK_FIRST: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// How long a simulator this starts is given to make its stand-ins. Built
+/// by `cargo run` first, which is most of it.
+const WAIT_FOR_SIMULATOR: std::time::Duration = std::time::Duration::from_secs(120);
+
+/// Have a simulator ready for this run, where it has anything to simulate.
+///
+/// Under the flight setting, none: a run that is like a flight then looks
+/// like one, with no simulator present to answer for a device that is
+/// missing. Otherwise the simulator file's readiness address is asked first.
+/// One that answers set up for this run is used and left running when this
+/// exits, since this did not start it; one set up for another is refused,
+/// saying what differs; and where nothing answers, tcssim is started and
+/// waited for. See "Waiting for the Simulator" in docs/design.rst.
+fn simulator_for(
+    graph: &Graph,
+    payload_path: &str,
+    sim_path: Option<&str>,
+    mode: Mode,
+    pm_tcssim: &ProcessManager,
+) -> Result<(), String> {
+    if mode.is_flight() {
+        eprintln!(
+            "--simulate={mode}: tcssim is not started, a run like a flight having no stand-ins"
+        );
+        return Ok(());
+    }
+    let Some(sim_path) = sim_path.filter(|_| anything_simulated(graph, sim_path)) else {
+        match sim_path {
+            Some(path) => eprintln!("{path}: nothing to simulate, so tcssim is not started"),
+            None => {
+                eprintln!("{payload_path}: no simulator file beside it, so tcssim is not started")
+            }
+        }
+        return Ok(());
+    };
+    let sim_file = SimConfigFile::load(sim_path).map_err(|e| format!("{sim_path}: {e}"))?;
+    let at = sim_file.ready().map_err(|e| format!("{sim_path}: {e}"))?;
+    let ours = SetUpFor {
+        configuration: tcslibgs::config_digest::digest_of_graph(graph)
+            .map_err(|e| format!("{payload_path}: {e}"))?,
+        simulator: tcslibgs::config_digest::digest_of_simulator_file(sim_path)
+            .map_err(|e| format!("{sim_path}: {e}"))?,
+        mode,
+    };
+    let [_, tcssim] = CHILDREN;
+    match simulator::ask(at, ASK_FIRST).map_err(|e| e.to_string())? {
+        Some(answer) => {
+            let differences = ours.differences(&answer.set_up_for);
+            if !differences.is_empty() {
+                return Err(simulator::NotReady::Differs { at, differences }.to_string());
+            }
+            eprintln!("a simulator is already answering at {at} for this run: using it, and leaving it running");
+            return simulator::wait(at, &ours, WAIT_FOR_SIMULATOR).map_err(|e| e.to_string());
+        }
+        None => {
+            pm_tcssim.start_child(tcssim, payload_path, mode);
+            eprintln!("waiting for tcssim to say at {at} that it is ready");
+        }
+    }
+
+    // Waited for a little at a time, so that a tcssim that refused to start
+    // -- and said why, in its own window -- is noticed as that, rather than
+    // waited for until the time runs out.
+    let started = std::time::Instant::now();
+    loop {
+        let waited = started.elapsed();
+        match simulator::wait(at, &ours, ASK_FIRST) {
+            Ok(()) => return Ok(()),
+            Err(simulator::NotReady::Silent { .. })
+            | Err(simulator::NotReady::StillStarting { .. })
+                if pm_tcssim.has_exited() =>
+            {
+                return Err(format!(
+                    "tcssim stopped before it said at {at} that it was ready: what it \
+                     said is why"
+                ))
+            }
+            Err(simulator::NotReady::Silent { .. }) if waited < WAIT_FOR_SIMULATOR => {}
+            Err(simulator::NotReady::StillStarting { .. }) if waited < WAIT_FOR_SIMULATOR => {}
+            Err(simulator::NotReady::Silent { at, .. }) => {
+                return Err(simulator::NotReady::Silent { at, waited }.to_string())
+            }
+            Err(simulator::NotReady::StillStarting { at, .. }) => {
+                return Err(simulator::NotReady::StillStarting { at, waited }.to_string())
+            }
+            Err(e) => return Err(e.to_string()),
+        }
+    }
 }
 
 /// The two command links the configuration's `tcspecial` section states.
@@ -1127,7 +1224,7 @@ fn ping_node(
 }
 
 /// Run the MOC on a configuration. Does not return.
-pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> ! {
+pub fn run(payload_path: &str, sim_path: Option<&str>, mode: Mode, mut startup: Startup) -> ! {
     let graph = match Graph::load(payload_path) {
         Ok(graph) => graph,
         Err(e) => {
@@ -1227,26 +1324,22 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> 
     // contact is made leaves out.
     let declined = declined_for(rows.len());
 
-    // The vehicle, and the simulator where there is anything to simulate.
-    // tcspecial has no command interpreter to ask whether it is already
-    // running, so one is started; and tcssim with nothing to be would exit at
-    // once, taking the MOC with it.
-    let [tcspecial, tcssim] = CHILDREN;
-    let pm_tcspecial = Arc::new(ProcessManager::new());
-    pm_tcspecial.start_child(tcspecial, payload_path);
+    // The simulator, where there is anything to simulate, ready before the
+    // vehicle starts: tcspecial judges each payload by what is at its
+    // endpoint before it opens anything, and a stand-in not made yet is one
+    // it does not find. Then the vehicle, which has no command interpreter to
+    // ask whether it is already running, so one is started.
+    let [tcspecial, _] = CHILDREN;
     let pm_tcssim = Arc::new(ProcessManager::new());
-    if anything_simulated(&graph, sim_path) {
-        pm_tcssim.start_child(tcssim, payload_path);
-    } else {
-        match sim_path {
-            Some(path) => {
-                eprintln!("{path}: nothing to simulate, so tcssim is not started")
-            }
-            None => {
-                eprintln!("{payload_path}: no simulator file beside it, so tcssim is not started")
-            }
-        }
+    if let Err(e) = simulator_for(&graph, payload_path, sim_path, mode, &pm_tcssim) {
+        // A simulator this started and that never became ready is not left
+        // holding the payloads' paths.
+        pm_tcssim.kill();
+        startup.error(e);
+        stop(&startup);
     }
+    let pm_tcspecial = Arc::new(ProcessManager::new());
+    pm_tcspecial.start_child(tcspecial, payload_path, mode);
 
     // Whether the vehicle is serving the configuration this MOC read. This
     // MOC digests the configuration files it read, with the function

@@ -22,6 +22,10 @@ pub fn run_device_file_node(
     running: Arc<AtomicBool>,
     stats: Arc<std::sync::Mutex<PayloadStats>>,
 ) {
+    // Nothing to make: tcspecial opens the device itself, and this stands in
+    // only for the device producing data.
+    config.standing.made();
+
     let mut rng = rand::thread_rng();
     // Packets that have gone, which the faults that are counted rather than
     // random ask about.

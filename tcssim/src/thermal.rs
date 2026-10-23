@@ -470,6 +470,8 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(bytes)),
             packet_interval_ms: Arc::new(AtomicU32::new(every)),
             segment_interval_ms: Arc::new(AtomicU32::new(0)),
+            sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            standing: Default::default(),
         }
     }
 

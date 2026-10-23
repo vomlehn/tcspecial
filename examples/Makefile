@@ -9,6 +9,14 @@ ROOT = ..
 #   make run-simple RUST_LOG=debug
 RUST_LOG = info
 
+# The run's simulation mode, given to every program a run target starts:
+# none, some or all. All by default, because these targets run on a desk with
+# stand-ins, and a program that leaves the flag out gets none -- the flight
+# setting -- and refuses every stand-in. See "Simulation Modes" in
+# docs/design.rst.
+#   make run-simple SIMULATE=some
+SIMULATE = all
+
 # Where the examples' logs are written. The examples' configurations name
 # the same directory, so a change here is a change there as well.
 TELEMETRY = /tmp/telemetry
@@ -55,7 +63,7 @@ define runexample_on
 		rm -rf $(TELEMETRY); \
 		mkdir $(TELEMETRY); \
 		cargo build -q --bin tcspecial --bin tcssim --bin tcsmoc; \
-		RUST_LOG=$(RUST_LOG) cargo run -q --bin tcsmoc -- examples/$(1)/$(1).yaml \
+		RUST_LOG=$(RUST_LOG) cargo run -q --bin tcsmoc -- --simulate=$(SIMULATE) examples/$(1)/$(1).yaml \
 	)
 endef
 
@@ -118,7 +126,7 @@ run-simple-app: check-python3
 		cd $(ROOT); \
 		rm -rf $(TELEMETRY); \
 		mkdir $(TELEMETRY); \
-		RUST_LOG=$(RUST_LOG) target/debug/tcspecial --quiet examples/simple-app/simple-app.yaml & \
+		RUST_LOG=$(RUST_LOG) target/debug/tcspecial --quiet --simulate=$(SIMULATE) examples/simple-app/simple-app.yaml & \
 		vehicle=$$!; \
 		trap 'pkill -P $$vehicle || true; kill -INT $$vehicle 2>/dev/null || true; wait $$vehicle || true' EXIT; \
 		trap 'exit 130' INT TERM; \

@@ -30,8 +30,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, lateness, make_the_path_lead_to, send_in_segments, wait_out_packet,
-    wait_while_running, Pacing, PayloadConfig, PayloadStats, Produce,
+    a_packet, could_not_stand_in, lateness, make_the_path_lead_to, send_in_segments,
+    wait_out_packet, wait_while_running, Pacing, PayloadConfig, PayloadStats, Produce,
 };
 
 /// Where the kernel lists its I2C adapters, and what the stub's is called.
@@ -241,13 +241,15 @@ pub fn run_i2c_node(
     let bus = match SimulatedBus::open(&config.name, &config.address, config.bus_address) {
         Ok(bus) => bus,
         Err(e) => {
-            eprintln!(
-                "{}: failed to stand in for an I2C device: {}",
-                config.name, e
+            could_not_stand_in(
+                &config,
+                format!("failed to stand in for an I2C device: {}", e),
             );
             return;
         }
     };
+    // The stub's chip found and its bank loaded.
+    config.standing.made();
 
     let mut rng = rand::thread_rng();
     // Packets that have gone, which the faults that are counted rather than

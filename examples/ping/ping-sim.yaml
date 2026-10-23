@@ -2,6 +2,12 @@
 
 description: Simulator settings for ping.yaml, which has no payloads to stand in for
 
+# Where tcssim answers whether it has made its stand-ins, which whatever
+# starts the run asks before it starts tcspecial. A port no other example
+# uses, so that two can be run at once.
+tcssim:
+  ready: "127.0.0.1:7904"
+
 # The ping node is the vehicle's own, and what it answers is the ground
 # station's ping: nothing here is a payload, so there is nothing to simulate.
 simulated_payloads: []

@@ -32,7 +32,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
-use crate::payload::{wait_out_packet, Pacing, PayloadConfig, PayloadStats};
+use crate::payload::{could_not_stand_in, wait_out_packet, Pacing, PayloadConfig, PayloadStats};
 
 /// Where the kernel puts a simulated chip's lines.
 ///
@@ -130,10 +130,11 @@ pub fn run_gpio_node(
     let lines = match lines_of(Path::new(SIM_DEVICES), &config.address, &config.gpio_lines) {
         Some(lines) => lines,
         None => {
-            eprintln!("{}: {}", config.name, how_to_make_one(&config.address));
+            could_not_stand_in(&config, how_to_make_one(&config.address));
             return;
         }
     };
+    config.standing.made();
 
     // What each line is being pulled to, which is what moving it means.
     let mut high = false;
@@ -146,7 +147,7 @@ pub fn run_gpio_node(
         // cannot be triggered. A device whose interval is nought is a chip
         // whose lines do not move, as a device with no interval is silent
         // everywhere else.
-        if pacing.produces() {
+        if pacing.sending && pacing.produces() {
             high = !high;
             let pull = if high { "pull-up" } else { "pull-down" };
 

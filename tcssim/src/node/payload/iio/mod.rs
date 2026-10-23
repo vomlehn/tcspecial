@@ -32,8 +32,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, lateness, send_in_segments, wait_out_packet, wait_while_running, Pacing,
-    PayloadConfig, PayloadStats, Produce,
+    a_packet, could_not_stand_in, lateness, send_in_segments, wait_out_packet, wait_while_running,
+    Pacing, PayloadConfig, PayloadStats, Produce,
 };
 use crate::pty::SimulatedNode;
 
@@ -53,13 +53,14 @@ pub fn run_iio_node(
     ) {
         Ok(node) => node,
         Err(e) => {
-            eprintln!(
-                "{}: failed to stand in for a sample buffer: {}",
-                config.name, e
+            could_not_stand_in(
+                &config,
+                format!("failed to stand in for a sample buffer: {}", e),
             );
             return;
         }
     };
+    config.standing.made();
 
     let mut rng = rand::thread_rng();
     let mut sent = 0u64;
@@ -132,6 +133,8 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(8)),
             packet_interval_ms: Arc::new(AtomicU32::new(20)),
             segment_interval_ms: Arc::new(AtomicU32::new(0)),
+            sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            standing: Default::default(),
         }
     }
 

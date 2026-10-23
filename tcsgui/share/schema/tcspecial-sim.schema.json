@@ -8,6 +8,20 @@
     "description": {
       "type": "string"
     },
+    "tcssim": {
+      "description": "What tcssim itself is told. Required: tcssim does not start without it, and a harness cannot wait for a simulator without knowing where to ask.",
+      "type": "object",
+      "properties": {
+        "ready": {
+          "description": "The UDP address, as address:port, at which tcssim answers whether it has made its stand-ins. One no other run uses: a simulator left running holds it, and a second one started on the same address is refused.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ready"
+      ],
+      "additionalProperties": false
+    },
     "thermal_mass": {
       "description": "The thermal masses the simulated payloads are attached to. A mass cools towards its environment and is warmed by the heaters that are on, so that what the vehicle reads is a consequence of what the vehicle drove: three sensors reading one mass agree, where three sending random bytes never do. A mass nothing is attached to is refused.",
       "type": "array",

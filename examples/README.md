@@ -20,6 +20,13 @@ tcspecial runs itself. `tcsverify` refuses either, as tcssim does.
 
 The YAML and XML files must say the same thing, so change both together.
 
+Every simulator file has a `tcssim` section giving the address at which
+tcssim says it has made its stand-ins, a port no other example uses, so that
+tcsmoc starts tcspecial only once they are there. The `make run-*` targets
+give every program `--simulate=all`, the run being one with stand-ins only: a
+program started without `--simulate` gets the flight setting, `none`, and
+refuses every stand-in. See "Stand-ins or hardware" in the manual.
+
 The examples' programs -- `beacon`, `lorem_moc` and `ping_moc.py` --
 are quiet unless given `-v` or `--verbose`: they print what they are for and
 any error, and with the flag they also say what they are doing, such as where

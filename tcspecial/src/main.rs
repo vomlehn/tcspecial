@@ -14,8 +14,9 @@
 //! setting and the one a run without `--simulate` gets.
 //!
 //! `--simulate=<mode>` is the simulation mode, `none`, `some` or `all`: see
-//! `tcslibgs::simulate`. It is read and checked here; what it requires of the
-//! payloads is specified in `docs/design.rst` and not yet enforced.
+//! `tcslibgs::simulate`. Each payload is judged a stand-in or not before
+//! anything is opened, and a run whose payloads the mode does not allow is
+//! refused: see `tcspecial::runtime::start`.
 //!
 //! `--types` prints the payload types this build contains, separated by
 //! commas, and exits: what `tcsverify --types=` takes, so that a
@@ -183,7 +184,7 @@ fn main() {
     // its own beside it, and each stopping the other. See tcspecial::visual.
     #[cfg(feature = "visual")]
     if visual {
-        process::exit(tcspecial::visual::run(&payload_path));
+        process::exit(tcspecial::visual::run(&payload_path, simulate));
     }
-    process::exit(runtime::start::run_or_report(&payload_path));
+    process::exit(runtime::start::run_or_report(&payload_path, simulate));
 }

@@ -5,8 +5,22 @@
 //! byte for byte. Read here, once, so that the three programs take the flag
 //! the same way and refuse the same mistakes in the same words. See
 //! "Simulation Modes" in `docs/design.rst`.
+//!
+//! What the mode is checked against is here too: whether each payload is a
+//! stand-in, [`judge`], found from what is at the end of its endpoint and not
+//! from what any file says, and whether a run's payloads are what its mode
+//! allows, [`refusals`]. How a stand-in of each type is told apart is that
+//! type's own rule, beside its other rules in `crate::node::payload`; this
+//! says which of them a node is asked, and what the answers come to.
 
 use std::fmt;
+use std::path::{Path, PathBuf};
+
+use crate::gateway::is_gateway;
+use crate::graph::reach::reach_of;
+use crate::graph::Node;
+use crate::node::payload;
+use crate::types::{DHType, EndpointConfig};
 
 /// The flag, as it is written before its `=`.
 pub const FLAG: &str = "--simulate";
@@ -102,6 +116,339 @@ pub fn take_mode(args: Vec<String>) -> Result<(Mode, Vec<String>), String> {
     Ok((mode.unwrap_or(Mode::None), rest))
 }
 
+/// What a payload was found to be.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Verdict {
+    /// One of the things the simulator, or the stub scripts in `bin/`, make.
+    StandIn,
+    /// Hardware: what was found is something the simulator does not make.
+    Hardware,
+    /// Nothing could be told: nothing is there, or what is there could not be
+    /// looked at. Counted as hardware, because failing that way round is the
+    /// point of the mode -- a stand-in mistaken for hardware costs a refused
+    /// run, and hardware mistaken for a stand-in costs the hardware.
+    CannotTell,
+}
+
+/// What one payload was found to be, and how to make it a stand-in.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Judged {
+    pub verdict: Verdict,
+    /// What was found, as a clause about what the node reaches:
+    /// `/dev/i2c-1 is a real adapter (i915 gmbus)`.
+    pub found: String,
+    /// The attribute that says what the node reaches: `path`, `interface` or
+    /// `address`. What a refusal says to change.
+    pub attribute: &'static str,
+    /// What would make the payload a stand-in, in the configuration's terms:
+    /// `point path at the i2c-stub bus, which bin/mki2c makes`.
+    pub to_stand_in: &'static str,
+}
+
+impl Judged {
+    pub fn stand_in(found: String, attribute: &'static str, to_stand_in: &'static str) -> Judged {
+        Judged {
+            verdict: Verdict::StandIn,
+            found,
+            attribute,
+            to_stand_in,
+        }
+    }
+
+    pub fn hardware(found: String, attribute: &'static str, to_stand_in: &'static str) -> Judged {
+        Judged {
+            verdict: Verdict::Hardware,
+            found,
+            attribute,
+            to_stand_in,
+        }
+    }
+
+    pub fn cannot_tell(
+        found: String,
+        attribute: &'static str,
+        to_stand_in: &'static str,
+    ) -> Judged {
+        Judged {
+            verdict: Verdict::CannotTell,
+            found,
+            attribute,
+            to_stand_in,
+        }
+    }
+
+    pub fn is_stand_in(&self) -> bool {
+        self.verdict == Verdict::StandIn
+    }
+
+    /// What was found, in a word and a clause: for the startup summary.
+    pub fn said(&self) -> String {
+        let word = match self.verdict {
+            Verdict::StandIn => "a stand-in",
+            Verdict::Hardware => "hardware",
+            Verdict::CannotTell => "taken for hardware, as what could not be told",
+        };
+        format!("{word}: {}", self.found)
+    }
+}
+
+/// Where a host's devices are described: `/sys`, or a tree made to look like
+/// it in a test.
+///
+/// Every judgement that looks past a path reads the kernel's account of what
+/// is there, which is the one place a bus number or a chip says what it is.
+#[derive(Debug, Clone)]
+pub struct Host {
+    pub sys: PathBuf,
+}
+
+impl Host {
+    /// This host.
+    pub fn this() -> Host {
+        Host {
+            sys: PathBuf::from("/sys"),
+        }
+    }
+
+    /// The kernel's directory for the character device at `path`, or what
+    /// was found there instead, as a clause.
+    ///
+    /// Through `/sys/dev/char/<major>:<minor>`, which every character device
+    /// the kernel made has: a device node's name says nothing, since anyone
+    /// can make one called anything, and its numbers say which device it is.
+    pub fn device_of(&self, path: &str) -> Result<PathBuf, String> {
+        let (major, minor) = character_device(path)?;
+        let entry = self.sys.join(format!("dev/char/{major}:{minor}"));
+        std::fs::canonicalize(&entry).map_err(|_| {
+            format!(
+                "{path} is a character device ({major}:{minor}) the kernel \
+                 does not describe in {}",
+                entry.display()
+            )
+        })
+    }
+}
+
+/// The device numbers of the character device at `path`, following links, or
+/// what is there instead, as a clause.
+pub(crate) fn character_device(path: &str) -> Result<(u64, u64), String> {
+    let found = match std::fs::metadata(path) {
+        Ok(found) => found,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return Err(format!("nothing is at {path}"))
+        }
+        Err(e) => return Err(format!("{path} cannot be looked at ({e})")),
+    };
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::{FileTypeExt, MetadataExt};
+        if !found.file_type().is_char_device() {
+            return Err(format!("{path} is {}", kind_of_file(&found)));
+        }
+        Ok(split_device(found.rdev()))
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = found;
+        Err(format!("{path} cannot be looked at on this platform"))
+    }
+}
+
+/// What a file that is not a character device is, for a clause.
+#[cfg(unix)]
+fn kind_of_file(found: &std::fs::Metadata) -> &'static str {
+    use std::os::unix::fs::FileTypeExt;
+    let kind = found.file_type();
+    if kind.is_dir() {
+        "a directory"
+    } else if kind.is_file() {
+        "an ordinary file"
+    } else if kind.is_fifo() {
+        "a pipe"
+    } else if kind.is_socket() {
+        "a socket"
+    } else if kind.is_block_device() {
+        "a block device"
+    } else {
+        "not a character device"
+    }
+}
+
+/// A device number's major and minor halves, as Linux packs them.
+fn split_device(device: u64) -> (u64, u64) {
+    let major = ((device >> 8) & 0xfff) | ((device >> 32) & !0xfff);
+    let minor = (device & 0xff) | ((device >> 12) & !0xff);
+    (major, minor)
+}
+
+/// The majors Linux gives a pseudo-terminal's slave: 136 to 143.
+const PTY_SLAVE_MAJORS: std::ops::RangeInclusive<u64> = 136..=143;
+
+/// Whether `path` resolves to a pseudo-terminal's slave, which is what tcssim
+/// makes for a payload reached through a device node: the one judgement of
+/// serial, spi, rpmsg and device-file payloads, and the second of an iio one.
+///
+/// By the device's numbers, after following every link: tcssim links the
+/// payload's path to the slave it made, and a name under `/dev/pts` is only a
+/// name.
+pub(crate) fn pseudo_terminal(
+    path: &str,
+    attribute: &'static str,
+    to_stand_in: &'static str,
+) -> Judged {
+    match character_device(path) {
+        Err(found) => Judged::cannot_tell(found, attribute, to_stand_in),
+        Ok((major, minor)) if PTY_SLAVE_MAJORS.contains(&major) => {
+            let resolved = std::fs::canonicalize(path)
+                .map(|to| to.display().to_string())
+                .unwrap_or_else(|_| format!("{major}:{minor}"));
+            Judged::stand_in(
+                format!("{path} resolves to a pseudo-terminal, {resolved}"),
+                attribute,
+                to_stand_in,
+            )
+        }
+        Ok((major, minor)) => Judged::hardware(
+            format!("{path} is a character device ({major}:{minor}) and not a pseudo-terminal"),
+            attribute,
+            to_stand_in,
+        ),
+    }
+}
+
+/// Whether `node` is counted by the mode: a node of an interface type other
+/// than the gateway.
+///
+/// Computations, logs, tees and app nodes have no hardware behind them to
+/// stand in for -- an app node's program is the thing itself -- and the
+/// gateway is the link the run is commanded over, set up by whoever started
+/// the ground station.
+pub fn counted(node: &Node) -> bool {
+    !is_gateway(&node.node_type) && DHType::from_spelling(&node.node_type).is_some()
+}
+
+/// What `node` was found to be, where the mode counts it.
+///
+/// From what is at the end of its endpoint, by its type's own rule. Asked
+/// before anything is opened: opening is not always harmless, since a serial
+/// port raises its modem lines as it opens and a GPIO line requested as an
+/// output is driven the moment the request is granted.
+pub fn judge(host: &Host, node: &Node) -> Option<Judged> {
+    if !counted(node) {
+        return None;
+    }
+    let reach = match reach_of(node) {
+        Ok(reach) => reach,
+        Err(why) => {
+            return Some(Judged::cannot_tell(
+                why,
+                "path",
+                "correct the node, which is refused as it is",
+            ))
+        }
+    };
+    Some(match &reach.endpoint {
+        EndpointConfig::Network(at) => payload::network::judged(at),
+        EndpointConfig::Device(at) => payload::device_file::judged(&at.path),
+        EndpointConfig::Serial(at) => payload::serial::judged(&at.path),
+        EndpointConfig::I2c(at) => payload::i2c::judged(host, &at.bus),
+        EndpointConfig::Spi(at) => payload::spi::judged(&at.path),
+        EndpointConfig::Can(at) => payload::can::judged(host, &at.interface),
+        EndpointConfig::Iio(at) => payload::iio::judged(host, &at.path),
+        EndpointConfig::Rpmsg(at) => payload::rpmsg::judged(&at.path),
+        EndpointConfig::Gpio(at) => payload::gpio::judged(host, &at.path),
+        EndpointConfig::Hdlc(at) => payload::hdlc::judged(&at.interface),
+    })
+}
+
+/// Everything about a run's payloads that `mode` forbids, each naming the
+/// node, what it reaches, what was found there and the mode, and saying what
+/// would satisfy the mode. Empty where the run may go ahead.
+///
+/// Every refusal rather than the first, as every other check here gives
+/// them: a run with three payloads on the wrong bus is one trip to a desk.
+pub fn refusals(mode: Mode, payloads: &[(&str, &Judged)]) -> Vec<String> {
+    let flag = format!("{FLAG}={mode}");
+    match mode {
+        Mode::None => payloads
+            .iter()
+            .filter(|(_, judged)| judged.is_stand_in())
+            .map(|(name, judged)| {
+                format!(
+                    "{name}: {}, a stand-in, and {flag}, the flight setting, allows \
+                     none: point {} at the hardware, or give {FLAG}=some or \
+                     {FLAG}=all for a run that is not a flight",
+                    judged.found, judged.attribute
+                )
+            })
+            .collect(),
+        Mode::All => payloads
+            .iter()
+            .filter(|(_, judged)| !judged.is_stand_in())
+            .map(|(name, judged)| {
+                let found = match judged.verdict {
+                    Verdict::CannotTell => format!(
+                        "{}, so whether it is a stand-in cannot be told",
+                        judged.found
+                    ),
+                    _ => judged.found.clone(),
+                };
+                format!(
+                    "{name}: {found}, and {flag} allows only stand-ins: {}",
+                    judged.to_stand_in
+                )
+            })
+            .collect(),
+        Mode::Some => {
+            let stand_ins = payloads.iter().filter(|(_, j)| j.is_stand_in()).count();
+            if payloads.is_empty() {
+                vec![format!(
+                    "{flag} wants at least one payload that is a stand-in and one \
+                     that is not, and this configuration has no payloads: give \
+                     {FLAG}=all or {FLAG}=none"
+                )]
+            } else if stand_ins == 0 {
+                vec![format!(
+                    "{flag} wants at least one payload that is a stand-in, and none \
+                     of the {} is one ({}): give {FLAG}=none for a run on hardware \
+                     alone, or make one of them a stand-in",
+                    payloads.len(),
+                    names(payloads)
+                )]
+            } else if stand_ins == payloads.len() {
+                vec![format!(
+                    "{flag} wants at least one payload that is not a stand-in, and \
+                     every one is ({}): give {FLAG}=all for a run on stand-ins alone",
+                    names(payloads)
+                )]
+            } else {
+                Vec::new()
+            }
+        }
+    }
+}
+
+fn names(payloads: &[(&str, &Judged)]) -> String {
+    payloads
+        .iter()
+        .map(|(name, _)| *name)
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// Whether `path` is a directory, for a judgement that asks whether the
+/// kernel lists something.
+pub(crate) fn is_dir(path: &Path) -> bool {
+    path.is_dir()
+}
+
+/// The first line of a file the kernel keeps, trimmed, where it can be read.
+pub(crate) fn read_line(path: &Path) -> Option<String> {
+    std::fs::read_to_string(path)
+        .ok()
+        .map(|text| text.trim().to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -141,6 +488,89 @@ mod tests {
         ] {
             let said = take_mode(args(wrong)).unwrap_err();
             assert!(said.contains("none, some, all"), "{said}");
+        }
+    }
+
+    fn stand_in() -> Judged {
+        Judged::stand_in(
+            "/dev/i2c-7 is the i2c-stub's adapter".into(),
+            "path",
+            "fix it",
+        )
+    }
+
+    fn hardware() -> Judged {
+        Judged::hardware(
+            "/dev/i2c-1 is a real adapter (gmbus)".into(),
+            "path",
+            "fix it",
+        )
+    }
+
+    fn unknown() -> Judged {
+        Judged::cannot_tell("nothing is at /dev/i2c-9".into(), "path", "fix it")
+    }
+
+    #[test]
+    fn none_refuses_each_stand_in_saying_which_flag_a_test_wants() {
+        let (s, h) = (stand_in(), hardware());
+        let said = refusals(Mode::None, &[("a", &s), ("b", &h), ("c", &s)]);
+        assert_eq!(said.len(), 2, "{said:?}");
+        assert!(said[0].starts_with("a: /dev/i2c-7 is the i2c-stub's adapter, a stand-in"));
+        assert!(
+            said[0].contains("--simulate=some or --simulate=all"),
+            "{}",
+            said[0]
+        );
+        assert!(refusals(Mode::None, &[("b", &h)]).is_empty());
+        assert!(refusals(Mode::None, &[]).is_empty());
+    }
+
+    #[test]
+    fn all_refuses_each_payload_that_is_not_a_stand_in_and_says_what_could_not_be_told() {
+        let (s, h, u) = (stand_in(), hardware(), unknown());
+        let said = refusals(Mode::All, &[("a", &s), ("b", &h), ("c", &u)]);
+        assert_eq!(
+            said,
+            [
+                "b: /dev/i2c-1 is a real adapter (gmbus), and --simulate=all allows only \
+                 stand-ins: fix it",
+                "c: nothing is at /dev/i2c-9, so whether it is a stand-in cannot be told, \
+                 and --simulate=all allows only stand-ins: fix it",
+            ]
+        );
+        assert!(refusals(Mode::All, &[("a", &s)]).is_empty());
+        // Nothing to stand in for is nothing exercised.
+        assert!(refusals(Mode::All, &[]).is_empty());
+    }
+
+    #[test]
+    fn some_wants_one_of_each_and_counts_what_could_not_be_told_as_hardware() {
+        let (s, h, u) = (stand_in(), hardware(), unknown());
+        assert!(refusals(Mode::Some, &[("a", &s), ("b", &h)]).is_empty());
+        assert!(refusals(Mode::Some, &[("a", &s), ("c", &u)]).is_empty());
+        let said = refusals(Mode::Some, &[("a", &s), ("b", &s)]);
+        assert!(said[0].contains("give --simulate=all"), "{said:?}");
+        let said = refusals(Mode::Some, &[("b", &h)]);
+        assert!(said[0].contains("give --simulate=none"), "{said:?}");
+        assert_eq!(refusals(Mode::Some, &[]).len(), 1);
+    }
+
+    /// What the mode counts: the payloads reached over an interface, and not
+    /// the gateway, a computation, a log or an app.
+    #[test]
+    fn the_mode_counts_interfaces_and_not_the_gateway() {
+        let node = |node_type: &str| Node {
+            name: "n".into(),
+            node_type: node_type.into(),
+            group: None,
+            attributes: Default::default(),
+        };
+        for counted_type in ["i2c", "network", "device-file", "hdlc", "gpio"] {
+            assert!(counted(&node(counted_type)), "{counted_type}");
+        }
+        for not in ["moc", "compute", "log", "app_pl", "tee-moc", "ping"] {
+            assert!(!counted(&node(not)), "{not}");
         }
     }
 }

@@ -8198,11 +8198,12 @@ what is wrong with them.
 
 Simulation Modes
 ----------------
-**Specified, not yet implemented**, except that tcspecial reads
-``--simulate``, ``tcslibgs::simulate``, refusing a mode that is not one of
-the three or a flag given twice, and refuses ``--visual`` under ``none``: see
-`The Visual Window`_. What a mode requires of the payloads is not yet
-checked, and tcssim and tcsmoc do not yet take the flag.
+Implemented, except that the mode and the judgements are not yet written
+to the telemetry log: they are said in the startup summary only. The mode is
+read by ``tcslibgs::simulate::take_mode``, a payload is judged by
+``tcslibgs::simulate::judge`` and its type's ``judged`` in
+``tcslibgs::node::payload``, and the mode is checked by
+``tcslibgs::simulate::refusals``, which tcspecial and tcssim both call.
 
 Tcspecial reaches each payload through whatever is at the end of its endpoint,
 and nothing in a configuration says whether that is the payload or a stand-in
@@ -8284,7 +8285,7 @@ Requirement
                     so the far end is on this host
        i2c          the bus's adapter is the kernel's i2c-stub
        gpio         the chip belongs to the kernel's gpio-sim
-       can          the interface is a vcan
+       can          the interface is a virtual CAN interface, a vcan
        iio          the device belongs to the kernel's iio_dummy, or the path
                     resolves to a pseudo-terminal
        serial, spi,
@@ -8292,6 +8293,13 @@ Requirement
        device-file  the path resolves to a pseudo-terminal's slave, which is
                     what tcssim makes
        hdlc         never: nothing stands in for a synchronous line
+
+    Tcssim does not yet make a pseudo-terminal for a device-file payload:
+    what it stands in for there is the device producing data, which
+    tcspecial reads from whatever is at the path. So a device-file payload is
+    a stand-in only where something else has made its path a
+    pseudo-terminal, and until tcssim makes one a run with a device-file
+    payload cannot be ``all``.
 
 Requirement
     What cannot be told apart is real. Under ``all`` it is refused, and the
@@ -8368,7 +8376,10 @@ Requirement
 
 Waiting for the Simulator
 -------------------------
-**Specified, not yet implemented.**
+Implemented: the messages are ``tcslibgs::ready``, tcssim's end is
+``tcssim/src/ready.rs``, a harness waits through ``tcslib::simulator`` or
+``python/tcslib/simulator.py``, and tcsmoc and ``tcssim --wait`` are
+harnesses.
 
 A stand-in has to exist before tcspecial looks for it. Tcssim makes a
 pseudo-terminal and links the payload's path to it, binds a socket, or loads
@@ -8408,6 +8419,13 @@ Requirement
     with the same function in the Python ground station's library. Every
     harness then waits the same way, and there is one statement of what the
     messages are.
+
+Requirement
+    Tcssim makes every stand-in as it starts and keeps it until it stops. A
+    panel's button decides only whether its payload sends: a stand-in that
+    existed only while its panel was sending would be one tcspecial found or
+    not by what somebody had pressed, and one tcssim could not say was ready
+    until somebody had pressed every button.
 
 Requirement
     Tcssim binds the readiness socket before it makes any stand-in, and keeps

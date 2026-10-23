@@ -1071,6 +1071,12 @@ pub struct SimPayload {
 pub struct SimConfigFile {
     #[serde(default)]
     pub description: Option<String>,
+    /// What tcssim itself is configured with: where it answers whether it is
+    /// ready. Optional as the file parses, so that the editor and tcsverify
+    /// read a file without one, and required by everything that uses it --
+    /// tcssim to start, and a harness to wait: see [`SimConfigFile::ready`].
+    #[serde(default)]
+    pub tcssim: Option<SimTcssim>,
     #[serde(default)]
     pub simulated_payload_groups: Vec<SimGroup>,
     /// The thermal masses the payloads are attached to.
@@ -1083,6 +1089,15 @@ pub struct SimConfigFile {
     pub thermal_mass: Vec<SimThermalMass>,
     #[serde(default)]
     pub simulated_payloads: Vec<SimPayload>,
+}
+
+/// The simulator file's `tcssim` section.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SimTcssim {
+    /// The UDP address, as `address:port`, at which tcssim answers whether it
+    /// has made its stand-ins: see `crate::ready`.
+    pub ready: String,
 }
 
 /// A thermal mass, as a simulator file states it.
@@ -1191,6 +1206,27 @@ impl SimConfigFile {
     /// Read a simulator configuration file.
     pub fn load<P: AsRef<Path>>(path: P) -> TcsResult<Self> {
         load_config_file(path)
+    }
+
+    /// Where tcssim answers whether it is ready: the `tcssim` section's
+    /// `ready`, as a UDP address.
+    ///
+    /// Required, and with no default, so that the harness and the simulator
+    /// read it from the one place and cannot each assume a different one.
+    pub fn ready(&self) -> Result<std::net::SocketAddr, String> {
+        let wanted = "the simulator file needs a tcssim section saying where tcssim \
+                      answers whether it is ready, as an address:port no other run uses -- \
+                      tcssim: { ready: \"127.0.0.1:7900\" }";
+        let Some(section) = self.tcssim.as_ref() else {
+            return Err(wanted.to_string());
+        };
+        let said = section.ready.trim();
+        said.parse().map_err(|_| {
+            format!(
+                "tcssim.ready is \"{said}\", which is not an address:port such as \
+                 127.0.0.1:7900: give the address and port tcssim answers at"
+            )
+        })
     }
 
     /// Settle every data handler's simulation settings.

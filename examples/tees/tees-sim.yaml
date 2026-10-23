@@ -3,6 +3,12 @@
 # How tcssim stands in for the payloads of tees.yaml.
 description: Simulator settings for the payloads of tees.yaml
 
+# Where tcssim answers whether it has made its stand-ins, which whatever
+# starts the run asks before it starts tcspecial. A port no other example
+# uses, so that two can be run at once.
+tcssim:
+  ready: "127.0.0.1:7906"
+
 # The heater is not here: it is driven and never read, so there is nothing for
 # a simulator to send in its place, and what tcspecial sends it goes to a
 # socket nobody holds -- or to whatever ground station is listening there.

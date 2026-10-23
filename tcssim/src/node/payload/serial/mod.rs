@@ -28,8 +28,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, ignore_this_request, lateness, send_in_segments, wait_out_packet, wait_while_running,
-    Pacing, PayloadConfig, PayloadStats, Produce,
+    a_packet, could_not_stand_in, ignore_this_request, lateness, send_in_segments, wait_out_packet,
+    wait_while_running, Pacing, PayloadConfig, PayloadStats, Produce,
 };
 use crate::pty::SimulatedNode;
 
@@ -48,13 +48,14 @@ pub fn run_serial_node(
         match SimulatedNode::open(&format!("{}: a serial line", config.name), &config.address) {
             Ok(line) => line,
             Err(e) => {
-                eprintln!(
-                    "{}: failed to stand in for a serial line: {}",
-                    config.name, e
+                could_not_stand_in(
+                    &config,
+                    format!("failed to stand in for a serial line: {}", e),
                 );
                 return;
             }
         };
+    config.standing.made();
 
     let mut rng = rand::thread_rng();
     // Packets that have gone, which the faults that are counted rather than
@@ -157,6 +158,8 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(segment)),
             packet_interval_ms: Arc::new(AtomicU32::new(200)),
             segment_interval_ms: Arc::new(AtomicU32::new(40)),
+            sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            standing: Default::default(),
             triggered: false,
         })
     }

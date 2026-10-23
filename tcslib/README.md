@@ -23,6 +23,11 @@ for each:
   says which build is running, which configuration it is serving and the
   digest of the files it read. It is the one thing a ground station can know
   about a spacecraft without having asked it anything.
+- **Waiting for the simulator.** `simulator::wait` asks tcssim, at the
+  address its simulator file gives as `tcssim.ready`, until it has made its
+  stand-ins and is set up for the same configuration, simulator file and
+  `--simulate` mode, so that a harness starts tcspecial only once there is
+  something for it to find. It says what it last heard when it gives up.
 
 The link to tcspecial is UDP, and only UDP: `TcsClient` sends its commands
 through a `UdpConnection`.
@@ -40,6 +45,7 @@ uses too. tcslib re-exports all of it, so a ground program needs only tcslib.
 ## Who uses it
 
 - `tcsmoc`, the test ground station.
+- `tcssim`, whose `--wait` waits through `simulator`.
 - `tcsui`, the window pieces shared by the ground programs.
 - `examples/simple-app`, whose ground station `lorem_moc` gets its data with
   one call to `Moc::receive_into`, into a buffer it made beforehand.

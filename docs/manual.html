@@ -423,28 +423,32 @@ ul.auto-toc {
 <li><a class="reference internal" href="#what-the-vehicle-answers-to" id="toc-entry-44">What the vehicle answers to</a></li>
 <li><a class="reference internal" href="#where-the-links-are" id="toc-entry-45">Where the links are</a></li>
 <li><a class="reference internal" href="#where-the-logs-segments-go" id="toc-entry-46">Where the logs' segments go</a></li>
-<li><a class="reference internal" href="#building-tcspecial-for-a-vehicle" id="toc-entry-47">Building tcspecial for a vehicle</a></li>
-<li><a class="reference internal" href="#watching-tcspecial-work" id="toc-entry-48">Watching tcspecial work</a></li>
+<li><a class="reference internal" href="#stand-ins-or-hardware-simulate" id="toc-entry-47">Stand-ins or hardware: <tt class="docutils literal"><span class="pre">--simulate</span></tt></a><ul>
+<li><a class="reference internal" href="#waiting-for-the-simulator" id="toc-entry-48">Waiting for the simulator</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#testing" id="toc-entry-49">Testing</a><ul>
-<li><a class="reference internal" href="#tcsmoc" id="toc-entry-50">tcsmoc</a><ul>
-<li><a class="reference internal" href="#the-tcsmoc-window" id="toc-entry-51">The tcsmoc window</a></li>
-<li><a class="reference internal" href="#when-data-last-arrived" id="toc-entry-52">When data last arrived</a></li>
-<li><a class="reference internal" href="#a-triggered-payload-on-the-console" id="toc-entry-53">A triggered payload on the console</a></li>
-<li><a class="reference internal" href="#what-each-end-read" id="toc-entry-54">What each end read</a></li>
-<li><a class="reference internal" href="#commands" id="toc-entry-55">Commands</a></li>
-<li><a class="reference internal" href="#beaconing" id="toc-entry-56">Beaconing</a></li>
+<li><a class="reference internal" href="#building-tcspecial-for-a-vehicle" id="toc-entry-49">Building tcspecial for a vehicle</a></li>
+<li><a class="reference internal" href="#watching-tcspecial-work" id="toc-entry-50">Watching tcspecial work</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#tcssim" id="toc-entry-57">tcssim</a><ul>
-<li><a class="reference internal" href="#the-tcssim-window" id="toc-entry-58">The tcssim window</a></li>
+<li><a class="reference internal" href="#testing" id="toc-entry-51">Testing</a><ul>
+<li><a class="reference internal" href="#tcsmoc" id="toc-entry-52">tcsmoc</a><ul>
+<li><a class="reference internal" href="#the-tcsmoc-window" id="toc-entry-53">The tcsmoc window</a></li>
+<li><a class="reference internal" href="#when-data-last-arrived" id="toc-entry-54">When data last arrived</a></li>
+<li><a class="reference internal" href="#a-triggered-payload-on-the-console" id="toc-entry-55">A triggered payload on the console</a></li>
+<li><a class="reference internal" href="#what-each-end-read" id="toc-entry-56">What each end read</a></li>
+<li><a class="reference internal" href="#commands" id="toc-entry-57">Commands</a></li>
+<li><a class="reference internal" href="#beaconing" id="toc-entry-58">Beaconing</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#tcssim" id="toc-entry-59">tcssim</a><ul>
+<li><a class="reference internal" href="#the-tcssim-window" id="toc-entry-60">The tcssim window</a></li>
 </ul>
 </li>
 </ul>
 </li>
-<li><a class="reference internal" href="#crates-used" id="toc-entry-59">Crates Used</a></li>
-<li><a class="reference internal" href="#license" id="toc-entry-60">License</a></li>
+<li><a class="reference internal" href="#crates-used" id="toc-entry-61">Crates Used</a></li>
+<li><a class="reference internal" href="#license" id="toc-entry-62">License</a></li>
 </ul>
 </div>
 <div class="section" id="introduction">
@@ -2989,20 +2993,20 @@ than leaving it unsaid.</p>
 <div class="section" id="what-the-programs-take-without-the-makefile">
 <h2><a class="toc-backref" href="#toc-entry-43">What the programs take without the Makefile</a></h2>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--<span class="whitespace"> </span>tests/manual/thermostat.yaml<span class="whitespace">
+<span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.yaml<span class="whitespace">
 </span><span class="generic prompt">$ </span><span class="name variable">PAYLOAD_SIM_YAML</span><span class="operator">=</span>examples/thermostat/thermostat-sim.yaml<span class="whitespace"> </span><span class="literal string escape">\
-</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcssim<span class="whitespace"> </span>--<span class="whitespace"> </span>tests/manual/thermostat.yaml<span class="whitespace">
+</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcssim<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.yaml<span class="whitespace">
 </span><span class="generic prompt">$ </span><span class="name variable">PAYLOAD_SIM_YAML</span><span class="operator">=</span>examples/thermostat/thermostat-sim.yaml<span class="whitespace"> </span><span class="literal string escape">\
-</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcsmoc<span class="whitespace"> </span>--<span class="whitespace"> </span>tests/manual/thermostat.yaml
+</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcsmoc<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.yaml
 </pre>
 <p>Every tcspecial configuration above may end in <tt class="docutils literal">.xml</tt> instead, and the same
 commands then run the same set in the other format:</p>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--<span class="whitespace"> </span>tests/manual/thermostat.xml<span class="whitespace">
+<span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.xml<span class="whitespace">
 </span><span class="generic prompt">$ </span><span class="name variable">PAYLOAD_SIM_YAML</span><span class="operator">=</span>examples/thermostat/thermostat-sim.yaml<span class="whitespace"> </span><span class="literal string escape">\
-</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcssim<span class="whitespace"> </span>--<span class="whitespace"> </span>tests/manual/thermostat.xml<span class="whitespace">
+</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcssim<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.xml<span class="whitespace">
 </span><span class="generic prompt">$ </span><span class="name variable">PAYLOAD_SIM_YAML</span><span class="operator">=</span>examples/thermostat/thermostat-sim.yaml<span class="whitespace"> </span><span class="literal string escape">\
-</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcsmoc<span class="whitespace"> </span>--<span class="whitespace"> </span>tests/manual/thermostat.xml
+</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcsmoc<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.xml
 </pre>
 <p>The extension is what says how to read a file -- see <a class="reference internal" href="#configuration-file-formats">Configuration File
 Formats</a> -- and it is read rather than guessed at, so a name ending in
@@ -3256,11 +3260,83 @@ overrides the quieter default as well.</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>make<span class="whitespace"> </span>runmocy<span class="whitespace"> </span><span class="name variable">RUST_LOG</span><span class="operator">=</span>debug<span class="whitespace">
 </span><span class="generic prompt">$ </span><span class="name variable">RUST_LOG</span><span class="operator">=</span>tcspecial::ci<span class="operator">=</span>trace<span class="whitespace"> </span><span class="literal string escape">\
-</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--<span class="whitespace"> </span>tests/manual/thermostat.yaml
+</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.yaml
 </pre>
 </div>
+<div class="section" id="stand-ins-or-hardware-simulate">
+<h2><a class="toc-backref" href="#toc-entry-47">Stand-ins or hardware: <tt class="docutils literal"><span class="pre">--simulate</span></tt></a></h2>
+<p>Nothing in a configuration says whether a payload is the hardware or a
+stand-in for it, and <tt class="docutils literal"><span class="pre">/dev/i2c-7</span></tt> can be the kernel's I2C stub on one host
+and a real bus on the next. So each run says which kind of run it is, with
+<tt class="docutils literal"><span class="pre">--simulate</span></tt>, given to tcspecial, tcssim and tcsmoc alike:</p>
+<dl class="docutils">
+<dt><tt class="docutils literal"><span class="pre">--simulate=none</span></tt></dt>
+<dd>No payload may be a stand-in. This is the flight setting, and it is what a
+program started without the flag gets.</dd>
+<dt><tt class="docutils literal"><span class="pre">--simulate=some</span></tt></dt>
+<dd>At least one payload is a stand-in and at least one is not: a
+configuration being debugged against part of its hardware.</dd>
+<dt><tt class="docutils literal"><span class="pre">--simulate=all</span></tt></dt>
+<dd>Every payload is a stand-in, so that nothing exercises hardware at all.</dd>
+</dl>
+<p>tcspecial decides for itself what each payload is, from what is at the end
+of its endpoint, before it opens anything, and says so as it starts:</p>
+<pre class="code console literal-block">
+<span class="generic output">simulation mode: all
+  temp_1: hardware: /dev/i2c-1 is a real adapter (Synopsys DesignWare I2C adapter)
+  sensor: a stand-in: 127.0.0.1 is a loopback address, so the far end is on this host</span>
+</pre>
+<p>A run whose payloads the mode does not allow is refused there, each payload
+named with what it reaches, what is there, and what would satisfy the mode.</p>
+<p>A payload is a stand-in when its endpoint is something <tt class="docutils literal">bin/</tt> or tcssim
+makes: an I2C bus whose adapter is the kernel's <tt class="docutils literal"><span class="pre">i2c-stub</span></tt>, a GPIO chip of
+<tt class="docutils literal"><span class="pre">gpio-sim</span></tt>, a virtual CAN interface, an IIO sensor of <tt class="docutils literal">iio_dummy</tt>, or a
+path that leads to a pseudo-terminal, which is what tcssim makes for a
+serial, SPI, rpmsg or IIO payload. A network payload is a stand-in when its
+address is a loopback address or a Unix-domain path. That is the weakest of
+the judgements: it says only that the far end is on this host, and a program
+on this host in front of real hardware passes it. A synchronous HDLC line is
+never a stand-in, and anything that cannot be told -- nothing at the path, a
+host name -- is taken for hardware.</p>
+<p>The Makefiles' run targets give every program <tt class="docutils literal"><span class="pre">--simulate=$(SIMULATE)</span></tt>,
+which is <tt class="docutils literal">all</tt> unless the command line says otherwise:</p>
+<pre class="code console literal-block">
+<span class="generic prompt">$ </span>make<span class="whitespace"> </span>runmocy<span class="whitespace"> </span><span class="name variable">SIMULATE</span><span class="operator">=</span>some
+</pre>
+<div class="section" id="waiting-for-the-simulator">
+<h3><a class="toc-backref" href="#toc-entry-48">Waiting for the simulator</a></h3>
+<p>A stand-in has to exist before tcspecial looks for it, so in a run with
+stand-ins tcssim is started first, and tcspecial only once tcssim has said it
+has made them all. tcssim makes every stand-in as it starts; a panel's button
+decides only whether that payload sends.</p>
+<p>tcssim says whether it is ready at the UDP address its simulator file gives
+in a <tt class="docutils literal">tcssim</tt> section, which every simulator file needs:</p>
+<pre class="code yaml literal-block">
+<span class="name tag">tcssim</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="name tag">ready</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;127.0.0.1:7903&quot;</span>
+</pre>
+<p>Use an address no other run uses: a tcssim left running holds it, and a second
+one started on the same address is refused, naming it. tcssim does not start
+under <tt class="docutils literal"><span class="pre">--simulate=none</span></tt>, there being nothing for it to do.</p>
+<p>tcsmoc does the waiting itself. Under <tt class="docutils literal">some</tt> or <tt class="docutils literal">all</tt> it asks at that
+address first; a simulator already running on the same configuration,
+simulator file and mode is used and left running, one set up for anything
+else is refused, saying what differs, and otherwise tcsmoc starts tcssim and
+waits for it. Under <tt class="docutils literal">none</tt> it starts tcspecial alone. For a run started by
+hand, <tt class="docutils literal">tcssim <span class="pre">--wait</span></tt> is the waiting:</p>
+<pre class="code console literal-block">
+<span class="generic prompt">$ </span>tcssim<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>x.yaml<span class="whitespace"> </span><span class="punctuation">&amp;</span><span class="whitespace">
+</span><span class="generic prompt">$ </span>tcssim<span class="whitespace"> </span>--wait<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>x.yaml<span class="whitespace"> </span><span class="operator">&amp;&amp;</span><span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>x.yaml
+</pre>
+<p><tt class="docutils literal"><span class="pre">--wait</span></tt> waits thirty seconds, or as many as <tt class="docutils literal"><span class="pre">--wait=&lt;seconds&gt;</span></tt> says, and
+exits with a failure saying what it last heard: nothing, which is a tcssim
+not running or an address that is wrong, or a simulator still starting, or one
+that failed or is set up for another run. A ground station of its own waits
+through <tt class="docutils literal"><span class="pre">tcslib::simulator::wait</span></tt>, or <tt class="docutils literal">tcslib.simulator.wait</tt> in Python.</p>
+</div>
+</div>
 <div class="section" id="building-tcspecial-for-a-vehicle">
-<h2><a class="toc-backref" href="#toc-entry-47">Building tcspecial for a vehicle</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-49">Building tcspecial for a vehicle</a></h2>
 <p>A tcspecial contains the payload types it was built with, and no others.
 Each type is a Cargo feature named as a configuration writes the type --
 <tt class="docutils literal"><span class="pre">device-file</span></tt>, <tt class="docutils literal">serial</tt>, <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, <tt class="docutils literal">can</tt>, <tt class="docutils literal">iio</tt>, <tt class="docutils literal">rpmsg</tt>,
@@ -3295,7 +3371,7 @@ configuration</span>
 vehicle; see <a class="reference internal" href="#checking-a-set-without-running-it">Checking a set without running it</a>.</p>
 </div>
 <div class="section" id="watching-tcspecial-work">
-<h2><a class="toc-backref" href="#toc-entry-48">Watching tcspecial work</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-50">Watching tcspecial work</a></h2>
 <p>A tcspecial built with the <tt class="docutils literal">visual</tt> feature can show what it is doing. Never
 build a tcspecial that flies this way: the feature is for a vehicle on a desk.</p>
 <pre class="code console literal-block">
@@ -3319,7 +3395,7 @@ build one that has it.</p>
 </div>
 </div>
 <div class="section" id="testing">
-<h1><a class="toc-backref" href="#toc-entry-49">Testing</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-51">Testing</a></h1>
 <p>Testing is done with two programs, and a third that checks the files they
 read:</p>
 <ul class="simple">
@@ -3331,9 +3407,9 @@ and errors.</li>
 running any of it: see <a class="reference internal" href="#checking-a-set-without-running-it">Checking a set without running it</a>.</li>
 </ul>
 <div class="section" id="tcsmoc">
-<h2><a class="toc-backref" href="#toc-entry-50">tcsmoc</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-52">tcsmoc</a></h2>
 <div class="section" id="the-tcsmoc-window">
-<h3><a class="toc-backref" href="#toc-entry-51">The tcsmoc window</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-53">The tcsmoc window</a></h3>
 <p>Across the top, from the left:</p>
 <dl class="docutils">
 <dt>the <tt class="docutils literal">tcspecial link</tt> box</dt>
@@ -3438,7 +3514,7 @@ see traffic, and nothing is asked of the spacecraft to show it.</p>
 said about that handler: see <a class="reference internal" href="#seeing-what-was-read">Seeing what was read</a>.</p>
 </div>
 <div class="section" id="when-data-last-arrived">
-<h3><a class="toc-backref" href="#toc-entry-52">When data last arrived</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-54">When data last arrived</a></h3>
 <p><tt class="docutils literal">Last recv</tt> on each panel is when that source's data last arrived, and the
 panel says nothing more about whether that was recent enough. Nothing in a
 configuration states how often a node's data should arrive -- a node produces
@@ -3452,7 +3528,7 @@ what has arrived without a command going out. What only the spacecraft can say
 is for.</p>
 </div>
 <div class="section" id="a-triggered-payload-on-the-console">
-<h3><a class="toc-backref" href="#toc-entry-53">A triggered payload on the console</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-55">A triggered payload on the console</a></h3>
 <p>A payload that answers requests sends nothing until tcspecial asks it to, so
 when such a panel shows no data the question is what the MOC sent and what came
 back -- and a panel shows neither. For those payloads, and only those, tcsmoc
@@ -3484,7 +3560,7 @@ appears in no other counter, because a trigger is a write with no read behind
 it.</p>
 </div>
 <div class="section" id="what-each-end-read">
-<h3><a class="toc-backref" href="#toc-entry-54">What each end read</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-56">What each end read</a></h3>
 <p>When a link comes up, tcsmoc sends its software version and an MD5 of the
 payload configuration it read, and tcspecial answers with its own. Each
 prints what it read on the terminal it was
@@ -3521,7 +3597,7 @@ rather than replacing; stopping it and letting tcsmoc start a fresh one is the
 fix.</p>
 </div>
 <div class="section" id="commands">
-<h3><a class="toc-backref" href="#toc-entry-55">Commands</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-57">Commands</a></h3>
 <p>From the <tt class="docutils literal">Command</tt> menu. Three of the seven items send a command:</p>
 <dl class="docutils">
 <dt>Ping</dt>
@@ -3557,7 +3633,7 @@ is done from its own panel, and the panels show what a query would ask for
 without anyone asking.</p>
 </div>
 <div class="section" id="beaconing">
-<h3><a class="toc-backref" href="#toc-entry-56">Beaconing</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-58">Beaconing</a></h3>
 <p>TCSpecial sends a beacon at the interval its configuration states, from the
 address the payload set's <tt class="docutils literal">tcspecial</tt> section names to the address beside it,
 or <tt class="docutils literal">tcspecial.yaml</tt>'s pair for a set with no section. Tcsmoc binds that same
@@ -3682,9 +3758,9 @@ arrived and leaves the status to the commands and to the beacon.</p>
 </div>
 </div>
 <div class="section" id="tcssim">
-<h2><a class="toc-backref" href="#toc-entry-57">tcssim</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-59">tcssim</a></h2>
 <div class="section" id="the-tcssim-window">
-<h3><a class="toc-backref" href="#toc-entry-58">The tcssim window</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-60">The tcssim window</a></h3>
 <p>One panel per simulated payload, in a grid, and a <tt class="docutils literal">Quit All</tt> button at the
 foot of the window. Nothing in the window names a payload or fixes how many
 there are: the two configuration files decide that, so a payload added to or
@@ -3747,7 +3823,7 @@ both are shown the same way.</p>
 </div>
 </div>
 <div class="section" id="crates-used">
-<h1><a class="toc-backref" href="#toc-entry-59">Crates Used</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-61">Crates Used</a></h1>
 <p>These are the crates the workspace's <tt class="docutils literal">Cargo.toml</tt> files name directly --
 every one of the nineteen manifests, the root and each crate under it. The
 crates they depend on in turn are not listed: <tt class="docutils literal">cargo tree</tt> shows the whole
@@ -3915,7 +3991,7 @@ $ cargo metadata --format-version 1
 </pre>
 </div>
 <div class="section" id="license">
-<h1><a class="toc-backref" href="#toc-entry-60">License</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-62">License</a></h1>
 <p>TCSpecial -- the flight software, the libraries, the ground programs and the
 examples -- is licensed under either of the Apache License, Version 2.0
 (<tt class="docutils literal"><span class="pre">LICENSE-APACHE</span></tt>, or <a class="reference external" href="http://www.apache.org/licenses/LICENSE-2.0">http://www.apache.org/licenses/LICENSE-2.0</a>) or the MIT

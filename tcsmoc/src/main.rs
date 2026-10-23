@@ -12,6 +12,7 @@ use std::thread;
 use std::time::Duration;
 
 use tcslibgs::config::payload_path_from_args;
+use tcslibgs::simulate::Mode;
 use tcslibgs::{Edge, NO_TRANSFER_TIME};
 use tcsverify::startup::Startup;
 
@@ -447,9 +448,19 @@ fn update_row(model: &Rc<VecModel<DHInfo>>, row: usize, f: impl FnOnce(&mut DHIn
 /// would be started with, without starting it. The children open windows and
 /// bind fixed ports, so a test that spawned them would not be a test anyone
 /// could run twice at once, or alongside a real session.
-fn child_command(name: &str, payload_path: &str) -> Command {
+///
+/// With the MOC's own simulation mode, so that the two cannot disagree in a
+/// run the MOC started: see `tcslibgs::simulate`.
+fn child_command(name: &str, payload_path: &str, mode: Mode) -> Command {
     let mut command = Command::new("cargo");
-    command.args(["run", "--bin", name, "--", payload_path]);
+    command.args([
+        "run",
+        "--bin",
+        name,
+        "--",
+        &format!("{}={mode}", tcslibgs::simulate::FLAG),
+        payload_path,
+    ]);
     command
 }
 
@@ -475,8 +486,8 @@ impl ProcessManager {
     /// next MOC on that configuration then fails to bind. Asking is what a
     /// signal does, so the timer that notices a signal stops what the MOC
     /// started, the one that ended included, and exits: see `stop_if_asked`.
-    fn start_child(&self, name: &str, payload_path: &str) {
-        let child = child_command(name, payload_path)
+    fn start_child(&self, name: &str, payload_path: &str, mode: Mode) {
+        let child = child_command(name, payload_path, mode)
             .spawn()
             .unwrap_or_else(|_| panic!("Failed to start {}", name));
 
@@ -515,6 +526,18 @@ impl ProcessManager {
         });
     }
 
+    /// Whether the child this started has ended. False where it started
+    /// none.
+    fn has_exited(&self) -> bool {
+        match self.child.lock() {
+            Ok(mut guard) => match guard.as_mut() {
+                Some(child) => !matches!(child.try_wait(), Ok(None)),
+                None => false,
+            },
+            Err(_) => false,
+        }
+    }
+
     fn kill(&self) {
         let name = self.name.lock().unwrap();
         eprintln!("Kill child {}", *name);
@@ -540,7 +563,18 @@ fn main() {
     // follow from how many data handlers it describes.
     // No variable of its own: the MOC starts the other two and they inherit
     // its environment, so a variable here would name their file as well.
-    let payload_path = match payload_path_from_args(env::args(), None) {
+    // The run's simulation mode, given to both programs this starts: see
+    // `tcslibgs::simulate`. Under the flight setting, which is what a run
+    // without the flag gets, tcssim is not started at all.
+    let (mode, args) = match tcslibgs::simulate::take_mode(env::args().collect()) {
+        Ok(taken) => taken,
+        Err(e) => {
+            eprintln!("tcsmoc: {e}");
+            exit(1);
+        }
+    };
+    eprintln!("simulation mode: {mode}");
+    let payload_path = match payload_path_from_args(args.into_iter(), None) {
         Ok(payload_path) => payload_path,
         Err(e) => {
             eprintln!("{}", e);
@@ -573,7 +607,7 @@ fn main() {
     );
     present_and_stop_if_fatal(&startup);
 
-    vehicle::run(&payload_path, sim_path.as_deref(), startup);
+    vehicle::run(&payload_path, sim_path.as_deref(), mode, startup);
 }
 
 /// Ask for this window to be put against one edge of the display.
@@ -1760,14 +1794,21 @@ mod tests {
     #[test]
     fn each_child_is_started_on_the_mocs_payload_file() {
         for name in CHILDREN {
-            let command = child_command(name, "tcspecial2.yaml");
+            let command = child_command(name, "tcspecial2.yaml", Mode::All);
 
             assert_eq!(command.get_program(), "cargo", "{name}");
             let args: Vec<&OsStr> = command.get_args().collect();
             assert_eq!(
                 args,
-                ["run", "--bin", name, "--", "tcspecial2.yaml"],
-                "{name}"
+                [
+                    "run",
+                    "--bin",
+                    name,
+                    "--",
+                    "--simulate=all",
+                    "tcspecial2.yaml"
+                ],
+                "{name}: with the MOC's own mode"
             );
 
             // Nothing is put in the child's environment: the argument says it
@@ -1785,7 +1826,7 @@ mod tests {
         let payload_path = payload_path_from_args(args(&["tcspecial2.yaml"]), None).unwrap();
 
         for name in CHILDREN {
-            let command = child_command(name, &payload_path);
+            let command = child_command(name, &payload_path, Mode::All);
             let args: Vec<&OsStr> = command.get_args().collect();
             assert_eq!(
                 args.last(),
@@ -1803,7 +1844,7 @@ mod tests {
         assert_eq!(payload_path, DEFAULT_PAYLOAD_CONFIG_PATH);
 
         for name in CHILDREN {
-            let command = child_command(name, &payload_path);
+            let command = child_command(name, &payload_path, Mode::All);
             let args: Vec<&OsStr> = command.get_args().collect();
             assert_eq!(
                 args.last(),

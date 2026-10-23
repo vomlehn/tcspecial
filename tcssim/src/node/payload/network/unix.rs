@@ -243,7 +243,7 @@ pub fn run_unix_dgram_node(
     //
     // The vehicle's end is unbound, so nothing arrives here from a path: see
     // `tcspecial::node::payload::network::unix::UnixDatagramEndpoint::reaching`.
-    if matches!(config.thermal, Some(crate::thermal::Thermal::Heats { .. })) {
+    if config.driven || matches!(config.thermal, Some(crate::thermal::Thermal::Heats { .. })) {
         run_driven_unix_dgram_node(config, running, stats, &handler);
         return;
     }
@@ -427,8 +427,12 @@ fn run_driven_unix_dgram_node(
                 break;
             }
             // The mass is told before the statistics are, so that nothing
-            // holds the stats lock across the mass's own.
-            crate::thermal::driven(&config.thermal, &config.name, &buf[..n]);
+            // holds the stats lock across the mass's own. Not where the
+            // panel has the device switched off: what arrives is counted, as
+            // every stand-in counts it, and acted on by nothing.
+            if pacing.sending {
+                crate::thermal::driven(&config.thermal, &config.name, &buf[..n]);
+            }
             let mut guard = stats.lock().unwrap();
             guard.a_packet_has_come(&buf[..n]);
             guard.bytes_recv += n as u64;
@@ -473,6 +477,7 @@ mod tests {
             segment_interval_ms: Arc::new(AtomicU32::new(20)),
             sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             standing: Default::default(),
+            driven: false,
             triggered: false,
         })
     }
@@ -599,6 +604,7 @@ mod tests {
             segment_interval_ms: Arc::new(AtomicU32::new(0)),
             sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             standing: Default::default(),
+            driven: false,
         });
         device.start().expect("the device starts");
 
@@ -683,6 +689,7 @@ mod tests {
             segment_interval_ms: Arc::new(AtomicU32::new(0)),
             sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             standing: Default::default(),
+            driven: false,
         });
         device.start().expect("the device starts");
 

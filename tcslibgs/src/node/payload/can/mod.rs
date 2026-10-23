@@ -137,7 +137,7 @@ pub fn judged(host: &crate::simulate::Host, interface: &str) -> crate::simulate:
     use crate::simulate::{read_line, Judged};
     let listed = host.sys.join("class/net").join(interface);
     let Ok(device) = std::fs::canonicalize(&listed) else {
-        return Judged::cannot_tell(
+        return Judged::absent(
             format!("there is no network interface called {interface}"),
             "interface",
             TO_STAND_IN,
@@ -202,7 +202,7 @@ mod stand_in_tests {
         assert_eq!(judged(&host, "vcan0").verdict, Verdict::StandIn);
         assert_eq!(judged(&host, "can0").verdict, Verdict::Hardware);
         assert_eq!(judged(&host, "lo").verdict, Verdict::CannotTell);
-        assert_eq!(judged(&host, "can9").verdict, Verdict::CannotTell);
+        assert_eq!(judged(&host, "can9").verdict, Verdict::Absent);
     }
 }
 

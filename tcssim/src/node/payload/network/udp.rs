@@ -53,7 +53,7 @@ pub fn run_udp_node(
     // was wrong there is the reason it is right here: whichever end speaks
     // first binds nothing, and for a heater neither end would ever speak if
     // this one waited to be asked.
-    if matches!(config.thermal, Some(crate::thermal::Thermal::Heats { .. })) {
+    if config.driven || matches!(config.thermal, Some(crate::thermal::Thermal::Heats { .. })) {
         run_driven_udp_node(config, running, stats, &handler);
         return;
     }
@@ -224,8 +224,12 @@ fn run_driven_udp_node(
                 break;
             }
             // The mass is told before the statistics are, so that nothing
-            // holds the stats lock across the mass's own.
-            crate::thermal::driven(&config.thermal, &config.name, &buf[..n]);
+            // holds the stats lock across the mass's own. Not where the
+            // panel has the device switched off: what arrives is counted, as
+            // every stand-in counts it, and acted on by nothing.
+            if pacing.sending {
+                crate::thermal::driven(&config.thermal, &config.name, &buf[..n]);
+            }
             let mut guard = stats.lock().unwrap();
             guard.a_packet_has_come(&buf[..n]);
             guard.bytes_recv += n as u64;
@@ -284,6 +288,7 @@ mod tests {
             segment_interval_ms: Arc::new(AtomicU32::new(40)),
             sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             standing: Default::default(),
+            driven: false,
             triggered: false,
         });
         device.start().expect("the device starts");
@@ -359,6 +364,7 @@ mod tests {
             segment_interval_ms: Arc::new(AtomicU32::new(0)),
             sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             standing: Default::default(),
+            driven: false,
             triggered: true,
         });
         device.start().expect("the device starts");
@@ -413,6 +419,7 @@ mod tests {
             segment_interval_ms: Arc::new(AtomicU32::new(0)),
             sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             standing: Default::default(),
+            driven: false,
         })
     }
 
@@ -461,6 +468,7 @@ mod tests {
             segment_interval_ms: Arc::new(AtomicU32::new(0)),
             sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             standing: Default::default(),
+            driven: false,
         };
 
         // The name reaches the thread that does the talking, which is the
@@ -753,6 +761,7 @@ mod tests {
             segment_interval_ms: Arc::new(AtomicU32::new(50)),
             sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             standing: Default::default(),
+            driven: false,
             triggered: false,
         });
         device.start().expect("the device starts");

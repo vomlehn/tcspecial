@@ -1272,6 +1272,23 @@ pub struct DHConfig {
     /// [`crate::graph::reach::Reach::sends_from`] that is read.
     #[serde(default)]
     pub sends_from: Option<SendsFrom>,
+    /// Where this payload is reached over UDP when it is simulated, where its
+    /// node says: see [`crate::graph::reach::Reach::stand_in`].
+    ///
+    /// Read by the simulator, whose stand-in for it is then a UDP socket
+    /// there rather than anything at [`DHConfig::endpoint`], which is still
+    /// what the payload is and what its simulator entry is held to.
+    #[serde(default)]
+    pub stand_in: Option<std::net::SocketAddr>,
+    /// Whether the payload is only driven: written to by the vehicle and
+    /// never read, as a heater or a valve is.
+    ///
+    /// A stand-in for one sends nothing and watches what arrives, counting
+    /// it, so that tcssim shows a driven payload as it shows every other. Its
+    /// simulator entry then needs no packet interval, there being nothing to
+    /// send.
+    #[serde(default)]
+    pub driven: bool,
 }
 
 /// What the rules for `kind` make of these terms.

@@ -113,7 +113,10 @@ pub fn handlers(graph: &Graph, sim_file: &SimConfigFile) -> Result<Vec<DHConfig>
         }
     }
 
-    let named = |name: &str| sim_file.simulated_payloads.iter().any(|e| e.name == name);
+    // Those whose simulate is true. One that is false is the real device,
+    // which tcssim makes nothing for; one whose simulate is missing or stated
+    // twice is refused where the file is checked, and is not simulated here.
+    let named = |name: &str| sim_file.simulates(name);
     let mut handlers = Vec::new();
     for node in graph
         .nodes
@@ -121,44 +124,16 @@ pub fn handlers(graph: &Graph, sim_file: &SimConfigFile) -> Result<Vec<DHConfig>
         .filter(|n| n.is_payload() && named(&n.name))
     {
         // A payload that is only driven -- a heater, a valve -- is written to
-        // and never read, and a stand-in for it would be sending data nothing
-        // reads into a device the vehicle is trying to drive.
-        //
-        // Unless it warms a thermal mass. Then being driven is the whole of
-        // what it is for: the stand-in sends nothing and watches what arrives,
-        // so that the mass the sensors read is warmed by what the vehicle
-        // decided. See `crate::sim_config::Attached`.
+        // and never read. Its stand-in sends nothing and watches what
+        // arrives, counting it, so that it is shown and switched as every
+        // other simulated payload is; one that warms a thermal mass warms it
+        // as well. See `crate::types::DHConfig::driven`.
         let leaves = graph.links.iter().any(|l| l.origin().node == node.name);
         let arrives = graph.links.iter().any(|l| {
             l.to.each()
                 .iter()
                 .any(|d| Destination::parse(d).node == node.name)
         });
-        let warms = sim_file
-            .simulated_payloads
-            .iter()
-            .filter(|entry| entry.name == node.name)
-            .any(|entry| {
-                entry.settings.heats.is_some()
-                    || entry
-                        .group
-                        .as_ref()
-                        .and_then(|name| {
-                            sim_file
-                                .simulated_payload_groups
-                                .iter()
-                                .find(|group| &group.name == name)
-                        })
-                        .is_some_and(|group| group.settings.heats.is_some())
-            });
-        if arrives && !leaves && !warms {
-            return Err(format!(
-                "\"{}\" is driven and never read, so there is nothing for a \
-                 simulator to send in its place: leave it out of the simulator \
-                 file, or say which thermal mass it heats",
-                node.name
-            ));
-        }
 
         // A payload that is a program is the program itself: tcspecial runs
         // it, and there is no device or socket for a simulator to stand in
@@ -201,6 +176,8 @@ pub fn handlers(graph: &Graph, sim_file: &SimConfigFile) -> Result<Vec<DHConfig>
             mode,
             stale_interval: None,
             sends_from: reach.sends_from,
+            stand_in: reach.stand_in,
+            driven: arrives && !leaves,
         });
     }
     Ok(handlers)

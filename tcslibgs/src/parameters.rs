@@ -463,6 +463,8 @@ mod tests {
             mode: DHMode::Periodic,
             stale_interval: None,
             sends_from: None,
+            stand_in: None,
+            driven: false,
         }
     }
 
@@ -485,7 +487,7 @@ mod tests {
     fn both_files_are_shown_and_told_apart() {
         let dh = udp("DH2");
         let sim = settled(
-            "simulated_payloads:\n  - name: DH2\n    type: network\n    protocol: udp\n    \
+            "simulated_payloads:\n  - name: DH2\n    simulate: true\n    type: network\n    protocol: udp\n    \
              packet_interval: 500 ms\n    segment_size: 5\n    segment_interval: 40 ms\n",
             &dh,
         );
@@ -562,7 +564,7 @@ mod tests {
         };
 
         let sim = settled(
-            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: tcp\n",
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    protocol: tcp\n",
             &dh,
         );
         let shown = payload_parameters(&dh, Some(&sim));
@@ -591,7 +593,7 @@ mod tests {
     fn only_the_faults_that_were_asked_for_are_listed() {
         let dh = udp("DH2");
         let sim = settled(
-            "simulated_payloads:\n  - name: DH2\n    type: network\n    protocol: udp\n    \
+            "simulated_payloads:\n  - name: DH2\n    simulate: true\n    type: network\n    protocol: udp\n    \
              packet_interval: 100 ms\n    drop_percent: 10\n    jitter: 25 ms\n",
             &dh,
         );
@@ -691,7 +693,7 @@ mod tests {
     fn nothing_shown_is_a_measurement() {
         let dh = udp("DH2");
         let sim = settled(
-            "simulated_payloads:\n  - name: DH2\n    type: network\n    protocol: udp\n    \
+            "simulated_payloads:\n  - name: DH2\n    simulate: true\n    type: network\n    protocol: udp\n    \
              packet_interval: 100 ms\n",
             &dh,
         );

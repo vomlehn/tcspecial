@@ -165,7 +165,7 @@ const TO_STAND_IN: &str = "point path at the i2c-stub bus, which bin/mki2c makes
 pub fn judged(host: &crate::simulate::Host, bus: &str) -> crate::simulate::Judged {
     match host.device_of(bus) {
         Ok(device) => adapter_judged(bus, &device),
-        Err(found) => crate::simulate::Judged::cannot_tell(found, "path", TO_STAND_IN),
+        Err(found) => found.judged("path", TO_STAND_IN),
     }
 }
 
@@ -231,7 +231,7 @@ mod stand_in_tests {
     #[test]
     fn a_bus_with_nothing_at_it_cannot_be_told() {
         let judged = judged(&crate::simulate::Host::this(), "/nonexistent/i2c-99");
-        assert_eq!(judged.verdict, Verdict::CannotTell);
+        assert_eq!(judged.verdict, Verdict::Absent);
         assert_eq!(judged.found, "nothing is at /nonexistent/i2c-99");
     }
 }

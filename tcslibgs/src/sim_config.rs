@@ -63,6 +63,11 @@ pub enum SimConfigError {
     UnknownPayload { payload: String },
     /// A data handler has no simulated payload to drive it.
     Unsimulated { handler: String },
+    /// A simulated payload with no `simulate`, from itself or its group.
+    SimulateUnstated { payload: String },
+    /// A simulated payload that states `simulate` and names a group that
+    /// states it too.
+    SimulateTwice { payload: String, group: String },
     /// A thermal mass whose figures cannot be read, or that nothing is
     /// attached to.
     BadThermalMass { mass: String, why: String },
@@ -79,6 +84,12 @@ pub enum SimConfigError {
     /// A triggered payload was given a packet interval, which it has nothing
     /// to do with: it sends when it is asked.
     IntervalForATriggeredPayload {
+        payload: String,
+        setting: &'static str,
+    },
+    /// A payload that is only driven was given a packet interval, which it
+    /// has nothing to do with: it sends nothing.
+    IntervalForADrivenPayload {
         payload: String,
         setting: &'static str,
     },
@@ -177,6 +188,19 @@ impl fmt::Display for SimConfigError {
                  handler of that name",
                 payload
             ),
+            SimConfigError::SimulateUnstated { payload } => write!(
+                f,
+                "\"{payload}\" says nowhere whether it is simulated: give it simulate: \
+                 true for tcssim to stand in for it, or simulate: false for the real \
+                 device, or give it to a group that says"
+            ),
+            SimConfigError::SimulateTwice { payload, group } => write!(
+                f,
+                "\"{payload}\" states simulate, and so does its group \"{group}\": a \
+                 payload does not override its group's simulate, so take it out of \
+                 one of the two -- out of the payload, or out of the group and into \
+                 each payload in it"
+            ),
             SimConfigError::Unsimulated { handler } => write!(
                 f,
                 "data handler \"{}\" has no simulated payload: add one naming it, \
@@ -194,6 +218,12 @@ impl fmt::Display for SimConfigError {
                 setting,
                 why,
             } => write!(f, "simulated payload \"{payload}\": {setting}: {why}"),
+            SimConfigError::IntervalForADrivenPayload { payload, setting } => write!(
+                f,
+                "simulated payload \"{payload}\" is only driven -- the vehicle writes to \
+                 it and reads nothing from it -- so it sends nothing, and {setting} \
+                 governs nothing: take it out"
+            ),
             SimConfigError::NoPacketInterval { payload } => write!(
                 f,
                 "simulated payload \"{}\" has no packet interval: state one for it \
@@ -378,9 +408,12 @@ impl SimConfigError {
 
             SimConfigError::UnknownGroup { payload, .. }
             | SimConfigError::UnknownPayload { payload }
+            | SimConfigError::SimulateUnstated { payload }
+            | SimConfigError::SimulateTwice { payload, .. }
             | SimConfigError::NoPacketInterval { payload }
             | SimConfigError::NotAnInterval { payload, .. }
             | SimConfigError::IntervalForATriggeredPayload { payload, .. }
+            | SimConfigError::IntervalForADrivenPayload { payload, .. }
             | SimConfigError::NotAPercentage { payload, .. }
             | SimConfigError::FaultForTheWrongPayload { payload, .. }
             | SimConfigError::NoKind { payload, .. }
@@ -470,14 +503,20 @@ pub fn simulable(dh: &DHConfig) -> Result<(), String> {
     // synchronous line has none -- there is no virtual HDLC interface -- so
     // what is said is that, rather than a payload that looks simulated and is
     // not.
+    //
+    // Unless its node gives a stand_in: then tcspecial reaches it over UDP
+    // when the run has stand-ins, and the simulator answers there.
     if let EndpointConfig::Hdlc(hdlc) = &dh.endpoint {
-        return Err(format!(
-            "simulated payload \"{}\" is on a synchronous line ({}), and there \
-             is nothing in the kernel that stands in for one: a card is needed \
-             -- a wanxl, a pci200syn, a pc300too or a FarSync -- and tcspecial \
-             reads it directly. Unlike a CAN bus there is no virtual one",
-            dh.name.0, hdlc.interface
-        ));
+        if dh.stand_in.is_none() {
+            return Err(format!(
+                "simulated payload \"{}\" is on a synchronous line ({}), and there \
+                 is nothing in the kernel that stands in for one: give its node a \
+                 stand_in, such as 127.0.0.1:7950, for tcspecial to reach it over \
+                 UDP when it is simulated, or leave it to a card -- a wanxl, a \
+                 pci200syn, a pc300too or a FarSync -- with simulate: false",
+                dh.name.0, hdlc.interface
+            ));
+        }
     }
 
     // Nor a raw socket's. One cannot be opened without CAP_NET_RAW, and on
@@ -791,6 +830,15 @@ fn what_it_is(
 /// found rather than being a field no window offers.
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub struct SimSettings {
+    /// Whether the payload is simulated: `true` for tcssim to stand in for
+    /// it, `false` for the real device.
+    ///
+    /// Required of every simulated payload, from itself or from its group
+    /// and never from both: see [`SimConfigFile::simulate_of`]. Not taken over
+    /// a group's by [`SimSettings::over`], as every other setting is, because
+    /// a payload may not override its group's.
+    #[serde(default, deserialize_with = "blank_is_unstated")]
+    pub simulate: Option<bool>,
     // What payload this is, said again. Neither of these is a setting of the
     // simulation: the payload configuration decides both, and a simulator
     // file that disagreed with it would be simulating something else. They
@@ -966,6 +1014,7 @@ where
 /// answers from, how fast it sends, what it does wrong, and what it is
 /// attached to.
 pub const SETTINGS: &[&str] = &[
+    "simulate",
     "type",
     "protocol",
     "payload_address",
@@ -998,6 +1047,9 @@ impl SimSettings {
     /// state. Used to lay a simulated payload over the group it names.
     fn over(&self, base: &SimSettings) -> SimSettings {
         SimSettings {
+            // From one of the two and never both, which is checked where
+            // it is asked: see `SimConfigFile::simulate_of`.
+            simulate: self.simulate.or(base.simulate),
             dh_type: self.dh_type.clone().or_else(|| base.dh_type.clone()),
             protocol: self.protocol.clone().or_else(|| base.protocol.clone()),
             payload_address: self
@@ -1285,6 +1337,57 @@ impl SimConfigFile {
     }
 
     /// One payload's settings laid over its group's, where it names one.
+    /// Whether `payload` is simulated, from the one place it says: itself or
+    /// the group it names.
+    ///
+    /// Neither is refused, because whether a device is simulated is not left
+    /// to a default; both is refused, whether or not they agree, because a
+    /// payload does not override its group's `simulate` -- the group says it
+    /// for every payload in it, and a reader of the group has read the answer.
+    pub fn simulate_of(&self, payload: &SimPayload) -> Result<bool, SimConfigError> {
+        let group = payload.group.as_ref().and_then(|name| {
+            self.simulated_payload_groups
+                .iter()
+                .find(|group| &group.name == name)
+        });
+        match (payload.settings.simulate, group) {
+            (Some(_), Some(group)) if group.settings.simulate.is_some() => {
+                Err(SimConfigError::SimulateTwice {
+                    payload: payload.name.clone(),
+                    group: group.name.clone(),
+                })
+            }
+            (Some(simulate), _) => Ok(simulate),
+            // A group that is not there is that mistake, and not a second
+            // one about simulate: one mistake, one problem.
+            (None, None) if payload.group.is_some() => Err(SimConfigError::UnknownGroup {
+                payload: payload.name.clone(),
+                group: payload.group.clone().unwrap_or_default(),
+            }),
+            (None, Some(group)) => {
+                group
+                    .settings
+                    .simulate
+                    .ok_or_else(|| SimConfigError::SimulateUnstated {
+                        payload: payload.name.clone(),
+                    })
+            }
+            (None, None) => Err(SimConfigError::SimulateUnstated {
+                payload: payload.name.clone(),
+            }),
+        }
+    }
+
+    /// Whether the payload called `name` is one this file has tcssim stand
+    /// in for: named, with `simulate` true. A payload whose `simulate` is
+    /// missing or stated twice is not, the problem being reported where the
+    /// file is checked.
+    pub fn simulates(&self, name: &str) -> bool {
+        self.simulated_payloads
+            .iter()
+            .any(|payload| payload.name == name && self.simulate_of(payload) == Ok(true))
+    }
+
     fn settings_of(&self, payload: &SimPayload) -> SimSettings {
         match payload.group.as_ref().and_then(|name| {
             self.simulated_payload_groups
@@ -1529,8 +1632,23 @@ impl SimConfigFile {
                     .map_err(|e| nought_says(e, "no jitter is this setting left out"))
             };
 
+            // A payload that is only driven sends nothing, so it has no
+            // interval either, and one stated for it governs nothing.
+            if dh.driven {
+                for (setting, stated) in [
+                    ("packet_interval", settings.packet_interval.is_some()),
+                    ("segment_interval", settings.segment_interval.is_some()),
+                ] {
+                    if stated {
+                        return Err(SimConfigError::IntervalForADrivenPayload {
+                            payload: payload.name.clone(),
+                            setting,
+                        });
+                    }
+                }
+            }
             let packet_interval = match (
-                triggered,
+                triggered || dh.driven,
                 how_often("packet_interval", &settings.packet_interval)?,
             ) {
                 (true, Some(_)) => {
@@ -1720,9 +1838,27 @@ impl SimConfigFile {
             }
         }
 
+        // Whether each is simulated, from the one place it says. Asked of
+        // every entry, the real ones too: an entry that says neither is as
+        // wrong as one that says both, whatever it would have said.
+        for payload in payloads.values() {
+            match self.simulate_of(payload) {
+                // Said where the payload's settings are settled.
+                Err(SimConfigError::UnknownGroup { .. }) | Ok(_) => {}
+                Err(e) => problems.push(e),
+            }
+        }
+
         // A name here that no data handler has would otherwise be a line with
-        // no effect, which is what a misspelled handler name looks like.
-        for name in payloads.keys() {
+        // no effect, which is what a misspelled handler name looks like. Not
+        // asked of a payload that is not simulated: it has no data handler
+        // here, the handlers being the payloads tcssim stands in for, and
+        // whether its name is a payload's is asked where the configuration is
+        // -- see `crate::graph::simulated::handlers`.
+        for (name, payload) in &payloads {
+            if self.simulate_of(payload).is_ok_and(|simulated| !simulated) {
+                continue;
+            }
             if !names.contains(name) {
                 problems.push(SimConfigError::UnknownPayload {
                     payload: (*name).to_string(),
@@ -1775,6 +1911,8 @@ mod tests {
             mode: Default::default(),
             stale_interval: None,
             sends_from: None,
+            stand_in: None,
+            driven: false,
         }
     }
 
@@ -1804,6 +1942,7 @@ mod tests {
                     "protocol" => "udp",
                     "payload_address" => "127.0.0.1",
                     "reads" | "heats" => "cabin",
+                    "simulate" => "true",
                     _ => "1",
                 };
                 format!("    {name}: {value}")
@@ -1859,6 +1998,7 @@ mod tests {
             "
 simulated_payload_groups:
   - name: steady_1hz
+    simulate: true
     packet_interval: 1 s
     segment_interval: 250 ms
 simulated_payloads:
@@ -1894,6 +2034,7 @@ simulated_payloads:
             "
 simulated_payload_groups:
   - name: steady_1hz
+    simulate: true
     packet_interval: 1 s
     segment_interval: 1 s
 simulated_payloads:
@@ -1919,6 +2060,7 @@ simulated_payloads:
             "
 simulated_payloads:
   - name: DH0
+    simulate: true
     type: network
     protocol: udp
     packet_interval: 500 ms
@@ -1937,10 +2079,12 @@ simulated_payloads:
             "
 simulated_payloads:
   - name: DH1
+    simulate: true
     type: network
     protocol: udp
     packet_interval: 1 ms
   - name: DH0
+    simulate: true
     type: network
     protocol: udp
     packet_interval: continuous
@@ -1961,6 +2105,7 @@ simulated_payloads:
             "
 simulated_payloads:
   - name: DH0
+    simulate: true
     type: network
     protocol: udp
     packet_interval: continuous
@@ -1981,10 +2126,12 @@ simulated_payloads:
             "
 simulated_payloads:
   - name: DH0
+    simulate: true
     type: network
     protocol: udp
     packet_interval: continuous
   - name: DH7
+    simulate: true
     type: network
     protocol: udp
     packet_interval: continuous
@@ -2020,6 +2167,123 @@ simulated_payloads:
         );
     }
 
+    /// Whether a payload is simulated is said once: by the payload or by its
+    /// group. Neither is refused, and so is both, even where they agree.
+    #[test]
+    fn simulate_is_said_once_by_the_payload_or_by_its_group() {
+        let neither = parse(
+            "
+simulated_payloads:
+  - name: DH0
+    type: network
+    protocol: udp
+    packet_interval: 1 s
+",
+        );
+        assert_eq!(
+            neither.resolve(&[handler("DH0", 1)]),
+            Err(SimConfigError::SimulateUnstated {
+                payload: "DH0".to_string()
+            })
+        );
+
+        let both = parse(
+            "
+simulated_payload_groups:
+  - name: g
+    simulate: true
+    packet_interval: 1 s
+simulated_payloads:
+  - name: DH0
+    simulate: true
+    type: network
+    protocol: udp
+    group: g
+",
+        );
+        assert_eq!(
+            both.resolve(&[handler("DH0", 1)]),
+            Err(SimConfigError::SimulateTwice {
+                payload: "DH0".to_string(),
+                group: "g".to_string()
+            })
+        );
+
+        let from_the_group = parse(
+            "
+simulated_payload_groups:
+  - name: g
+    simulate: false
+simulated_payloads:
+  - name: DH0
+    group: g
+",
+        );
+        assert_eq!(
+            from_the_group.simulate_of(&from_the_group.simulated_payloads[0]),
+            Ok(false)
+        );
+        assert!(!from_the_group.simulates("DH0"));
+    }
+
+    /// A payload that is only driven sends nothing, so it needs no interval,
+    /// and one given it governs nothing and is refused.
+    #[test]
+    fn a_driven_payload_takes_no_interval() {
+        let mut heater = handler("heater", 1);
+        heater.driven = true;
+        let quiet = parse(
+            "
+simulated_payloads:
+  - name: heater
+    simulate: true
+    type: network
+    protocol: udp
+",
+        );
+        assert!(quiet.resolve(std::slice::from_ref(&heater)).is_ok());
+
+        let timed = parse(
+            "
+simulated_payloads:
+  - name: heater
+    simulate: true
+    type: network
+    protocol: udp
+    packet_interval: 1 s
+",
+        );
+        assert_eq!(
+            timed.resolve(&[heater]),
+            Err(SimConfigError::IntervalForADrivenPayload {
+                payload: "heater".to_string(),
+                setting: "packet_interval",
+            })
+        );
+    }
+
+    /// A payload that is not simulated has no data handler here, the handlers
+    /// being the payloads tcssim stands in for, and is not reported as naming
+    /// none.
+    #[test]
+    fn a_payload_that_is_not_simulated_needs_no_handler() {
+        let file = parse(
+            "
+simulated_payloads:
+  - name: DH0
+    simulate: true
+    type: network
+    protocol: udp
+    packet_interval: 1 s
+  - name: heater
+    simulate: false
+",
+        );
+        assert!(file.simulates("DH0"));
+        assert!(!file.simulates("heater"));
+        assert!(file.resolve(&[handler("DH0", 1)]).is_ok());
+    }
+
     /// A device handler, for the tests that need a kind that is not network.
     fn device(name: &str) -> DHConfig {
         let mut dh = handler(name, 4);
@@ -2039,7 +2303,7 @@ simulated_payloads:
     #[test]
     fn a_setting_written_empty_is_a_setting_not_stated() {
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: \"\"\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \"\"\n    \
              protocol: \"\"\n    packet_interval: \"\"\n    \
              drop_percent: \"\"\n    silent_after: \"\"\n",
         );
@@ -2057,7 +2321,7 @@ simulated_payloads:
         let said = format!(
             "{}",
             parse(
-                "simulated_payloads:\n  - name: DH0\n    type: network\n    \
+                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    \
                  protocol: udp\n    packet_interval: often\n"
             )
             .resolve(&[handler("DH0", 12)])
@@ -2086,7 +2350,7 @@ simulated_payloads:
             "payload_interface: localhost:5000",
         ] {
             let file = parse(&format!(
-                "simulated_payloads:\n  - name: DH0\n    type: network\n    \
+                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    \
                  protocol: udp\n    packet_interval: 100 ms\n    {plain}\n"
             ));
             let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
@@ -2102,7 +2366,7 @@ simulated_payloads:
 
         // A group is read the same way.
         let file = parse(
-            "simulated_payload_groups:\n  - name: g\n    packet_interval: 100 ms\n    \
+            "simulated_payload_groups:\n  - name: g\n    simulate: true\n    packet_interval: 100 ms\n    \
              port: 5000\n\
              simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    \
              group: g\n",
@@ -2124,7 +2388,7 @@ simulated_payloads:
     fn a_datagram_payload_may_be_told_what_to_bind() {
         let settled = |extra: &str, dh: &DHConfig| {
             parse(&format!(
-                "simulated_payloads:\n  - name: DH0\n    type: network\n    \
+                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    \
                  protocol: udp\n    packet_interval: 100 ms\n{extra}"
             ))
             .resolve(std::slice::from_ref(dh))
@@ -2179,7 +2443,7 @@ simulated_payloads:
         sending.sends_from = Some(crate::SendsFrom::Socket("127.0.0.1:7001".parse().unwrap()));
         let file = |extra: &str| {
             parse(&format!(
-                "simulated_payloads:\n  - name: DH0\n    type: network\n    \
+                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    \
                  protocol: udp\n    packet_interval: 100 ms\n{extra}"
             ))
         };
@@ -2219,7 +2483,7 @@ simulated_payloads:
         };
         let file = |extra: &str| {
             parse(&format!(
-                "simulated_payloads:\n  - name: DH0\n    type: network\n    \
+                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    \
                  protocol: udp\n{extra}"
             ))
         };
@@ -2256,7 +2520,7 @@ simulated_payloads:
             port: 5000,
         });
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: tcp\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    protocol: tcp\n    \
              packet_interval: 100 ms\n    payload_port: 7000\n",
         );
         let said = format!("{}", file.resolve(&[stream]).unwrap_err());
@@ -2275,7 +2539,7 @@ simulated_payloads:
         });
         let path = |extra: &str| {
             parse(&format!(
-                "simulated_payloads:\n  - name: DH0\n    type: network\n    \
+                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    \
                  protocol: unix_dgram\n    packet_interval: 100 ms\n{extra}"
             ))
             .resolve(std::slice::from_ref(&socket))
@@ -2297,7 +2561,7 @@ simulated_payloads:
 
         // A device has no address at all.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: device-file\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: device-file\n    \
              packet_interval: continuous\n    payload_port: 7000\n",
         );
         let said = format!("{}", file.resolve(&[device("DH0")]).unwrap_err());
@@ -2318,7 +2582,7 @@ simulated_payloads:
     fn two_simulator_files_may_name_their_payloads_alike() {
         let a_set = |interval: &str| {
             parse(&format!(
-                "simulated_payload_groups:\n  - name: steady\n    \
+                "simulated_payload_groups:\n  - name: steady\n    simulate: true\n    \
                  packet_interval: {interval}\n\
                  simulated_payloads:\n  - name: DH0\n    type: network\n    \
                  protocol: udp\n    group: steady\n"
@@ -2351,7 +2615,7 @@ simulated_payloads:
     #[test]
     fn a_word_that_is_not_a_setting_is_refused() {
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: network\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    \
              protocol: udp\n    packet_interval: 100 ms\n    drop_percnt: 10\n",
         );
         let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
@@ -2364,7 +2628,7 @@ simulated_payloads:
         // misspelling hides best: it is read once and applies to every
         // payload that names it.
         let file = parse(
-            "simulated_payload_groups:\n  - name: slow\n    packet_intervl_ms: 100\n\
+            "simulated_payload_groups:\n  - name: slow\n    simulate: true\n    packet_intervl_ms: 100\n\
              simulated_payloads:\n  - name: DH0\n    type: network\n    \
              protocol: udp\n    group: slow\n",
         );
@@ -2378,7 +2642,8 @@ simulated_payloads:
     /// And the sections of the file itself, for the same reason.
     #[test]
     fn a_section_that_is_not_a_section_is_refused() {
-        let text = "simulated_payload:\n  - name: DH0\n    packet_interval: 100 ms\n";
+        let text =
+            "simulated_payload:\n  - name: DH0\n    simulate: true\n    packet_interval: 100 ms\n";
         let e = crate::ConfigFormat::Yaml
             .parse::<SimConfigFile>(text)
             .expect_err("a file whose one section is misspelled describes nothing");
@@ -2404,7 +2669,7 @@ simulated_payloads:
         // The simulator file of the datagram set, against the tcspecial
         // configuration of the stream set.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: network\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    \
              protocol: udp\n    packet_interval: 1 s\n",
         );
 
@@ -2432,7 +2697,7 @@ simulated_payloads:
     #[test]
     fn the_two_files_cannot_disagree_about_the_kind() {
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: device-file\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: device-file\n    \
              packet_interval: 1 s\n",
         );
         let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
@@ -2449,7 +2714,9 @@ simulated_payloads:
     /// it, since that is the one thing an error here always knows.
     #[test]
     fn a_simulated_payload_says_what_it_stands_in_for() {
-        let file = parse("simulated_payloads:\n  - name: DH0\n    packet_interval: 1 s\n");
+        let file = parse(
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    packet_interval: 1 s\n",
+        );
         let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
         assert!(
             said.contains("type: network"),
@@ -2459,7 +2726,7 @@ simulated_payloads:
         // A network payload says which transport, too, for the same reason:
         // the kind alone would not have caught the pairing above.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: network\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    \
              packet_interval: 1 s\n",
         );
         let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
@@ -2473,7 +2740,7 @@ simulated_payloads:
     #[test]
     fn only_a_network_payload_has_a_transport() {
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: device-file\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: device-file\n    \
              protocol: udp\n    packet_interval: continuous\n",
         );
         let said = format!("{}", file.resolve(&[device("DH0")]).unwrap_err());
@@ -2485,7 +2752,7 @@ simulated_payloads:
         // And a device that states none resolves, which is the whole of what
         // a device has to say about how it is reached.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: device-file\n    packet_interval: continuous\n",
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: device-file\n    packet_interval: continuous\n",
         );
         file.resolve(&[device("DH0")])
             .expect("a device needs no transport");
@@ -2496,7 +2763,7 @@ simulated_payloads:
     #[test]
     fn a_kind_or_a_transport_that_is_neither_is_refused() {
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: netwrok\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: netwrok\n    \
              packet_interval: 1 s\n",
         );
         let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
@@ -2506,7 +2773,7 @@ simulated_payloads:
         );
 
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: network\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    \
              protocol: udb\n    packet_interval: 1 s\n",
         );
         let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
@@ -2521,7 +2788,7 @@ simulated_payloads:
     #[test]
     fn a_group_may_carry_what_its_payloads_stand_in_for() {
         let file = parse(
-            "simulated_payload_groups:\n  - name: datagrams\n    type: network\n    \
+            "simulated_payload_groups:\n  - name: datagrams\n    simulate: true\n    type: network\n    \
              protocol: udp\n    packet_interval: 1 s\n\
              simulated_payloads:\n  - name: DH0\n    group: datagrams\n  \
              - name: DH1\n    group: datagrams\n",
@@ -2537,7 +2804,7 @@ simulated_payloads:
         // A percentage is nought to a hundred. Anything else is a
         // misunderstanding rather than a severe fault.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    packet_interval: 100 ms\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    protocol: udp\n    packet_interval: 100 ms\n    \
              drop_percent: 150\n",
         );
         let e = file.resolve(&[handler("DH0", 4)]).unwrap_err();
@@ -2550,7 +2817,7 @@ simulated_payloads:
         // A payload that sends on its own is never asked for anything, so it
         // has no request to ignore.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    packet_interval: 100 ms\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    protocol: udp\n    packet_interval: 100 ms\n    \
              ignore_trigger_percent: 50\n",
         );
         let e = file.resolve(&[handler("DH0", 4)]).unwrap_err();
@@ -2563,7 +2830,7 @@ simulated_payloads:
         // And hanging up needs a link to hang up. handler() makes a UDP
         // payload, which has none.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    packet_interval: 100 ms\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    protocol: udp\n    packet_interval: 100 ms\n    \
              close_after: 10\n",
         );
         let e = file.resolve(&[handler("DH0", 4)]).unwrap_err();
@@ -2591,10 +2858,12 @@ simulated_payloads:
             mode: DHMode::Periodic,
             stale_interval: None,
             sends_from: None,
+            stand_in: None,
+            driven: false,
         };
 
         let file = parse(
-            "simulated_payload_groups:\n  - name: flaky\n    packet_interval: 100 ms\n    \
+            "simulated_payload_groups:\n  - name: flaky\n    simulate: true\n    packet_interval: 100 ms\n    \
              drop_percent: 10\n    jitter: 25 ms\n\
              simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: tcp\n    group: flaky\n    \
              close_after: 7\n",
@@ -2619,7 +2888,7 @@ simulated_payloads:
     /// existed asked for.
     #[test]
     fn a_file_with_no_faults_asks_for_a_payload_that_works() {
-        let file = parse("simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    packet_interval: 100 ms\n");
+        let file = parse("simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    protocol: udp\n    packet_interval: 100 ms\n");
         let resolved = file.resolve(&[handler("DH0", 4)]).expect("resolves");
         assert_eq!(resolved[0].faults, Faults::default());
         assert!(!resolved[0].faults.any());
@@ -2650,6 +2919,8 @@ simulated_payloads:
             },
             stale_interval: None,
             sends_from: None,
+            stand_in: None,
+            driven: false,
         };
 
         for stated in ["packet_interval: 1 s", "segment_interval: 1 s"] {
@@ -2657,7 +2928,7 @@ simulated_payloads:
 
             // Stated by the payload itself.
             let file = parse(&format!(
-                "simulated_payloads:\n  - name: DH0\n    type: network\n    \
+                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    \
                  protocol: tcp\n    {stated}\n"
             ));
             let said = format!("{}", file.resolve(&[triggered("DH0")]).unwrap_err());
@@ -2671,7 +2942,7 @@ simulated_payloads:
             // may not state would be governed by a group it
             // only joined for the settings it may.
             let file = parse(&format!(
-                "simulated_payload_groups:\n  - name: driven\n    {stated}\n\
+                "simulated_payload_groups:\n  - name: driven\n    simulate: true\n    {stated}\n\
                  simulated_payloads:\n  - name: DH0\n    type: network\n    \
                  protocol: tcp\n    group: driven\n"
             ));
@@ -2685,7 +2956,7 @@ simulated_payloads:
         // What such a payload may still say is how it divides an answer:
         // that is its own business, however it was prompted.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: tcp\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    protocol: tcp\n    \
              segment_size: 2\n",
         );
         let resolved = file
@@ -2733,11 +3004,13 @@ simulated_payloads:
             },
             stale_interval: None,
             sends_from: None,
+            stand_in: None,
+            driven: false,
         };
 
         // Stated, and refused in terms of where it belongs.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: tcp\n    packet_interval: 1 s\n",
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    protocol: tcp\n    packet_interval: 1 s\n",
         );
         let e = file.resolve(&[triggered("DH0")]).unwrap_err();
         let said = format!("{e}");
@@ -2750,7 +3023,7 @@ simulated_payloads:
         // the segment settings still apply, since how a payload divides an
         // answer is its own business.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: tcp\n    segment_size: 2\n",
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    protocol: tcp\n    segment_size: 2\n",
         );
         let resolved = file
             .resolve(&[triggered("DH0")])
@@ -2782,8 +3055,12 @@ simulated_payloads:
             },
             stale_interval: None,
             sends_from: None,
+            stand_in: None,
+            driven: false,
         };
-        let file = parse("simulated_payloads:\n  - name: DH0\n    type: device-file\n");
+        let file = parse(
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: device-file\n",
+        );
         let problems = file.problems(&[device]);
         assert!(
             matches!(
@@ -2805,6 +3082,7 @@ simulated_payloads:
             "
 simulated_payload_groups:
   - name: sizes_only
+    simulate: true
     segment_size: 4
 simulated_payloads:
   - name: DH0
@@ -2836,6 +3114,7 @@ simulated_payloads:
             "
 simulated_payloads:
   - name: DH0
+    simulate: true
     type: network
     protocol: udp
     packet_interval: continuous
@@ -2851,6 +3130,7 @@ simulated_payloads:
             "
 simulated_payloads:
   - name: DH0
+    simulate: true
     type: network
     protocol: udp
     packet_interval: 1 s
@@ -2871,6 +3151,7 @@ simulated_payloads:
                 "
 simulated_payloads:
   - name: DH0
+    simulate: true
     type: network
     protocol: udp
     packet_interval: {nought}
@@ -2890,6 +3171,7 @@ simulated_payloads:
             "
 simulated_payloads:
   - name: DH0
+    simulate: true
     type: network
     protocol: udp
     packet_interval: 1 s
@@ -2909,8 +3191,10 @@ simulated_payloads:
             "
 simulated_payload_groups:
   - name: steady_1hz
+    simulate: true
     packet_interval: 1 s
   - name: continuous
+    simulate: true
     packet_interval: continuous
 simulated_payloads:
   - name: DH0
@@ -2936,6 +3220,7 @@ simulated_payloads:
             "
 simulated_payload_groups:
   - name: steady_1hz
+    simulate: true
     packet_interval: 1 s
 simulated_payloads:
   - name: DH0
@@ -2960,8 +3245,10 @@ simulated_payloads:
             "
 simulated_payload_groups:
   - name: g
+    simulate: true
     packet_interval: 1 ms
   - name: g
+    simulate: true
     packet_interval: 2 ms
 simulated_payloads:
   - name: DH0
@@ -2982,10 +3269,12 @@ simulated_payloads:
             "
 simulated_payloads:
   - name: DH0
+    simulate: true
     type: network
     protocol: udp
     packet_interval: 1 ms
   - name: DH0
+    simulate: true
     type: network
     protocol: udp
     packet_interval: 2 ms
@@ -3006,6 +3295,7 @@ simulated_payloads:
             "
 simulated_payloads:
   - name: DEV
+    simulate: true
     type: device-file
     packet_interval: continuous
 ",

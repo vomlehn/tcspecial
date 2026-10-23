@@ -692,8 +692,10 @@ fn check_graph(path: &Path, built: &[&str], report: &mut Report) -> Option<tcsli
 ///
 /// By name first: see `tcslibgs::SimConfigFile::problems_by_name`. Then, where
 /// the names are all right, what tcssim and tcsmoc ask before starting a
-/// simulator, `tcslibgs::graph::simulated::handlers`: a file that passed here
-/// and was refused there would be a verifier saying yes to a run that fails.
+/// simulator, `tcslibgs::graph::simulated::handlers`, and what tcssim asks of
+/// each payload's settings against its handler,
+/// `tcslibgs::SimConfigFile::problems`: a file that passed here and was refused
+/// there would be a verifier saying yes to a run that fails.
 fn check_graph_simulator(path: &Path, graph: Option<&tcslibgs::graph::Graph>, report: &mut Report) {
     let Some((text, format)) = read(path, report) else {
         return;
@@ -728,16 +730,26 @@ fn check_graph_simulator(path: &Path, graph: Option<&tcslibgs::graph::Graph>, re
     // One answer and not all of them: the simulator stops at the first
     // payload it will not stand in for, and says which, as the start would.
     if named_well && report.room() {
-        if let Err(why) = tcslibgs::graph::simulated::handlers(graph, &sim) {
-            // The complaint names the payload first, in quotes, which is the
-            // entry to point at.
-            let line = why
-                .strip_prefix('"')
-                .and_then(|rest| rest.split_once('"'))
-                .map_or(THE_FILE_ITSELF, |(payload, _)| {
-                    found.line_of(&tcslibgs::About::SimPayload(payload.to_string()))
-                });
-            report.add(path, line, why);
+        match tcslibgs::graph::simulated::handlers(graph, &sim) {
+            Err(why) => {
+                // The complaint names the payload first, in quotes, which is
+                // the entry to point at.
+                let line = why
+                    .strip_prefix('"')
+                    .and_then(|rest| rest.split_once('"'))
+                    .map_or(THE_FILE_ITSELF, |(payload, _)| {
+                        found.line_of(&tcslibgs::About::SimPayload(payload.to_string()))
+                    });
+                report.add(path, line, why);
+            }
+            Ok(handlers) => {
+                for problem in sim.problems(&handlers) {
+                    if !report.room() {
+                        break;
+                    }
+                    report.add(path, found.line_of(&problem.about()), problem.to_string());
+                }
+            }
         }
     }
 }
@@ -1005,9 +1017,9 @@ moc:
     /// A simulator file that names a payload the simulator will not stand in
     /// for is refused here, as tcssim and tcsmoc refuse it, on its line.
     ///
-    /// A heater is driven and never read, so a stand-in for it would be
-    /// sending data nothing reads: the simulator says to leave it out, and a
-    /// verifier that said nothing would pass a run that fails.
+    /// A heater is driven and never read, so its stand-in sends nothing, and a
+    /// packet interval given it governs nothing: the simulator refuses it, and
+    /// a verifier that said nothing would pass a run that fails.
     #[test]
     fn a_simulated_payload_the_simulator_refuses_is_an_error() {
         // The sound graph with a heater the ground drives through a tee.
@@ -1028,10 +1040,14 @@ moc:
         let sim = "\
 simulated_payloads:
   - name: sensor
+    simulate: true
     type: i2c
+    packet_interval: 1 s
   - name: heater
+    simulate: true
     type: network
     protocol: udp
+    packet_interval: 1 s
 ";
         let set = written(".yaml", &configuration, sim);
         let report = verify(&set.payload, Some(&set.sim), Limits::EVERYTHING);
@@ -1042,21 +1058,20 @@ simulated_payloads:
             .collect();
         assert_eq!(said.len(), 1, "{:?}", report.findings);
         assert!(
-            said[0]
-                .message
-                .contains("\"heater\" is driven and never read"),
+            said[0].message.contains("\"heater\" is only driven"),
             "{}",
             said[0].message
         );
-        assert_eq!(said[0].line, 4, "the heater's entry");
+        assert_eq!(said[0].line, 6, "the heater's entry");
 
-        // And without it, nothing.
+        // And without the interval, nothing: a driven payload is simulated,
+        // its stand-in counting what the vehicle sends it.
         let set = written(
             ".yaml",
             &configuration,
             &sim.replace(
-                "  - name: heater\n    type: network\n    protocol: udp\n",
-                "",
+                "    protocol: udp\n    packet_interval: 1 s\n",
+                "    protocol: udp\n",
             ),
         );
         let report = verify(&set.payload, Some(&set.sim), Limits::EVERYTHING);
@@ -1177,14 +1192,18 @@ vehicle:
         let (dir, path) = graph_written(".yaml", SOUND_GRAPH);
         let sim = dir.path().join("vehiclesim.yaml");
 
-        std::fs::write(&sim, "simulated_payloads:\n  - name: sensor\n").unwrap();
+        std::fs::write(
+            &sim,
+            "simulated_payloads:\n  - name: sensor\n    simulate: true\n    type: i2c\n    packet_interval: 1 s\n",
+        )
+        .unwrap();
         let report = verify(&path, Some(&sim), Limits::EVERYTHING);
         assert!(!report.found_anything(), "{:?}", report.findings);
         assert!(report.joined);
 
         std::fs::write(
             &sim,
-            "simulated_payloads:\n  - name: sensor\n  - name: sensr\n    group: none\n",
+            "simulated_payloads:\n  - name: sensor\n    simulate: true\n  - name: sensr\n    group: none\n",
         )
         .unwrap();
         let report = verify(&path, Some(&sim), Limits::EVERYTHING);
@@ -1194,7 +1213,7 @@ vehicle:
         assert!(all.contains("names group \"none\""), "{all}");
         for finding in &report.findings {
             assert_eq!(finding.file, sim, "{finding}");
-            assert_eq!(finding.line, 3, "{finding}");
+            assert_eq!(finding.line, 4, "{finding}");
         }
     }
 
@@ -1296,9 +1315,11 @@ payloads:
 description: settings
 simulated_payloads:
   - name: DH0
+    simulate: true
     type: device-file
     packet_interval: 1 s
   - name: DH1
+    simulate: true
     type: network
     protocol: udp
     packet_interval: 1 s
@@ -1541,9 +1562,11 @@ payloads:
 description: settings
 simulated_payloads:
   - name: DH0
+    simulate: true
     type: device-file
     packet_interval: 1 s
   - name: nobody
+    simulate: true
     type: device-file
     packet_interval: 1 s
 ";
@@ -1561,8 +1584,8 @@ simulated_payloads:
             assert_eq!(finding.file, set.sim, "a problem in the wrong file");
         }
         assert!(
-            report.findings.iter().any(|f| f.line == 6),
-            "the entry that names nobody is on line 6: {:?}",
+            report.findings.iter().any(|f| f.line == 7),
+            "the entry that names nobody is on line 7: {:?}",
             report.findings
         );
     }
@@ -1607,7 +1630,7 @@ simulated_payloads:
         let set = written(
             ".yaml",
             &text,
-            "simulated_payloads:\n  - name: DH0\n   type: device-file\n",
+            "simulated_payloads:\n  - name: DH0\n   simulate: true\n   type: device-file\n",
         );
         let report = verify(&set.payload, Some(&set.sim), Limits::EVERYTHING);
         assert!(

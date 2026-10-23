@@ -522,7 +522,7 @@ mod tests {
             "    stirred: \"yes\"\n",
             "\n",
             "simulated_payloads:\n",
-            "  - name: temp_1\n",
+            "  - name: temp_1\n    simulate: true\n",
             "    reads: cabin\n",
         );
         std::fs::write(&path, given).expect("written");
@@ -596,6 +596,7 @@ mod tests {
                         "type" => "network",
                         "protocol" => "udp",
                         "payload_address" => "127.0.0.1",
+                        "simulate" => "true",
                         _ => "1",
                     };
                     (name.to_string(), value.to_string())
@@ -639,7 +640,7 @@ mod tests {
         let path = where_.path().join("vehiclesim.yaml");
         std::fs::write(
             &path,
-            "simulated_payloads:\n  - name: payload\n    future_thing: 7\n",
+            "simulated_payloads:\n  - name: payload\n    simulate: true\n    future_thing: 7\n",
         )
         .expect("a file");
 

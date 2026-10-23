@@ -117,6 +117,9 @@ pub struct PayloadConfig {
     /// Whether its stand-in has been made, which the readiness socket says:
     /// see [`crate::ready`].
     pub standing: Arc<crate::ready::Standing>,
+    /// Whether the payload is only driven, so that its stand-in sends
+    /// nothing and watches what arrives: see `tcslibgs::DHConfig::driven`.
+    pub driven: bool,
 }
 
 /// The thread of a payload of `config`'s kind, which makes its stand-in and
@@ -734,6 +737,7 @@ mod tests {
             segment_interval_ms: Arc::new(AtomicU32::new(100)),
             sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             standing: Default::default(),
+            driven: false,
         }
     }
 
@@ -1103,6 +1107,7 @@ mod tests {
             segment_interval_ms: Arc::new(AtomicU32::new(1000)),
             sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             standing: Default::default(),
+            driven: false,
             triggered: false,
         };
 

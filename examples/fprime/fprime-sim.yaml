@@ -9,11 +9,17 @@ description: Simulator settings for the payloads of fprime.yaml
 tcssim:
   ready: "127.0.0.1:7902"
 
-# The heater is not here: it is driven and never read, so there is nothing for
-# a simulator to send in its place.
 simulated_payloads:
+  # Driven and never read: its stand-in sends nothing and counts what the
+  # vehicle sends it, so that its panel shows each command reaching it.
+  - name: heater
+    simulate: true
+    type: network
+    protocol: udp
+
   # One reading a second, sent whole.
   - name: thermometer
+    simulate: true
     type: network
     protocol: udp
     packet_interval: 1 s

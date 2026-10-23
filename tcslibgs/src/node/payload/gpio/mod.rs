@@ -331,7 +331,7 @@ const TO_STAND_IN: &str = "point path at the gpio-sim chip, which bin/mkgpio mak
 pub fn judged(host: &crate::simulate::Host, path: &str) -> crate::simulate::Judged {
     match host.device_of(path) {
         Ok(device) => chip_judged(path, &device),
-        Err(found) => crate::simulate::Judged::cannot_tell(found, "path", TO_STAND_IN),
+        Err(found) => found.judged("path", TO_STAND_IN),
     }
 }
 

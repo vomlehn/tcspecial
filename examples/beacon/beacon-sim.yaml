@@ -7,6 +7,12 @@
 # can be run with tcssim as any other is.
 description: Simulator settings for the payload of beacon.yaml
 
+# Where tcssim answers whether it has made its stand-ins, which whatever
+# starts the run asks before it starts tcspecial. A port no other example
+# uses, so that two can be run at once.
+tcssim:
+  ready: "127.0.0.1:7901"
+
 simulated_payloads:
   # One packet a second, sent whole.
   - name: sensor

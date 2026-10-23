@@ -1,0 +1,82 @@
+//! tcspecial judges each payload a stand-in or not before it opens anything,
+//! and refuses a run whose payloads its `--simulate` mode does not allow.
+//!
+//! The configuration's one payload is a socket on this host, which is a
+//! stand-in. Every address it states is a port below 1024, which a test
+//! cannot bind: a run the mode refuses says so before it tries, and a run it
+//! allows goes on to say its digest and then fails to bind, so nothing here
+//! holds a port another test might want.
+
+use std::process::Command;
+
+fn configuration(dir: &std::path::Path) -> std::path::PathBuf {
+    let path = dir.join("vehicle.yaml");
+    let missing = dir.join("telemetry");
+    std::fs::write(
+        &path,
+        format!(
+            "tcspecial:
+  gateway: radio
+  beacon: {{ interval: \"5 s\", recv: \"127.0.0.1:1\", send: \"127.0.0.1:2\" }}
+  log: {{ directory: \"{}\", segment_size: \"65536\" }}
+  payload_command: {{ dest_base: \"127.0.0.1:3\", source_base: \"127.0.0.1:4\" }}
+  payload_telemetry: {{ dest_base: \"127.0.0.1:5\", source_base: \"127.0.0.1:6\" }}
+  tcs_cmd: {{ recv: \"127.0.0.1:7\", send: \"127.0.0.1:8\" }}
+payloads:
+  - name: sensor
+    type: network
+    protocol: \"udp\"
+    address: \"127.0.0.1\"
+    port: \"9\"
+",
+            missing.display()
+        ),
+    )
+    .expect("written");
+    path
+}
+
+fn run(args: &[&str]) -> String {
+    let dir = tempfile::tempdir().expect("a directory");
+    let path = configuration(dir.path());
+    let ran = Command::new(env!("CARGO_BIN_EXE_tcspecial"))
+        .args(args)
+        .arg(&path)
+        .env_remove("RUST_LOG")
+        .output()
+        .expect("tcspecial runs");
+    assert!(!ran.status.success(), "no run binds a port below 1024");
+    String::from_utf8_lossy(&ran.stderr).into_owned()
+}
+
+/// Left out, the mode is the flight setting, and a stand-in is refused
+/// saying which flag a test run wants -- before the log is looked at.
+#[test]
+fn a_stand_in_is_refused_in_the_flight_setting() {
+    for args in [&[][..], &["--simulate=none"]] {
+        let said = run(args);
+        assert!(said.contains("simulation mode: none"), "{said}");
+        assert!(
+            said.contains("sensor: a stand-in: 127.0.0.1 is a loopback address"),
+            "{said}"
+        );
+        assert!(
+            said.contains("--simulate=none, the flight setting, allows none"),
+            "{said}"
+        );
+        assert!(!said.contains("tcspecial v"), "{said}");
+    }
+}
+
+/// Allowed, the run goes on past the judgement to say its digest.
+#[test]
+fn a_stand_in_is_allowed_where_the_mode_allows_it() {
+    let said = run(&["--simulate=all"]);
+    assert!(said.contains("simulation mode: all"), "{said}");
+    assert!(!said.contains("allows"), "{said}");
+    assert!(said.contains("tcspecial v"), "{said}");
+
+    // One stand-in and nothing else is not `some`.
+    let said = run(&["--simulate=some"]);
+    assert!(said.contains("give --simulate=all"), "{said}");
+}

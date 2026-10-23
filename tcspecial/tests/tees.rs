@@ -155,6 +155,7 @@ fn a_tee_sends_each_datum_both_ways() {
         Command::new(env!("CARGO_BIN_EXE_tcspecial"))
             .arg(&configuration)
             .arg("--quiet")
+            .arg("--simulate=all")
             .env_remove("RUST_LOG")
             .stdout(Stdio::null())
             .stderr(Stdio::null())

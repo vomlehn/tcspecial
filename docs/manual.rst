@@ -2776,22 +2776,22 @@ What the programs take without the Makefile
 -------------------------------------------
 .. code-block:: console
 
-   $ cargo run --bin tcspecial -- tests/manual/thermostat.yaml
+   $ cargo run --bin tcspecial -- --simulate=all tests/manual/thermostat.yaml
    $ PAYLOAD_SIM_YAML=examples/thermostat/thermostat-sim.yaml \
-       cargo run --bin tcssim -- tests/manual/thermostat.yaml
+       cargo run --bin tcssim -- --simulate=all tests/manual/thermostat.yaml
    $ PAYLOAD_SIM_YAML=examples/thermostat/thermostat-sim.yaml \
-       cargo run --bin tcsmoc -- tests/manual/thermostat.yaml
+       cargo run --bin tcsmoc -- --simulate=all tests/manual/thermostat.yaml
 
 Every tcspecial configuration above may end in ``.xml`` instead, and the same
 commands then run the same set in the other format:
 
 .. code-block:: console
 
-   $ cargo run --bin tcspecial -- tests/manual/thermostat.xml
+   $ cargo run --bin tcspecial -- --simulate=all tests/manual/thermostat.xml
    $ PAYLOAD_SIM_YAML=examples/thermostat/thermostat-sim.yaml \
-       cargo run --bin tcssim -- tests/manual/thermostat.xml
+       cargo run --bin tcssim -- --simulate=all tests/manual/thermostat.xml
    $ PAYLOAD_SIM_YAML=examples/thermostat/thermostat-sim.yaml \
-       cargo run --bin tcsmoc -- tests/manual/thermostat.xml
+       cargo run --bin tcsmoc -- --simulate=all tests/manual/thermostat.xml
 
 The extension is what says how to read a file -- see `Configuration File
 Formats`_ -- and it is read rather than guessed at, so a name ending in
@@ -3095,7 +3095,90 @@ overrides the quieter default as well.
 
    $ make runmocy RUST_LOG=debug
    $ RUST_LOG=tcspecial::ci=trace \
-       cargo run --bin tcspecial -- tests/manual/thermostat.yaml
+       cargo run --bin tcspecial -- --simulate=all tests/manual/thermostat.yaml
+
+Stand-ins or hardware: ``--simulate``
+-------------------------------------
+Nothing in a configuration says whether a payload is the hardware or a
+stand-in for it, and ``/dev/i2c-7`` can be the kernel's I2C stub on one host
+and a real bus on the next. So each run says which kind of run it is, with
+``--simulate``, given to tcspecial, tcssim and tcsmoc alike:
+
+``--simulate=none``
+    No payload may be a stand-in. This is the flight setting, and it is what a
+    program started without the flag gets.
+``--simulate=some``
+    At least one payload is a stand-in and at least one is not: a
+    configuration being debugged against part of its hardware.
+``--simulate=all``
+    Every payload is a stand-in, so that nothing exercises hardware at all.
+
+tcspecial decides for itself what each payload is, from what is at the end
+of its endpoint, before it opens anything, and says so as it starts:
+
+.. code-block:: console
+
+   simulation mode: all
+     temp_1: hardware: /dev/i2c-1 is a real adapter (Synopsys DesignWare I2C adapter)
+     sensor: a stand-in: 127.0.0.1 is a loopback address, so the far end is on this host
+
+A run whose payloads the mode does not allow is refused there, each payload
+named with what it reaches, what is there, and what would satisfy the mode.
+
+A payload is a stand-in when its endpoint is something ``bin/`` or tcssim
+makes: an I2C bus whose adapter is the kernel's ``i2c-stub``, a GPIO chip of
+``gpio-sim``, a virtual CAN interface, an IIO sensor of ``iio_dummy``, or a
+path that leads to a pseudo-terminal, which is what tcssim makes for a
+serial, SPI, rpmsg or IIO payload. A network payload is a stand-in when its
+address is a loopback address or a Unix-domain path. That is the weakest of
+the judgements: it says only that the far end is on this host, and a program
+on this host in front of real hardware passes it. A synchronous HDLC line is
+never a stand-in, and anything that cannot be told -- nothing at the path, a
+host name -- is taken for hardware.
+
+The Makefiles' run targets give every program ``--simulate=$(SIMULATE)``,
+which is ``all`` unless the command line says otherwise:
+
+.. code-block:: console
+
+   $ make runmocy SIMULATE=some
+
+Waiting for the simulator
+^^^^^^^^^^^^^^^^^^^^^^^^^
+A stand-in has to exist before tcspecial looks for it, so in a run with
+stand-ins tcssim is started first, and tcspecial only once tcssim has said it
+has made them all. tcssim makes every stand-in as it starts; a panel's button
+decides only whether that payload sends.
+
+tcssim says whether it is ready at the UDP address its simulator file gives
+in a ``tcssim`` section, which every simulator file needs:
+
+.. code-block:: yaml
+
+   tcssim:
+     ready: "127.0.0.1:7903"
+
+Use an address no other run uses: a tcssim left running holds it, and a second
+one started on the same address is refused, naming it. tcssim does not start
+under ``--simulate=none``, there being nothing for it to do.
+
+tcsmoc does the waiting itself. Under ``some`` or ``all`` it asks at that
+address first; a simulator already running on the same configuration,
+simulator file and mode is used and left running, one set up for anything
+else is refused, saying what differs, and otherwise tcsmoc starts tcssim and
+waits for it. Under ``none`` it starts tcspecial alone. For a run started by
+hand, ``tcssim --wait`` is the waiting:
+
+.. code-block:: console
+
+   $ tcssim --simulate=all x.yaml &
+   $ tcssim --wait --simulate=all x.yaml && tcspecial --simulate=all x.yaml
+
+``--wait`` waits thirty seconds, or as many as ``--wait=<seconds>`` says, and
+exits with a failure saying what it last heard: nothing, which is a tcssim
+not running or an address that is wrong, or a simulator still starting, or one
+that failed or is set up for another run. A ground station of its own waits
+through ``tcslib::simulator::wait``, or ``tcslib.simulator.wait`` in Python.
 
 Building tcspecial for a vehicle
 --------------------------------

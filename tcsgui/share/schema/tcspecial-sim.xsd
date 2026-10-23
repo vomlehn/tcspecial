@@ -73,10 +73,20 @@
     </xs:all>
   </xs:complexType>
 
+  <!-- What tcssim itself is told: the UDP address, as address:port, at
+       which it answers whether it has made its stand-ins. Required by tcssim
+       to start, and by a harness to wait for it. -->
+  <xs:complexType name="tcssim">
+    <xs:all>
+      <xs:element name="ready" type="xs:string"/>
+    </xs:all>
+  </xs:complexType>
+
   <xs:element name="simulator">
     <xs:complexType>
       <xs:choice minOccurs="0" maxOccurs="unbounded">
         <xs:element name="description" type="xs:string"/>
+        <xs:element name="tcssim" type="tcssim"/>
         <xs:element name="simulated_payload_groups" type="entry"/>
         <xs:element name="thermal_mass" type="thermal_mass"/>
         <xs:element name="simulated_payloads" type="entry"/>

@@ -14,8 +14,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, ignore_this_request, lateness, send_in_segments, wait_out_packet, wait_while_running,
-    Pacing, PayloadConfig, PayloadStats, Produce,
+    a_packet, could_not_stand_in, ignore_this_request, lateness, send_in_segments, wait_out_packet,
+    wait_while_running, Pacing, PayloadConfig, PayloadStats, Produce,
 };
 
 /// Run a simulated device reached over UDP.
@@ -83,22 +83,23 @@ pub fn run_udp_node(
     let socket = match UdpSocket::bind(&mine) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!(
-                "{}: failed to bind the UDP device at {}: {}",
-                config.name, mine, e
+            could_not_stand_in(
+                &config,
+                format!("failed to bind the UDP device at {mine}: {e}"),
             );
             return;
         }
     };
     if speaks_first {
         if let Err(e) = socket.connect(&handler) {
-            eprintln!(
-                "{}: failed to reach the handler at {}: {}",
-                config.name, handler, e
+            could_not_stand_in(
+                &config,
+                format!("failed to reach the handler at {handler}: {e}"),
             );
             return;
         }
     }
+    config.standing.made();
     // Who last asked, for a device that answers: where its answer goes.
     let mut asker = None;
 
@@ -188,14 +189,15 @@ fn run_driven_udp_node(
     let socket = match UdpSocket::bind(at) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!(
-                "{}: failed to wait for the vehicle at {}: {}",
-                config.name, at, e
+            could_not_stand_in(
+                &config,
+                format!("failed to wait for the vehicle at {at}: {e}"),
             );
             return;
         }
     };
     socket.set_nonblocking(true).ok();
+    config.standing.made();
 
     while running.load(Ordering::SeqCst) {
         let started = Instant::now();
@@ -280,6 +282,8 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(5)),
             packet_interval_ms: Arc::new(AtomicU32::new(200)),
             segment_interval_ms: Arc::new(AtomicU32::new(40)),
+            sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            standing: Default::default(),
             triggered: false,
         });
         device.start().expect("the device starts");
@@ -353,6 +357,8 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(12)),
             packet_interval_ms: Arc::new(AtomicU32::new(10)),
             segment_interval_ms: Arc::new(AtomicU32::new(0)),
+            sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            standing: Default::default(),
             triggered: true,
         });
         device.start().expect("the device starts");
@@ -405,6 +411,8 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(12)),
             packet_interval_ms: Arc::new(AtomicU32::new(20)),
             segment_interval_ms: Arc::new(AtomicU32::new(0)),
+            sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            standing: Default::default(),
         })
     }
 
@@ -451,6 +459,8 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(12)),
             packet_interval_ms: Arc::new(AtomicU32::new(20)),
             segment_interval_ms: Arc::new(AtomicU32::new(0)),
+            sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            standing: Default::default(),
         };
 
         // The name reaches the thread that does the talking, which is the
@@ -741,6 +751,8 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(8)),
             packet_interval_ms: Arc::new(AtomicU32::new(50)),
             segment_interval_ms: Arc::new(AtomicU32::new(50)),
+            sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            standing: Default::default(),
             triggered: false,
         });
         device.start().expect("the device starts");

@@ -50,6 +50,7 @@ fn a_missing_log_directory_is_named_with_what_to_do() {
     let ran = Command::new(env!("CARGO_BIN_EXE_tcspecial"))
         .arg(&configuration)
         .arg("--quiet")
+        .arg("--simulate=all")
         .env_remove("RUST_LOG")
         .output()
         .expect("tcspecial runs");

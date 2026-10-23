@@ -182,6 +182,8 @@ pub fn payload_config_attached(
         segment_size: Arc::new(AtomicU32::new(sim.segment_size)),
         packet_interval_ms: Arc::new(AtomicU32::new(sim.packet_interval.as_millis() as u32)),
         segment_interval_ms: Arc::new(AtomicU32::new(sim.segment_interval.as_millis() as u32)),
+        sending: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        standing: Default::default(),
     })
 }
 

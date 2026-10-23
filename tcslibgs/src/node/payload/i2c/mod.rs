@@ -148,3 +148,90 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
         timeout,
     }))
 }
+
+/// The name the kernel's `i2c-stub` gives the adapter it makes, which is how
+/// `bin/mki2c` finds it and how a stand-in bus is told from a real one.
+pub const STUB_ADAPTER: &str = "SMBus stub driver";
+
+/// What `--simulate` asks to change on an I2C node that is not a stand-in.
+const TO_STAND_IN: &str = "point path at the i2c-stub bus, which bin/mki2c makes";
+
+/// Whether the bus at `bus` is the kernel's `i2c-stub`, from the name of the
+/// adapter behind it. See [`crate::simulate`].
+///
+/// By the adapter's name and not the bus number, which is given out as
+/// adapters appear: `/dev/i2c-7` is the stub on one host and a display's
+/// gmbus on the next.
+pub fn judged(host: &crate::simulate::Host, bus: &str) -> crate::simulate::Judged {
+    match host.device_of(bus) {
+        Ok(device) => adapter_judged(bus, &device),
+        Err(found) => crate::simulate::Judged::cannot_tell(found, "path", TO_STAND_IN),
+    }
+}
+
+/// The judgement of a bus whose kernel directory is `device`: an i2c-dev
+/// class device, whose `name` is its adapter's.
+fn adapter_judged(bus: &str, device: &std::path::Path) -> crate::simulate::Judged {
+    use crate::simulate::{read_line, Judged};
+    match read_line(&device.join("name")) {
+        Some(name) if name == STUB_ADAPTER => Judged::stand_in(
+            format!("{bus} is the i2c-stub's adapter"),
+            "path",
+            TO_STAND_IN,
+        ),
+        Some(name) => Judged::hardware(
+            format!("{bus} is a real adapter ({name})"),
+            "path",
+            TO_STAND_IN,
+        ),
+        None => Judged::cannot_tell(
+            format!("{bus}'s adapter has no name in {}", device.display()),
+            "path",
+            TO_STAND_IN,
+        ),
+    }
+}
+
+#[cfg(test)]
+mod stand_in_tests {
+    use super::*;
+    use crate::simulate::Verdict;
+
+    fn adapter(name: Option<&str>) -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        if let Some(name) = name {
+            std::fs::write(dir.path().join("name"), format!("{name}\n")).unwrap();
+        }
+        dir
+    }
+
+    #[test]
+    fn the_stub_is_a_stand_in_and_a_real_adapter_is_named() {
+        let stub = adapter(Some(STUB_ADAPTER));
+        assert_eq!(
+            adapter_judged("/dev/i2c-7", stub.path()).verdict,
+            Verdict::StandIn
+        );
+
+        let real = adapter(Some("i915 gmbus dpb"));
+        let judged = adapter_judged("/dev/i2c-1", real.path());
+        assert_eq!(judged.verdict, Verdict::Hardware);
+        assert_eq!(
+            judged.found,
+            "/dev/i2c-1 is a real adapter (i915 gmbus dpb)"
+        );
+
+        let nameless = adapter(None);
+        assert_eq!(
+            adapter_judged("/dev/i2c-2", nameless.path()).verdict,
+            Verdict::CannotTell
+        );
+    }
+
+    #[test]
+    fn a_bus_with_nothing_at_it_cannot_be_told() {
+        let judged = judged(&crate::simulate::Host::this(), "/nonexistent/i2c-99");
+        assert_eq!(judged.verdict, Verdict::CannotTell);
+        assert_eq!(judged.found, "nothing is at /nonexistent/i2c-99");
+    }
+}

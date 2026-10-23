@@ -21,7 +21,8 @@ argue from this order and say so.
   telemetry protocol, and how every configuration file is read and checked.
   A rule about what a configuration may say belongs here, and nowhere else.
 - `tcslib` -- what a ground station is built on: `TcsClient` for commands,
-  `moc::Moc` for the vehicle's data, `beacon` for its beacons.
+  `moc::Moc` for the vehicle's data, `beacon` for its beacons, `simulator`
+  for waiting until tcssim has made its stand-ins.
 - `tcslib-c` -- tcslib for C and C++: beacons, data and commands behind one
   hand-written header, `include/tcs.h`, which `tests/c_and_cpp.rs` holds to
   the library by compiling a ground station against it with gcc and g++.
@@ -80,6 +81,12 @@ cargo run -q --bin tcsverify -- <configuration> [simulator file]
 
 `make help` lists the Makefile's targets. `make` in `docs/`, `examples/`,
 `tcslib/`, `tcslib-c/` and `tcslibgs/` builds their HTML pages.
+
+tcspecial, tcssim and tcsmoc take `--simulate=none|some|all`. Left out it is
+`none`, the flight setting, under which tcspecial refuses every stand-in and
+tcssim will not start, so a run on a desk gives `--simulate=all`, as the
+Makefiles' run targets do. tcspecial judges each payload a stand-in or not
+from what is at its endpoint (`tcslibgs::simulate`), never from a file.
 
 The GUIs and tcspecial may be launched when what is being checked can only be
 seen by running them, but `cargo test` comes first. They bind fixed ports:

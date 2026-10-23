@@ -141,18 +141,19 @@ fn lines_of(graph: &Graph) -> Vec<Line> {
     lines
 }
 
-/// Run the vehicle in `path` with the window open, and say what to exit with.
+/// Run the vehicle in `path` under `mode` with the window open, and say what
+/// to exit with.
 ///
 /// The vehicle on a thread of its own and the window on this one. Each ends
 /// the other: a window closed stops the vehicle, as an interrupt would, and a
 /// vehicle that stops -- or never starts -- closes the window.
-pub fn run(path: &str) -> i32 {
+pub fn run(path: &str, mode: tcslibgs::simulate::Mode) -> i32 {
     // Read again rather than handed over: the vehicle reads its own copy,
     // and checked it before this was called.
     let graph = match Graph::load(path) {
         Ok(graph) => graph,
         // Said by the vehicle, which reads the same file and says why.
-        Err(_) => return runtime::start::run_or_report(path),
+        Err(_) => return runtime::start::run_or_report(path, mode),
     };
     let lines = lines_of(&graph);
     watch(lines.len());
@@ -171,7 +172,7 @@ pub fn run(path: &str) -> i32 {
         std::thread::Builder::new()
             .name("vehicle".to_string())
             .spawn(move || {
-                let said = runtime::start::run_or_report(&path);
+                let said = runtime::start::run_or_report(&path, mode);
                 // The window goes with the vehicle. Asked of the window's
                 // own thread, which is the one that may close it.
                 let _ = slint::invoke_from_event_loop(|| {

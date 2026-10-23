@@ -407,6 +407,17 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
     }))
 }
 
+/// Whether `interface` is a stand-in, which a synchronous line never is:
+/// there is no virtual HDLC interface, so such a payload needs a card. See
+/// [`crate::simulate`].
+pub fn judged(interface: &str) -> crate::simulate::Judged {
+    crate::simulate::Judged::hardware(
+        format!("{interface} is a synchronous line, which nothing stands in for"),
+        "interface",
+        "leave the hdlc node out of a run that must exercise no hardware",
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

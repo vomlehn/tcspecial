@@ -103,6 +103,16 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
     }))
 }
 
+/// Whether the device at `path` is a stand-in: a pseudo-terminal, which is
+/// what tcssim makes for a rpmsg payload. See [`crate::simulate`].
+pub fn judged(path: &str) -> crate::simulate::Judged {
+    crate::simulate::pseudo_terminal(
+        path,
+        "path",
+        "start tcssim first, which makes a pseudo-terminal at path",
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

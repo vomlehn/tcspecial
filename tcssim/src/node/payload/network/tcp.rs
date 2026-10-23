@@ -15,8 +15,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, hangs_up, ignore_this_request, lateness, send_in_segments, wait_out_packet,
-    wait_while_running, Pacing, PayloadConfig, PayloadStats, Produce,
+    a_packet, could_not_stand_in, hangs_up, ignore_this_request, lateness, send_in_segments,
+    wait_out_packet, wait_while_running, Pacing, PayloadConfig, PayloadStats, Produce,
 };
 
 /// Run a simulated device reached over TCP.
@@ -31,12 +31,14 @@ pub fn run_tcp_node(
     let listener = match TcpListener::bind(&addr) {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("{}: failed to bind the TCP listener: {}", config.name, e);
+            could_not_stand_in(&config, format!("failed to bind the TCP listener: {e}"));
             return;
         }
     };
 
     listener.set_nonblocking(true).ok();
+    // Listening, which is what a handler connecting to it needs.
+    config.standing.made();
 
     let mut connection: Option<TcpStream> = None;
     let mut rng = rand::thread_rng();
@@ -152,6 +154,8 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(12)),
             packet_interval_ms: Arc::new(AtomicU32::new(interval_ms)),
             segment_interval_ms: Arc::new(AtomicU32::new(interval_ms)),
+            sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            standing: Default::default(),
         })
     }
 

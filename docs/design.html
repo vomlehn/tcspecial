@@ -8404,11 +8404,12 @@ what is wrong with them.</p>
 </pre>
 <div class="section" id="simulation-modes">
 <h2><a class="toc-backref" href="#toc-entry-93">Simulation Modes</a></h2>
-<p><strong>Specified, not yet implemented</strong>, except that tcspecial reads
-<tt class="docutils literal"><span class="pre">--simulate</span></tt>, <tt class="docutils literal"><span class="pre">tcslibgs::simulate</span></tt>, refusing a mode that is not one of
-the three or a flag given twice, and refuses <tt class="docutils literal"><span class="pre">--visual</span></tt> under <tt class="docutils literal">none</tt>: see
-<a class="reference internal" href="#the-visual-window">The Visual Window</a>. What a mode requires of the payloads is not yet
-checked, and tcssim and tcsmoc do not yet take the flag.</p>
+<p>Implemented, except that the mode and the judgements are not yet written
+to the telemetry log: they are said in the startup summary only. The mode is
+read by <tt class="docutils literal"><span class="pre">tcslibgs::simulate::take_mode</span></tt>, a payload is judged by
+<tt class="docutils literal"><span class="pre">tcslibgs::simulate::judge</span></tt> and its type's <tt class="docutils literal">judged</tt> in
+<tt class="docutils literal"><span class="pre">tcslibgs::node::payload</span></tt>, and the mode is checked by
+<tt class="docutils literal"><span class="pre">tcslibgs::simulate::refusals</span></tt>, which tcspecial and tcssim both call.</p>
 <p>Tcspecial reaches each payload through whatever is at the end of its endpoint,
 and nothing in a configuration says whether that is the payload or a stand-in
 for it. <tt class="docutils literal"><span class="pre">/dev/i2c-7</span></tt> is an <tt class="docutils literal"><span class="pre">i2c-stub</span></tt> on one host and a real bus on
@@ -8478,12 +8479,12 @@ Simulator</a>.</dd>
 <dt>Requirement</dt>
 <dd><p class="first">A payload is a stand-in when its endpoint is one of the things the
 simulator, or the stub scripts in <tt class="docutils literal">bin/</tt>, make:</p>
-<pre class="code text last literal-block">
+<pre class="code text literal-block">
 network      the address is a loopback address or a Unix-domain path,
              so the far end is on this host
 i2c          the bus's adapter is the kernel's i2c-stub
 gpio         the chip belongs to the kernel's gpio-sim
-can          the interface is a vcan
+can          the interface is a virtual CAN interface, a vcan
 iio          the device belongs to the kernel's iio_dummy, or the path
              resolves to a pseudo-terminal
 serial, spi,
@@ -8492,6 +8493,12 @@ device-file  the path resolves to a pseudo-terminal's slave, which is
              what tcssim makes
 hdlc         never: nothing stands in for a synchronous line
 </pre>
+<p class="last">Tcssim does not yet make a pseudo-terminal for a device-file payload:
+what it stands in for there is the device producing data, which
+tcspecial reads from whatever is at the path. So a device-file payload is
+a stand-in only where something else has made its path a
+pseudo-terminal, and until tcssim makes one a run with a device-file
+payload cannot be <tt class="docutils literal">all</tt>.</p>
 </dd>
 <dt>Requirement</dt>
 <dd>What cannot be told apart is real. Under <tt class="docutils literal">all</tt> it is refused, and the
@@ -8567,7 +8574,10 @@ served only testing.</dd>
 </div>
 <div class="section" id="waiting-for-the-simulator">
 <h2><a class="toc-backref" href="#toc-entry-96">Waiting for the Simulator</a></h2>
-<p><strong>Specified, not yet implemented.</strong></p>
+<p>Implemented: the messages are <tt class="docutils literal"><span class="pre">tcslibgs::ready</span></tt>, tcssim's end is
+<tt class="docutils literal">tcssim/src/ready.rs</tt>, a harness waits through <tt class="docutils literal"><span class="pre">tcslib::simulator</span></tt> or
+<tt class="docutils literal">python/tcslib/simulator.py</tt>, and tcsmoc and <tt class="docutils literal">tcssim <span class="pre">--wait</span></tt> are
+harnesses.</p>
 <p>A stand-in has to exist before tcspecial looks for it. Tcssim makes a
 pseudo-terminal and links the payload's path to it, binds a socket, or loads
 the bank of an <tt class="docutils literal"><span class="pre">i2c-stub</span></tt> chip, and until it has, the path, the socket or
@@ -8603,6 +8613,12 @@ telemetry, and a ground station waits through one function in <tt class="docutil
 with the same function in the Python ground station's library. Every
 harness then waits the same way, and there is one statement of what the
 messages are.</dd>
+<dt>Requirement</dt>
+<dd>Tcssim makes every stand-in as it starts and keeps it until it stops. A
+panel's button decides only whether its payload sends: a stand-in that
+existed only while its panel was sending would be one tcspecial found or
+not by what somebody had pressed, and one tcssim could not say was ready
+until somebody had pressed every button.</dd>
 <dt>Requirement</dt>
 <dd>Tcssim binds the readiness socket before it makes any stand-in, and keeps
 it bound for as long as it runs. A harness that asks while the simulator

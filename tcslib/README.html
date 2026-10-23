@@ -196,6 +196,13 @@ for the beacon tcspecial sends on its own, every
 says which build is running, which configuration it is serving and the
 digest of the files it read. It is the one thing a ground station can
 know about a spacecraft without having asked it anything.</li>
+<li><strong>Waiting for the simulator.</strong>
+<code>simulator::wait</code> asks tcssim, at the address its simulator
+file gives as <code>tcssim.ready</code>, until it has made its stand-ins
+and is set up for the same configuration, simulator file and
+<code>--simulate</code> mode, so that a harness starts tcspecial only
+once there is something for it to find. It says what it last heard when
+it gives up.</li>
 </ul>
 <p>The link to tcspecial is UDP, and only UDP: <code>TcsClient</code>
 sends its commands through a <code>UdpConnection</code>.</p>
@@ -211,6 +218,8 @@ of it, so a ground program needs only tcslib.</p>
 <h2 id="who-uses-it">Who uses it</h2>
 <ul>
 <li><code>tcsmoc</code>, the test ground station.</li>
+<li><code>tcssim</code>, whose <code>--wait</code> waits through
+<code>simulator</code>.</li>
 <li><code>tcsui</code>, the window pieces shared by the ground
 programs.</li>
 <li><code>examples/simple-app</code>, whose ground station

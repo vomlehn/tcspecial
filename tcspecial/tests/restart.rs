@@ -125,6 +125,7 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
         Command::new(env!("CARGO_BIN_EXE_tcspecial"))
             .arg(&configuration)
             .arg("--quiet")
+            .arg("--simulate=all")
             .env_remove("RUST_LOG")
             .stdout(Stdio::null())
             .spawn()

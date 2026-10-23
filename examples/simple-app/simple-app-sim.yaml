@@ -11,4 +11,10 @@
 # than nothing at all.
 description: Simulator settings for simple-app.yaml, whose payload is a program
 
+# Where tcssim answers whether it has made its stand-ins, which whatever
+# starts the run asks before it starts tcspecial. A port no other example
+# uses, so that two can be run at once.
+tcssim:
+  ready: "127.0.0.1:7905"
+
 simulated_payloads: []

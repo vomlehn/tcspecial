@@ -9,6 +9,24 @@
 //! business knowing: how fast a payload produces packets, and how a packet is
 //! divided into segments. The two are joined by the data handler's name; see
 //! [`tcslibgs::sim_config`].
+//!
+//! `--simulate=<mode>` is the run's simulation mode, as tcspecial and tcsmoc
+//! take it: see `tcslibgs::simulate`. Under `none`, the flight setting and
+//! the mode a run without the flag gets, tcssim refuses to start, there being
+//! nothing for it to do in a run that may have no stand-ins. Under `some` and
+//! `all` it checks that what it will stand in for, with what is a stand-in
+//! already, is what the mode allows.
+//!
+//! Every stand-in is made as tcssim starts and kept until it stops, so that
+//! tcspecial finds them whatever the panels say; a panel's button decides
+//! only whether its payload sends. Before making any, tcssim binds the
+//! readiness socket its simulator file states as `tcssim.ready`, and answers
+//! there whether they are made: see [`ready`].
+//!
+//! `--wait[=<seconds>]` is the other end of that: given the same files and
+//! mode, it waits for a simulator already started on them to be ready, and
+//! exits successfully when it is, or with a failure saying why. Thirty
+//! seconds unless told otherwise.
 
 use slint::{Model, ModelRc, SharedString, VecModel};
 use std::env;
@@ -27,10 +45,14 @@ mod grid;
 mod node;
 mod payload;
 mod pty;
+mod ready;
 mod thermal;
 
 use endpoint::{endpoint_description, payload_config_attached};
 use payload::{PayloadConfig, PayloadStats, SimulatedPayload};
+use tcslibgs::graph::Graph;
+use tcslibgs::ready::SetUpFor;
+use tcslibgs::simulate::{counted, judge, refusals, Host, Judged, Mode};
 use tcslibgs::{ResolvedSim, SimConfigFile};
 use tcsverify::startup::Startup;
 
@@ -314,7 +336,7 @@ type Loaded = (
 /// asked again rather than assumed: the files can change between the two
 /// reads, and a simulator running on a half-read pair would be worse than one
 /// that says so.
-fn load(payload_path: &str, sim_path: &str, startup: &mut Startup) -> Option<Loaded> {
+fn load(payload_path: &str, sim_path: &str, mode: Mode, startup: &mut Startup) -> Option<Loaded> {
     let sim_file = match SimConfigFile::load(sim_path) {
         Ok(sim_file) => sim_file,
         Err(e) => {
@@ -348,6 +370,20 @@ fn load(payload_path: &str, sim_path: &str, startup: &mut Startup) -> Option<Loa
             return None;
         }
     };
+
+    // Whether what this simulator will stand in for, with what is a stand-in
+    // already, is what the mode allows. A simulator file that forgot a
+    // payload is caught here, before anything runs; only tcspecial's own
+    // check protects the hardware, because only tcspecial opens it.
+    if let Some(graph) = graph.as_ref() {
+        let refused = stand_ins_refused(graph, &sim_file, sim_path, mode);
+        if !refused.is_empty() {
+            for refusal in refused {
+                startup.error(format!("{payload_path}: {refusal}"));
+            }
+            return None;
+        }
+    }
 
     // Join the two by name. Every data handler needs settings and every
     // settings entry needs a handler, so this is where a file naming a payload
@@ -408,6 +444,139 @@ fn load(payload_path: &str, sim_path: &str, startup: &mut Startup) -> Option<Loa
     Some((dh_configs, sim_file, sims, configs))
 }
 
+/// Every way the payloads of `graph` are not what `mode` allows, counting as
+/// a stand-in each payload the simulator file names, which tcssim will stand
+/// in for, and each that already is one by `tcslibgs::simulate`'s rules -- a
+/// heater on a gpio-sim chip, say, which bin/mkgpio made and the simulator
+/// file leaves out.
+fn stand_ins_refused(
+    graph: &Graph,
+    sim_file: &SimConfigFile,
+    sim_path: &str,
+    mode: Mode,
+) -> Vec<String> {
+    let host = Host::this();
+    let judged: Vec<(&str, Judged)> = graph
+        .nodes
+        .iter()
+        .filter(|node| counted(node))
+        .filter_map(|node| {
+            let named = sim_file
+                .simulated_payloads
+                .iter()
+                .any(|simulated| simulated.name == node.name);
+            let judged = if named {
+                Judged::stand_in(
+                    format!("{sim_path} names it, for tcssim to stand in for"),
+                    "path",
+                    "",
+                )
+            } else {
+                judge(&host, node)?
+            };
+            Some((node.name.as_str(), judged))
+        })
+        .collect();
+    let pairs: Vec<(&str, &Judged)> = judged.iter().map(|(name, j)| (*name, j)).collect();
+    refusals(mode, &pairs)
+        .into_iter()
+        .map(|refusal| match mode {
+            Mode::All => format!("{refusal}, or name it in {sim_path} for tcssim to stand in for"),
+            _ => refusal,
+        })
+        .collect()
+}
+
+/// Read where this simulator says whether it is ready, and bind it, with
+/// what it is set up for: or say what stops either.
+fn ready_socket(
+    payload_path: &str,
+    sim_path: &str,
+    sim_file: &SimConfigFile,
+    mode: Mode,
+) -> Result<(std::net::UdpSocket, SetUpFor), String> {
+    let at = sim_file.ready().map_err(|e| format!("{sim_path}: {e}"))?;
+    let set_up_for = set_up_for(payload_path, sim_path, mode)?;
+    let socket = ready::bind(at).map_err(|e| format!("{sim_path}: {e}"))?;
+    eprintln!("answering whether it is ready at {at}");
+    Ok((socket, set_up_for))
+}
+
+/// What a simulator started on these files under `mode` is set up for, as
+/// its readiness answers say and a harness compares.
+fn set_up_for(payload_path: &str, sim_path: &str, mode: Mode) -> Result<SetUpFor, String> {
+    Ok(SetUpFor {
+        configuration: tcslibgs::config_digest::digest_of_file(payload_path)
+            .map_err(|e| format!("{payload_path}: {e}"))?,
+        simulator: tcslibgs::config_digest::digest_of_simulator_file(sim_path)
+            .map_err(|e| format!("{sim_path}: {e}"))?,
+        mode,
+    })
+}
+
+/// How long `--wait` waits where it is not told.
+const WAIT_DEFAULT: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// Take `--wait` or `--wait=<seconds>` out of the arguments: how long to
+/// wait, where it was given, and what is left.
+fn take_wait(args: Vec<String>) -> Result<(Option<std::time::Duration>, Vec<String>), String> {
+    let mut waiting = None;
+    let mut rest = Vec::with_capacity(args.len());
+    for arg in args {
+        let patience = if arg == "--wait" {
+            WAIT_DEFAULT
+        } else if let Some(seconds) = arg.strip_prefix("--wait=") {
+            match seconds.parse::<f64>() {
+                Ok(seconds) if seconds > 0.0 && seconds.is_finite() => {
+                    std::time::Duration::from_secs_f64(seconds)
+                }
+                _ => {
+                    return Err(format!(
+                        "--wait={seconds} is not a number of seconds: give --wait=30, or \
+                         --wait for thirty seconds"
+                    ))
+                }
+            }
+        } else {
+            rest.push(arg);
+            continue;
+        };
+        if waiting.replace(patience).is_some() {
+            return Err("--wait is given twice: give it once".to_string());
+        }
+    }
+    Ok((waiting, rest))
+}
+
+/// `--wait`: wait for a simulator started on these files under `mode` to be
+/// ready, and say what to exit with. Nothing is stood in for and no window
+/// opens: this is the harness for a run started by hand.
+fn wait_for_another(
+    payload_path: &str,
+    sim_path: &str,
+    mode: Mode,
+    patience: std::time::Duration,
+) -> i32 {
+    let wanted = SimConfigFile::load(sim_path)
+        .map_err(|e| format!("{sim_path}: {e}"))
+        .and_then(|sim_file| sim_file.ready().map_err(|e| format!("{sim_path}: {e}")))
+        .and_then(|at| Ok((at, set_up_for(payload_path, sim_path, mode)?)));
+    let (at, ours) = match wanted {
+        Ok(wanted) => wanted,
+        Err(e) => {
+            eprintln!("tcssim --wait: {e}");
+            return 1;
+        }
+    };
+    match tcslib::simulator::wait(at, &ours, patience) {
+        Ok(()) => 0,
+        Err(e) => {
+            eprintln!("tcssim --wait: {e}");
+            1
+        }
+    }
+}
+
 /// Say what was found as tcssim started, in a window of its own, and wait for
 /// it to be closed.
 ///
@@ -461,22 +630,51 @@ fn present(startup: &Startup) {
 fn main() {
     //    env_logger::init();
 
-    // Read both configuration files before the window exists, so a file that
-    // cannot be read is reported plainly rather than as an empty window.
-    let payload_path = match payload_path_from_args(env::args(), Some(SIM_PAYLOAD_CONFIG_PATH_VAR))
-    {
-        Ok(payload_path) => payload_path,
+    // The mode first, and before anything is read: under the flight setting
+    // there is nothing to read anything for.
+    let (mode, args) = match tcslibgs::simulate::take_mode(env::args().collect()) {
+        Ok(taken) => taken,
         Err(e) => {
-            eprintln!("{}", e);
+            eprintln!("tcssim: {e}");
             process::exit(1);
         }
     };
+    let (waiting, args) = match take_wait(args) {
+        Ok(taken) => taken,
+        Err(e) => {
+            eprintln!("tcssim: {e}");
+            process::exit(1);
+        }
+    };
+    if mode.is_flight() {
+        eprintln!(
+            "tcssim: --simulate={mode} is the flight setting, which allows no stand-ins, \
+             so there is nothing for a simulator to do or to wait for: give \
+             --simulate=some or --simulate=all for a run with stand-ins"
+        );
+        process::exit(1);
+    }
+
+    // Read both configuration files before the window exists, so a file that
+    // cannot be read is reported plainly rather than as an empty window.
+    let payload_path =
+        match payload_path_from_args(args.into_iter(), Some(SIM_PAYLOAD_CONFIG_PATH_VAR)) {
+            Ok(payload_path) => payload_path,
+            Err(e) => {
+                eprintln!("{}", e);
+                process::exit(1);
+            }
+        };
     // The one PAYLOAD_SIM_YAML names, and otherwise the one beside the
     // configuration and named for it, found as tcsmoc finds it.
     let sim_path = env::var(SIM_CONFIG_PATH_VAR).unwrap_or_else(|_| {
         tcslibgs::config::sim_path_beside(&payload_path)
             .unwrap_or_else(|| DEFAULT_SIM_CONFIG_PATH.to_string())
     });
+
+    if let Some(patience) = waiting {
+        process::exit(wait_for_another(&payload_path, &sim_path, mode, patience));
+    }
 
     // Everything wrong with the pair, in tcsverify's words and before
     // anything else is read from either: every problem at once, each with its
@@ -496,13 +694,27 @@ fn main() {
     let loaded = if startup.fatal() {
         None
     } else {
-        load(&payload_path, &sim_path, &mut startup)
+        load(&payload_path, &sim_path, mode, &mut startup)
     };
     if !startup.is_empty() {
         present(&startup);
     }
     let Some((dh_configs, sim_file, sims, configs)) = loaded.filter(|_| !startup.fatal()) else {
         process::exit(1);
+    };
+
+    // Where this simulator says whether it is ready, bound before any
+    // stand-in is made: a harness asking while it starts is told so, and an
+    // address already held -- by a simulator left running -- stops this one
+    // before it fights that one for the payloads' paths.
+    let readiness = match ready_socket(&payload_path, &sim_path, &sim_file, mode) {
+        Ok(readiness) => readiness,
+        Err(e) => {
+            let mut refused = Startup::default();
+            refused.error(e);
+            present(&refused);
+            process::exit(1);
+        }
     };
 
     eprintln!(
@@ -541,12 +753,25 @@ fn main() {
     ui.window()
         .set_size(grid::window_size(&sizes, &shape, configs.len()));
 
-    // Create simulated payloads
-    let payloads: Arc<Mutex<Vec<SimulatedPayload>>> = Arc::new(Mutex::new(
-        configs.into_iter().map(SimulatedPayload::new).collect(),
-    ));
+    // Every stand-in made now, and each payload silent until its panel says
+    // otherwise: what tcspecial finds is then the same whatever anyone has
+    // pressed, and the readiness socket can say when all of it is there.
+    let (socket, set_up_for) = readiness;
+    ready::serve(
+        socket,
+        Arc::new(ready::Readiness {
+            payloads: configs.iter().map(|c| c.standing.clone()).collect(),
+            set_up_for,
+        }),
+    );
+    let mut made: Vec<SimulatedPayload> = configs.into_iter().map(SimulatedPayload::new).collect();
+    for payload in &mut made {
+        // A payload not yet running, so this cannot be refused.
+        let _ = payload.start();
+    }
+    let payloads: Arc<Mutex<Vec<SimulatedPayload>>> = Arc::new(Mutex::new(made));
 
-    // The one button each panel has, which starts and stops its payload.
+    // The one button each panel has, which has its payload send or not.
     {
         let payloads = payloads.clone();
         let model = model.clone();
@@ -567,19 +792,14 @@ fn main() {
             };
 
             match transfer_wanted(&showing) {
-                Transfer::Send => match payload.start() {
-                    Ok(_) => update_row(&model, row, |info| {
+                Transfer::Send => {
+                    payload.send(true);
+                    update_row(&model, row, |info| {
                         info.status = SharedString::from(RUNNING_STATUS);
-                    }),
-                    // The panel keeps saying it is not sending, which is
-                    // true: a payload that could not be started has not
-                    // started. Named as the payload configuration names it,
-                    // because a row number is this window's business and not
-                    // the reader's.
-                    Err(e) => eprintln!("{}: cannot start: {}", payload.name(), e),
-                },
+                    });
+                }
                 Transfer::Silent => {
-                    payload.stop();
+                    payload.send(false);
                     update_row(&model, row, |info| {
                         info.status = SharedString::from(STOPPED_STATUS);
                     });
@@ -685,7 +905,8 @@ mod tests {
         assert!(sim.ends_with("minimal-sim.yaml"), "{sim}");
 
         let mut startup = Startup::default();
-        let (dh_configs, _, sims, configs) = load(payload, &sim, &mut startup).expect("it loads");
+        let (dh_configs, _, sims, configs) =
+            load(payload, &sim, Mode::All, &mut startup).expect("it loads");
         assert!(startup.is_empty(), "{:?}", startup.lines());
         assert_eq!(dh_configs.len(), 1);
         assert_eq!(dh_configs[0].name.0, "sensor");
@@ -702,7 +923,7 @@ mod tests {
         let sim = tcslibgs::config::sim_path_beside(payload).expect("its simulator file");
 
         let mut startup = Startup::default();
-        assert!(load(payload, &sim, &mut startup).is_none());
+        assert!(load(payload, &sim, Mode::All, &mut startup).is_none());
         assert!(
             startup
                 .lines()

@@ -21,6 +21,12 @@
 # that way.
 description: Simulator settings for the payloads of thermostat.yaml
 
+# Where tcssim answers whether it has made its stand-ins, which whatever
+# starts the run asks before it starts tcspecial. A port no other example
+# uses, so that two can be run at once.
+tcssim:
+  ready: "127.0.0.1:7907"
+
 thermal_mass:
   # The cabin: ten kelvin below the setpoint of thermostat.yaml, losing the
   # difference with a fifty second constant -- which at the setpoint is a

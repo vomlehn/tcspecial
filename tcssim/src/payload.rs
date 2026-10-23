@@ -107,6 +107,62 @@ pub struct PayloadConfig {
     pub thermal: Option<crate::thermal::Thermal>,
     pub packet_interval_ms: Arc<AtomicU32>,
     pub segment_interval_ms: Arc<AtomicU32>,
+    /// Whether this payload sends: its panel's button.
+    ///
+    /// Apart from whether it is running, which it is from the moment tcssim
+    /// starts: a stand-in is made as tcssim starts and kept until it stops, so
+    /// that tcspecial finds it whatever the panel says, and the button decides
+    /// only whether anything goes over it. See [`Pacing::a_packet_is_due`].
+    pub sending: Arc<AtomicBool>,
+    /// Whether its stand-in has been made, which the readiness socket says:
+    /// see [`crate::ready`].
+    pub standing: Arc<crate::ready::Standing>,
+}
+
+/// The thread of a payload of `config`'s kind, which makes its stand-in and
+/// then runs it until `running` is cleared.
+fn run_kind(
+    config: PayloadConfig,
+    running: Arc<AtomicBool>,
+    stats: Arc<std::sync::Mutex<PayloadStats>>,
+) {
+    match config.protocol {
+        PayloadProtocol::Tcp => {
+            crate::node::payload::network::tcp::run_tcp_node(config, running, stats)
+        }
+        PayloadProtocol::Udp => {
+            crate::node::payload::network::udp::run_udp_node(config, running, stats)
+        }
+        PayloadProtocol::Device => {
+            crate::node::payload::device_file::run_device_file_node(config, running, stats)
+        }
+        PayloadProtocol::Serial => {
+            crate::node::payload::serial::run_serial_node(config, running, stats)
+        }
+        PayloadProtocol::I2c => crate::node::payload::i2c::run_i2c_node(config, running, stats),
+        PayloadProtocol::Spi => crate::node::payload::spi::run_spi_node(config, running, stats),
+        PayloadProtocol::Can => crate::node::payload::can::run_can_node(config, running, stats),
+        PayloadProtocol::Iio => crate::node::payload::iio::run_iio_node(config, running, stats),
+        PayloadProtocol::Rpmsg => {
+            crate::node::payload::rpmsg::run_rpmsg_node(config, running, stats)
+        }
+        PayloadProtocol::Gpio => crate::node::payload::gpio::run_gpio_node(config, running, stats),
+        PayloadProtocol::UnixStream => {
+            crate::node::payload::network::unix::run_unix_stream_node(config, running, stats)
+        }
+        PayloadProtocol::UnixDgram => {
+            crate::node::payload::network::unix::run_unix_dgram_node(config, running, stats)
+        }
+    }
+}
+
+/// Say that `config`'s payload could not stand in, and why: on stderr, as
+/// everything a payload says of itself is, and on the readiness socket, so
+/// that a harness waiting for it is told rather than left to give up.
+pub(crate) fn could_not_stand_in(config: &PayloadConfig, why: String) {
+    let said = format!("{}: {why}", config.name);
+    eprintln!("{said}");
+    config.standing.failed(&said);
 }
 
 /// Payload protocol type
@@ -223,39 +279,29 @@ impl SimulatedPayload {
         let config = self.config.clone();
         let stats = self.stats.clone();
 
-        let handle = thread::spawn(move || match config.protocol {
-            PayloadProtocol::Tcp => {
-                crate::node::payload::network::tcp::run_tcp_node(config, running, stats)
-            }
-            PayloadProtocol::Udp => {
-                crate::node::payload::network::udp::run_udp_node(config, running, stats)
-            }
-            PayloadProtocol::Device => {
-                crate::node::payload::device_file::run_device_file_node(config, running, stats)
-            }
-            PayloadProtocol::Serial => {
-                crate::node::payload::serial::run_serial_node(config, running, stats)
-            }
-            PayloadProtocol::I2c => crate::node::payload::i2c::run_i2c_node(config, running, stats),
-            PayloadProtocol::Spi => crate::node::payload::spi::run_spi_node(config, running, stats),
-            PayloadProtocol::Can => crate::node::payload::can::run_can_node(config, running, stats),
-            PayloadProtocol::Iio => crate::node::payload::iio::run_iio_node(config, running, stats),
-            PayloadProtocol::Rpmsg => {
-                crate::node::payload::rpmsg::run_rpmsg_node(config, running, stats)
-            }
-            PayloadProtocol::Gpio => {
-                crate::node::payload::gpio::run_gpio_node(config, running, stats)
-            }
-            PayloadProtocol::UnixStream => {
-                crate::node::payload::network::unix::run_unix_stream_node(config, running, stats)
-            }
-            PayloadProtocol::UnixDgram => {
-                crate::node::payload::network::unix::run_unix_dgram_node(config, running, stats)
+        let handle = thread::spawn(move || {
+            let standing = config.standing.clone();
+            let name = config.name.clone();
+            let still_running = running.clone();
+            run_kind(config, running, stats);
+            // A payload whose thread ends while it is meant to be running has
+            // stopped standing in, whether or not it said why: the readiness
+            // socket says so, and keeps the first reason it was given.
+            if still_running.load(Ordering::SeqCst) {
+                standing.failed(&format!(
+                    "{name}: stopped standing in; see what tcssim said"
+                ));
             }
         });
 
         self.thread_handle = Some(handle);
         Ok(())
+    }
+
+    /// Have it send, or be silent: its panel's button. Its stand-in is there
+    /// either way.
+    pub fn send(&self, sending: bool) {
+        self.config.sending.store(sending, Ordering::SeqCst);
     }
 
     /// Stop the payload simulation
@@ -271,12 +317,13 @@ impl SimulatedPayload {
         self.running.load(Ordering::SeqCst)
     }
 
-    /// Get the current statistics
     /// This payload's name, as the tcspecial configuration file gives it.
+    #[cfg(test)]
     pub fn name(&self) -> &str {
         &self.config.name
     }
 
+    /// Get the current statistics
     pub fn stats(&self) -> PayloadStats {
         let guard = self.stats.lock().unwrap();
         PayloadStats {
@@ -586,6 +633,7 @@ pub(crate) fn hangs_up(config: &PayloadConfig, sent: u64) -> bool {
 /// What the sender threads read out of the shared configuration each time
 /// round, since the window can change any of it while a payload runs.
 pub(crate) struct Pacing {
+    pub(crate) sending: bool,
     pub(crate) packet_size: usize,
     pub(crate) segment_size: usize,
     pub(crate) packet_interval: Duration,
@@ -595,6 +643,7 @@ pub(crate) struct Pacing {
 impl Pacing {
     pub(crate) fn read(config: &PayloadConfig) -> Self {
         Self {
+            sending: config.sending.load(Ordering::SeqCst),
             packet_size: config.packet_size.load(Ordering::SeqCst) as usize,
             segment_size: config.segment_size.load(Ordering::SeqCst) as usize,
             packet_interval: Duration::from_millis(
@@ -619,8 +668,13 @@ impl Pacing {
     /// For one that answers requests, exactly when a request has arrived --
     /// `asked` being the bytes just read -- so that a trigger is answered once
     /// and silence is answered not at all.
+    ///
+    /// Never for a payload whose panel has it silent: its stand-in is there,
+    /// and nothing goes over it.
     pub(crate) fn a_packet_is_due(&self, triggered: bool, asked: usize) -> bool {
-        if triggered {
+        if !self.sending {
+            false
+        } else if triggered {
             asked > 0
         } else {
             self.produces()
@@ -678,6 +732,8 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(12)),
             packet_interval_ms: Arc::new(AtomicU32::new(100)),
             segment_interval_ms: Arc::new(AtomicU32::new(100)),
+            sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            standing: Default::default(),
         }
     }
 
@@ -991,6 +1047,7 @@ mod tests {
     fn the_segments_are_sent_inside_the_packet_interval() {
         let running = AtomicBool::new(true);
         let pacing = Pacing {
+            sending: true,
             packet_size: 3,
             segment_size: 1,
             packet_interval: Duration::from_millis(100),
@@ -1044,6 +1101,8 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(12)),
             packet_interval_ms: Arc::new(AtomicU32::new(1000)),
             segment_interval_ms: Arc::new(AtomicU32::new(1000)),
+            sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            standing: Default::default(),
             triggered: false,
         };
 

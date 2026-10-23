@@ -75,6 +75,14 @@ endif
 #   make run TCSPECIAL_CONFIG_FILE=examples/minimal/minimal RUST_LOG=debug
 RUST_LOG = info
 
+# The run's simulation mode, given to every program a run target starts:
+# none, some or all. All by default, because these targets run on a desk with
+# stand-ins, and a program that leaves the flag out gets none -- the flight
+# setting -- and refuses every stand-in. See "Simulation Modes" in
+# docs/design.rst.
+#   make runmocy SIMULATE=some
+SIMULATE = all
+
 RELEASE = --release
 RELEASE =
 
@@ -177,7 +185,7 @@ run:
 	( \
 		set -eu; \
 		echo "Running $(PROJECT_NAME)..."; \
-		cd $(RUST) && RUST_LOG=$(RUST_LOG) cargo run -q --bin tcspecial -- $(TCSPECIAL_CONFIG_FILE).yaml \
+		cd $(RUST) && RUST_LOG=$(RUST_LOG) cargo run -q --bin tcspecial -- --simulate=$(SIMULATE) $(TCSPECIAL_CONFIG_FILE).yaml \
 	)
 
 # Running tcsmoc on one spelling of the tcspecial configuration.
@@ -194,7 +202,7 @@ define runmoc_on
 	( \
 		set -eu; \
 		echo "Running $(MOC_NAME) on $(basename $(TCSPECIAL_CONFIG_FILE)).$(1)..."; \
-		cd $(RUST) && RUST_LOG=$(RUST_LOG) PAYLOAD_SIM_YAML=$(TCSPECIAL_SIM_FILE) cargo run -q --bin tcsmoc -- $(basename $(TCSPECIAL_CONFIG_FILE).$(1)).$(1) \
+		cd $(RUST) && RUST_LOG=$(RUST_LOG) PAYLOAD_SIM_YAML=$(TCSPECIAL_SIM_FILE) cargo run -q --bin tcsmoc -- --simulate=$(SIMULATE) $(basename $(TCSPECIAL_CONFIG_FILE).$(1)).$(1) \
 	)
 endef
 
@@ -301,7 +309,7 @@ runsim:
 	( \
 		set -eu; \
 		echo "Running $(SIM_NAME)..."; \
-		cd $(RUST) && RUST_LOG=$(RUST_LOG) PAYLOAD_SIM_YAML=$(TCSPECIAL_SIM_FILE) cargo run -q --bin tcssim -- $(TCSPECIAL_CONFIG_FILE).yaml \
+		cd $(RUST) && RUST_LOG=$(RUST_LOG) PAYLOAD_SIM_YAML=$(TCSPECIAL_SIM_FILE) cargo run -q --bin tcssim -- --simulate=$(SIMULATE) $(TCSPECIAL_CONFIG_FILE).yaml \
 	)
 
 # Make the virtual CAN bus a CAN payload needs.

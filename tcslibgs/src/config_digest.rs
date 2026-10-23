@@ -137,6 +137,18 @@ pub fn digest_of_graph(graph: &crate::graph::Graph) -> TcsResult<ConfigDigest> {
     digest_of_value(&interpretation_of_graph(graph))
 }
 
+/// The digest of the simulator file at `path`: of its bytes.
+///
+/// Of the text rather than of what it parses into, as a configuration's is:
+/// a simulator file is read by tcssim alone and in one format, so the two
+/// spellings that make the configuration's digest an interpretation's do not
+/// arise. What it is for is a harness telling whether a simulator already
+/// running read the file the harness did.
+pub fn digest_of_simulator_file<P: AsRef<Path>>(path: P) -> TcsResult<ConfigDigest> {
+    let text = std::fs::read(path.as_ref())?;
+    Ok(ConfigDigest(md5::compute(text).0))
+}
+
 /// What a configuration file is read as, as a value tree: the thing its
 /// digest is taken over.
 ///

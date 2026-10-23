@@ -11,6 +11,8 @@ written after, and each module after the Rust it says again:
 | `tcsui/theme.py` | `tcsui/ui/titled.slint`, the Slint windows' style | The ttk theme every Tk window is drawn in, and the kinds of text a panel holds: a heading, a value, the figure it is read for, a note. |
 | `tcslibgs/beacon.py` | `tcslibgs/src/beacon.rs` | The beacon as it goes on the link, packed and unpacked by `tcslibgs/beacon_packet.py`, which tcs-xtce generates from `tcslibgs/xtce/beacon.xml` as it generates the Rust. |
 | `tcslibgs/ping.py` | `tcslibgs/src/node/vehicle/ping/mod.rs` | What a ping and its answer say. |
+| `tcslibgs/ready.py` | `tcslibgs/src/ready.rs` | What a harness and tcssim say on tcssim's readiness socket. |
+| `tcslib/simulator.py` | `tcslib/src/simulator.rs` | Waiting for tcssim to have made its stand-ins before tcspecial is started. |
 | `tcslibgs/configuration.py` | `tcslibgs::graph::parameters`, `graph::order`, `graph::telemetry`, `types::came_from` | What a ground station reads out of a configuration: where the beacons are, where a `moc` node is bound, and which port a source's data arrives at. |
 
 And beside the ping example, because it is the example's own part of the

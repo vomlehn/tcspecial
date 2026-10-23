@@ -20,6 +20,7 @@ use std::time::Instant;
 use log::{debug, error, info, warn};
 use tcslibgs::config_digest::{digest_of_graph, ConfigDigest, ConfigVersion};
 use tcslibgs::graph::Graph;
+use tcslibgs::simulate::{judge, refusals, Host, Judged, Mode};
 
 use crate::beacon_send::BeaconSend;
 use crate::runtime::command::{Commands, Flying};
@@ -58,11 +59,12 @@ pub fn summary(line: impl std::fmt::Display) {
     }
 }
 
-/// Read, check and run the configuration in `path`, until asked to stop.
+/// Read, check and run the configuration in `path` under the simulation mode
+/// `mode`, until asked to stop.
 ///
 /// Every reason it could not start, rather than the first: a file with three
 /// problems in it is one trip to a desk, where one problem at a time is three.
-pub fn run_graph(path: &str) -> Result<(), Vec<String>> {
+pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
     let graph = Graph::load(path).map_err(|why| vec![format!("{path}: {why}")])?;
 
     // The same checks the ground tool runs, against the same code. A
@@ -88,6 +90,20 @@ pub fn run_graph(path: &str) -> Result<(), Vec<String>> {
     summary(format!("{path}: {}", shape_of(&graph)));
     for (name, what) in described(&graph) {
         summary(format!("  {name}: {what}"));
+    }
+
+    // Whether each payload is a stand-in, judged from what is at the end of
+    // its endpoint and before anything is opened, and the run refused here if
+    // the mode is not met: opening is not always harmless, and a check made
+    // after opening would already have done what --simulate=all exists to
+    // prevent. Said in the summary whatever the answer, because what kind of
+    // run this is is what somebody watching it start needs to know first.
+    let refused = judged_against(&graph, mode);
+    if !refused.is_empty() {
+        return Err(refused
+            .iter()
+            .map(|refusal| format!("{path}: {refusal}"))
+            .collect());
     }
 
     // What this vehicle is serving: the build and the configuration's
@@ -162,6 +178,23 @@ pub fn run_graph(path: &str) -> Result<(), Vec<String>> {
 
     info!("{path}: stopped");
     Ok(())
+}
+
+/// Judge each payload of `graph`, say what each was found to be, and give
+/// whatever `mode` forbids of them: see `tcslibgs::simulate`.
+fn judged_against(graph: &Graph, mode: Mode) -> Vec<String> {
+    let host = Host::this();
+    let judged: Vec<(&str, Judged)> = graph
+        .nodes
+        .iter()
+        .filter_map(|node| judge(&host, node).map(|judged| (node.name.as_str(), judged)))
+        .collect();
+    summary(format!("simulation mode: {mode}"));
+    for (name, judged) in &judged {
+        summary(format!("  {name}: {}", judged.said()));
+    }
+    let pairs: Vec<(&str, &Judged)> = judged.iter().map(|(name, j)| (*name, j)).collect();
+    refusals(mode, &pairs)
 }
 
 /// What a configuration is, in a line: how many nodes, groups and logs, each
@@ -412,12 +445,12 @@ extern "C" fn stop(_signal: libc::c_int) {
     STOPPING.store(true, Ordering::Relaxed);
 }
 
-/// Run the configuration in `path` and say what to exit with.
+/// Run the configuration in `path` under `mode` and say what to exit with.
 ///
 /// For `main`, which has one more thing to do than report: a vehicle that
 /// could not start must not look as though it is running.
-pub fn run_or_report(path: &str) -> i32 {
-    match run_graph(path) {
+pub fn run_or_report(path: &str, mode: Mode) -> i32 {
+    match run_graph(path, mode) {
         Ok(()) => {
             // Does not return where a RESTART asked for one.
             restart::if_asked();
@@ -459,8 +492,8 @@ mod tests {
         )
         .expect("the file is written");
 
-        let problems =
-            run_graph(path.to_str().expect("a path")).expect_err("a configuration with faults");
+        let problems = run_graph(path.to_str().expect("a path"), Mode::All)
+            .expect_err("a configuration with faults");
         assert!(
             problems.len() >= 2,
             "every problem should be given: {problems:?}"

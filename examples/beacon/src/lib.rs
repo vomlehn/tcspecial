@@ -110,10 +110,12 @@ impl Vehicle {
                 program.display()
             ));
         }
+        // With stand-ins: the beacon example's payload is a program on this
+        // host, which the flight setting a run without the flag gets refuses.
         let args: &[&str] = if verbose {
-            &[configuration]
+            &["--simulate=all", configuration]
         } else {
-            &["--quiet", configuration]
+            &["--quiet", "--simulate=all", configuration]
         };
         Ok(Vehicle::new(program, args))
     }

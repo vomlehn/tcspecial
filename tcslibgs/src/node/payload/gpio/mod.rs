@@ -319,6 +319,73 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
     }))
 }
 
+/// What `--simulate` asks to change on a GPIO node that is not a stand-in.
+const TO_STAND_IN: &str = "point path at the gpio-sim chip, which bin/mkgpio makes";
+
+/// Whether the chip at `path` belongs to the kernel's `gpio-sim`, from where
+/// the kernel puts it. See [`crate::simulate`].
+///
+/// A simulated chip is a child of a `gpio-sim.<n>` platform device, and a
+/// real one the child of whatever controller it is on; the chip's number is
+/// given out as chips appear and says nothing.
+pub fn judged(host: &crate::simulate::Host, path: &str) -> crate::simulate::Judged {
+    match host.device_of(path) {
+        Ok(device) => chip_judged(path, &device),
+        Err(found) => crate::simulate::Judged::cannot_tell(found, "path", TO_STAND_IN),
+    }
+}
+
+/// The judgement of a chip whose kernel directory is `device`.
+fn chip_judged(path: &str, device: &std::path::Path) -> crate::simulate::Judged {
+    use crate::simulate::Judged;
+    let simulated = device.components().any(|part| {
+        part.as_os_str()
+            .to_str()
+            .is_some_and(|part| part.starts_with("gpio-sim."))
+    });
+    if simulated {
+        return Judged::stand_in(
+            format!("{path} is a chip of the kernel's gpio-sim"),
+            "path",
+            TO_STAND_IN,
+        );
+    }
+    let on = device
+        .parent()
+        .and_then(|parent| parent.file_name())
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_else(|| device.display().to_string());
+    Judged::hardware(
+        format!("{path} is a real chip, on {on}"),
+        "path",
+        TO_STAND_IN,
+    )
+}
+
+#[cfg(test)]
+mod stand_in_tests {
+    use super::*;
+    use crate::simulate::Verdict;
+    use std::path::Path;
+
+    #[test]
+    fn a_chip_under_gpio_sim_is_a_stand_in_and_another_is_not() {
+        let simulated = Path::new("/sys/devices/platform/gpio-sim.0/gpiochip5");
+        assert_eq!(
+            chip_judged("/dev/gpiochip5", simulated).verdict,
+            Verdict::StandIn
+        );
+
+        let real = Path::new("/sys/devices/pci0000:00/INTC1056:00/gpiochip0");
+        let judged = chip_judged("/dev/gpiochip0", real);
+        assert_eq!(judged.verdict, Verdict::Hardware);
+        assert_eq!(
+            judged.found,
+            "/dev/gpiochip0 is a real chip, on INTC1056:00"
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

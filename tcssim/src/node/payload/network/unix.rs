@@ -33,8 +33,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, hangs_up, ignore_this_request, lateness, send_in_segments, wait_out_packet,
-    wait_while_running, Pacing, PayloadConfig, PayloadStats, Produce,
+    a_packet, could_not_stand_in, hangs_up, ignore_this_request, lateness, send_in_segments,
+    wait_out_packet, wait_while_running, Pacing, PayloadConfig, PayloadStats, Produce,
 };
 
 /// What a datagram device's own path is called, given the handler's.
@@ -117,9 +117,9 @@ pub fn run_unix_stream_node(
 ) {
     let path = PathBuf::from(&config.address);
     if let Err(e) = clear_a_dead_socket(&path) {
-        eprintln!(
-            "{}: failed to stand in for a Unix stream device: {}",
-            config.name, e
+        could_not_stand_in(
+            &config,
+            format!("failed to stand in for a Unix stream device: {}", e),
         );
         return;
     }
@@ -127,17 +127,16 @@ pub fn run_unix_stream_node(
     let listener = match UnixListener::bind(&path) {
         Ok(listener) => listener,
         Err(e) => {
-            eprintln!(
-                "{}: failed to listen at {}: {}",
-                config.name,
-                path.display(),
-                e
+            could_not_stand_in(
+                &config,
+                format!("failed to listen at {}: {}", path.display(), e),
             );
             return;
         }
     };
     let _bound = BoundPath { path: path.clone() };
     listener.set_nonblocking(true).ok();
+    config.standing.made();
     eprintln!(
         "{}: a Unix stream device is listening at {}",
         config.name,
@@ -264,9 +263,9 @@ pub fn run_unix_dgram_node(
     };
 
     if let Err(e) = clear_a_dead_socket(&mine) {
-        eprintln!(
-            "{}: failed to stand in for a Unix datagram device: {}",
-            config.name, e
+        could_not_stand_in(
+            &config,
+            format!("failed to stand in for a Unix datagram device: {}", e),
         );
         return;
     }
@@ -274,12 +273,13 @@ pub fn run_unix_dgram_node(
     let socket = match UnixDatagram::bind(&mine) {
         Ok(socket) => socket,
         Err(e) => {
-            eprintln!("{}: failed to bind {}: {}", config.name, mine.display(), e);
+            could_not_stand_in(&config, format!("failed to bind {}: {}", mine.display(), e));
             return;
         }
     };
     let _bound = BoundPath { path: mine.clone() };
     socket.set_nonblocking(true).ok();
+    config.standing.made();
     if speaks_first {
         eprintln!(
             "{}: a Unix datagram device at {} is sending to {}",
@@ -378,9 +378,12 @@ fn run_driven_unix_dgram_node(
     at: &Path,
 ) {
     if let Err(e) = clear_a_dead_socket(at) {
-        eprintln!(
-            "{}: failed to stand in for a driven Unix datagram device: {}",
-            config.name, e
+        could_not_stand_in(
+            &config,
+            format!(
+                "failed to stand in for a driven Unix datagram device: {}",
+                e
+            ),
         );
         return;
     }
@@ -388,11 +391,9 @@ fn run_driven_unix_dgram_node(
     let socket = match UnixDatagram::bind(at) {
         Ok(socket) => socket,
         Err(e) => {
-            eprintln!(
-                "{}: failed to wait for the vehicle at {}: {}",
-                config.name,
-                at.display(),
-                e
+            could_not_stand_in(
+                &config,
+                format!("failed to wait for the vehicle at {}: {}", at.display(), e),
             );
             return;
         }
@@ -401,6 +402,7 @@ fn run_driven_unix_dgram_node(
         path: at.to_path_buf(),
     };
     socket.set_nonblocking(true).ok();
+    config.standing.made();
     eprintln!(
         "{}: a driven Unix datagram device is waiting at {}",
         config.name,
@@ -469,6 +471,8 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(5)),
             packet_interval_ms: Arc::new(AtomicU32::new(100)),
             segment_interval_ms: Arc::new(AtomicU32::new(20)),
+            sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            standing: Default::default(),
             triggered: false,
         })
     }
@@ -593,6 +597,8 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(12)),
             packet_interval_ms: Arc::new(AtomicU32::new(10)),
             segment_interval_ms: Arc::new(AtomicU32::new(0)),
+            sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            standing: Default::default(),
         });
         device.start().expect("the device starts");
 
@@ -675,6 +681,8 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(1)),
             packet_interval_ms: Arc::new(AtomicU32::new(20)),
             segment_interval_ms: Arc::new(AtomicU32::new(0)),
+            sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            standing: Default::default(),
         });
         device.start().expect("the device starts");
 

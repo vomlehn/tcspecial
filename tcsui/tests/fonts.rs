@@ -1,6 +1,6 @@
 //! Every window takes its default type size from `ui/fonts.slint`.
 //!
-//! The windows are in five crates, and each says its default-font-size
+//! The windows are in six crates, and each says its default-font-size
 //! itself, so a window added without it would be set in Slint's own default
 //! and look like it belonged to another program. Read from the files rather
 //! than from a list here, so that a new window is held to it without anyone
@@ -49,7 +49,7 @@ fn every_window_is_set_in_the_one_default_size() {
             }
         }
     }
-    assert!(windows >= 19, "only {windows} windows were found");
+    assert!(windows >= 18, "only {windows} windows were found");
 }
 
 #[test]

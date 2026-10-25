@@ -6236,10 +6236,11 @@ mod tests {
             // keep the colours they had. Allowed because colour is the fourth
             // channel in this scheme and not the first -- every pair of types
             // differs in two things that are not colour, which
-            // `style::tests::every_pair_of_types_differs_in_two_things_that_are_not_colour`
-            // is the statement of -- so two nodes sharing a tint are still two
-            // shapes nobody can confuse. The ramp is walked in order either
-            // way, which the loop above is what checks.
+            // `every_pair_of_types_differs_in_two_things_that_are_not_colour`
+            // in `style::tests` is the statement of -- so two nodes
+            // sharing a tint are still two shapes nobody can confuse. The
+            // ramp is walked in order either way, which the loop above is
+            // what checks.
             // And the MOC panel, since the F´ gateway joined the ground
             // station: two types and one rung, the two being told apart by
             // their edge and their label rather than by colour.

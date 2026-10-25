@@ -34,6 +34,9 @@
     <payloads>
         <name>spi-1</name>
         <type>spi</type>
+        <max_speed>1000000</max_speed>
+        <path>/dev/spidev0.0</path>
+        <spi_mode>0</spi_mode>
         <payload-out><target>moc-1</target></payload-out>
     </payloads>
     <tcsgui>

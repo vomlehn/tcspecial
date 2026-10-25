@@ -1,9 +1,21 @@
 # yaml-language-server: $schema=tcsgui/share/schema/tcspecial-sim.schema.json
 
+# How tcssim stands in for the one payload of example.yaml.
+#
+# There is no SPI device to open on most hosts, so spi-1 gives a stand_in
+# address in example.yaml: under --simulate=some or all tcspecial reads it
+# there over UDP, and tcssim answers there.
+description: Simulator settings for the payload of example.yaml
+
 # Where tcssim answers whether it has made its stand-ins, which whatever
 # starts the run asks before it starts tcspecial. A port no other example
 # uses, so that two can be run at once.
 tcssim:
   ready: "127.0.0.1:7900"
 
-simulated_payloads: []
+simulated_payloads:
+  # One packet a second.
+  - name: spi-1
+    simulate: true
+    type: spi
+    packet_interval: 1 s

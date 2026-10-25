@@ -37,6 +37,7 @@
         <max_speed>1000000</max_speed>
         <path>/dev/spidev0.0</path>
         <spi_mode>0</spi_mode>
+        <stand_in>127.0.0.1:7951</stand_in>
         <payload-out><target>moc-1</target></payload-out>
     </payloads>
     <tcsgui>

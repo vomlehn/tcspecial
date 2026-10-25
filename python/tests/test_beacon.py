@@ -273,8 +273,7 @@ class LoopTest(unittest.TestCase):
         self.assertEqual(broken.showing.stage, Stage.UNHEARD)
         self.assertEqual(broken.at, AT)
 
-    def test_missed_beacons_a_restart_and_a_differing_configuration_are_remarked_on(
-            self):
+    def test_remarks_on_missed_beacons_a_restart_and_a_differing_config(self):
         sender = ("127.0.0.1", 7500)
         first = self.beacons.heard(a_beacon(sequence=1), sender)
         self.assertTrue(

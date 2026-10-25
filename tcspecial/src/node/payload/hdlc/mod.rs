@@ -176,8 +176,7 @@ impl HdlcEndpoint {
         if fd < 0 {
             return Err(TcsError::Endpoint(format!(
                 "{what}: cannot open a packet socket for {}: {}. A kernel \
-                 without \\
-                 packet sockets has none to give",
+                 without packet sockets has none to give",
                 config.interface,
                 io::Error::last_os_error()
             )));

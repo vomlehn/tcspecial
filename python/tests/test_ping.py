@@ -28,7 +28,9 @@ class PingTest(unittest.TestCase):
     def test_the_answer_is_the_ping_a_space_and_the_time(self):
         message = ping.message(7, SENT).encode()
         answer = ping.reply(message, ANSWERED)
-        self.assertEqual(answer, b"ping #7 1760900000.000000001 1760900000.250000000")
+        self.assertEqual(
+            answer, b"ping #7 1760900000.000000001 1760900000.250000000"
+        )
         self.assertEqual(
             ping.read_reply(answer),
             ping.Pong(ping=ping.Ping(count=7, sent=SENT), answered=ANSWERED),

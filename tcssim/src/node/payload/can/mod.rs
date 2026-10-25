@@ -15,8 +15,8 @@
 //! What the simulator cannot do is make the bus. A virtual one is created with
 //! `ip link add dev vcan0 type vcan` and brought up with `ip link set dev
 //! vcan0 up`, both of which need root, so this finds the interface and says
-//! what would make one if it is not there -- as [`crate::node::payload::i2c`] does
-//! for its kernel module.
+//! what would make one if it is not there -- as
+//! [`crate::node::payload::i2c`] does for its kernel module.
 //!
 //! A frame is its own length and carries eight bytes, or sixty-four as CAN
 //! FD. A packet larger than that cannot be sent at all, which the device
@@ -33,8 +33,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, ignore_this_request, lateness, send_in_segments, wait_out_packet, wait_while_running,
-    Pacing, PayloadConfig, PayloadStats, Produce,
+    a_packet, ignore_this_request, lateness, send_in_segments, wait_out_packet,
+    wait_while_running, Pacing, PayloadConfig, PayloadStats, Produce,
 };
 
 /// Where a frame's data begins in both of the kernel's frame structures: the
@@ -62,15 +62,17 @@ impl BusMember {
         let interface = config.address.clone();
         let index = index_of(&interface).ok_or_else(|| {
             format!(
-                "{}: this host has no interface called \"{interface}\". Make a virtual \
-                 bus with \"ip link add dev {interface} type vcan\" and bring it up \
-                 with \"ip link set dev {interface} up\"",
+                "{}: this host has no interface called \"{interface}\". Make a \
+                 virtual bus with \"ip link add dev {interface} type vcan\" \
+                 and bring it up with \"ip link set dev {interface} up\"",
                 config.name
             )
         })?;
 
         // SAFETY: a socket call with constant arguments, checked before use.
-        let fd = unsafe { libc::socket(libc::PF_CAN, libc::SOCK_RAW, libc::CAN_RAW) };
+        let fd = unsafe {
+            libc::socket(libc::PF_CAN, libc::SOCK_RAW, libc::CAN_RAW)
+        };
         if fd < 0 {
             return Err(format!(
                 "{}: cannot open a CAN socket: {}",
@@ -157,8 +159,13 @@ impl BusMember {
         // SAFETY: both calls take the descriptor by value.
         let flags = unsafe { libc::fcntl(socket.as_raw_fd(), libc::F_GETFL) };
         if flags < 0
-            || unsafe { libc::fcntl(socket.as_raw_fd(), libc::F_SETFL, flags | libc::O_NONBLOCK) }
-                < 0
+            || unsafe {
+                libc::fcntl(
+                    socket.as_raw_fd(),
+                    libc::F_SETFL,
+                    flags | libc::O_NONBLOCK,
+                )
+            } < 0
         {
             return Err(format!(
                 "{}: cannot make this CAN socket non-blocking: {}",
@@ -254,7 +261,8 @@ impl BusMember {
         }
 
         // The length field, which is in the same place in both structures.
-        let length = (frame[4] as usize).min(self.frame_bytes()).min(into.len());
+        let length =
+            (frame[4] as usize).min(self.frame_bytes()).min(into.len());
         into[..length].copy_from_slice(&frame[DATA_AT..DATA_AT + length]);
         length
     }
@@ -362,10 +370,14 @@ mod tests {
     /// has no carrier and reports "unknown" whether it is up or not -- so
     /// this reads `IFF_UP` itself.
     fn is_up(interface: &str) -> bool {
-        let Ok(flags) = std::fs::read_to_string(format!("/sys/class/net/{interface}/flags")) else {
+        let Ok(flags) = std::fs::read_to_string(format!(
+            "/sys/class/net/{interface}/flags"
+        )) else {
             return false;
         };
-        let Ok(flags) = u32::from_str_radix(flags.trim().trim_start_matches("0x"), 16) else {
+        let Ok(flags) =
+            u32::from_str_radix(flags.trim().trim_start_matches("0x"), 16)
+        else {
             return false;
         };
         flags & libc::IFF_UP as u32 != 0
@@ -390,7 +402,11 @@ mod tests {
     /// intermittently, nowhere near the cause. So each test that touches the
     /// bus takes an identifier of its own, and the device and the handler
     /// within one test share it, which is how they talk at all.
-    fn device_on(interface: &str, can_id: u32, triggered: bool) -> PayloadConfig {
+    fn device_on(
+        interface: &str,
+        can_id: u32,
+        triggered: bool,
+    ) -> PayloadConfig {
         PayloadConfig {
             thermal: None,
             name: "can-device".to_string(),
@@ -423,10 +439,13 @@ mod tests {
     /// panel with every counter at nought and no reason given.
     #[test]
     fn a_bus_that_is_not_there_says_how_to_make_one() {
-        let said = match BusMember::join(&device_on("vcan-nonesuch", 0x200, false)) {
-            Err(e) => e,
-            Ok(_) => panic!("this host has an interface called vcan-nonesuch"),
-        };
+        let said =
+            match BusMember::join(&device_on("vcan-nonesuch", 0x200, false)) {
+                Err(e) => e,
+                Ok(_) => {
+                    panic!("this host has an interface called vcan-nonesuch")
+                }
+            };
         assert!(
             said.contains("vcan-nonesuch") && said.contains("ip link add"),
             "the error should name the bus and how to make one: {said}"
@@ -447,10 +466,10 @@ mod tests {
             return;
         };
 
-        let device =
-            BusMember::join(&device_on(&interface, 0x201, false)).expect("a member of the bus");
-        let handler =
-            BusMember::join(&device_on(&interface, 0x201, false)).expect("another member");
+        let device = BusMember::join(&device_on(&interface, 0x201, false))
+            .expect("a member of the bus");
+        let handler = BusMember::join(&device_on(&interface, 0x201, false))
+            .expect("another member");
 
         assert_eq!(
             device.send(&[9, 8, 7]).expect("a frame goes out"),
@@ -509,7 +528,8 @@ mod tests {
         };
         assert!(
             said.contains("will not fit") && said.contains("8"),
-            "the error should say it cannot be sent and how much a frame takes: {said}"
+            "the error should say it cannot be sent and how much a frame \
+             takes: {said}"
         );
 
         // The most each kind of frame carries, neither of them refused.
@@ -519,7 +539,9 @@ mod tests {
 
         let said = match fd.send(&[0u8; 65]) {
             Err(e) => format!("{e}"),
-            Ok(n) => panic!("sixty-five bytes went into a sixty-four-byte frame as {n}"),
+            Ok(n) => panic!(
+                "sixty-five bytes went into a sixty-four-byte frame as {n}"
+            ),
         };
         assert!(
             said.contains("64"),
@@ -541,7 +563,8 @@ mod tests {
         };
 
         // The handler's end, which asks.
-        let handler = BusMember::join(&device_on(&interface, 0x202, false)).expect("a member");
+        let handler = BusMember::join(&device_on(&interface, 0x202, false))
+            .expect("a member");
 
         let mut config = device_on(&interface, 0x202, true);
         // A triggered device sends when it is asked and at no rate of its

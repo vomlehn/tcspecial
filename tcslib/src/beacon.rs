@@ -28,8 +28,9 @@
 //! happens is that one fails to arrive. How long ago the last one was is
 //! therefore the whole of the state, and what a ground station shows is how
 //! that age has grown, through four stages: Unheard, Heard, Aging and
-//! Waiting -- see [`Stage::label`]. [`Schedule`] is those stages and how long each lasts, with no colours in it -- a stage is
-//! what is true, and which colour says so is the window's business.
+//! Waiting -- see [`Stage::label`]. [`Schedule`] is those stages and how
+//! long each lasts, with no colours in it -- a stage is what is true, and
+//! which colour says so is the window's business.
 //!
 //! The stages also decide how long to wait on the socket. A station whose
 //! indicator blinks has to wake up to blink it even when nothing arrives, so
@@ -42,7 +43,8 @@ use std::net::{SocketAddr, UdpSocket};
 use std::time::{Duration, SystemTime};
 
 use tcslibgs::{
-    came_from, Beacon, BeaconError, ConfigDigest, ConfigVersion, Timestamp, NO_TRANSFER_TIME,
+    came_from, Beacon, BeaconError, ConfigDigest, ConfigVersion, Timestamp,
+    NO_TRANSFER_TIME,
 };
 
 /// Where beacons come from and where they are received.
@@ -273,7 +275,9 @@ impl Schedule {
         // A step lasts from one count of missed beacons to the next: so many
         // whole intervals, held at the longest a step can be rather than
         // wrapping for an interval too long to multiply.
-        let missing = |from: u32, to: u32| interval.checked_mul(to - from).unwrap_or(Duration::MAX);
+        let missing = |from: u32, to: u32| {
+            interval.checked_mul(to - from).unwrap_or(Duration::MAX)
+        };
         let blink = Some(Blink {
             on: Duration::from_millis(500),
             off: Duration::from_millis(500),
@@ -412,7 +416,11 @@ impl Schedule {
     /// Nothing heard is [`Contact::Lost`], and so is a last beacon in the
     /// future: an age that cannot be worked out is not a reason to claim
     /// contact.
-    pub fn contact_at(&self, last: Option<SystemTime>, now: SystemTime) -> Contact {
+    pub fn contact_at(
+        &self,
+        last: Option<SystemTime>,
+        now: SystemTime,
+    ) -> Contact {
         let Some(last) = last else {
             return Contact::Lost;
         };
@@ -471,7 +479,11 @@ pub fn what_it_read(version: ConfigVersion, digest: ConfigDigest) -> String {
 
 /// [`what_it_read`], written onto the end of `out`: how a pass says it
 /// without allocating.
-fn write_what_it_read(version: ConfigVersion, digest: ConfigDigest, out: &mut String) {
+fn write_what_it_read(
+    version: ConfigVersion,
+    digest: ConfigDigest,
+    out: &mut String,
+) {
     let _ = write!(out, "tcspecial v{version} md5 {digest}");
 }
 
@@ -524,12 +536,18 @@ struct Reading {
 /// [`hear`], with the message written into `message` in place of what it
 /// held: how a pass hears a beacon allocating nothing of its own. Unpacking
 /// it does allocate, and says so: see [`Beacon::read`].
-fn read_into(datagram: &[u8], expected: Option<ConfigDigest>, message: &mut String) -> Reading {
+fn read_into(
+    datagram: &[u8],
+    expected: Option<ConfigDigest>,
+    message: &mut String,
+) -> Reading {
     message.clear();
     let read = Beacon::read(datagram);
     let beacon = read.as_ref().ok();
     let digests = match (beacon, expected) {
-        (Some(beacon), Some(ours)) if beacon.digest != ours => Some((beacon.digest, ours)),
+        (Some(beacon), Some(ours)) if beacon.digest != ours => {
+            Some((beacon.digest, ours))
+        }
         _ => None,
     };
     if let Some((theirs, ours)) = digests {
@@ -563,8 +581,8 @@ pub fn differs(theirs: ConfigDigest, ours: ConfigDigest) -> Option<String> {
 fn write_differs(theirs: ConfigDigest, ours: ConfigDigest, out: &mut String) {
     let _ = write!(
         out,
-        "CONFIGURATION DIFFERS: tcspecial is serving md5 {theirs}, and this MOC \
-         read md5 {ours}"
+        "CONFIGURATION DIFFERS: tcspecial is serving md5 {theirs}, and this \
+         MOC read md5 {ours}"
     );
 }
 
@@ -589,13 +607,18 @@ const UNREADABLE_SHOWN: usize = 40;
 /// What cannot be read is shown as `String::from_utf8_lossy` would show it,
 /// a replacement character for each stretch that is not UTF-8, but a
 /// character at a time, so that nothing is made to show it.
-fn write_message(datagram: &[u8], read: &Result<Beacon, BeaconError>, out: &mut String) {
+fn write_message(
+    datagram: &[u8],
+    read: &Result<Beacon, BeaconError>,
+    out: &mut String,
+) {
     match read {
         Ok(beacon) => write_what_it_read(beacon.version, beacon.digest, out),
         Err(_) => {
             out.push_str("unreadable: ");
             let mut text = datagram.utf8_chunks().flat_map(|chunk| {
-                let bad = (!chunk.invalid().is_empty()).then_some(char::REPLACEMENT_CHARACTER);
+                let bad = (!chunk.invalid().is_empty())
+                    .then_some(char::REPLACEMENT_CHARACTER);
                 chunk.valid().chars().chain(bad)
             });
             for c in text.by_ref().take(UNREADABLE_SHOWN) {
@@ -811,7 +834,11 @@ impl Beacons {
             Ok((size, _)) => {
                 // Written over what the last beacon said: this one is what
                 // a beacon says now.
-                let heard = read_into(&buffer[..size], self.expected, &mut self.last.said);
+                let heard = read_into(
+                    &buffer[..size],
+                    self.expected,
+                    &mut self.last.said,
+                );
                 let remarks = &mut self.last.remarks;
 
                 // A configuration that differs is the one thing a beacon can
@@ -826,7 +853,8 @@ impl Beacons {
                     {
                         Some(why) => remarks.push(why),
                         None => remarks.push(
-                            "tcspecial is serving the configuration this MOC read again"
+                            "tcspecial is serving the configuration this MOC \
+                             read again"
                                 .to_string(),
                         ),
                     }
@@ -836,13 +864,14 @@ impl Beacons {
                 if let Some(sequence) = heard.sequence {
                     match counted(self.sequence, sequence) {
                         Counted::Missed(missed) => remarks.push(format!(
-                            "{missed} beacon{} did not arrive: #{sequence} came after #{}",
+                            "{missed} beacon{} did not arrive: #{sequence} \
+                             came after #{}",
                             if missed == 1 { "" } else { "s" },
                             self.sequence.unwrap_or(0)
                         )),
                         Counted::Restarted => remarks.push(format!(
-                            "the beacons start again at #{sequence}, so tcspecial has \
-                             restarted"
+                            "the beacons start again at #{sequence}, so \
+                             tcspecial has restarted"
                         )),
                         Counted::First | Counted::Next => {}
                     }
@@ -852,7 +881,8 @@ impl Beacons {
                 Arrived::Beacon
             }
             Err(ref e)
-                if e.kind() == io::ErrorKind::WouldBlock || e.kind() == io::ErrorKind::TimedOut =>
+                if e.kind() == io::ErrorKind::WouldBlock
+                    || e.kind() == io::ErrorKind::TimedOut =>
             {
                 Arrived::Nothing
             }
@@ -914,10 +944,11 @@ mod tests {
     /// Waiting.
     #[test]
     fn each_stage_is_called_what_it_is() {
-        let said: Vec<&str> = [Stage::Unheard, Stage::Heard, Stage::Aging, Stage::Waiting]
-            .iter()
-            .map(|stage| stage.label())
-            .collect();
+        let said: Vec<&str> =
+            [Stage::Unheard, Stage::Heard, Stage::Aging, Stage::Waiting]
+                .iter()
+                .map(|stage| stage.label())
+                .collect();
         assert_eq!(said, ["Unheard", "Heard", "Aging", "Waiting"]);
     }
     use tcslibgs::{CommandStatus, HostPort, PingTelemetry, Telemetry};
@@ -963,7 +994,8 @@ mod tests {
         assert_eq!(
             schedule.contact_at(last, at + Duration::from_millis(4_001)),
             Contact::Lost,
-            "the beacons have stopped, so the spacecraft is not being heard from"
+            "the beacons have stopped, so the spacecraft is not being heard \
+             from"
         );
 
         // Nothing heard at all is the same position as having stopped
@@ -1168,7 +1200,9 @@ mod tests {
     #[test]
     fn the_stage_is_the_number_of_beacons_missed() {
         let stage_for = |missed: u128| match missed {
-            n if n >= u128::from(WAITING_AFTER_MISSED) => (Stage::Waiting, true),
+            n if n >= u128::from(WAITING_AFTER_MISSED) => {
+                (Stage::Waiting, true)
+            }
             n if n >= u128::from(AGING_AFTER_MISSED) => (Stage::Aging, true),
             n if n >= u128::from(BLINKING_AFTER_MISSED) => (Stage::Heard, true),
             _ => (Stage::Heard, false),
@@ -1183,11 +1217,15 @@ mod tests {
                 for elapsed in [
                     interval * count,
                     interval * count + interval / 2,
-                    (interval * (count + 1)).saturating_sub(Duration::from_nanos(1)),
+                    (interval * (count + 1))
+                        .saturating_sub(Duration::from_nanos(1)),
                 ] {
                     let showing = schedule.at(elapsed);
                     let (stage, blinks) = stage_for(missed(elapsed, interval));
-                    assert_eq!(showing.stage, stage, "{elapsed:?} at {interval:?}");
+                    assert_eq!(
+                        showing.stage, stage,
+                        "{elapsed:?} at {interval:?}"
+                    );
                     // A blinking step's indicator is dark for half of every
                     // second, which a steady one never is.
                     if !blinks {
@@ -1279,7 +1317,8 @@ mod tests {
         // Telemetry that is not a beacon is shown as what arrived. Nothing
         // sends a response to this address, so this is a misconfiguration,
         // and the start of the JSON is enough to name it.
-        let other = Telemetry::Ping(PingTelemetry::new(1, CommandStatus::Success));
+        let other =
+            Telemetry::Ping(PingTelemetry::new(1, CommandStatus::Success));
         let datagram = serde_json::to_vec(&other).expect("it serializes");
         let shown = message_of(&datagram);
         assert!(
@@ -1365,8 +1404,8 @@ mod tests {
                 port: 0,
             },
         };
-        let mut beacons =
-            Beacons::listening(link, schedule(), None).expect("a socket on a port of its own");
+        let mut beacons = Beacons::listening(link, schedule(), None)
+            .expect("a socket on a port of its own");
 
         // Nothing has arrived yet, so there is nothing to show and nothing is
         // being heard from.
@@ -1385,7 +1424,8 @@ mod tests {
         beacons.last.said.clear();
         beacons.last.said.push_str("tcspecial v9.9.9 md5 abc");
         let heard = beacons.after(Arrived::Beacon).clone();
-        let arrival = heard.at.expect("a pass that received a beacon says when");
+        let arrival =
+            heard.at.expect("a pass that received a beacon says when");
         assert_eq!(heard.said, "tcspecial v9.9.9 md5 abc");
         assert_eq!(heard.showing.stage, Stage::Heard);
         assert_eq!(
@@ -1431,7 +1471,8 @@ mod tests {
     /// alive on the word of whoever sent it is the one thing this must not do.
     #[test]
     fn a_datagram_from_the_wrong_place_is_not_a_beacon() {
-        let listening = UdpSocket::bind("127.0.0.1:0").expect("a port for the station");
+        let listening =
+            UdpSocket::bind("127.0.0.1:0").expect("a port for the station");
         let recv = listening.local_addr().expect("its address");
         drop(listening);
 
@@ -1447,16 +1488,20 @@ mod tests {
                 port: recv.port(),
             },
         };
-        let mut beacons = match Beacons::listening(link, Schedule::standard(), None) {
-            Ok(beacons) => beacons,
-            // The port was taken between being chosen and being bound, which
-            // is a machine being busy and not a fault in any of this.
-            Err(_) => return,
-        };
+        let mut beacons =
+            match Beacons::listening(link, Schedule::standard(), None) {
+                Ok(beacons) => beacons,
+                // The port was taken between being chosen and being bound,
+                // which is a machine being busy and not a fault in any of
+                // this.
+                Err(_) => return,
+            };
 
-        let stranger = UdpSocket::bind("127.0.0.1:0").expect("a socket for the stranger");
+        let stranger =
+            UdpSocket::bind("127.0.0.1:0").expect("a socket for the stranger");
         let version = ConfigVersion::of_this_build();
-        let datagram = Beacon::new(1, version, ConfigDigest([0; 16])).to_bytes();
+        let datagram =
+            Beacon::new(1, version, ConfigDigest([0; 16])).to_bytes();
         stranger
             .send_to(&datagram, recv)
             .expect("the stranger sends");
@@ -1487,7 +1532,8 @@ mod tests {
         assert!(again.warnings.is_empty(), "{:?}", again.warnings);
 
         // A stranger at another address is.
-        let another = UdpSocket::bind("127.0.0.1:0").expect("a socket for another");
+        let another =
+            UdpSocket::bind("127.0.0.1:0").expect("a socket for another");
         another
             .send_to(&datagram, recv)
             .expect("the other stranger sends");

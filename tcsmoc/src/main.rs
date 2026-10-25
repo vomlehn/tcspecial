@@ -180,7 +180,9 @@ fn rows_of_room(rows: usize, panels: usize) -> usize {
 /// opens with.
 fn height_for_rows(sizes: &Sizes, rows: usize) -> f32 {
     let rows = rows.max(1);
-    rows as f32 * sizes.panel_height + (rows - 1) as f32 * sizes.grid_spacing + sizes.chrome_height
+    rows as f32 * sizes.panel_height
+        + (rows - 1) as f32 * sizes.grid_spacing
+        + sizes.chrome_height
 }
 
 /// The size the window opens at for a grid of `shape` holding `panels`.
@@ -328,7 +330,9 @@ fn present(startup: &Startup) {
     let window = match StartupWindow::new() {
         Ok(window) => window,
         Err(e) => {
-            eprintln!("tcsmoc: what was found cannot be shown in a window: {e}");
+            eprintln!(
+                "tcsmoc: what was found cannot be shown in a window: {e}"
+            );
             return;
         }
     };
@@ -420,7 +424,11 @@ fn show_arrivals(dh_model: &Rc<VecModel<DHInfo>>, arrivals: &Arrivals) {
 ///
 /// A Slint model row is a value rather than a place, so a field is changed by
 /// reading the row, changing it, and putting it back.
-fn update_row(model: &Rc<VecModel<DHInfo>>, row: usize, f: impl FnOnce(&mut DHInfo)) {
+fn update_row(
+    model: &Rc<VecModel<DHInfo>>,
+    row: usize,
+    f: impl FnOnce(&mut DHInfo),
+) {
     if let Some(mut info) = model.row_data(row) {
         f(&mut info);
         model.set_row_data(row, info);
@@ -505,7 +513,10 @@ impl ProcessManager {
                 if let Some(ref mut child) = *guard {
                     match child.try_wait() {
                         Ok(Some(status)) => {
-                            println!("{} exited with status: {}", name_clone, status);
+                            println!(
+                                "{} exited with status: {}",
+                                name_clone, status
+                            );
                             ask_to_stop();
                             break;
                         }
@@ -566,13 +577,14 @@ fn main() {
     // The run's simulation mode, given to both programs this starts: see
     // `tcslibgs::simulate`. Under the flight setting, which is what a run
     // without the flag gets, tcssim is not started at all.
-    let (mode, args) = match tcslibgs::simulate::take_mode(env::args().collect()) {
-        Ok(taken) => taken,
-        Err(e) => {
-            eprintln!("tcsmoc: {e}");
-            exit(1);
-        }
-    };
+    let (mode, args) =
+        match tcslibgs::simulate::take_mode(env::args().collect()) {
+            Ok(taken) => taken,
+            Err(e) => {
+                eprintln!("tcsmoc: {e}");
+                exit(1);
+            }
+        };
     eprintln!("simulation mode: {mode}");
     let payload_path = match payload_path_from_args(args.into_iter(), None) {
         Ok(payload_path) => payload_path,
@@ -627,9 +639,11 @@ fn ask_for_the_edge(ui: &MainWindow, edge: Edge) {
         move || {
             let Some(ui) = ui_weak.upgrade() else { return };
             let window = ui.window();
-            if let Some(y) =
-                tcslibgs::display::top_of(edge, tcslibgs::screen_height(), window.size().height)
-            {
+            if let Some(y) = tcslibgs::display::top_of(
+                edge,
+                tcslibgs::screen_height(),
+                window.size().height,
+            ) {
                 window.set_position(slint::PhysicalPosition::new(0, y));
             }
         },
@@ -737,10 +751,14 @@ fn remember_main_window(ui: &MainWindow) {
 
 /// The main window, while it is there.
 fn main_window() -> Option<MainWindow> {
-    MAIN_WINDOW.with(|main| main.borrow().as_ref().and_then(|weak| weak.upgrade()))
+    MAIN_WINDOW
+        .with(|main| main.borrow().as_ref().and_then(|weak| weak.upgrade()))
 }
 
-fn kill_and_exit_all(pm_tcssim: &Arc<ProcessManager>, pm_tcspecial: Option<&Arc<ProcessManager>>) {
+fn kill_and_exit_all(
+    pm_tcssim: &Arc<ProcessManager>,
+    pm_tcspecial: Option<&Arc<ProcessManager>>,
+) {
     pm_tcssim.kill();
     if let Some(pm_tcspecial) = pm_tcspecial {
         pm_tcspecial.kill();
@@ -749,7 +767,8 @@ fn kill_and_exit_all(pm_tcssim: &Arc<ProcessManager>, pm_tcspecial: Option<&Arc<
 }
 
 /// Whether something has asked this MOC to stop.
-static STOPPING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static STOPPING: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
 
 /// Ask the kernel to tell us about an interrupt and a termination.
 ///
@@ -823,7 +842,10 @@ mod tests {
         DHInfo {
             name: SharedString::from(name),
             dev_id: i32::try_from(row).unwrap_or(i32::MAX),
-            config: SharedString::from(format!("to moc, at 127.0.0.1:{}", 5100 + row)),
+            config: SharedString::from(format!(
+                "to moc, at 127.0.0.1:{}",
+                5100 + row
+            )),
             packet_size: 0,
             status: SharedString::from(crate::vehicle::UNKNOWN_STATUS),
             oc_time: SharedString::from(NO_TRANSFER_TIME),
@@ -925,9 +947,10 @@ mod tests {
             ui.window().set_size(window_size(&sizes, &shape, panels));
             ui.show().unwrap();
 
-            let widths: Vec<f32> = ElementHandle::find_by_element_type_name(&ui, "DHPanel")
-                .map(|panel| panel.size().width)
-                .collect();
+            let widths: Vec<f32> =
+                ElementHandle::find_by_element_type_name(&ui, "DHPanel")
+                    .map(|panel| panel.size().width)
+                    .collect();
             assert_eq!(
                 widths.len(),
                 panels,
@@ -957,7 +980,8 @@ mod tests {
         use i_slint_backend_testing::ElementHandle;
 
         for panels in [2usize, 3, 4, 5] {
-            let rows: Vec<DHInfo> = (0..panels).map(|i| a_panel(i, &format!("DH{i}"))).collect();
+            let rows: Vec<DHInfo> =
+                (0..panels).map(|i| a_panel(i, &format!("DH{i}"))).collect();
 
             let ui = MainWindow::new().unwrap();
 
@@ -975,9 +999,12 @@ mod tests {
                 // As the panel writes it: the handler's name and its number,
                 // which is its place in the configuration.
                 let name = format!("DH{i} (dev id {i})");
-                let handle = ElementHandle::find_by_accessible_label(&ui, &name)
-                    .next()
-                    .unwrap_or_else(|| panic!("{panels} panels: no panel labelled {name}"));
+                let handle =
+                    ElementHandle::find_by_accessible_label(&ui, &name)
+                        .next()
+                        .unwrap_or_else(|| {
+                            panic!("{panels} panels: no panel labelled {name}")
+                        });
                 let at = handle.absolute_position();
                 placed.push((name, at.x, at.y));
             }
@@ -1013,11 +1040,20 @@ mod tests {
                 );
 
                 if i % shape.columns == 0 {
-                    assert_eq!(*x, placed[0].1, "{placement}: a new row starts over");
+                    assert_eq!(
+                        *x, placed[0].1,
+                        "{placement}: a new row starts over"
+                    );
                     assert!(y > before_y, "{placement}: a new row is below");
                 } else {
-                    assert!(x > before_x, "{placement}: the next panel is to the right");
-                    assert_eq!(y, before_y, "{placement}: the same row is level");
+                    assert!(
+                        x > before_x,
+                        "{placement}: the next panel is to the right"
+                    );
+                    assert_eq!(
+                        y, before_y,
+                        "{placement}: the same row is level"
+                    );
                 }
             }
 
@@ -1045,19 +1081,25 @@ mod tests {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("..")
             .join(DEFAULT_PAYLOAD_CONFIG_PATH);
-        let graph = tcslibgs::graph::Graph::load(&path)
-            .unwrap_or_else(|e| panic!("{} failed to load: {e}", path.display()));
-        let links = tcslibgs::graph::telemetry::of(&graph).expect("its links to the ground");
-        let shipped = crate::vehicle::panels(&links, &crate::vehicle::settable_of(&graph));
+        let graph = tcslibgs::graph::Graph::load(&path).unwrap_or_else(|e| {
+            panic!("{} failed to load: {e}", path.display())
+        });
+        let links = tcslibgs::graph::telemetry::of(&graph)
+            .expect("its links to the ground");
+        let shipped = crate::vehicle::panels(
+            &links,
+            &crate::vehicle::settable_of(&graph),
+        );
         assert!(!shipped.is_empty(), "{} has no panels", path.display());
 
         // More handlers than the three-row floor covers, as well as the
         // shipped file. Both are needed: the floor leaves the shipped four
         // rows to spare, so only a grid taller than the floor can show
         // whether the panel and chrome heights are right.
-        let crowded: Vec<DHInfo> = std::iter::repeat_with(|| shipped[0].clone())
-            .take(16)
-            .collect();
+        let crowded: Vec<DHInfo> =
+            std::iter::repeat_with(|| shipped[0].clone())
+                .take(16)
+                .collect();
 
         for (what, rows) in [
             (format!("{}", path.display()), shipped),
@@ -1091,7 +1133,9 @@ mod tests {
             // label from running off the side of its panel: a Button reports
             // the width it was given, where a Text that does not fit is
             // clipped and reports the width it had.
-            for button in ElementHandle::find_by_element_type_name(&ui, "Button") {
+            for button in
+                ElementHandle::find_by_element_type_name(&ui, "Button")
+            {
                 let right = button.absolute_position().x + button.size().width;
                 assert!(
                     right <= window.width,
@@ -1128,29 +1172,30 @@ mod tests {
                         )
                     })
                     .collect();
-            for button in ElementHandle::find_by_element_type_name(&ui, "Button") {
+            for button in
+                ElementHandle::find_by_element_type_name(&ui, "Button")
+            {
                 let left = button.absolute_position().x;
                 let right = left + button.size().width;
                 let top = button.absolute_position().y;
                 // The command interpreter's own buttons, and Quit, are in no
                 // panel.
-                let Some(&(panel_left, panel_right, _, _)) =
-                    panel_rects
-                        .iter()
-                        .find(|(left_edge, right_edge, top_edge, bottom_edge)| {
-                            left >= *left_edge
-                                && left < *right_edge
-                                && top >= *top_edge
-                                && top < *bottom_edge
-                        })
+                let Some(&(panel_left, panel_right, _, _)) = panel_rects
+                    .iter()
+                    .find(|(left_edge, right_edge, top_edge, bottom_edge)| {
+                        left >= *left_edge
+                            && left < *right_edge
+                            && top >= *top_edge
+                            && top < *bottom_edge
+                    })
                 else {
                     continue;
                 };
                 assert!(
                     right <= panel_right,
-                    "{what}: the {:?} button runs from {left} to {right}, past the \
-                     panel that holds it, which ends at {panel_right} having \
-                     started at {panel_left}",
+                    "{what}: the {:?} button runs from {left} to {right}, past \
+                     the panel that holds it, which ends at {panel_right} \
+                     having started at {panel_left}",
                     button.accessible_label(),
                 );
             }
@@ -1160,12 +1205,14 @@ mod tests {
             // centred in it, which is where the gap under the Data Handlers
             // heading came from, and a grid taller than its area is one whose
             // lowest panels are below the window.
-            let area = ElementHandle::find_by_element_id(&ui, "MainWindow::scroll")
-                .next()
-                .expect("the window has a scrolling area for the panels");
-            let grid = ElementHandle::find_by_element_id(&ui, "MainWindow::grid")
-                .next()
-                .expect("the window has a grid of panels");
+            let area =
+                ElementHandle::find_by_element_id(&ui, "MainWindow::scroll")
+                    .next()
+                    .expect("the window has a scrolling area for the panels");
+            let grid =
+                ElementHandle::find_by_element_id(&ui, "MainWindow::grid")
+                    .next()
+                    .expect("the window has a grid of panels");
             assert_eq!(
                 grid.absolute_position().y,
                 area.absolute_position().y,
@@ -1204,7 +1251,10 @@ mod tests {
             // round -- its rows state heights, so the surplus could only
             // gather at the bottom, which showed as a band under the packet
             // count.
-            for (n, panel) in ElementHandle::find_by_element_type_name(&ui, "DHPanel").enumerate() {
+            for (n, panel) in
+                ElementHandle::find_by_element_type_name(&ui, "DHPanel")
+                    .enumerate()
+            {
                 assert!(
                     (panel.size().height - sizes.panel_height).abs() <= 1.0,
                     "{what}: panel {n} is {} tall where a panel wants {}",
@@ -1212,7 +1262,9 @@ mod tests {
                     sizes.panel_height
                 );
             }
-            for button in ElementHandle::find_by_element_type_name(&ui, "Button") {
+            for button in
+                ElementHandle::find_by_element_type_name(&ui, "Button")
+            {
                 assert!(
                     button.size().height <= 40.0,
                     "{what}: the {:?} button is {} tall, which is a stretched \
@@ -1233,9 +1285,10 @@ mod tests {
             // Last in the case, because it leaves the window a different size
             // than it was opened at.
             let columns_now = |ui: &MainWindow| -> usize {
-                let tops: Vec<f32> = ElementHandle::find_by_element_type_name(ui, "DHPanel")
-                    .map(|e| e.absolute_position().y)
-                    .collect();
+                let tops: Vec<f32> =
+                    ElementHandle::find_by_element_type_name(ui, "DHPanel")
+                        .map(|e| e.absolute_position().y)
+                        .collect();
                 let first = tops.iter().copied().fold(f32::MAX, f32::min);
                 tops.iter().filter(|y| (**y - first).abs() < 1.0).count()
             };
@@ -1255,7 +1308,8 @@ mod tests {
                 assert_eq!(
                     columns_now(&ui),
                     1,
-                    "{what}: a window one panel wide did not come down to one column"
+                    "{what}: a window one panel wide did not come down to one \
+                     column"
                 );
 
                 let wide = sizes.width_for_columns(panels);
@@ -1298,7 +1352,8 @@ mod tests {
                 let found: Vec<_> = if found_what.contains("::") {
                     ElementHandle::find_by_element_id(&ui, found_what).collect()
                 } else {
-                    ElementHandle::find_by_element_type_name(&ui, found_what).collect()
+                    ElementHandle::find_by_element_type_name(&ui, found_what)
+                        .collect()
                 };
 
                 assert_eq!(
@@ -1312,9 +1367,11 @@ mod tests {
                 // Against the bottom of the area the panels live in,
                 // which is where they are cut off, rather than the bottom of
                 // the window: below the area is the row with Quit in it.
-                let area_bottom = area.absolute_position().y + area.size().height;
+                let area_bottom =
+                    area.absolute_position().y + area.size().height;
                 for (n, element) in found.iter().enumerate() {
-                    let bottom = element.absolute_position().y + element.size().height;
+                    let bottom =
+                        element.absolute_position().y + element.size().height;
                     assert!(
                         bottom <= area_bottom && bottom <= window_height,
                         "{what}: {found_what} {n} ends {bottom} down, past the \
@@ -1332,8 +1389,9 @@ mod tests {
         panels_fill_left_to_right();
         every_panel_in_a_row_is_the_same_width();
         the_question_is_asked_in_front_of_the_greyed_panels();
-        crate::vehicle::tests::pressing_connect_and_enable_commands_the_vehicle();
-        crate::vehicle::tests::pressing_send_ping_pings_the_node_and_times_its_answer();
+        use crate::vehicle::tests as vehicle;
+        vehicle::pressing_connect_and_enable_commands_the_vehicle();
+        vehicle::pressing_send_ping_pings_the_node_and_times_its_answer();
     }
 
     /// The question about a configuration that differs is asked inside the
@@ -1382,7 +1440,10 @@ mod tests {
             "the question at {at:?}, {size:?} is not inside a window {window:?}"
         );
         let veil = ElementHandle::find_by_element_type_name(&ui, "Rectangle")
-            .find(|e| e.size().width == window.width && e.size().height == window.height)
+            .find(|e| {
+                e.size().width == window.width
+                    && e.size().height == window.height
+            })
             .expect("a veil over the whole window");
         assert!(veil.is_valid());
 
@@ -1390,7 +1451,9 @@ mod tests {
         ElementQuery::from_root(&ui)
             .match_inherits("DiffersPanel")
             .match_descendants()
-            .match_predicate(|e| e.accessible_label().as_deref() == Some("Continue anyway"))
+            .match_predicate(|e| {
+                e.accessible_label().as_deref() == Some("Continue anyway")
+            })
             .find_first()
             .expect("the question has Continue anyway")
             .invoke_accessible_default_action();
@@ -1414,8 +1477,10 @@ mod tests {
 
         // One file says it, and one function reads it, which is what both
         // ends call: tcspecial resolves the pair the same way.
-        let graph = tcslibgs::graph::Graph::load(&payload_path)
-            .unwrap_or_else(|e| panic!("{} failed to load: {e}", payload_path.display()));
+        let graph =
+            tcslibgs::graph::Graph::load(&payload_path).unwrap_or_else(|e| {
+                panic!("{} failed to load: {e}", payload_path.display())
+            });
         let mine = tcslibgs::graph::parameters::beacon_of(&graph)
             .expect("its tcspecial section reads")
             .expect("the shipped fixture states a beacon");
@@ -1467,7 +1532,9 @@ mod tests {
         {
             let kind = "sends to the ground";
             let lines = shown(a_panel(0, "DH0"));
-            let count = |label: &str| lines.iter().filter(|shown| *shown == label).count();
+            let count = |label: &str| {
+                lines.iter().filter(|shown| *shown == label).count()
+            };
 
             // The one panel's two readings of what arrived.
             for line in ["Last recv:", "From payload:"] {
@@ -1503,13 +1570,16 @@ mod tests {
             let shown_counted = shown(counted);
             assert!(
                 shown_counted.iter().any(|line| line == "Recv: 3 recv"),
-                "a payload that {kind} does not show what arrived: {shown_counted:?}"
+                "a payload that {kind} does not show what arrived: \
+                 {shown_counted:?}"
             );
             assert!(
                 !shown_counted
                     .iter()
-                    .any(|line| line.starts_with("Recv: ") && line.contains("bytes")),
-                "a panel still counts bytes where packets are counted: {shown_counted:?}"
+                    .any(|line| line.starts_with("Recv: ")
+                        && line.contains("bytes")),
+                "a panel still counts bytes where packets are counted: \
+                 {shown_counted:?}"
             );
 
             // And a panel that has heard nothing says nought rather than
@@ -1652,8 +1722,15 @@ mod tests {
     /// rather than left to a comment.
     #[test]
     fn the_window_and_rust_agree_on_the_status_strings() {
-        let window = Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint");
-        let source = std::fs::read_to_string(&window).unwrap();
+        let window =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint");
+        // Runs of whitespace are one space, so an expression the window
+        // wraps over several lines is found as written here.
+        let source = std::fs::read_to_string(&window)
+            .unwrap()
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
 
         assert!(
             source.contains(&format!("ci-status: \"{}\"", DISCONNECTED_STATUS)),
@@ -1702,7 +1779,8 @@ mod tests {
     /// first, and that each is wired to its own callback.
     #[test]
     fn a_panel_has_a_button_for_each_command() {
-        let window = Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint");
+        let window =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint");
         let source = std::fs::read_to_string(&window).unwrap();
 
         for (label, callback) in [
@@ -1724,8 +1802,10 @@ mod tests {
 
         // Enable before Disable, which is the order a panel is read in: the
         // press a panel is opened to make comes first.
-        let enable = source.find(&format!("text: \"{ENABLE_LABEL}\";")).unwrap();
-        let disable = source.find(&format!("text: \"{DISABLE_LABEL}\";")).unwrap();
+        let enable =
+            source.find(&format!("text: \"{ENABLE_LABEL}\";")).unwrap();
+        let disable =
+            source.find(&format!("text: \"{DISABLE_LABEL}\";")).unwrap();
         assert!(enable < disable, "Disable is offered before Enable");
 
         // And the one button they replaced is gone, label and callback both.
@@ -1749,12 +1829,15 @@ mod tests {
         let mut data = DHSample::new();
         data.record(&[0xDE, 0xAD]);
         let arrival = Arrival {
-            at: Timestamp::at(std::time::SystemTime::UNIX_EPOCH + Duration::from_secs(3661)),
+            at: Timestamp::at(
+                std::time::SystemTime::UNIX_EPOCH + Duration::from_secs(3661),
+            ),
             data,
             packets: 5,
             sends_values: false,
         };
-        let arrivals: Arrivals = Arc::new(Mutex::new(vec![None, Some(arrival)]));
+        let arrivals: Arrivals =
+            Arc::new(Mutex::new(vec![None, Some(arrival)]));
 
         show_arrivals(&model, &arrivals);
 
@@ -1814,7 +1897,8 @@ mod tests {
             // Nothing is put in the child's environment: the argument says it
             // all, and a variable set here would reach whatever that child
             // starts in turn.
-            let envs: Vec<(&OsStr, Option<&OsStr>)> = command.get_envs().collect();
+            let envs: Vec<(&OsStr, Option<&OsStr>)> =
+                command.get_envs().collect();
             assert!(envs.is_empty(), "{name} was given {envs:?}");
         }
     }
@@ -1823,7 +1907,8 @@ mod tests {
     /// command line.
     #[test]
     fn the_children_get_the_file_the_command_line_named() {
-        let payload_path = payload_path_from_args(args(&["tcspecial2.yaml"]), None).unwrap();
+        let payload_path =
+            payload_path_from_args(args(&["tcspecial2.yaml"]), None).unwrap();
 
         for name in CHILDREN {
             let command = child_command(name, &payload_path, Mode::All);
@@ -1874,10 +1959,15 @@ mod tests {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("..")
             .join(DEFAULT_PAYLOAD_CONFIG_PATH);
-        let graph = tcslibgs::graph::Graph::load(&path)
-            .unwrap_or_else(|e| panic!("{} failed to load: {e}", path.display()));
-        let links = tcslibgs::graph::telemetry::of(&graph).expect("its links to the ground");
-        let model = crate::vehicle::panels(&links, &crate::vehicle::settable_of(&graph));
+        let graph = tcslibgs::graph::Graph::load(&path).unwrap_or_else(|e| {
+            panic!("{} failed to load: {e}", path.display())
+        });
+        let links = tcslibgs::graph::telemetry::of(&graph)
+            .expect("its links to the ground");
+        let model = crate::vehicle::panels(
+            &links,
+            &crate::vehicle::settable_of(&graph),
+        );
 
         assert!(model.len() > 1, "the fixture has {} panels", model.len());
 

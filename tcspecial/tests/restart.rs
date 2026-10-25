@@ -11,7 +11,9 @@ use std::net::UdpSocket;
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
-use tcslibgs::{ArmKey, Beacon, CommandStatus, RestartArmCommand, RestartCommand, Telemetry};
+use tcslibgs::{
+    ArmKey, Beacon, CommandStatus, RestartArmCommand, RestartCommand, Telemetry,
+};
 
 /// A socket on a port nothing else holds, kept so that it stays that way.
 fn socket() -> UdpSocket {
@@ -57,14 +59,20 @@ fn beacon(ground: &UdpSocket) -> u32 {
                 Ok(beacon) => return beacon.sequence,
                 Err(why) => panic!("expected a beacon: {why}"),
             },
-            Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => {
+                continue
+            }
             Err(e) => panic!("no beacon: {e}"),
         }
     }
 }
 
 /// Send `command` from `ground` to `at` and read its answer's status.
-fn ask(ground: &UdpSocket, at: u16, command: &tcslibgs::Command) -> CommandStatus {
+fn ask(
+    ground: &UdpSocket,
+    at: u16,
+    command: &tcslibgs::Command,
+) -> CommandStatus {
     let asked = serde_json::to_vec(command).expect("a command");
     ground
         .send_to(&asked, ("127.0.0.1", at))
@@ -77,7 +85,9 @@ fn ask(ground: &UdpSocket, at: u16, command: &tcslibgs::Command) -> CommandStatu
                     .expect("telemetry")
                     .status()
             }
-            Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => {
+                continue
+            }
             Err(e) => panic!("no answer: {e}"),
         }
     }
@@ -101,7 +111,8 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
   beacon: {{ interval: \"100 ms\", recv: \"127.0.0.1:{}\", send: \"{}\" }}
   payload_command: {{ dest_base: \"{}\", source_base: \"{}\" }}
   payload_telemetry: {{ dest_base: \"{}\", source_base: \"{}\" }}
-  tcs_cmd: {{ recv: \"127.0.0.1:{take_at}\", send: \"127.0.0.1:{commands_at}\" }}
+  tcs_cmd: {{ recv: \"127.0.0.1:{take_at}\", \
+  send: \"127.0.0.1:{commands_at}\" }}
 ",
             beacons.local_addr().expect("where").port(),
             at(),
@@ -145,7 +156,8 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
     let open_before = descriptors(pid);
     assert!(
         open_before.contains(&handed),
-        "the handed descriptor, {handed}, is not open in tcspecial: {open_before:?}"
+        "the handed descriptor, {handed}, is not open in tcspecial: \
+         {open_before:?}"
     );
 
     let key = ArmKey(0x5eed);
@@ -186,7 +198,8 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
     let open_after = descriptors(pid);
     assert!(
         open_after.contains(&handed),
-        "the handed descriptor, {handed}, did not survive the restart: {open_after:?}"
+        "the handed descriptor, {handed}, did not survive the restart: \
+         {open_after:?}"
     );
     assert_eq!(
         open_after.len(),

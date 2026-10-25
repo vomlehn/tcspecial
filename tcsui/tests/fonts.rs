@@ -54,12 +54,16 @@ fn every_window_is_set_in_the_one_default_size() {
 
 #[test]
 fn the_python_windows_use_the_same_size() {
-    let slint = std::fs::read_to_string(root().join("tcsui/ui/fonts.slint")).expect("it reads");
-    let python = std::fs::read_to_string(root().join("python/tcsui/fonts.py")).expect("it reads");
+    let slint = std::fs::read_to_string(root().join("tcsui/ui/fonts.slint"))
+        .expect("it reads");
+    let python = std::fs::read_to_string(root().join("python/tcsui/fonts.py"))
+        .expect("it reads");
 
     let points = slint
         .lines()
-        .find_map(|line| line.trim().strip_prefix("out property <length> window: "))
+        .find_map(|line| {
+            line.trim().strip_prefix("out property <length> window: ")
+        })
         .and_then(|rest| rest.strip_suffix("pt;"))
         .expect("fonts.slint states the size in points");
     assert_eq!(points, "12");
@@ -88,11 +92,13 @@ fn every_text_box_and_button_is_set_in_the_one_size() {
         let lines: Vec<&str> = text.lines().collect();
         for (at, line) in lines.iter().enumerate() {
             let code = line.split("//").next().unwrap_or("");
-            let opens = ["Button {", "LineEdit {", "TextEdit {"]
-                .iter()
-                .any(|widget| {
-                    code.trim_start().starts_with(widget) || code.contains(&format!(":= {widget}"))
-                });
+            let opens =
+                ["Button {", "LineEdit {", "TextEdit {"]
+                    .iter()
+                    .any(|widget| {
+                        code.trim_start().starts_with(widget)
+                            || code.contains(&format!(":= {widget}"))
+                    });
             if !opens {
                 continue;
             }
@@ -102,11 +108,13 @@ fn every_text_box_and_button_is_set_in_the_one_size() {
             for (offset, inner) in lines[at..].iter().enumerate() {
                 let inner = inner.split("//").next().unwrap_or("");
                 if depth == 1 {
-                    if let Some(size) = inner.trim().strip_prefix("font-size:") {
+                    if let Some(size) = inner.trim().strip_prefix("font-size:")
+                    {
                         assert_eq!(
                             size.trim(),
                             "Fonts.window;",
-                            "{}:{}: a text box or button set in a size of its own",
+                            "{}:{}: a text box or button set in a size of \
+                             its own",
                             file.display(),
                             at + offset + 1
                         );
@@ -159,9 +167,14 @@ fn no_text_is_set_smaller_than_the_one_size() {
             // A Type definition, `small: Fonts.window;`, and every use.
             let size = if let Some(size) = code.strip_prefix("font-size:") {
                 size
-            } else if let Some(rest) = code.strip_prefix("out property <length> ") {
+            } else if let Some(rest) =
+                code.strip_prefix("out property <length> ")
+            {
                 match rest.split_once(':') {
-                    Some((name, size)) if ["small", "body", "strong", "title"].contains(&name) => {
+                    Some((name, size))
+                        if ["small", "body", "strong", "title"]
+                            .contains(&name) =>
+                    {
                         size
                     }
                     _ => continue,
@@ -183,14 +196,17 @@ fn no_text_is_set_smaller_than_the_one_size() {
         }
     }
 
-    for python in ["python/tcsui/beacon_panel.py", "examples/ping/ping_moc.py"] {
-        let text = std::fs::read_to_string(root().join(python)).expect("it reads");
+    for python in ["python/tcsui/beacon_panel.py", "examples/ping/ping_moc.py"]
+    {
+        let text =
+            std::fs::read_to_string(root().join(python)).expect("it reads");
         for (at, line) in text.lines().enumerate() {
             if let Some(font) = line.split("font=(").nth(1) {
                 let size = font.split(',').nth(1).unwrap_or("").trim();
                 assert!(
                     size.starts_with("fonts.POINTS"),
-                    "{python}:{}: a font named with a size other than fonts.POINTS",
+                    "{python}:{}: a font named with a size other than \
+                     fonts.POINTS",
                     at + 1
                 );
             }

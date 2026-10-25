@@ -75,7 +75,11 @@ impl Through {
     /// will not fit is reported and kept rather than cut down: part of a value
     /// is not a smaller value, and the queue holds it so that a caller with a
     /// larger buffer can still have it.
-    pub fn take(&mut self, what: &str, buffer: &mut [u8]) -> Result<usize, String> {
+    pub fn take(
+        &mut self,
+        what: &str,
+        buffer: &mut [u8],
+    ) -> Result<usize, String> {
         let Some(datum) = self.waiting.pop_front() else {
             return Ok(0);
         };
@@ -84,8 +88,8 @@ impl Through {
             let wanted = datum.len();
             self.waiting.push_front(datum);
             return Err(format!(
-                "{what}: what arrived is {wanted} bytes and the buffer holds {}: \
-                 part of a value is not a smaller value",
+                "{what}: what arrived is {wanted} bytes and the buffer holds \
+                 {}: part of a value is not a smaller value",
                 buffer.len()
             ));
         }

@@ -2,7 +2,8 @@
 #
 # A payload: what the vehicle carries this flight. Its readings leave by
 # payload-out on their way to the ground, and what asks for them -- a
-# trigger, a command -- arrives at moc-in. Its Rust is tcspecial/src/node/payload/hdlc/.
+# trigger, a command -- arrives at moc-in. Its Rust is
+# tcspecial/src/node/payload/hdlc/.
 node: hdlc
 type: hdlc
 about: >
@@ -81,10 +82,10 @@ attributes:
     kind: bytes
     about: >
       What to write to it as the vehicle opens it -- at startup, and whenever
-      the ground starts it again -- written as a trigger is: a C string in quotes,
-      bytes in brackets, or both one after another. A heater that must start off, a register
-      to set before the part reads sensibly. A write that fails stops the
-      node from starting.
+      the ground starts it again -- written as a trigger is: a C string in
+      quotes, bytes in brackets, or both one after another. A heater that must
+      start off, a register to set before the part reads sensibly. A write that
+      fails stops the node from starting.
   - name: stand_in
     required: false
     about: >

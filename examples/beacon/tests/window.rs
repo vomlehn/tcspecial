@@ -150,24 +150,32 @@ fn the_stage_line_follows_the_stage() {
         stage.absolute_position().x > status_right,
         "the stage is not to the right of the Status label"
     );
-    let middle = |e: &ElementHandle| e.absolute_position().y + e.size().height / 2.0;
+    let middle =
+        |e: &ElementHandle| e.absolute_position().y + e.size().height / 2.0;
     assert!(
         (middle(&stage) - middle(&status)).abs() <= 2.0,
         "the stage is not on the Status row"
     );
     // The indicator is the round thing on that row, between the label and
     // the stage.
-    let indicator = ElementHandle::find_by_element_type_name(&window, "Rectangle")
-        .filter(|e| (middle(e) - middle(&status)).abs() <= 2.0)
-        .filter(|e| e.size().width > 0.0 && (e.size().width - e.size().height).abs() < 0.5)
-        .min_by(|a, b| a.absolute_position().x.total_cmp(&b.absolute_position().x))
-        .expect("the indicator");
+    let indicator =
+        ElementHandle::find_by_element_type_name(&window, "Rectangle")
+            .filter(|e| (middle(e) - middle(&status)).abs() <= 2.0)
+            .filter(|e| {
+                e.size().width > 0.0
+                    && (e.size().width - e.size().height).abs() < 0.5
+            })
+            .min_by(|a, b| {
+                a.absolute_position().x.total_cmp(&b.absolute_position().x)
+            })
+            .expect("the indicator");
     assert!(
         indicator.absolute_position().x > status_right,
         "the indicator is not after the Status label"
     );
     assert!(
-        stage.absolute_position().x >= indicator.absolute_position().x + indicator.size().width,
+        stage.absolute_position().x
+            >= indicator.absolute_position().x + indicator.size().width,
         "the stage is not after the indicator"
     );
 }
@@ -187,13 +195,15 @@ fn the_values_line_up_after_their_labels() {
     window.show().expect("it is shown");
 
     // The panel's own copy of the stage's words is Stage::label's.
-    let words: Vec<String> = [Stage::Unheard, Stage::Heard, Stage::Aging, Stage::Waiting]
-        .iter()
-        .map(|stage| stage.label().to_string())
-        .collect();
-    let panel = ElementHandle::find_by_element_id(&window, "WatchWindow::panel")
-        .next()
-        .expect("the window has the panel");
+    let words: Vec<String> =
+        [Stage::Unheard, Stage::Heard, Stage::Aging, Stage::Waiting]
+            .iter()
+            .map(|stage| stage.label().to_string())
+            .collect();
+    let panel =
+        ElementHandle::find_by_element_id(&window, "WatchWindow::panel")
+            .next()
+            .expect("the window has the panel");
     let x_of = |text: &str| {
         ElementHandle::find_by_element_type_name(&window, "Text")
             .filter(|e| e.accessible_label().as_deref() == Some(text))
@@ -203,7 +213,10 @@ fn the_values_line_up_after_their_labels() {
     };
     let indicator_x = || {
         ElementHandle::find_by_element_type_name(&window, "Rectangle")
-            .filter(|e| e.size().width > 0.0 && (e.size().width - e.size().height).abs() < 0.5)
+            .filter(|e| {
+                e.size().width > 0.0
+                    && (e.size().width - e.size().height).abs() < 0.5
+            })
             .map(|e| e.absolute_position().x)
             .next()
             .expect("the indicator")
@@ -249,7 +262,8 @@ fn the_values_line_up_after_their_labels() {
     let (labels, values, _) = seen.expect("a stage was shown");
     assert!(
         values - labels <= widest_label + 12.0 + 1.0,
-        "the values start {} past the labels, the widest label being {widest_label}",
+        "the values start {} past the labels, the widest label being \
+         {widest_label}",
         values - labels
     );
 }

@@ -1,4 +1,7 @@
-import { Button, GroupBox, LineEdit, ListView, GridBox, StandardListView, ScrollView } from "std-widgets.slint";
+import {
+    Button, GroupBox, LineEdit, ListView, GridBox, StandardListView,
+    ScrollView
+} from "std-widgets.slint";
 import { Copyable, CopyButton } from "../../tcsverify/ui/copy.slint";
 // The beacon's panel, shared with the other ground programs: see tcsui. What
 // it shows is worked out in Rust, from what tcslib::beacon reports.
@@ -129,7 +132,10 @@ component DHPanel inherits Rectangle {
             // No packet interval: how often a payload produces a packet is a
             // property of a simulation rather than of a payload, so it lives in
             // the simulator's own file and tcssim is what shows it.
-            Text { text: "Packet Size: " + packet-size + " bytes"; font-size: Fonts.window; }
+            Text {
+                text: "Packet Size: " + packet-size + " bytes";
+                font-size: Fonts.window;
+            }
         }
 
         // Two buttons, one per command, each saying what it sends. Enable
@@ -249,7 +255,8 @@ component DHPanel inherits Rectangle {
                             Button {
                                 text: "Set";
                                 clicked => {
-                                    set-clicked(attribute-field.text, value-field.text);
+                                    set-clicked(attribute-field.text,
+                                                value-field.text);
                                 }
                             }
                         }
@@ -258,7 +265,8 @@ component DHPanel inherits Rectangle {
                     // And a node no binding names says so, rather than
                     // showing a field whose every press would be refused.
                     if settable == "": Text {
-                        text: "No command binding names this node, so nothing on it may be set from the ground.";
+                        text: "No command binding names this node, "
+                            + "so nothing on it may be set from the ground.";
                         font-size: Fonts.window;
                         wrap: word-wrap;
                     }
@@ -295,15 +303,31 @@ component DHPanel inherits Rectangle {
             // a thermostat that emits only when its decision changes has no
             // rate to be judged against. An indicator that could never change
             // is worse than no indicator.
-            Text { text: "Last recv:"; font-size: Fonts.window; vertical-alignment: center; }
-            Text { text: oc-time; font-size: Fonts.window; vertical-alignment: center; }
+            Text {
+                text: "Last recv:";
+                font-size: Fonts.window;
+                vertical-alignment: center;
+            }
+            Text {
+                text: oc-time;
+                font-size: Fonts.window;
+                vertical-alignment: center;
+            }
         }
 
         from-payload-row := HorizontalLayout {
             spacing: 4px;
             min-height: 14px;
-            Text { text: "From payload:"; font-size: Fonts.window; vertical-alignment: center; }
-            Text { text: oc-data; font-size: Fonts.window; vertical-alignment: center; }
+            Text {
+                text: "From payload:";
+                font-size: Fonts.window;
+                vertical-alignment: center;
+            }
+            Text {
+                text: oc-data;
+                font-size: Fonts.window;
+                vertical-alignment: center;
+            }
         }
 
         // How many packets have arrived from this payload, counted by the
@@ -314,12 +338,17 @@ component DHPanel inherits Rectangle {
         // payload that was sending steadily.
         counters-row := HorizontalLayout {
             min-height: 14px;
-            Text { text: "Recv: " + packets-recv + " recv"; font-size: Fonts.window; }
+            Text {
+                text: "Recv: " + packets-recv + " recv";
+                font-size: Fonts.window;
+            }
         }
     }
 }
 
-export enum MenuAction { ping, arm-restart, restart, query, query-dh, start-dh, stop-dh }
+export enum MenuAction {
+    ping, arm-restart, restart, query, query-dh, start-dh, stop-dh
+}
 
 // Asked when tcspecial announces a configuration other than the one this MOC
 // read: the digest in its beacons, computed from the files it read, is not the
@@ -364,14 +393,16 @@ component DiffersPanel inherits Rectangle {
             font-size: Fonts.window;
         }
         Copyable {
-            text: "The panels may show sources where the vehicle does not send them. Continue anyway?";
+            text: "The panels may show sources where the vehicle "
+                + "does not send them. Continue anyway?";
             font-size: Fonts.window;
             color: #6b7280;
         }
         HorizontalLayout {
             spacing: 8px;
             CopyButton {
-                said: "tcspecial is serving a different configuration\n" + root.message;
+                said: "tcspecial is serving a different configuration\n"
+                    + root.message;
             }
             Rectangle { }
             Button {
@@ -511,22 +542,23 @@ export component MainWindow inherits Window {
     // window it opens has to have room for every panel and no more than a
     // row to spare.
     //
-    // Height: everything above and below the grid -- both group box
-    // headings, the command interpreter's controls, the row holding Quit, the
-    // padding round them all, and the grid's own padding inside the scrolling
-    // area. 436 since the beacon's box took a title and its message took a
-    // second line where the window is too narrow for it in one, which
-    // together are 38 more than the row above the grid had been. Width: the padding of the scrolling area and of the grid inside
-    // it. The width was 30 in main.rs and wanted 36, and the column gaps were
-    // left out of the window's width altogether, so a three-column grid stood
-    // twenty-six pixels wider than the area it scrolled in and the last
-    // column was cut off.
+    // Height: everything above and below the grid -- both group box headings,
+    // the command interpreter's controls, the row holding Quit, the padding
+    // round them all, and the grid's own padding inside the scrolling area. 436
+    // since the beacon's box took a title and its message took a second line
+    // where the window is too narrow for it in one, which together are 38 more
+    // than the row above the grid had been. Width: the padding of the scrolling
+    // area and of the grid inside it. The width was 30 in main.rs and wanted
+    // 36, and the column gaps were left out of the window's width altogether,
+    // so a three-column grid stood twenty-six pixels wider than the area it
+    // scrolled in and the last column was cut off.
     out property <length> grid-spacing: 10px;
     out property <length> chrome-width: 36px;
     out property <length> chrome-height: 436px;
 
     // Rows follow from the panel count and the column count.
-    property <int> grid-rows: Math.max(1, Math.ceil(dh-model.length / Math.max(1, columns)));
+    property <int> grid-rows:
+        Math.max(1, Math.ceil(dh-model.length / Math.max(1, columns)));
 
     // When the last beacon arrived, and the placeholder until one has. The
     // same text the panels' time lines come up with, so the window says one
@@ -621,7 +653,10 @@ export component MainWindow inherits Window {
                             HorizontalLayout {
                                 spacing: 8px;
 
-                                Text { text: "Address:"; vertical-alignment: center; }
+                                Text {
+                                    text: "Address:";
+                                    vertical-alignment: center;
+                                }
                                 LineEdit {
                                     text <=> ci-address;
                                     min-width: 150px;
@@ -639,12 +674,16 @@ export component MainWindow inherits Window {
                                 // reads the same status back to find out
                                 // which it was.
                                 Button {
-                                    text: ci-status == "Connected" ? "Disconnect" : "Connect";
+                                    text: ci-status == "Connected"
+                                        ? "Disconnect"
+                                        : "Connect";
                                     clicked => { link-clicked(); }
                                 }
                                 Text {
                                     text: "Status: " + ci-status;
-                                    color: ci-status == "Connected" ? #008000 : #ff0000;
+                                    color: ci-status == "Connected"
+                                        ? #008000
+                                        : #ff0000;
                                     vertical-alignment: center;
                                 }
                             }
@@ -752,7 +791,10 @@ export component MainWindow inherits Window {
                 }
 
                 HorizontalLayout {
-                    Text { text: "Last Response: " + last-response; font-size: Fonts.window; }
+                    Text {
+                        text: "Last Response: " + last-response;
+                        font-size: Fonts.window;
+                    }
                 }
 
                 command-times-row := HorizontalLayout {
@@ -785,8 +827,8 @@ export component MainWindow inherits Window {
                             spacing: root.grid-spacing;
                         // No height of its own. It used to claim grid-rows *
                         // panel-height, which the panels then overran, and a
-                        // ScrollView centres content shorter than itself: that is
-                        // where the gap under the Data Handlers heading came
+                        // ScrollView centres content shorter than itself: that
+                        // is where the gap under the Data Handlers heading came
                         // from, with the panels hanging off the bottom at the
                         // same time. Each panel asks for the height it needs
                         // instead, and the grid is as tall as they come to.
@@ -808,7 +850,9 @@ export component MainWindow inherits Window {
                             setting: dh.setting;
                             enable-clicked => { enable-dh(i); }
                             disable-clicked => { disable-dh(i); }
-                            set-clicked(attribute, value) => { set-dh(i, attribute, value); }
+                            set-clicked(attribute, value) => {
+                                set-dh(i, attribute, value);
+                            }
                         }
                     }
                     Rectangle { }

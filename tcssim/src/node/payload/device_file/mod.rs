@@ -12,8 +12,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, lateness, send_in_segments, wait_out_packet, wait_while_running, Pacing,
-    PayloadConfig, PayloadStats, Produce,
+    a_packet, lateness, send_in_segments, wait_out_packet, wait_while_running,
+    Pacing, PayloadConfig, PayloadStats, Produce,
 };
 
 /// Run device payload simulation (simulates /dev/urandom-like behavior)

@@ -144,7 +144,9 @@ pub fn digest_of_graph(graph: &crate::graph::Graph) -> TcsResult<ConfigDigest> {
 /// spellings that make the configuration's digest an interpretation's do not
 /// arise. What it is for is a harness telling whether a simulator already
 /// running read the file the harness did.
-pub fn digest_of_simulator_file<P: AsRef<Path>>(path: P) -> TcsResult<ConfigDigest> {
+pub fn digest_of_simulator_file<P: AsRef<Path>>(
+    path: P,
+) -> TcsResult<ConfigDigest> {
     let text = std::fs::read(path.as_ref())?;
     Ok(ConfigDigest(md5::compute(text).0))
 }
@@ -157,7 +159,9 @@ pub fn digest_of_simulator_file<P: AsRef<Path>>(path: P) -> TcsResult<ConfigDige
 /// that reads them acts on the same thing. Two whose interpretations differ
 /// differ where the trees do, which is what a program comparing two spellings
 /// of one configuration needs to say: see `tcsverify`.
-pub fn interpretation_of_file<P: AsRef<Path>>(path: P) -> TcsResult<serde_json::Value> {
+pub fn interpretation_of_file<P: AsRef<Path>>(
+    path: P,
+) -> TcsResult<serde_json::Value> {
     Ok(interpretation_of_graph(&crate::graph::Graph::load(
         path.as_ref(),
     )?))
@@ -165,10 +169,13 @@ pub fn interpretation_of_file<P: AsRef<Path>>(path: P) -> TcsResult<serde_json::
 
 /// What a configuration is read as: see [`digest_of_graph`], which
 /// says what is in it and what is not.
-pub fn interpretation_of_graph(graph: &crate::graph::Graph) -> serde_json::Value {
+pub fn interpretation_of_graph(
+    graph: &crate::graph::Graph,
+) -> serde_json::Value {
     use serde_json::{json, Map, Value};
 
-    let text = |scalar: &crate::Scalar| Value::String(scalar.as_str().to_string());
+    let text =
+        |scalar: &crate::Scalar| Value::String(scalar.as_str().to_string());
     let tcspecial: Map<String, Value> = graph
         .tcspecial
         .as_ref()
@@ -224,8 +231,9 @@ pub fn interpretation_of_graph(graph: &crate::graph::Graph) -> serde_json::Value
 
 /// The digest of any document that can be written out as a value tree.
 fn digest_of_value<T: Serialize>(document: &T) -> TcsResult<ConfigDigest> {
-    let value = serde_json::to_value(document)
-        .map_err(|e| TcsError::Config(format!("cannot digest the configuration: {e}")))?;
+    let value = serde_json::to_value(document).map_err(|e| {
+        TcsError::Config(format!("cannot digest the configuration: {e}"))
+    })?;
 
     let mut canonical = Vec::new();
     write_canonical(&value, &mut canonical);
@@ -258,7 +266,8 @@ fn write_canonical(value: &serde_json::Value, out: &mut Vec<u8>) {
             // By name and then by value: a name appears once in a map, so the
             // value settles nothing here -- it is in the ordering because a
             // reader of the digest should not have to know that.
-            let mut pairs: Vec<(&String, &serde_json::Value)> = map.iter().collect();
+            let mut pairs: Vec<(&String, &serde_json::Value)> =
+                map.iter().collect();
             pairs.sort_by(|a, b| {
                 a.0.cmp(b.0)
                     .then_with(|| a.1.to_string().cmp(&b.1.to_string()))
@@ -281,7 +290,9 @@ fn write_canonical(value: &serde_json::Value, out: &mut Vec<u8>) {
         serde_json::Value::Bool(yes) => {
             out.extend_from_slice(if *yes { b"true" } else { b"false" })
         }
-        serde_json::Value::Number(n) => out.extend_from_slice(n.to_string().as_bytes()),
+        serde_json::Value::Number(n) => {
+            out.extend_from_slice(n.to_string().as_bytes())
+        }
         serde_json::Value::String(s) => out.extend_from_slice(s.as_bytes()),
     }
 }
@@ -305,7 +316,8 @@ mod tests {
             ("0.0.0", (0, 0, 0)),
             ("255.255.255", (255, 255, 255)),
         ] {
-            let version = ConfigVersion::of_text(text).unwrap_or_else(|| panic!("{text}"));
+            let version = ConfigVersion::of_text(text)
+                .unwrap_or_else(|| panic!("{text}"));
             assert_eq!(
                 (version.major, version.minor, version.patch),
                 want,
@@ -334,8 +346,10 @@ mod tests {
 
     fn example_graph(name: &str, ext: &str) -> crate::graph::Graph {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        crate::graph::Graph::load(root.join(format!("examples/{name}/{name}.{ext}")))
-            .expect("the example reads")
+        crate::graph::Graph::load(
+            root.join(format!("examples/{name}/{name}.{ext}")),
+        )
+        .expect("the example reads")
     }
 
     /// A configuration digests alike in either spelling, and
@@ -343,12 +357,16 @@ mod tests {
     #[test]
     fn a_graph_digests_alike_in_both_spellings() {
         for name in ["minimal", "thermostat", "simple-app"] {
-            let yaml = digest_of_graph(&example_graph(name, "yaml")).expect("it digests");
-            let xml = digest_of_graph(&example_graph(name, "xml")).expect("it digests");
+            let yaml = digest_of_graph(&example_graph(name, "yaml"))
+                .expect("it digests");
+            let xml = digest_of_graph(&example_graph(name, "xml"))
+                .expect("it digests");
             assert_eq!(yaml, xml, "{name}");
             let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-            let file = digest_of_file(root.join(format!("examples/{name}/{name}.yaml")))
-                .expect("the file digests");
+            let file = digest_of_file(
+                root.join(format!("examples/{name}/{name}.yaml")),
+            )
+            .expect("the file digests");
             assert_eq!(file, yaml, "{name}");
         }
     }
@@ -401,7 +419,8 @@ mod tests {
     fn a_digest_is_sixteen_bytes_of_hex() {
         let said = format!(
             "{}",
-            digest_of_graph(&example_graph("minimal", "yaml")).expect("it digests")
+            digest_of_graph(&example_graph("minimal", "yaml"))
+                .expect("it digests")
         );
         assert_eq!(said.len(), 32, "{said}");
         assert!(said.chars().all(|c| c.is_ascii_hexdigit()), "{said}");

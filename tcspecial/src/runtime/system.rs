@@ -44,7 +44,8 @@ use crate::node::vehicle::log::LogNode;
 use crate::runtime::fabric::{Fabric, Moved, Port, Read};
 use crate::runtime::node_state::{Abandon, NodeStates, Nudge};
 use crate::runtime::port::{
-    AppPort, ComputePort, EndpointPort, LogPort, NullPort, PingPort, TeePort, Use,
+    AppPort, ComputePort, EndpointPort, LogPort, NullPort, PingPort, TeePort,
+    Use,
 };
 use crate::runtime::route::Routes;
 use crate::runtime::schedule::Schedule;
@@ -210,14 +211,13 @@ impl Workbench {
     /// over: each answer carries its job's ticket, so a late one cannot be
     /// taken for this one's.
     pub fn ask(&self, work: Work) -> Result<(), String> {
-        let answers = self
-            .answers
-            .lock()
-            .map_err(|_| "the command interpreter's answers are lost".to_string())?;
+        let answers = self.answers.lock().map_err(|_| {
+            "the command interpreter's answers are lost".to_string()
+        })?;
         let ticket = self.tickets.fetch_add(1, Ordering::Relaxed);
-        self.jobs
-            .send(Job { work, ticket })
-            .map_err(|_| "the vehicle is no longer making passes".to_string())?;
+        self.jobs.send(Job { work, ticket }).map_err(|_| {
+            "the vehicle is no longer making passes".to_string()
+        })?;
         self.nudge.poke();
         let deadline = Instant::now() + WORK_DEADLINE;
         loop {
@@ -241,8 +241,13 @@ impl Workbench {
 /// A type of its own because it is written down twice -- the field that holds
 /// one and the parameter that supplies it -- and a closure's type spelled
 /// twice is two places to keep in step.
-type Opener =
-    Box<dyn FnMut(&tcslibgs::graph::Node, &Routes, &Abandon) -> Result<Box<dyn Port>, String>>;
+type Opener = Box<
+    dyn FnMut(
+        &tcslibgs::graph::Node,
+        &Routes,
+        &Abandon,
+    ) -> Result<Box<dyn Port>, String>,
+>;
 
 pub struct System {
     /// The nodes, and the table saying how they are joined.
@@ -294,7 +299,11 @@ impl System {
     ///
     /// Every log is opened with `segsend`, which is what its filled segments
     /// are handed to.
-    pub fn of(graph: &Graph, now: Instant, segsend: SegSend) -> Result<System, Vec<String>> {
+    pub fn of(
+        graph: &Graph,
+        now: Instant,
+        segsend: SegSend,
+    ) -> Result<System, Vec<String>> {
         System::of_opening(
             graph,
             now,
@@ -312,16 +321,21 @@ impl System {
     pub fn of_opening(
         graph: &Graph,
         now: Instant,
-        mut opener: impl FnMut(&tcslibgs::graph::Node, &Routes, &Abandon) -> Result<Box<dyn Port>, String>
+        mut opener: impl FnMut(
+                &tcslibgs::graph::Node,
+                &Routes,
+                &Abandon,
+            ) -> Result<Box<dyn Port>, String>
             + 'static,
         mut ground: impl FnMut(&Telemetered) -> Result<Box<dyn Port>, String>,
     ) -> Result<System, Vec<String>> {
         let routes = Routes::of(graph);
         // Before anything opens, because a node's state is what decides
         // whether the pass touches it and every node has one from the start.
-        let states = Arc::new(
-            NodeStates::of(graph).map_err(|e| vec![format!("a node's wakeup descriptor: {e}")])?,
-        );
+        let states =
+            Arc::new(NodeStates::of(graph).map_err(|e| {
+                vec![format!("a node's wakeup descriptor: {e}")]
+            })?);
         let mut fabric = Fabric::new(routes.clone(), DATUM_BYTES);
         fabric.watched_by(states.clone());
         let mut refused = Vec::new();
@@ -374,8 +388,8 @@ impl System {
             return Err(refused);
         }
 
-        let (bench, desk) =
-            Workbench::in_two().map_err(|e| vec![format!("the loop's own wakeup: {e}")])?;
+        let (bench, desk) = Workbench::in_two()
+            .map_err(|e| vec![format!("the loop's own wakeup: {e}")])?;
 
         Ok(System {
             fabric,
@@ -441,10 +455,14 @@ impl System {
             }
             match pace {
                 // Read, and asked if it is asked, only when due.
-                Pace::Exchange(_) | Pace::Floor(_) => is_due.then_some((node.as_str(), Read::Take)),
+                Pace::Exchange(_) | Pace::Floor(_) => {
+                    is_due.then_some((node.as_str(), Read::Take))
+                }
                 // Read on every pass, taking what has arrived; asked only
                 // when due.
-                Pace::Ask(_) if is_due => Some((node.as_str(), Read::UnaskedThenAsk)),
+                Pace::Ask(_) if is_due => {
+                    Some((node.as_str(), Read::UnaskedThenAsk))
+                }
                 Pace::Ask(_) => Some((node.as_str(), Read::Unasked)),
             }
         });
@@ -661,7 +679,12 @@ impl System {
     ///
     /// Passed through so that whatever reads commands does not have to know
     /// how the nodes are held: see [`Fabric::set`].
-    pub fn set(&mut self, node: &str, attribute: &str, value: &[u8]) -> Result<(), String> {
+    pub fn set(
+        &mut self,
+        node: &str,
+        attribute: &str,
+        value: &[u8],
+    ) -> Result<(), String> {
         self.fabric.set(node, attribute, value)
     }
 }
@@ -738,9 +761,9 @@ impl Pace {
 /// than a vehicle that stops.
 fn pace_of(node: &tcslibgs::graph::Node) -> Option<Pace> {
     let read = |name: &str| {
-        node.attributes
-            .get(name)
-            .and_then(|said| tcslibgs::graph::parse_interval(said.as_str().trim()).ok())
+        node.attributes.get(name).and_then(|said| {
+            tcslibgs::graph::parse_interval(said.as_str().trim()).ok()
+        })
     };
     if let Some(interval) = read("trigger_interval") {
         return Some(if tcslibgs::graph::interface::sends(&node.node_type) {
@@ -771,7 +794,11 @@ fn pace_of(node: &tcslibgs::graph::Node) -> Option<Pace> {
 /// because something was delivered to it, and the fabric passes that on in the
 /// same pass -- see [`Port::ready`]. Polling one would be asking a question
 /// whose answer has already been taken.
-fn is_polled(node: &tcslibgs::graph::Node, routes: &Routes, port: &dyn Port) -> bool {
+fn is_polled(
+    node: &tcslibgs::graph::Node,
+    routes: &Routes,
+    port: &dyn Port,
+) -> bool {
     node.group.is_none()
         && port.produces()
         && routes.fan_out(&node.name) > 0
@@ -792,12 +819,16 @@ fn is_polled(node: &tcslibgs::graph::Node, routes: &Routes, port: &dyn Port) -> 
 /// there from the first reading rather than waiting to be spoken to.
 pub fn open_ground_link(link: &Telemetered) -> Result<Box<dyn Port>, String> {
     let what = link.name.as_str();
-    let (reader, writer) = bind_oc_pair(what, &link.vehicle, Some(&link.ground)).map_err(|e| {
-        format!(
-            "{what}: cannot send from {}:{} to the ground at {}:{}: {e}",
-            link.vehicle.address, link.vehicle.port, link.ground.address, link.ground.port
-        )
-    })?;
+    let (reader, writer) =
+        bind_oc_pair(what, &link.vehicle, Some(&link.ground)).map_err(|e| {
+            format!(
+                "{what}: cannot send from {}:{} to the ground at {}:{}: {e}",
+                link.vehicle.address,
+                link.vehicle.port,
+                link.ground.address,
+                link.ground.port
+            )
+        })?;
     Ok(Box::new(EndpointPort::of(
         what,
         reader,
@@ -836,7 +867,10 @@ pub fn open(
         // a link of its own to the node's ground_base, opened beside it --
         // see `open_ground_link`. So one that binds nothing, or that nothing
         // is read from, is held as a node that is never asked anything.
-        "moc" if !tcslibgs::graph::reach::binds(node) || Use::of(routes, &node.name).is_err() => {
+        "moc"
+            if !tcslibgs::graph::reach::binds(node)
+                || Use::of(routes, &node.name).is_err() =>
+        {
             Ok(Box::new(NullPort::of()))
         }
         // A node whose work is a program, started here and talked to over the
@@ -867,14 +901,18 @@ pub fn described(graph: &Graph) -> BTreeMap<String, String> {
             let how = match node.node_type.as_str() {
                 "compute" | "log" => String::new(),
                 "null-moc" | "null-payload" => "drops what arrives".to_string(),
-                "tee-moc" | "tee-payload" => "sends what arrives both ways".to_string(),
+                "tee-moc" | "tee-payload" => {
+                    "sends what arrives both ways".to_string()
+                }
                 "ping" => "answers pings".to_string(),
                 // An app node is a program of its own, and what it does with
                 // what arrives is in that program: nothing here can say more
                 // than which of the two streams it is run with, which its type
                 // already says. See `crate::node::vehicle::app_payload_veh`
                 // and its four neighbours.
-                other if tcslibgs::node::app::Kind::of(other).is_some() => "a program".to_string(),
+                other if tcslibgs::node::app::Kind::of(other).is_some() => {
+                    "a program".to_string()
+                }
                 // A ground link, where nothing the vehicle sends passes
                 // through the node itself: each source has a link of its own
                 // to the node's `ground_base`. So one that nothing is read
@@ -959,7 +997,11 @@ mod tests {
             Ok(Taken::of(datum.len()))
         }
 
-        fn give(&mut self, _arriving: Arriving<'_>, _data: &[u8]) -> Result<(), String> {
+        fn give(
+            &mut self,
+            _arriving: Arriving<'_>,
+            _data: &[u8],
+        ) -> Result<(), String> {
             Err("a sensor is read and not written".to_string())
         }
 
@@ -979,7 +1021,11 @@ mod tests {
             Ok(Taken::NOTHING)
         }
 
-        fn give(&mut self, _arriving: Arriving<'_>, data: &[u8]) -> Result<(), String> {
+        fn give(
+            &mut self,
+            _arriving: Arriving<'_>,
+            data: &[u8],
+        ) -> Result<(), String> {
             self.got.lock().expect("the record").push(data.to_vec());
             Ok(())
         }
@@ -1003,7 +1049,11 @@ mod tests {
             Ok(())
         }
 
-        fn give(&mut self, _arriving: Arriving<'_>, _data: &[u8]) -> Result<(), String> {
+        fn give(
+            &mut self,
+            _arriving: Arriving<'_>,
+            _data: &[u8],
+        ) -> Result<(), String> {
             Ok(())
         }
     }
@@ -1033,7 +1083,11 @@ mod tests {
             Ok(())
         }
 
-        fn give(&mut self, _arriving: Arriving<'_>, _data: &[u8]) -> Result<(), String> {
+        fn give(
+            &mut self,
+            _arriving: Arriving<'_>,
+            _data: &[u8],
+        ) -> Result<(), String> {
             Err("a part that is asked is read and not written".to_string())
         }
 
@@ -1058,16 +1112,18 @@ mod tests {
 payloads:
   - { name: exchanged, type: i2c, path: \"/dev/i2c-1\", address: \"0x48\",
       trigger: \"55\", trigger_interval: \"100 ms\", payload-out: ground }
-  - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7002\",
+  - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", \
+  port: \"7002\",
       trigger: \"55\", trigger_interval: \"100 ms\", payload-out: ground }
-  - { name: floored, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7001\",
+  - { name: floored, type: network, protocol: udp, address: \"127.0.0.1\", \
+  port: \"7001\",
       poll_interval: \"100 ms\", payload-out: ground }
 ",
         );
         if every_pass {
             text.push_str(
-                "  - { name: always, type: network, protocol: udp, address: \"127.0.0.1\", \
-                 port: \"7003\", payload-out: ground }\n",
+                "  - { name: always, type: network, protocol: udp, address: \
+                 \"127.0.0.1\", port: \"7003\", payload-out: ground }\n",
             );
         }
         std::fs::write(&path, text).expect("written");
@@ -1207,7 +1263,8 @@ payloads:
 payloads:
   - { name: exchanged, type: i2c, path: \"/dev/i2c-1\", address: \"0x48\",
       trigger: \"55\", trigger_interval: \"100 ms\", payload-out: ground }
-  - { name: floored, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7001\",
+  - { name: floored, type: network, protocol: udp, address: \"127.0.0.1\", \
+  port: \"7001\",
       poll_interval: \"300 ms\", payload-out: ground }
 ",
         )
@@ -1265,7 +1322,8 @@ payloads:
         std::fs::write(
             &path,
             "payloads:
-  - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7005\",
+  - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", \
+  port: \"7005\",
       trigger: \"55\", trigger_interval: \"100 ms\", payload-out: average }
 vehicle:
   - { name: average, type: compute, function: mean, inputs: 1 }
@@ -1284,7 +1342,10 @@ vehicle:
         let mut system = System::of_opening(
             &graph,
             start,
-            move |node: &Node, _: &Routes, _: &Abandon| match node.node_type.as_str() {
+            move |node: &Node, _: &Routes, _: &Abandon| match node
+                .node_type
+                .as_str()
+            {
                 "network" => Ok(Box::new(Asked {
                     readings: scripted.clone(),
                     asks: counted.clone(),
@@ -1376,7 +1437,8 @@ vehicle:
         std::fs::write(
             &path,
             "payloads:
-  - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7009\",
+  - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", \
+  port: \"7009\",
       trigger: \"55\", trigger_interval: \"100 ms\", payload-out: average }
 vehicle:
   - { name: average, type: compute, function: mean, inputs: 1 }
@@ -1392,7 +1454,10 @@ vehicle:
         let mut system = System::of_opening(
             &graph,
             start,
-            move |node: &Node, _: &Routes, _: &Abandon| match node.node_type.as_str() {
+            move |node: &Node, _: &Routes, _: &Abandon| match node
+                .node_type
+                .as_str()
+            {
                 "network" => Ok(Box::new(Asked {
                     readings: scripted.clone(),
                     asks: counted.clone(),
@@ -1404,7 +1469,8 @@ vehicle:
         .expect("it opens");
 
         let states = system.states();
-        let counts = |node: &str| states.named(node).expect("the node").counts();
+        let counts =
+            |node: &str| states.named(node).expect("the node").counts();
 
         // Nothing has moved, and nothing has a time: a node that has never
         // spoken is not a node that went quiet.
@@ -1484,7 +1550,11 @@ vehicle:
             std::mem::take(&mut self.turned_away)
         }
 
-        fn give(&mut self, _arriving: Arriving<'_>, _data: &[u8]) -> Result<(), String> {
+        fn give(
+            &mut self,
+            _arriving: Arriving<'_>,
+            _data: &[u8],
+        ) -> Result<(), String> {
             Ok(())
         }
     }
@@ -1500,7 +1570,8 @@ vehicle:
         std::fs::write(
             &path,
             "payloads:
-  - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7010\",
+  - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", \
+  port: \"7010\",
       trigger: \"[55]\", trigger_interval: \"100 ms\", payload-out: average }
 vehicle:
   - { name: average, type: compute, function: mean, inputs: 1 }
@@ -1512,15 +1583,19 @@ vehicle:
         let mut system = System::of_opening(
             &graph,
             start,
-            |node: &Node, _: &Routes, _: &Abandon| match node.node_type.as_str() {
-                "network" => Ok(Box::new(Besieged { turned_away: 3 }) as Box<dyn Port>),
+            |node: &Node, _: &Routes, _: &Abandon| match node.node_type.as_str()
+            {
+                "network" => {
+                    Ok(Box::new(Besieged { turned_away: 3 }) as Box<dyn Port>)
+                }
                 _ => Ok(Box::new(Ground::default()) as Box<dyn Port>),
             },
             |_: &Telemetered| Ok(Box::new(Ground::default()) as Box<dyn Port>),
         )
         .expect("it opens");
         let states = system.states();
-        let counts = |node: &str| states.named(node).expect("the node").counts();
+        let counts =
+            |node: &str| states.named(node).expect("the node").counts();
 
         system.pass(start);
         assert_eq!(counts("asked").strangers, 3);
@@ -1549,7 +1624,8 @@ vehicle:
         std::fs::write(
             &path,
             "payloads:
-  - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7006\",
+  - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", \
+  port: \"7006\",
       poll_interval: \"100 ms\", payload-out: average }
 vehicle:
   - { name: average, type: compute, function: mean, inputs: 1 }
@@ -1636,7 +1712,8 @@ vehicle:
         std::fs::write(
             &path,
             "payloads:
-  - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7007\",
+  - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", \
+  port: \"7007\",
       poll_interval: \"100 ms\", payload-out: average }
 vehicle:
   - { name: average, type: compute, function: mean, inputs: 1 }
@@ -1647,7 +1724,9 @@ vehicle:
         let mut system = System::of_opening(
             &graph,
             start,
-            |_: &Node, _: &Routes, _: &Abandon| Ok(Box::new(Ground::default()) as Box<dyn Port>),
+            |_: &Node, _: &Routes, _: &Abandon| {
+                Ok(Box::new(Ground::default()) as Box<dyn Port>)
+            },
             |_: &Telemetered| Ok(Box::new(Ground::default()) as Box<dyn Port>),
         )
         .expect("it opens");
@@ -1657,7 +1736,9 @@ vehicle:
         states.named("asked").expect("the node").disable();
 
         // Asked from another thread, which blocks until a pass takes it.
-        let asking = std::thread::spawn(move || bench.ask(Work::Disable("asked".into())));
+        let asking = std::thread::spawn(move || {
+            bench.ask(Work::Disable("asked".into()))
+        });
 
         // The pass takes the work between its stages and answers it.
         let waited = Instant::now();
@@ -1694,7 +1775,9 @@ vehicle:
         fn scripted(&self, name: &str, datum: &[u8]) {
             self.sensors
                 .get(name)
-                .unwrap_or_else(|| panic!("there is no sensor called \"{name}\" here"))
+                .unwrap_or_else(|| {
+                    panic!("there is no sensor called \"{name}\" here")
+                })
                 .lock()
                 .expect("the record")
                 .push(datum.to_vec());
@@ -1703,14 +1786,15 @@ vehicle:
 
     fn vehicle(now: Instant, readings: &[(&str, &[u8])]) -> Vehicle {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let mut graph =
-            Graph::load(root.join("tests/manual/thermostat.yaml")).expect("the example reads");
+        let mut graph = Graph::load(root.join("tests/manual/thermostat.yaml"))
+            .expect("the example reads");
 
         // The log writes into a directory of this test's own; the example's is
         // a place on a vehicle. Leaked on purpose: the directory must outlive
         // the system that is writing into it, and a test that tidied it up
         // first would be a test of a log with nowhere to write.
-        let where_ = Box::leak(Box::new(tempfile::tempdir().expect("a directory")));
+        let where_ =
+            Box::leak(Box::new(tempfile::tempdir().expect("a directory")));
         for node in graph.nodes.iter_mut() {
             if node.node_type == "log" {
                 node.attributes.insert(
@@ -1751,7 +1835,8 @@ vehicle:
                         readings: opening_sensors
                             .get(&node.name)
                             .map_or_else(kept, Arc::clone),
-                    }) as Box<dyn Port>),
+                    })
+                        as Box<dyn Port>),
                     "gpio" => Ok(Box::new(Ground {
                         got: Arc::clone(&opening_heaters),
                     }) as Box<dyn Port>),
@@ -1770,8 +1855,12 @@ vehicle:
             // apart.
             |link: &Telemetered| {
                 let got = match link.via {
-                    tcslibgs::graph::telemetry::Via::Moc(_) => Arc::clone(&ground),
-                    tcslibgs::graph::telemetry::Via::PayloadTelemetry => Arc::clone(&telemetry),
+                    tcslibgs::graph::telemetry::Via::Moc(_) => {
+                        Arc::clone(&ground)
+                    }
+                    tcslibgs::graph::telemetry::Via::PayloadTelemetry => {
+                        Arc::clone(&telemetry)
+                    }
                 };
                 Ok(Box::new(Ground { got }) as Box<dyn Port>)
             },
@@ -1825,7 +1914,12 @@ vehicle:
                 System.alloc_zeroed(layout)
             }
 
-            unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, size: usize) -> *mut u8 {
+            unsafe fn realloc(
+                &self,
+                ptr: *mut u8,
+                layout: Layout,
+                size: usize,
+            ) -> *mut u8 {
                 note();
                 System.realloc(ptr, layout, size)
             }
@@ -1859,7 +1953,11 @@ vehicle:
             Ok(Taken::of(self.reading.len()))
         }
 
-        fn give(&mut self, _arriving: Arriving<'_>, _data: &[u8]) -> Result<(), String> {
+        fn give(
+            &mut self,
+            _arriving: Arriving<'_>,
+            _data: &[u8],
+        ) -> Result<(), String> {
             Err("a sensor is read and not written".to_string())
         }
 
@@ -1878,7 +1976,11 @@ vehicle:
             Ok(Taken::NOTHING)
         }
 
-        fn give(&mut self, _arriving: Arriving<'_>, _data: &[u8]) -> Result<(), String> {
+        fn give(
+            &mut self,
+            _arriving: Arriving<'_>,
+            _data: &[u8],
+        ) -> Result<(), String> {
             self.got.fetch_add(1, Ordering::Relaxed);
             Ok(())
         }
@@ -1919,8 +2021,8 @@ vehicle:
         );
         assert_eq!(
             made, 0,
-            "twenty running passes allocated {made} times: something in the main \
-             loop is allocating again"
+            "twenty running passes allocated {made} times: something in the \
+             main loop is allocating again"
         );
     }
 
@@ -1950,8 +2052,13 @@ vehicle:
             .map(|sequence| {
                 let value = if sequence % 2 == 0 { "280.0" } else { "300.0" };
                 serde_json::to_vec(&Command::SetNode(
-                    SetNodeCommand::new(sequence, NodeId::of(0), "setpoint", value.as_bytes())
-                        .expect("it fits"),
+                    SetNodeCommand::new(
+                        sequence,
+                        NodeId::of(0),
+                        "setpoint",
+                        value.as_bytes(),
+                    )
+                    .expect("it fits"),
                 ))
                 .expect("it serializes")
             })
@@ -1967,7 +2074,9 @@ vehicle:
             // What the command thread does with each: read it, and hand the
             // setting to the pass by the node's shared name.
             let round = |datagram: &[u8]| {
-                let Ok(Command::SetNode(set)) = serde_json::from_slice::<Command>(datagram) else {
+                let Ok(Command::SetNode(set)) =
+                    serde_json::from_slice::<Command>(datagram)
+                else {
                     panic!("a SET_NODE");
                 };
                 bench.ask(Work::Set {
@@ -2011,17 +2120,24 @@ vehicle:
             "every setpoint is set: {answers:?}"
         );
         assert_eq!(answers.len(), 20);
-        assert_eq!(asked, 0, "reading and handing over allocated {asked} times");
+        assert_eq!(
+            asked, 0,
+            "reading and handing over allocated {asked} times"
+        );
         assert_eq!(made, 0, "the passes doing the work allocated {made} times");
     }
 
     /// The shipped thermostat, with its sensors steady, its heaters and the
     /// ground counting what reaches them, and its log in `log_in`: a vehicle
     /// that can be made to pass for ever.
-    fn steady_thermostat(log_in: &Path, delivered: &Tally, start: Instant) -> System {
+    fn steady_thermostat(
+        log_in: &Path,
+        delivered: &Tally,
+        start: Instant,
+    ) -> System {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let mut graph =
-            Graph::load(root.join("tests/manual/thermostat.yaml")).expect("the example reads");
+        let mut graph = Graph::load(root.join("tests/manual/thermostat.yaml"))
+            .expect("the example reads");
         for node in graph.nodes.iter_mut() {
             if node.node_type == "log" {
                 node.attributes.insert(
@@ -2036,7 +2152,10 @@ vehicle:
         System::of_opening(
             &graph,
             start,
-            move |node: &Node, routes: &Routes, abandon: &Abandon| match node.node_type.as_str() {
+            move |node: &Node, routes: &Routes, abandon: &Abandon| match node
+                .node_type
+                .as_str()
+            {
                 "i2c" => Ok(Box::new(Steady {
                     reading: &[0x01, 0x00],
                 }) as Box<dyn Port>),
@@ -2065,18 +2184,25 @@ vehicle:
     #[test]
     fn answering_and_beaconing_allocate_nothing() {
         use tcslibgs::{
-            came_from, Beacon, BeaconPacker, CommandStatus, ConfigDigest, ConfigVersion, HostPort,
-            PingTelemetry, Telemetry,
+            came_from, Beacon, BeaconPacker, CommandStatus, ConfigDigest,
+            ConfigVersion, HostPort, PingTelemetry, Telemetry,
         };
 
         let stated = HostPort {
             address: "127.0.0.1".to_string(),
             port: 4000,
         };
-        let from: std::net::SocketAddr = "127.0.0.1:4000".parse().expect("an address");
-        let stranger: std::net::SocketAddr = "10.0.0.1:4000".parse().expect("an address");
-        let beacon = Beacon::new(7, ConfigVersion::of_this_build(), ConfigDigest([0x5a; 16]));
-        let answer = Telemetry::Ping(PingTelemetry::new(3, CommandStatus::Success));
+        let from: std::net::SocketAddr =
+            "127.0.0.1:4000".parse().expect("an address");
+        let stranger: std::net::SocketAddr =
+            "10.0.0.1:4000".parse().expect("an address");
+        let beacon = Beacon::new(
+            7,
+            ConfigVersion::of_this_build(),
+            ConfigDigest([0x5a; 16]),
+        );
+        let answer =
+            Telemetry::Ping(PingTelemetry::new(3, CommandStatus::Success));
         // Made once, as each thread makes its own.
         let mut data: Vec<u8> = Vec::with_capacity(1024);
         let mut packer = BeaconPacker::new();
@@ -2086,7 +2212,8 @@ vehicle:
                 assert!(came_from(&stated, &from));
                 assert!(!came_from(&stated, &stranger));
                 data.clear();
-                serde_json::to_writer(&mut data, &answer).expect("it is written");
+                serde_json::to_writer(&mut data, &answer)
+                    .expect("it is written");
                 assert!(!packer.pack(&beacon).is_empty());
             }
         });
@@ -2127,12 +2254,15 @@ vehicle:
             .lock()
             .expect("the record")
             .iter()
-            .map(
-                |datum| match crate::node::vehicle::compute::from_value(datum, "the ground") {
+            .map(|datum| {
+                match crate::node::vehicle::compute::from_value(
+                    datum,
+                    "the ground",
+                ) {
                     Ok(number) => format!("{number}"),
                     Err(_) => String::from_utf8_lossy(datum).to_string(),
-                },
-            )
+                }
+            })
             .collect();
         // The three readings, the one temperature voted out of them, and the
         // decision. The vote is 289.15 and not the mean's 288.5396: sorted,
@@ -2166,7 +2296,8 @@ vehicle:
         );
         assert!(
             vehicle.telemetry.lock().expect("the record").is_empty(),
-            "the sensors are drawn into their conversions, and report only through them"
+            "the sensors are drawn into their conversions, and report only \
+             through them"
         );
 
         // And the log holds the pass: one segment file with something in it,
@@ -2187,8 +2318,8 @@ vehicle:
     #[test]
     fn an_undrawn_payload_reports_over_its_own_link() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let graph =
-            Graph::load(root.join("examples/minimal/minimal.yaml")).expect("the example reads");
+        let graph = Graph::load(root.join("examples/minimal/minimal.yaml"))
+            .expect("the example reads");
 
         let sent = kept();
         let mut system = System::of_opening(
@@ -2196,7 +2327,9 @@ vehicle:
             Instant::now(),
             |_node: &Node, _routes: &Routes, _: &Abandon| {
                 Ok(Box::new(Sensor {
-                    readings: Arc::new(TestLock::new(vec![b"reading 1".to_vec()])),
+                    readings: Arc::new(TestLock::new(vec![
+                        b"reading 1".to_vec()
+                    ])),
                 }) as Box<dyn Port>)
             },
             |link: &Telemetered| {
@@ -2208,7 +2341,11 @@ vehicle:
         )
         .expect("the example opens");
 
-        assert_eq!(system.polled(), ["sensor"], "it is read, being in no group");
+        assert_eq!(
+            system.polled(),
+            ["sensor"],
+            "it is read, being in no group"
+        );
         let moved = system.pass(Instant::now());
         assert!(moved.all_delivered(), "{:?}", moved.refused);
         assert_eq!(
@@ -2230,8 +2367,8 @@ vehicle:
         std::fs::write(
             &path,
             "moc:\n\
-             \x20 - { name: ground, type: moc, address: 127.0.0.1, port: \"5000\", \
-             ground_base: \"127.0.0.1:5100\", moc-out: pinger }\n\
+             \x20 - { name: ground, type: moc, address: 127.0.0.1, port: \
+             \"5000\", ground_base: \"127.0.0.1:5100\", moc-out: pinger }\n\
              vehicle:\n\
              \x20 - { name: pinger, type: ping, payload-out: ground }\n",
         )
@@ -2277,7 +2414,8 @@ vehicle:
         assert!(moved.all_delivered(), "{:?}", moved.refused);
         let answers = sent.lock().expect("the record").clone();
         assert_eq!(answers.len(), 1, "{answers:?}");
-        let pong = tcslibgs::node::vehicle::ping::read_reply(&answers[0]).expect("an answer");
+        let pong = tcslibgs::node::vehicle::ping::read_reply(&answers[0])
+            .expect("an answer");
         assert_eq!(pong.ping.count, 1);
         assert!(answers[0].starts_with(b"ping #1 1760900000.000000001 "));
 
@@ -2310,7 +2448,8 @@ vehicle:
         // And what the loop waits for is the rest of the interval.
         let waiting = vehicle.system.until_next_pass(soon);
         assert!(
-            waiting > Duration::from_millis(50) && waiting <= Duration::from_millis(70),
+            waiting > Duration::from_millis(50)
+                && waiting <= Duration::from_millis(70),
             "{waiting:?} is not the rest of a tenth of a second"
         );
     }
@@ -2334,8 +2473,8 @@ vehicle:
         assert_eq!(
             vehicle.system.holds(),
             17,
-            "twelve nodes in the example, and a link to the ground for each of the five \
-             nodes drawn into its moc node"
+            "twelve nodes in the example, and a link to the ground for each of \
+             the five nodes drawn into its moc node"
         );
     }
 
@@ -2364,21 +2503,29 @@ vehicle:
     #[test]
     fn a_vehicle_starts_only_if_everything_opens() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let graph =
-            Graph::load(root.join("tests/manual/thermostat.yaml")).expect("the example reads");
+        let graph = Graph::load(root.join("tests/manual/thermostat.yaml"))
+            .expect("the example reads");
 
         let refused = System::of_opening(
             &graph,
             Instant::now(),
             |node, routes, abandon| {
                 if node.node_type == "i2c" {
-                    return Err(format!("{}: /dev/i2c-1 is not there", node.name));
+                    return Err(format!(
+                        "{}: /dev/i2c-1 is not there",
+                        node.name
+                    ));
                 }
                 if node.node_type == "log" {
-                    return Err(format!("{}: /var/log/tcspecial is not there", node.name));
+                    return Err(format!(
+                        "{}: /var/log/tcspecial is not there",
+                        node.name
+                    ));
                 }
                 match node.node_type.as_str() {
-                    "spi" | "gpio" | "moc" => Ok(Box::new(Ground::default()) as Box<dyn Port>),
+                    "spi" | "gpio" | "moc" => {
+                        Ok(Box::new(Ground::default()) as Box<dyn Port>)
+                    }
                     _ => open(node, routes, abandon, &SegSend::none()),
                 }
             },
@@ -2399,8 +2546,8 @@ vehicle:
     #[test]
     fn a_configuration_can_be_described_without_a_vehicle() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let graph =
-            Graph::load(root.join("tests/manual/thermostat.yaml")).expect("the example reads");
+        let graph = Graph::load(root.join("tests/manual/thermostat.yaml"))
+            .expect("the example reads");
 
         let described = described(&graph);
         assert_eq!(described["temp_1"], "i2c, read");
@@ -2530,7 +2677,8 @@ vehicle:
         // suite beside it takes longer -- which is a loaded machine and not a
         // loop that failed to wait.
         assert!(
-            waits.get() > Duration::ZERO && waits.get() <= Duration::from_millis(100),
+            waits.get() > Duration::ZERO
+                && waits.get() <= Duration::from_millis(100),
             "the loop should have waited for the next group: {:?}",
             waits.get()
         );

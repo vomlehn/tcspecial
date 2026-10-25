@@ -19,8 +19,9 @@ A beacon is not a request and is not answered, so the only thing that ever
 happens is that one fails to arrive. How long ago the last one was is
 therefore the whole of the state, and what a ground station shows is how that
 age has grown, through four stages: Unheard, Heard, Aging and Waiting -- see
-:meth:`Stage.label`. :class:`Schedule` is those stages and how long each lasts, with no colours in it -- a stage is what
-is true, and which colour says so is the window's business.
+:meth:`Stage.label`. :class:`Schedule` is those stages and how long each
+lasts, with no colours in it -- a stage is what is true, and which colour says
+so is the window's business.
 
 The stages also decide how long to wait on the socket. A station whose
 indicator blinks has to wake up to blink it even when nothing arrives, so
@@ -359,8 +360,8 @@ def differs(theirs, ours):
     if theirs == ours:
         return None
     return (
-        f"CONFIGURATION DIFFERS: tcspecial is serving md5 {theirs}, and this MOC "
-        f"read md5 {ours}"
+        f"CONFIGURATION DIFFERS: tcspecial is serving md5 {theirs}, and this "
+        f"MOC read md5 {ours}"
     )
 
 
@@ -372,7 +373,11 @@ def message_of(datagram):
         return what_it_read(beacon["version"], beacon["digest"])
     text = datagram.decode("utf-8", errors="replace")
     head = text[:40]
-    return f"unreadable: {head}..." if len(head) < len(text) else f"unreadable: {head}"
+    return (
+        f"unreadable: {head}..."
+        if len(head) < len(text)
+        else f"unreadable: {head}"
+    )
 
 
 class Counted(enum.Enum):
@@ -472,7 +477,9 @@ class Beacons:
         """
         waiting = self._schedule.after(self._at, self._clock())
         try:
-            self._socket.settimeout(None if waiting.until is None else waiting.until / SECOND)
+            self._socket.settimeout(
+                None if waiting.until is None else waiting.until / SECOND
+            )
         except OSError:
             return self.after(Arrived.BROKEN, [])
 
@@ -495,8 +502,8 @@ class Beacons:
             if self._stranger != sender:
                 warnings.append(
                     f"a beacon came from {sender[0]}:{sender[1]} and not from "
-                    f"{self._link.send}, which is where the configuration says they "
-                    "come from -- ignored"
+                    f"{self._link.send}, which is where the configuration says "
+                    "they come from -- ignored"
                 )
                 self._stranger = sender
             return self.after(Arrived.NOTHING, remarks, warnings=warnings)
@@ -508,7 +515,10 @@ class Beacons:
             remarks.append(
                 heard.differs
                 if heard.differs is not None
-                else "tcspecial is serving the configuration this MOC read again"
+                else (
+                    "tcspecial is serving the configuration this MOC read "
+                    "again"
+                )
             )
             self._differed = heard.differs is not None
 
@@ -516,13 +526,13 @@ class Beacons:
             kind, missed = counted(self._sequence, heard.sequence)
             if kind is Counted.MISSED:
                 remarks.append(
-                    f"{missed} beacon{'' if missed == 1 else 's'} did not arrive: "
-                    f"#{heard.sequence} came after #{self._sequence}"
+                    f"{missed} beacon{'' if missed == 1 else 's'} did not "
+                    f"arrive: #{heard.sequence} came after #{self._sequence}"
                 )
             elif kind is Counted.RESTARTED:
                 remarks.append(
-                    f"the beacons start again at #{heard.sequence}, so tcspecial "
-                    "has restarted"
+                    f"the beacons start again at #{heard.sequence}, so "
+                    "tcspecial has restarted"
                 )
             self._sequence = heard.sequence
 
@@ -536,7 +546,11 @@ class Beacons:
         if arrived is Arrived.BEACON:
             self._at = now
             self._said = message
-        showing = UNHEARD if arrived is Arrived.BROKEN else self._schedule.after(self._at, now)
+        showing = (
+            UNHEARD
+            if arrived is Arrived.BROKEN
+            else self._schedule.after(self._at, now)
+        )
         return Pass(
             arrived=arrived,
             showing=showing,

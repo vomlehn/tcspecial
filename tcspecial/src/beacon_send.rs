@@ -88,9 +88,9 @@ impl BeaconSend {
         // or firewalled by a rule somebody could write down beforehand.
         let socket = UdpSocket::bind(from_addr.to_string()).map_err(|e| {
             tcslibgs::TcsError::Config(format!(
-                "beacons cannot be sent from {from_addr} ({e}): change beacon.send \
-                 in the configuration's tcspecial section to an address this \
-                 machine has and a port nothing else is using"
+                "beacons cannot be sent from {from_addr} ({e}): change \
+                 beacon.send in the configuration's tcspecial section to an \
+                 address this machine has and a port nothing else is using"
             ))
         })?;
 
@@ -99,9 +99,10 @@ impl BeaconSend {
         // allocates, and the destination does not move.
         let unresolved = || {
             tcslibgs::TcsError::Config(format!(
-                "beacons cannot be sent to {dest_addr}, which does not resolve to \
-                 an address: change beacon.recv in the configuration's tcspecial \
-                 section to the address the ground listens for beacons on"
+                "beacons cannot be sent to {dest_addr}, which does not resolve \
+                 to an address: change beacon.recv in the configuration's \
+                 tcspecial section to the address the ground listens for \
+                 beacons on"
             ))
         };
         let dest: SocketAddr = (dest_addr.address.as_str(), dest_addr.port)
@@ -158,7 +159,8 @@ impl BeaconSend {
                     .duration_since(SystemTime::now())
                     .unwrap_or(Duration::from_millis(1));
 
-                let (guard, result) = self.pair.cvar.wait_timeout(expiration, timeout).unwrap();
+                let (guard, result) =
+                    self.pair.cvar.wait_timeout(expiration, timeout).unwrap();
                 expiration = guard;
 
                 if result.timed_out() {
@@ -186,8 +188,10 @@ impl BeaconSend {
     ) -> TcsResult<()> {
         // From one: the first beacon is the first beacon, and nought is what
         // every beacon used to carry.
-        let sequence = self.sent.fetch_add(1, Ordering::Relaxed).wrapping_add(1);
-        let data = packer.pack(&Beacon::new(sequence, self.version, self.digest));
+        let sequence =
+            self.sent.fetch_add(1, Ordering::Relaxed).wrapping_add(1);
+        let data =
+            packer.pack(&Beacon::new(sequence, self.version, self.digest));
         trace!("send_beacon: sending to {dest}");
         // Recorded before it is sent, as a command response is, so that a
         // beacon the send fails on is still known to have been produced.
@@ -279,7 +283,8 @@ mod tests {
     /// fail whenever something else on the machine held it.
     #[test]
     fn the_beacons_are_numbered_in_order_from_one() {
-        let ground = std::net::UdpSocket::bind("127.0.0.1:0").expect("a ground socket");
+        let ground =
+            std::net::UdpSocket::bind("127.0.0.1:0").expect("a ground socket");
         ground
             .set_read_timeout(Some(Duration::from_secs(5)))
             .expect("a timeout");
@@ -356,7 +361,11 @@ mod tests {
             let (size, _) = loop {
                 match ground.recv_from(&mut buffer) {
                     Ok(got) => break got,
-                    Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                    Err(ref e)
+                        if e.kind() == std::io::ErrorKind::Interrupted =>
+                    {
+                        continue
+                    }
                     Err(e) => panic!("a beacon: {e}"),
                 }
             };

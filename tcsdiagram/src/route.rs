@@ -160,9 +160,9 @@ impl Obstacle {
 /// next one's left edge, so "out, across, in" meant one thing and the
 /// arrowhead always pointed right. Now a link leaves the terminal it is
 /// attached to -- and the vehicleward stream leaves a node's *left* side, on
-/// its way from the ground link to a payload drawn further left -- so the way out of the source
-/// and the way into the target are two separate facts, and neither of them is
-/// always right.
+/// its way from the ground link to a payload drawn further left -- so the way
+/// out of the source and the way into the target are two separate facts, and
+/// neither of them is always right.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Ends {
     /// Where the line starts: a point on the source's edge.
@@ -194,7 +194,12 @@ impl Ends {
     }
 
     /// Both ends as the terminals put them.
-    pub fn new(from: (f32, f32), to: (f32, f32), leaves_right: bool, arrives_right: bool) -> Ends {
+    pub fn new(
+        from: (f32, f32),
+        to: (f32, f32),
+        leaves_right: bool,
+        arrives_right: bool,
+    ) -> Ends {
         Ends {
             from,
             to,
@@ -271,7 +276,11 @@ pub fn route(ends: Ends, around: &[Obstacle]) -> String {
 /// `taken` is every route already drawn on this canvas, in the order they were
 /// drawn. A link is routed against them so that no two lines run along the
 /// same track -- see [`shared`].
-pub fn lay(ends: Ends, around: &[Obstacle], taken: &[Vec<(f32, f32)>]) -> Vec<(f32, f32)> {
+pub fn lay(
+    ends: Ends,
+    around: &[Obstacle],
+    taken: &[Vec<(f32, f32)>],
+) -> Vec<(f32, f32)> {
     way(ends, around, taken)
 }
 
@@ -457,7 +466,11 @@ pub fn runs_through(ends: Ends, around: &[Obstacle]) -> usize {
 /// visible; bends before length because the lengths of two orthogonal routes
 /// between one pair of points are usually equal, and of two equal routes the
 /// one with fewer turns is the one that can be followed.
-fn way(ends: Ends, around: &[Obstacle], taken: &[Vec<(f32, f32)>]) -> Vec<(f32, f32)> {
+fn way(
+    ends: Ends,
+    around: &[Obstacle],
+    taken: &[Vec<(f32, f32)>],
+) -> Vec<(f32, f32)> {
     let boxes = blocking(around, ends.from, ends.to);
     let mut best: Option<Weighed> = None;
 
@@ -683,7 +696,10 @@ fn blocking(around: &[Obstacle], from: (f32, f32), to: (f32, f32)) -> Vec<Box> {
 
 /// Whether a point is on or inside a node.
 fn holds(b: &Obstacle, (x, y): (f32, f32)) -> bool {
-    x >= b.x - 0.5 && x <= b.x + b.width + 0.5 && y >= b.y - 0.5 && y <= b.y + b.height + 0.5
+    x >= b.x - 0.5
+        && x <= b.x + b.width + 0.5
+        && y >= b.y - 0.5
+        && y <= b.y + b.height + 0.5
 }
 
 /// The same tracks, and then a lane either side of each, and a second beyond
@@ -692,9 +708,9 @@ fn holds(b: &Obstacle, (x, y): (f32, f32)) -> bool {
 /// The tracks themselves first, so a route still prefers the middle of the gap
 /// or the side of a node; the lanes after, in the order a route should try
 /// them -- one lane out either way, then two, and so on to four. Four a side
-/// is eight millimetres, thirty pixels, which is as far as a line can be moved and still
-/// read as the line between those two nodes; a ninth line through one gap is a
-/// diagram with something else wrong with it.
+/// is eight millimetres, thirty pixels, which is as far as a line can be
+/// moved and still read as the line between those two nodes; a ninth line
+/// through one gap is a diagram with something else wrong with it.
 fn laned(tracks: Vec<f32>) -> Vec<f32> {
     let mut out = tracks.clone();
     for step in [
@@ -735,7 +751,12 @@ pub fn shared(points: &[(f32, f32)], taken: &[Vec<(f32, f32)>]) -> u32 {
 }
 
 /// How far two segments run along one another, in pixels.
-fn together(a1: (f32, f32), a2: (f32, f32), b1: (f32, f32), b2: (f32, f32)) -> f32 {
+fn together(
+    a1: (f32, f32),
+    a2: (f32, f32),
+    b1: (f32, f32),
+    b2: (f32, f32),
+) -> f32 {
     let flat = |p: (f32, f32), q: (f32, f32)| (p.1 - q.1).abs() < 0.5;
     let upright = |p: (f32, f32), q: (f32, f32)| (p.0 - q.0).abs() < 0.5;
     let run = |lo1: f32, hi1: f32, lo2: f32, hi2: f32| {
@@ -778,7 +799,11 @@ fn crossings(points: &[(f32, f32)], boxes: &[Box]) -> usize {
 ///
 /// Open on every side on purpose: a segment along a box's edge touches it and
 /// does not cross it, which is exactly what a line leaving its own node does.
-fn crosses(from: (f32, f32), to: (f32, f32), (bx1, by1, bx2, by2): Box) -> bool {
+fn crosses(
+    from: (f32, f32),
+    to: (f32, f32),
+    (bx1, by1, bx2, by2): Box,
+) -> bool {
     let (x1, x2) = (from.0.min(to.0), from.0.max(to.0));
     let (y1, y2) = (from.1.min(to.1), from.1.max(to.1));
     x1 < bx2 && bx1 < x2 && y1 < by2 && by1 < y2
@@ -1056,7 +1081,9 @@ mod tests {
 
         // And within a pixel of level, which is where two nodes of the same
         // height but different sizes land.
-        assert!(!route(Ends::forward(0.0, 64.0, 240.0, 64.4), &[]).contains('Q'));
+        assert!(
+            !route(Ends::forward(0.0, 64.0, 240.0, 64.4), &[]).contains('Q')
+        );
     }
 
     /// A route that turns does so at right angles.
@@ -1083,8 +1110,10 @@ mod tests {
             for pair in route_.windows(2) {
                 let (from, to) = (pair[0], pair[1]);
                 assert!(
-                    (to.0 - from.0).abs() < 0.05 || (to.1 - from.1).abs() < 0.05,
-                    "the segment from {from:?} to {to:?} is a diagonal: {route_:?}"
+                    (to.0 - from.0).abs() < 0.05
+                        || (to.1 - from.1).abs() < 0.05,
+                    "the segment from {from:?} to {to:?} is a diagonal: \
+                     {route_:?}"
                 );
             }
             assert!(
@@ -1170,7 +1199,8 @@ mod tests {
 
         // From the payload's right edge back round to the ground station's
         // left edge, which is the shape of every telemetry link.
-        let route_ = way(Ends::forward(896.0, 188.0, 24.0, 104.0), &around, &[]);
+        let route_ =
+            way(Ends::forward(896.0, 188.0, 24.0, 104.0), &around, &[]);
         assert!(
             !through(&route_, &payload),
             "the line runs back through its own source: {route_:?}"
@@ -1190,7 +1220,8 @@ mod tests {
     fn a_line_keeps_off_a_node_it_passes() {
         let passed = node(300.0, 100.0);
         let around = [node(40.0, 40.0), passed, node(600.0, 300.0)];
-        let route_ = way(Ends::forward(192.0, 68.0, 600.0, 328.0), &around, &[]);
+        let route_ =
+            way(Ends::forward(192.0, 68.0, 600.0, 328.0), &around, &[]);
 
         let kept = (
             passed.x - CLEAR,
@@ -1200,7 +1231,8 @@ mod tests {
         );
         assert!(
             !route_.windows(2).any(|s| crosses(s[0], s[1], kept)),
-            "the line comes within {CLEAR} pixels of a node it passes: {route_:?}"
+            "the line comes within {CLEAR} pixels of a node it passes: \
+             {route_:?}"
         );
     }
 
@@ -1247,7 +1279,8 @@ mod tests {
     /// its ends, which are where its terminals put them.
     #[test]
     fn a_routes_runs_are_on_the_millimetre_grid() {
-        let on_grid = |v: f32| crate::pane::is_on_grid(v as i32) && v.fract() == 0.0;
+        let on_grid =
+            |v: f32| crate::pane::is_on_grid(v as i32) && v.fract() == 0.0;
         let around = [node(300.0, 120.0), node(300.0, 200.0)];
         for ends in [
             Ends::forward(192.0, 68.0, 600.0, 328.0),
@@ -1259,13 +1292,19 @@ mod tests {
             for pair in route_.windows(2) {
                 let ((x1, y1), (x2, y2)) = (pair[0], pair[1]);
                 let at_an_end = |p: (f32, f32)| p == ends.from || p == ends.to;
-                if (x1 - x2).abs() < 0.5 && !at_an_end(pair[0]) && !at_an_end(pair[1]) {
+                if (x1 - x2).abs() < 0.5
+                    && !at_an_end(pair[0])
+                    && !at_an_end(pair[1])
+                {
                     assert!(on_grid(x1), "a vertical run at {x1}: {route_:?}");
                 }
-                let level_with_an_end =
-                    (y1 - ends.from.1).abs() < 0.5 || (y1 - ends.to.1).abs() < 0.5;
+                let level_with_an_end = (y1 - ends.from.1).abs() < 0.5
+                    || (y1 - ends.to.1).abs() < 0.5;
                 if (y1 - y2).abs() < 0.5 && !level_with_an_end {
-                    assert!(on_grid(y1), "a horizontal run at {y1}: {route_:?}");
+                    assert!(
+                        on_grid(y1),
+                        "a horizontal run at {y1}: {route_:?}"
+                    );
                 }
             }
         }
@@ -1301,12 +1340,14 @@ mod tests {
     /// The vehicleward stream, which is what terminals made necessary: it
     /// leaves a node's left side and arrives at the next one's right side, and
     /// the next one is drawn further left -- the ground link being the
-    /// rightmost working pane and the payloads the leftmost. Every piece of the route has to turn around for
-    /// it: the stub, the straight run, the arrowhead.
+    /// rightmost working pane and the payloads the leftmost. Every piece of
+    /// the route has to turn around for it: the stub, the straight run, the
+    /// arrowhead.
     #[test]
     fn a_leftward_link_runs_leftward() {
-        let leftward =
-            |x1: f32, y1: f32, x2: f32, y2: f32| Ends::new((x1, y1), (x2, y2), false, false);
+        let leftward = |x1: f32, y1: f32, x2: f32, y2: f32| {
+            Ends::new((x1, y1), (x2, y2), false, false)
+        };
 
         // Level and clear: one straight line, as the forward case is.
         assert_eq!(
@@ -1441,8 +1482,10 @@ mod tests {
 
         let on_the_line = |(x, y): (f32, f32)| {
             route_.windows(2).any(|s| {
-                let (lo, hi) = (s[0].0.min(s[1].0) - 0.5, s[0].0.max(s[1].0) + 0.5);
-                let (top, bottom) = (s[0].1.min(s[1].1) - 0.5, s[0].1.max(s[1].1) + 0.5);
+                let (lo, hi) =
+                    (s[0].0.min(s[1].0) - 0.5, s[0].0.max(s[1].0) + 0.5);
+                let (top, bottom) =
+                    (s[0].1.min(s[1].1) - 0.5, s[0].1.max(s[1].1) + 0.5);
                 (lo..=hi).contains(&x) && (top..=bottom).contains(&y)
             })
         };

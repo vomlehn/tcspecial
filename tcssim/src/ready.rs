@@ -13,7 +13,9 @@ use std::net::{SocketAddr, UdpSocket};
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 
-use tcslibgs::ready::{Answer, Reason, Request, SetUpFor, State, ANSWER_BYTES, REQUEST_BYTES};
+use tcslibgs::ready::{
+    Answer, Reason, Request, SetUpFor, State, ANSWER_BYTES, REQUEST_BYTES,
+};
 
 const MAKING: u8 = 0;
 const MADE: u8 = 1;
@@ -35,9 +37,12 @@ impl Standing {
         // A stand-in that failed stays failed: a later success is a retry
         // nothing here makes, and the answer must not go back to ready over
         // a failure nobody has seen.
-        let _ = self
-            .state
-            .compare_exchange(MAKING, MADE, Ordering::SeqCst, Ordering::SeqCst);
+        let _ = self.state.compare_exchange(
+            MAKING,
+            MADE,
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        );
     }
 
     /// It could not be made, or it has stopped, and why.
@@ -73,7 +78,8 @@ impl Readiness {
     /// The state now: failed if any stand-in failed, ready if every one is
     /// made, and starting otherwise.
     fn now(&self) -> (State, Reason) {
-        if let Some(failed) = self.payloads.iter().find(|p| p.state() == FAILED) {
+        if let Some(failed) = self.payloads.iter().find(|p| p.state() == FAILED)
+        {
             return (State::Failed, failed.reason());
         }
         if self.payloads.iter().all(|p| p.state() == MADE) {
@@ -90,9 +96,9 @@ pub fn bind(at: SocketAddr) -> Result<UdpSocket, String> {
     UdpSocket::bind(at).map_err(|e| {
         if e.kind() == std::io::ErrorKind::AddrInUse {
             format!(
-                "tcssim.ready, {at}, is already taken -- most likely by a tcssim left \
-                 running from an earlier run: stop that one, or give this simulator \
-                 file a tcssim.ready no other run uses"
+                "tcssim.ready, {at}, is already taken -- most likely by a \
+                 tcssim left running from an earlier run: stop that one, or \
+                 give this simulator file a tcssim.ready no other run uses"
             )
         } else {
             format!("tcssim.ready, {at}, cannot be bound: {e}")

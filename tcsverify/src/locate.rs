@@ -235,8 +235,8 @@ fn xml(text: &str) -> Where {
         }
         depth += 1;
 
-        // `<name>DH0</name>`, which is how a tcspecial configuration written in XML
-        // says which payload this is.
+        // `<name>DH0</name>`, which is how a tcspecial configuration written in
+        // XML says which payload this is.
         if element == "name" {
             if let Some(close) = rest.find("</") {
                 found.note(&section, rest[..close].trim(), opened_on);
@@ -324,7 +324,8 @@ payloads:
     /// the same line.
     #[test]
     fn a_name_is_looked_for_in_the_section_it_belongs_to() {
-        let text = "payload_groups:\n  - name: alike\npayloads:\n  - name: alike\n";
+        let text =
+            "payload_groups:\n  - name: alike\npayloads:\n  - name: alike\n";
         let found = Where::of(text, ConfigFormat::Yaml);
         assert_eq!(found.line_of(&About::NodeGroup("alike".to_string())), 2);
         assert_eq!(found.line_of(&About::Node("alike".to_string())), 4);
@@ -447,7 +448,8 @@ simulated_payloads:
     /// nowhere.
     #[test]
     fn the_root_is_not_a_section() {
-        let text = "<payload-configuration><payloads><name>DH0</name></payloads>\
+        let text =
+            "<payload-configuration><payloads><name>DH0</name></payloads>\
                     </payload-configuration>\n";
         let found = Where::of(text, ConfigFormat::Xml);
         assert_eq!(found.line_of(&About::Node("DH0".to_string())), 1);

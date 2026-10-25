@@ -204,9 +204,9 @@ part, with no window. The Rust crate beside them is the tests that hold the
 Python to the Rust; `cargo test` runs them.
 
 ```
-make run-ping                                   # the vehicle and the window
-python3 examples/ping/ping_moc.py --pings 3     # no window: three pings, printed
-python3 examples/ping/ping_moc.py --yaml        # ping.yaml rather than ping.xml
+make run-ping                               # the vehicle and the window
+python3 examples/ping/ping_moc.py --pings 3 # no window: three pings, printed
+python3 examples/ping/ping_moc.py --yaml    # ping.yaml rather than ping.xml
 ```
 
 `ping_moc.py` starts the vehicle itself: tcspecial from the build, on the same
@@ -313,7 +313,7 @@ terminals instead, in either order:
 
 ```
 cargo build                     # lorem_moc and tcspecial
-cargo run --bin lorem_moc       # in one terminal: the ground (--xml for the XML)
+cargo run --bin lorem_moc       # in one terminal: the ground (--xml for XML)
 cargo run --bin tcspecial -- examples/simple-app/simple-app.yaml   # in another
 ```
 

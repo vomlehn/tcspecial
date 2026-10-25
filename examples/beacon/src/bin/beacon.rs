@@ -42,7 +42,9 @@ use std::time::Duration;
 
 use slint::ComponentHandle;
 
-use beacon_example::{notice_exit, prepare, show_on, wire, Vehicle, WatchWindow};
+use beacon_example::{
+    notice_exit, prepare, show_on, wire, Vehicle, WatchWindow,
+};
 use tcslib::beacon::{Beacons, Schedule, STANDARD_INTERVAL};
 use tcslibgs::config_digest::digest_of_file;
 use tcslibgs::graph::parameters::{beacon_interval_of, beacon_of};
@@ -78,8 +80,8 @@ impl Arguments {
                 "-v" | "--verbose" => verbose = true,
                 flag if flag.starts_with('-') => {
                     return Err(format!(
-                        "{flag} is not an option: the options are --yaml, --xml, -v \
-                         and --verbose"
+                        "{flag} is not an option: the options are --yaml, \
+                         --xml, -v and --verbose"
                     ))
                 }
                 _ if path.is_some() => {
@@ -98,14 +100,18 @@ impl Arguments {
 }
 
 fn main() -> Result<(), slint::PlatformError> {
-    let Arguments { path, verbose } = match Arguments::of(std::env::args().skip(1)) {
-        Ok(arguments) => arguments,
-        Err(why) => {
-            eprintln!("{why}");
-            eprintln!("usage: beacon [--yaml | --xml] [-v | --verbose] [configuration]");
-            std::process::exit(2);
-        }
-    };
+    let Arguments { path, verbose } =
+        match Arguments::of(std::env::args().skip(1)) {
+            Ok(arguments) => arguments,
+            Err(why) => {
+                eprintln!("{why}");
+                eprintln!(
+                    "usage: beacon [--yaml | --xml] [-v | --verbose] \
+                 [configuration]"
+                );
+                std::process::exit(2);
+            }
+        };
 
     let graph = match Graph::load(&path) {
         Ok(graph) => graph,
@@ -122,8 +128,9 @@ fn main() -> Result<(), slint::PlatformError> {
         Ok(Some(link)) => link,
         Ok(None) => {
             eprintln!(
-                "{path} has no tcspecial section, so it says nothing about where its \
-                 beacons go -- and a configuration with no section sends none"
+                "{path} has no tcspecial section, so it says nothing about \
+                 where its beacons go -- and a configuration with no section \
+                 sends none"
             );
             std::process::exit(1);
         }
@@ -142,7 +149,10 @@ fn main() -> Result<(), slint::PlatformError> {
     let expected = match digest_of_file(&path) {
         Ok(digest) => Some(digest),
         Err(why) => {
-            eprintln!("{path} cannot be digested, so no beacon's digest is checked: {why}");
+            eprintln!(
+                "{path} cannot be digested, so no beacon's digest is \
+                 checked: {why}"
+            );
             None
         }
     };

@@ -63,8 +63,8 @@ use document::{Document, Fault};
 use editor::Editor;
 use journal::{Edit, Link};
 use pane::{
-    confine, dividers_for, edges_of, is_payload, pane_of, percents_for, size_of, Dividers, Pane,
-    WORKING_WIDTH,
+    confine, dividers_for, edges_of, is_payload, pane_of, percents_for,
+    size_of, Dividers, Pane, WORKING_WIDTH,
 };
 use style::NodeType;
 use subdiagram::{Home, Qualified};
@@ -92,12 +92,18 @@ slint::include_modules!();
 /// A node already on the wrong side of a divider holds nothing: it is a node a
 /// file put there, it comes home when it is next dragged, and letting it pin
 /// the divider would mean one such node froze the control.
-fn divider_range(document: &Document, dividers: Dividers, which: Pane) -> (i32, i32) {
+fn divider_range(
+    document: &Document,
+    dividers: Dividers,
+    which: Pane,
+) -> (i32, i32) {
     // Which panes this divider is between, and the room its neighbours keep.
     let step = WORKING_WIDTH * settings::LEAST / 100;
     let (left, right, mut low, mut high) = match which {
         // The payload divider: between the payload pane and the vehicle's.
-        Pane::Payloads => (Pane::Payloads, Pane::Vehicle, step, dividers.vehicle - step),
+        Pane::Payloads => {
+            (Pane::Payloads, Pane::Vehicle, step, dividers.vehicle - step)
+        }
         // And the vehicle divider, between the vehicle's and the moc pane.
         _ => (
             Pane::Vehicle,
@@ -519,7 +525,9 @@ macro_rules! furnish {
 /// starting with a dash is refused rather than taken for a file name: a
 /// mistyped flag would otherwise be a configuration created under that name.
 /// More than two files is refused too, there being nothing for a third to be.
-fn command_line(words: impl Iterator<Item = String>) -> Result<(Vec<String>, bool), String> {
+fn command_line(
+    words: impl Iterator<Item = String>,
+) -> Result<(Vec<String>, bool), String> {
     let mut files = Vec::new();
     let mut read_only = false;
     for word in words {
@@ -533,7 +541,8 @@ fn command_line(words: impl Iterator<Item = String>) -> Result<(Vec<String>, boo
     }
     if files.len() > 2 {
         return Err(format!(
-            "{} files were named, and tcsgui takes a configuration and a simulator file",
+            "{} files were named, and tcsgui takes a configuration and a \
+             simulator file",
             files.len()
         ));
     }
@@ -541,14 +550,16 @@ fn command_line(words: impl Iterator<Item = String>) -> Result<(Vec<String>, boo
 }
 
 /// What is said when the command line is not one tcsgui takes.
-const USAGE: &str = "usage: tcsgui [-r | --read-only] <configuration file> [<simulator file>]";
+const USAGE: &str =
+    "usage: tcsgui [-r | --read-only] <configuration file> [<simulator file>]";
 
 fn main() -> Result<(), slint::PlatformError> {
     // The flags, wherever they are, and the files in the order given. One
     // flag: `-r`, `--read-only` or `--readonly`, a session that shows a
     // configuration and changes nothing -- see `Editor::set_read_only` and
     // `command_line`.
-    let (files, read_only_asked) = match command_line(std::env::args().skip(1)) {
+    let (files, read_only_asked) = match command_line(std::env::args().skip(1))
+    {
         Ok(said) => said,
         Err(why) => {
             eprintln!("tcsgui: {why}");
@@ -562,13 +573,14 @@ fn main() -> Result<(), slint::PlatformError> {
     let path = files.next().unwrap_or_else(|| {
         eprintln!("tcsgui: {USAGE}");
         eprintln!(
-            "tcsgui: the file need not exist yet; it is written as edits are made, \
-             and its history is kept beside it"
+            "tcsgui: the file need not exist yet; it is written as edits are \
+             made, and its history is kept beside it"
         );
         eprintln!(
-            "tcsgui: a second file is the simulator's own configuration -- how fast \
-             a simulated payload sends and what it does wrong -- and is edited from \
-             the menu. It is written as YAML, so its name has to end in \".yaml\""
+            "tcsgui: a second file is the simulator's own configuration -- \
+             how fast a simulated payload sends and what it does wrong -- and \
+             is edited from the menu. It is written as YAML, so its name has \
+             to end in \".yaml\""
         );
         eprintln!(
             "tcsgui: -r, --read-only or --readonly opens the files to look at: \
@@ -671,7 +683,8 @@ fn main() -> Result<(), slint::PlatformError> {
     // Deliberately not in the document: what somebody is looking at is not
     // something the vehicle flies, and an edit for it would make choosing a
     // node undoable, which is not what undo is for.
-    let chosen: Rc<RefCell<BTreeMap<String, String>>> = Rc::new(RefCell::new(BTreeMap::new()));
+    let chosen: Rc<RefCell<BTreeMap<String, String>>> =
+        Rc::new(RefCell::new(BTreeMap::new()));
 
     // Which node a link is being drawn from, while the gesture is running.
     // Nothing is recorded until it finishes on another node, so a drag that
@@ -801,9 +814,11 @@ fn main() -> Result<(), slint::PlatformError> {
                         .borrow()
                         .journal_path()
                         .map(|path| path.display().to_string())
-                        .unwrap_or_else(|| "no history, there being nowhere to \
+                        .unwrap_or_else(|| {
+                            "no history, there being nowhere to \
                                              keep one"
-                            .to_string())
+                                .to_string()
+                        })
                 );
             }
         }
@@ -888,7 +903,8 @@ macro_rules! wiring {
                         // type: a described node is "mean" and not
                         // "compute-3", which is what a reader of the
                         // configuration will be looking for.
-                        let name = fresh_name(editor.document(), &called, &home);
+                        let name =
+                            fresh_name(editor.document(), &called, &home);
                         let at = next_place(
                             editor.document(),
                             &home,
@@ -954,10 +970,11 @@ macro_rules! wiring {
                         // window: the window has been drawing it offset by the
                         // drag, and the edit has to be relative to the
                         // document.
-                        let (was, node_type) = match editor.document().node(&absolute) {
-                            Some(node) => (node.at, node.node_type.clone()),
-                            None => return,
-                        };
+                        let (was, node_type) =
+                            match editor.document().node(&absolute) {
+                                Some(node) => (node.at, node.node_type.clone()),
+                                None => return,
+                            };
                         // Brought back inside its own pane: a payload dragged
                         // left stops at the divider rather than crossing it.
                         // The drag is clamped rather than refused, so pushing
@@ -966,7 +983,10 @@ macro_rules! wiring {
                         let now = confine(
                             &node_type,
                             views.borrow().divider.get(),
-                            snap((was.0 + dx.round() as i32, was.1 + dy.round() as i32)),
+                            snap((
+                                was.0 + dx.round() as i32,
+                                was.1 + dy.round() as i32,
+                            )),
                         );
                         // A press that moved nothing is a click, and a click
                         // on a node is a request to see what it says. Told
@@ -1104,16 +1124,32 @@ macro_rules! wiring {
                 {
                     let editor = editor.clone();
                     let views = views.clone();
-                    window.on_payload_list_divider_moved(move |dy: f32, tall: f32| {
-                        drag_list_divider(&editor, &views, Pane::Payloads, dy, tall);
-                    });
+                    window.on_payload_list_divider_moved(
+                        move |dy: f32, tall: f32| {
+                            drag_list_divider(
+                                &editor,
+                                &views,
+                                Pane::Payloads,
+                                dy,
+                                tall,
+                            );
+                        },
+                    );
                 }
                 {
                     let editor = editor.clone();
                     let views = views.clone();
-                    window.on_vehicle_list_divider_moved(move |dy: f32, tall: f32| {
-                        drag_list_divider(&editor, &views, Pane::Vehicle, dy, tall);
-                    });
+                    window.on_vehicle_list_divider_moved(
+                        move |dy: f32, tall: f32| {
+                            drag_list_divider(
+                                &editor,
+                                &views,
+                                Pane::Vehicle,
+                                dy,
+                                tall,
+                            );
+                        },
+                    );
                 }
             }
             {
@@ -1132,9 +1168,10 @@ macro_rules! wiring {
                     // A terminal with one link on it is a line being picked up
                     // by its end; one with none, or with several, is a line
                     // about to be drawn. See Drawing::holding.
-                    let sink = tcslibgs::graph::terminals::stream_of(&at.terminal)
-                        .map(|(sink, _)| sink)
-                        .unwrap_or(false);
+                    let sink =
+                        tcslibgs::graph::terminals::stream_of(&at.terminal)
+                            .map(|(sink, _)| sink)
+                            .unwrap_or(false);
                     let held = {
                         let editor = editor_for_press.borrow();
                         let theirs = attached(editor.document(), &at, sink);
@@ -1173,7 +1210,11 @@ macro_rules! wiring {
                         .as_ref()
                         .and_then(|from| {
                             let editor = editor_for_motion.borrow();
-                            let anchor = anchored(editor.document(), &home_for_motion, from)?;
+                            let anchor = anchored(
+                                editor.document(),
+                                &home_for_motion,
+                                from,
+                            )?;
                             Some(route::drawing(anchor, (x, y)))
                         })
                         .unwrap_or_default();
@@ -1203,9 +1244,17 @@ macro_rules! wiring {
                         // drawn: two gestures that look the same and do
                         // different things.
                         let what = match &from.holding {
-                            Some(held) => dropped(editor.document(), &home, held, &from, (x, y)),
-                            None => joined(editor.document(), &home, &from, (x, y))
-                                .map(|link| Edit::AddLink { link }),
+                            Some(held) => dropped(
+                                editor.document(),
+                                &home,
+                                held,
+                                &from,
+                                (x, y),
+                            ),
+                            None => {
+                                joined(editor.document(), &home, &from, (x, y))
+                                    .map(|link| Edit::AddLink { link })
+                            }
                         };
                         if let Some(edit) = what {
                             editor.edit(edit);
@@ -1225,7 +1274,8 @@ macro_rules! wiring {
                 // that shows what the node says, which is what a click used
                 // to open on its own.
                 window.on_node_edit(move |name| {
-                    let absolute = Qualified::of(&name, &home_for_menu).absolute();
+                    let absolute =
+                        Qualified::of(&name, &home_for_menu).absolute();
                     show_node(&editor_for_menu, &views_for_menu, &absolute);
                 });
             }
@@ -1235,7 +1285,11 @@ macro_rules! wiring {
                 // What might be wrong, and what was set aside: one window,
                 // pointed at either list. See `show_concerns`.
                 window.on_show_concerns(move || {
-                    show_concerns(&editor_for_concerns, &views_for_concerns, false);
+                    show_concerns(
+                        &editor_for_concerns,
+                        &views_for_concerns,
+                        false,
+                    );
                 });
             }
             {
@@ -1252,8 +1306,13 @@ macro_rules! wiring {
                 // And Delete, which asks before it does anything: see
                 // `confirm_delete`.
                 window.on_node_delete(move |name| {
-                    let absolute = Qualified::of(&name, &home_for_delete).absolute();
-                    confirm_delete(&editor_for_delete, &views_for_delete, &absolute);
+                    let absolute =
+                        Qualified::of(&name, &home_for_delete).absolute();
+                    confirm_delete(
+                        &editor_for_delete,
+                        &views_for_delete,
+                        &absolute,
+                    );
                 });
             }
             {
@@ -1265,9 +1324,10 @@ macro_rules! wiring {
                 let chosen = chosen.clone();
                 let home = home.clone();
                 window.on_node_selected(move |name| {
-                    chosen
-                        .borrow_mut()
-                        .insert(home.clone().unwrap_or_default(), name.to_string());
+                    chosen.borrow_mut().insert(
+                        home.clone().unwrap_or_default(),
+                        name.to_string(),
+                    );
                     // The outline only: choosing a node is the same press
                     // that starts dragging it, and rebuilding the canvas here
                     // would replace the element the pointer is holding. See
@@ -1402,7 +1462,11 @@ fn put_node(window: &NodeWindow, editor: &Editor, node: &str) {
 ///
 /// Made once per node and raised afterwards: pressing a node twice should
 /// bring its window forward, not make a second one saying the same thing.
-fn show_node(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>, node: &str) {
+fn show_node(
+    editor: &Rc<RefCell<Editor>>,
+    views: &Rc<RefCell<Views>>,
+    node: &str,
+) {
     if !views.borrow().attributes.contains_key(node) {
         let window = match NodeWindow::new() {
             Ok(window) => {
@@ -1562,7 +1626,12 @@ fn wire_node(
 /// between the payload pane and the vehicle's, `Pane::Vehicle` for the one
 /// between the vehicle's and the moc pane. Both gestures are the same work, and
 /// writing it twice is two places for the clamping to be got wrong in.
-fn drag_divider(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>, which: Pane, dx: f32) {
+fn drag_divider(
+    editor: &Rc<RefCell<Editor>>,
+    views: &Rc<RefCell<Views>>,
+    which: Pane,
+    dx: f32,
+) {
     let dividers = views.borrow().divider.clone();
     {
         let editor = editor.borrow();
@@ -1643,7 +1712,8 @@ fn drag_list_divider(
     }
     lists.set(now);
 
-    let (moc_percent, vehicle_percent) = percents_for(views.borrow().divider.get());
+    let (moc_percent, vehicle_percent) =
+        percents_for(views.borrow().divider.get());
     settings::save(settings::Settings {
         moc_percent,
         vehicle_percent,
@@ -1666,7 +1736,12 @@ fn drag_list_divider(
 /// pixel count is how this window happens to be sized today. And every share
 /// comes back inside [`settings::LEAST`] however far the line was dragged,
 /// which is the rule a test can hold this to and a markup cannot.
-fn list_shares_after((moc, vehicle): (i32, i32), which: Pane, dy: f32, tall: f32) -> (i32, i32) {
+fn list_shares_after(
+    (moc, vehicle): (i32, i32),
+    which: Pane,
+    dy: f32,
+    tall: f32,
+) -> (i32, i32) {
     if tall < 1.0 {
         return (moc, vehicle);
     }
@@ -1705,7 +1780,11 @@ fn list_shares_after((moc, vehicle): (i32, i32), which: Pane, dy: f32, tall: f32
 /// Rows are held by their place in the list, which is why the window is
 /// refreshed after every decision: a row acted on changes the list under it,
 /// and an index into a list that has moved is a decision about the wrong node.
-fn show_concerns(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>, aside: bool) {
+fn show_concerns(
+    editor: &Rc<RefCell<Editor>>,
+    views: &Rc<RefCell<Views>>,
+    aside: bool,
+) {
     if views.borrow().concerns.is_none() {
         let window = match ConcernsWindow::new() {
             Ok(window) => {
@@ -1726,7 +1805,8 @@ fn show_concerns(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>, aside
                     let Some(window) = shown.concerns.as_ref() else {
                         return;
                     };
-                    let (raised, set_aside) = editor.borrow().document().concerns_apart();
+                    let (raised, set_aside) =
+                        editor.borrow().document().concerns_apart();
                     let list = if window.get_aside() {
                         set_aside
                     } else {
@@ -1750,7 +1830,8 @@ fn show_concerns(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>, aside
                         return;
                     };
                     let was_aside = window.get_aside();
-                    let (raised, set_aside) = editor.borrow().document().concerns_apart();
+                    let (raised, set_aside) =
+                        editor.borrow().document().concerns_apart();
                     let list = if was_aside { set_aside } else { raised };
                     list.get(which as usize).map(|concern| Edit::SetAside {
                         node: concern.node().to_string(),
@@ -1810,7 +1891,8 @@ fn list_concerns(editor: &Editor, views: &Rc<RefCell<Views>>, aside: bool) {
         .collect();
 
     // What the Copy button copies: every row, one to a line.
-    let everything: Vec<String> = rows.iter().map(|row| row.said.to_string()).collect();
+    let everything: Vec<String> =
+        rows.iter().map(|row| row.said.to_string()).collect();
 
     if let Some(window) = views.borrow().concerns.as_ref() {
         window.set_aside(aside);
@@ -1861,7 +1943,11 @@ fn go_to(editor: Rc<RefCell<Editor>>, views: Rc<RefCell<Views>>, node: &str) {
 /// was on top. Deleting is what the window's Delete does and nothing else
 /// here does it, so a window that cannot be made is a node that cannot be
 /// deleted -- said on the error output, rather than deleting it unasked.
-fn confirm_delete(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>, node: &str) {
+fn confirm_delete(
+    editor: &Rc<RefCell<Editor>>,
+    views: &Rc<RefCell<Views>>,
+    node: &str,
+) {
     // Nothing to ask about: a node somebody deleted while the menu was open.
     if editor.borrow().document().node(node).is_none() {
         return;
@@ -2025,10 +2111,9 @@ fn troubles_of(document: &Document) -> Vec<Trouble> {
     }
 
     let at_of = |name: &str| {
-        document
-            .nodes
-            .iter()
-            .position(|node| Qualified::of(&node.name, &node.home).absolute() == name)
+        document.nodes.iter().position(|node| {
+            Qualified::of(&node.name, &node.home).absolute() == name
+        })
     };
 
     for fault in document.faults() {
@@ -2050,8 +2135,12 @@ fn troubles_of(document: &Document) -> Vec<Trouble> {
             // The group ones. A node in a group nobody declared is the node's
             // to answer -- the group may be a misspelling -- and a group with
             // nothing in it is the group's.
-            Fault::NoSuchGroup { node, .. } => (at_of(node), node.clone(), Fix::Node),
-            Fault::EmptyGroup { group } => (None, String::new(), Fix::Group(group.clone())),
+            Fault::NoSuchGroup { node, .. } => {
+                (at_of(node), node.clone(), Fix::Node)
+            }
+            Fault::EmptyGroup { group } => {
+                (None, String::new(), Fix::Group(group.clone()))
+            }
             // The lines.
             // The line the document actually holds, not one built from the
             // two names: a removal is matched by what a link joins, origin
@@ -2085,7 +2174,10 @@ fn troubles_of(document: &Document) -> Vec<Trouble> {
                 let line = document
                     .links
                     .iter()
-                    .rfind(|link| link.to == *node && link.input.as_deref() == Some(input.as_str()))
+                    .rfind(|link| {
+                        link.to == *node
+                            && link.input.as_deref() == Some(input.as_str())
+                    })
                     .cloned();
                 match line {
                     Some(line) => (None, String::new(), Fix::Line(line)),
@@ -2093,11 +2185,15 @@ fn troubles_of(document: &Document) -> Vec<Trouble> {
                 }
             }
             // The configuration's own parameters.
-            Fault::BadTcspecial { .. } => (None, String::new(), Fix::Parameters),
+            Fault::BadTcspecial { .. } => {
+                (None, String::new(), Fix::Parameters)
+            }
             // And everything else is a node somebody has to look at.
             Fault::UnknownType { node, .. }
             | Fault::BadNode { node, .. }
-            | Fault::UntriggeredInput { node, .. } => (at_of(node), node.clone(), Fix::Node),
+            | Fault::UntriggeredInput { node, .. } => {
+                (at_of(node), node.clone(), Fix::Node)
+            }
         };
         // A node fault naming a node the document does not hold has nothing
         // to offer and nothing to point at: it cannot happen from a file the
@@ -2148,15 +2244,15 @@ fn verified(editor: &Editor) -> Vec<Trouble> {
         return Vec::new();
     }
     let simulator = simulator.filter(|path| path.exists());
-    let report = tcsverify::verify(config, simulator, tcsverify::Limits::EVERYTHING);
+    let report =
+        tcsverify::verify(config, simulator, tcsverify::Limits::EVERYTHING);
 
     let document = editor.document();
     let faults = document.faults();
     let at_of = |name: &str| {
-        document
-            .nodes
-            .iter()
-            .position(|node| Qualified::of(&node.name, &node.home).absolute() == name)
+        document.nodes.iter().position(|node| {
+            Qualified::of(&node.name, &node.home).absolute() == name
+        })
     };
 
     // In the order found, as tcsverify prints them.
@@ -2170,15 +2266,19 @@ fn verified(editor: &Editor) -> Vec<Trouble> {
                 .is_none_or(|problem| !said_already(problem, &faults))
         })
         .map(|finding| {
-            let node = match finding.problem.as_ref().map(|problem| problem.about()) {
-                Some(tcslibgs::About::Node(name)) => name,
-                _ => String::new(),
-            };
+            let node =
+                match finding.problem.as_ref().map(|problem| problem.about()) {
+                    Some(tcslibgs::About::Node(name)) => name,
+                    _ => String::new(),
+                };
             let at = (!node.is_empty()).then(|| at_of(&node)).flatten();
             let fix = match &finding.problem {
                 _ if at.is_some() => Fix::Node,
-                Some(Problem::NoTcspecial) | Some(Problem::BadTcspecial { .. }) => Fix::Parameters,
-                Some(Problem::EmptyGroup { group }) => Fix::Group(group.clone()),
+                Some(Problem::NoTcspecial)
+                | Some(Problem::BadTcspecial { .. }) => Fix::Parameters,
+                Some(Problem::EmptyGroup { group }) => {
+                    Fix::Group(group.clone())
+                }
                 _ => Fix::Nothing,
             };
             Trouble {
@@ -2200,15 +2300,29 @@ fn verified(editor: &Editor) -> Vec<Trouble> {
 /// read as two mistakes.
 fn said_already(problem: &Problem, faults: &[Fault]) -> bool {
     faults.iter().any(|fault| match (problem, fault) {
-        (Problem::DuplicateNode { name }, Fault::DuplicateName { name: said }) => name == said,
+        (
+            Problem::DuplicateNode { name },
+            Fault::DuplicateName { name: said },
+        ) => name == said,
         (Problem::NamelessNode, Fault::NamelessNode { .. }) => true,
-        (Problem::UnknownType { node, .. }, Fault::UnknownType { node: said, .. }) => node == said,
-        (Problem::NoSuchNode { from, missing, .. }, Fault::DanglingLink { from: f, to }) => {
-            (from == f || missing == f) && (missing == to || from == to)
+        (
+            Problem::UnknownType { node, .. },
+            Fault::UnknownType { node: said, .. },
+        ) => node == said,
+        (
+            Problem::NoSuchNode { from, missing, .. },
+            Fault::DanglingLink { from: f, to },
+        ) => (from == f || missing == f) && (missing == to || from == to),
+        (Problem::SelfLink { node }, Fault::SelfLink { node: said }) => {
+            node == said
         }
-        (Problem::SelfLink { node }, Fault::SelfLink { node: said }) => node == said,
-        (Problem::NoSuchGroup { node, .. }, Fault::NoSuchGroup { node: said, .. }) => node == said,
-        (Problem::EmptyGroup { group }, Fault::EmptyGroup { group: said }) => group == said,
+        (
+            Problem::NoSuchGroup { node, .. },
+            Fault::NoSuchGroup { node: said, .. },
+        ) => node == said,
+        (Problem::EmptyGroup { group }, Fault::EmptyGroup { group: said }) => {
+            group == said
+        }
         (
             Problem::InputBoundTwice { node, input },
             Fault::InputBoundTwice {
@@ -2217,7 +2331,10 @@ fn said_already(problem: &Problem, faults: &[Fault]) -> bool {
             },
         ) => node == said && input == into,
         (Problem::BadNode { node, .. }, Fault::BadNode { node: said, .. })
-        | (Problem::BadNode { node, .. }, Fault::UnknownType { node: said, .. }) => node == said,
+        | (
+            Problem::BadNode { node, .. },
+            Fault::UnknownType { node: said, .. },
+        ) => node == said,
         (Problem::BadTcspecial { .. }, Fault::BadTcspecial { .. }) => true,
         (
             Problem::UntriggeredInput { node, from },
@@ -2243,7 +2360,10 @@ fn said_already(problem: &Problem, faults: &[Fault]) -> bool {
 ///
 /// Here rather than in the markup for the usual reason: the markup can compare
 /// two strings, this is a rule about a document, and a rule is worth a test.
-fn names_settle(document: &Document, proposed: &BTreeMap<usize, String>) -> Result<(), String> {
+fn names_settle(
+    document: &Document,
+    proposed: &BTreeMap<usize, String>,
+) -> Result<(), String> {
     let whole = |at: usize, name: &str| {
         document
             .nodes
@@ -2273,7 +2393,10 @@ fn names_settle(document: &Document, proposed: &BTreeMap<usize, String>) -> Resu
         let held = Qualified::of(&node.name, &node.home).absolute();
         if let Some(asked) = taken.get(&held) {
             let _ = asked;
-            return Err(format!("Another node is already called \"{}\".", node.name));
+            return Err(format!(
+                "Another node is already called \"{}\".",
+                node.name
+            ));
         }
     }
     Ok(())
@@ -2313,7 +2436,10 @@ fn settle_problems(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
     let Some(window) = top else {
         // Every one of these is still reported as a fault, so this failing is
         // a quieter editor rather than a broken one.
-        eprintln!("tcsgui: the problems cannot be asked about: the main window has gone");
+        eprintln!(
+            "tcsgui: the problems cannot be asked about: the main window \
+                   has gone"
+        );
         return;
     };
 
@@ -2324,7 +2450,9 @@ fn settle_problems(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
         troubles
             .iter()
             .filter(|trouble| trouble.nameable())
-            .filter_map(|trouble| trouble.at.map(|at| (at, trouble.node.clone())))
+            .filter_map(|trouble| {
+                trouble.at.map(|at| (at, trouble.node.clone()))
+            })
             .collect(),
     ));
     // And the rows the window is showing, so a press can say which one it was
@@ -2340,7 +2468,9 @@ fn settle_problems(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
             .upgrade()
             .expect("the window exists")
             .on_problems_typed(move |row, said| {
-                let Some(at) = showing.borrow().get(row as usize).and_then(|t| t.at) else {
+                let Some(at) =
+                    showing.borrow().get(row as usize).and_then(|t| t.at)
+                else {
                     return;
                 };
                 proposed.borrow_mut().insert(at, said.to_string());
@@ -2368,7 +2498,9 @@ fn settle_problems(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
             .upgrade()
             .expect("the window exists")
             .on_problems_derive(move |row| {
-                let Some(at) = showing.borrow().get(row as usize).and_then(|t| t.at) else {
+                let Some(at) =
+                    showing.borrow().get(row as usize).and_then(|t| t.at)
+                else {
                     return;
                 };
                 let spare = editor.borrow().document().spare_name(at);
@@ -2476,7 +2608,8 @@ fn settle_problems(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
                 Some(Fix::Parameters) => {
                     show_parameters(&editor, &views);
                 }
-                Some(Fix::Name) | Some(Fix::Node) | Some(Fix::Nothing) | None => return,
+                Some(Fix::Name) | Some(Fix::Node) | Some(Fix::Nothing)
+                | None => return,
             }
             again(&editor, &views, &showing, &proposed);
         });
@@ -2590,8 +2723,10 @@ fn say_problems(
         window.set_problems_any_nameable(rows.iter().any(|row| row.nameable));
         // What the Copy button copies: the window's heading, then every
         // problem, one to a line.
-        let mut everything =
-            vec!["This configuration has problems the vehicle would not fly with".to_string()];
+        let mut everything = vec![
+            "This configuration has problems the vehicle would not fly with"
+                .to_string(),
+        ];
         everything.extend(rows.iter().map(|row| row.said.to_string()));
         window.set_problems_everything(everything.join("\n").into());
         window.set_problems_rows(ModelRc::from(Rc::new(VecModel::from(rows))));
@@ -2819,7 +2954,8 @@ fn alerting(views: &Rc<RefCell<Views>>) {
         window.on_acknowledged(move || {
             listen_when_read(&views, Some(Startup::Alert));
             // Hidden and kept, not dropped: see above.
-            let window = views.borrow().alert.as_ref().map(|window| window.as_weak());
+            let window =
+                views.borrow().alert.as_ref().map(|window| window.as_weak());
             if let Some(window) = window.and_then(|window| window.upgrade()) {
                 let _ = window.hide();
             }
@@ -2922,7 +3058,8 @@ fn leave(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
         .as_ref()
         .map(|window| window.as_weak());
     if let Some(window) = window.and_then(|window| window.upgrade()) {
-        window.set_trouble(editor.borrow().trouble().unwrap_or_default().into());
+        window
+            .set_trouble(editor.borrow().trouble().unwrap_or_default().into());
         if let Err(e) = window.show() {
             eprintln!("tcsgui: the offer to save cannot be shown: {e}");
             slint::quit_event_loop().ok();
@@ -3129,7 +3266,10 @@ fn put_sim_groups(window: &SimWindow, editor: &Editor, group: &str) {
     window.set_can_add(true);
     window.set_choices(ModelRc::from(Rc::new(VecModel::from(choices))));
     window.set_chosen(group.into());
-    window.set_fields(settings_shown(&crate::sim::Simulator::fields(false), said));
+    window.set_fields(settings_shown(
+        &crate::sim::Simulator::fields(false),
+        said,
+    ));
     window.set_trouble(editor.trouble().unwrap_or_default().into());
 }
 
@@ -3141,13 +3281,19 @@ fn put_sim_groups(window: &SimWindow, editor: &Editor, group: &str) {
 /// rather than nothing at all. Nothing is marked: every one of these is
 /// optional -- a payload that says nothing takes everything from its group --
 /// so an empty field is a question not yet answered and not a fault.
-fn settings_shown(fields: &[&'static str], said: &BTreeMap<String, String>) -> ModelRc<FieldView> {
+fn settings_shown(
+    fields: &[&'static str],
+    said: &BTreeMap<String, String>,
+) -> ModelRc<FieldView> {
     ModelRc::from(Rc::new(VecModel::from(settings_of(fields, said))))
 }
 
 /// The same, as rows rather than as a model, for the panel to append to a
 /// node's own.
-fn settings_of(fields: &[&'static str], said: &BTreeMap<String, String>) -> Vec<FieldView> {
+fn settings_of(
+    fields: &[&'static str],
+    said: &BTreeMap<String, String>,
+) -> Vec<FieldView> {
     let mut shown: Vec<FieldView> = fields
         .iter()
         .map(|setting| FieldView {
@@ -3193,7 +3339,9 @@ fn show_parameters(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
                 window
             }
             Err(e) => {
-                eprintln!("tcsgui: the tcspecial parameters cannot be opened: {e}");
+                eprintln!(
+                    "tcsgui: the tcspecial parameters cannot be opened: {e}"
+                );
                 return;
             }
         };
@@ -3204,11 +3352,13 @@ fn show_parameters(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
                 {
                     let mut editor = editor.borrow_mut();
                     let attribute = attribute.to_string();
-                    let was = editor.document().tcspecial.get(&attribute).cloned();
+                    let was =
+                        editor.document().tcspecial.get(&attribute).cloned();
                     // An empty field clears the parameter rather than setting
                     // it to nothing: the line comes out of the file, which is
                     // what somebody would have written.
-                    let now = (!value.trim().is_empty()).then(|| value.to_string());
+                    let now =
+                        (!value.trim().is_empty()).then(|| value.to_string());
                     if was == now {
                         return;
                     }
@@ -3289,7 +3439,11 @@ fn show_sim_groups(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
 }
 
 /// Wire the groups window's four callbacks to the one editor.
-fn wire_sim_groups(window: &SimWindow, editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
+fn wire_sim_groups(
+    window: &SimWindow,
+    editor: &Rc<RefCell<Editor>>,
+    views: &Rc<RefCell<Views>>,
+) {
     let showing = views.borrow().showing_sim_group.clone();
 
     {
@@ -3313,11 +3467,9 @@ fn wire_sim_groups(window: &SimWindow, editor: &Rc<RefCell<Editor>>, views: &Rc<
             let name = {
                 let mut editor = editor.borrow_mut();
                 let taken = |name: &str| {
-                    editor
-                        .document()
-                        .simulator
-                        .as_ref()
-                        .is_some_and(|simulator| simulator.groups.contains_key(name))
+                    editor.document().simulator.as_ref().is_some_and(
+                        |simulator| simulator.groups.contains_key(name),
+                    )
                 };
                 let name = if !taken("group") {
                     "group".to_string()
@@ -3351,7 +3503,10 @@ fn wire_sim_groups(window: &SimWindow, editor: &Rc<RefCell<Editor>>, views: &Rc<
                     // Carried whole, so that undoing the removal puts back
                     // the group that was there and not an empty one of the
                     // same name.
-                    Some(said) => said.iter().map(|(a, b)| (a.clone(), b.clone())).collect(),
+                    Some(said) => said
+                        .iter()
+                        .map(|(a, b)| (a.clone(), b.clone()))
+                        .collect(),
                     None => return,
                 };
                 editor.edit(Edit::RemoveSimGroup { name, settings });
@@ -3460,7 +3615,11 @@ fn show_group(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
 /// worth reading twice -- it sets one value on every payload of the group as a
 /// single edit, so that undo takes back the gesture rather than the first of a
 /// dozen consequences.
-fn wire_group(window: &GroupWindow, editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
+fn wire_group(
+    window: &GroupWindow,
+    editor: &Rc<RefCell<Editor>>,
+    views: &Rc<RefCell<Views>>,
+) {
     {
         // Choosing which group the window is showing. Nothing is recorded:
         // what somebody is looking at is not something the vehicle flies.
@@ -3595,7 +3754,9 @@ fn wire_group(window: &GroupWindow, editor: &Rc<RefCell<Editor>>, views: &Rc<Ref
             let group = showing.borrow().clone();
             {
                 let mut editor = editor.borrow_mut();
-                let Some(interval) = editor.document().groups.get(&group).cloned() else {
+                let Some(interval) =
+                    editor.document().groups.get(&group).cloned()
+                else {
                     return;
                 };
                 editor.edit(Edit::RemoveGroup {
@@ -3658,7 +3819,8 @@ fn panel_of(
     // own list, which says what is asked for and not what kind it is, so
     // those are text -- and every type has a description, which is what
     // `nodes::tests::every_description_has_its_rust` is for.
-    let described = nodes::matching(descriptions(), &node.node_type, &node.attributes);
+    let described =
+        nodes::matching(descriptions(), &node.node_type, &node.attributes);
     let declared: Vec<nodes::Attribute> = match described {
         Some(described) => described.fields(),
         None => NodeType::ALL
@@ -3778,7 +3940,11 @@ fn label(edit: Option<&Edit>) -> slint::SharedString {
 /// edge, labelled with the far node's full name. It cannot be drawn to the
 /// node itself -- that node is in another window -- and leaving it out
 /// altogether would make a subdiagram look unconnected when it is not.
-fn views_of(editor: &Editor, home: &Home, held: Option<&Link>) -> (Vec<NodeView>, Vec<LinkView>) {
+fn views_of(
+    editor: &Editor,
+    home: &Home,
+    held: Option<&Link>,
+) -> (Vec<NodeView>, Vec<LinkView>) {
     let document = editor.document();
     let faults = editor.faults();
 
@@ -3864,7 +4030,10 @@ fn ends_of(document: &Document, link: &Link, home: &Home) -> route::Ends {
 
 /// Every node of the document as tcsdiagram draws it, each saying whether it
 /// is on `home`'s page.
-fn on_sheet<'a>(document: &'a Document, home: &Home) -> Vec<tcsdiagram::view::OnSheet<'a>> {
+fn on_sheet<'a>(
+    document: &'a Document,
+    home: &Home,
+) -> Vec<tcsdiagram::view::OnSheet<'a>> {
     document
         .nodes
         .iter()
@@ -3945,7 +4114,8 @@ fn dropped(
     pressed: &Drawing,
     (x, y): (f32, f32),
 ) -> Option<Edit> {
-    let (sink_pressed, _) = tcslibgs::graph::terminals::stream_of(&pressed.terminal)?;
+    let (sink_pressed, _) =
+        tcslibgs::graph::terminals::stream_of(&pressed.terminal)?;
 
     // The end being carried keeps its own terminal: a `payload-in` taken
     // off one node goes on another node's `payload-in` and nowhere else.
@@ -3962,7 +4132,8 @@ fn dropped(
         // several -- the ground's -- is deleted from its source end, which has
         // the one link on it.
         if node_under(document, home, (x, y)).is_none() {
-            return (!sink_pressed).then(|| Edit::RemoveLink { link: held.clone() });
+            return (!sink_pressed)
+                .then(|| Edit::RemoveLink { link: held.clone() });
         }
         // Over a node that cannot be this end, but could be the other one:
         // then the gesture was drawing a new line and not moving this one.
@@ -3979,7 +4150,8 @@ fn dropped(
         // *can* take this end still takes it -- that is the re-routing
         // gesture, and it is the reading a person has when they drag an end
         // off one vehicle node onto another.
-        return joined(document, home, pressed, (x, y)).map(|link| Edit::AddLink { link });
+        return joined(document, home, pressed, (x, y))
+            .map(|link| Edit::AddLink { link });
     };
 
     // Back where it started.
@@ -4007,7 +4179,9 @@ fn dropped(
         terminal: now
             .input
             .clone()
-            .filter(|input| tcslibgs::graph::terminals::stream_of(input).is_some())
+            .filter(|input| {
+                tcslibgs::graph::terminals::stream_of(input).is_some()
+            })
             .or_else(|| {
                 style::terminal_for(
                     &document.node(&now.to)?.node_type.clone(),
@@ -4022,14 +4196,13 @@ fn dropped(
     if source.node == sink.node {
         return None;
     }
-    if !tcslibgs::graph::terminals::pairs_with(&source.terminal, &sink.terminal) {
+    if !tcslibgs::graph::terminals::pairs_with(&source.terminal, &sink.terminal)
+    {
         return None;
     }
-    if document
-        .links
-        .iter()
-        .any(|theirs| theirs.same_connection(&now) && !theirs.same_connection(held))
-    {
+    if document.links.iter().any(|theirs| {
+        theirs.same_connection(&now) && !theirs.same_connection(held)
+    }) {
         return None;
     }
 
@@ -4044,7 +4217,11 @@ fn dropped(
 /// For telling "let go of over a node" from "let go of over the canvas", which
 /// are two different things: the first is a gesture that missed a terminal and
 /// the second is one that meant to put the line down.
-fn node_under(document: &Document, home: &Home, (x, y): (f32, f32)) -> Option<String> {
+fn node_under(
+    document: &Document,
+    home: &Home,
+    (x, y): (f32, f32),
+) -> Option<String> {
     document
         .nodes_in(home)
         .into_iter()
@@ -4116,14 +4293,20 @@ fn attached(document: &Document, at: &Drawing, sink: bool) -> Vec<Link> {
 ///
 /// and a link that is already there, which would otherwise be a second line
 /// on top of the first and two deliveries of every datum.
-fn joined(document: &Document, home: &Home, pressed: &Drawing, (x, y): (f32, f32)) -> Option<Link> {
+fn joined(
+    document: &Document,
+    home: &Home,
+    pressed: &Drawing,
+    (x, y): (f32, f32),
+) -> Option<Link> {
     // Either way about. A link may be drawn from the data source that feeds
     // it or from the data sink that wants feeding -- the same link, and a
     // person drawing a diagram works in whichever direction they are reading
     // it. So which end was pressed decides what is being looked for under the
     // pointer, and the link is put back in its own order afterwards: a link
     // leaves a source and arrives at a sink however it was drawn.
-    let (sink_pressed, _) = tcslibgs::graph::terminals::stream_of(&pressed.terminal)?;
+    let (sink_pressed, _) =
+        tcslibgs::graph::terminals::stream_of(&pressed.terminal)?;
     // The far end of the line, which the stream names: see `landed`.
     let wanted = tcslibgs::graph::terminals::answers(&pressed.terminal)?;
     let dropped = landed(document, home, (x, y), wanted)?;
@@ -4136,7 +4319,8 @@ fn joined(document: &Document, home: &Home, pressed: &Drawing, (x, y): (f32, f32
     if source.node == sink.node {
         return None;
     }
-    if !tcslibgs::graph::terminals::pairs_with(&source.terminal, &sink.terminal) {
+    if !tcslibgs::graph::terminals::pairs_with(&source.terminal, &sink.terminal)
+    {
         return None;
     }
 
@@ -4167,10 +4351,15 @@ fn joined(document: &Document, home: &Home, pressed: &Drawing, (x, y): (f32, f32
 /// `None` for a node or a terminal this page does not draw, which is what a
 /// gesture on another page looks like from here: no line, rather than a line
 /// from a guess.
-fn anchored(document: &Document, home: &Home, from: &Drawing) -> Option<(f32, f32)> {
+fn anchored(
+    document: &Document,
+    home: &Home,
+    from: &Drawing,
+) -> Option<(f32, f32)> {
     if let Some(held) = &from.holding {
         let ends = ends_of(document, held, home);
-        let (sink_pressed, _) = tcslibgs::graph::terminals::stream_of(&from.terminal)?;
+        let (sink_pressed, _) =
+            tcslibgs::graph::terminals::stream_of(&from.terminal)?;
         // The end that is not the one in hand.
         return Some(if sink_pressed { ends.from } else { ends.to });
     }
@@ -4185,8 +4374,8 @@ fn anchored(document: &Document, home: &Home, from: &Drawing) -> Option<(f32, f3
 ///
 /// Anywhere on the node will do -- its name, its middle, a corner box -- and
 /// `wanted` is the terminal it attaches to, which the gesture already knows.
-/// A stream has one name at each of its ends, so a line drawn from a `payload-out`
-/// can only arrive at a `payload-in`, and an end carried off a
+/// A stream has one name at each of its ends, so a line drawn from a
+/// `payload-out` can only arrive at a `payload-in`, and an end carried off a
 /// `payload-in` can only be put down on another `payload-in`: there is
 /// nothing else the gesture could have meant. The terminals are still drawn,
 /// because they are what says which streams a type carries and which way --
@@ -4198,7 +4387,12 @@ fn anchored(document: &Document, home: &Home, from: &Drawing) -> Option<(f32, f3
 /// carrying what the ground sends has nowhere to land on it. A gesture that
 /// cannot make a link still makes nothing; what has changed is how hard it is
 /// to aim, not what may be joined to what.
-fn landed(document: &Document, home: &Home, (x, y): (f32, f32), wanted: &str) -> Option<Drawing> {
+fn landed(
+    document: &Document,
+    home: &Home,
+    (x, y): (f32, f32),
+    wanted: &str,
+) -> Option<Drawing> {
     let (sink, _) = tcslibgs::graph::terminals::stream_of(wanted)?;
     let node = node_under(document, home, (x, y))?;
     let found = document.node(&node)?;
@@ -4236,7 +4430,11 @@ fn landed(document: &Document, home: &Home, (x, y): (f32, f32), wanted: &str) ->
 /// payload has one way in, and the schema reads an unnamed end as that one.
 /// Which is also what keeps the editor from writing a terminal into every
 /// link of every file it saves.
-fn arriving_at(document: &Document, node: &str, terminal: &str) -> Option<String> {
+fn arriving_at(
+    document: &Document,
+    node: &str,
+    terminal: &str,
+) -> Option<String> {
     if let Some(input) = free_input(document, node) {
         return Some(input);
     }
@@ -4246,8 +4444,8 @@ fn arriving_at(document: &Document, node: &str, terminal: &str) -> Option<String
 /// And about the end it leaves by, which is always the terminal pressed.
 ///
 /// Always, because a link *is* an attribute of the node it leaves, named after
-/// that terminal: `payload-out: k_1` is where the link is written, so there is no
-/// such thing as a link whose source terminal the file does not say.
+/// that terminal: `payload-out: k_1` is where the link is written, so there is
+/// no such thing as a link whose source terminal the file does not say.
 fn leaving_by(from: &Drawing) -> Option<String> {
     Some(from.terminal.clone())
 }
@@ -4446,11 +4644,11 @@ fn next_place(
 ///
 /// A node's upper left corner sits on the millimetre grid, in steps of five
 /// millimetres so that its terminals are on lines five millimetres apart --
-/// see `pane::PX_PER_MM` and `pane::NODE_STEP_MM`. Three things come of it and none is merely decorative: a
-/// diagram stops looking approximate, nodes line up without anybody nudging
-/// them, and the positions written to the file are points a person can name,
-/// so a file edited by hand and a file written by the editor differ in what
-/// was meant rather than in a pixel.
+/// see `pane::PX_PER_MM` and `pane::NODE_STEP_MM`. Three things come of it
+/// and none is merely decorative: a diagram stops looking approximate, nodes
+/// line up without anybody nudging them, and the positions written to the
+/// file are points a person can name, so a file edited by hand and a file
+/// written by the editor differ in what was meant rather than in a pixel.
 fn snap((x, y): (i32, i32)) -> (i32, i32) {
     (pane::on_node_grid(x), pane::on_node_grid(y))
 }
@@ -4468,7 +4666,10 @@ fn snap((x, y): (i32, i32)) -> (i32, i32) {
 /// Three lists rather than one, because there are three working panes and a
 /// shape's pane follows from the list it came from. A single list would leave
 /// the rule to be found out by placing something and watching where it went.
-fn palette_of(pane: Pane, described: &[nodes::Described]) -> ModelRc<PaletteEntry> {
+fn palette_of(
+    pane: Pane,
+    described: &[nodes::Described],
+) -> ModelRc<PaletteEntry> {
     let mut entries: Vec<PaletteEntry> = Vec::new();
     let mut family = "";
 
@@ -4506,7 +4707,14 @@ fn palette_of(pane: Pane, described: &[nodes::Described]) -> ModelRc<PaletteEntr
         if theirs.is_empty() {
             entries.push(PaletteEntry {
                 heading: "".into(),
-                node: view_of(t.spelling(), t.spelling(), (8, 2), None, false, None),
+                node: view_of(
+                    t.spelling(),
+                    t.spelling(),
+                    (8, 2),
+                    None,
+                    false,
+                    None,
+                ),
                 is_heading: false,
                 sets: "".into(),
             });
@@ -4515,7 +4723,14 @@ fn palette_of(pane: Pane, described: &[nodes::Described]) -> ModelRc<PaletteEntr
         for one in theirs {
             entries.push(PaletteEntry {
                 heading: "".into(),
-                node: view_of(&one.node, t.spelling(), (8, 2), None, false, None),
+                node: view_of(
+                    &one.node,
+                    t.spelling(),
+                    (8, 2),
+                    None,
+                    false,
+                    None,
+                ),
                 is_heading: false,
                 sets: written(&one.sets).into(),
             });
@@ -4568,7 +4783,8 @@ fn alphabetical(entries: &mut [PaletteEntry]) {
 /// because one description has a typo in it would be an editor a typo turns
 /// off.
 fn descriptions() -> &'static [nodes::Described] {
-    static FOUND: std::sync::OnceLock<Vec<nodes::Described>> = std::sync::OnceLock::new();
+    static FOUND: std::sync::OnceLock<Vec<nodes::Described>> =
+        std::sync::OnceLock::new();
     FOUND.get_or_init(|| {
         let (described, trouble) = nodes::described();
         for said in trouble {
@@ -4597,7 +4813,9 @@ fn stated(sets: &str) -> Vec<(String, String)> {
     sets.split(';')
         .filter(|pair| !pair.trim().is_empty())
         .filter_map(|pair| pair.split_once('='))
-        .map(|(name, value)| (name.trim().to_string(), value.trim().to_string()))
+        .map(|(name, value)| {
+            (name.trim().to_string(), value.trim().to_string())
+        })
         .collect()
 }
 
@@ -4616,7 +4834,13 @@ fn view_of(
     summary: Option<&str>,
 ) -> NodeView {
     node_view(
-        tcsdiagram::view::node_look(name, node_type, at, fault.is_some(), summary),
+        tcsdiagram::view::node_look(
+            name,
+            node_type,
+            at,
+            fault.is_some(),
+            summary,
+        ),
         selected,
     )
 }
@@ -4722,9 +4946,11 @@ mod tests {
     fn markup() -> String {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
         let read = |path: std::path::PathBuf| {
-            std::fs::read_to_string(&path).unwrap_or_else(|why| panic!("{}: {why}", path.display()))
+            std::fs::read_to_string(&path)
+                .unwrap_or_else(|why| panic!("{}: {why}", path.display()))
         };
-        read(root.join("ui/main.slint")) + &read(root.join("../tcsdiagram/ui/diagram.slint"))
+        read(root.join("ui/main.slint"))
+            + &read(root.join("../tcsdiagram/ui/diagram.slint"))
     }
 
     // The palette, which moved to tcsdiagram with the drawing and is held to
@@ -4734,8 +4960,8 @@ mod tests {
     use slint::Model;
     use style::ERROR_TINT;
     use tcsdiagram::look::{
-        came_later, ramp_order, tint_of, MARK, MOC_LINE, MOC_RUNGS, PAYLOAD_LINE, PAYLOAD_RUNGS,
-        VEHICLE_RUNGS,
+        came_later, ramp_order, tint_of, MARK, MOC_LINE, MOC_RUNGS,
+        PAYLOAD_LINE, PAYLOAD_RUNGS, VEHICLE_RUNGS,
     };
 
     /// Where the dividers sit until somebody moves them.
@@ -4763,7 +4989,10 @@ mod tests {
     }
 
     /// The same, from a tree given rather than found.
-    fn rows_from(pane: Pane, described: &[nodes::Described]) -> Vec<PaletteEntry> {
+    fn rows_from(
+        pane: Pane,
+        described: &[nodes::Described],
+    ) -> Vec<PaletteEntry> {
         let palette = palette_of(pane, described);
         (0..palette.row_count())
             .map(|i| palette.row_data(i).unwrap())
@@ -4966,7 +5195,8 @@ mod tests {
             (Pane::Vehicle, settings::DEFAULT_LIST_VEHICLE),
             (
                 Pane::Payloads,
-                100 - settings::DEFAULT_LIST_MOC - settings::DEFAULT_LIST_VEHICLE,
+                100 - settings::DEFAULT_LIST_MOC
+                    - settings::DEFAULT_LIST_VEHICLE,
             ),
         ] {
             let rows = rows_of(pane);
@@ -4996,7 +5226,8 @@ mod tests {
     /// line, and nothing else that looks like a flag is taken at all.
     #[test]
     fn the_command_line_takes_the_read_only_flag() {
-        let said = |words: &[&str]| command_line(words.iter().map(|w| w.to_string()));
+        let said =
+            |words: &[&str]| command_line(words.iter().map(|w| w.to_string()));
         assert_eq!(said(&["a.yaml"]), Ok((vec!["a.yaml".to_string()], false)));
         for flag in ["-r", "--read-only", "--readonly"] {
             assert_eq!(
@@ -5005,7 +5236,10 @@ mod tests {
             );
             assert_eq!(
                 said(&["a.yaml", "a-sim.yaml", flag]),
-                Ok((vec!["a.yaml".to_string(), "a-sim.yaml".to_string()], true))
+                Ok((
+                    vec!["a.yaml".to_string(), "a-sim.yaml".to_string()],
+                    true
+                ))
             );
         }
         assert!(
@@ -5026,14 +5260,16 @@ mod tests {
         i_slint_backend_testing::init_no_event_loop();
         let window = MainWindow::new().expect("a window");
         window.global::<Session>().set_read_only(true);
-        window.set_problems_rows(ModelRc::from(Rc::new(VecModel::from(vec![ProblemRow {
-            said: "\"twice\" is the name of two nodes".into(),
-            node: "twice".into(),
-            now: "twice".into(),
-            nameable: true,
-            there: true,
-            action: "".into(),
-        }]))));
+        window.set_problems_rows(ModelRc::from(Rc::new(VecModel::from(vec![
+            ProblemRow {
+                said: "\"twice\" is the name of two nodes".into(),
+                node: "twice".into(),
+                now: "twice".into(),
+                nameable: true,
+                there: true,
+                action: "".into(),
+            },
+        ]))));
         window.set_problems_any_nameable(true);
         window.set_problems_ready(true);
         window.set_problems_up(true);
@@ -5046,7 +5282,9 @@ mod tests {
             ElementQuery::from_root(&window)
                 .match_inherits("ProblemsPanel")
                 .match_descendants()
-                .match_predicate(move |e| e.accessible_label().as_deref() == Some(wanted.as_str()))
+                .match_predicate(move |e| {
+                    e.accessible_label().as_deref() == Some(wanted.as_str())
+                })
                 .find_first()
                 .unwrap_or_else(|| panic!("there is no {label} button"))
                 .accessible_enabled()
@@ -5076,13 +5314,18 @@ mod tests {
     #[test]
     fn every_popup_can_be_copied_from() {
         let markup = std::fs::read_to_string(
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint"),
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("ui/main.slint"),
         )
         .expect("the markup");
         let window = |name: &str| -> &str {
             let start = markup
                 .find(&format!("export component {name} inherits Window {{"))
-                .or_else(|| markup.find(&format!("component {name} inherits Rectangle {{")))
+                .or_else(|| {
+                    markup.find(&format!(
+                        "component {name} inherits Rectangle {{"
+                    ))
+                })
                 .unwrap_or_else(|| panic!("there is no {name}"));
             let rest = &markup[start..];
             &rest[..rest.find("\n}\n").expect("the end of it")]
@@ -5133,7 +5376,9 @@ mod tests {
         ] {
             let (moc, vehicle) = list_shares_after(lists(), which, dy, 800.0);
             let payload = 100 - moc - vehicle;
-            for (name, share) in [("moc", moc), ("vehicle", vehicle), ("payload", payload)] {
+            for (name, share) in
+                [("moc", moc), ("vehicle", vehicle), ("payload", payload)]
+            {
                 assert!(
                     share >= settings::LEAST,
                     "dragging the {which:?} line by {dy} would leave the \
@@ -5147,12 +5392,14 @@ mod tests {
         // upper line gives the payload list, which has no share of its own,
         // what it takes from the vehicle list.
         let (was_moc, was_vehicle) = lists();
-        let (moc, vehicle) = list_shares_after(lists(), Pane::Payloads, 80.0, 800.0);
+        let (moc, vehicle) =
+            list_shares_after(lists(), Pane::Payloads, 80.0, 800.0);
         assert_eq!((moc, vehicle), (was_moc, was_vehicle - 10));
 
         // And the lower line takes from the moc list and gives to the
         // vehicle's, leaving the payload list alone.
-        let (moc, vehicle) = list_shares_after(lists(), Pane::Vehicle, 80.0, 800.0);
+        let (moc, vehicle) =
+            list_shares_after(lists(), Pane::Vehicle, 80.0, 800.0);
         assert_eq!((moc, vehicle), (was_moc - 10, was_vehicle + 10));
         assert_eq!(
             100 - moc - vehicle,
@@ -5181,7 +5428,9 @@ mod tests {
         let mut document = Document::new();
         // A node named twice, a node of a type this build does not know, a
         // line to a node that is not there, and a group nothing is in.
-        for (name, node_type) in [("i2c", "i2c"), ("i2c", "i2c"), ("odd", "contraption")] {
+        for (name, node_type) in
+            [("i2c", "i2c"), ("i2c", "i2c"), ("odd", "contraption")]
+        {
             document.apply(&Edit::AddNode {
                 name: name.to_string(),
                 node_type: node_type.to_string(),
@@ -5207,7 +5456,8 @@ mod tests {
         // Both nodes of the shared name, because the file does not say which
         // of them was meant, and each by its own position so a rename can
         // reach it.
-        let shared: Vec<&Trouble> = troubles.iter().filter(|t| t.node == "i2c").collect();
+        let shared: Vec<&Trouble> =
+            troubles.iter().filter(|t| t.node == "i2c").collect();
         assert_eq!(shared.len(), 2, "{troubles:?}");
         assert_eq!((shared[0].at, shared[1].at), (Some(0), Some(1)));
         assert!(shared.iter().all(|t| t.nameable()), "a name is the fix");
@@ -5220,9 +5470,14 @@ mod tests {
         // what a link joins.
         match fix_for("one of them is not here") {
             Some(Fix::Line(line)) => {
-                assert_eq!((line.from.as_str(), line.to.as_str()), ("i2c", "nowhere"));
+                assert_eq!(
+                    (line.from.as_str(), line.to.as_str()),
+                    ("i2c", "nowhere")
+                );
             }
-            other => panic!("the dangling line should offer its own removal: {other:?}"),
+            other => panic!(
+                "the dangling line should offer its own removal: {other:?}"
+            ),
         }
 
         // And the group nothing is in, which offers its own deletion.
@@ -5244,7 +5499,9 @@ mod tests {
         for trouble in &troubles {
             assert!(!trouble.said.is_empty(), "{trouble:?}");
             assert!(
-                trouble.nameable() || trouble.at.is_some() || !trouble.offer().is_empty(),
+                trouble.nameable()
+                    || trouble.at.is_some()
+                    || !trouble.offer().is_empty(),
                 "a row with nothing to press: {trouble:?}"
             );
         }
@@ -5260,8 +5517,11 @@ mod tests {
     fn a_node_nobody_fixed_is_still_drawn_in_its_pane() {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("vehicle.yaml");
-        std::fs::write(&path, "vehicle:\n  - name: odd\n    type: contraption\n")
-            .expect("a configuration naming a type this build has not got");
+        std::fs::write(
+            &path,
+            "vehicle:\n  - name: odd\n    type: contraption\n",
+        )
+        .expect("a configuration naming a type this build has not got");
 
         let editor = Editor::open(&path, dividers());
         assert!(
@@ -5309,7 +5569,8 @@ mod tests {
 
         let editor = Editor::open(&path, dividers());
         let troubles = startup_troubles(&editor);
-        let said: Vec<&str> = troubles.iter().map(|t| t.said.as_str()).collect();
+        let said: Vec<&str> =
+            troubles.iter().map(|t| t.said.as_str()).collect();
 
         // The empty group is the editor's own fault and the rules' too: one
         // row, the editor's, which offers to delete it.
@@ -5321,7 +5582,8 @@ mod tests {
 
         // The unfinished node is the rules' alone, and it is there, said as
         // tcsverify says it and offering the node.
-        let report = tcsverify::verify(&path, None, tcsverify::Limits::EVERYTHING);
+        let report =
+            tcsverify::verify(&path, None, tcsverify::Limits::EVERYTHING);
         let unfinished = report
             .findings
             .iter()
@@ -5330,7 +5592,9 @@ mod tests {
         let row = troubles
             .iter()
             .find(|t| t.said == unfinished.to_string())
-            .unwrap_or_else(|| panic!("{unfinished} should be listed: {said:#?}"));
+            .unwrap_or_else(|| {
+                panic!("{unfinished} should be listed: {said:#?}")
+            });
         assert_eq!(row.fix, Fix::Node);
         assert!(row.at.is_some());
 
@@ -5358,7 +5622,9 @@ mod tests {
     #[test]
     fn the_names_offered_have_to_settle_the_duplicate() {
         let mut document = Document::new();
-        for (name, node_type) in [("i2c", "i2c"), ("i2c", "i2c"), ("moc", "moc")] {
+        for (name, node_type) in
+            [("i2c", "i2c"), ("i2c", "i2c"), ("moc", "moc")]
+        {
             document.apply(&Edit::AddNode {
                 name: name.to_string(),
                 node_type: node_type.to_string(),
@@ -5375,15 +5641,22 @@ mod tests {
 
         // As the file has them: still the same name, which is what the window
         // opens on and what the button has to wait for.
-        assert!(names_settle(&document, &asked(&[(0, "i2c"), (1, "i2c")])).is_err());
+        assert!(
+            names_settle(&document, &asked(&[(0, "i2c"), (1, "i2c")])).is_err()
+        );
 
         // One of them changed is enough.
-        assert!(names_settle(&document, &asked(&[(0, "i2c"), (1, "i2c-1")])).is_ok());
+        assert!(names_settle(&document, &asked(&[(0, "i2c"), (1, "i2c-1")]))
+            .is_ok());
         // Both, to something else again.
-        assert!(names_settle(&document, &asked(&[(0, "fore"), (1, "aft")])).is_ok());
+        assert!(
+            names_settle(&document, &asked(&[(0, "fore"), (1, "aft")])).is_ok()
+        );
 
         // A blank is not a name.
-        assert!(names_settle(&document, &asked(&[(0, "i2c"), (1, "  ")])).is_err());
+        assert!(
+            names_settle(&document, &asked(&[(0, "i2c"), (1, "  ")])).is_err()
+        );
 
         // And a third node's name is a duplicate again: a button that made
         // the same question come back would be no answer at all.
@@ -5393,8 +5666,8 @@ mod tests {
 
         // What is said is about what is wrong, because it is said instead of
         // the button being pressable.
-        let said =
-            names_settle(&document, &asked(&[(0, "same"), (1, "same")])).expect_err("two the same");
+        let said = names_settle(&document, &asked(&[(0, "same"), (1, "same")]))
+            .expect_err("two the same");
         assert!(said.contains("same"), "{said}");
     }
 
@@ -5493,7 +5766,8 @@ mod tests {
         // tree describes is offered once per description instead, which is
         // what the test below is about.
         for t in NodeType::ALL {
-            let how_many = offered.iter().filter(|said| *said == t.spelling()).count();
+            let how_many =
+                offered.iter().filter(|said| *said == t.spelling()).count();
             let described = descriptions()
                 .iter()
                 .filter(|one| one.node_type == t.spelling())
@@ -5501,7 +5775,8 @@ mod tests {
             assert_eq!(
                 how_many,
                 described.max(1),
-                "{} is offered {how_many} times and has {described} descriptions",
+                "{} is offered {how_many} times and has {described} \
+                 descriptions",
                 t.spelling()
             );
         }
@@ -5520,21 +5795,23 @@ mod tests {
     /// are declared, and each is offered in its own pane under its own name.
     #[test]
     fn the_vehicle_pane_offers_what_the_tree_describes() {
-        let tree = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("share/nodes");
+        let tree = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("share/nodes");
         let (described, trouble) = nodes::read_tree(&tree);
         assert_eq!(trouble, Vec::<String>::new());
 
         // Every description is offered, in whichever pane its type belongs to.
-        let everywhere: Vec<String> = [Pane::Moc, Pane::Vehicle, Pane::Payloads]
-            .into_iter()
-            .flat_map(|pane| {
-                rows_from(pane, &described)
-                    .into_iter()
-                    .filter(|row| !row.is_heading)
-                    .map(|row| row.node.name.to_string())
-                    .collect::<Vec<String>>()
-            })
-            .collect();
+        let everywhere: Vec<String> =
+            [Pane::Moc, Pane::Vehicle, Pane::Payloads]
+                .into_iter()
+                .flat_map(|pane| {
+                    rows_from(pane, &described)
+                        .into_iter()
+                        .filter(|row| !row.is_heading)
+                        .map(|row| row.node.name.to_string())
+                        .collect::<Vec<String>>()
+                })
+                .collect();
         for one in &described {
             assert!(
                 everywhere.contains(&one.node),
@@ -5593,7 +5870,8 @@ mod tests {
     #[test]
     fn every_outline_is_one_the_markup_knows() {
         let markup = std::fs::read_to_string(
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint"),
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("ui/main.slint"),
         )
         .expect("the markup this binary was built from");
 
@@ -5713,7 +5991,8 @@ mod tests {
         // Where a node may be, which is where the terminals' places are
         // worked out from: see `style::terminal_at`.
         let at = (pane::node_ceil(0), pane::node_ceil(0));
-        let view = |node_type: &str| view_of("x", node_type, at, None, false, None);
+        let view =
+            |node_type: &str| view_of("x", node_type, at, None, false, None);
 
         // A payload: what the ground sends arrives, and its readings leave.
         let sensor = view("i2c");
@@ -5802,7 +6081,8 @@ mod tests {
 
         for (what, line) in [("payload", PAYLOAD_LINE), ("moc", MOC_LINE)] {
             for sight in Sight::ALL {
-                let apart = difference(seen(painted(line), sight), seen(fault, sight));
+                let apart =
+                    difference(seen(painted(line), sight), seen(fault, sight));
                 assert!(
                     apart >= 35.0,
                     "the {what} line is {apart:.1} from the fault red under \
@@ -5867,7 +6147,12 @@ mod tests {
                     .expect("a type of its own");
                 (came_later(t), *name)
             });
-            assert_eq!(order, sorted, "the {} panel is out of order", pane.label());
+            assert_eq!(
+                order,
+                sorted,
+                "the {} panel is out of order",
+                pane.label()
+            );
 
             // The first rung is darker than the line, by the eight the tiers
             // ask -- and twelve *apart* from it, which is the rule that
@@ -5885,7 +6170,10 @@ mod tests {
                 line - first
             );
             for sight in Sight::ALL {
-                let apart = difference(seen(painted(rungs[0]), sight), seen(painted(from), sight));
+                let apart = difference(
+                    seen(painted(rungs[0]), sight),
+                    seen(painted(from), sight),
+                );
                 assert!(
                     apart >= 12.0,
                     "the {} panel's first node is {apart:.1} from the line it \
@@ -5898,7 +6186,8 @@ mod tests {
             // seen beside it: two and a half units, where two is "the same
             // colour in two printings".
             for pair in rungs.windows(2) {
-                let (above, below) = (lightness(painted(pair[0])), lightness(painted(pair[1])));
+                let (above, below) =
+                    (lightness(painted(pair[0])), lightness(painted(pair[1])));
                 assert!(
                     above - below >= 2.5,
                     "two rungs of the {} panel are {:.1} apart in lightness",
@@ -5913,8 +6202,8 @@ mod tests {
                 let body = painted(rung);
                 assert!(
                     lightness(body) >= 13.0,
-                    "a rung of the {} panel is at {:.1} of lightness, below the \
-                     floor where the families converge",
+                    "a rung of the {} panel is at {:.1} of lightness, below \
+                     the floor where the families converge",
                     pane.label(),
                     lightness(body)
                 );
@@ -6018,7 +6307,11 @@ mod tests {
                 painted(&ground_of(style::ground_of(pane))),
             ));
         }
-        scheme.push(("the payload line".to_string(), None, painted(PAYLOAD_LINE)));
+        scheme.push((
+            "the payload line".to_string(),
+            None,
+            painted(PAYLOAD_LINE),
+        ));
         scheme.push(("the moc line".to_string(), None, painted(MOC_LINE)));
         for t in NodeType::ALL {
             scheme.push((
@@ -6028,7 +6321,8 @@ mod tests {
             ));
         }
 
-        let mut closest = (f64::MAX, Sight::Normal, String::new(), String::new());
+        let mut closest =
+            (f64::MAX, Sight::Normal, String::new(), String::new());
         for (i, (one, mine, a)) in scheme.iter().enumerate() {
             for (two, theirs, b) in &scheme[i + 1..] {
                 // Two nodes of one panel are the exemption, and it is
@@ -6138,10 +6432,11 @@ mod tests {
         // somebody with any of the three dichromacies can tell which pane
         // they are looking at.
         use sight::{difference, seen, Sight};
-        let grounds: Vec<(Pane, (u8, u8, u8))> = [Pane::Moc, Pane::Vehicle, Pane::Payloads]
-            .into_iter()
-            .map(|pane| (pane, painted(&ground_of(style::ground_of(pane)))))
-            .collect();
+        let grounds: Vec<(Pane, (u8, u8, u8))> =
+            [Pane::Moc, Pane::Vehicle, Pane::Payloads]
+                .into_iter()
+                .map(|pane| (pane, painted(&ground_of(style::ground_of(pane)))))
+                .collect();
         for (pane, ground) in &grounds {
             assert!(
                 lightness(*ground) >= 82.0,
@@ -6208,11 +6503,13 @@ mod tests {
             home: None,
         });
 
-        let (name, node_type, _, fields, _) = panel_of(&editor, &None, Some("temp_1"));
+        let (name, node_type, _, fields, _) =
+            panel_of(&editor, &None, Some("temp_1"));
         assert_eq!(name, "temp_1");
         assert_eq!(node_type, "i2c");
 
-        let shown: Vec<String> = fields.iter().map(|f| f.name.to_string()).collect();
+        let shown: Vec<String> =
+            fields.iter().map(|f| f.name.to_string()).collect();
         assert!(shown.contains(&"path".to_string()), "{shown:?}");
         assert!(shown.contains(&"address".to_string()), "{shown:?}");
 
@@ -6351,7 +6648,8 @@ mod tests {
         }
         // And everything snapped is a place a node may be, and the nearest:
         // never more than half a step away.
-        let half = (pane::NODE_STEP_MM as f64 * pane::PX_PER_MM / 2.0).ceil() as i32;
+        let half =
+            (pane::NODE_STEP_MM as f64 * pane::PX_PER_MM / 2.0).ceil() as i32;
         for x in -40..400 {
             let at = snap((x, x)).0;
             assert!(pane::is_on_node_grid(at), "{x} snapped to {at}");
@@ -6367,11 +6665,22 @@ mod tests {
                 "{mm} mm is at {at}"
             );
             assert_eq!(pane::on_grid(at), at, "{mm} mm");
-            assert_eq!(pane::grid_after(at), pane::grid_point(mm + 1), "{mm} mm");
-            assert_eq!(pane::grid_before(at), pane::grid_point(mm - 1), "{mm} mm");
+            assert_eq!(
+                pane::grid_after(at),
+                pane::grid_point(mm + 1),
+                "{mm} mm"
+            );
+            assert_eq!(
+                pane::grid_before(at),
+                pane::grid_point(mm - 1),
+                "{mm} mm"
+            );
         }
         // The ground station a new configuration starts with is on it too.
-        assert!(pane::is_on_node_grid(MOC_PLACE.0) && pane::is_on_node_grid(MOC_PLACE.1));
+        assert!(
+            pane::is_on_node_grid(MOC_PLACE.0)
+                && pane::is_on_node_grid(MOC_PLACE.1)
+        );
         assert!(MOC_PLACE.0 + style::WIDTH as i32 <= WORKING_WIDTH);
     }
 
@@ -6440,11 +6749,13 @@ mod tests {
         });
 
         let (top, _) = views_of(&editor, &None, None);
-        let names: Vec<String> = top.iter().map(|n| n.name.to_string()).collect();
+        let names: Vec<String> =
+            top.iter().map(|n| n.name.to_string()).collect();
         assert_eq!(names, vec!["cabin".to_string(), "moc".to_string()]);
 
         let (inside, _) = views_of(&editor, &Some("cabin".into()), None);
-        let names: Vec<String> = inside.iter().map(|n| n.name.to_string()).collect();
+        let names: Vec<String> =
+            inside.iter().map(|n| n.name.to_string()).collect();
         assert_eq!(names, vec!["temp_1".to_string()]);
 
         // The closed box says what is in it, rather than drawing it.
@@ -6541,9 +6852,9 @@ mod tests {
     /// its `payload-out`, in its upper right corner, and arrive at the
     /// computation by its `payload-in`, in that node's upper left -- so the
     /// line runs rightward along the top of both, the way the data goes and
-    /// the way the panes are arranged. It used to leave the middle of the source's
-    /// right edge and arrive at the middle of the target's left edge, which
-    /// was the only thing a line could do before terminals.
+    /// the way the panes are arranged. It used to leave the middle of the
+    /// source's right edge and arrive at the middle of the target's left edge,
+    /// which was the only thing a line could do before terminals.
     #[test]
     fn a_link_is_drawn_between_its_nodes() {
         use journal::{Edit, Link};
@@ -6616,7 +6927,8 @@ mod tests {
         // corner -- so the line touches both boxes it joins and crosses
         // neither shape.
         let ((start_x, start_y), leaves_right) =
-            style::attachment("i2c", (24, 24), "payload-out").expect("a payload's source");
+            style::attachment("i2c", (24, 24), "payload-out")
+                .expect("a payload's source");
         assert!(leaves_right, "the readings leave towards the ground");
         assert!(
             view.route
@@ -6626,7 +6938,8 @@ mod tests {
         );
 
         let ((end_x, end_y), _) =
-            style::attachment("compute", (400, 40), "payload-in").expect("a sink");
+            style::attachment("compute", (400, 40), "payload-in")
+                .expect("a sink");
         assert!(
             view.route.ends_with(&format!("{end_x:.1} {end_y:.1}")),
             "{}",
@@ -6691,7 +7004,8 @@ mod tests {
                 .find(|(name, _, _)| name == node)
                 .expect("the node");
             let (x, y, width, height) =
-                style::terminal_box(node_type, *at, terminal).expect("a terminal");
+                style::terminal_box(node_type, *at, terminal)
+                    .expect("a terminal");
             (x + width / 2.0, y + height / 2.0)
         };
         let drawn = |node: &str, terminal: &str| Drawing {
@@ -6742,7 +7056,10 @@ mod tests {
             over("sensor", "moc-in"),
         )
         .expect("what the ground sends reaches the payload");
-        assert_eq!((back.from.as_str(), back.to.as_str()), ("ground", "sensor"));
+        assert_eq!(
+            (back.from.as_str(), back.to.as_str()),
+            ("ground", "sensor")
+        );
 
         // A null node has two of each, so its links say which: that is the
         // whole reason a terminal is written into a file.
@@ -6974,7 +7291,8 @@ mod tests {
         let kind = |node: &str| found(node).1;
         let over = |node: &str, terminal: &str| {
             let (x, y, width, height) =
-                style::terminal_box(&kind(node), at(node), terminal).expect("a terminal");
+                style::terminal_box(&kind(node), at(node), terminal)
+                    .expect("a terminal");
             (x + width / 2.0, y + height / 2.0)
         };
         let middle = |node: &str| {
@@ -7060,7 +7378,13 @@ mod tests {
         // Not onto the far node itself, which would be a link from a node to
         // itself.
         assert_eq!(
-            dropped(&document, &None, &held, &pressed, over("sensor", "moc-in")),
+            dropped(
+                &document,
+                &None,
+                &held,
+                &pressed,
+                over("sensor", "moc-in")
+            ),
             None
         );
 
@@ -7073,7 +7397,12 @@ mod tests {
         assert_eq!(
             dropped(&document, &None, &held, &pressed, middle("other")),
             Some(Edit::AddLink {
-                link: Link::joining("other", Some("payload-out"), "ground", None)
+                link: Link::joining(
+                    "other",
+                    Some("payload-out"),
+                    "ground",
+                    None
+                )
             }),
             "a second line into the ground should be drawn, not refused"
         );
@@ -7228,7 +7557,9 @@ mod tests {
         };
 
         // Nothing linked yet: nothing to hand over.
-        assert!(attached(&document, &at("sensor", "payload-out"), false).is_empty());
+        assert!(
+            attached(&document, &at("sensor", "payload-out"), false).is_empty()
+        );
 
         document.apply(&Edit::AddLink {
             link: Link::joining("sensor", Some("payload-out"), "ground", None),
@@ -7246,7 +7577,12 @@ mod tests {
         // A second destination from the same source: now the source has two,
         // and nothing says which a drag meant.
         document.apply(&Edit::AddLink {
-            link: Link::joining("sensor", Some("payload-out"), "housekeeping", None),
+            link: Link::joining(
+                "sensor",
+                Some("payload-out"),
+                "housekeeping",
+                None,
+            ),
         });
         assert_eq!(
             attached(&document, &at("sensor", "payload-out"), false).len(),
@@ -7298,12 +7634,14 @@ mod tests {
             });
         }
 
-        let over = |node: &str, node_type: &str, at: (i32, i32), terminal: &str| {
-            let (x, y, width, height) =
-                style::terminal_box(node_type, at, terminal).expect("a terminal");
-            let _ = node;
-            (x + width / 2.0, y + height / 2.0)
-        };
+        let over =
+            |node: &str, node_type: &str, at: (i32, i32), terminal: &str| {
+                let (x, y, width, height) =
+                    style::terminal_box(node_type, at, terminal)
+                        .expect("a terminal");
+                let _ = node;
+                (x + width / 2.0, y + height / 2.0)
+            };
 
         let link = joined(
             &document,
@@ -7329,7 +7667,8 @@ mod tests {
         // the ground sends arrives.
         document.apply(&Edit::AddLink { link });
         let ends = ends_of(&document, &document.links[0], &None);
-        let ((x, y), _) = style::attachment("compute", (300, 120), "moc-in").expect("a terminal");
+        let ((x, y), _) = style::attachment("compute", (300, 120), "moc-in")
+            .expect("a terminal");
         assert_eq!(
             ends.to,
             (x, y),
@@ -7390,7 +7729,9 @@ mod tests {
         });
 
         let ends = ends_of(&document, &document.links[0], &None);
-        let ((x, y), _) = style::attachment("app_all_veh", (300, 120), "moc-in").expect("the sink");
+        let ((x, y), _) =
+            style::attachment("app_all_veh", (300, 120), "moc-in")
+                .expect("the sink");
         assert_eq!(
             ends.to,
             (x, y),
@@ -7587,9 +7928,9 @@ mod tests {
     ///
     /// Both lines and all three panes, which is three rules in one place: the
     /// payload line keeps the payload pane and the vehicle's open, and the
-    /// vehicle line keeps the vehicle's and the moc pane open. A pane with nothing
-    /// visible in it is a pane whose nodes cannot be reached, and the drag
-    /// that does it is one press away.
+    /// vehicle line keeps the vehicle's and the moc pane open. A pane with
+    /// nothing visible in it is a pane whose nodes cannot be reached, and the
+    /// drag that does it is one press away.
     #[test]
     fn neither_divider_can_close_a_pane() {
         let document = Document::new();
@@ -7679,16 +8020,22 @@ mod tests {
         // control is in it: a kind that reached the window and chose the same
         // box as everything else would be a kind that did nothing.
         let markup = std::fs::read_to_string(
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint"),
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("ui/main.slint"),
         )
         .expect("the markup this binary was built from");
-        let tightened: String = markup.split_whitespace().collect::<Vec<&str>>().join(" ");
+        let tightened: String =
+            markup.split_whitespace().collect::<Vec<&str>>().join(" ");
         assert!(
-            tightened.contains("if !f.is-heading && f.kind == \"boolean\": CheckBox {"),
+            tightened.contains(
+                "if !f.is-heading && f.kind == \"boolean\": CheckBox {"
+            ),
             "a boolean field is not offered with a control of two states"
         );
         assert!(
-            tightened.contains("if !f.is-heading && f.kind != \"boolean\": LineEdit {"),
+            tightened.contains(
+                "if !f.is-heading && f.kind != \"boolean\": LineEdit {"
+            ),
             "the other kinds are not offered with a box to write in"
         );
     }
@@ -7725,12 +8072,17 @@ mod tests {
         let window = NodeWindow::new().expect("a window");
         put_node(&window, &editor, "bay");
         window.show().expect("the window shows");
-        assert_eq!(window.get_about_shown(), about.as_str(), "before any field");
+        assert_eq!(
+            window.get_about_shown(),
+            about.as_str(),
+            "before any field"
+        );
 
         // The first box to write in is the executable's: it is the first
         // attribute an app's description asks for that is not a true or false.
         let boxes =
-            ElementHandle::find_by_element_type_name(&window, "LineEdit").collect::<Vec<_>>();
+            ElementHandle::find_by_element_type_name(&window, "LineEdit")
+                .collect::<Vec<_>>();
         let named = fields
             .iter()
             .filter(|field| !field.is_heading && field.kind != "boolean")
@@ -7760,7 +8112,8 @@ mod tests {
     #[test]
     fn an_inert_main_window_has_an_area_over_it() {
         let markup = std::fs::read_to_string(
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint"),
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("ui/main.slint"),
         )
         .expect("the markup this binary was built from");
 
@@ -7785,7 +8138,8 @@ mod tests {
              so the surface is over it and takes them instead"
         );
         let veil = &body[overlay..];
-        let veil = &veil[..veil.find("\n    }\n").expect("the end of the veil")];
+        let veil =
+            &veil[..veil.find("\n    }\n").expect("the end of the veil")];
         for said in [
             "width: 100%;",
             "height: 100%;",
@@ -7802,9 +8156,9 @@ mod tests {
             "if root.problems-up: ProblemsPanel {",
             "if root.alert-up: AlertPanel {",
         ] {
-            let at = body
-                .find(dialog)
-                .unwrap_or_else(|| panic!("the main window does not ask {dialog:?}"));
+            let at = body.find(dialog).unwrap_or_else(|| {
+                panic!("the main window does not ask {dialog:?}")
+            });
             assert!(at > overlay, "{dialog:?} is behind the veil");
         }
     }
@@ -7819,17 +8173,18 @@ mod tests {
     /// asked it to cover.
     ///
     /// The bands are written down in `pane::NAMES` and drawn in tcsdiagram's
-    /// `diagram.slint`, so this reads the markup and holds the two against each other: a band
-    /// made deeper in the window without this would leave the row reserved
-    /// shallower than the row that is drawn, and a node would be placed over
-    /// a name.
+    /// `diagram.slint`, so this reads the markup and holds the two against
+    /// each other: a band made deeper in the window without this would leave
+    /// the row reserved shallower than the row that is drawn, and a node would
+    /// be placed over a name.
     #[test]
     fn nothing_placed_by_the_editor_covers_a_panes_name() {
         let markup = markup();
         // The same markup with its line breaks and indentation taken out, so
         // that what is asked of it is what it says rather than how it is laid
         // out.
-        let tightened: String = markup.split_whitespace().collect::<Vec<&str>>().join(" ");
+        let tightened: String =
+            markup.split_whitespace().collect::<Vec<&str>>().join(" ");
 
         // The three names, each at the same height inside its own band.
         for name in ["\"MOC\"", "\"Vehicle\"", "\"Payloads\""] {
@@ -7871,7 +8226,8 @@ mod tests {
         // what `NAMES` is the generous answer to.
         assert!(
             tightened.contains(
-                "property <length> heading-tall: max(moc-heading.preferred-height, \
+                "property <length> heading-tall: \
+                 max(moc-heading.preferred-height, \
                  max(vehicle-heading.preferred-height, \
                  payload-heading.preferred-height)) + 2 * Space.tight;"
             ),
@@ -7894,12 +8250,14 @@ mod tests {
         // And Fonts.window is twelve points, which is sixteen pixels: see
         // tcsui/ui/fonts.slint.
         let fonts = std::fs::read_to_string(
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../tcsui/ui/fonts.slint"),
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../tcsui/ui/fonts.slint"),
         )
         .expect("tcsui's fonts read");
         assert!(
             fonts.contains("out property <length> window: 12pt;"),
-            "Fonts.window is no longer twelve points, so pane::NAMES is out of date"
+            "Fonts.window is no longer twelve points, so pane::NAMES is out of \
+             date"
         );
         assert!(
             height >= 21 + 2 * 4,
@@ -7923,8 +8281,11 @@ mod tests {
         // And so does every node of an arrangement, which lays the whole
         // canvas out at once.
         let where_ = tempfile::tempdir().expect("a directory");
-        let mut editor = Editor::open(&where_.path().join("vehicle.yaml"), dividers());
-        for (name, kind) in [("a", "i2c"), ("b", "i2c"), ("c", "compute"), ("d", "moc")] {
+        let mut editor =
+            Editor::open(&where_.path().join("vehicle.yaml"), dividers());
+        for (name, kind) in
+            [("a", "i2c"), ("b", "i2c"), ("c", "compute"), ("d", "moc")]
+        {
             editor.edit(Edit::AddNode {
                 name: name.to_string(),
                 node_type: kind.to_string(),
@@ -8027,17 +8388,26 @@ mod tests {
                     pane::is_on_grid(dividers.payloads),
                     "{vehicle}% is off the grid"
                 );
-                assert!(pane::is_on_grid(dividers.vehicle), "{moc}% is off the grid");
+                assert!(
+                    pane::is_on_grid(dividers.vehicle),
+                    "{moc}% is off the grid"
+                );
                 // And a percentage means what it says: that much of the
                 // working pane, within the grid step it is snapped to, counted
                 // from the right where the moc pane is.
                 assert!(
-                    (dividers.vehicle - WORKING_WIDTH * (100 - moc) / 100).abs() <= 2,
-                    "a moc pane of {moc}% left the divider at {} of {WORKING_WIDTH}",
+                    (dividers.vehicle - WORKING_WIDTH * (100 - moc) / 100)
+                        .abs()
+                        <= 2,
+                    "a moc pane of {moc}% left the divider at {} of \
+                     {WORKING_WIDTH}",
                     dividers.vehicle
                 );
                 assert!(
-                    (dividers.payloads - WORKING_WIDTH * (100 - moc - vehicle) / 100).abs() <= 2,
+                    (dividers.payloads
+                        - WORKING_WIDTH * (100 - moc - vehicle) / 100)
+                        .abs()
+                        <= 2,
                     "a vehicle pane of {vehicle}% left the divider at {} of \
                      {WORKING_WIDTH}",
                     dividers.payloads
@@ -8084,7 +8454,11 @@ mod tests {
 
         let (low, high) = divider_range(&document, d, Pane::Vehicle);
         assert_eq!(low, d.payloads + step);
-        assert_eq!(high, WORKING_WIDTH - step, "the moc pane keeps a twentieth");
+        assert_eq!(
+            high,
+            WORKING_WIDTH - step,
+            "the moc pane keeps a twentieth"
+        );
         assert!(low > 0 && high < WORKING_WIDTH);
     }
 
@@ -8124,7 +8498,11 @@ mod tests {
 
         let (low, high) = divider_range(&document, d, Pane::Vehicle);
         assert_eq!(low, 400 + width, "the computation's right edge stops it");
-        assert_eq!(high, d.vehicle + 48, "the ground link's left edge stops it");
+        assert_eq!(
+            high,
+            d.vehicle + 48,
+            "the ground link's left edge stops it"
+        );
         assert!(low <= d.vehicle && d.vehicle <= high, "{low}..{high}");
 
         // A node on the wrong side of the divider holds nothing. Otherwise one
@@ -8192,14 +8570,20 @@ mod tests {
         for (attribute, _) in tcslibgs::graph::parameters::ATTRIBUTES {
             assert_eq!(
                 said.get(*attribute).map(String::as_str),
-                Some(tcslibgs::graph::parameters::default_of(attribute).unwrap_or("")),
+                Some(
+                    tcslibgs::graph::parameters::default_of(attribute)
+                        .unwrap_or("")
+                ),
                 "{attribute} should be offered with whatever it defaults to"
             );
         }
         // Which is nothing, for everything but the beacon's interval: a socket
         // has no value that is right until somebody says so, and "how often
         // does the vehicle say it is alive" has one.
-        assert_eq!(said.get("beacon.interval").map(String::as_str), Some("1 s"));
+        assert_eq!(
+            said.get("beacon.interval").map(String::as_str),
+            Some("1 s")
+        );
         // And none of it is a fault: the editor is lazy, and a configuration
         // nobody has filled in yet is one nobody has filled in yet. What it
         // must say before it flies is the ground check's to insist on, with a
@@ -8215,7 +8599,8 @@ mod tests {
         for unanswered in ["tcs_cmd", "payload_telemetry", "log"] {
             assert!(
                 !written.contains(unanswered),
-                "{unanswered} is not stated and should not be written: {written}"
+                "{unanswered} is not stated and should not be written: \
+                 {written}"
             );
         }
 
@@ -8251,7 +8636,8 @@ mod tests {
         let where_ = tempfile::tempdir().expect("a directory");
 
         // One that has something in it.
-        let mut editor = Editor::open(&where_.path().join("a.yaml"), dividers());
+        let mut editor =
+            Editor::open(&where_.path().join("a.yaml"), dividers());
         editor.edit(Edit::AddNode {
             name: "to_kelvin".into(),
             node_type: "compute".into(),
@@ -8261,7 +8647,8 @@ mod tests {
         assert!(editor.document().node("moc-1").is_none());
 
         // One somebody has emptied, which has a history behind it.
-        let mut editor = Editor::open(&where_.path().join("b.yaml"), dividers());
+        let mut editor =
+            Editor::open(&where_.path().join("b.yaml"), dividers());
         editor.edit(Edit::AddNode {
             name: "to_kelvin".into(),
             node_type: "compute".into(),
@@ -8305,7 +8692,8 @@ mod tests {
     /// the file the editor opens by default and the one somebody draws their
     /// own graph in, and the worked example is where the shipped lines live.
     #[test]
-    fn no_line_of_the_worked_example_is_drawn_through_a_node_or_along_another() {
+    fn no_line_of_the_worked_example_is_drawn_through_a_node_or_along_another()
+    {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
 
         // The worked example, which is the shipped configuration with lines in
@@ -8333,7 +8721,10 @@ mod tests {
                     )
                 })
                 .collect();
-            assert!(!obstacles.is_empty(), "thermostat.{extension} has no nodes");
+            assert!(
+                !obstacles.is_empty(),
+                "thermostat.{extension} has no nodes"
+            );
             assert!(!document.links.is_empty(), "and no links");
 
             // Every route, laid in the file's order as the canvas lays them,
@@ -8370,12 +8761,13 @@ mod tests {
                 // routes that start or end at the same point are two lines
                 // meeting at one terminal, whatever their links are called.
                 let meets = |one: &[(f32, f32)], two: &[(f32, f32)]| {
-                    let ends = |p: &[(f32, f32)]| [p.first().copied(), p.last().copied()];
+                    let ends = |p: &[(f32, f32)]| {
+                        [p.first().copied(), p.last().copied()]
+                    };
                     ends(one).iter().flatten().any(|a| {
-                        ends(two)
-                            .iter()
-                            .flatten()
-                            .any(|b| (a.0 - b.0).abs() < 1.0 && (a.1 - b.1).abs() < 1.0)
+                        ends(two).iter().flatten().any(|b| {
+                            (a.0 - b.0).abs() < 1.0 && (a.1 - b.1).abs() < 1.0
+                        })
                     })
                 };
                 let apart: Vec<Vec<(f32, f32)>> = taken
@@ -8386,7 +8778,8 @@ mod tests {
                 along += route::shared(&points, &apart);
                 // What the same link would have cost before the lanes: the
                 // route the router picks when it is told about nothing.
-                blind += route::shared(&route::lay(ends, &obstacles, &[]), &apart);
+                blind +=
+                    route::shared(&route::lay(ends, &obstacles, &[]), &apart);
                 taken.push(points);
             }
 
@@ -8753,9 +9146,11 @@ mod tests {
         // All three up: the question came up with the file, the alert is told
         // to say something of its own, and the list is opened as the bar's
         // count opens it.
-        views
-            .borrow()
-            .say("Something did not work.", "a device that is full", "");
+        views.borrow().say(
+            "Something did not work.",
+            "a device that is full",
+            "",
+        );
         show_concerns(&editor, &views, false);
         assert!(views.borrow().names.is_some(), "the question is up");
         assert!(views.borrow().alert.is_some(), "the alert is up");
@@ -8793,7 +9188,12 @@ mod tests {
             });
         }
         editor.borrow_mut().edit(Edit::AddLink {
-            link: journal::Link::joining("sensor", Some("payload-out"), "ground", None),
+            link: journal::Link::joining(
+                "sensor",
+                Some("payload-out"),
+                "ground",
+                None,
+            ),
         });
 
         let ui = MainWindow::new().expect("a window");
@@ -8822,7 +9222,8 @@ mod tests {
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
         }));
-        let chosen: Rc<RefCell<BTreeMap<String, String>>> = Rc::new(RefCell::new(BTreeMap::new()));
+        let chosen: Rc<RefCell<BTreeMap<String, String>>> =
+            Rc::new(RefCell::new(BTreeMap::new()));
         let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
         wire(&ui, &editor, &views, &drawing, &chosen, &None);
         views.borrow().refresh(&editor.borrow());
@@ -8958,7 +9359,8 @@ mod tests {
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
         }));
-        let chosen: Rc<RefCell<BTreeMap<String, String>>> = Rc::new(RefCell::new(BTreeMap::new()));
+        let chosen: Rc<RefCell<BTreeMap<String, String>>> =
+            Rc::new(RefCell::new(BTreeMap::new()));
         let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
         views.borrow_mut().chosen = chosen.clone();
         views.borrow_mut().drawing = drawing.clone();
@@ -8966,16 +9368,21 @@ mod tests {
         views.borrow().refresh(&editor.borrow());
         ui.show().expect("the window shows");
 
-        let canvas = testing::ElementHandle::find_by_element_id(&ui, "Surface::canvas")
-            .next()
-            .expect("the window has a canvas");
+        let canvas =
+            testing::ElementHandle::find_by_element_id(&ui, "Surface::canvas")
+                .next()
+                .expect("the window has a canvas");
         let origin = canvas.absolute_position();
-        let at = |x: f32, y: f32| slint::LogicalPosition::new(origin.x + x, origin.y + y);
+        let at = |x: f32, y: f32| {
+            slint::LogicalPosition::new(origin.x + x, origin.y + y)
+        };
 
-        // Pressed on the payload's payload-out, which is where its readings leave.
+        // Pressed on the payload's payload-out, which is where its readings
+        // leave.
         let node = editor.borrow().document().node("sensor").expect("it").at;
         let (x, y, width, height) =
-            style::terminal_box("i2c", node, "payload-out").expect("a terminal");
+            style::terminal_box("i2c", node, "payload-out")
+                .expect("a terminal");
         let from = at(x + width / 2.0, y + height / 2.0);
 
         // Nothing drawn before the gesture.
@@ -9085,7 +9492,8 @@ mod tests {
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
         }));
-        let chosen: Rc<RefCell<BTreeMap<String, String>>> = Rc::new(RefCell::new(BTreeMap::new()));
+        let chosen: Rc<RefCell<BTreeMap<String, String>>> =
+            Rc::new(RefCell::new(BTreeMap::new()));
         let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
         wire(&ui, &editor, &views, &drawing, &chosen, &None);
         views.borrow().refresh(&editor.borrow());
@@ -9191,7 +9599,8 @@ mod tests {
 
         // One that failed is put in front of them, and says why.
         let shut = |mode: u32| {
-            let mut permissions = std::fs::metadata(&locked).unwrap().permissions();
+            let mut permissions =
+                std::fs::metadata(&locked).unwrap().permissions();
             permissions.set_mode(mode);
             std::fs::set_permissions(&locked, permissions).unwrap();
         };
@@ -9321,8 +9730,14 @@ mod tests {
 
         // Two lines into one input, which is the fault: a mean over one
         // reading and itself.
-        let twice =
-            |to: &str| journal::Link::joining(to, Some("payload-out"), "cabin_temp", Some("in0"));
+        let twice = |to: &str| {
+            journal::Link::joining(
+                to,
+                Some("payload-out"),
+                "cabin_temp",
+                Some("in0"),
+            )
+        };
         editor.borrow_mut().edit(Edit::AddLink {
             link: twice("temp_1"),
         });
@@ -9401,7 +9816,12 @@ mod tests {
             });
         }
         editor.borrow_mut().edit(Edit::AddLink {
-            link: journal::Link::joining("sensor", Some("payload-out"), "ground", None),
+            link: journal::Link::joining(
+                "sensor",
+                Some("payload-out"),
+                "ground",
+                None,
+            ),
         });
 
         let ui = MainWindow::new().expect("a window");
@@ -9430,7 +9850,8 @@ mod tests {
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
         }));
-        let chosen: Rc<RefCell<BTreeMap<String, String>>> = Rc::new(RefCell::new(BTreeMap::new()));
+        let chosen: Rc<RefCell<BTreeMap<String, String>>> =
+            Rc::new(RefCell::new(BTreeMap::new()));
         let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
         views.borrow_mut().chosen = chosen.clone();
         views.borrow_mut().drawing = drawing.clone();
@@ -9438,16 +9859,22 @@ mod tests {
         views.borrow().refresh(&editor.borrow());
         ui.show().expect("the window shows");
 
-        let canvas = testing::ElementHandle::find_by_element_id(&ui, "Surface::canvas")
-            .next()
-            .expect("the window has a canvas");
+        let canvas =
+            testing::ElementHandle::find_by_element_id(&ui, "Surface::canvas")
+                .next()
+                .expect("the window has a canvas");
         let origin = canvas.absolute_position();
-        let middle = |node: &str, node_type: &str, at: (i32, i32), terminal: &str| {
-            let (x, y, width, height) =
-                style::terminal_box(node_type, at, terminal).expect("a terminal");
-            let _ = node;
-            slint::LogicalPosition::new(origin.x + x + width / 2.0, origin.y + y + height / 2.0)
-        };
+        let middle =
+            |node: &str, node_type: &str, at: (i32, i32), terminal: &str| {
+                let (x, y, width, height) =
+                    style::terminal_box(node_type, at, terminal)
+                        .expect("a terminal");
+                let _ = node;
+                slint::LogicalPosition::new(
+                    origin.x + x + width / 2.0,
+                    origin.y + y + height / 2.0,
+                )
+            };
 
         // Taken hold of at the payload's own source, which is where this line
         // leaves: a line is deleted from the end that sends it. The end it
@@ -9542,7 +9969,8 @@ mod tests {
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
         }));
-        let chosen: Rc<RefCell<BTreeMap<String, String>>> = Rc::new(RefCell::new(BTreeMap::new()));
+        let chosen: Rc<RefCell<BTreeMap<String, String>>> =
+            Rc::new(RefCell::new(BTreeMap::new()));
         let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
         views.borrow_mut().chosen = chosen.clone();
         views.borrow_mut().drawing = drawing.clone();
@@ -9582,7 +10010,8 @@ mod tests {
         chosen
             .borrow_mut()
             .insert(String::new(), "vote-1".to_string());
-        let (_, _, _, fields, _) = panel_of(&editor.borrow(), &None, Some("vote-1"));
+        let (_, _, _, fields, _) =
+            panel_of(&editor.borrow(), &None, Some("vote-1"));
         let asked: Vec<String> = fields
             .iter()
             .filter(|field| !field.is_heading)
@@ -9644,7 +10073,9 @@ mod tests {
                     .iter()
                     .find(|node| !before.contains(&node.name))
                     .cloned()
-                    .unwrap_or_else(|| panic!("{} placed nothing", row.node.name));
+                    .unwrap_or_else(|| {
+                        panic!("{} placed nothing", row.node.name)
+                    });
 
                 editor.borrow_mut().undo();
                 assert!(
@@ -9658,8 +10089,14 @@ mod tests {
                     .document()
                     .node(&placed.name)
                     .cloned()
-                    .unwrap_or_else(|| panic!("one redo should put {} back", placed.name));
-                assert_eq!(back, placed, "{} came back other than it was", placed.name);
+                    .unwrap_or_else(|| {
+                        panic!("one redo should put {} back", placed.name)
+                    });
+                assert_eq!(
+                    back, placed,
+                    "{} came back other than it was",
+                    placed.name
+                );
             }
         }
     }
@@ -9728,7 +10165,8 @@ mod tests {
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
         }));
-        let chosen: Rc<RefCell<BTreeMap<String, String>>> = Rc::new(RefCell::new(BTreeMap::new()));
+        let chosen: Rc<RefCell<BTreeMap<String, String>>> =
+            Rc::new(RefCell::new(BTreeMap::new()));
         let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
         views.borrow_mut().chosen = chosen.clone();
         views.borrow_mut().drawing = drawing.clone();
@@ -9736,14 +10174,16 @@ mod tests {
         views.borrow().refresh(&editor.borrow());
         ui.show().expect("the window shows");
 
-        let canvas = testing::ElementHandle::find_by_element_id(&ui, "Surface::canvas")
-            .next()
-            .expect("the window has a canvas");
+        let canvas =
+            testing::ElementHandle::find_by_element_id(&ui, "Surface::canvas")
+                .next()
+                .expect("the window has a canvas");
         let origin = canvas.absolute_position();
 
         // The middle of a terminal's box, where the pointer goes.
         let middle = |node: &str, terminal: &str| {
-            let at = editor.borrow().document().node(node).expect("the node").at;
+            let at =
+                editor.borrow().document().node(node).expect("the node").at;
             let node_type = editor
                 .borrow()
                 .document()
@@ -9752,8 +10192,12 @@ mod tests {
                 .node_type
                 .clone();
             let (x, y, width, height) =
-                style::terminal_box(&node_type, at, terminal).expect("a terminal");
-            slint::LogicalPosition::new(origin.x + x + width / 2.0, origin.y + y + height / 2.0)
+                style::terminal_box(&node_type, at, terminal)
+                    .expect("a terminal");
+            slint::LogicalPosition::new(
+                origin.x + x + width / 2.0,
+                origin.y + y + height / 2.0,
+            )
         };
 
         // And the middle of a node, which is the other place a line may be
@@ -9792,8 +10236,8 @@ mod tests {
         assert_eq!(
             links.len(),
             1,
-            "dragging from a terminal to one that pairs with it should make one \
-             link: {links:?}"
+            "dragging from a terminal to one that pairs with it should make \
+             one link: {links:?}"
         );
         assert_eq!(
             (links[0].from.as_str(), links[0].to.as_str()),
@@ -9818,7 +10262,8 @@ mod tests {
         // the middle of the ground link's box. The terminal is the stream's
         // own answer -- a payload-out arrives at a payload-in -- so there is
         // nothing to aim at.
-        let gesture = |from: slint::LogicalPosition, to: slint::LogicalPosition| {
+        let gesture = |from: slint::LogicalPosition,
+                       to: slint::LogicalPosition| {
             ui.window()
                 .dispatch_event(WindowEvent::PointerMoved { position: from });
             ui.window().dispatch_event(WindowEvent::PointerPressed {
@@ -9919,7 +10364,8 @@ mod tests {
             assert_eq!(
                 ui.get_links().row_count(),
                 editor.borrow().document().links.len(),
-                "example.{extension}: the canvas and the file disagree about its lines"
+                "example.{extension}: the canvas and the file disagree about \
+                 its lines"
             );
         }
 
@@ -9949,7 +10395,8 @@ mod tests {
                 );
                 assert!(
                     link.marker.ends_with('Z'),
-                    "thermostat.{extension}: line {row} has no flow marker: {:?}",
+                    "thermostat.{extension}: line {row} has no flow marker: \
+                     {:?}",
                     link.marker
                 );
             }
@@ -10029,7 +10476,8 @@ mod tests {
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
         }));
-        let chosen: Rc<RefCell<BTreeMap<String, String>>> = Rc::new(RefCell::new(BTreeMap::new()));
+        let chosen: Rc<RefCell<BTreeMap<String, String>>> =
+            Rc::new(RefCell::new(BTreeMap::new()));
         let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
         views.borrow_mut().chosen = chosen.clone();
         views.borrow_mut().drawing = drawing.clone();
@@ -10038,9 +10486,10 @@ mod tests {
 
         ui.show().expect("the window shows");
 
-        let canvas = testing::ElementHandle::find_by_element_id(&ui, "Surface::canvas")
-            .next()
-            .expect("the window has a canvas");
+        let canvas =
+            testing::ElementHandle::find_by_element_id(&ui, "Surface::canvas")
+                .next()
+                .expect("the window has a canvas");
         let at = canvas.absolute_position();
         let (width, height) = size_of("compute");
 
@@ -10066,7 +10515,10 @@ mod tests {
         for step in 1..=steps {
             let part = step as f32 / steps as f32;
             ui.window().dispatch_event(WindowEvent::PointerMoved {
-                position: slint::LogicalPosition::new(from.x + by.0 * part, from.y + by.1 * part),
+                position: slint::LogicalPosition::new(
+                    from.x + by.0 * part,
+                    from.y + by.1 * part,
+                ),
             });
         }
 
@@ -10074,9 +10526,12 @@ mod tests {
         // half a person sees: a drag that only moved the node on release
         // would look like a drag that was doing nothing.
         // The one on the canvas, the others being the palette's.
-        let drawn = testing::ElementHandle::find_by_element_id(&ui, "NodeShape::moving")
-            .find(|handle| handle.absolute_position().x >= at.x)
-            .expect("a node draws its parts in a container that the drag moves");
+        let drawn = testing::ElementHandle::find_by_element_id(
+            &ui,
+            "NodeShape::moving",
+        )
+        .find(|handle| handle.absolute_position().x >= at.x)
+        .expect("a node draws its parts in a container that the drag moves");
         let followed = drawn.absolute_position();
         assert!(
             (followed.x - (at.x + was.0 as f32 + by.0)).abs() < 1.0
@@ -10164,7 +10619,8 @@ mod tests {
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
         }));
-        let chosen: Rc<RefCell<BTreeMap<String, String>>> = Rc::new(RefCell::new(BTreeMap::new()));
+        let chosen: Rc<RefCell<BTreeMap<String, String>>> =
+            Rc::new(RefCell::new(BTreeMap::new()));
         let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
         views.borrow_mut().chosen = chosen.clone();
         views.borrow_mut().drawing = drawing.clone();
@@ -10172,9 +10628,10 @@ mod tests {
         views.borrow().refresh(&editor.borrow());
         ui.show().expect("the window shows");
 
-        let canvas = testing::ElementHandle::find_by_element_id(&ui, "Surface::canvas")
-            .next()
-            .expect("the window has a canvas");
+        let canvas =
+            testing::ElementHandle::find_by_element_id(&ui, "Surface::canvas")
+                .next()
+                .expect("the window has a canvas");
         let at = canvas.absolute_position();
         let (width, height) = size_of("i2c");
         let from = slint::LogicalPosition::new(
@@ -10210,7 +10667,8 @@ mod tests {
                 pane::node_floor(dividers().payloads - style::WIDTH as i32),
                 pane::on_node_grid(was.1 + by.1 as i32)
             ),
-            "a payload dragged {by:?} from {was:?} left its pane and is at {now:?}"
+            "a payload dragged {by:?} from {was:?} left its pane and is at \
+             {now:?}"
         );
     }
 
@@ -10257,7 +10715,8 @@ mod tests {
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
         }));
-        let chosen: Rc<RefCell<BTreeMap<String, String>>> = Rc::new(RefCell::new(BTreeMap::new()));
+        let chosen: Rc<RefCell<BTreeMap<String, String>>> =
+            Rc::new(RefCell::new(BTreeMap::new()));
         let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
         wire(&ui, &editor, &views, &drawing, &chosen, &None);
 
@@ -10280,7 +10739,8 @@ mod tests {
         let fields: Vec<FieldView> = (0..window.get_fields().row_count())
             .filter_map(|row| window.get_fields().row_data(row))
             .collect();
-        let offered: Vec<String> = fields.iter().map(|f| f.name.to_string()).collect();
+        let offered: Vec<String> =
+            fields.iter().map(|f| f.name.to_string()).collect();
         let expected: Vec<String> = tcslibgs::graph::parameters::ATTRIBUTES
             .iter()
             .map(|(name, _)| (*name).to_string())
@@ -10300,7 +10760,8 @@ mod tests {
 
         // Typing in one records an edit, and one Undo takes it back.
         let depth = editor.borrow().undo_depth();
-        window.invoke_parameter_set("tcs_cmd.recv".into(), "0.0.0.0:4000".into());
+        window
+            .invoke_parameter_set("tcs_cmd.recv".into(), "0.0.0.0:4000".into());
         assert_eq!(
             editor
                 .borrow()
@@ -10340,14 +10801,19 @@ mod tests {
         let before = before
             .as_any()
             .downcast_ref::<VecModel<FieldView>>()
-            .expect("a list of fields") as *const VecModel<FieldView>;
-        window.invoke_parameter_set("tcs_cmd.send".into(), "127.0.0.1:4100".into());
+            .expect("a list of fields")
+            as *const VecModel<FieldView>;
+        window.invoke_parameter_set(
+            "tcs_cmd.send".into(),
+            "127.0.0.1:4100".into(),
+        );
         views.borrow().refresh(&editor.borrow());
         let after = window.get_fields();
         let after = after
             .as_any()
             .downcast_ref::<VecModel<FieldView>>()
-            .expect("a list of fields") as *const VecModel<FieldView>;
+            .expect("a list of fields")
+            as *const VecModel<FieldView>;
         assert!(
             std::ptr::eq(before, after),
             "the fields were replaced, which takes the cursor with them"
@@ -10501,7 +10967,8 @@ mod tests {
 
         // A write that failed, so there is something to offer.
         let shut = |mode: u32| {
-            let mut permissions = std::fs::metadata(&locked).unwrap().permissions();
+            let mut permissions =
+                std::fs::metadata(&locked).unwrap().permissions();
             permissions.set_mode(mode);
             std::fs::set_permissions(&locked, permissions).unwrap();
         };
@@ -10634,7 +11101,8 @@ mod tests {
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
         }));
-        let chosen: Rc<RefCell<BTreeMap<String, String>>> = Rc::new(RefCell::new(BTreeMap::new()));
+        let chosen: Rc<RefCell<BTreeMap<String, String>>> =
+            Rc::new(RefCell::new(BTreeMap::new()));
         let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
         views.borrow_mut().chosen = chosen.clone();
         views.borrow_mut().drawing = drawing.clone();
@@ -10642,9 +11110,10 @@ mod tests {
         views.borrow().refresh(&editor.borrow());
         ui.show().expect("the window shows");
 
-        let canvas = testing::ElementHandle::find_by_element_id(&ui, "Surface::canvas")
-            .next()
-            .expect("the window has a canvas");
+        let canvas =
+            testing::ElementHandle::find_by_element_id(&ui, "Surface::canvas")
+                .next()
+                .expect("the window has a canvas");
         let at = canvas.absolute_position();
         // Pressed and released at one place, which is a click.
         let click = |node: (i32, i32), node_type: &str| {
@@ -10837,7 +11306,8 @@ mod tests {
 
         // With no simulator file, a payload's panel is its own attributes and
         // nothing else: there is no second file for anything to go in.
-        let (_, _, _, fields, _) = panel_of(&editor.borrow(), &None, Some("temp_1"));
+        let (_, _, _, fields, _) =
+            panel_of(&editor.borrow(), &None, Some("temp_1"));
         assert!(
             fields.iter().all(|f| !f.is_heading && !f.simulated),
             "the panel should carry nothing of a file that was not given"
@@ -10849,7 +11319,8 @@ mod tests {
 
         // Now the payload's panel is its attributes, a rule, and the
         // simulator's settings for it.
-        let (_, _, _, fields, _) = panel_of(&editor.borrow(), &None, Some("temp_1"));
+        let (_, _, _, fields, _) =
+            panel_of(&editor.borrow(), &None, Some("temp_1"));
         let rule = fields
             .iter()
             .position(|f| f.is_heading)
@@ -10987,7 +11458,8 @@ mod tests {
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
         }));
-        let chosen: Rc<RefCell<BTreeMap<String, String>>> = Rc::new(RefCell::new(BTreeMap::new()));
+        let chosen: Rc<RefCell<BTreeMap<String, String>>> =
+            Rc::new(RefCell::new(BTreeMap::new()));
         let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
         wire(&ui, &editor, &views, &drawing, &chosen, &None);
         views.borrow().refresh(&editor.borrow());
@@ -11231,17 +11703,25 @@ mod tests {
         }
         {
             let payload_moved = payload_moved.clone();
-            window.on_payload_divider_moved(move |dx| payload_moved.set(Some(dx)));
+            window.on_payload_divider_moved(move |dx| {
+                payload_moved.set(Some(dx))
+            });
         }
         window.show().expect("the window shows");
 
-        let canvas = testing::ElementHandle::find_by_element_id(&window, "Surface::canvas")
-            .next()
-            .expect("the window has a canvas");
+        let canvas = testing::ElementHandle::find_by_element_id(
+            &window,
+            "Surface::canvas",
+        )
+        .next()
+        .expect("the window has a canvas");
         let at = canvas.absolute_position();
 
         // On the line, halfway down it, which is where the handle is.
-        let from = slint::LogicalPosition::new(at.x + dividers().vehicle as f32, at.y + 200.0);
+        let from = slint::LogicalPosition::new(
+            at.x + dividers().vehicle as f32,
+            at.y + 200.0,
+        );
         let by = -120.0;
         let to = slint::LogicalPosition::new(from.x + by, from.y);
 
@@ -11276,7 +11756,10 @@ mod tests {
         );
 
         // And the other line, which is its own control.
-        let from = slint::LogicalPosition::new(at.x + dividers().payloads as f32, at.y + 200.0);
+        let from = slint::LogicalPosition::new(
+            at.x + dividers().payloads as f32,
+            at.y + 200.0,
+        );
         let by = 40.0;
         let to = slint::LogicalPosition::new(from.x + by, from.y);
         window
@@ -11328,12 +11811,17 @@ mod tests {
         let moved: Rc<Cell<Option<(f32, f32)>>> = Rc::new(Cell::new(None));
         {
             let moved = moved.clone();
-            window.on_node_moved(move |_name, dx, dy| moved.set(Some((dx, dy))));
+            window
+                .on_node_moved(move |_name, dx, dy| moved.set(Some((dx, dy))));
         }
 
         // The canvas is laid out before anything can be pressed on it.
         window.show().expect("the window shows");
-        let canvas = testing::ElementHandle::find_by_element_id(&window, "Surface::canvas").next();
+        let canvas = testing::ElementHandle::find_by_element_id(
+            &window,
+            "Surface::canvas",
+        )
+        .next();
         let (origin_x, origin_y) = match canvas {
             Some(canvas) => {
                 let at = canvas.absolute_position();
@@ -11367,9 +11855,12 @@ mod tests {
         // It follows the pointer while the gesture is running, which is the
         // half a person sees: a drag that only moved the node on release
         // would look like a drag that was doing nothing.
-        let drawn = testing::ElementHandle::find_by_element_id(&window, "NodeShape::moving")
-            .next()
-            .expect("a node draws its parts in a container that the drag moves");
+        let drawn = testing::ElementHandle::find_by_element_id(
+            &window,
+            "NodeShape::moving",
+        )
+        .next()
+        .expect("a node draws its parts in a container that the drag moves");
         let followed = drawn.absolute_position();
         assert!(
             (followed.x - (origin_x + at.0 as f32 + by.0)).abs() < 1.0

@@ -3,7 +3,10 @@ name = "tcsdiagram"
 version = "0.1.0"
 edition = "2021"
 license.workspace = true
-description = "How a TCSpecial configuration is drawn: the working panes, the nodes, the link routes and their colours, shared by the editor and the flight software's visual window"
+description = """\
+How a TCSpecial configuration is drawn: the working panes, the nodes, the link \
+routes and their colours, shared by the editor and the flight software's \
+visual window"""
 
 [dependencies]
 # The configuration's own words: node types, terminals, streams.

@@ -335,8 +335,8 @@ fn told<const N: usize>(expects: [&str; N]) -> Result<[String; N], String> {
     for (at, argument) in std::env::args_os().enumerate().skip(1) {
         said.push(argument.into_string().map_err(|_| {
             format!(
-                "argument {at} is not text: every argument an app is given is a \
-                 word from its configuration, and a configuration is text"
+                "argument {at} is not text: every argument an app is given is \
+                 a word from its configuration, and a configuration is text"
             )
         })?);
     }
@@ -399,9 +399,9 @@ fn taking(supported: &[Interface]) -> Result<(), String> {
         match (wanted, is_handed_over(interface.fd())) {
             (true, false) => {
                 return Err(format!(
-                    "{} was not handed over, and this app is one on which {}: it \
-                     is run by tcspecial, which opens descriptor {} for it as \
-                     one end of a socket pair",
+                    "{} was not handed over, and this app is one on which {}: \
+                     it is run by tcspecial, which opens descriptor {} for it \
+                     as one end of a socket pair",
                     interface.name(),
                     interface.carries(),
                     interface.fd()
@@ -409,9 +409,10 @@ fn taking(supported: &[Interface]) -> Result<(), String> {
             }
             (false, true) => {
                 return Err(format!(
-                    "{} was handed over at descriptor {}, and this app does not \
-                     support it: a program run as a kind of app it is not would \
-                     write the vehicle's data wherever that descriptor goes",
+                    "{} was handed over at descriptor {}, and this app does \
+                     not support it: a program run as a kind of app it is not \
+                     would write the vehicle's data wherever that descriptor \
+                     goes",
                     interface.name(),
                     interface.fd()
                 ))

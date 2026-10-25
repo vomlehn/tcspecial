@@ -29,7 +29,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::endpoint_config::{
-    reject_foreign_fields, reject_stream, EndpointConfigResult, GroupKind, LinkTerms,
+    reject_foreign_fields, reject_stream, EndpointConfigResult, GroupKind,
+    LinkTerms,
 };
 
 /// What an IIO payload says about its buffer.
@@ -40,7 +41,9 @@ use crate::endpoint_config::{
 /// `sysfs` by whoever brought the sensor up. A payload that stated those
 /// would be stating values nothing could apply: see the requirement in
 /// `design.rst` that a payload says only what it can set.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize,
+)]
 pub struct IioParams;
 
 /// What an IIO payload says about its buffer, which is nothing.
@@ -48,7 +51,10 @@ pub struct IioParams;
 /// Here all the same, and not as a shortcut: this is where a term belonging to
 /// another type of link is refused, and where a term that used to belong to
 /// this one is told that it no longer does.
-pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<GroupKind> {
+pub(crate) fn group_kind_of(
+    name: &str,
+    g: LinkTerms,
+) -> EndpointConfigResult<GroupKind> {
     reject_foreign_fields(name, "iio", &g, &[])?;
 
     // A buffer read hands over whole sample sets, as many as are ready, so
@@ -60,7 +66,8 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
 
 /// What `--simulate` asks to change on an IIO node that is not a stand-in.
 const TO_STAND_IN: &str =
-    "point path at the iio_dummy sensor, which bin/mkiio makes, or at a pseudo-terminal tcssim makes";
+    "point path at the iio_dummy sensor, which bin/mkiio makes, or at a \
+     pseudo-terminal tcssim makes";
 
 /// Whether the device at `path` is a stand-in: a sensor of the kernel's
 /// `iio_dummy`, or a pseudo-terminal. See [`crate::simulate`].
@@ -68,8 +75,12 @@ const TO_STAND_IN: &str =
 /// A dummy sensor is made through configfs, under
 /// `kernel/config/iio/devices/dummy`, and the directory made there is the
 /// device's name; a real sensor's name is its part's.
-pub fn judged(host: &crate::simulate::Host, path: &str) -> crate::simulate::Judged {
-    let on_a_terminal = crate::simulate::pseudo_terminal(path, "path", TO_STAND_IN);
+pub fn judged(
+    host: &crate::simulate::Host,
+    path: &str,
+) -> crate::simulate::Judged {
+    let on_a_terminal =
+        crate::simulate::pseudo_terminal(path, "path", TO_STAND_IN);
     if on_a_terminal.is_stand_in() {
         return on_a_terminal;
     }
@@ -103,7 +114,9 @@ fn sensor_judged(
             TO_STAND_IN,
         );
     };
-    if !name.is_empty() && is_dir(&host.sys.join("kernel/config/iio/devices/dummy").join(&name)) {
+    if !name.is_empty()
+        && is_dir(&host.sys.join("kernel/config/iio/devices/dummy").join(&name))
+    {
         Judged::stand_in(
             format!("{path} is {name}, a sensor of the kernel's iio_dummy"),
             "path",
@@ -129,7 +142,10 @@ mod stand_in_tests {
         let host = Host {
             sys: sys.path().to_path_buf(),
         };
-        std::fs::create_dir_all(sys.path().join("kernel/config/iio/devices/dummy/tcssim")).unwrap();
+        std::fs::create_dir_all(
+            sys.path().join("kernel/config/iio/devices/dummy/tcssim"),
+        )
+        .unwrap();
         let dummy = sys.path().join("devices/iio:device0");
         std::fs::create_dir_all(&dummy).unwrap();
         std::fs::write(dummy.join("name"), "tcssim\n").unwrap();

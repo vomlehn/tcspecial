@@ -16,9 +16,10 @@ use std::time::Duration;
 
 use tcslib::{TcsClient, UdpConnection};
 use tcslibgs::{
-    ArmKey, BeaconInterval, Command, CommandStatus, ConfigDigest, ConfigTelemetry, ConfigVersion,
-    ConnectTelemetry, DHSample, NodeCounts, NodeId, NodeTelemetry, PingTelemetry,
-    QueryNodeSampleTelemetry, QueryNodeTelemetry, Reason, RestartArmTelemetry, RestartTelemetry,
+    ArmKey, BeaconInterval, Command, CommandStatus, ConfigDigest,
+    ConfigTelemetry, ConfigVersion, ConnectTelemetry, DHSample, NodeCounts,
+    NodeId, NodeTelemetry, PingTelemetry, QueryNodeSampleTelemetry,
+    QueryNodeTelemetry, Reason, RestartArmTelemetry, RestartTelemetry,
     SetNodeTelemetry, Telemetry,
 };
 
@@ -46,58 +47,74 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
                 Ok(received) => received,
                 Err(_) => return,
             };
-            let command: Command =
-                serde_json::from_slice(&buffer[..size]).expect("the client sent a valid command");
+            let command: Command = serde_json::from_slice(&buffer[..size])
+                .expect("the client sent a valid command");
             let seq = command.sequence();
 
             let answer = match command {
-                Command::Ping(_) => {
-                    Telemetry::Ping(PingTelemetry::new(seq, CommandStatus::Success))
-                }
+                Command::Ping(_) => Telemetry::Ping(PingTelemetry::new(
+                    seq,
+                    CommandStatus::Success,
+                )),
                 // The stub answers with the ground's own two, which is a
                 // spacecraft reading the same configuration.
-                Command::Connect(cmd) => {
-                    Telemetry::Connect(ConnectTelemetry::new(seq, cmd.version, cmd.digest))
-                }
-                Command::RestartArm(_) => {
-                    Telemetry::RestartArm(RestartArmTelemetry::new(seq, CommandStatus::Success))
-                }
-                Command::Restart(_) => {
-                    Telemetry::Restart(RestartTelemetry::new(seq, CommandStatus::Success))
-                }
-                Command::Config(_) => {
-                    Telemetry::Config(ConfigTelemetry::new(seq, CommandStatus::Success))
-                }
+                Command::Connect(cmd) => Telemetry::Connect(
+                    ConnectTelemetry::new(seq, cmd.version, cmd.digest),
+                ),
+                Command::RestartArm(_) => Telemetry::RestartArm(
+                    RestartArmTelemetry::new(seq, CommandStatus::Success),
+                ),
+                Command::Restart(_) => Telemetry::Restart(
+                    RestartTelemetry::new(seq, CommandStatus::Success),
+                ),
+                Command::Config(_) => Telemetry::Config(ConfigTelemetry::new(
+                    seq,
+                    CommandStatus::Success,
+                )),
                 // A node's commands, each answered for the node it named.
                 // Every command has an answer here because the stub reads
                 // whatever arrives, and a command it could not answer would
                 // look like a link that had gone quiet.
-                Command::StartNode(cmd) => Telemetry::StartNode(NodeTelemetry::started(
-                    seq,
-                    CommandStatus::Success,
-                    cmd.node,
-                )),
-                Command::StopNode(cmd) => Telemetry::StopNode(NodeTelemetry::stopped(
-                    seq,
-                    CommandStatus::Success,
-                    cmd.node,
-                )),
+                Command::StartNode(cmd) => {
+                    Telemetry::StartNode(NodeTelemetry::started(
+                        seq,
+                        CommandStatus::Success,
+                        cmd.node,
+                    ))
+                }
+                Command::StopNode(cmd) => {
+                    Telemetry::StopNode(NodeTelemetry::stopped(
+                        seq,
+                        CommandStatus::Success,
+                        cmd.node,
+                    ))
+                }
                 // A setpoint is taken, and anything else refused as the
                 // vehicle refuses it: with a reason.
                 Command::SetNode(cmd) if cmd.attribute == "setpoint" => {
-                    Telemetry::SetNode(SetNodeTelemetry::new(seq, CommandStatus::Success, cmd.node))
+                    Telemetry::SetNode(SetNodeTelemetry::new(
+                        seq,
+                        CommandStatus::Success,
+                        cmd.node,
+                    ))
                 }
                 Command::SetNode(cmd) => Telemetry::SetNode(
-                    SetNodeTelemetry::new(seq, CommandStatus::InvalidParameter, cmd.node)
-                        .because(Reason::of("it is spelled half_band")),
+                    SetNodeTelemetry::new(
+                        seq,
+                        CommandStatus::InvalidParameter,
+                        cmd.node,
+                    )
+                    .because(Reason::of("it is spelled half_band")),
                 ),
-                Command::QueryNode(cmd) => Telemetry::QueryNode(QueryNodeTelemetry::new(
-                    seq,
-                    CommandStatus::Success,
-                    cmd.node,
-                    true,
-                    stub_counts(),
-                )),
+                Command::QueryNode(cmd) => {
+                    Telemetry::QueryNode(QueryNodeTelemetry::new(
+                        seq,
+                        CommandStatus::Success,
+                        cmd.node,
+                        true,
+                        stub_counts(),
+                    ))
+                }
                 Command::QueryNodeSample(cmd) => {
                     Telemetry::QueryNodeSample(QueryNodeSampleTelemetry::new(
                         seq,
@@ -126,9 +143,11 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
 /// A client: the spacecraft's link and the one link every node is commanded
 /// on.
 fn client_to(addr: &str) -> TcsClient {
-    let spacecraft = UdpConnection::new("127.0.0.1:0", addr).expect("connection");
+    let spacecraft =
+        UdpConnection::new("127.0.0.1:0", addr).expect("connection");
     let nodes = UdpConnection::new("127.0.0.1:0", addr).expect("the node link");
-    let mut client = TcsClient::of_a_graph(Box::new(spacecraft), Box::new(nodes));
+    let mut client =
+        TcsClient::of_a_graph(Box::new(spacecraft), Box::new(nodes));
     client.set_timeout(Duration::from_secs(10));
     client
 }
@@ -158,7 +177,8 @@ fn what_a_node_has_moved_comes_back() {
     let (addr, stub) = stub_spacecraft(2);
     let mut client = client_to(&addr);
 
-    let (status, enabled, counts) = client.query_node(NodeId::of(2)).expect("an answer");
+    let (status, enabled, counts) =
+        client.query_node(NodeId::of(2)).expect("an answer");
     assert!(status.is_success());
     assert!(
         enabled,
@@ -168,7 +188,8 @@ fn what_a_node_has_moved_comes_back() {
 
     // And the bytes, which are a separate command: asking for them every
     // poll would spend downlink on data nobody reads.
-    let (status, taken, given) = client.query_node_sample(NodeId::of(2)).expect("an answer");
+    let (status, taken, given) =
+        client.query_node_sample(NodeId::of(2)).expect("an answer");
     assert!(status.is_success());
     assert_eq!(taken.data(), stub_sample(0x30).data());
     assert_eq!(given.data(), stub_sample(0x40).data());
@@ -235,9 +256,11 @@ fn a_node_is_commanded_by_its_id_and_the_answer_says_which() {
 fn a_client_with_no_node_link_refuses_a_node_command() {
     // Nothing is listening: the refusal happens before anything is sent, so
     // there is nothing for a far end to do.
-    let spacecraft = UdpConnection::new("127.0.0.1:0", "127.0.0.1:1").expect("connection");
+    let spacecraft =
+        UdpConnection::new("127.0.0.1:0", "127.0.0.1:1").expect("connection");
     let mut client = TcsClient::spacecraft_only(Box::new(spacecraft));
-    let said = format!("{}", client.start_node(NodeId::of(0)).expect_err("refused"));
+    let said =
+        format!("{}", client.start_node(NodeId::of(0)).expect_err("refused"));
     assert!(
         said.contains("node") && said.contains("link"),
         "the refusal should say why: {said}"
@@ -285,7 +308,8 @@ fn a_spacecraft_that_does_not_answer_times_out() {
 
     let connection = UdpConnection::new("127.0.0.1:0", &addr).unwrap();
     let nodes = UdpConnection::new("127.0.0.1:0", &addr).unwrap();
-    let mut client = TcsClient::of_a_graph(Box::new(connection), Box::new(nodes));
+    let mut client =
+        TcsClient::of_a_graph(Box::new(connection), Box::new(nodes));
     client.set_timeout(Duration::from_millis(250));
 
     assert!(client.ping().is_err(), "a silent link should be an error");

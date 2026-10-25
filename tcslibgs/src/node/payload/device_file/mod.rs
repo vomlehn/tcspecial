@@ -2,8 +2,8 @@
 //!
 //! Only how a device file's stand-in is told apart is here. What a
 //! `device-file` node may say is a path and the terms every endpoint takes,
-//! which `crate::graph::reach` reads with the rules of `crate::endpoint_config`;
-//! there is nothing of its own to check.
+//! which `crate::graph::reach` reads with the rules of
+//! `crate::endpoint_config`; there is nothing of its own to check.
 
 /// Whether the file at `path` is a stand-in: a pseudo-terminal, which is
 /// what tcssim makes for a device-file payload. See [`crate::simulate`].
@@ -38,7 +38,8 @@ mod tests {
             )
         };
         assert_eq!(opened, 0, "a pseudo-terminal opens");
-        let named = std::fs::read_link(format!("/proc/self/fd/{slave}")).unwrap();
+        let named =
+            std::fs::read_link(format!("/proc/self/fd/{slave}")).unwrap();
         let dir = tempfile::tempdir().unwrap();
         let link = dir.path().join("payload");
         std::os::unix::fs::symlink(&named, &link).unwrap();
@@ -52,7 +53,10 @@ mod tests {
         );
 
         assert_eq!(judged_of("/dev/null"), Verdict::Hardware);
-        assert_eq!(judged_of(dir.path().to_str().unwrap()), Verdict::CannotTell);
+        assert_eq!(
+            judged_of(dir.path().to_str().unwrap()),
+            Verdict::CannotTell
+        );
         assert_eq!(judged_of("/nonexistent/payload"), Verdict::Absent);
 
         // SAFETY: the two descriptors openpty opened, closed once each.

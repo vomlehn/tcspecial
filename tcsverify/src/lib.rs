@@ -205,7 +205,9 @@ impl Report {
     pub fn lines(&self) -> Vec<(bool, String)> {
         self.findings
             .iter()
-            .map(|finding| (finding.severity == Severity::Error, finding.to_string()))
+            .map(|finding| {
+                (finding.severity == Severity::Error, finding.to_string())
+            })
             .collect()
     }
 
@@ -215,9 +217,9 @@ impl Report {
     /// what a simulator file says and runs without it, so a problem there is
     /// worth saying and not worth stopping for.
     pub fn found_errors_in(&self, file: &Path) -> bool {
-        self.findings
-            .iter()
-            .any(|finding| finding.severity == Severity::Error && finding.file == file)
+        self.findings.iter().any(|finding| {
+            finding.severity == Severity::Error && finding.file == file
+        })
     }
 
     fn add(&mut self, file: &Path, line: usize, message: impl Into<String>) {
@@ -235,7 +237,9 @@ impl Report {
         if self.halted {
             return;
         }
-        if severity == Severity::Warning && self.limits.warnings == Warnings::Off {
+        if severity == Severity::Warning
+            && self.limits.warnings == Warnings::Off
+        {
             return;
         }
         self.findings.push(Finding {
@@ -261,7 +265,9 @@ impl Report {
         let errors_only = self.limits.warnings != Warnings::Errors;
         self.findings
             .iter()
-            .filter(|finding| !errors_only || finding.severity == Severity::Error)
+            .filter(|finding| {
+                !errors_only || finding.severity == Severity::Error
+            })
             .count()
     }
 
@@ -289,7 +295,11 @@ impl Report {
 /// `limits` are tcsverify's `--error-limit` and `--warnings`, and the report
 /// passes or fails -- [`Report::status`] -- as tcsverify would under them.
 /// [`Limits::EVERYTHING`] looks at everything.
-pub fn verify(payload_path: &Path, sim_path: Option<&Path>, limits: Limits) -> Report {
+pub fn verify(
+    payload_path: &Path,
+    sim_path: Option<&Path>,
+    limits: Limits,
+) -> Report {
     verify_built(
         payload_path,
         sim_path,
@@ -391,11 +401,12 @@ pub fn compare(first: &Path, second: &Path, report: &mut Report) {
     ) {
         (Ok(one), Ok(two)) => (one, two),
         (one, two) => {
-            let unread: Vec<String> = [(first, one.is_err()), (second, two.is_err())]
-                .iter()
-                .filter(|(_, failed)| *failed)
-                .map(|(path, _)| path.display().to_string())
-                .collect();
+            let unread: Vec<String> =
+                [(first, one.is_err()), (second, two.is_err())]
+                    .iter()
+                    .filter(|(_, failed)| *failed)
+                    .map(|(path, _)| path.display().to_string())
+                    .collect();
             report.add(
                 second,
                 THE_FILE_ITSELF,
@@ -436,8 +447,9 @@ pub fn compare(first: &Path, second: &Path, report: &mut Report) {
                 path.join(" / ")
             ),
             Said::Order(a, b) => format!(
-                "{}: {first_name} gives them in the order {a} and {second_name} \
-                 in the order {b}, and the order is part of what they mean",
+                "{}: {first_name} gives them in the order {a} and \
+                 {second_name} in the order {b}, and the order is part of \
+                 what they mean",
                 path.join(" / ")
             ),
         };
@@ -482,7 +494,9 @@ fn keys_of(list: &[serde_json::Value]) -> Option<Vec<String>> {
     for key in ["name", "from"] {
         let keys: Option<Vec<String>> = list
             .iter()
-            .map(|entry| entry.get(key).and_then(|k| k.as_str()).map(str::to_string))
+            .map(|entry| {
+                entry.get(key).and_then(|k| k.as_str()).map(str::to_string)
+            })
             .collect();
         if let Some(keys) = keys {
             let mut unique = keys.clone();
@@ -533,7 +547,9 @@ fn differences_between(
                     path.push(key.clone());
                     match kb.iter().position(|k| k == key) {
                         Some(at) => differences_between(x, &b[at], path, out),
-                        None => out.push((path.clone(), Said::OnlyFirst(alone(x)))),
+                        None => {
+                            out.push((path.clone(), Said::OnlyFirst(alone(x))))
+                        }
                     }
                     path.pop();
                 }
@@ -546,28 +562,41 @@ fn differences_between(
                 }
                 // And the order, which is part of what they mean: a node's
                 // place is its device id.
-                let common = |keys: &[String], other: &[String]| -> Vec<String> {
+                let common = |keys: &[String],
+                              other: &[String]|
+                 -> Vec<String> {
                     keys.iter().filter(|k| other.contains(k)).cloned().collect()
                 };
                 let (oa, ob) = (common(&ka, &kb), common(&kb, &ka));
                 if oa != ob {
-                    out.push((path.clone(), Said::Order(oa.join(", "), ob.join(", "))));
+                    out.push((
+                        path.clone(),
+                        Said::Order(oa.join(", "), ob.join(", ")),
+                    ));
                 }
             }
             _ => {
                 for at in 0..a.len().max(b.len()) {
                     path.push(at.to_string());
                     match (a.get(at), b.get(at)) {
-                        (Some(x), Some(y)) => differences_between(x, y, path, out),
-                        (Some(x), None) => out.push((path.clone(), Said::OnlyFirst(alone(x)))),
-                        (None, Some(y)) => out.push((path.clone(), Said::OnlySecond(alone(y)))),
+                        (Some(x), Some(y)) => {
+                            differences_between(x, y, path, out)
+                        }
+                        (Some(x), None) => {
+                            out.push((path.clone(), Said::OnlyFirst(alone(x))))
+                        }
+                        (None, Some(y)) => {
+                            out.push((path.clone(), Said::OnlySecond(alone(y))))
+                        }
                         (None, None) => {}
                     }
                     path.pop();
                 }
             }
         },
-        (x, y) if x != y => out.push((path.clone(), Said::Both(shown(x), shown(y)))),
+        (x, y) if x != y => {
+            out.push((path.clone(), Said::Both(shown(x), shown(y))))
+        }
         _ => {}
     }
 }
@@ -589,8 +618,13 @@ fn line_of_path(text: &str, path: &[String]) -> usize {
     let mut found = None;
     let parts = path
         .iter()
-        .filter(|part| part.parse::<usize>().is_err() && !NOT_WRITTEN.contains(&part.as_str()))
-        .flat_map(|part| part.split('.').map(str::to_string).collect::<Vec<_>>());
+        .filter(|part| {
+            part.parse::<usize>().is_err()
+                && !NOT_WRITTEN.contains(&part.as_str())
+        })
+        .flat_map(|part| {
+            part.split('.').map(str::to_string).collect::<Vec<_>>()
+        });
     for part in parts {
         // A whole name, outside a comment: `heater` is not found in
         // `heaters`, and a comment saying what an attribute is for is not
@@ -600,7 +634,8 @@ fn line_of_path(text: &str, path: &[String]) -> usize {
             if said.starts_with('#') || said.starts_with("<!--") {
                 return false;
             }
-            let in_a_name = |c: char| c.is_alphanumeric() || c == '_' || c == '-';
+            let in_a_name =
+                |c: char| c.is_alphanumeric() || c == '_' || c == '-';
             line.match_indices(part.as_str()).any(|(at, _)| {
                 let before = line[..at].chars().next_back();
                 let after = line[at + part.len()..].chars().next();
@@ -623,7 +658,11 @@ fn line_of_path(text: &str, path: &[String]) -> usize {
 ///
 /// Hands back the graph, for a simulator file to be joined to, when it read at
 /// all.
-fn check_graph(path: &Path, built: &[&str], report: &mut Report) -> Option<tcslibgs::graph::Graph> {
+fn check_graph(
+    path: &Path,
+    built: &[&str],
+    report: &mut Report,
+) -> Option<tcslibgs::graph::Graph> {
     let graph = match tcslibgs::graph::Graph::load(path) {
         Ok(graph) => graph,
         Err(e) => {
@@ -696,7 +735,11 @@ fn check_graph(path: &Path, built: &[&str], report: &mut Report) -> Option<tcsli
 /// each payload's settings against its handler,
 /// `tcslibgs::SimConfigFile::problems`: a file that passed here and was refused
 /// there would be a verifier saying yes to a run that fails.
-fn check_graph_simulator(path: &Path, graph: Option<&tcslibgs::graph::Graph>, report: &mut Report) {
+fn check_graph_simulator(
+    path: &Path,
+    graph: Option<&tcslibgs::graph::Graph>,
+    report: &mut Report,
+) {
     let Some((text, format)) = read(path, report) else {
         return;
     };
@@ -738,7 +781,9 @@ fn check_graph_simulator(path: &Path, graph: Option<&tcslibgs::graph::Graph>, re
                     .strip_prefix('"')
                     .and_then(|rest| rest.split_once('"'))
                     .map_or(THE_FILE_ITSELF, |(payload, _)| {
-                        found.line_of(&tcslibgs::About::SimPayload(payload.to_string()))
+                        found.line_of(&tcslibgs::About::SimPayload(
+                            payload.to_string(),
+                        ))
                     });
                 report.add(path, line, why);
             }
@@ -747,7 +792,11 @@ fn check_graph_simulator(path: &Path, graph: Option<&tcslibgs::graph::Graph>, re
                     if !report.room() {
                         break;
                     }
-                    report.add(path, found.line_of(&problem.about()), problem.to_string());
+                    report.add(
+                        path,
+                        found.line_of(&problem.about()),
+                        problem.to_string(),
+                    );
                 }
             }
         }
@@ -800,7 +849,9 @@ fn line_in_message(message: &str) -> usize {
 /// in its error -- and anything else is reported from the first line.
 fn line_of(e: &TcsError) -> usize {
     match e {
-        TcsError::Yaml(e) => e.location().map_or(THE_FILE_ITSELF, |at| at.line()),
+        TcsError::Yaml(e) => {
+            e.location().map_or(THE_FILE_ITSELF, |at| at.line())
+        }
         TcsError::Xml { line, .. } => *line,
         _ => THE_FILE_ITSELF,
     }
@@ -816,13 +867,15 @@ mod tests {
     fn thermostat_pair(
         change: impl Fn(String) -> String,
     ) -> (tempfile::TempDir, PathBuf, PathBuf, PathBuf) {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/thermostat");
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../examples/thermostat");
         let dir = tempfile::tempdir().expect("a directory");
         let at = |name: &str| dir.path().join(name);
         for name in ["thermostat.yaml", "thermostat-sim.yaml"] {
             std::fs::copy(root.join(name), at(name)).expect("copied");
         }
-        let xml = std::fs::read_to_string(root.join("thermostat.xml")).expect("the XML");
+        let xml = std::fs::read_to_string(root.join("thermostat.xml"))
+            .expect("the XML");
         std::fs::write(at("thermostat.xml"), change(xml)).expect("written");
         let (xml, yaml, sim) = (
             at("thermostat.xml"),
@@ -837,9 +890,11 @@ mod tests {
     /// words tcspecial uses to refuse it -- and nothing else.
     #[test]
     fn a_node_of_a_type_not_built_is_reported_where_it_is_written() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/thermostat");
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../examples/thermostat");
         let yaml = root.join("thermostat.yaml");
-        let report = verify_built(&yaml, None, Limits::EVERYTHING, &["i2c", "spi"]);
+        let report =
+            verify_built(&yaml, None, Limits::EVERYTHING, &["i2c", "spi"]);
         let found: Vec<(usize, &str)> = report
             .findings
             .iter()
@@ -857,11 +912,19 @@ mod tests {
             vec![
                 (
                     line_of("heaters_1"),
-                    tcslibgs::graph::built::not_built_message("heaters_1", "gpio").as_str()
+                    tcslibgs::graph::built::not_built_message(
+                        "heaters_1",
+                        "gpio"
+                    )
+                    .as_str()
                 ),
                 (
                     line_of("heaters_2"),
-                    tcslibgs::graph::built::not_built_message("heaters_2", "gpio").as_str()
+                    tcslibgs::graph::built::not_built_message(
+                        "heaters_2",
+                        "gpio"
+                    )
+                    .as_str()
                 ),
             ]
         );
@@ -887,8 +950,9 @@ mod tests {
     /// file says, at the line the second file sets it on.
     #[test]
     fn a_value_one_spelling_changes_is_reported() {
-        let (_dir, xml, yaml, sim) =
-            thermostat_pair(|xml| xml.replacen("<setpoint>293.15", "<setpoint>290", 1));
+        let (_dir, xml, yaml, sim) = thermostat_pair(|xml| {
+            xml.replacen("<setpoint>293.15", "<setpoint>290", 1)
+        });
         let report = verify_pair(&yaml, &xml, &sim, Limits::EVERYTHING, &ALL);
         let said = report.said();
         assert_eq!(report.findings.len(), 1, "{said:?}");
@@ -920,14 +984,19 @@ mod tests {
         // Compared and not verified, so the simulator file is not wanted.
         let (_dir, xml, yaml, _) = thermostat_pair(|xml| {
             xml.replace("<name>heaters_1</name>", "<name>heater</name>")
-                .replace("<target>heaters_1</target>", "<target>heater</target>")
+                .replace(
+                    "<target>heaters_1</target>",
+                    "<target>heater</target>",
+                )
         });
         let mut report = Report::default();
         compare(&yaml, &xml, &mut report);
-        let said: Vec<&str> = report.findings.iter().map(|f| f.message.as_str()).collect();
+        let said: Vec<&str> =
+            report.findings.iter().map(|f| f.message.as_str()).collect();
         assert!(
             said.iter()
-                .any(|m| m.contains("nodes / heaters_1:") && m.contains("does not")),
+                .any(|m| m.contains("nodes / heaters_1:")
+                    && m.contains("does not")),
             "{said:?}"
         );
         assert!(
@@ -935,8 +1004,9 @@ mod tests {
             "{said:?}"
         );
         assert!(
-            said.iter()
-                .any(|m| m.contains("\"heaters_1\"") && m.contains("\"heater\"")),
+            said.iter().any(
+                |m| m.contains("\"heaters_1\"") && m.contains("\"heater\"")
+            ),
             "{said:?}"
         );
         assert!(said.len() <= 4, "{said:?}");
@@ -947,12 +1017,16 @@ mod tests {
     /// orders differ.
     #[test]
     fn nodes_in_another_order_differ() {
-        let one = serde_json::json!({ "nodes": [{ "name": "a" }, { "name": "b" }] });
-        let two = serde_json::json!({ "nodes": [{ "name": "b" }, { "name": "a" }] });
+        let one =
+            serde_json::json!({ "nodes": [{ "name": "a" }, { "name": "b" }] });
+        let two =
+            serde_json::json!({ "nodes": [{ "name": "b" }, { "name": "a" }] });
         let mut out = Vec::new();
         differences_between(&one, &two, &mut Vec::new(), &mut out);
         assert_eq!(out.len(), 1);
-        assert!(matches!(&out[0].1, Said::Order(a, b) if a == "a, b" && b == "b, a"));
+        assert!(
+            matches!(&out[0].1, Said::Order(a, b) if a == "a, b" && b == "b, a")
+        );
     }
 
     /// A file in a temporary directory, so the findings name a real path.
@@ -982,7 +1056,10 @@ mod tests {
     }
 
     /// A configuration in a temporary directory.
-    fn graph_written(extension: &str, text: &str) -> (tempfile::TempDir, PathBuf) {
+    fn graph_written(
+        extension: &str,
+        text: &str,
+    ) -> (tempfile::TempDir, PathBuf) {
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join(format!("vehicle{extension}"));
         std::fs::write(&path, text).expect("written");
@@ -1009,9 +1086,11 @@ payload_groups:
   - name: temps
     interval: \"3 s\"
 payloads:
-  - { name: sensor, type: i2c, group: temps, path: \"/dev/i2c-1\", address: \"0x48\", payload-out: moc }
+  - { name: sensor, type: i2c, group: temps, path: \"/dev/i2c-1\", \
+address: \"0x48\", payload-out: moc }
 moc:
-  - { name: moc, type: moc, address: \"10.0.0.1\", port: \"5000\", ground_base: \"10.0.0.2:5100\" }
+  - { name: moc, type: moc, address: \"10.0.0.1\", port: \"5000\", \
+ground_base: \"10.0.0.2:5100\" }
 ";
 
     /// A simulator file that names a payload the simulator will not stand in
@@ -1030,8 +1109,8 @@ moc:
         )
         .replace(
             "payload-out: moc }\n",
-            "payload-out: moc }\n  - { name: heater, type: network, protocol: udp, \
-             address: \"127.0.0.1\", port: \"8001\" }\n",
+            "payload-out: moc }\n  - { name: heater, type: network, \
+             protocol: udp, address: \"127.0.0.1\", port: \"8001\" }\n",
         )
         .replace(
             "ground_base: \"10.0.0.2:5100\" }",
@@ -1122,7 +1201,8 @@ payload_groups:
   - name: temps
     interval: soon
 payloads:
-  - { name: a, type: i2c, group: temps, path: \"/dev/i2c-1\", payload-out: nowhere }
+  - { name: a, type: i2c, group: temps, path: \"/dev/i2c-1\", \
+payload-out: nowhere }
   - { name: a, type: spi, path: \"/dev/spidev0.0\" }
 vehicle:
   - { name: m, type: compute, function: mean, inputs: \"in0\" }
@@ -1130,7 +1210,8 @@ vehicle:
         );
 
         let report = verify(&path, None, Limits::EVERYTHING);
-        let said: Vec<String> = report.findings.iter().map(|f| f.to_string()).collect();
+        let said: Vec<String> =
+            report.findings.iter().map(|f| f.to_string()).collect();
         let all = said.join("\n");
 
         assert!(all.contains("two nodes are called \"a\""), "{all}");
@@ -1194,7 +1275,8 @@ vehicle:
 
         std::fs::write(
             &sim,
-            "simulated_payloads:\n  - name: sensor\n    simulate: true\n    type: i2c\n    packet_interval: 1 s\n",
+            "simulated_payloads:\n  - name: sensor\n    simulate: true\n    \
+             type: i2c\n    packet_interval: 1 s\n",
         )
         .unwrap();
         let report = verify(&path, Some(&sim), Limits::EVERYTHING);
@@ -1203,11 +1285,13 @@ vehicle:
 
         std::fs::write(
             &sim,
-            "simulated_payloads:\n  - name: sensor\n    simulate: true\n  - name: sensr\n    group: none\n",
+            "simulated_payloads:\n  - name: sensor\n    simulate: true\n  \
+             - name: sensr\n    group: none\n",
         )
         .unwrap();
         let report = verify(&path, Some(&sim), Limits::EVERYTHING);
-        let said: Vec<String> = report.findings.iter().map(|f| f.to_string()).collect();
+        let said: Vec<String> =
+            report.findings.iter().map(|f| f.to_string()).collect();
         let all = said.join("\n");
         assert!(all.contains("\"sensr\" is simulated"), "{all}");
         assert!(all.contains("names group \"none\""), "{all}");
@@ -1225,7 +1309,8 @@ vehicle:
     fn the_shipped_examples_simulator_file_fits_it() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let sim = root.join("example-sim.yaml");
-        let report = verify(&root.join("example.yaml"), Some(&sim), Limits::EVERYTHING);
+        let report =
+            verify(&root.join("example.yaml"), Some(&sim), Limits::EVERYTHING);
         assert!(report.joined);
         let about_sim: Vec<String> = report
             .findings
@@ -1381,16 +1466,19 @@ payloads:
         assert_eq!(report.status(), 1);
 
         // Each beside the node it is about, in the order the file wrote them.
-        let lines: Vec<usize> = report.findings.iter().map(|f| f.line).collect();
+        let lines: Vec<usize> =
+            report.findings.iter().map(|f| f.line).collect();
         assert_eq!(lines, vec![21, 26, 31], "{:?}", report.findings);
-        for (finding, missing) in report
-            .findings
-            .iter()
-            .zip(["nowhere", "elsewhere", "anywhere"])
+        for (finding, missing) in
+            report
+                .findings
+                .iter()
+                .zip(["nowhere", "elsewhere", "anywhere"])
         {
             assert!(
                 finding.message.contains(missing),
-                "a finding should name what the link could not find: {finding:?}"
+                "a finding should name what the link could not find: \
+                 {finding:?}"
             );
         }
     }
@@ -1432,7 +1520,8 @@ payloads:
             GOOD_SIM,
         );
         let report = verify(&set.payload, None, Limits::EVERYTHING);
-        let first = report.findings.first().expect("something is wrong with it");
+        let first =
+            report.findings.first().expect("something is wrong with it");
         assert!(
             first.to_string().starts_with(&format!(
                 "{}:{}: {}: ",
@@ -1451,7 +1540,8 @@ payloads:
     /// A file that does not parse is reported from where the parser stopped.
     #[test]
     fn a_file_that_does_not_parse_says_where_it_stopped() {
-        let text = GOOD.replace("payloads:", "payloads:\n  - name: bad\n   type: oops");
+        let text = GOOD
+            .replace("payloads:", "payloads:\n  - name: bad\n   type: oops");
         let set = written(".yaml", &text, GOOD_SIM);
         let report = verify(&set.payload, None, Limits::EVERYTHING);
         assert_eq!(report.findings.len(), 1, "{:?}", report.findings);
@@ -1469,8 +1559,10 @@ payloads:
     /// file's first.
     #[test]
     fn an_xml_file_that_does_not_parse_says_where_it_stopped() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/minimal");
-        let good = std::fs::read_to_string(root.join("minimal.xml")).expect("the example");
+        let root =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/minimal");
+        let good = std::fs::read_to_string(root.join("minimal.xml"))
+            .expect("the example");
         let line_holding = |text: &str, what: &str| {
             text.lines()
                 .position(|line| line.contains(what))
@@ -1499,8 +1591,10 @@ payloads:
     /// A file written in the language that is gone is told what became of it.
     #[test]
     fn a_file_in_the_old_language_is_told_so() {
-        let text = "endpoint_groups:\n  - name: g\n    type: network\n    protocol: udp\n\
-                    endpoints:\n  - name: e\n    group: g\n    address: localhost\n    \
+        let text = "endpoint_groups:\n  - name: g\n    type: network\n    \
+                    protocol: udp\n\
+                    endpoints:\n  - name: e\n    group: g\n    \
+                    address: localhost\n    \
                     port: 5000\n";
         let set = written(".yaml", text, GOOD_SIM);
         let report = verify(&set.payload, None, Limits::EVERYTHING);
@@ -1516,14 +1610,16 @@ payloads:
     /// does not have, beside the line that writes it, in either format.
     #[test]
     fn a_version_is_refused_as_a_field_there_is_not() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/minimal");
+        let root =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/minimal");
         // Where the line goes: below the YAML schema comment, and below the
         // XML root's start tag, which runs over the file's second to fourth.
         for (file, line, at) in [
             ("minimal.yaml", "version: \"2.0\"\n", 3),
             ("minimal.xml", "    <version>2.0</version>\n", 5),
         ] {
-            let good = std::fs::read_to_string(root.join(file)).expect("the example");
+            let good =
+                std::fs::read_to_string(root.join(file)).expect("the example");
             let extension = if file.ends_with(".xml") {
                 ".xml"
             } else {
@@ -1535,7 +1631,12 @@ payloads:
 
             let report = verify(&path, None, Limits::EVERYTHING);
             assert_eq!(report.findings.len(), 1, "{file}: {:?}", report.said());
-            assert_eq!(report.findings[0].line, at, "{file}: {:?}", report.said());
+            assert_eq!(
+                report.findings[0].line,
+                at,
+                "{file}: {:?}",
+                report.said()
+            );
             let said = &report.findings[0].message;
             assert!(said.contains("unknown field `version`"), "{file}: {said}");
             assert_ne!(report.status(), 0, "{file}");
@@ -1612,7 +1713,8 @@ simulated_payloads:
         assert!(!report.joined);
         assert!(
             report.findings.iter().all(|f| f.file == set.payload),
-            "the simulator file was faulted for the tcspecial configuration's problems: {:?}",
+            "the simulator file was faulted for the tcspecial \
+             configuration's problems: {:?}",
             report.findings
         );
     }
@@ -1630,7 +1732,8 @@ simulated_payloads:
         let set = written(
             ".yaml",
             &text,
-            "simulated_payloads:\n  - name: DH0\n   simulate: true\n   type: device-file\n",
+            "simulated_payloads:\n  - name: DH0\n   simulate: true\n   \
+             type: device-file\n",
         );
         let report = verify(&set.payload, Some(&set.sim), Limits::EVERYTHING);
         assert!(
@@ -1647,7 +1750,8 @@ simulated_payloads:
         for id in 0..count {
             // A link to a node that is not there, which is one error each.
             payloads.push_str(&format!(
-                "  - name: DH{id}\n    type: device-file\n    path: /dev/null{id}\n    \
+                "  - name: DH{id}\n    type: device-file\n    \
+                 path: /dev/null{id}\n    \
                  payload-out:\n      - target: nowhere{id}\n"
             ));
         }
@@ -1692,7 +1796,8 @@ simulated_payloads:
     fn the_error_limit_stops_the_run_on_the_last_it_allows() {
         let set = with_errors(12);
         for limit in [1, 3, 12] {
-            let report = verify(&set.payload, None, limited(Some(limit), Warnings::On));
+            let report =
+                verify(&set.payload, None, limited(Some(limit), Warnings::On));
             assert!(report.halted, "the run did not stop at {limit}");
             assert_eq!(report.findings.len(), limit, "{:?}", report.findings);
             assert_eq!(printed(&report).lines().count(), limit);
@@ -1728,7 +1833,8 @@ simulated_payloads:
     fn findings_are_printed_in_the_order_found() {
         let (_dir, path) = with_warnings(3);
         let text = std::fs::read_to_string(&path).expect("written");
-        std::fs::write(&path, text.replace("    recv: 0.0.0.0:4000\n", "")).expect("written");
+        std::fs::write(&path, text.replace("    recv: 0.0.0.0:4000\n", ""))
+            .expect("written");
 
         let every = printed(&verify(&path, None, Limits::EVERYTHING));
         let every: Vec<&str> = every.lines().collect();
@@ -1743,7 +1849,8 @@ simulated_payloads:
         );
 
         for limit in 1..=errors {
-            let report = verify(&path, None, limited(Some(limit), Warnings::On));
+            let report =
+                verify(&path, None, limited(Some(limit), Warnings::On));
             let some = printed(&report);
             let some: Vec<&str> = some.lines().collect();
             assert_eq!(some, every[..some.len()], "under {limit}");
@@ -1753,7 +1860,8 @@ simulated_payloads:
             );
         }
         for limit in 1..=every.len() {
-            let report = verify(&path, None, limited(Some(limit), Warnings::Errors));
+            let report =
+                verify(&path, None, limited(Some(limit), Warnings::Errors));
             let some = printed(&report);
             assert_eq!(
                 some.lines().collect::<Vec<_>>(),
@@ -1861,7 +1969,8 @@ simulated_payloads:
         // And the worked example is finished, warnings and all: it is the one
         // a reader is meant to learn the shape from.
         for extension in ["yaml", "xml"] {
-            let graph = root.join(format!("tests/manual/thermostat.{extension}"));
+            let graph =
+                root.join(format!("tests/manual/thermostat.{extension}"));
             let report = verify(&graph, None, Limits::EVERYTHING);
             assert!(
                 !report.found_anything(),
@@ -1888,8 +1997,9 @@ simulated_payloads:
         // The shipped example with one more payload on it, placed and not yet
         // told which device it is on or linked to anything -- which is what
         // the editor writes the moment somebody drops a node on the canvas.
-        let said = std::fs::read_to_string(root.join("tests/manual/thermostat.yaml"))
-            .expect("the worked example");
+        let said =
+            std::fs::read_to_string(root.join("tests/manual/thermostat.yaml"))
+                .expect("the worked example");
         std::fs::write(
             &path,
             said.replace(

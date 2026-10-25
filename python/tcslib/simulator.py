@@ -58,7 +58,11 @@ def ask(at, patience):
                     time.sleep(max(0.0, until - time.monotonic()))
                     break
                 answer = decode_answer(data)
-                if came[:2] == at[:2] and answer and answer.sequence <= sequence:
+                if (
+                    came[:2] == at[:2]
+                    and answer
+                    and answer.sequence <= sequence
+                ):
                     return answer
             sequence += 1
 
@@ -75,13 +79,15 @@ def wait(at, ours, patience):
             if heard:
                 raise NotReady(
                     "starting",
-                    f"the simulator at {at[0]}:{at[1]} was still making its stand-ins "
-                    f"after {waited:.1f} s: look at what tcssim says, or give it longer",
+                    f"the simulator at {at[0]}:{at[1]} was still making its "
+                    f"stand-ins after {waited:.1f} s: look at what tcssim "
+                    "says, or give it longer",
                 )
             raise NotReady(
                 "silent",
-                f"nothing answered at {at[0]}:{at[1]} in {waited:.1f} s: tcssim is "
-                "not running, or tcssim.ready in the simulator file is not where it is",
+                f"nothing answered at {at[0]}:{at[1]} in {waited:.1f} s: "
+                "tcssim is not running, or tcssim.ready in the simulator file "
+                "is not where it is",
             )
         answer = ask(at, left)
         if answer is None:
@@ -91,15 +97,16 @@ def wait(at, ours, patience):
         if differences:
             raise NotReady(
                 "differs",
-                f"the simulator at {at[0]}:{at[1]} is set up for another run, and so "
-                f"is not used -- {'; '.join(differences)}: stop it, or start this run "
-                "on what it read",
+                f"the simulator at {at[0]}:{at[1]} is set up for another run, "
+                f"and so is not used -- {'; '.join(differences)}: stop it, or "
+                "start this run on what it read",
             )
         if answer.state == "ready":
             return
         if answer.state == "failed":
             raise NotReady(
                 "failed",
-                f"the simulator at {at[0]}:{at[1]} could not stand in: {answer.reason}",
+                f"the simulator at {at[0]}:{at[1]} could not stand in: "
+                f"{answer.reason}",
             )
         time.sleep(min(RESEND_EVERY, left))

@@ -3,7 +3,9 @@ name = "tcsui"
 version = "0.1.0"
 edition = "2021"
 license.workspace = true
-description = "Window pieces shared by the TCSpecial ground programs: the panels, and what to show on them"
+description = """\
+Window pieces shared by the TCSpecial ground programs: the panels, and what to \
+show on them"""
 
 [dependencies]
 # What a panel reports is `tcslib::beacon`'s: this crate is how it is shown,

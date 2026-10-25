@@ -61,9 +61,11 @@ use crate::beacon_receive::BeaconReceive;
 use crate::ci_link::{CiLink, Commanded};
 use crate::oc_link::{Arrival, Arrivals};
 use crate::{
-    ask_for_the_edge, grid_shape, handle_close, handle_quit, present, show_arrivals, stop,
-    window_size, DHInfo, Edge, MainWindow, MenuAction, PingWindow, ProcessManager, Sizes, CHILDREN,
-    CONNECTED_STATUS, DISCONNECTED_STATUS, ERROR_STATUS, NO_TRANSFER_TIME, PANEL_REFRESH_INTERVAL,
+    ask_for_the_edge, grid_shape, handle_close, handle_quit, present,
+    show_arrivals, stop, window_size, DHInfo, Edge, MainWindow, MenuAction,
+    PingWindow, ProcessManager, Sizes, CHILDREN, CONNECTED_STATUS,
+    DISCONNECTED_STATUS, ERROR_STATUS, NO_TRANSFER_TIME,
+    PANEL_REFRESH_INTERVAL,
 };
 
 /// What a panel's status says of a node the spacecraft says is running.
@@ -127,7 +129,10 @@ fn was_declined(declined: &crate::Declined, row: usize) -> bool {
 }
 
 /// What a node command says when the two ends have not agreed what they read.
-pub const NOT_AGREED: &str = "The vehicle has not agreed which configuration it is flying, so      a node id means nothing yet: press Connect, which sends CONNECT and      compares the digests.";
+pub const NOT_AGREED: &str = "The vehicle has not agreed which configuration \
+                              it is flying, so      a node id means nothing \
+                              yet: press Connect, which sends CONNECT and      \
+                              compares the digests.";
 
 /// Whether the vehicle has agreed that it is flying the configuration this
 /// window read.
@@ -175,7 +180,10 @@ pub fn settable_of(graph: &Graph) -> BTreeMap<String, Vec<String>> {
 ///
 /// `settable` is what [`settable_of`] found, so that each panel offers what
 /// the configuration says may be set on its node and nothing else.
-pub fn panels(links: &[Telemetered], settable: &BTreeMap<String, Vec<String>>) -> Vec<DHInfo> {
+pub fn panels(
+    links: &[Telemetered],
+    settable: &BTreeMap<String, Vec<String>>,
+) -> Vec<DHInfo> {
     let mut links: Vec<&Telemetered> = links.iter().collect();
     links.sort_by_key(|link| link.id);
     links
@@ -199,7 +207,8 @@ pub fn panels(links: &[Telemetered], settable: &BTreeMap<String, Vec<String>>) -
                 oc_data: SharedString::new(),
                 packets_recv: 0,
                 parameters: SharedString::from(format!(
-                    "{} (device id {})\nsends {via}\nthe ground receives at {}:{}",
+                    "{} (device id {})\nsends {via}\nthe ground receives at \
+                     {}:{}",
                     link.source, link.id, link.ground.address, link.ground.port
                 )),
                 // What the ground may set on this node: all of them for the
@@ -240,7 +249,8 @@ const ASK_FIRST: std::time::Duration = std::time::Duration::from_secs(1);
 
 /// How long a simulator this starts is given to make its stand-ins. Built
 /// by `cargo run` first, which is most of it.
-const WAIT_FOR_SIMULATOR: std::time::Duration = std::time::Duration::from_secs(120);
+const WAIT_FOR_SIMULATOR: std::time::Duration =
+    std::time::Duration::from_secs(120);
 
 /// Have a simulator ready for this run, where it has anything to simulate.
 ///
@@ -260,20 +270,29 @@ fn simulator_for(
 ) -> Result<(), String> {
     if mode.is_flight() {
         eprintln!(
-            "--simulate={mode}: tcssim is not started, a run like a flight having no stand-ins"
+            "--simulate={mode}: tcssim is not started, a run like a flight \
+             having no stand-ins"
         );
         return Ok(());
     }
-    let Some(sim_path) = sim_path.filter(|_| anything_simulated(graph, sim_path)) else {
+    let Some(sim_path) =
+        sim_path.filter(|_| anything_simulated(graph, sim_path))
+    else {
         match sim_path {
-            Some(path) => eprintln!("{path}: nothing to simulate, so tcssim is not started"),
+            Some(path) => eprintln!(
+                "{path}: nothing to simulate, so tcssim is not started"
+            ),
             None => {
-                eprintln!("{payload_path}: no simulator file beside it, so tcssim is not started")
+                eprintln!(
+                    "{payload_path}: no simulator file beside it, so \
+                           tcssim is not started"
+                )
             }
         }
         return Ok(());
     };
-    let sim_file = SimConfigFile::load(sim_path).map_err(|e| format!("{sim_path}: {e}"))?;
+    let sim_file = SimConfigFile::load(sim_path)
+        .map_err(|e| format!("{sim_path}: {e}"))?;
     let at = sim_file.ready().map_err(|e| format!("{sim_path}: {e}"))?;
     let ours = SetUpFor {
         configuration: tcslibgs::config_digest::digest_of_graph(graph)
@@ -287,10 +306,15 @@ fn simulator_for(
         Some(answer) => {
             let differences = ours.differences(&answer.set_up_for);
             if !differences.is_empty() {
-                return Err(simulator::NotReady::Differs { at, differences }.to_string());
+                return Err(simulator::NotReady::Differs { at, differences }
+                    .to_string());
             }
-            eprintln!("a simulator is already answering at {at} for this run: using it, and leaving it running");
-            return simulator::wait(at, &ours, WAIT_FOR_SIMULATOR).map_err(|e| e.to_string());
+            eprintln!(
+                "a simulator is already answering at {at} for this run: \
+                       using it, and leaving it running"
+            );
+            return simulator::wait(at, &ours, WAIT_FOR_SIMULATOR)
+                .map_err(|e| e.to_string());
         }
         None => {
             pm_tcssim.start_child(tcssim, payload_path, mode);
@@ -311,17 +335,22 @@ fn simulator_for(
                 if pm_tcssim.has_exited() =>
             {
                 return Err(format!(
-                    "tcssim stopped before it said at {at} that it was ready: what it \
-                     said is why"
+                    "tcssim stopped before it said at {at} that it was ready: \
+                     what it said is why"
                 ))
             }
-            Err(simulator::NotReady::Silent { .. }) if waited < WAIT_FOR_SIMULATOR => {}
-            Err(simulator::NotReady::StillStarting { .. }) if waited < WAIT_FOR_SIMULATOR => {}
+            Err(simulator::NotReady::Silent { .. })
+                if waited < WAIT_FOR_SIMULATOR => {}
+            Err(simulator::NotReady::StillStarting { .. })
+                if waited < WAIT_FOR_SIMULATOR => {}
             Err(simulator::NotReady::Silent { at, .. }) => {
-                return Err(simulator::NotReady::Silent { at, waited }.to_string())
+                return Err(
+                    simulator::NotReady::Silent { at, waited }.to_string()
+                )
             }
             Err(simulator::NotReady::StillStarting { at, .. }) => {
-                return Err(simulator::NotReady::StillStarting { at, waited }.to_string())
+                return Err(simulator::NotReady::StillStarting { at, waited }
+                    .to_string())
             }
             Err(e) => return Err(e.to_string()),
         }
@@ -337,7 +366,9 @@ fn simulator_for(
 ///
 /// `None` for a configuration with no section, which takes no commands, as it
 /// sends no beacons: the section is where the ports are written down.
-fn command_links_of(graph: &Graph) -> Result<Option<(String, String, Commanded)>, String> {
+fn command_links_of(
+    graph: &Graph,
+) -> Result<Option<(String, String, Commanded)>, String> {
     let Some(links) = tcslib::command_links_of(graph)? else {
         return Ok(None);
     };
@@ -368,7 +399,9 @@ fn hear_what_the_vehicle_read(
         match guard.client() {
             Some(client) => client.connect(version, digest),
             None => {
-                ui.set_last_response(SharedString::from(crate::ci_link::NOT_CONNECTED));
+                ui.set_last_response(SharedString::from(
+                    crate::ci_link::NOT_CONNECTED,
+                ));
                 return;
             }
         }
@@ -387,14 +420,14 @@ fn hear_what_the_vehicle_read(
             let said = if !same {
                 format!(
                     "tcspecial is flying a different configuration: md5 \
-                     {their_digest}, not {digest} -- so a node \
-                     id would name a node of a graph this window has not read, and \
-                     Enable and Disable will not send one"
+                     {their_digest}, not {digest} -- so a node id would name a \
+                     node of a graph this window has not read, and Enable and \
+                     Disable will not send one"
                 )
             } else if theirs != version {
                 format!(
-                    "tcspecial is version {theirs}, this is {version}; it is flying \
-                     the configuration this window read, md5 {digest}"
+                    "tcspecial is version {theirs}, this is {version}; it is \
+                     flying the configuration this window read, md5 {digest}"
                 )
             } else {
                 format!("tcspecial agrees: v{version} md5 {digest}")
@@ -409,7 +442,9 @@ fn hear_what_the_vehicle_read(
             if let Ok(mut held) = agreed.lock() {
                 *held = None;
             }
-            ui.set_last_response(SharedString::from(format!("CONNECT failed: {e}")));
+            ui.set_last_response(SharedString::from(format!(
+                "CONNECT failed: {e}"
+            )));
         }
     }
 }
@@ -477,7 +512,8 @@ fn connected_in_contact(
     declined: &crate::Declined,
     contact: &Mutex<tcslib::beacon::Contact>,
 ) {
-    let heard = matches!(contact.lock().as_deref(), Ok(tcslib::beacon::Contact::Made));
+    let heard =
+        matches!(contact.lock().as_deref(), Ok(tcslib::beacon::Contact::Made));
     if !heard || !may_command_nodes(agreed) {
         return;
     }
@@ -485,7 +521,9 @@ fn connected_in_contact(
     contact_made(ui, link, agreed, model, declined);
     let asked = ui.get_last_response();
     if asked != connect_said {
-        ui.set_last_response(SharedString::from(format!("{connect_said}; {asked}")));
+        ui.set_last_response(SharedString::from(format!(
+            "{connect_said}; {asked}"
+        )));
     }
 }
 
@@ -511,13 +549,16 @@ fn ask_nodes(
         let Some(mut info) = model.row_data(row) else {
             continue;
         };
-        let node = tcslibgs::NodeId(u32::try_from(info.dev_id).unwrap_or(u32::MAX));
+        let node =
+            tcslibgs::NodeId(u32::try_from(info.dev_id).unwrap_or(u32::MAX));
         let answer = {
             let mut guard = link.lock().unwrap();
             match guard.client() {
                 Some(client) => client.query_node(node),
                 None => {
-                    ui.set_last_response(SharedString::from(crate::ci_link::NOT_CONNECTED));
+                    ui.set_last_response(SharedString::from(
+                        crate::ci_link::NOT_CONNECTED,
+                    ));
                     return;
                 }
             }
@@ -545,7 +586,9 @@ fn ask_nodes(
                 said.push(format!("{}: {}", info.name, info.status));
                 model.set_row_data(row, info);
             }
-            Ok((status, _, _)) => said.push(format!("{}: {status:?}", info.name)),
+            Ok((status, _, _)) => {
+                said.push(format!("{}: {status:?}", info.name))
+            }
             Err(e) => said.push(format!("{}: no answer ({e})", info.name)),
         }
     }
@@ -633,9 +676,13 @@ fn set_a_nodes_attribute(
     let answer = {
         let mut guard = link.lock().unwrap();
         match guard.client() {
-            Some(client) => client.set_node(node, attribute.trim(), value.as_bytes()),
+            Some(client) => {
+                client.set_node(node, attribute.trim(), value.as_bytes())
+            }
             None => {
-                ui.set_last_response(SharedString::from(crate::ci_link::NOT_CONNECTED));
+                ui.set_last_response(SharedString::from(
+                    crate::ci_link::NOT_CONNECTED,
+                ));
                 return;
             }
         }
@@ -643,8 +690,8 @@ fn set_a_nodes_attribute(
 
     let said = match answer {
         Ok((status, answered, _)) if answered != node => format!(
-            "SET_NODE {node} ({name}) was answered about {answered}: the two ends \
-             are not reading the same configuration ({status:?})"
+            "SET_NODE {node} ({name}) was answered about {answered}: the two \
+             ends are not reading the same configuration ({status:?})"
         ),
         Ok((status, _, _)) if status.is_success() => {
             format!(
@@ -656,15 +703,17 @@ fn set_a_nodes_attribute(
         // are both InvalidParameter, so the status says that it was refused
         // and the reason the vehicle sends says why: which word to change.
         Ok((status, _, reason)) if !reason.is_empty() => format!(
-            "SET_NODE {node} ({name}).{} = {value} was refused: {status:?} -- {reason}",
+            "SET_NODE {node} ({name}).{} = {value} was refused: {status:?} -- \
+             {reason}",
             attribute.trim()
         ),
         // A vehicle that sends no reason: said as the two possibilities,
         // because an operator with the window and no log should still know
         // where to look.
         Ok((status, _, _)) => format!(
-            "SET_NODE {node} ({name}).{} = {value} was refused: {status:?} -- no \
-             binding names that attribute, or the node will not take that value",
+            "SET_NODE {node} ({name}).{} = {value} was refused: {status:?} -- \
+             no binding names that attribute, or the node will not take that \
+             value",
             attribute.trim()
         ),
         Err(e) => format!("SET_NODE {node} ({name}) failed: {e}"),
@@ -716,7 +765,9 @@ fn command_a_node(
                 }
             }
             None => {
-                ui.set_last_response(SharedString::from(crate::ci_link::NOT_CONNECTED));
+                ui.set_last_response(SharedString::from(
+                    crate::ci_link::NOT_CONNECTED,
+                ));
                 return;
             }
         }
@@ -727,8 +778,8 @@ fn command_a_node(
         // it was asked about, and an id that came back as another is the one
         // thing this could not otherwise notice.
         Ok((status, answered)) if answered != node => format!(
-            "{verb} {node} ({name}) was answered about {answered}: the two ends are \
-             not reading the same configuration ({status:?})"
+            "{verb} {node} ({name}) was answered about {answered}: the two \
+             ends are not reading the same configuration ({status:?})"
         ),
         Ok((status, _)) if status.is_success() => {
             let mut info = info;
@@ -745,7 +796,10 @@ fn command_a_node(
             }
             format!("{verb} {node} ({name}): {status:?}")
         }
-        Ok((status, _)) => format!("{verb} {node} ({name}) was refused: {status:?}"),
+        Ok((status, _)) => format!(
+            "{verb} {node} ({name}) was refused: \
+                                    {status:?}"
+        ),
         Err(e) => format!("{verb} {node} ({name}) failed: {e}"),
     };
     eprintln!("{said}");
@@ -806,7 +860,11 @@ pub(crate) fn command_buttons(
                 }
                 eprintln!("Disconnected from {address}");
                 ui.set_ci_status(SharedString::from(DISCONNECTED_STATUS));
-                ui.set_last_response(SharedString::from(format!("Disconnected from {address}")));
+                ui.set_last_response(SharedString::from(format!(
+                    "Disconnected \
+                                                                 from \
+                                                                 {address}"
+                )));
                 return;
             }
 
@@ -827,15 +885,24 @@ pub(crate) fn command_buttons(
 
             match digest {
                 Some(digest) => {
-                    hear_what_the_vehicle_read(&ui, &link, &agreed, ours, digest);
-                    connected_in_contact(&ui, &link, &agreed, model.as_ref(), &declined, &contact);
+                    hear_what_the_vehicle_read(
+                        &ui, &link, &agreed, ours, digest,
+                    );
+                    connected_in_contact(
+                        &ui,
+                        &link,
+                        &agreed,
+                        model.as_ref(),
+                        &declined,
+                        &contact,
+                    );
                 }
                 // Nothing to compare with, so nothing may be commanded by id:
                 // the warning at startup said why.
                 None => ui.set_last_response(SharedString::from(
-                    "Connected, and this configuration could not be digested, so \
-                     there is nothing to check the vehicle's answer against: \
-                     Enable and Disable will not send a node id",
+                    "Connected, and this configuration could not be digested, \
+                     so there is nothing to check the vehicle's answer \
+                     against: Enable and Disable will not send a node id",
                 )),
             }
         });
@@ -848,7 +915,8 @@ pub(crate) fn command_buttons(
         let link = link.clone();
         ui.on_ping_clicked(move || {
             let ui = weak.unwrap();
-            let answer = link.lock().unwrap().client().map(|client| client.ping());
+            let answer =
+                link.lock().unwrap().client().map(|client| client.ping());
             let said = match answer {
                 Some(Ok(tm)) => {
                     format!("PING OK at {}", tm.header.timestamp.time_of_day())
@@ -888,12 +956,21 @@ pub(crate) fn command_buttons(
                 // The two the menu can do something about. Each is the same
                 // command the button beside it sends, by the same function:
                 // one place decides what a press means.
-                MenuAction::Query => query_every_node(&ui, &link, &agreed, &model),
+                MenuAction::Query => {
+                    query_every_node(&ui, &link, &agreed, &model)
+                }
                 MenuAction::Ping => {
-                    let answer = link.lock().unwrap().client().map(|client| client.ping());
+                    let answer = link
+                        .lock()
+                        .unwrap()
+                        .client()
+                        .map(|client| client.ping());
                     ui.set_last_response(SharedString::from(match answer {
                         Some(Ok(tm)) => {
-                            format!("PING OK at {}", tm.header.timestamp.time_of_day())
+                            format!(
+                                "PING OK at {}",
+                                tm.header.timestamp.time_of_day()
+                            )
                         }
                         Some(Err(e)) => format!("PING failed: {e}"),
                         None => crate::ci_link::NOT_CONNECTED.to_string(),
@@ -920,7 +997,15 @@ pub(crate) fn command_buttons(
         let declined = declined.clone();
         ui.on_enable_dh(move |row| {
             if let Some(ui) = weak.upgrade() {
-                command_a_node(&ui, &link, &agreed, &model, &declined, row as usize, true);
+                command_a_node(
+                    &ui,
+                    &link,
+                    &agreed,
+                    &model,
+                    &declined,
+                    row as usize,
+                    true,
+                );
             }
         });
     }
@@ -932,7 +1017,15 @@ pub(crate) fn command_buttons(
         let declined = declined.clone();
         ui.on_disable_dh(move |row| {
             if let Some(ui) = weak.upgrade() {
-                command_a_node(&ui, &link, &agreed, &model, &declined, row as usize, false);
+                command_a_node(
+                    &ui,
+                    &link,
+                    &agreed,
+                    &model,
+                    &declined,
+                    row as usize,
+                    false,
+                );
             }
         });
     }
@@ -963,7 +1056,8 @@ pub(crate) fn command_buttons(
 /// nowhere to send a command: the controls say that rather than doing
 /// nothing, which an operator reads as a window that has stopped working.
 fn no_command_link(ui: &MainWindow) {
-    const NO_LINK: &str = "This configuration states no tcspecial section, so it says where \
+    const NO_LINK: &str =
+        "This configuration states no tcspecial section, so it says where \
          no command link is: nothing can be started or stopped from here. The \
          panels show what each source sends to the ground.";
 
@@ -1049,7 +1143,8 @@ fn take_answer(feed: &PingFeed, data: &[u8], at: std::time::Duration) {
 /// How often the ping window looks for an answer to show. Short, because the
 /// answer to a ping somebody has just sent is what they are watching for;
 /// cheap, because most looks find nothing and do nothing.
-const PING_REFRESH_INTERVAL: std::time::Duration = std::time::Duration::from_millis(100);
+const PING_REFRESH_INTERVAL: std::time::Duration =
+    std::time::Duration::from_millis(100);
 
 /// Show the ping window what the pinger keeps, whenever something new has
 /// arrived, from a timer on the window's thread.
@@ -1201,7 +1296,8 @@ fn ping_node(
                 return;
             };
             let sent = tcslibgs::node::vehicle::ping::now().and_then(|at| {
-                let mut pinger = pinger.lock().map_err(|_| "the pinger".to_string())?;
+                let mut pinger =
+                    pinger.lock().map_err(|_| "the pinger".to_string())?;
                 let message = pinger.ping(at)?;
                 uplink.send(message.as_bytes())?;
                 Ok(PingShown::of(pinger.exchange()))
@@ -1224,7 +1320,12 @@ fn ping_node(
 }
 
 /// Run the MOC on a configuration. Does not return.
-pub fn run(payload_path: &str, sim_path: Option<&str>, mode: Mode, mut startup: Startup) -> ! {
+pub fn run(
+    payload_path: &str,
+    sim_path: Option<&str>,
+    mode: Mode,
+    mut startup: Startup,
+) -> ! {
     let graph = match Graph::load(payload_path) {
         Ok(graph) => graph,
         Err(e) => {
@@ -1241,8 +1342,8 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mode: Mode, mut startup: 
     };
     if links.is_empty() {
         startup.warning(format!(
-            "{payload_path}: nothing in it sends to the ground, so there is nothing \
-             for the panels to show"
+            "{payload_path}: nothing in it sends to the ground, so there is \
+             nothing for the panels to show"
         ));
     }
 
@@ -1290,7 +1391,10 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mode: Mode, mut startup: 
     // connect to and the buttons say so.
     let (link, vehicle_at) = match command_links_of(&graph) {
         Ok(Some((from, to, commanded))) => {
-            eprintln!("Commands from {from} to {to}, nodes on {}", commanded.to);
+            eprintln!(
+                "Commands from {from} to {to}, nodes on {}",
+                commanded.to
+            );
             (
                 Some(Arc::new(Mutex::new(CiLink::down_commanding(
                     &from, commanded,
@@ -1300,8 +1404,9 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mode: Mode, mut startup: 
         }
         Ok(None) => {
             startup.warning(format!(
-                "{payload_path} states no tcspecial section, so it says where no \
-                 command link is: nothing can be started or stopped from here"
+                "{payload_path} states no tcspecial section, so it says where \
+                 no command link is: nothing can be started or stopped from \
+                 here"
             ));
             (None, String::new())
         }
@@ -1331,7 +1436,9 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mode: Mode, mut startup: 
     // ask whether it is already running, so one is started.
     let [tcspecial, _] = CHILDREN;
     let pm_tcssim = Arc::new(ProcessManager::new());
-    if let Err(e) = simulator_for(&graph, payload_path, sim_path, mode, &pm_tcssim) {
+    if let Err(e) =
+        simulator_for(&graph, payload_path, sim_path, mode, &pm_tcssim)
+    {
         // A simulator this started and that never became ready is not left
         // holding the payloads' paths.
         pm_tcssim.kill();
@@ -1357,8 +1464,8 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mode: Mode, mut startup: 
         }
         Err(e) => {
             startup.warning(format!(
-                "{payload_path} cannot be digested, so tcspecial's beacons cannot be \
-                 checked against it: {e}"
+                "{payload_path} cannot be digested, so tcspecial's beacons \
+                 cannot be checked against it: {e}"
             ));
             None
         }
@@ -1367,7 +1474,8 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mode: Mode, mut startup: 
     // The interval the configuration sends beacons at, which is what says how
     // late one is; a configuration whose interval cannot be read gets the
     // standard schedule, and says so.
-    let interval = match tcslibgs::graph::parameters::beacon_interval_of(&graph) {
+    let interval = match tcslibgs::graph::parameters::beacon_interval_of(&graph)
+    {
         Ok(interval) => interval.unwrap_or(tcslib::beacon::STANDARD_INTERVAL),
         Err(e) => {
             startup.warning(format!(
@@ -1431,7 +1539,8 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mode: Mode, mut startup: 
                                     );
                                 }
                             });
-                        }) as crate::beacon_receive::OnContact
+                        })
+                            as crate::beacon_receive::OnContact
                     }),
                 },
             )
@@ -1469,7 +1578,9 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mode: Mode, mut startup: 
         .iter()
         .filter(|n| tcslibgs::gateway::is_gateway(&n.node_type))
         .map(|n| n.name.as_str())
-        .filter(|name| links.iter().any(|l| l.via == Via::Moc(name.to_string())))
+        .filter(|name| {
+            links.iter().any(|l| l.via == Via::Moc(name.to_string()))
+        })
         .collect();
     let mut receivers = Vec::new();
     for name in mocs {
@@ -1520,16 +1631,23 @@ pub fn run(payload_path: &str, sim_path: Option<&str>, mode: Mode, mut startup: 
                 // When the last command went out and when its answer came back,
                 // which the window shows under the link's own status.
                 //
-                // try_lock rather than lock: the link belongs to the buttons, and
-                // a window that waited for it here would stop repainting exactly
-                // while a command was in flight -- which is when an operator is
-                // watching it. A pass that cannot have it leaves the times as
-                // they are, and the next one is a second away.
+                // try_lock rather than lock: the link belongs to the buttons,
+                // and a window that waited for it here would stop repainting
+                // exactly while a command was in flight -- which is when an
+                // operator is watching it. A pass that cannot have it leaves
+                // the times as they are, and the next one is a second away.
                 let Some(times) = times.as_ref() else { return };
-                if let (Some(ui), Ok(link)) = (ui_weak.upgrade(), times.try_lock()) {
-                    let (sent, received) = link.command_times().unwrap_or((None, None));
-                    ui.set_cmd_sent_time(SharedString::from(crate::shown_time(sent)));
-                    ui.set_cmd_recv_time(SharedString::from(crate::shown_time(received)));
+                if let (Some(ui), Ok(link)) =
+                    (ui_weak.upgrade(), times.try_lock())
+                {
+                    let (sent, received) =
+                        link.command_times().unwrap_or((None, None));
+                    ui.set_cmd_sent_time(SharedString::from(
+                        crate::shown_time(sent),
+                    ));
+                    ui.set_cmd_recv_time(SharedString::from(
+                        crate::shown_time(received),
+                    ));
                 }
             },
         );
@@ -1617,15 +1735,19 @@ vehicle:
         let fresh = Arc::clone(&feed.fresh);
         let rows = Arc::new(BTreeMap::from([("pinger".to_string(), 0)]));
         let arrivals: Arrivals = Arc::new(Mutex::new(vec![None]));
-        thread::spawn(move || serve(moc, rows, Arc::new(BTreeSet::new()), arrivals, Some(feed)));
+        thread::spawn(move || {
+            serve(moc, rows, Arc::new(BTreeSet::new()), arrivals, Some(feed))
+        });
 
         let answer = ping::reply(sent.as_bytes(), at).expect("answered");
-        let vehicle = std::net::UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
+        let vehicle = std::net::UdpSocket::bind("127.0.0.1:0")
+            .expect("the vehicle's socket");
         vehicle
             .send_to(answer.as_bytes(), ("127.0.0.1", port))
             .expect("sent");
 
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let deadline =
+            std::time::Instant::now() + std::time::Duration::from_secs(5);
         while !fresh.load(Ordering::Acquire) {
             assert!(
                 std::time::Instant::now() < deadline,
@@ -1658,8 +1780,10 @@ vehicle:
                 "moc:
   - {{ name: ground, type: moc, ground_base: \"127.0.0.1:{}\" }}
 payloads:
-  - {{ name: a, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7001\", payload-out: ground }}
-  - {{ name: b, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7002\", payload-out: ground }}
+  - {{ name: a, type: network, protocol: udp, address: \"127.0.0.1\", \
+    port: \"7001\", payload-out: ground }}
+  - {{ name: b, type: network, protocol: udp, address: \"127.0.0.1\", \
+    port: \"7002\", payload-out: ground }}
 ",
                 port - 1
             ),
@@ -1677,10 +1801,13 @@ payloads:
         let arrivals: Arrivals = Arc::new(Mutex::new(vec![None, None]));
         {
             let arrivals = arrivals.clone();
-            thread::spawn(move || serve(moc, rows, sends_values, arrivals, None));
+            thread::spawn(move || {
+                serve(moc, rows, sends_values, arrivals, None)
+            });
         }
 
-        let vehicle = std::net::UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
+        let vehicle = std::net::UdpSocket::bind("127.0.0.1:0")
+            .expect("the vehicle's socket");
         vehicle
             .send_to(b"from a", ("127.0.0.1", port))
             .expect("sent");
@@ -1690,14 +1817,21 @@ payloads:
                 .expect("sent");
         }
 
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let deadline =
+            std::time::Instant::now() + std::time::Duration::from_secs(5);
         loop {
             let slots = arrivals.lock().expect("the slots");
             if let Some(arrival) = &slots[1] {
                 if arrival.packets == 2 {
-                    assert_eq!(&arrival.data.bytes[..arrival.data.len as usize], b"293.15");
+                    assert_eq!(
+                        &arrival.data.bytes[..arrival.data.len as usize],
+                        b"293.15"
+                    );
                     assert!(arrival.sends_values);
-                    assert!(slots[0].is_none(), "a has no panel, and filled one");
+                    assert!(
+                        slots[0].is_none(),
+                        "a has no panel, and filled one"
+                    );
                     break;
                 }
             }
@@ -1726,13 +1860,15 @@ payloads:
 
         every_node_lost_contact(&model);
 
-        let statuses: Vec<String> = model.iter().map(|info| info.status.to_string()).collect();
+        let statuses: Vec<String> =
+            model.iter().map(|info| info.status.to_string()).collect();
         assert_eq!(statuses, [STALE_STATUS; 3]);
     }
 
     fn example(name: &str) -> Graph {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        Graph::load(root.join(format!("examples/{name}/{name}.yaml"))).expect("the example reads")
+        Graph::load(root.join(format!("examples/{name}/{name}.yaml")))
+            .expect("the example reads")
     }
 
     /// One panel per source, in device id order, saying where its data
@@ -1818,7 +1954,8 @@ payloads:
             "the example binds the thermostat's setpoint and nothing else"
         );
 
-        let shown = panels(&telemetry::of(&graph).expect("its links"), &settable);
+        let shown =
+            panels(&telemetry::of(&graph).expect("its links"), &settable);
         // The thermostat is one of the panels, its decision reaching the
         // ground as well as the heaters, and it is the one that binds
         // something: its panel offers the setpoint and the others offer
@@ -1893,11 +2030,11 @@ payloads:
         std::fs::write(
             &path,
             format!(
-                "moc:\n  - name: moc\n    type: moc\n    address: \"127.0.0.1\"\n    \
-                 port: \"{port}\"\n    ground_base: \"127.0.0.1:9100\"\n    \
-                 payload-in: true\n    moc-out:\n      - target: ping\n\
-                 vehicle:\n  - name: ping\n    type: ping\n    moc-in: true\n    \
-                 payload-out:\n      - target: moc\n"
+                "moc:\n  - name: moc\n    type: moc\n    address: \
+                 \"127.0.0.1\"\n    port: \"{port}\"\n    ground_base: \
+                 \"127.0.0.1:9100\"\n    payload-in: true\n    moc-out:\n      \
+                 - target: ping\nvehicle:\n  - name: ping\n    type: ping\n    \
+                 moc-in: true\n    payload-out:\n      - target: moc\n"
             ),
         )
         .expect("written");
@@ -1926,7 +2063,8 @@ payloads:
             ping_window.window().dispatch_event(event);
         }
         let mut buffer = [0u8; ping::REPLY_BYTES];
-        let (got, _) = vehicle.recv_from(&mut buffer).expect("the ping arrived");
+        let (got, _) =
+            vehicle.recv_from(&mut buffer).expect("the ping arrived");
         let sent = std::str::from_utf8(&buffer[..got])
             .expect("text")
             .to_string();
@@ -2001,8 +2139,8 @@ payloads:
         use i_slint_backend_testing::ElementHandle;
         use std::net::UdpSocket;
         use tcslibgs::{
-            Command, ConfigDigest, ConfigVersion, ConnectTelemetry, HostPort, NodeTelemetry,
-            Telemetry,
+            Command, ConfigDigest, ConfigVersion, ConnectTelemetry, HostPort,
+            NodeTelemetry, Telemetry,
         };
 
         let ours = ConfigDigest([0x5Au8; 16]);
@@ -2025,30 +2163,39 @@ payloads:
                     Ok(got) => got,
                     Err(_) => return seen,
                 };
-                let command: Command = serde_json::from_slice(&buffer[..size]).expect("a command");
+                let command: Command =
+                    serde_json::from_slice(&buffer[..size]).expect("a command");
                 let seq = command.sequence();
                 seen.push(command.cmd_type());
                 let answer = match &command {
-                    Command::Connect(_) => Telemetry::Connect(ConnectTelemetry::new(
-                        seq,
-                        ConfigVersion::of_this_build(),
-                        // The same digest the window read: a vehicle flying
-                        // the configuration this window is showing.
-                        ConfigDigest([0x5Au8; 16]),
-                    )),
-                    Command::StopNode(cmd) => Telemetry::StopNode(NodeTelemetry::stopped(
-                        seq,
-                        tcslibgs::CommandStatus::Success,
-                        cmd.node,
-                    )),
-                    Command::StartNode(cmd) => Telemetry::StartNode(NodeTelemetry::started(
-                        seq,
-                        tcslibgs::CommandStatus::Success,
-                        cmd.node,
-                    )),
+                    Command::Connect(_) => {
+                        Telemetry::Connect(ConnectTelemetry::new(
+                            seq,
+                            ConfigVersion::of_this_build(),
+                            // The same digest the window read: a vehicle flying
+                            // the configuration this window is showing.
+                            ConfigDigest([0x5Au8; 16]),
+                        ))
+                    }
+                    Command::StopNode(cmd) => {
+                        Telemetry::StopNode(NodeTelemetry::stopped(
+                            seq,
+                            tcslibgs::CommandStatus::Success,
+                            cmd.node,
+                        ))
+                    }
+                    Command::StartNode(cmd) => {
+                        Telemetry::StartNode(NodeTelemetry::started(
+                            seq,
+                            tcslibgs::CommandStatus::Success,
+                            cmd.node,
+                        ))
+                    }
                     Command::SetNode(cmd) => {
-                        *setting.lock().expect("the record") =
-                            Some((cmd.attribute.to_string(), cmd.value.to_vec()));
+                        *setting.lock().expect("the record") = Some((
+                            cmd.attribute.to_string(),
+                            cmd.value.to_vec(),
+                        ));
                         Telemetry::SetNode(tcslibgs::SetNodeTelemetry::new(
                             seq,
                             tcslibgs::CommandStatus::Success,
@@ -2090,7 +2237,8 @@ payloads:
         let links = telemetry::of(&graph).expect("its links");
         let mut settable = settable_of(&graph);
         settable.insert(links[0].source.clone(), vec!["setpoint".to_string()]);
-        let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(panels(&links, &settable)));
+        let model: Rc<VecModel<DHInfo>> =
+            Rc::new(VecModel::from(panels(&links, &settable)));
         ui.set_dh_model(ModelRc::from(model.clone()));
         ui.set_ci_status(SharedString::from(DISCONNECTED_STATUS));
         ui.set_ci_address(SharedString::from(at.clone()));
@@ -2116,7 +2264,15 @@ payloads:
         // The spacecraft being heard from, as the beacon thread would say: so
         // a Connect is the moment to ask what each node is doing.
         let contact = Arc::new(Mutex::new(tcslib::beacon::Contact::Made));
-        command_buttons(&ui, &link, &agreed, Some(ours), &model, &declined, &contact);
+        command_buttons(
+            &ui,
+            &link,
+            &agreed,
+            Some(ours),
+            &model,
+            &declined,
+            &contact,
+        );
 
         // A panel starts at Unknown: nothing has been asked.
         assert_eq!(
@@ -2127,7 +2283,12 @@ payloads:
         let press = |label: &str| {
             let found: Vec<ElementHandle> =
                 ElementHandle::find_by_accessible_label(&ui, label).collect();
-            assert_eq!(found.len(), 1, "one {label} button, found {}", found.len());
+            assert_eq!(
+                found.len(),
+                1,
+                "one {label} button, found {}",
+                found.len()
+            );
             found[0].invoke_accessible_default_action();
         };
 
@@ -2204,13 +2365,14 @@ payloads:
         // label: a LineEdit carries no accessible label, and these two are
         // told apart by the thing the test is checking -- the attribute comes
         // filled in from the binding and the value does not.
-        let fields: Vec<ElementHandle> = ElementHandle::find_by_element_type_name(&ui, "LineEdit")
-            .filter(|field| {
-                field
-                    .accessible_value()
-                    .is_some_and(|held| held == "setpoint" || held.is_empty())
-            })
-            .collect();
+        let fields: Vec<ElementHandle> =
+            ElementHandle::find_by_element_type_name(&ui, "LineEdit")
+                .filter(|field| {
+                    field.accessible_value().is_some_and(|held| {
+                        held == "setpoint" || held.is_empty()
+                    })
+                })
+                .collect();
         assert_eq!(
             fields.len(),
             2,
@@ -2224,19 +2386,23 @@ payloads:
             fields.iter().any(|field| field
                 .accessible_value()
                 .is_some_and(|held| held == "setpoint")),
-            "one field should start with the attribute the binding names, so that \
-             only the value has to be typed"
+            "one field should start with the attribute the binding names, so \
+             that only the value has to be typed"
         );
         let value = fields
             .iter()
-            .find(|field| field.accessible_value().is_some_and(|held| held.is_empty()))
+            .find(|field| {
+                field.accessible_value().is_some_and(|held| held.is_empty())
+            })
             .expect("the value field, which starts empty");
         value.set_accessible_value("300.0");
         press("Set");
 
         let said = ui.get_last_response().to_string();
         assert!(
-            said.contains("SET_NODE") && said.contains("setpoint") && said.contains("300.0"),
+            said.contains("SET_NODE")
+                && said.contains("setpoint")
+                && said.contains("300.0"),
             "the answer should be shown: {said}"
         );
         assert_eq!(
@@ -2258,9 +2424,11 @@ payloads:
             STOPPED_STATUS,
             "the panel should say what the query answered"
         );
-        let shown = model.row_data(0).expect("the panel").parameters.to_string();
+        let shown =
+            model.row_data(0).expect("the panel").parameters.to_string();
         assert!(
-            shown.contains("480 bytes in 40 reads") && shown.contains("40 triggers"),
+            shown.contains("480 bytes in 40 reads")
+                && shown.contains("40 triggers"),
             "and the counts should be in the popup: {shown}"
         );
         assert!(

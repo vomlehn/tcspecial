@@ -34,7 +34,9 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 /// the second -- which is two fields to carry, two to serialize, and two to
 /// get wrong: arithmetic on it had to borrow across the second, and the
 /// nanoseconds were never shown or read by anything.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord,
+)]
 pub struct Timestamp {
     /// Microseconds since the UNIX epoch, or all ones for a clock that could
     /// not be read: [`Timestamp::CLOCK_FAULT`].
@@ -280,7 +282,8 @@ pub fn came_from(stated: &HostPort, from: &SocketAddr) -> bool {
         return false;
     };
     let from = std::str::from_utf8(&text[..len]).unwrap_or("");
-    let this_host = |name: &str| matches!(name, "localhost" | "127.0.0.1" | "::1");
+    let this_host =
+        |name: &str| matches!(name, "localhost" | "127.0.0.1" | "::1");
     if this_host(&stated.address) {
         this_host(from)
     } else {
@@ -319,7 +322,10 @@ fn written(value: &impl std::fmt::Display, out: &mut [u8]) -> Option<usize> {
 /// be told from a host: a handler at `localhost:4000` and a command link at
 /// `0.0.0.0:4000` do collide, without naming one host between them.
 fn binds_every_interface(address: &str) -> bool {
-    address.is_empty() || address == "0.0.0.0" || address == "::" || address == "*"
+    address.is_empty()
+        || address == "0.0.0.0"
+        || address == "::"
+        || address == "*"
 }
 
 impl DHType {
@@ -384,7 +390,8 @@ impl DHType {
 
     /// Every kind, as a file would write them, for an error to list.
     pub fn spellings() -> String {
-        "network, device-file, serial, i2c, spi, can, iio, rpmsg, gpio, or hdlc".to_string()
+        "network, device-file, serial, i2c, spi, can, iio, rpmsg, gpio, or hdlc"
+            .to_string()
     }
 
     /// The name this word used to be, for a file that still writes it.
@@ -452,7 +459,9 @@ impl NetworkProtocol {
 /// handlers in order of it. Ordered and hashed for that reason -- a name is a
 /// map key -- and the configuration holds every name in a file to being
 /// distinct, there being nothing else to tell two handlers apart.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash,
+)]
 pub struct DHName(pub String);
 
 impl DHName {
@@ -480,7 +489,18 @@ impl DHName {
 /// order. Agreeing about the digest is what CONNECT establishes, and a ground
 /// station whose digest does not match the vehicle's does not send commands
 /// about nodes at all.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+)]
 pub struct NodeId(pub u32);
 
 impl NodeId {
@@ -603,7 +623,9 @@ impl BeaconInterval {
 /// Named for what a node does: a node has one interface and two directions --
 /// what the vehicle takes from it and what the vehicle gives it -- so those
 /// are the words.
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq,
+)]
 pub struct NodeCounts {
     /// Bytes the vehicle has taken from this node.
     pub taken_bytes: u64,
@@ -796,9 +818,10 @@ impl DHSample {
         };
 
         if as_value && !self.was_truncated() {
-            if let Ok(number) =
-                crate::node::vehicle::compute::from_value(self.data(), "what arrived")
-            {
+            if let Ok(number) = crate::node::vehicle::compute::from_value(
+                self.data(),
+                "what arrived",
+            ) {
                 let shown = crate::node::vehicle::compute::as_text(number);
                 return (time.time_of_day(), format!("{shown} K"));
             }
@@ -841,7 +864,18 @@ pub enum NetworkProtocol {
 /// level for socket options, and a raw socket opened with it is refused by
 /// the kernel -- and not 255, `IPPROTO_RAW`, which can only send: a payload
 /// that could never be read would be a payload nobody could tell was there.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+)]
 pub struct IpProtocol(u8);
 
 impl IpProtocol {
@@ -1203,7 +1237,9 @@ impl DHMode {
     pub fn polling(&self) -> Option<(&[u8], Duration)> {
         match self {
             DHMode::Periodic => None,
-            DHMode::Triggered { trigger, interval } => Some((trigger, *interval)),
+            DHMode::Triggered { trigger, interval } => {
+                Some((trigger, *interval))
+            }
         }
     }
 }
@@ -1302,7 +1338,9 @@ pub(crate) fn kind_of_terms(
     wire: crate::endpoint_config::LinkTerms,
 ) -> Result<crate::endpoint_config::GroupKind, String> {
     match kind {
-        DHType::Serial => crate::node::payload::serial::group_kind_of(name, wire),
+        DHType::Serial => {
+            crate::node::payload::serial::group_kind_of(name, wire)
+        }
         DHType::I2c => crate::node::payload::i2c::group_kind_of(name, wire),
         DHType::Spi => crate::node::payload::spi::group_kind_of(name, wire),
         DHType::Can => crate::node::payload::can::group_kind_of(name, wire),
@@ -1375,9 +1413,9 @@ impl HostPort {
     /// something no socket can be, and the useful moment to say so is while
     /// somebody is reading the file.
     pub fn at(&self, id: usize) -> Result<NetworkConfig, String> {
-        let port = (self.port as usize)
-            .checked_add(id)
-            .ok_or_else(|| format!("{}:{} plus {id} is not a port", self.address, self.port))?;
+        let port = (self.port as usize).checked_add(id).ok_or_else(|| {
+            format!("{}:{} plus {id} is not a port", self.address, self.port)
+        })?;
         if port > u16::MAX as usize {
             return Err(format!(
                 "{}:{} plus {id} is port {port}, and a port is at most 65535: \
@@ -1412,8 +1450,8 @@ pub fn host_port_of(attribute: &str, stated: &str) -> Result<HostPort, String> {
     let said = stated.trim();
     let (address, port) = said.rsplit_once(':').ok_or_else(|| {
         format!(
-            "{attribute} \"{said}\" is not an address and a port: it is written \
-             as address:port, as 0.0.0.0:4000"
+            "{attribute} \"{said}\" is not an address and a port: it is \
+             written as address:port, as 0.0.0.0:4000"
         )
     })?;
 
@@ -1432,8 +1470,8 @@ pub fn host_port_of(attribute: &str, stated: &str) -> Result<HostPort, String> {
     if port == 0 {
         return Err(format!(
             "{attribute} \"{said}\" asks for port 0, which is a request for \
-             whatever port is free -- and a link nobody can predict the port of \
-             is one the other end cannot reach"
+             whatever port is free -- and a link nobody can predict the port \
+             of is one the other end cannot reach"
         ));
     }
 
@@ -1590,9 +1628,9 @@ pub struct PayloadCommandJson {
 /// All but one of its entries are subsections -- `tcs_cmd`,
 /// `payload_telemetry`, `beacon` and `log` -- because each is one thing with
 /// more than one attribute to it, and a prefix repeated on two or three flat
-/// names is a subsection somebody declined to write. The names under one are short for the same reason: `beacon.send`
-/// says what `beacon_send` said, and says it where the reader is already
-/// looking at the beacon.
+/// names is a subsection somebody declined to write. The names under one are
+/// short for the same reason: `beacon.send` says what `beacon_send` said, and
+/// says it where the reader is already looking at the beacon.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CIConfigJson {
     /// What the vehicle answers to, which decides how every link below is
@@ -1641,8 +1679,8 @@ pub struct CIConfigJson {
 /// that could never be restarted, which is a configuration nobody means and
 /// would find out about only when they needed it.
 pub fn restart_arm_valid_of(said: &str) -> Result<Duration, String> {
-    let valid =
-        crate::graph::parse_interval(said).map_err(|why| format!("restart_arm_valid: {why}"))?;
+    let valid = crate::graph::parse_interval(said)
+        .map_err(|why| format!("restart_arm_valid: {why}"))?;
     if valid.is_zero() {
         return Err(
             "restart_arm_valid is nought, which is an arm that lapses as it is \
@@ -1704,8 +1742,10 @@ impl CIConfigJson {
             "payload_command.source_base",
             &self.payload_command.source_base,
         )?;
-        let payload_command_dest_base =
-            host_port_of("payload_command.dest_base", &self.payload_command.dest_base)?;
+        let payload_command_dest_base = host_port_of(
+            "payload_command.dest_base",
+            &self.payload_command.dest_base,
+        )?;
         let moc_cmd_send = host_port_of("tcs_cmd.send", &self.tcs_cmd.send)?;
         let payload_source_base = host_port_of(
             "payload_telemetry.source_base",
@@ -1731,8 +1771,9 @@ impl CIConfigJson {
         // protocol counts milliseconds in four bytes, so an interval longer
         // than that could be set here and never commanded -- refused where
         // the file is read rather than at the first CONFIG.
-        let beacon_interval = crate::graph::parse_interval(&self.beacon.interval)
-            .map_err(|why| format!("beacon.interval: {why}"))?;
+        let beacon_interval =
+            crate::graph::parse_interval(&self.beacon.interval)
+                .map_err(|why| format!("beacon.interval: {why}"))?;
         if u32::try_from(beacon_interval.as_millis()).is_err() {
             return Err(
                 "beacon.interval: longer than the protocol can carry, which \
@@ -1755,7 +1796,9 @@ impl CIConfigJson {
         // equal to the spacecraft link is a file that has put two links in one
         // socket. The rest of the sum is checked where the payloads are known
         // and the ids with them -- see `interpreter_collisions`.
-        if payload_command_dest_base.address == address && payload_command_dest_base.port == port {
+        if payload_command_dest_base.address == address
+            && payload_command_dest_base.port == port
+        {
             return Err(format!(
                 "tcs_cmd.recv and payload_command.dest_base are both \
                  {address}:{port}, and the two links cannot be one socket: \

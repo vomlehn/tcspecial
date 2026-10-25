@@ -3,7 +3,8 @@
 # payload-out.
 #
 # A link cannot carry one stream into the other, so this is how what the
-# ground sends reaches a payload-in. Its Rust is tcspecial/src/node/vehicle/tee_moc/.
+# ground sends reaches a payload-in. Its Rust is
+# tcspecial/src/node/vehicle/tee_moc/.
 node: tee-moc
 type: tee-moc
 about: Sends what the ground sends on as MOC data and again as payload data.

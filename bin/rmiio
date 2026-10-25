@@ -26,7 +26,8 @@ iio_devices="$configfs/iio/devices/dummy"
 iio_triggers="$configfs/iio/triggers/hrtimer"
 
 if [ "$(id -u)" -ne 0 ]; then
-	echo "rmiio: re-running under sudo, which is what unloading a module needs"
+	echo "rmiio: re-running under sudo, which is what unloading a module" \
+		"needs"
 	exec sudo -- "$0" "$@"
 fi
 
@@ -61,13 +62,18 @@ fi
 # industrialio alone whatever happens. Those two are how every real sensor on
 # the host is reached, and this script's business is its own sensor and not the
 # subsystem.
-if [ -d /sys/module/iio_dummy ] && [ -z "$(ls -A "$iio_devices" 2>/dev/null)" ]; then
+if [ -d /sys/module/iio_dummy ] &&
+	[ -z "$(ls -A "$iio_devices" 2>/dev/null)" ]; then
 	echo "rmiio: unloading iio_dummy, which now holds no sensors"
-	modprobe -r iio_dummy || echo "rmiio: iio_dummy is in use, so it stays loaded"
+	modprobe -r iio_dummy ||
+		echo "rmiio: iio_dummy is in use, so it stays loaded"
 fi
-if [ -d /sys/module/iio_trig_hrtimer ] && [ -z "$(ls -A "$iio_triggers" 2>/dev/null)" ]; then
+if [ -d /sys/module/iio_trig_hrtimer ] &&
+	[ -z "$(ls -A "$iio_triggers" 2>/dev/null)" ]; then
 	echo "rmiio: unloading iio-trig-hrtimer, which now holds no triggers"
-	modprobe -r iio-trig-hrtimer || echo "rmiio: iio-trig-hrtimer is in use, so it stays loaded"
+	modprobe -r iio-trig-hrtimer ||
+		echo "rmiio: iio-trig-hrtimer is in use, so it" \
+			"stays loaded"
 fi
 
 echo "rmiio: done"

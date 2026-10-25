@@ -22,7 +22,8 @@ use tcslibgs::{I2cConfig, TcsError, TcsResult};
 
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
 use crate::endpoint::{
-    wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable, WaitResult,
+    wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable,
+    WaitResult,
 };
 
 /// Requests of an open I2C bus, from `linux/i2c-dev.h`.
@@ -94,7 +95,8 @@ impl Transfers {
             return Ok(Transfers::Raw);
         }
 
-        let block = I2C_FUNC_SMBUS_READ_I2C_BLOCK | I2C_FUNC_SMBUS_WRITE_I2C_BLOCK;
+        let block =
+            I2C_FUNC_SMBUS_READ_I2C_BLOCK | I2C_FUNC_SMBUS_WRITE_I2C_BLOCK;
         if funcs & block == block {
             return Ok(Transfers::BlockRegister);
         }
@@ -153,7 +155,9 @@ impl I2cEndpoint {
             .read(true)
             .write(true)
             .open(&config.bus)
-            .map_err(|e| TcsError::Endpoint(format!("{on} cannot be opened: {e}")))?;
+            .map_err(|e| {
+                TcsError::Endpoint(format!("{on} cannot be opened: {e}"))
+            })?;
 
         let fd = bus.as_raw_fd();
 
@@ -195,7 +199,11 @@ impl I2cEndpoint {
     ///
     /// Returns the bytes moved. A block carries its own length, so a read says
     /// how much there was and a write says how much to take.
-    fn block(&mut self, read_write: u8, bytes: &mut SmbusData) -> TcsResult<usize> {
+    fn block(
+        &mut self,
+        read_write: u8,
+        bytes: &mut SmbusData,
+    ) -> TcsResult<usize> {
         let mut transfer = SmbusTransfer {
             read_write,
             command: DATA_REGISTER,
@@ -205,7 +213,10 @@ impl I2cEndpoint {
 
         // SAFETY: the bus is open, and the transfer points at a live block for
         // the duration of the call.
-        if unsafe { libc::ioctl(self.bus.as_raw_fd(), I2C_SMBUS, &mut transfer) } < 0 {
+        if unsafe {
+            libc::ioctl(self.bus.as_raw_fd(), I2C_SMBUS, &mut transfer)
+        } < 0
+        {
             return Err(TcsError::Io(std::io::Error::last_os_error()));
         }
 
@@ -261,7 +272,11 @@ impl EndpointWaitable for I2cEndpoint {
     /// transfer the master starts -- so the wait is on the command pipe and
     /// the bus together, as for a device file, and a bus that is always ready
     /// simply makes every wait return at once.
-    fn wait_for_event(&self, cmd_fd: RawFd, timeout_ms: i32) -> TcsResult<WaitResult> {
+    fn wait_for_event(
+        &self,
+        cmd_fd: RawFd,
+        timeout_ms: i32,
+    ) -> TcsResult<WaitResult> {
         wait_for_fds(self.io_fd(), cmd_fd, PollFlags::POLLIN, timeout_ms)
     }
 }
@@ -332,7 +347,8 @@ mod tests {
     #[test]
     fn how_a_bus_is_talked_to_follows_from_what_it_can_do() {
         let raw = I2C_FUNC_I2C;
-        let block = I2C_FUNC_SMBUS_READ_I2C_BLOCK | I2C_FUNC_SMBUS_WRITE_I2C_BLOCK;
+        let block =
+            I2C_FUNC_SMBUS_READ_I2C_BLOCK | I2C_FUNC_SMBUS_WRITE_I2C_BLOCK;
 
         assert_eq!(Transfers::of(raw, "/dev/i2c-1").unwrap(), Transfers::Raw);
         assert_eq!(

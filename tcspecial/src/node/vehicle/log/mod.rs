@@ -91,7 +91,9 @@ impl LogNode {
             // directory from filling over a long flight.
             handoff,
         )
-        .map_err(|e| format!("\"{what}\": cannot open a log in {directory}: {e}"))?;
+        .map_err(|e| {
+            format!("\"{what}\": cannot open a log in {directory}: {e}")
+        })?;
 
         Ok(LogNode {
             what: what.to_string(),
@@ -163,9 +165,9 @@ impl std::fmt::Debug for LogNode {
 /// The `tcslog` format these records are written in.
 ///
 /// The one place the two spellings meet. A configuration states a format by
-/// the rules in `tcslibgs::node::vehicle::log`, which the ground tool checks without
-/// `tcslog` in it at all; this is where what it settled becomes what the
-/// library takes.
+/// the rules in `tcslibgs::node::vehicle::log`, which the ground tool checks
+/// without `tcslog` in it at all; this is where what it settled becomes what
+/// the library takes.
 fn tcslog_format(format: LogFormat) -> Format {
     match format {
         LogFormat::Fixed(bytes) => Format::Fixed(bytes),
@@ -183,10 +185,10 @@ mod tests {
 
     /// A node built here rather than read, so a test can make one wrong.
     ///
-    /// What a log node may say is checked in `tcslibgs::node::vehicle::log`, where the
-    /// ground tool checks it too. What is tested here is the other half: that
-    /// a log opens where the node said, writes what arrives, and reports what
-    /// it could not write.
+    /// What a log node may say is checked in `tcslibgs::node::vehicle::log`,
+    /// where the ground tool checks it too. What is tested here is the other
+    /// half: that a log opens where the node said, writes what arrives, and
+    /// reports what it could not write.
     fn node(name: &str, attributes: &[(&str, &str)]) -> Node {
         Node {
             name: name.to_string(),
@@ -267,7 +269,8 @@ mod tests {
             .collect();
         assert_eq!(written.len(), 1, "{written:?}");
         assert!(
-            written[0].starts_with("log-housekeeping-") && written[0].ends_with(".tcslog"),
+            written[0].starts_with("log-housekeeping-")
+                && written[0].ends_with(".tcslog"),
             "the segment file should be named for the node: {written:?}"
         );
 
@@ -314,7 +317,8 @@ mod tests {
     #[test]
     fn the_examples_log_is_what_it_says() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let graph = Graph::load(root.join("tests/manual/thermostat.yaml")).expect("it reads");
+        let graph = Graph::load(root.join("tests/manual/thermostat.yaml"))
+            .expect("it reads");
         let housekeeping = graph.node("housekeeping").expect("the log");
 
         // Opened into a directory of this test's own, the example's being a
@@ -328,7 +332,8 @@ mod tests {
             Scalar::of(where_.path().to_str().expect("a path")),
         );
 
-        let log = LogNode::of(&moved, &SegSend::none()).expect("the example's log opens");
+        let log = LogNode::of(&moved, &SegSend::none())
+            .expect("the example's log opens");
         assert_eq!(log.format(), Format::VariableTsRc);
     }
 }

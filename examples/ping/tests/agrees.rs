@@ -38,7 +38,8 @@ fn described() -> Vec<(String, String)> {
         .expect("text")
         .lines()
         .map(|line| {
-            let (name, value) = line.split_once(' ').expect("a name and a value");
+            let (name, value) =
+                line.split_once(' ').expect("a name and a value");
             (name.to_string(), value.to_string())
         })
         .collect()
@@ -65,14 +66,18 @@ fn worked_out() -> Vec<(String, String)> {
         .find(|node| node.name == "moc")
         .expect("a moc node");
     let uplink = match reach_of(moc).expect("it is reached").endpoint {
-        EndpointConfig::Network(network) => format!("{}:{}", network.address, network.port),
+        EndpointConfig::Network(network) => {
+            format!("{}:{}", network.address, network.port)
+        }
         other => panic!("a moc node is a socket: {other:?}"),
     };
 
     let downlink = telemetry::of(&graph)
         .expect("its links to the ground work out")
         .into_iter()
-        .find(|link| link.source == "ping" && link.via == Via::Moc("moc".to_string()))
+        .find(|link| {
+            link.source == "ping" && link.via == Via::Moc("moc".to_string())
+        })
         .map(|link| format!("{}:{}", link.ground.address, link.ground.port))
         .expect("ping sends to the moc node");
 
@@ -99,12 +104,17 @@ fn the_python_reads_the_configuration_as_the_rust_does() {
             .iter()
             .find(|(said, _)| said == name)
             .map(|(_, value)| value)
-            .unwrap_or_else(|| panic!("the Python says nothing of {name}: {python:?}"));
+            .unwrap_or_else(|| {
+                panic!("the Python says nothing of {name}: {python:?}")
+            });
         // The digest is tcsverify's, which the Python asks for and does not
         // work out: a build that has not made tcsverify yet leaves it to say
         // so, and there is then nothing of the Python's to compare.
         if name == "digest" && ours == "None" {
-            eprintln!("tcsverify is not built, so the Python had no digest to compare");
+            eprintln!(
+                "tcsverify is not built, so the Python had no digest to \
+                 compare"
+            );
             continue;
         }
         assert_eq!(ours, theirs, "{name}: the Python and the Rust disagree");

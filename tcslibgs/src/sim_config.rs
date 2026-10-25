@@ -42,7 +42,8 @@ use std::time::Duration;
 
 use crate::verify::About;
 use crate::{
-    load_config_file, one_host, DHConfig, DHType, EndpointConfig, NetworkProtocol, TcsResult,
+    load_config_file, one_host, DHConfig, DHType, EndpointConfig,
+    NetworkProtocol, TcsResult,
 };
 use serde::de::IgnoredAny;
 use serde::{Deserialize, Serialize};
@@ -179,38 +180,39 @@ impl fmt::Display for SimConfigError {
             }
             SimConfigError::UnknownGroup { payload, group } => write!(
                 f,
-                "simulated payload \"{}\" names group \"{}\", which is not defined",
+                "simulated payload \"{}\" names group \"{}\", which is not \
+                 defined",
                 payload, group
             ),
             SimConfigError::UnknownPayload { payload } => write!(
                 f,
-                "\"{}\" is simulated, but the payload configuration has no data \
-                 handler of that name",
+                "\"{}\" is simulated, but the payload configuration has no \
+                 data handler of that name",
                 payload
             ),
             SimConfigError::SimulateUnstated { payload } => write!(
                 f,
-                "\"{payload}\" says nowhere whether it is simulated: give it simulate: \
-                 true for tcssim to stand in for it, or simulate: false for the real \
-                 device, or give it to a group that says"
+                "\"{payload}\" says nowhere whether it is simulated: give it \
+                 simulate: true for tcssim to stand in for it, or simulate: \
+                 false for the real device, or give it to a group that says"
             ),
             SimConfigError::SimulateTwice { payload, group } => write!(
                 f,
-                "\"{payload}\" states simulate, and so does its group \"{group}\": a \
-                 payload does not override its group's simulate, so take it out of \
-                 one of the two -- out of the payload, or out of the group and into \
-                 each payload in it"
+                "\"{payload}\" states simulate, and so does its group \"\
+                 {group}\": a payload does not override its group's simulate, \
+                 so take it out of one of the two -- out of the payload, or \
+                 out of the group and into each payload in it"
             ),
             SimConfigError::Unsimulated { handler } => write!(
                 f,
-                "data handler \"{}\" has no simulated payload: add one naming it, \
-                 or remove the handler",
+                "data handler \"{}\" has no simulated payload: add one naming \
+                 it, or remove the handler",
                 handler
             ),
             SimConfigError::UnusedGroup { group } => write!(
                 f,
-                "simulated payload group \"{}\" is named by no simulated payload: \
-                 name it from one, or remove the group",
+                "simulated payload group \"{}\" is named by no simulated \
+                 payload: name it from one, or remove the group",
                 group
             ),
             SimConfigError::NotAnInterval {
@@ -218,16 +220,18 @@ impl fmt::Display for SimConfigError {
                 setting,
                 why,
             } => write!(f, "simulated payload \"{payload}\": {setting}: {why}"),
-            SimConfigError::IntervalForADrivenPayload { payload, setting } => write!(
+            SimConfigError::IntervalForADrivenPayload { payload, setting } => {
+                write!(
                 f,
-                "simulated payload \"{payload}\" is only driven -- the vehicle writes to \
-                 it and reads nothing from it -- so it sends nothing, and {setting} \
-                 governs nothing: take it out"
-            ),
+                "simulated payload \"{payload}\" is only driven -- the vehicle \
+                 writes to it and reads nothing from it -- so it sends \
+                 nothing, and {setting} governs nothing: take it out"
+            )
+            }
             SimConfigError::NoPacketInterval { payload } => write!(
                 f,
-                "simulated payload \"{}\" has no packet interval: state one for it \
-                 or in the group it names",
+                "simulated payload \"{}\" has no packet interval: state one \
+                 for it or in the group it names",
                 payload
             ),
             SimConfigError::NotAPercentage {
@@ -236,8 +240,8 @@ impl fmt::Display for SimConfigError {
                 given,
             } => write!(
                 f,
-                "simulated payload \"{}\" gives {} as {}, which is a percentage: \
-                 nought to a hundred",
+                "simulated payload \"{}\" gives {} as {}, which is a \
+                 percentage: nought to a hundred",
                 payload, given, setting
             ),
             SimConfigError::FaultForTheWrongPayload {
@@ -246,15 +250,17 @@ impl fmt::Display for SimConfigError {
                 why,
             } => write!(
                 f,
-                "simulated payload \"{}\" asks for {}, which it cannot have: {}",
+                "simulated payload \"{}\" asks for {}, which it cannot have: \
+                 {}",
                 payload, fault, why
             ),
             SimConfigError::NoSuchSetting { what, name, given } => write!(
                 f,
-                "{} \"{}\" states \"{}\", which is not a setting. A word this file \
-                 does not know is refused rather than ignored: a misspelled \
-                 setting that was ignored would have the simulator do something \
-                 other than what the file asked for, and say nothing",
+                "{} \"{}\" states \"{}\", which is not a setting. A word this \
+                 file does not know is refused rather than ignored: a \
+                 misspelled setting that was ignored would have the simulator \
+                 do something other than what the file asked for, and say \
+                 nothing",
                 what, name, given
             ),
             SimConfigError::NoKind { payload, actually } => write!(
@@ -263,14 +269,15 @@ impl fmt::Display for SimConfigError {
                  stands in for: state type: {}, as the payload configuration \
                  does. It is stated in both files so that the two can be \
                  checked against each other, which is the only thing that \
-                 catches a simulator file paired with the wrong tcspecial configuration",
+                 catches a simulator file paired with the wrong tcspecial \
+                 configuration",
                 payload,
                 actually.spelling()
             ),
             SimConfigError::NoSuchKind { payload, given } => write!(
                 f,
-                "simulated payload \"{}\" is a \"{}\" payload, which is not a kind: \
-                 expected {}",
+                "simulated payload \"{}\" is a \"{}\" payload, which is not a \
+                 kind: expected {}",
                 payload,
                 given,
                 DHType::spellings()
@@ -281,29 +288,31 @@ impl fmt::Display for SimConfigError {
                 in_sim_file,
             } => write!(
                 f,
-                "simulated payload \"{}\" is a {} payload here and a {} payload in \
-                 the payload configuration. Both files describe the one payload, so \
-                 they cannot disagree about its kind: either this is not the \
-                 tcspecial configuration these settings were written for, or one of the two \
-                 has been changed and the other has not",
+                "simulated payload \"{}\" is a {} payload here and a {} \
+                 payload in the payload configuration. Both files describe the \
+                 one payload, so they cannot disagree about its kind: either \
+                 this is not the tcspecial configuration these settings were \
+                 written for, or one of the two has been changed and the other \
+                 has not",
                 payload,
                 in_sim_file.spelling(),
                 in_payload_file.spelling()
             ),
             SimConfigError::NoProtocol { payload, actually } => write!(
                 f,
-                "simulated payload \"{}\" is a network payload and does not say \
-                 which transport: state protocol: {}, as the payload configuration \
-                 does. Which transport it is decides what the payload can be made \
-                 to do -- only a stream can be hung up on, and only a stream can \
-                 be triggered -- so a network payload states it in both files",
+                "simulated payload \"{}\" is a network payload and does not \
+                 say which transport: state protocol: {}, as the payload \
+                 configuration does. Which transport it is decides what the \
+                 payload can be made to do -- only a stream can be hung up on, \
+                 and only a stream can be triggered -- so a network payload \
+                 states it in both files",
                 payload,
                 actually.spelling()
             ),
             SimConfigError::NoSuchProtocol { payload, given } => write!(
                 f,
-                "simulated payload \"{}\" speaks \"{}\", which is not a protocol: \
-                 expected {}",
+                "simulated payload \"{}\" speaks \"{}\", which is not a \
+                 protocol: expected {}",
                 payload,
                 given,
                 NetworkProtocol::spellings()
@@ -315,9 +324,9 @@ impl fmt::Display for SimConfigError {
             } => write!(
                 f,
                 "simulated payload \"{}\" speaks {} here and {} in the payload \
-                 configuration. The transport decides how the payload is reached \
-                 and what it can be asked to do, so the two files cannot disagree \
-                 about it",
+                 configuration. The transport decides how the payload is \
+                 reached and what it can be asked to do, so the two files \
+                 cannot disagree about it",
                 payload,
                 in_sim_file.spelling(),
                 in_payload_file.spelling()
@@ -328,8 +337,8 @@ impl fmt::Display for SimConfigError {
                 setting,
             } => write!(
                 f,
-                "simulated payload \"{}\" is a {} payload and states {}, which only \
-                 a network payload has",
+                "simulated payload \"{}\" is a {} payload and states {}, which \
+                 only a network payload has",
                 payload,
                 kind.spelling(),
                 setting
@@ -340,26 +349,29 @@ impl fmt::Display for SimConfigError {
                 why,
             } => write!(
                 f,
-                "simulated payload \"{}\" states {}, which it has no use for: {}",
+                "simulated payload \"{}\" states {}, which it has no use for: \
+                 {}",
                 payload, setting, why
             ),
             SimConfigError::OneSocketForBothEnds { payload, what } => write!(
                 f,
-                "simulated payload \"{}\" would bind {}, which is the handler's own \
-                 end of the link: a socket cannot be bound twice, and the two ends \
-                 of a link are two sockets",
+                "simulated payload \"{}\" would bind {}, which is the \
+                 handler's own end of the link: a socket cannot be bound \
+                 twice, and the two ends of a link are two sockets",
                 payload, what
             ),
-            SimConfigError::TheOtherFilesBusiness { what, name, given } => write!(
-                f,
-                "{} \"{}\" states {}, which belongs in the tcspecial \
-                 configuration file: the simulator takes where a payload is from \
-                 there. What this \
-                 file may say is where the payload answers from -- payload_address \
-                 and payload_port, the payload's own end of the link -- which \
-                 nothing else states",
-                what, name, given
-            ),
+            SimConfigError::TheOtherFilesBusiness { what, name, given } => {
+                write!(
+                    f,
+                    "{} \"{}\" states {}, which belongs in the tcspecial \
+                     configuration file: the simulator takes where a payload \
+                     is from there. What this file may say is where the \
+                     payload answers from -- payload_address and payload_port, \
+                     the payload's own end of the link -- which nothing else \
+                     states",
+                    what, name, given
+                )
+            }
             SimConfigError::CannotSimulate { why, .. } => write!(f, "{why}"),
             SimConfigError::BadThermalMass { mass, why } => {
                 write!(f, "thermal mass \"{mass}\": {why}")
@@ -367,12 +379,15 @@ impl fmt::Display for SimConfigError {
             SimConfigError::BadAttachment { payload, why } => {
                 write!(f, "simulated payload \"{payload}\": {why}")
             }
-            SimConfigError::IntervalForATriggeredPayload { payload, setting } => write!(
+            SimConfigError::IntervalForATriggeredPayload {
+                payload,
+                setting,
+            } => write!(
                 f,
-                "simulated payload \"{}\" is triggered, so it sends when tcspecial \
-                 asks and has no timing of its own: {} belongs to a payload that \
-                 sends on its own, and the rate a triggered one is asked at is \
-                 trigger_interval in the payload configuration",
+                "simulated payload \"{}\" is triggered, so it sends when \
+                 tcspecial asks and has no timing of its own: {} belongs to a \
+                 payload that sends on its own, and the rate a triggered one \
+                 is asked at is trigger_interval in the payload configuration",
                 payload, setting
             ),
         }
@@ -399,12 +414,20 @@ impl SimConfigError {
 
         match self {
             SimConfigError::Duplicate { what, name } => either(what, name),
-            SimConfigError::TheOtherFilesBusiness { what, name, .. } => either(what, name),
-            SimConfigError::NoSuchSetting { what, name, .. } => either(what, name),
+            SimConfigError::TheOtherFilesBusiness { what, name, .. } => {
+                either(what, name)
+            }
+            SimConfigError::NoSuchSetting { what, name, .. } => {
+                either(what, name)
+            }
 
-            SimConfigError::UnusedGroup { group } => About::SimGroup(group.clone()),
+            SimConfigError::UnusedGroup { group } => {
+                About::SimGroup(group.clone())
+            }
 
-            SimConfigError::Unsimulated { .. } => About::Section("simulated_payloads"),
+            SimConfigError::Unsimulated { .. } => {
+                About::Section("simulated_payloads")
+            }
 
             SimConfigError::UnknownGroup { payload, .. }
             | SimConfigError::UnknownPayload { payload }
@@ -412,7 +435,9 @@ impl SimConfigError {
             | SimConfigError::SimulateTwice { payload, .. }
             | SimConfigError::NoPacketInterval { payload }
             | SimConfigError::NotAnInterval { payload, .. }
-            | SimConfigError::IntervalForATriggeredPayload { payload, .. }
+            | SimConfigError::IntervalForATriggeredPayload {
+                payload, ..
+            }
             | SimConfigError::IntervalForADrivenPayload { payload, .. }
             | SimConfigError::NotAPercentage { payload, .. }
             | SimConfigError::FaultForTheWrongPayload { payload, .. }
@@ -426,7 +451,9 @@ impl SimConfigError {
             | SimConfigError::NoAddressOfItsOwn { payload, .. }
             | SimConfigError::OneSocketForBothEnds { payload, .. }
             | SimConfigError::CannotSimulate { payload, .. }
-            | SimConfigError::BadAttachment { payload, .. } => About::SimPayload(payload.clone()),
+            | SimConfigError::BadAttachment { payload, .. } => {
+                About::SimPayload(payload.clone())
+            }
             // A mass is not a payload and not a group: it is named in a
             // section of its own, which is where a reader should be sent.
             SimConfigError::BadThermalMass { .. } => About::File,
@@ -462,11 +489,13 @@ fn nought_says(e: SimConfigError, instead: &str) -> SimConfigError {
             payload,
             setting,
             why,
-        } if why.contains("no interval at all") => SimConfigError::NotAnInterval {
-            payload,
-            setting,
-            why: format!("{why}: {instead}"),
-        },
+        } if why.contains("no interval at all") => {
+            SimConfigError::NotAnInterval {
+                payload,
+                setting,
+                why: format!("{why}: {instead}"),
+            }
+        }
         other => other,
     }
 }
@@ -509,11 +538,12 @@ pub fn simulable(dh: &DHConfig) -> Result<(), String> {
     if let EndpointConfig::Hdlc(hdlc) = &dh.endpoint {
         if dh.stand_in.is_none() {
             return Err(format!(
-                "simulated payload \"{}\" is on a synchronous line ({}), and there \
-                 is nothing in the kernel that stands in for one: give its node a \
-                 stand_in, such as 127.0.0.1:7950, for tcspecial to reach it over \
-                 UDP when it is simulated, or leave it to a card -- a wanxl, a \
-                 pci200syn, a pc300too or a FarSync -- with simulate: false",
+                "simulated payload \"{}\" is on a synchronous line ({}), and \
+                 there is nothing in the kernel that stands in for one: give \
+                 its node a stand_in, such as 127.0.0.1:7950, for tcspecial to \
+                 reach it over UDP when it is simulated, or leave it to a card \
+                 -- a wanxl, a pci200syn, a pc300too or a FarSync -- with \
+                 simulate: false",
                 dh.name.0, hdlc.interface
             ));
         }
@@ -527,11 +557,12 @@ pub fn simulable(dh: &DHConfig) -> Result<(), String> {
     if let EndpointConfig::Network(net) = &dh.endpoint {
         if let NetworkProtocol::Raw(protocol) = net.protocol {
             return Err(format!(
-                "simulated payload \"{}\" is reached on a raw socket (IP protocol \
-                 {protocol} from {}), which nothing here stands in for: a raw \
-                 socket needs CAP_NET_RAW, and on one host every raw socket of a \
-                 protocol hears every datagram of it, its own included. Take it \
-                 out of the simulator file; tcspecial reaches it directly",
+                "simulated payload \"{}\" is reached on a raw socket (IP \
+                 protocol {protocol} from {}), which nothing here stands in \
+                 for: a raw socket needs CAP_NET_RAW, and on one host every \
+                 raw socket of a protocol hears every datagram of it, its own \
+                 included. Take it out of the simulator file; tcspecial \
+                 reaches it directly",
                 dh.name.0, net.address
             ));
         }
@@ -552,14 +583,18 @@ pub fn simulable(dh: &DHConfig) -> Result<(), String> {
     // exactly like a handler whose polling had stopped working.
     if dh.mode.polling().is_some() {
         let cannot = match &dh.endpoint {
-            EndpointConfig::Device(_) => Some("a device, which tcspecial reads directly"),
-            EndpointConfig::I2c(_) => Some("a bus, where the master's own read is the trigger"),
+            EndpointConfig::Device(_) => {
+                Some("a device, which tcspecial reads directly")
+            }
+            EndpointConfig::I2c(_) => {
+                Some("a bus, where the master's own read is the trigger")
+            }
             _ => None,
         };
         if let Some(cannot) = cannot {
             return Err(format!(
-                "{} is triggered, but the simulator cannot stand in for a triggered \
-                 payload on {cannot}",
+                "{} is triggered, but the simulator cannot stand in for a \
+                 triggered payload on {cannot}",
                 dh.name.0
             ));
         }
@@ -641,9 +676,11 @@ fn what_it_is(
     let actually = endpoint.kind();
 
     let stated = match settings.dh_type.as_deref() {
-        Some(text) => DHType::from_spelling(text).ok_or_else(|| SimConfigError::NoSuchKind {
-            payload: name.to_string(),
-            given: text.to_string(),
+        Some(text) => DHType::from_spelling(text).ok_or_else(|| {
+            SimConfigError::NoSuchKind {
+                payload: name.to_string(),
+                given: text.to_string(),
+            }
         })?,
         None => {
             return Err(SimConfigError::NoKind {
@@ -688,9 +725,11 @@ fn what_it_is(
 
     let stated = match settings.protocol.as_deref() {
         Some(text) => {
-            NetworkProtocol::from_spelling(text).ok_or_else(|| SimConfigError::NoSuchProtocol {
-                payload: name.to_string(),
-                given: text.to_string(),
+            NetworkProtocol::from_spelling(text).ok_or_else(|| {
+                SimConfigError::NoSuchProtocol {
+                    payload: name.to_string(),
+                    given: text.to_string(),
+                }
             })?
         }
         None => {
@@ -735,8 +774,8 @@ fn what_it_is(
                 return Err(SimConfigError::NoAddressOfItsOwn {
                     payload: name.to_string(),
                     setting,
-                    why: "a stream payload is the end that waits, so it binds the \
-                          address the payload configuration gives it",
+                    why: "a stream payload is the end that waits, so it binds \
+                          the address the payload configuration gives it",
                 });
             }
         }
@@ -754,7 +793,8 @@ fn what_it_is(
                 return Err(SimConfigError::NoAddressOfItsOwn {
                     payload: name.to_string(),
                     setting,
-                    why: "a triggered payload is the end that waits: tcspecial \
+                    why:
+                        "a triggered payload is the end that waits: tcspecial \
                           sends its trigger to the address the payload \
                           configuration gives, so it binds that address",
                 });
@@ -775,9 +815,9 @@ fn what_it_is(
                 return Err(SimConfigError::NoAddressOfItsOwn {
                     payload: name.to_string(),
                     setting,
-                    why: "its node in the tcspecial configuration states sends_from, \
-                          which is where it sends from and the one address the \
-                          vehicle reads it from",
+                    why: "its node in the tcspecial configuration states \
+                          sends_from, which is where it sends from and the one \
+                          address the vehicle reads it from",
                 });
             }
         }
@@ -789,8 +829,8 @@ fn what_it_is(
         return Err(SimConfigError::NoAddressOfItsOwn {
             payload: name.to_string(),
             setting: "payload_port",
-            why: "a Unix datagram socket is named by a path, so payload_address is \
-                  where this payload answers from",
+            why: "a Unix datagram socket is named by a path, so \
+                  payload_address is where this payload answers from",
         });
     }
 
@@ -798,7 +838,8 @@ fn what_it_is(
     // payload told to bind its handler's address would fail at the bind with
     // nothing to say about which file was wrong.
     if named_by_a_path {
-        if settings.payload_address.as_deref() == Some(network.address.as_str()) {
+        if settings.payload_address.as_deref() == Some(network.address.as_str())
+        {
             return Err(SimConfigError::OneSocketForBothEnds {
                 payload: name.to_string(),
                 what: network.address.clone(),
@@ -997,9 +1038,9 @@ where
     // The value in the message, which the parse error alone does not carry:
     // "invalid digit found in string" says nothing about which string, and a
     // file has fourteen settings it could have been.
-    text.parse::<T>()
-        .map(Some)
-        .map_err(|e| serde::de::Error::custom(format!("\"{text}\" cannot be read here: {e}")))
+    text.parse::<T>().map(Some).map_err(|e| {
+        serde::de::Error::custom(format!("\"{text}\" cannot be read here: {e}"))
+    })
 }
 
 /// Every setting a group or a simulated payload may state, by the name a file
@@ -1078,7 +1119,9 @@ impl SimSettings {
             jitter: self.jitter.clone().or_else(|| base.jitter.clone()),
             silent_after: self.silent_after.or(base.silent_after),
             close_after: self.close_after.or(base.close_after),
-            ignore_trigger_percent: self.ignore_trigger_percent.or(base.ignore_trigger_percent),
+            ignore_trigger_percent: self
+                .ignore_trigger_percent
+                .or(base.ignore_trigger_percent),
         }
     }
 }
@@ -1266,17 +1309,18 @@ impl SimConfigFile {
     /// Required, and with no default, so that the harness and the simulator
     /// read it from the one place and cannot each assume a different one.
     pub fn ready(&self) -> Result<std::net::SocketAddr, String> {
-        let wanted = "the simulator file needs a tcssim section saying where tcssim \
-                      answers whether it is ready, as an address:port no other run uses -- \
-                      tcssim: { ready: \"127.0.0.1:7900\" }";
+        let wanted = "the simulator file needs a tcssim section saying where \
+                      tcssim answers whether it is ready, as an address:port \
+                      no other run uses -- tcssim: { ready: \"127.0.0.1:7900\" \
+                      }";
         let Some(section) = self.tcssim.as_ref() else {
             return Err(wanted.to_string());
         };
         let said = section.ready.trim();
         said.parse().map_err(|_| {
             format!(
-                "tcssim.ready is \"{said}\", which is not an address:port such as \
-                 127.0.0.1:7900: give the address and port tcssim answers at"
+                "tcssim.ready is \"{said}\", which is not an address:port such \
+                 as 127.0.0.1:7900: give the address and port tcssim answers at"
             )
         })
     }
@@ -1297,20 +1341,27 @@ impl SimConfigFile {
     pub fn masses(&self) -> Result<Vec<ResolvedMass>, SimConfigError> {
         let mut masses = Vec::new();
         for mass in &self.thermal_mass {
-            let named = |what: &'static str, said: &str| SimConfigError::BadThermalMass {
-                mass: mass.name.clone(),
-                why: format!("{what}: {said}"),
+            let named = |what: &'static str, said: &str| {
+                SimConfigError::BadThermalMass {
+                    mass: mass.name.clone(),
+                    why: format!("{what}: {said}"),
+                }
             };
 
-            let environment: f64 = mass.environment.trim().parse().map_err(|_| {
-                named(
-                    "environment",
-                    &format!("\"{}\" is not a number of kelvin", mass.environment.trim()),
-                )
-            })?;
+            let environment: f64 =
+                mass.environment.trim().parse().map_err(|_| {
+                    named(
+                        "environment",
+                        &format!(
+                            "\"{}\" is not a number of kelvin",
+                            mass.environment.trim()
+                        ),
+                    )
+                })?;
 
-            let time_constant = crate::graph::parse_interval(mass.time_constant.trim())
-                .map_err(|why| named("time_constant", &why))?;
+            let time_constant =
+                crate::graph::parse_interval(mass.time_constant.trim())
+                    .map_err(|why| named("time_constant", &why))?;
 
             if !self.simulated_payloads.iter().any(|payload| {
                 let settings = self.settings_of(payload);
@@ -1320,9 +1371,9 @@ impl SimConfigFile {
                 return Err(SimConfigError::BadThermalMass {
                     mass: mass.name.clone(),
                     why: "nothing reads it and nothing warms it: a mass no \
-                          payload is attached to is a model nobody looks at, and \
-                          the likeliest cause is a payload whose reads or heats \
-                          names something else"
+                          payload is attached to is a model nobody looks at, \
+                          and the likeliest cause is a payload whose reads or \
+                          heats names something else"
                         .to_string(),
                 });
             }
@@ -1344,7 +1395,10 @@ impl SimConfigFile {
     /// to a default; both is refused, whether or not they agree, because a
     /// payload does not override its group's `simulate` -- the group says it
     /// for every payload in it, and a reader of the group has read the answer.
-    pub fn simulate_of(&self, payload: &SimPayload) -> Result<bool, SimConfigError> {
+    pub fn simulate_of(
+        &self,
+        payload: &SimPayload,
+    ) -> Result<bool, SimConfigError> {
         let group = payload.group.as_ref().and_then(|name| {
             self.simulated_payload_groups
                 .iter()
@@ -1360,18 +1414,17 @@ impl SimConfigFile {
             (Some(simulate), _) => Ok(simulate),
             // A group that is not there is that mistake, and not a second
             // one about simulate: one mistake, one problem.
-            (None, None) if payload.group.is_some() => Err(SimConfigError::UnknownGroup {
-                payload: payload.name.clone(),
-                group: payload.group.clone().unwrap_or_default(),
-            }),
-            (None, Some(group)) => {
-                group
-                    .settings
-                    .simulate
-                    .ok_or_else(|| SimConfigError::SimulateUnstated {
-                        payload: payload.name.clone(),
-                    })
+            (None, None) if payload.group.is_some() => {
+                Err(SimConfigError::UnknownGroup {
+                    payload: payload.name.clone(),
+                    group: payload.group.clone().unwrap_or_default(),
+                })
             }
+            (None, Some(group)) => group.settings.simulate.ok_or_else(|| {
+                SimConfigError::SimulateUnstated {
+                    payload: payload.name.clone(),
+                }
+            }),
             (None, None) => Err(SimConfigError::SimulateUnstated {
                 payload: payload.name.clone(),
             }),
@@ -1383,9 +1436,9 @@ impl SimConfigFile {
     /// missing or stated twice is not, the problem being reported where the
     /// file is checked.
     pub fn simulates(&self, name: &str) -> bool {
-        self.simulated_payloads
-            .iter()
-            .any(|payload| payload.name == name && self.simulate_of(payload) == Ok(true))
+        self.simulated_payloads.iter().any(|payload| {
+            payload.name == name && self.simulate_of(payload) == Ok(true)
+        })
     }
 
     fn settings_of(&self, payload: &SimPayload) -> SimSettings {
@@ -1406,7 +1459,8 @@ impl SimConfigFile {
         payload: &str,
         settings: &SimSettings,
     ) -> Result<Option<Attached>, SimConfigError> {
-        let known = |name: &str| self.thermal_mass.iter().any(|m| m.name == name);
+        let known =
+            |name: &str| self.thermal_mass.iter().any(|m| m.name == name);
         let bad = |why: String| SimConfigError::BadAttachment {
             payload: payload.to_string(),
             why,
@@ -1424,22 +1478,24 @@ impl SimConfigFile {
             (Some(mass), None) => {
                 if !known(mass) {
                     return Err(bad(format!(
-                        "it reads \"{mass}\", and no thermal_mass of that name is \
-                         declared"
+                        "it reads \"{mass}\", and no thermal_mass of that name \
+                         is declared"
                     )));
                 }
                 if settings.rate.is_some() {
-                    return Err(bad("rate is how hard a heater warms a mass, and this one \
+                    return Err(bad(
+                        "rate is how hard a heater warms a mass, and this one \
                          reads it"
-                        .to_string()));
+                            .to_string(),
+                    ));
                 }
                 Ok(Some(Attached::Reads(mass.to_string())))
             }
             (None, Some(mass)) => {
                 if !known(mass) {
                     return Err(bad(format!(
-                        "it heats \"{mass}\", and no thermal_mass of that name is \
-                         declared"
+                        "it heats \"{mass}\", and no thermal_mass of that name \
+                         is declared"
                     )));
                 }
                 let said = settings.rate.as_deref().ok_or_else(|| {
@@ -1456,9 +1512,9 @@ impl SimConfigFile {
                 })?;
                 if rate <= 0.0 {
                     return Err(bad(format!(
-                        "rate: {rate} does not warm anything, and a heater that \
-                         warms nothing is one the configuration may as well leave \
-                         out"
+                        "rate: {rate} does not warm anything, and a heater \
+                         that warms nothing is one the configuration may as \
+                         well leave out"
                     )));
                 }
                 Ok(Some(Attached::Heats {
@@ -1469,8 +1525,8 @@ impl SimConfigFile {
             (None, None) => {
                 if settings.rate.is_some() {
                     return Err(bad(
-                        "rate is how hard a heater warms a mass, and this payload \
-                         is attached to none"
+                        "rate is how hard a heater warms a mass, and this \
+                         payload is attached to none"
                             .to_string(),
                     ));
                 }
@@ -1479,7 +1535,10 @@ impl SimConfigFile {
         }
     }
 
-    pub fn resolve(&self, handlers: &[DHConfig]) -> Result<Vec<ResolvedSim>, SimConfigError> {
+    pub fn resolve(
+        &self,
+        handlers: &[DHConfig],
+    ) -> Result<Vec<ResolvedSim>, SimConfigError> {
         let (resolved, problems) = self.check(handlers);
         match problems.into_iter().next() {
             Some(problem) => Err(problem),
@@ -1500,8 +1559,12 @@ impl SimConfigFile {
     ///
     /// The settings are the ones that settled, so a file with a problem still
     /// yields the payloads that have none.
-    fn check(&self, handlers: &[DHConfig]) -> (Vec<ResolvedSim>, Vec<SimConfigError>) {
-        let names: Vec<&str> = handlers.iter().map(|dh| dh.name.0.as_str()).collect();
+    fn check(
+        &self,
+        handlers: &[DHConfig],
+    ) -> (Vec<ResolvedSim>, Vec<SimConfigError>) {
+        let names: Vec<&str> =
+            handlers.iter().map(|dh| dh.name.0.as_str()).collect();
         let mut problems: Vec<SimConfigError> = Vec::new();
         let (groups, payloads) = self.entries(&names, &mut problems);
 
@@ -1510,21 +1573,20 @@ impl SimConfigFile {
         // with the first.
         let settle = |dh: &DHConfig| -> Result<ResolvedSim, SimConfigError> {
             let payload =
-                payloads
-                    .get(dh.name.0.as_str())
-                    .ok_or_else(|| SimConfigError::Unsimulated {
+                payloads.get(dh.name.0.as_str()).ok_or_else(|| {
+                    SimConfigError::Unsimulated {
                         handler: dh.name.0.clone(),
-                    })?;
+                    }
+                })?;
 
             let settings = match &payload.group {
                 Some(group) => {
-                    let base =
-                        groups
-                            .get(group.as_str())
-                            .ok_or_else(|| SimConfigError::UnknownGroup {
-                                payload: payload.name.clone(),
-                                group: group.clone(),
-                            })?;
+                    let base = groups.get(group.as_str()).ok_or_else(|| {
+                        SimConfigError::UnknownGroup {
+                            payload: payload.name.clone(),
+                            group: group.clone(),
+                        }
+                    })?;
                     payload.settings.over(base)
                 }
                 None => payload.settings.clone(),
@@ -1566,10 +1628,12 @@ impl SimConfigFile {
                     ("segment_interval", settings.segment_interval.is_some()),
                 ] {
                     if stated {
-                        return Err(SimConfigError::IntervalForATriggeredPayload {
-                            payload: payload.name.clone(),
-                            setting,
-                        });
+                        return Err(
+                            SimConfigError::IntervalForATriggeredPayload {
+                                payload: payload.name.clone(),
+                                setting,
+                            },
+                        );
                     }
                 }
             }
@@ -1577,60 +1641,66 @@ impl SimConfigFile {
             // A length of time, kept as one: what the simulator does
             // with these is wait, and the one grammar for a length of
             // time is `graph::parse_interval`.
-            let length_of_time = |setting: &'static str,
-                                  said: &str|
-             -> Result<Duration, SimConfigError> {
-                crate::graph::parse_interval(said).map_err(|why| SimConfigError::NotAnInterval {
-                    payload: payload.name.clone(),
-                    setting,
-                    why,
-                })
-            };
+            let length_of_time =
+                |setting: &'static str,
+                 said: &str|
+                 -> Result<Duration, SimConfigError> {
+                    crate::graph::parse_interval(said).map_err(|why| {
+                        SimConfigError::NotAnInterval {
+                            payload: payload.name.clone(),
+                            setting,
+                            why,
+                        }
+                    })
+                };
 
             // How often a stand-in produces something: a length of time,
             // or `CONTINUOUS` for as fast as the payload can be driven.
-            let how_often = |setting: &'static str,
-                             said: &Option<String>|
-             -> Result<Option<Duration>, SimConfigError> {
-                let Some(said) = said else { return Ok(None) };
-                let said = said.trim();
-                if said == CONTINUOUS {
-                    return Ok(Some(Duration::ZERO));
-                }
-                length_of_time(setting, said).map(Some).map_err(|e| {
-                    nought_says(
-                        e,
-                        &format!(
-                            "a payload driven as fast as it can be is \
+            let how_often =
+                |setting: &'static str,
+                 said: &Option<String>|
+                 -> Result<Option<Duration>, SimConfigError> {
+                    let Some(said) = said else { return Ok(None) };
+                    let said = said.trim();
+                    if said == CONTINUOUS {
+                        return Ok(Some(Duration::ZERO));
+                    }
+                    length_of_time(setting, said).map(Some).map_err(|e| {
+                        nought_says(
+                            e,
+                            &format!(
+                                "a payload driven as fast as it can be is \
                                  {CONTINUOUS}"
-                        ),
-                    )
-                })
-            };
+                            ),
+                        )
+                    })
+                };
 
             // And how late a packet may be, which is a length of time and
             // nothing else: a payload cannot be late continuously, and a
             // jitter of nought is no jitter -- which is what leaving the
             // setting out says.
-            let how_late = |setting: &'static str,
-                            said: &Option<String>|
-             -> Result<Option<Duration>, SimConfigError> {
-                let Some(said) = said else { return Ok(None) };
-                let said = said.trim();
-                if said == CONTINUOUS {
-                    return Err(SimConfigError::NotAnInterval {
-                        payload: payload.name.clone(),
-                        setting,
-                        why: format!(
-                            "\"{CONTINUOUS}\" is how often a payload sends and not \
-                                 how late a packet may be: leave this out for no jitter"
+            let how_late =
+                |setting: &'static str,
+                 said: &Option<String>|
+                 -> Result<Option<Duration>, SimConfigError> {
+                    let Some(said) = said else { return Ok(None) };
+                    let said = said.trim();
+                    if said == CONTINUOUS {
+                        return Err(SimConfigError::NotAnInterval {
+                            payload: payload.name.clone(),
+                            setting,
+                            why: format!(
+                            "\"{CONTINUOUS}\" is how often a payload sends and \
+                             not how late a packet may be: leave this out for \
+                             no jitter"
                         ),
-                    });
-                }
-                length_of_time(setting, said)
-                    .map(Some)
-                    .map_err(|e| nought_says(e, "no jitter is this setting left out"))
-            };
+                        });
+                    }
+                    length_of_time(setting, said).map(Some).map_err(|e| {
+                        nought_says(e, "no jitter is this setting left out")
+                    })
+                };
 
             // A payload that is only driven sends nothing, so it has no
             // interval either, and one stated for it governs nothing.
@@ -1640,10 +1710,12 @@ impl SimConfigFile {
                     ("segment_interval", settings.segment_interval.is_some()),
                 ] {
                     if stated {
-                        return Err(SimConfigError::IntervalForADrivenPayload {
-                            payload: payload.name.clone(),
-                            setting,
-                        });
+                        return Err(
+                            SimConfigError::IntervalForADrivenPayload {
+                                payload: payload.name.clone(),
+                                setting,
+                            },
+                        );
                     }
                 }
             }
@@ -1668,16 +1740,20 @@ impl SimConfigFile {
 
             // A packet is one segment unless the file divides it, and
             // segments arrive at the packet rate unless it says otherwise.
-            let segment_size = settings
-                .segment_size
-                .unwrap_or_else(|| u32::try_from(dh.packet_size).unwrap_or(u32::MAX));
+            let segment_size = settings.segment_size.unwrap_or_else(|| {
+                u32::try_from(dh.packet_size).unwrap_or(u32::MAX)
+            });
 
             // What this payload is asked to do wrong, and whether it is
             // a payload that could do it. A percentage above a hundred is
             // a misunderstanding rather than a severe fault, and a fault
             // a kind cannot have is a setting that would govern nothing.
             let faults = Faults {
-                drop_percent: a_percentage(&payload.name, "drop_percent", settings.drop_percent)?,
+                drop_percent: a_percentage(
+                    &payload.name,
+                    "drop_percent",
+                    settings.drop_percent,
+                )?,
                 corrupt_percent: a_percentage(
                     &payload.name,
                     "corrupt_percent",
@@ -1688,7 +1764,8 @@ impl SimConfigFile {
                     "truncate_percent",
                     settings.truncate_percent,
                 )?,
-                jitter: how_late("jitter", &settings.jitter)?.unwrap_or_default(),
+                jitter: how_late("jitter", &settings.jitter)?
+                    .unwrap_or_default(),
                 silent_after: settings.silent_after.unwrap_or(0),
                 close_after: settings.close_after.unwrap_or(0),
                 ignore_trigger_percent: a_percentage(
@@ -1719,8 +1796,8 @@ impl SimConfigFile {
                     payload: payload.name.clone(),
                     fault: "close_after",
                     why: "this payload has no connection to close: only a \
-                              stream has one, where the handler connects and the \
-                              payload may hang up",
+                          stream has one, where the handler connects and the \
+                          payload may hang up",
                 });
             }
 
@@ -1736,7 +1813,9 @@ impl SimConfigFile {
                 // Where its node says it sends from, if it says: the file
                 // may not say both, which `what_it_is` has refused.
                 payload_address: match &dh.sends_from {
-                    Some(crate::SendsFrom::Socket(at)) => Some(at.ip().to_string()),
+                    Some(crate::SendsFrom::Socket(at)) => {
+                        Some(at.ip().to_string())
+                    }
                     Some(crate::SendsFrom::Path(path)) => Some(path.clone()),
                     None => settings.payload_address.clone(),
                 },
@@ -1745,8 +1824,11 @@ impl SimConfigFile {
                     _ => settings.payload_port,
                 },
                 packet_interval,
-                segment_interval: how_often("segment_interval", &settings.segment_interval)?
-                    .unwrap_or(packet_interval),
+                segment_interval: how_often(
+                    "segment_interval",
+                    &settings.segment_interval,
+                )?
+                .unwrap_or(packet_interval),
                 segment_size,
                 triggered,
                 faults,
@@ -1807,8 +1889,11 @@ impl SimConfigFile {
     ) -> (BTreeMap<&str, &SimSettings>, BTreeMap<&str, &SimPayload>) {
         let mut groups: BTreeMap<&str, &SimSettings> = BTreeMap::new();
         for group in &self.simulated_payload_groups {
-            if let Err(e) = nothing_unknown("simulated payload group", &group.name, &group.unknown)
-            {
+            if let Err(e) = nothing_unknown(
+                "simulated payload group",
+                &group.name,
+                &group.unknown,
+            ) {
                 problems.push(e);
             }
             // Kept even when something is wrong with it, so that the payloads
@@ -1827,7 +1912,11 @@ impl SimConfigFile {
 
         let mut payloads: BTreeMap<&str, &SimPayload> = BTreeMap::new();
         for payload in &self.simulated_payloads {
-            if let Err(e) = nothing_unknown("simulated payload", &payload.name, &payload.unknown) {
+            if let Err(e) = nothing_unknown(
+                "simulated payload",
+                &payload.name,
+                &payload.unknown,
+            ) {
                 problems.push(e);
             }
             if payloads.insert(payload.name.as_str(), payload).is_some() {
@@ -1895,7 +1984,10 @@ impl SimConfigFile {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{DHMode, DHName, DeviceConfig, EndpointConfig, NetworkConfig, NetworkProtocol};
+    use crate::{
+        DHMode, DHName, DeviceConfig, EndpointConfig, NetworkConfig,
+        NetworkProtocol,
+    };
 
     fn handler(name: &str, packet_size: usize) -> DHConfig {
         DHConfig {
@@ -1948,7 +2040,10 @@ mod tests {
                 format!("    {name}: {value}")
             })
             .collect();
-        let text = format!("simulated_payloads:\n  - name: DH0\n{}\n", said.join("\n"));
+        let text = format!(
+            "simulated_payloads:\n  - name: DH0\n{}\n",
+            said.join("\n")
+        );
 
         let file = parse(&text);
         let payload = &file.simulated_payloads[0];
@@ -2303,7 +2398,8 @@ simulated_payloads:
     #[test]
     fn a_setting_written_empty_is_a_setting_not_stated() {
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \"\"\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
+             \"\"\n    \
              protocol: \"\"\n    packet_interval: \"\"\n    \
              drop_percent: \"\"\n    silent_after: \"\"\n",
         );
@@ -2321,7 +2417,8 @@ simulated_payloads:
         let said = format!(
             "{}",
             parse(
-                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    \
+                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    \
+                 type: network\n    \
                  protocol: udp\n    packet_interval: often\n"
             )
             .resolve(&[handler("DH0", 12)])
@@ -2350,30 +2447,38 @@ simulated_payloads:
             "payload_interface: localhost:5000",
         ] {
             let file = parse(&format!(
-                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    \
+                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    \
+                 type: network\n    \
                  protocol: udp\n    packet_interval: 100 ms\n    {plain}\n"
             ));
-            let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
+            let said =
+                format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
             assert!(
-                said.contains("tcspecial configuration file") && said.contains("DH0"),
+                said.contains("tcspecial configuration file")
+                    && said.contains("DH0"),
                 "writing {plain} should name the file it belongs in: {said}"
             );
             assert!(
-                said.contains("payload_address") && said.contains("payload_port"),
+                said.contains("payload_address")
+                    && said.contains("payload_port"),
                 "and what this file may say instead: {said}"
             );
         }
 
         // A group is read the same way.
         let file = parse(
-            "simulated_payload_groups:\n  - name: g\n    simulate: true\n    packet_interval: 100 ms\n    \
+            "simulated_payload_groups:\n  - name: g\n    simulate: true\n    \
+             packet_interval: 100 ms\n    \
              port: 5000\n\
-             simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    \
+             simulated_payloads:\n  - name: DH0\n    type: network\n    \
+             protocol: udp\n    \
              group: g\n",
         );
-        let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
+        let said =
+            format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
         assert!(
-            said.contains("tcspecial configuration file") && said.contains("\"g\""),
+            said.contains("tcspecial configuration file")
+                && said.contains("\"g\""),
             "the error should name the group: {said}"
         );
     }
@@ -2388,7 +2493,8 @@ simulated_payloads:
     fn a_datagram_payload_may_be_told_what_to_bind() {
         let settled = |extra: &str, dh: &DHConfig| {
             parse(&format!(
-                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    \
+                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    \
+                 type: network\n    \
                  protocol: udp\n    packet_interval: 100 ms\n{extra}"
             ))
             .resolve(std::slice::from_ref(dh))
@@ -2440,10 +2546,12 @@ simulated_payloads:
     #[test]
     fn a_payload_that_says_where_it_sends_from_is_simulated_from_there() {
         let mut sending = handler("DH0", 4);
-        sending.sends_from = Some(crate::SendsFrom::Socket("127.0.0.1:7001".parse().unwrap()));
+        sending.sends_from =
+            Some(crate::SendsFrom::Socket("127.0.0.1:7001".parse().unwrap()));
         let file = |extra: &str| {
             parse(&format!(
-                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    \
+                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    \
+                 type: network\n    \
                  protocol: udp\n    packet_interval: 100 ms\n{extra}"
             ))
         };
@@ -2483,7 +2591,8 @@ simulated_payloads:
         };
         let file = |extra: &str| {
             parse(&format!(
-                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    \
+                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    \
+                 type: network\n    \
                  protocol: udp\n{extra}"
             ))
         };
@@ -2520,12 +2629,14 @@ simulated_payloads:
             port: 5000,
         });
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    protocol: tcp\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
+             network\n    protocol: tcp\n    \
              packet_interval: 100 ms\n    payload_port: 7000\n",
         );
         let said = format!("{}", file.resolve(&[stream]).unwrap_err());
         assert!(
-            said.contains("payload_port") && said.contains("the end that waits"),
+            said.contains("payload_port")
+                && said.contains("the end that waits"),
             "{said}"
         );
 
@@ -2539,7 +2650,8 @@ simulated_payloads:
         });
         let path = |extra: &str| {
             parse(&format!(
-                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    \
+                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    \
+                 type: network\n    \
                  protocol: unix_dgram\n    packet_interval: 100 ms\n{extra}"
             ))
             .resolve(std::slice::from_ref(&socket))
@@ -2561,7 +2673,8 @@ simulated_payloads:
 
         // A device has no address at all.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: device-file\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
+             device-file\n    \
              packet_interval: continuous\n    payload_port: 7000\n",
         );
         let said = format!("{}", file.resolve(&[device("DH0")]).unwrap_err());
@@ -2582,7 +2695,8 @@ simulated_payloads:
     fn two_simulator_files_may_name_their_payloads_alike() {
         let a_set = |interval: &str| {
             parse(&format!(
-                "simulated_payload_groups:\n  - name: steady\n    simulate: true\n    \
+                "simulated_payload_groups:\n  - name: steady\n    simulate: \
+                 true\n    \
                  packet_interval: {interval}\n\
                  simulated_payloads:\n  - name: DH0\n    type: network\n    \
                  protocol: udp\n    group: steady\n"
@@ -2615,10 +2729,12 @@ simulated_payloads:
     #[test]
     fn a_word_that_is_not_a_setting_is_refused() {
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
+             network\n    \
              protocol: udp\n    packet_interval: 100 ms\n    drop_percnt: 10\n",
         );
-        let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
+        let said =
+            format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
         assert!(
             said.contains("drop_percnt") && said.contains("not a setting"),
             "the error should name the word it does not know: {said}"
@@ -2628,11 +2744,13 @@ simulated_payloads:
         // misspelling hides best: it is read once and applies to every
         // payload that names it.
         let file = parse(
-            "simulated_payload_groups:\n  - name: slow\n    simulate: true\n    packet_intervl_ms: 100\n\
+            "simulated_payload_groups:\n  - name: slow\n    simulate: \
+             true\n    packet_intervl_ms: 100\n\
              simulated_payloads:\n  - name: DH0\n    type: network\n    \
              protocol: udp\n    group: slow\n",
         );
-        let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
+        let said =
+            format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
         assert!(
             said.contains("packet_intervl_ms") && said.contains("slow"),
             "the error should name the group and the word: {said}"
@@ -2643,10 +2761,13 @@ simulated_payloads:
     #[test]
     fn a_section_that_is_not_a_section_is_refused() {
         let text =
-            "simulated_payload:\n  - name: DH0\n    simulate: true\n    packet_interval: 100 ms\n";
+            "simulated_payload:\n  - name: DH0\n    simulate: true\n    \
+             packet_interval: 100 ms\n";
         let e = crate::ConfigFormat::Yaml
             .parse::<SimConfigFile>(text)
-            .expect_err("a file whose one section is misspelled describes nothing");
+            .expect_err(
+                "a file whose one section is misspelled describes nothing",
+            );
         let said = format!("{e}");
         assert!(
             said.contains("simulated_payload"),
@@ -2669,7 +2790,8 @@ simulated_payloads:
         // The simulator file of the datagram set, against the tcspecial
         // configuration of the stream set.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
+             network\n    \
              protocol: udp\n    packet_interval: 1 s\n",
         );
 
@@ -2682,7 +2804,9 @@ simulated_payloads:
 
         let said = format!("{}", file.resolve(&[stream]).unwrap_err());
         assert!(
-            said.contains("udp") && said.contains("tcp") && said.contains("DH0"),
+            said.contains("udp")
+                && said.contains("tcp")
+                && said.contains("DH0"),
             "the error should name the payload and both transports: {said}"
         );
 
@@ -2697,10 +2821,12 @@ simulated_payloads:
     #[test]
     fn the_two_files_cannot_disagree_about_the_kind() {
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: device-file\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
+             device-file\n    \
              packet_interval: 1 s\n",
         );
-        let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
+        let said =
+            format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
         assert!(
             said.contains("device") && said.contains("network"),
             "the error should name the kind each file gives: {said}"
@@ -2715,9 +2841,11 @@ simulated_payloads:
     #[test]
     fn a_simulated_payload_says_what_it_stands_in_for() {
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    packet_interval: 1 s\n",
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    \
+             packet_interval: 1 s\n",
         );
-        let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
+        let said =
+            format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
         assert!(
             said.contains("type: network"),
             "the error should say what to write: {said}"
@@ -2726,10 +2854,12 @@ simulated_payloads:
         // A network payload says which transport, too, for the same reason:
         // the kind alone would not have caught the pairing above.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
+             network\n    \
              packet_interval: 1 s\n",
         );
-        let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
+        let said =
+            format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
         assert!(
             said.contains("protocol: udp"),
             "the error should say which transport to write: {said}"
@@ -2740,7 +2870,8 @@ simulated_payloads:
     #[test]
     fn only_a_network_payload_has_a_transport() {
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: device-file\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
+             device-file\n    \
              protocol: udp\n    packet_interval: continuous\n",
         );
         let said = format!("{}", file.resolve(&[device("DH0")]).unwrap_err());
@@ -2752,7 +2883,8 @@ simulated_payloads:
         // And a device that states none resolves, which is the whole of what
         // a device has to say about how it is reached.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: device-file\n    packet_interval: continuous\n",
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
+             device-file\n    packet_interval: continuous\n",
         );
         file.resolve(&[device("DH0")])
             .expect("a device needs no transport");
@@ -2763,20 +2895,26 @@ simulated_payloads:
     #[test]
     fn a_kind_or_a_transport_that_is_neither_is_refused() {
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: netwrok\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
+             netwrok\n    \
              packet_interval: 1 s\n",
         );
-        let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
+        let said =
+            format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
         assert!(
-            said.contains("netwrok") && said.contains("network") && said.contains("i2c"),
+            said.contains("netwrok")
+                && said.contains("network")
+                && said.contains("i2c"),
             "the error should list the kinds: {said}"
         );
 
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
+             network\n    \
              protocol: udb\n    packet_interval: 1 s\n",
         );
-        let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
+        let said =
+            format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
         assert!(
             said.contains("udb") && said.contains("unix_dgram"),
             "the error should list the transports: {said}"
@@ -2788,7 +2926,8 @@ simulated_payloads:
     #[test]
     fn a_group_may_carry_what_its_payloads_stand_in_for() {
         let file = parse(
-            "simulated_payload_groups:\n  - name: datagrams\n    simulate: true\n    type: network\n    \
+            "simulated_payload_groups:\n  - name: datagrams\n    simulate: \
+             true\n    type: network\n    \
              protocol: udp\n    packet_interval: 1 s\n\
              simulated_payloads:\n  - name: DH0\n    group: datagrams\n  \
              - name: DH1\n    group: datagrams\n",
@@ -2804,7 +2943,8 @@ simulated_payloads:
         // A percentage is nought to a hundred. Anything else is a
         // misunderstanding rather than a severe fault.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    protocol: udp\n    packet_interval: 100 ms\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
+             network\n    protocol: udp\n    packet_interval: 100 ms\n    \
              drop_percent: 150\n",
         );
         let e = file.resolve(&[handler("DH0", 4)]).unwrap_err();
@@ -2817,26 +2957,30 @@ simulated_payloads:
         // A payload that sends on its own is never asked for anything, so it
         // has no request to ignore.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    protocol: udp\n    packet_interval: 100 ms\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
+             network\n    protocol: udp\n    packet_interval: 100 ms\n    \
              ignore_trigger_percent: 50\n",
         );
         let e = file.resolve(&[handler("DH0", 4)]).unwrap_err();
         let said = format!("{e}");
         assert!(
-            said.contains("ignore_trigger_percent") && said.contains("sends on its own"),
+            said.contains("ignore_trigger_percent")
+                && said.contains("sends on its own"),
             "{said}"
         );
 
         // And hanging up needs a link to hang up. handler() makes a UDP
         // payload, which has none.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    protocol: udp\n    packet_interval: 100 ms\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
+             network\n    protocol: udp\n    packet_interval: 100 ms\n    \
              close_after: 10\n",
         );
         let e = file.resolve(&[handler("DH0", 4)]).unwrap_err();
         let said = format!("{e}");
         assert!(
-            said.contains("close_after") && said.contains("no connection to close"),
+            said.contains("close_after")
+                && said.contains("no connection to close"),
             "{said}"
         );
     }
@@ -2863,9 +3007,11 @@ simulated_payloads:
         };
 
         let file = parse(
-            "simulated_payload_groups:\n  - name: flaky\n    simulate: true\n    packet_interval: 100 ms\n    \
+            "simulated_payload_groups:\n  - name: flaky\n    simulate: \
+             true\n    packet_interval: 100 ms\n    \
              drop_percent: 10\n    jitter: 25 ms\n\
-             simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: tcp\n    group: flaky\n    \
+             simulated_payloads:\n  - name: DH0\n    type: network\n    \
+             protocol: tcp\n    group: flaky\n    \
              close_after: 7\n",
         );
 
@@ -2888,7 +3034,11 @@ simulated_payloads:
     /// existed asked for.
     #[test]
     fn a_file_with_no_faults_asks_for_a_payload_that_works() {
-        let file = parse("simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    protocol: udp\n    packet_interval: 100 ms\n");
+        let file = parse(
+            "simulated_payloads:\n  - name: DH0\n    simulate: \
+                          true\n    type: network\n    protocol: udp\n    \
+                          packet_interval: 100 ms\n",
+        );
         let resolved = file.resolve(&[handler("DH0", 4)]).expect("resolves");
         assert_eq!(resolved[0].faults, Faults::default());
         assert!(!resolved[0].faults.any());
@@ -2928,12 +3078,15 @@ simulated_payloads:
 
             // Stated by the payload itself.
             let file = parse(&format!(
-                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    \
+                "simulated_payloads:\n  - name: DH0\n    simulate: true\n    \
+                 type: network\n    \
                  protocol: tcp\n    {stated}\n"
             ));
-            let said = format!("{}", file.resolve(&[triggered("DH0")]).unwrap_err());
+            let said =
+                format!("{}", file.resolve(&[triggered("DH0")]).unwrap_err());
             assert!(
-                said.contains(named) && said.contains("trigger_interval in the payload"),
+                said.contains(named)
+                    && said.contains("trigger_interval in the payload"),
                 "{stated}: {said}"
             );
 
@@ -2942,13 +3095,16 @@ simulated_payloads:
             // may not state would be governed by a group it
             // only joined for the settings it may.
             let file = parse(&format!(
-                "simulated_payload_groups:\n  - name: driven\n    simulate: true\n    {stated}\n\
+                "simulated_payload_groups:\n  - name: driven\n    simulate: \
+                 true\n    {stated}\n\
                  simulated_payloads:\n  - name: DH0\n    type: network\n    \
                  protocol: tcp\n    group: driven\n"
             ));
-            let said = format!("{}", file.resolve(&[triggered("DH0")]).unwrap_err());
+            let said =
+                format!("{}", file.resolve(&[triggered("DH0")]).unwrap_err());
             assert!(
-                said.contains(named) && said.contains("trigger_interval in the payload"),
+                said.contains(named)
+                    && said.contains("trigger_interval in the payload"),
                 "{stated}, inherited: {said}"
             );
         }
@@ -2956,7 +3112,8 @@ simulated_payloads:
         // What such a payload may still say is how it divides an answer:
         // that is its own business, however it was prompted.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    protocol: tcp\n    \
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
+             network\n    protocol: tcp\n    \
              segment_size: 2\n",
         );
         let resolved = file
@@ -3010,12 +3167,14 @@ simulated_payloads:
 
         // Stated, and refused in terms of where it belongs.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    protocol: tcp\n    packet_interval: 1 s\n",
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
+             network\n    protocol: tcp\n    packet_interval: 1 s\n",
         );
         let e = file.resolve(&[triggered("DH0")]).unwrap_err();
         let said = format!("{e}");
         assert!(
-            said.contains("payload configuration") && said.contains("triggered"),
+            said.contains("payload configuration")
+                && said.contains("triggered"),
             "{said}"
         );
 
@@ -3023,7 +3182,8 @@ simulated_payloads:
         // the segment settings still apply, since how a payload divides an
         // answer is its own business.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    protocol: tcp\n    segment_size: 2\n",
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
+             network\n    protocol: tcp\n    segment_size: 2\n",
         );
         let resolved = file
             .resolve(&[triggered("DH0")])
@@ -3059,13 +3219,15 @@ simulated_payloads:
             driven: false,
         };
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: device-file\n",
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
+             device-file\n",
         );
         let problems = file.problems(&[device]);
         assert!(
             matches!(
                 problems.as_slice(),
-                [SimConfigError::CannotSimulate { payload, .. }] if payload == "DH0"
+                [SimConfigError::CannotSimulate { payload, .. }]
+                    if payload == "DH0"
             ),
             "{problems:?}"
         );
@@ -3316,7 +3478,9 @@ simulated_payloads:
     fn a_raw_payload_is_not_simulated() {
         let dh = DHConfig {
             endpoint: EndpointConfig::Network(crate::NetworkConfig {
-                protocol: NetworkProtocol::Raw(crate::IpProtocol::of(253).expect("a number")),
+                protocol: NetworkProtocol::Raw(
+                    crate::IpProtocol::of(253).expect("a number"),
+                ),
                 address: "10.0.0.7".to_string(),
                 port: 0,
             }),

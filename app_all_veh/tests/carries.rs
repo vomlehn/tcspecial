@@ -28,7 +28,8 @@ fn arguments() -> Vec<String> {
 /// Each stream comes out of the interface it was going to.
 #[test]
 fn each_stream_is_carried_to_the_other_interface() {
-    let mut running = parent::start(&app(), &arguments(), Supports::ALL).expect("it starts");
+    let mut running =
+        parent::start(&app(), &arguments(), Supports::ALL).expect("it starts");
 
     // Groundward: payload data written at the first interface, where the app
     // reads payload data, comes out at the second, where it writes it.
@@ -70,7 +71,8 @@ fn each_stream_is_carried_to_the_other_interface() {
 /// apart. So this one waits on the wrong interface and wants nothing.
 #[test]
 fn the_streams_are_not_crossed() {
-    let mut running = parent::start(&app(), &arguments(), Supports::ALL).expect("it starts");
+    let mut running =
+        parent::start(&app(), &arguments(), Supports::ALL).expect("it starts");
     // Short, because what this test wants is for nothing to arrive: the
     // default would have it wait five seconds to find out.
     running.waits(Some(Duration::from_millis(500)));
@@ -104,7 +106,8 @@ fn the_streams_are_not_crossed() {
 #[test]
 fn run_with_the_wrong_arguments_it_refuses_and_says_why() {
     let mut running =
-        parent::start(&app(), &["through".to_string()], Supports::ALL).expect("it starts");
+        parent::start(&app(), &["through".to_string()], Supports::ALL)
+            .expect("it starts");
 
     let said = running
         .read_complaint()

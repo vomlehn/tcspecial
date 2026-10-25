@@ -40,7 +40,9 @@ use tcslibgs::format::ConfigFormat;
 pub type Settings = BTreeMap<String, String>;
 
 /// The simulator configuration being edited.
-#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize,
+)]
 pub struct Simulator {
     /// The file it came from and goes back to.
     ///
@@ -209,7 +211,8 @@ pub fn read(path: &Path) -> Result<Simulator, Trouble> {
         return Ok(simulator);
     }
 
-    let unreadable = |e: &dyn std::fmt::Display| Trouble::Unreadable(format!("{e}"));
+    let unreadable =
+        |e: &dyn std::fmt::Display| Trouble::Unreadable(format!("{e}"));
     let format = ConfigFormat::of_file(path).map_err(|e| unreadable(&e))?;
     let text = std::fs::read_to_string(path).map_err(|e| unreadable(&e))?;
     let file: File = format.parse(&text).map_err(|e| unreadable(&e))?;
@@ -233,7 +236,8 @@ pub fn read(path: &Path) -> Result<Simulator, Trouble> {
         ("simulated payload group", &file.simulated_payload_groups),
         ("simulated payload", &file.simulated_payloads),
     ] {
-        let mut seen: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
+        let mut seen: std::collections::BTreeSet<&str> =
+            std::collections::BTreeSet::new();
         for entry in entries {
             if !seen.insert(entry.name.as_str()) {
                 return Err(Trouble::Unusable(format!(
@@ -292,7 +296,10 @@ pub fn to_yaml(simulator: &Simulator, payloads: &[String]) -> String {
     // from whatever is written next, each of which opens with one.
     out.push_str(&format!(
         "# yaml-language-server: $schema={}\n",
-        crate::nodes::schema_reference(&simulator.path, crate::nodes::SIM_JSON_SCHEMA)
+        crate::nodes::schema_reference(
+            &simulator.path,
+            crate::nodes::SIM_JSON_SCHEMA
+        )
     ));
 
     if let Some(description) = &simulator.description {
@@ -325,7 +332,8 @@ pub fn to_yaml(simulator: &Simulator, payloads: &[String]) -> String {
         out.push_str("\nthermal_mass:\n");
         for (name, said) in &simulator.masses {
             out.push_str(&format!("  - name: {}\n", quoted(name)));
-            let mut fields: Vec<&str> = tcslibgs::sim_config::MASS_SETTINGS.to_vec();
+            let mut fields: Vec<&str> =
+                tcslibgs::sim_config::MASS_SETTINGS.to_vec();
             let theirs: Vec<&str> = said
                 .keys()
                 .map(String::as_str)
@@ -335,7 +343,10 @@ pub fn to_yaml(simulator: &Simulator, payloads: &[String]) -> String {
             for field in fields {
                 if let Some(value) = said.get(field).map(|value| value.trim()) {
                     if !value.is_empty() {
-                        out.push_str(&format!("    {field}: {}\n", quoted(value)));
+                        out.push_str(&format!(
+                            "    {field}: {}\n",
+                            quoted(value)
+                        ));
                     }
                 }
             }
@@ -391,7 +402,10 @@ pub fn to_yaml(simulator: &Simulator, payloads: &[String]) -> String {
                 // what the form is for is saying which questions there are.
                 match said.get(setting).map(|value| value.trim()) {
                     Some(value) if !value.is_empty() => {
-                        out.push_str(&format!("    {setting}: {}\n", quoted(value)));
+                        out.push_str(&format!(
+                            "    {setting}: {}\n",
+                            quoted(value)
+                        ));
                     }
                     _ => out.push_str(&format!("    {setting}:\n")),
                 }
@@ -468,22 +482,34 @@ mod tests {
             );
 
             let payloads = vec!["payload".to_string()];
-            std::fs::write(&path, to_yaml(&simulator, &payloads)).expect("written");
+            std::fs::write(&path, to_yaml(&simulator, &payloads))
+                .expect("written");
             let read_back = read(&path).expect("read back");
 
-            assert_eq!(read_back.description, simulator.description, "{extension}");
+            assert_eq!(
+                read_back.description, simulator.description,
+                "{extension}"
+            );
             // The file is a form: every setting of every entry is written,
             // empty where nobody has filled it in, so what comes back is what
             // went in plus the blanks.
             for (name, said) in &simulator.groups {
                 let back = read_back.groups.get(name).expect("the group");
                 for (setting, value) in said {
-                    assert_eq!(back.get(setting), Some(value), "{extension} {setting}");
+                    assert_eq!(
+                        back.get(setting),
+                        Some(value),
+                        "{extension} {setting}"
+                    );
                 }
             }
             let back = read_back.payloads.get("payload").expect("the payload");
             for (setting, value) in &simulator.payloads["payload"] {
-                assert_eq!(back.get(setting), Some(value), "{extension} {setting}");
+                assert_eq!(
+                    back.get(setting),
+                    Some(value),
+                    "{extension} {setting}"
+                );
             }
             // Including the one that was cleared, which comes back empty: the
             // simulator's own reader takes a setting written empty as a
@@ -529,8 +555,14 @@ mod tests {
 
         let read_in = read(&path).expect("it reads");
         let cabin = read_in.masses.get("cabin").expect("the mass");
-        assert_eq!(cabin.get("environment").map(String::as_str), Some("283.15"));
-        assert_eq!(cabin.get("time_constant").map(String::as_str), Some("50 s"));
+        assert_eq!(
+            cabin.get("environment").map(String::as_str),
+            Some("283.15")
+        );
+        assert_eq!(
+            cabin.get("time_constant").map(String::as_str),
+            Some("50 s")
+        );
         assert_eq!(cabin.get("stirred").map(String::as_str), Some("yes"));
 
         // Saved, as every other edit saves the whole file, and read again.
@@ -563,7 +595,8 @@ mod tests {
             .remove("stirred");
         let plain = where_.path().join("plainsim.yaml");
         this_build.path = plain.clone();
-        std::fs::write(&plain, to_yaml(&this_build, &payloads)).expect("written");
+        std::fs::write(&plain, to_yaml(&this_build, &payloads))
+            .expect("written");
         tcslibgs::sim_config::SimConfigFile::load(&plain)
             .expect("the simulator reads what the editor wrote");
     }
@@ -640,7 +673,8 @@ mod tests {
         let path = where_.path().join("vehiclesim.yaml");
         std::fs::write(
             &path,
-            "simulated_payloads:\n  - name: payload\n    simulate: true\n    future_thing: 7\n",
+            "simulated_payloads:\n  - name: payload\n    simulate: \
+             true\n    future_thing: 7\n",
         )
         .expect("a file");
 

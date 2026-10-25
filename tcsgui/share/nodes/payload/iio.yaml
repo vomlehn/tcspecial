@@ -2,7 +2,8 @@
 #
 # A payload: what the vehicle carries this flight. Its readings leave by
 # payload-out on their way to the ground, and what asks for them -- a
-# trigger, a command -- arrives at moc-in. Its Rust is tcspecial/src/node/payload/iio/.
+# trigger, a command -- arrives at moc-in. Its Rust is
+# tcspecial/src/node/payload/iio/.
 node: iio
 type: iio
 about: A sensor read through the kernel's IIO buffers.

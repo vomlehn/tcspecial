@@ -75,7 +75,10 @@ impl AppMocVeh {
     }
 
     /// The same, into the fabric's buffer, allocating nothing.
-    pub fn take_payload_data_now_into(&mut self, out: &mut [u8]) -> Result<ReadInto, String> {
+    pub fn take_payload_data_now_into(
+        &mut self,
+        out: &mut [u8],
+    ) -> Result<ReadInto, String> {
         self.running.read_payload_now_into(out)
     }
 
@@ -117,8 +120,8 @@ mod tests {
 
     /// A program standing in for an app of this kind.
     ///
-    /// `cat`, reading and writing the one interface this kind is given: MOC data
-    /// arrives at descriptor 1 and what it reads goes back to the same
+    /// `cat`, reading and writing the one interface this kind is given: MOC
+    /// data arrives at descriptor 1 and what it reads goes back to the same
     /// descriptor, which is payload data there.
     fn stands_in(where_: &std::path::Path) -> PathBuf {
         let path = where_.join("stands_in");
@@ -151,7 +154,8 @@ mod tests {
     fn packets_reach_the_program_and_come_back() {
         let where_ = tempfile::tempdir().expect("a directory");
         let program = stands_in(where_.path());
-        let mut node = crate::when_not_busy(|| AppMocVeh::of(&says(&program))).expect("it starts");
+        let mut node = crate::when_not_busy(|| AppMocVeh::of(&says(&program)))
+            .expect("it starts");
 
         node.give_moc_data(b"SET 300").expect("it takes a packet");
         assert_eq!(

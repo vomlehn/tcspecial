@@ -56,7 +56,10 @@ pub fn reading_of(
 ) -> Result<crate::node::vehicle::compute::ToKelvinParams, String> {
     use crate::node::vehicle::compute::{params_of, Computation};
 
-    let mut found: Vec<(String, crate::node::vehicle::compute::ToKelvinParams)> = Vec::new();
+    let mut found: Vec<(
+        String,
+        crate::node::vehicle::compute::ToKelvinParams,
+    )> = Vec::new();
     for link in graph.links.iter().filter(|l| l.origin().node == payload) {
         for destination in link.to.each() {
             let to = Destination::parse(destination).node;
@@ -66,7 +69,9 @@ pub fn reading_of(
             if node.node_type != "compute" {
                 continue;
             }
-            if let Ok(Computation::ToKelvin(params)) = params_of(&node.name, &node.attributes) {
+            if let Ok(Computation::ToKelvin(params)) =
+                params_of(&node.name, &node.attributes)
+            {
                 if !found.iter().any(|(name, _)| name == &to) {
                     found.push((to, params));
                 }
@@ -83,7 +88,8 @@ pub fn reading_of(
              take the format, the scale and the offset from"
         )),
         _ => {
-            let named: Vec<&str> = found.iter().map(|(name, _)| name.as_str()).collect();
+            let named: Vec<&str> =
+                found.iter().map(|(name, _)| name.as_str()).collect();
             Err(format!(
                 "\"{payload}\" reads a thermal mass and its readings go to {} \
                  conversions ({}): there is no one encoding to send them in",
@@ -94,7 +100,10 @@ pub fn reading_of(
     }
 }
 
-pub fn handlers(graph: &Graph, sim_file: &SimConfigFile) -> Result<Vec<DHConfig>, String> {
+pub fn handlers(
+    graph: &Graph,
+    sim_file: &SimConfigFile,
+) -> Result<Vec<DHConfig>, String> {
     for entry in &sim_file.simulated_payloads {
         match graph.node(&entry.name) {
             Some(node) if node.is_payload() => {}
@@ -106,7 +115,8 @@ pub fn handlers(graph: &Graph, sim_file: &SimConfigFile) -> Result<Vec<DHConfig>
             }
             None => {
                 return Err(format!(
-                    "\"{}\" is simulated, and the configuration has no node of that name",
+                    "\"{}\" is simulated, and the configuration has no node of \
+                     that name",
                     entry.name
                 ))
             }
@@ -147,8 +157,9 @@ pub fn handlers(graph: &Graph, sim_file: &SimConfigFile) -> Result<Vec<DHConfig>
             ));
         }
 
-        let reach = reach_of(node)
-            .map_err(|why| format!("\"{}\" cannot be simulated: {why}", node.name))?;
+        let reach = reach_of(node).map_err(|why| {
+            format!("\"{}\" cannot be simulated: {why}", node.name)
+        })?;
 
         let mode = match reach.trigger {
             None => DHMode::Periodic,
@@ -190,10 +201,13 @@ mod tests {
 
     fn example(name: &str) -> (Graph, SimConfigFile) {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let graph = Graph::load(root.join(format!("examples/{name}/{name}.yaml")))
-            .expect("the example reads");
-        let sim = SimConfigFile::load(root.join(format!("examples/{name}/{name}-sim.yaml")))
-            .expect("its simulator file reads");
+        let graph =
+            Graph::load(root.join(format!("examples/{name}/{name}.yaml")))
+                .expect("the example reads");
+        let sim = SimConfigFile::load(
+            root.join(format!("examples/{name}/{name}-sim.yaml")),
+        )
+        .expect("its simulator file reads");
         (graph, sim)
     }
 

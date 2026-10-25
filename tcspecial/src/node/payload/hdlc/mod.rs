@@ -43,10 +43,13 @@ use std::mem;
 use std::os::unix::io::{AsRawFd, FromRawFd, OwnedFd, RawFd};
 
 use nix::poll::PollFlags;
-use tcslibgs::{ClockType, Encoding, FrameCheck, HdlcConfig, Standard, TcsError, TcsResult};
+use tcslibgs::{
+    ClockType, Encoding, FrameCheck, HdlcConfig, Standard, TcsError, TcsResult,
+};
 
 use crate::endpoint::{
-    wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable, WaitResult,
+    wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable,
+    WaitResult,
 };
 
 /// `SIOCWANDEV`, the one ioctl generic HDLC has.
@@ -172,7 +175,8 @@ impl HdlcEndpoint {
         };
         if fd < 0 {
             return Err(TcsError::Endpoint(format!(
-                "{what}: cannot open a packet socket for {}: {}. A kernel without \\
+                "{what}: cannot open a packet socket for {}: {}. A kernel \
+                 without \\
                  packet sockets has none to give",
                 config.interface,
                 io::Error::last_os_error()
@@ -219,9 +223,9 @@ fn interface_index(what: &str, interface: &str) -> TcsResult<libc::c_uint> {
     if index == 0 {
         return Err(TcsError::Config(format!(
             "{what}: this host has no interface called \"{interface}\": {}. A \
-             synchronous line is a card -- a wanxl, a pci200syn, a pc300too or a \
-             FarSync -- and unlike a CAN bus there is no virtual one to stand in \
-             for it",
+             synchronous line is a card -- a wanxl, a pci200syn, a pc300too or \
+             a FarSync -- and unlike a CAN bus there is no virtual one to \
+             stand in for it",
             io::Error::last_os_error()
         )));
     }
@@ -311,7 +315,11 @@ fn framing_of(config: &HdlcConfig) -> RawHdlcProto {
 }
 
 /// Set the port's wiring.
-fn set_interface(what: &str, asking: RawFd, config: &HdlcConfig) -> TcsResult<()> {
+fn set_interface(
+    what: &str,
+    asking: RawFd,
+    config: &HdlcConfig,
+) -> TcsResult<()> {
     let mut wiring = wiring_of(config);
     let mut request = request_for(
         what,
@@ -326,8 +334,8 @@ fn set_interface(what: &str, asking: RawFd, config: &HdlcConfig) -> TcsResult<()
     // call.
     if unsafe { libc::ioctl(asking, SIOCWANDEV, &mut request) } < 0 {
         return Err(TcsError::Endpoint(format!(
-            "{what}: {} will not be wired as {}: {}. A card that does not offer \
-             that standard refuses it here",
+            "{what}: {} will not be wired as {}: {}. A card that does not \
+             offer that standard refuses it here",
             config.interface,
             config.standard,
             io::Error::last_os_error()
@@ -338,7 +346,11 @@ fn set_interface(what: &str, asking: RawFd, config: &HdlcConfig) -> TcsResult<()
 }
 
 /// Set what the bits mean.
-fn set_protocol(what: &str, asking: RawFd, config: &HdlcConfig) -> TcsResult<()> {
+fn set_protocol(
+    what: &str,
+    asking: RawFd,
+    config: &HdlcConfig,
+) -> TcsResult<()> {
     let mut framing = framing_of(config);
     let mut request = request_for(
         what,
@@ -413,8 +425,9 @@ fn read_back(what: &str, asking: RawFd, config: &HdlcConfig) -> TcsResult<()> {
     }
     if framing != framing_of(config) {
         return Err(TcsError::Endpoint(format!(
-            "{what}: {} reports {:?} after being set to {:?}: a frame check the \
-             card is not applying is one the configuration only says it applies",
+            "{what}: {} reports {:?} after being set to {:?}: a frame check \
+             the card is not applying is one the configuration only says it \
+             applies",
             config.interface,
             framing,
             framing_of(config)
@@ -460,7 +473,11 @@ impl EndpointWaitable for HdlcEndpoint {
         self.socket.as_raw_fd()
     }
 
-    fn wait_for_event(&self, cmd_fd: RawFd, timeout_ms: i32) -> TcsResult<WaitResult> {
+    fn wait_for_event(
+        &self,
+        cmd_fd: RawFd,
+        timeout_ms: i32,
+    ) -> TcsResult<WaitResult> {
         wait_for_fds(self.io_fd(), cmd_fd, PollFlags::POLLIN, timeout_ms)
     }
 }
@@ -705,7 +722,8 @@ mod tests {
         };
         assert!(
             said.contains("hdlc-nonesuch") && said.contains("no virtual one"),
-            "the complaint should name the interface and say what one is: {said}"
+            "the complaint should name the interface and say what one is: \
+             {said}"
         );
     }
 }

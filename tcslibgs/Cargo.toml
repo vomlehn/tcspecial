@@ -3,7 +3,9 @@ name = "tcslibgs"
 version = "0.1.0"
 edition = "2021"
 license.workspace = true
-description = "What TCSpecial's ground and vehicle software share: the command and telemetry protocol, and how every configuration file is read and checked"
+description = """\
+What TCSpecial's ground and vehicle software share: the command and telemetry \
+protocol, and how every configuration file is read and checked"""
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }

@@ -57,7 +57,9 @@ impl Request {
             return None;
         }
         Some(Request {
-            sequence: u32::from_be_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]),
+            sequence: u32::from_be_bytes([
+                bytes[4], bytes[5], bytes[6], bytes[7],
+            ]),
         })
     }
 }
@@ -221,7 +223,8 @@ impl Answer {
         out[10..26].copy_from_slice(&self.set_up_for.configuration.0);
         out[26..42].copy_from_slice(&self.set_up_for.simulator.0);
         out[42..44].copy_from_slice(&(self.reason.len as u16).to_be_bytes());
-        out[44..44 + self.reason.len].copy_from_slice(&self.reason.bytes[..self.reason.len]);
+        out[44..44 + self.reason.len]
+            .copy_from_slice(&self.reason.bytes[..self.reason.len]);
     }
 
     /// An answer, or `None` for a datagram that is not one.
@@ -240,7 +243,9 @@ impl Answer {
         }
         let text = std::str::from_utf8(&bytes[44..44 + len]).ok()?;
         Some(Answer {
-            sequence: u32::from_be_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]),
+            sequence: u32::from_be_bytes([
+                bytes[4], bytes[5], bytes[6], bytes[7],
+            ]),
             state: State::of(bytes[8])?,
             set_up_for: SetUpFor {
                 configuration: digest(10),

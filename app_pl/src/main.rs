@@ -61,7 +61,9 @@ fn main() -> ExitCode {
             Ok(()) => {}
             // Nobody is reading: the vehicle has finished with this payload,
             // which is an end and not a fault.
-            Err(e) if e.kind() == io::ErrorKind::BrokenPipe => return ExitCode::SUCCESS,
+            Err(e) if e.kind() == io::ErrorKind::BrokenPipe => {
+                return ExitCode::SUCCESS
+            }
             Err(e) => {
                 let _ = errors.say(&format!(
                     "app_pl {name}: reading {count} could not be written: {e}"

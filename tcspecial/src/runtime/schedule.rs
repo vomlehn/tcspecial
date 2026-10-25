@@ -198,7 +198,8 @@ mod tests {
 
     fn thermostat() -> Graph {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        Graph::load(root.join("tests/manual/thermostat.yaml")).expect("the example reads")
+        Graph::load(root.join("tests/manual/thermostat.yaml"))
+            .expect("the example reads")
     }
 
     /// The three sensors of the example are read together, on one interval.
@@ -253,7 +254,8 @@ mod tests {
         assert_eq!(
             then,
             start + Duration::from_millis(100),
-            "the next time was taken from the finish rather than from the due time"
+            "the next time was taken from the finish rather than from the due \
+             time"
         );
 
         // And it is not due before then.
@@ -263,7 +265,9 @@ mod tests {
         // A hundred passes, each late: still on the original clock.
         let mut schedule = Schedule::of(&thermostat(), start);
         for n in 0..100 {
-            let due = start + Duration::from_millis(100 * n) + Duration::from_millis(7);
+            let due = start
+                + Duration::from_millis(100 * n)
+                + Duration::from_millis(7);
             schedule.read("cabin_temps", due);
         }
         assert_eq!(

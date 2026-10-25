@@ -93,7 +93,9 @@ pub fn read(path: &Path) -> Result<Document, String> {
         let mut attributes: BTreeMap<String, String> = node
             .attributes
             .iter()
-            .map(|(attribute, value)| (attribute.clone(), value.as_str().to_string()))
+            .map(|(attribute, value)| {
+                (attribute.clone(), value.as_str().to_string())
+            })
             .collect();
         if let Some(group) = &node.group {
             attributes.insert("group".to_string(), group.clone());
@@ -268,9 +270,10 @@ fn line_opens_an_entry(line: &str) -> bool {
 
 /// Which data source this line writes, if it writes one.
 ///
-/// `payload-out: k_1` in YAML and `<payload-out>k_1</payload-out>` in XML -- and the
-/// list form too, a comment above `payload-out: [a, b]` being about both of them.
-/// The two names are the schema's: see `tcslibgs::graph::terminals`.
+/// `payload-out: k_1` in YAML and `<payload-out>k_1</payload-out>` in XML --
+/// and the list form too, a comment above `payload-out: [a, b]` being about
+/// both of them. The two names are the schema's: see
+/// `tcslibgs::graph::terminals`.
 fn source_named(line: &str, xml: bool) -> Option<String> {
     for terminal in ["payload-out", "moc-out"] {
         let is = if xml {
@@ -407,7 +410,9 @@ mod tests {
                     .nodes
                     .iter()
                     .find(|n| n.name == written.name)
-                    .unwrap_or_else(|| panic!("{name}: {} was not read back", written.name));
+                    .unwrap_or_else(|| {
+                        panic!("{name}: {} was not read back", written.name)
+                    });
 
                 // Everything comes back as it went out, with one exception
                 // the XML spelling cannot avoid: a comment may not contain two
@@ -416,13 +421,14 @@ mod tests {
                 // hyphen on the way out. See `document::comment_safe`.
                 let mut written = written.clone();
                 if name.ends_with(".xml") {
-                    written.comment = written.comment.as_deref().map(|comment| {
-                        comment
-                            .lines()
-                            .map(crate::document::comment_safe)
-                            .collect::<Vec<String>>()
-                            .join("\n")
-                    });
+                    written.comment =
+                        written.comment.as_deref().map(|comment| {
+                            comment
+                                .lines()
+                                .map(crate::document::comment_safe)
+                                .collect::<Vec<String>>()
+                                .join("\n")
+                        });
                 }
                 assert_eq!(found, &written, "{name}: {}", written.name);
             }
@@ -500,14 +506,15 @@ mod tests {
         // drew -- including nothing at all, which is a configuration somebody
         // emptied and a state the editor starts new ones in. What is asked of
         // it is what is true however it is drawn: that both spellings read,
-        // that they say the same thing, and that neither is faulty. The worked example is
-        // the one with contents worth asserting, and
+        // that they say the same thing, and that neither is faulty. The
+        // worked example is the one with contents worth asserting, and
         // `the_worked_example_is_the_configuration_it_describes` asserts them.
         for name in ["example", "tests/manual/thermostat"] {
             let mut read_as: Vec<(usize, usize)> = Vec::new();
             for extension in ["yaml", "xml"] {
                 let path = root.join(format!("{name}.{extension}"));
-                let document = read(&path).unwrap_or_else(|e| panic!("{name}: {e}"));
+                let document =
+                    read(&path).unwrap_or_else(|e| panic!("{name}: {e}"));
                 read_as.push((document.nodes.len(), document.links.len()));
             }
             assert_eq!(
@@ -521,7 +528,8 @@ mod tests {
         // progress, and the editor's business is to say so rather than a
         // test's to refuse it.
         for extension in ["yaml", "xml"] {
-            let path = root.join(format!("tests/manual/thermostat.{extension}"));
+            let path =
+                root.join(format!("tests/manual/thermostat.{extension}"));
             let document = read(&path).expect("the worked example");
             assert!(
                 document.faults().is_empty(),
@@ -542,7 +550,8 @@ mod tests {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
 
         for extension in ["yaml", "xml"] {
-            let path = root.join(format!("tests/manual/thermostat.{extension}"));
+            let path =
+                root.join(format!("tests/manual/thermostat.{extension}"));
             let document = read(&path).expect("the worked example");
             assert_eq!(document.nodes.len(), 12, "thermostat.{extension}");
             assert_eq!(document.links.len(), 18, "thermostat.{extension}");
@@ -563,7 +572,8 @@ mod tests {
     #[test]
     fn the_shipped_example_is_the_same_in_both_spellings() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let document = read(&root.join("example.yaml")).expect("the example opens");
+        let document =
+            read(&root.join("example.yaml")).expect("the example opens");
         let path = root.join("example.xml");
         // Written for the place it is going, which is what decides how it
         // names its schema: see `nodes::schema_reference`.
@@ -592,7 +602,8 @@ mod tests {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
 
         for extension in ["yaml", "xml"] {
-            let path = root.join(format!("tests/manual/thermostat.{extension}"));
+            let path =
+                root.join(format!("tests/manual/thermostat.{extension}"));
             let document = read(&path).expect("the example opens");
 
             let sensor = document
@@ -603,9 +614,9 @@ mod tests {
             assert_eq!(
                 sensor.comment.as_deref(),
                 Some(
-                    "One of three sensors of the same place, a trio, so that the\n\
-                     temperature survives one of them going wrong. Two bytes, signed,\n\
-                     big endian."
+                    "One of three sensors of the same place, a trio, so \
+                     that the\ntemperature survives one of them going \
+                     wrong. Two bytes, signed,\nbig endian."
                 ),
                 "{extension}"
             );
@@ -619,7 +630,8 @@ mod tests {
                 .expect("the third of the trio");
             assert!(
                 third.comment.as_deref().is_some_and(|said| {
-                    said.contains("different bus") && said.contains("own conversion")
+                    said.contains("different bus")
+                        && said.contains("own conversion")
                 }),
                 "{extension}: {:?}",
                 third.comment
@@ -642,16 +654,18 @@ mod tests {
                     .find(|l| l.from == "thermostat" && l.to == heater)
                     .unwrap_or_else(|| panic!("the link to {heater}"));
                 assert!(
-                    link.comment
-                        .as_deref()
-                        .is_some_and(|said| said.contains("asserted below the setpoint")),
+                    link.comment.as_deref().is_some_and(
+                        |said| said.contains("asserted below the setpoint")
+                    ),
                     "{extension}: {heater}: {:?}",
                     link.comment
                 );
             }
             assert_eq!(
                 document.commands[0].comment.as_deref(),
-                Some("the cabin temperature the heaters are held at, in kelvin"),
+                Some(
+                    "the cabin temperature the heaters are held at, in kelvin"
+                ),
                 "{extension}"
             );
 
@@ -669,7 +683,8 @@ mod tests {
     #[test]
     fn a_name_that_does_not_exist_yet_is_a_new_document() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let document = read(&where_.path().join("nothing-here.yaml")).expect("a new document");
+        let document = read(&where_.path().join("nothing-here.yaml"))
+            .expect("a new document");
         assert!(document.nodes.is_empty() && document.links.is_empty());
     }
 
@@ -679,7 +694,8 @@ mod tests {
     fn a_file_that_is_not_a_configuration_is_reported() {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("notes.yaml");
-        std::fs::write(&path, "this is not a configuration\n").expect("written");
+        std::fs::write(&path, "this is not a configuration\n")
+            .expect("written");
 
         let said = read(&path).expect_err("a file that is not one");
         assert!(!said.is_empty(), "the complaint should say something");

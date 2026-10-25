@@ -14,10 +14,11 @@
 //!
 //! A link is an attribute of the node it leaves, named after the data source
 //! it leaves by, with one entry per line: `payload-out: [{ target: k_1 }]` is a
-//! link from this node's `payload-out` terminal to `k_1`, and an entry naming an
-//! `input` as well feeds a named input of the node it reaches. The short
-//! spelling is read too -- `payload-out: k_1`, `payload-out: [moc, cabin_temp.in0]` --
-//! and means the same thing; see [`Destinations`].
+//! link from this node's `payload-out` terminal to `k_1`, and an entry naming
+//! an `input` as well feeds a named input of the node it reaches. The short
+//! spelling is read too -- `payload-out: k_1`,
+//! `payload-out: [moc, cabin_temp.in0]` -- and means the same thing; see
+//! [`Destinations`].
 //!
 //! So there is no links section, and a node and the links out of it are read,
 //! written and deleted together. The node it arrives at says so as well --
@@ -310,7 +311,9 @@ pub fn types_in(section: Section) -> Vec<&'static str> {
             .filter(|kind| kind.is_built())
             .filter_map(|kind| kind.node_type())
             .collect(),
-        Section::Vehicle => VEHICLE_TYPES.iter().copied().chain(apps(false)).collect(),
+        Section::Vehicle => {
+            VEHICLE_TYPES.iter().copied().chain(apps(false)).collect()
+        }
         Section::Payloads => crate::types::DHType::ALL
             .iter()
             .map(|kind| kind.spelling())
@@ -389,7 +392,8 @@ pub fn starts_and_stops(node_type: &str) -> bool {
 #[derive(Debug, Clone, PartialEq)]
 pub struct NodeFile {
     pub node: Node,
-    /// Where this node's groundward data goes: the sinks its `payload-out` reaches.
+    /// Where this node's groundward data goes: the sinks its `payload-out`
+    /// reaches.
     pub payload_out: Vec<String>,
     /// And its vehicleward data: the sinks its `moc-out` reaches.
     pub moc_out: Vec<String>,
@@ -447,10 +451,12 @@ impl<'de> Deserialize<'de> for NodeFile {
     /// A node's attributes are whatever its type takes, so they are collected
     /// rather than declared -- and `serde(flatten)` cannot be used to collect
     /// them beside a declared `payload-out`, because an XML file writes several
-    /// destinations as several `<payload-out>` elements and a flattened map refuses
-    /// the second as a duplicate key. Read as a map here, the repeats are what
-    /// they look like: more destinations.
-    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+    /// destinations as several `<payload-out>` elements and a flattened map
+    /// refuses the second as a duplicate key. Read as a map here, the repeats
+    /// are what they look like: more destinations.
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> Result<Self, D::Error> {
         use serde::de::{self, MapAccess, Visitor};
         use std::fmt;
 
@@ -463,7 +469,10 @@ impl<'de> Deserialize<'de> for NodeFile {
                 f.write_str("a node")
             }
 
-            fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<NodeFile, A::Error> {
+            fn visit_map<A: MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> Result<NodeFile, A::Error> {
                 let mut name: Option<String> = None;
                 let mut node_type: Option<String> = None;
                 let mut group: Option<String> = None;
@@ -477,11 +486,27 @@ impl<'de> Deserialize<'de> for NodeFile {
 
                 while let Some(key) = map.next_key::<String>()? {
                     match key.as_str() {
-                        "name" => name = Some(map.next_value::<Scalar>()?.as_str().to_string()),
-                        "type" => {
-                            node_type = Some(map.next_value::<Scalar>()?.as_str().to_string())
+                        "name" => {
+                            name = Some(
+                                map.next_value::<Scalar>()?
+                                    .as_str()
+                                    .to_string(),
+                            )
                         }
-                        "group" => group = Some(map.next_value::<Scalar>()?.as_str().to_string()),
+                        "type" => {
+                            node_type = Some(
+                                map.next_value::<Scalar>()?
+                                    .as_str()
+                                    .to_string(),
+                            )
+                        }
+                        "group" => {
+                            group = Some(
+                                map.next_value::<Scalar>()?
+                                    .as_str()
+                                    .to_string(),
+                            )
+                        }
                         // Where this used to be, and said so rather than
                         // read as an attribute nothing knows: a position is
                         // the editor's own and lives in the `tcsgui` section
@@ -514,7 +539,9 @@ impl<'de> Deserialize<'de> for NodeFile {
                         // there -- a record of links written on the nodes they
                         // leave, and not a link. Checked against those links
                         // as the configuration is read: see `mirror`.
-                        "payload-in" => payload_in = Some(said_so("payload-in", &mut map)?),
+                        "payload-in" => {
+                            payload_in = Some(said_so("payload-in", &mut map)?)
+                        }
                         "moc-in" => moc_in = Some(said_so("moc-in", &mut map)?),
                         // A list of alternatives, each a run of bytes: a YAML
                         // list, or a repeated XML element, whose repeats add
@@ -525,19 +552,22 @@ impl<'de> Deserialize<'de> for NodeFile {
                             for one in &listed.0 {
                                 if entries(one.as_str()).len() > 1 {
                                     return Err(de::Error::custom(format!(
-                                        "\"{}\" writes the {attribute} {:?} as one value \
-                                         with commas between them: write each as an entry \
-                                         of its own -- a YAML list, or one <{attribute}> \
+                                        "\"{}\" writes the {attribute} {:?} as \
+                                         one value with commas between them: \
+                                         write each as an entry of its own -- \
+                                         a YAML list, or one <{attribute}> \
                                          element for each",
                                         name.as_deref().unwrap_or("a node"),
                                         one.as_str()
                                     )));
                                 }
                             }
-                            lists
-                                .entry(attribute)
-                                .or_default()
-                                .extend(listed.0.iter().map(|one| one.as_str().trim().to_string()));
+                            lists.entry(attribute).or_default().extend(
+                                listed
+                                    .0
+                                    .iter()
+                                    .map(|one| one.as_str().trim().to_string()),
+                            );
                         }
                         // Everything else is an attribute of the node, which
                         // is where a word nothing reads ends up -- and is
@@ -566,8 +596,10 @@ impl<'de> Deserialize<'de> for NodeFile {
 
                 Ok(NodeFile {
                     node: Node {
-                        name: name.ok_or_else(|| de::Error::missing_field("name"))?,
-                        node_type: node_type.ok_or_else(|| de::Error::missing_field("type"))?,
+                        name: name
+                            .ok_or_else(|| de::Error::missing_field("name"))?,
+                        node_type: node_type
+                            .ok_or_else(|| de::Error::missing_field("type"))?,
                         group,
                         attributes,
                     },
@@ -660,7 +692,8 @@ impl Node {
     /// For [`section_of`], which is asked before there is a node to ask about.
     pub fn is_payload_type(node_type: &str) -> bool {
         crate::types::DHType::from_spelling(node_type).is_some()
-            || crate::node::app::Kind::of(node_type).is_some_and(|kind| kind.is_payload())
+            || crate::node::app::Kind::of(node_type)
+                .is_some_and(|kind| kind.is_payload())
     }
 }
 
@@ -705,16 +738,16 @@ impl Link {
 /// A line is then one entry rather than one element of two lists, which is
 /// what makes several destinations safe to write: nothing pairs by position,
 /// so a list that slips by one cannot turn a reading into somebody else's
-/// input. In XML the same thing is a repeated `<payload-out>` with `<target>` in
-/// it.
+/// input. In XML the same thing is a repeated `<payload-out>` with `<target>`
+/// in it.
 ///
-/// The short spellings are still read: `payload-out: moc` and `payload-out: [moc,
-/// cabin_temp.in0]`, the node and its input separated by a dot. Every
-/// configuration written before entries existed says what it said, and a link
-/// to one place is a line somebody can still write in a line. All of them read
-/// into the same thing -- a destination as `node` or `node.input` -- because
-/// every rule about a link is about where it goes and not about how the file
-/// said so.
+/// The short spellings are still read: `payload-out: moc` and
+/// `payload-out: [moc, cabin_temp.in0]`, the node and its input separated by a
+/// dot. Every configuration written before entries existed says what it said,
+/// and a link to one place is a line somebody can still write in a line. All of
+/// them read into the same thing -- a destination as `node` or `node.input` --
+/// because every rule about a link is about where it goes and not about how the
+/// file said so.
 ///
 /// Read by hand rather than as an untagged enum, for the reason [`Scalar`]
 /// exists: a value written as an XML child element does not arrive as a
@@ -738,7 +771,9 @@ impl Destinations {
 }
 
 impl<'de> Deserialize<'de> for Destinations {
-    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> Result<Self, D::Error> {
         use serde::de::{self, MapAccess, SeqAccess, Visitor};
         use std::fmt;
 
@@ -751,11 +786,17 @@ impl<'de> Deserialize<'de> for Destinations {
                 f.write_str("a destination, or a list of them")
             }
 
-            fn visit_str<E: de::Error>(self, v: &str) -> Result<Destinations, E> {
+            fn visit_str<E: de::Error>(
+                self,
+                v: &str,
+            ) -> Result<Destinations, E> {
                 Ok(Destinations(vec![v.to_string()]))
             }
 
-            fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Destinations, A::Error> {
+            fn visit_seq<A: SeqAccess<'de>>(
+                self,
+                mut seq: A,
+            ) -> Result<Destinations, A::Error> {
                 let mut all = Vec::new();
                 // Each element is an entry, a string, or an XML element with
                 // text in it: see Bound.
@@ -767,7 +808,10 @@ impl<'de> Deserialize<'de> for Destinations {
 
             /// One entry -- `{ target: moc }` -- or one XML element with text
             /// in it: `<payload-out>moc</payload-out>`.
-            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Destinations, A::Error> {
+            fn visit_map<A: MapAccess<'de>>(
+                self,
+                map: A,
+            ) -> Result<Destinations, A::Error> {
                 Ok(Destinations(vec![written_as(map)?]))
             }
         }
@@ -786,7 +830,9 @@ impl<'de> Deserialize<'de> for Destinations {
 struct Bound(String);
 
 impl<'de> Deserialize<'de> for Bound {
-    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> Result<Self, D::Error> {
         use serde::de::{MapAccess, Visitor};
         use std::fmt;
 
@@ -799,11 +845,17 @@ impl<'de> Deserialize<'de> for Bound {
                 f.write_str("a destination, or an entry naming its target")
             }
 
-            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Bound, E> {
+            fn visit_str<E: serde::de::Error>(
+                self,
+                v: &str,
+            ) -> Result<Bound, E> {
                 Ok(Bound(v.to_string()))
             }
 
-            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Bound, A::Error> {
+            fn visit_map<A: MapAccess<'de>>(
+                self,
+                map: A,
+            ) -> Result<Bound, A::Error> {
                 Ok(Bound(written_as(map)?))
             }
         }
@@ -819,7 +871,9 @@ impl<'de> Deserialize<'de> for Bound {
 struct Listed(Vec<Scalar>);
 
 impl<'de> Deserialize<'de> for Listed {
-    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> Result<Self, D::Error> {
         use serde::de::value::MapAccessDeserializer;
         use serde::de::{MapAccess, SeqAccess, Visitor};
         use std::fmt;
@@ -833,15 +887,24 @@ impl<'de> Deserialize<'de> for Listed {
                 f.write_str("a value, or a list of them")
             }
 
-            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Listed, E> {
+            fn visit_str<E: serde::de::Error>(
+                self,
+                v: &str,
+            ) -> Result<Listed, E> {
                 Ok(Listed(vec![Scalar::of(v)]))
             }
 
-            fn visit_u64<E: serde::de::Error>(self, v: u64) -> Result<Listed, E> {
+            fn visit_u64<E: serde::de::Error>(
+                self,
+                v: u64,
+            ) -> Result<Listed, E> {
                 Ok(Listed(vec![Scalar::of(v.to_string())]))
             }
 
-            fn visit_i64<E: serde::de::Error>(self, v: i64) -> Result<Listed, E> {
+            fn visit_i64<E: serde::de::Error>(
+                self,
+                v: i64,
+            ) -> Result<Listed, E> {
                 Ok(Listed(vec![Scalar::of(v.to_string())]))
             }
 
@@ -854,7 +917,10 @@ impl<'de> Deserialize<'de> for Listed {
                 Ok(Listed(Vec::new()))
             }
 
-            fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Listed, A::Error> {
+            fn visit_seq<A: SeqAccess<'de>>(
+                self,
+                mut seq: A,
+            ) -> Result<Listed, A::Error> {
                 let mut all = Vec::new();
                 while let Some(one) = seq.next_element::<Scalar>()? {
                     all.push(one);
@@ -863,7 +929,10 @@ impl<'de> Deserialize<'de> for Listed {
             }
 
             /// An XML element with text in it, read as [`Scalar`] reads one.
-            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Listed, A::Error> {
+            fn visit_map<A: MapAccess<'de>>(
+                self,
+                map: A,
+            ) -> Result<Listed, A::Error> {
                 Ok(Listed(vec![Scalar::deserialize(
                     MapAccessDeserializer::new(map),
                 )?]))
@@ -885,7 +954,10 @@ impl<'de> Deserialize<'de> for Listed {
 /// data came from for a while, which read as "and nothing else" the moment a
 /// second line arrived -- so a file written against that is refused rather
 /// than half understood.
-fn said_so<'de, A: serde::de::MapAccess<'de>>(sink: &str, map: &mut A) -> Result<bool, A::Error> {
+fn said_so<'de, A: serde::de::MapAccess<'de>>(
+    sink: &str,
+    map: &mut A,
+) -> Result<bool, A::Error> {
     use serde::de::Error;
 
     let said = map.next_value::<Scalar>()?;
@@ -905,15 +977,17 @@ fn said_so<'de, A: serde::de::MapAccess<'de>>(sink: &str, map: &mut A) -> Result
 /// Two shapes arrive here. An entry -- `{ target: cabin_temp, input: in0 }` --
 /// which is what the editor writes and what a person writing a link by hand
 /// now has to write for a link to a named input. And an XML element with text
-/// in it, `<payload-out>moc</payload-out>`, which quick-xml hands over as a map of one
-/// entry whose value is the text: the short spelling, in the language where it
-/// does not arrive as a string.
+/// in it, `<payload-out>moc</payload-out>`, which quick-xml hands over as a map
+/// of one entry whose value is the text: the short spelling, in the language
+/// where it does not arrive as a string.
 ///
 /// Told apart by `target`, which the entry form always has. A mapping with
 /// neither `target` nor exactly one entry is refused rather than guessed at,
 /// and so is a word in an entry that is not `target` or `input`: a misspelled
 /// `targte` silently ignored is a link that quietly goes nowhere.
-fn written_as<'de, A: serde::de::MapAccess<'de>>(mut map: A) -> Result<String, A::Error> {
+fn written_as<'de, A: serde::de::MapAccess<'de>>(
+    mut map: A,
+) -> Result<String, A::Error> {
     use serde::de::Error;
 
     let mut target: Option<String> = None;
@@ -923,11 +997,18 @@ fn written_as<'de, A: serde::de::MapAccess<'de>>(mut map: A) -> Result<String, A
 
     while let Some(key) = map.next_key::<String>()? {
         match key.as_str() {
-            "target" => target = Some(map.next_value::<Scalar>()?.as_str().to_string()),
-            "input" => input = Some(map.next_value::<Scalar>()?.as_str().to_string()),
+            "target" => {
+                target = Some(map.next_value::<Scalar>()?.as_str().to_string())
+            }
+            "input" => {
+                input = Some(map.next_value::<Scalar>()?.as_str().to_string())
+            }
             // What XML calls the text of an element, which is how the short
-            // spelling arrives in that language: `<payload-out>moc</payload-out>`.
-            "$text" => text = Some(map.next_value::<Scalar>()?.as_str().to_string()),
+            // spelling arrives in that language:
+            // `<payload-out>moc</payload-out>`.
+            "$text" => {
+                text = Some(map.next_value::<Scalar>()?.as_str().to_string())
+            }
             // And nothing else. A word nobody knows is a misspelling, and a
             // misspelled `target` read as a name would be a link that quietly
             // goes nowhere.
@@ -982,10 +1063,12 @@ impl Destination {
     /// Read a destination as a file wrote it.
     pub fn parse(text: &str) -> Destination {
         match text.split_once('.') {
-            Some((node, input)) if !node.is_empty() && !input.is_empty() => Destination {
-                node: node.to_string(),
-                input: Some(input.to_string()),
-            },
+            Some((node, input)) if !node.is_empty() && !input.is_empty() => {
+                Destination {
+                    node: node.to_string(),
+                    input: Some(input.to_string()),
+                }
+            }
             // Total on purpose: saying what is wrong with a destination
             // belongs to the checking, which has a link to attach the
             // complaint to.
@@ -1100,8 +1183,8 @@ impl Graph {
             let file: GraphFile = read_one(&included)?;
             if file.tcspecial.is_some() {
                 return Err(TcsError::Config(format!(
-                    "{}: an included file may not have a tcspecial section -- a \
-                     configuration has one command interpreter, and the file \
+                    "{}: an included file may not have a tcspecial section -- \
+                     a configuration has one command interpreter, and the file \
                      that was asked for says what it is",
                     included.display()
                 )));
@@ -1216,7 +1299,9 @@ fn read_one(path: &Path) -> TcsResult<GraphFile> {
     let text = std::fs::read_to_string(path)
         .map_err(|e| TcsError::Config(format!("{}: {e}", path.display())))?;
 
-    if let Some(TcsError::Config(gone)) = crate::config::names_what_is_gone(&text, format) {
+    if let Some(TcsError::Config(gone)) =
+        crate::config::names_what_is_gone(&text, format)
+    {
         return Err(TcsError::Config(format!("{}: {gone}", path.display())));
     }
 
@@ -1232,14 +1317,14 @@ fn read_one(path: &Path) -> TcsResult<GraphFile> {
         (
             "nodes",
             file.nodes.is_some(),
-            "a node is written under moc, vehicle or payloads, according to what \
-             it is",
+            "a node is written under moc, vehicle or payloads, according to \
+             what it is",
         ),
         (
             "links",
             file.links.is_some(),
-            "a link is an attribute of the node it leaves, named after the data \
-             source it leaves by: `payload_out: k_1`",
+            "a link is an attribute of the node it leaves, named after the \
+             data source it leaves by: `payload_out: k_1`",
         ),
         (
             "groups",
@@ -1422,8 +1507,8 @@ pub fn parse_interval(text: &str) -> Result<Duration, String> {
         .map(|(known, micros)| (*known, *micros))
         .ok_or_else(|| {
             format!(
-                "\"{text}\": \"{unit}\" is not a unit of time: us, ms, s, min, h, \
-                 d or w"
+                "\"{text}\": \"{unit}\" is not a unit of time: us, ms, s, min, \
+                 h, d or w"
             )
         })?;
 
@@ -1452,7 +1537,10 @@ fn no_space(text: &str, said: &str) -> String {
              -- 500 ms, 1.5 s, 15 min"
         );
     }
-    format!("\"{text}\": write the number and the unit with a space between them, as \"{number} {unit}\"")
+    format!(
+        "\"{text}\": write the number and the unit with a space between them, \
+         as \"{number} {unit}\""
+    )
 }
 
 /// `digits` of `unit`, in whole microseconds.
@@ -1462,7 +1550,12 @@ fn no_space(text: &str, said: &str) -> String {
 /// week and a microsecond are the same arithmetic -- and checked, because
 /// seven hundred thousand weeks overflows the count rather than being an
 /// interval anybody meant.
-fn whole_micros(text: &str, digits: &str, unit: &str, micros: f64) -> Result<u64, String> {
+fn whole_micros(
+    text: &str,
+    digits: &str,
+    unit: &str,
+    micros: f64,
+) -> Result<u64, String> {
     let bare: String = digits.chars().filter(|c| *c != '_').collect();
     let bare = bare.trim();
     let bad = || format!("\"{text}\" is not a number of {unit}");
@@ -1553,7 +1646,10 @@ mod tests {
             let xml = Graph::load(root.join(format!("{name}.xml")))
                 .unwrap_or_else(|e| panic!("{name}.xml: {e}"));
 
-            assert_eq!(yaml.description, xml.description, "{name}: description");
+            assert_eq!(
+                yaml.description, xml.description,
+                "{name}: description"
+            );
             assert_eq!(yaml.groups, xml.groups, "{name}: groups");
             assert_eq!(yaml.nodes, xml.nodes, "{name}: nodes");
             assert_eq!(yaml.links, xml.links, "{name}: links");
@@ -1625,7 +1721,8 @@ mod tests {
 
         // Underscores group the digits and mean nothing, as everywhere else
         // in these files.
-        for said in ["1000 ms", "1_000 ms", "1_0_0_0 ms", "1.000 s", "1.0_00 s"] {
+        for said in ["1000 ms", "1_000 ms", "1_0_0_0 ms", "1.000 s", "1.0_00 s"]
+        {
             assert_eq!(
                 parse_interval(said).unwrap(),
                 Duration::from_millis(1000),
@@ -1679,7 +1776,8 @@ mod tests {
         for together in ["500ms", "3s", "15min", "1.5s", "1 w2 d"] {
             let why = parse_interval(together).expect_err("written together");
             assert!(
-                why.contains("space between them") || why.contains("nothing else"),
+                why.contains("space between them")
+                    || why.contains("nothing else"),
                 "{together}: {why}"
             );
         }
@@ -1703,9 +1801,11 @@ mod tests {
         // Nought is refused rather than taken for "as fast as possible", and
         // so is a fraction that rounds to it.
         for zero in [
-            "0 s", "0 ms", "0 us", "0 min", "0 h", "0 d", "0 w", "0.0 s", "0.4 us",
+            "0 s", "0 ms", "0 us", "0 min", "0 h", "0 d", "0 w", "0.0 s",
+            "0.4 us",
         ] {
-            let said = parse_interval(zero).expect_err("nought should be refused");
+            let said =
+                parse_interval(zero).expect_err("nought should be refused");
             assert!(said.contains("no interval at all"), "{zero}: {said}");
         }
         // And so is an interval too long to count, which is the same mistake
@@ -1746,10 +1846,10 @@ mod tests {
     fn the_shipped_example_reads_the_same_in_both_formats() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
 
-        let yaml =
-            Graph::load(root.join("tests/manual/thermostat.yaml")).expect("the YAML example reads");
-        let xml =
-            Graph::load(root.join("tests/manual/thermostat.xml")).expect("the XML example reads");
+        let yaml = Graph::load(root.join("tests/manual/thermostat.yaml"))
+            .expect("the YAML example reads");
+        let xml = Graph::load(root.join("tests/manual/thermostat.xml"))
+            .expect("the XML example reads");
 
         assert_eq!(
             yaml.nodes, xml.nodes,
@@ -1801,7 +1901,8 @@ mod tests {
     #[test]
     fn the_shipped_example_passes_its_own_checks() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let graph = Graph::load(root.join("tests/manual/thermostat.yaml")).expect("it reads");
+        let graph = Graph::load(root.join("tests/manual/thermostat.yaml"))
+            .expect("it reads");
 
         let problems = graph.check();
         assert!(
@@ -1830,20 +1931,27 @@ mod tests {
 tcspecial:
   gateway: radio
   tcs_cmd:
-    recv: 0.0.0.0:4000
+    \
+             recv: 0.0.0.0:4000
     send: 127.0.0.1:4100
-  payload_command:
+  \
+             payload_command:
     source_base: 127.0.0.1:4300
-    dest_base: 0.0.0.0:4200
+    dest_base: \
+             0.0.0.0:4200
   payload_telemetry:
-    source_base: 0.0.0.0:6000
+    source_base: \
+             0.0.0.0:6000
     dest_base: 127.0.0.1:6100
   beacon:
-    interval: 5 s
+    \
+             interval: 5 s
     send: \"0.0.0.0:5550\"
-    recv: \"127.0.0.1:5650\"
+    recv: \"\
+             127.0.0.1:5650\"
 moc:
-  - { name: moc, type: moc, address: \"10.0.0.1\", port: \"5000\", ground_base: \"10.0.0.2:5100\" }
+  - { name: moc, type: moc, address: \"\
+             10.0.0.1\", port: \"5000\", ground_base: \"10.0.0.2:5100\" }
 ",
         )
         .unwrap();
@@ -1890,8 +1998,15 @@ moc:
         let path = where_.path().join("old.yaml");
 
         for version in ["1.0", "2.0"] {
-            std::fs::write(&path, format!("version: \"{version}\"\npayloads: []\n")).unwrap();
-            let said = format!("{}", Graph::load(&path).expect_err("a version is refused"));
+            std::fs::write(
+                &path,
+                format!("version: \"{version}\"\npayloads: []\n"),
+            )
+            .unwrap();
+            let said = format!(
+                "{}",
+                Graph::load(&path).expect_err("a version is refused")
+            );
             assert!(said.contains("unknown field `version`"), "{said}");
         }
 
@@ -1906,9 +2021,11 @@ moc:
         let where_ = tempfile::tempdir().expect("a directory");
         let top = where_.path().join("vehicle.yaml");
         std::fs::write(&top, "include:\n  - cabin\n  - cabin\n").unwrap();
-        std::fs::write(where_.path().join("cabin.yaml"), "payloads: []\n").unwrap();
+        std::fs::write(where_.path().join("cabin.yaml"), "payloads: []\n")
+            .unwrap();
 
-        let said = format!("{}", Graph::load(&top).expect_err("twice is refused"));
+        let said =
+            format!("{}", Graph::load(&top).expect_err("twice is refused"));
         assert!(said.contains("included twice"), "{said}");
     }
 
@@ -1918,9 +2035,14 @@ moc:
         let where_ = tempfile::tempdir().expect("a directory");
         let top = where_.path().join("vehicle.yaml");
         std::fs::write(&top, "include:\n  - cabin\n").unwrap();
-        std::fs::write(where_.path().join("cabin.yaml"), "include:\n  - deeper\n").unwrap();
+        std::fs::write(
+            where_.path().join("cabin.yaml"),
+            "include:\n  - deeper\n",
+        )
+        .unwrap();
 
-        let said = format!("{}", Graph::load(&top).expect_err("nesting is refused"));
+        let said =
+            format!("{}", Graph::load(&top).expect_err("nesting is refused"));
         assert!(said.contains("may not include others"), "{said}");
     }
 
@@ -1931,18 +2053,20 @@ moc:
         let path = where_.path().join("vehicle.json");
         std::fs::write(&path, "{}").unwrap();
 
-        let said = format!("{}", Graph::load(&path).expect_err("json is refused"));
+        let said =
+            format!("{}", Graph::load(&path).expect_err("json is refused"));
         assert!(said.contains(".yaml"), "{said}");
     }
 
     /// One destination or several, however the file wrote it.
     #[test]
     fn a_link_may_go_to_one_place_or_many() {
-        let one: Link = serde_norway::from_str("from: a\nto: b\n").expect("one destination");
+        let one: Link = serde_norway::from_str("from: a\nto: b\n")
+            .expect("one destination");
         assert_eq!(one.to.each(), vec!["b"]);
 
-        let many: Link =
-            serde_norway::from_str("from: a\nto: [b, c.in0]\n").expect("several destinations");
+        let many: Link = serde_norway::from_str("from: a\nto: [b, c.in0]\n")
+            .expect("several destinations");
         assert_eq!(many.to.each(), vec!["b", "c.in0"]);
     }
 
@@ -1968,9 +2092,10 @@ payload-out:
 
         // One entry on its own needs no list, as one destination needs no
         // list.
-        let one: NodeFile =
-            serde_norway::from_str("name: a\ntype: compute\npayload-out: { target: moc }\n")
-                .expect("one entry");
+        let one: NodeFile = serde_norway::from_str(
+            "name: a\ntype: compute\npayload-out: { target: moc }\n",
+        )
+        .expect("one entry");
         assert_eq!(one.payload_out, vec!["moc"]);
     }
 
@@ -2007,21 +2132,27 @@ payload-out:
     #[test]
     fn terminators_are_read_as_a_list_in_either_format() {
         let yaml: NodeFile = serde_norway::from_str(
-            "name: a\ntype: serial\nterminators:\n  - '\"\\r\\n\"'\n  - '[03]'\n",
+            "name: a\ntype: serial\nterminators:\n  - '\"\\r\\n\"'\n  - \
+             '[03]'\n",
         )
         .expect("a list");
         let xml: NodeFile = ConfigFormat::Xml
             .parse(
                 "<node><name>a</name><type>serial</type>\
-                 <terminators>\"\\r\\n\"</terminators><terminators>[03]</terminators></node>",
+                 <terminators>\"\\r\\n\"\
+                 </terminators><terminators>[03]</terminators></node>",
             )
             .expect("repeated elements");
-        let joined = |file: &NodeFile| file.node.attributes["terminators"].as_str().to_string();
+        let joined = |file: &NodeFile| {
+            file.node.attributes["terminators"].as_str().to_string()
+        };
         assert_eq!(joined(&yaml), "\"\\r\\n\", [03]");
         assert_eq!(joined(&xml), joined(&yaml));
 
-        let one: NodeFile =
-            serde_norway::from_str("name: a\ntype: serial\nterminators: '[0A]'\n").expect("one");
+        let one: NodeFile = serde_norway::from_str(
+            "name: a\ntype: serial\nterminators: '[0A]'\n",
+        )
+        .expect("one");
         assert_eq!(joined(&one), "[0A]");
     }
 
@@ -2039,9 +2170,10 @@ payload-out:
         );
         assert!(said.contains("entry of its own"), "{said}");
 
-        let comma: NodeFile =
-            serde_norway::from_str("name: a\ntype: serial\nterminators: '\",\"'\n")
-                .expect("a comma in a string is a character");
+        let comma: NodeFile = serde_norway::from_str(
+            "name: a\ntype: serial\nterminators: '\",\"'\n",
+        )
+        .expect("a comma in a string is a character");
         assert_eq!(comma.node.attributes["terminators"].as_str(), "\",\"");
     }
 }

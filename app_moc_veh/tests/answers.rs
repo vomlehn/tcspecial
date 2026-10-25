@@ -21,7 +21,8 @@ fn arguments() -> Vec<String> {
 /// MOC data in, the same bytes out as payload data.
 #[test]
 fn a_packet_of_moc_data_comes_back_as_payload_data() {
-    let mut running = parent::start(&app(), &arguments(), Supports::MOC).expect("it starts");
+    let mut running =
+        parent::start(&app(), &arguments(), Supports::MOC).expect("it starts");
 
     running.write_moc(b"SET 300").expect("it takes a packet");
     assert_eq!(
@@ -39,7 +40,8 @@ fn a_packet_of_moc_data_comes_back_as_payload_data() {
 /// The payload interface is not this kind of app's.
 #[test]
 fn the_interface_it_has_not_got_cannot_be_reached() {
-    let mut running = parent::start(&app(), &arguments(), Supports::MOC).expect("it starts");
+    let mut running =
+        parent::start(&app(), &arguments(), Supports::MOC).expect("it starts");
 
     let said = running
         .write_payload(b"293.15")
@@ -54,7 +56,8 @@ fn the_interface_it_has_not_got_cannot_be_reached() {
 /// Run as a kind of app it is not, it refuses and says why.
 #[test]
 fn run_as_a_kind_it_is_not_it_refuses_and_says_why() {
-    let mut running = parent::start(&app(), &arguments(), Supports::ALL).expect("it starts");
+    let mut running =
+        parent::start(&app(), &arguments(), Supports::ALL).expect("it starts");
 
     let said = running
         .read_complaint()
@@ -75,7 +78,8 @@ fn run_as_a_kind_it_is_not_it_refuses_and_says_why() {
 #[test]
 fn run_with_the_wrong_arguments_it_refuses_and_says_why() {
     let mut running =
-        parent::start(&app(), &["back".to_string()], Supports::MOC).expect("it starts");
+        parent::start(&app(), &["back".to_string()], Supports::MOC)
+            .expect("it starts");
 
     let said = running
         .read_complaint()

@@ -15,8 +15,9 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, could_not_stand_in, hangs_up, ignore_this_request, lateness, send_in_segments,
-    wait_out_packet, wait_while_running, Pacing, PayloadConfig, PayloadStats, Produce,
+    a_packet, could_not_stand_in, hangs_up, ignore_this_request, lateness,
+    send_in_segments, wait_out_packet, wait_while_running, Pacing,
+    PayloadConfig, PayloadStats, Produce,
 };
 
 /// Run a simulated device reached over TCP.
@@ -31,7 +32,10 @@ pub fn run_tcp_node(
     let listener = match TcpListener::bind(&addr) {
         Ok(l) => l,
         Err(e) => {
-            could_not_stand_in(&config, format!("failed to bind the TCP listener: {e}"));
+            could_not_stand_in(
+                &config,
+                format!("failed to bind the TCP listener: {e}"),
+            );
             return;
         }
     };
@@ -126,7 +130,11 @@ mod tests {
     use std::time::Duration;
     use tcslibgs::Faults;
 
-    fn device_at(port: u16, triggered: bool, interval_ms: u32) -> SimulatedPayload {
+    fn device_at(
+        port: u16,
+        triggered: bool,
+        interval_ms: u32,
+    ) -> SimulatedPayload {
         faulty_device_at(port, triggered, interval_ms, Faults::default())
     }
 
@@ -161,7 +169,8 @@ mod tests {
     }
 
     fn a_free_port() -> u16 {
-        let socket = std::net::TcpListener::bind("127.0.0.1:0").expect("a port");
+        let socket =
+            std::net::TcpListener::bind("127.0.0.1:0").expect("a port");
         socket.local_addr().expect("its address").port()
     }
 
@@ -291,7 +300,8 @@ mod tests {
             bytes += n;
             assert!(
                 bytes <= 24,
-                "a device hanging up after two packets of twelve sent {bytes} bytes"
+                "a device hanging up after two packets of twelve sent {bytes} \
+                 bytes"
             );
         }
         assert_eq!(bytes, 24, "the link ended before the two packets did");

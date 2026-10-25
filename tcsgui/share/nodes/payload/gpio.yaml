@@ -2,7 +2,8 @@
 #
 # A payload: what the vehicle carries this flight. Its readings leave by
 # payload-out on their way to the ground, and what asks for them -- a
-# trigger, a command -- arrives at moc-in. Its Rust is tcspecial/src/node/payload/gpio/.
+# trigger, a command -- arrives at moc-in. Its Rust is
+# tcspecial/src/node/payload/gpio/.
 node: gpio
 type: gpio
 about: Discrete lines, driven or watched as events.
@@ -55,7 +56,7 @@ attributes:
     kind: bytes
     about: >
       What to write to it as the vehicle opens it -- at startup, and whenever
-      the ground starts it again -- written as a trigger is: a C string in quotes,
-      bytes in brackets, or both one after another. A heater that must start off, a register
-      to set before the part reads sensibly. A write that fails stops the
-      node from starting. Only for lines that are driven.
+      the ground starts it again -- written as a trigger is: a C string in
+      quotes, bytes in brackets, or both one after another. A heater that must
+      start off, a register to set before the part reads sensibly. A write that
+      fails stops the node from starting. Only for lines that are driven.

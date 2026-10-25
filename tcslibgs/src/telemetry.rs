@@ -39,7 +39,11 @@ impl TelemetryHeader {
     ///
     /// The only way one is built, so that a telemetry type added later cannot
     /// forget the time: there is nowhere to leave it out.
-    pub fn new(sequence: u32, tm_type: TelemetryType, status: CommandStatus) -> Self {
+    pub fn new(
+        sequence: u32,
+        tm_type: TelemetryType,
+        status: CommandStatus,
+    ) -> Self {
         Self {
             sequence,
             tm_type,
@@ -125,7 +129,11 @@ pub struct RestartArmTelemetry {
 impl RestartArmTelemetry {
     pub fn new(sequence: u32, status: CommandStatus) -> Self {
         Self {
-            header: TelemetryHeader::new(sequence, TelemetryType::RestartArm, status),
+            header: TelemetryHeader::new(
+                sequence,
+                TelemetryType::RestartArm,
+                status,
+            ),
         }
     }
 }
@@ -139,7 +147,11 @@ pub struct RestartTelemetry {
 impl RestartTelemetry {
     pub fn new(sequence: u32, status: CommandStatus) -> Self {
         Self {
-            header: TelemetryHeader::new(sequence, TelemetryType::Restart, status),
+            header: TelemetryHeader::new(
+                sequence,
+                TelemetryType::Restart,
+                status,
+            ),
         }
     }
 }
@@ -155,9 +167,17 @@ pub struct ConnectTelemetry {
 }
 
 impl ConnectTelemetry {
-    pub fn new(sequence: u32, version: ConfigVersion, digest: ConfigDigest) -> Self {
+    pub fn new(
+        sequence: u32,
+        version: ConfigVersion,
+        digest: ConfigDigest,
+    ) -> Self {
         Self {
-            header: TelemetryHeader::new(sequence, TelemetryType::Connect, CommandStatus::Success),
+            header: TelemetryHeader::new(
+                sequence,
+                TelemetryType::Connect,
+                CommandStatus::Success,
+            ),
             version,
             digest,
         }
@@ -171,7 +191,11 @@ impl ConnectTelemetry {
     /// is told what it asked as well as that it asked in the wrong place.
     pub fn refused(self, status: CommandStatus) -> Self {
         Self {
-            header: TelemetryHeader::new(self.header.sequence, TelemetryType::Connect, status),
+            header: TelemetryHeader::new(
+                self.header.sequence,
+                TelemetryType::Connect,
+                status,
+            ),
             ..self
         }
     }
@@ -185,7 +209,11 @@ pub struct ConfigTelemetry {
 impl ConfigTelemetry {
     pub fn new(sequence: u32, status: CommandStatus) -> Self {
         Self {
-            header: TelemetryHeader::new(sequence, TelemetryType::Config, status),
+            header: TelemetryHeader::new(
+                sequence,
+                TelemetryType::Config,
+                status,
+            ),
         }
     }
 }
@@ -216,7 +244,12 @@ impl NodeTelemetry {
         Self::of(sequence, TelemetryType::StopNode, status, node)
     }
 
-    fn of(sequence: u32, tm_type: TelemetryType, status: CommandStatus, node: NodeId) -> Self {
+    fn of(
+        sequence: u32,
+        tm_type: TelemetryType,
+        status: CommandStatus,
+        node: NodeId,
+    ) -> Self {
         Self {
             header: TelemetryHeader::new(sequence, tm_type, status),
             node,
@@ -251,7 +284,11 @@ impl SetNodeTelemetry {
     /// The answer, with no reason: see [`SetNodeTelemetry::because`].
     pub fn new(sequence: u32, status: CommandStatus, node: NodeId) -> Self {
         Self {
-            header: TelemetryHeader::new(sequence, TelemetryType::SetNode, status),
+            header: TelemetryHeader::new(
+                sequence,
+                TelemetryType::SetNode,
+                status,
+            ),
             node,
             reason: Reason::default(),
         }
@@ -303,7 +340,8 @@ impl Reason {
 
     pub fn as_str(&self) -> &str {
         // Written only whole characters at a time: see `write_str`.
-        std::str::from_utf8(&self.bytes[..usize::from(self.len)]).unwrap_or_default()
+        std::str::from_utf8(&self.bytes[..usize::from(self.len)])
+            .unwrap_or_default()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -341,7 +379,8 @@ impl std::fmt::Write for Reason {
             take -= 1;
         }
         self.bytes[end..end + take].copy_from_slice(&text.as_bytes()[..take]);
-        self.bytes[end + take..end + take + MARK.len()].copy_from_slice(MARK.as_bytes());
+        self.bytes[end + take..end + take + MARK.len()]
+            .copy_from_slice(MARK.as_bytes());
         self.len = (end + take + MARK.len()) as u8;
         self.cut = true;
         Ok(())
@@ -361,7 +400,10 @@ impl std::fmt::Display for Reason {
 }
 
 impl Serialize for Reason {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(self.as_str())
     }
 }
@@ -370,14 +412,22 @@ impl Serialize for Reason {
 /// vehicle would have cut it, rather than refused -- a reason is something to
 /// show, and an answer refused for its length would show nothing.
 impl<'de> Deserialize<'de> for Reason {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Self, D::Error> {
         struct Text;
         impl serde::de::Visitor<'_> for Text {
             type Value = Reason;
-            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            fn expecting(
+                &self,
+                f: &mut std::fmt::Formatter,
+            ) -> std::fmt::Result {
                 write!(f, "a reason, as text")
             }
-            fn visit_str<E: serde::de::Error>(self, text: &str) -> Result<Reason, E> {
+            fn visit_str<E: serde::de::Error>(
+                self,
+                text: &str,
+            ) -> Result<Reason, E> {
                 Ok(Reason::of(text))
             }
         }
@@ -416,7 +466,11 @@ impl QueryNodeTelemetry {
         counts: NodeCounts,
     ) -> Self {
         Self {
-            header: TelemetryHeader::new(sequence, TelemetryType::QueryNode, status),
+            header: TelemetryHeader::new(
+                sequence,
+                TelemetryType::QueryNode,
+                status,
+            ),
             node,
             enabled,
             counts,
@@ -458,7 +512,11 @@ impl QueryNodeSampleTelemetry {
         given: DHSample,
     ) -> Self {
         Self {
-            header: TelemetryHeader::new(sequence, TelemetryType::QueryNodeSample, status),
+            header: TelemetryHeader::new(
+                sequence,
+                TelemetryType::QueryNodeSample,
+                status,
+            ),
             node,
             taken,
             given,
@@ -476,12 +534,17 @@ impl QueryNodeSampleTelemetry {
 /// For the answers that carry nothing but a status. The ones that carry
 /// measurements -- a handler's statistics, a handler's last transfers -- are
 /// given empty ones here: a refused command measured nothing.
-pub fn answer_to(command: &crate::commands::Command, status: CommandStatus) -> Telemetry {
+pub fn answer_to(
+    command: &crate::commands::Command,
+    status: CommandStatus,
+) -> Telemetry {
     use crate::commands::Command;
 
     let sequence = command.sequence();
     match command {
-        Command::Ping(_) => Telemetry::Ping(PingTelemetry::new(sequence, status)),
+        Command::Ping(_) => {
+            Telemetry::Ping(PingTelemetry::new(sequence, status))
+        }
         // A CONNECT is answered where it belongs -- see the command
         // interpreter -- so the one that comes through here is a refused one,
         // and the status is the whole of what it says. The build is this
@@ -494,33 +557,41 @@ pub fn answer_to(command: &crate::commands::Command, status: CommandStatus) -> T
             )
             .refused(status),
         ),
-        Command::RestartArm(_) => Telemetry::RestartArm(RestartArmTelemetry::new(sequence, status)),
-        Command::Restart(_) => Telemetry::Restart(RestartTelemetry::new(sequence, status)),
-        Command::Config(_) => Telemetry::Config(ConfigTelemetry::new(sequence, status)),
+        Command::RestartArm(_) => {
+            Telemetry::RestartArm(RestartArmTelemetry::new(sequence, status))
+        }
+        Command::Restart(_) => {
+            Telemetry::Restart(RestartTelemetry::new(sequence, status))
+        }
+        Command::Config(_) => {
+            Telemetry::Config(ConfigTelemetry::new(sequence, status))
+        }
         // The id the command carried, refused or not: an answer about a node
         // says which node, and an id out of range is exactly the case where
         // the ground needs to see which one it sent.
-        Command::StartNode(cmd) => {
-            Telemetry::StartNode(NodeTelemetry::started(sequence, status, cmd.node))
-        }
-        Command::StopNode(cmd) => {
-            Telemetry::StopNode(NodeTelemetry::stopped(sequence, status, cmd.node))
-        }
-        Command::SetNode(cmd) => {
-            Telemetry::SetNode(SetNodeTelemetry::new(sequence, status, cmd.node))
-        }
+        Command::StartNode(cmd) => Telemetry::StartNode(
+            NodeTelemetry::started(sequence, status, cmd.node),
+        ),
+        Command::StopNode(cmd) => Telemetry::StopNode(NodeTelemetry::stopped(
+            sequence, status, cmd.node,
+        )),
+        Command::SetNode(cmd) => Telemetry::SetNode(SetNodeTelemetry::new(
+            sequence, status, cmd.node,
+        )),
         // A refused query measured nothing, so it carries no counts and no
         // samples: the status is the whole of what it says.
-        Command::QueryNode(cmd) => {
-            Telemetry::QueryNode(QueryNodeTelemetry::refused(sequence, status, cmd.node))
+        Command::QueryNode(cmd) => Telemetry::QueryNode(
+            QueryNodeTelemetry::refused(sequence, status, cmd.node),
+        ),
+        Command::QueryNodeSample(cmd) => {
+            Telemetry::QueryNodeSample(QueryNodeSampleTelemetry::new(
+                sequence,
+                status,
+                cmd.node,
+                DHSample::new(),
+                DHSample::new(),
+            ))
         }
-        Command::QueryNodeSample(cmd) => Telemetry::QueryNodeSample(QueryNodeSampleTelemetry::new(
-            sequence,
-            status,
-            cmd.node,
-            DHSample::new(),
-            DHSample::new(),
-        )),
     }
 }
 
@@ -547,7 +618,9 @@ impl Telemetry {
             Telemetry::RestartArm(tm) => tm.header.sequence,
             Telemetry::Restart(tm) => tm.header.sequence,
             Telemetry::Config(tm) => tm.header.sequence,
-            Telemetry::StartNode(tm) | Telemetry::StopNode(tm) => tm.header.sequence,
+            Telemetry::StartNode(tm) | Telemetry::StopNode(tm) => {
+                tm.header.sequence
+            }
             Telemetry::SetNode(tm) => tm.header.sequence,
             Telemetry::QueryNode(tm) => tm.header.sequence,
             Telemetry::QueryNodeSample(tm) => tm.header.sequence,
@@ -561,7 +634,9 @@ impl Telemetry {
             Telemetry::RestartArm(tm) => tm.header.tm_type,
             Telemetry::Restart(tm) => tm.header.tm_type,
             Telemetry::Config(tm) => tm.header.tm_type,
-            Telemetry::StartNode(tm) | Telemetry::StopNode(tm) => tm.header.tm_type,
+            Telemetry::StartNode(tm) | Telemetry::StopNode(tm) => {
+                tm.header.tm_type
+            }
             Telemetry::SetNode(tm) => tm.header.tm_type,
             Telemetry::QueryNode(tm) => tm.header.tm_type,
             Telemetry::QueryNodeSample(tm) => tm.header.tm_type,
@@ -575,7 +650,9 @@ impl Telemetry {
             Telemetry::RestartArm(tm) => tm.header.status,
             Telemetry::Restart(tm) => tm.header.status,
             Telemetry::Config(tm) => tm.header.status,
-            Telemetry::StartNode(tm) | Telemetry::StopNode(tm) => tm.header.status,
+            Telemetry::StartNode(tm) | Telemetry::StopNode(tm) => {
+                tm.header.status
+            }
             Telemetry::SetNode(tm) => tm.header.status,
             Telemetry::QueryNode(tm) => tm.header.status,
             Telemetry::QueryNodeSample(tm) => tm.header.status,
@@ -592,7 +669,9 @@ impl Telemetry {
             Telemetry::RestartArm(tm) => tm.header.timestamp,
             Telemetry::Restart(tm) => tm.header.timestamp,
             Telemetry::Config(tm) => tm.header.timestamp,
-            Telemetry::StartNode(tm) | Telemetry::StopNode(tm) => tm.header.timestamp,
+            Telemetry::StartNode(tm) | Telemetry::StopNode(tm) => {
+                tm.header.timestamp
+            }
             Telemetry::SetNode(tm) => tm.header.timestamp,
             Telemetry::QueryNode(tm) => tm.header.timestamp,
             Telemetry::QueryNodeSample(tm) => tm.header.timestamp,
@@ -644,8 +723,12 @@ mod tests {
     #[test]
     fn a_set_node_answer_carries_its_reason() {
         let refused = Telemetry::SetNode(
-            SetNodeTelemetry::new(7, CommandStatus::InvalidParameter, NodeId::of(2))
-                .because(Reason::of("it is spelled half_band")),
+            SetNodeTelemetry::new(
+                7,
+                CommandStatus::InvalidParameter,
+                NodeId::of(2),
+            )
+            .because(Reason::of("it is spelled half_band")),
         );
         let json = serde_json::to_string(&refused).unwrap();
         assert!(
@@ -654,7 +737,8 @@ mod tests {
         );
         assert_eq!(serde_json::from_str::<Telemetry>(&json).unwrap(), refused);
 
-        let without = json.replace(",\"reason\":\"it is spelled half_band\"", "");
+        let without =
+            json.replace(",\"reason\":\"it is spelled half_band\"", "");
         match serde_json::from_str::<Telemetry>(&without).unwrap() {
             Telemetry::SetNode(tm) => assert!(tm.reason.is_empty()),
             other => panic!("{other:?}"),
@@ -690,8 +774,14 @@ mod tests {
         let answers = [
             Telemetry::Ping(PingTelemetry::new(1, CommandStatus::Success)),
             Telemetry::Connect(ConnectTelemetry::new(2, version, digest)),
-            Telemetry::RestartArm(RestartArmTelemetry::new(3, CommandStatus::Success)),
-            Telemetry::Restart(RestartTelemetry::new(4, CommandStatus::Success)),
+            Telemetry::RestartArm(RestartArmTelemetry::new(
+                3,
+                CommandStatus::Success,
+            )),
+            Telemetry::Restart(RestartTelemetry::new(
+                4,
+                CommandStatus::Success,
+            )),
             Telemetry::Config(ConfigTelemetry::new(9, CommandStatus::Success)),
             Telemetry::StartNode(NodeTelemetry::started(
                 11,
@@ -747,7 +837,8 @@ mod tests {
 
     #[test]
     fn test_telemetry_serialization() {
-        let tm = Telemetry::Ping(PingTelemetry::new(42, CommandStatus::Success));
+        let tm =
+            Telemetry::Ping(PingTelemetry::new(42, CommandStatus::Success));
         let json = serde_json::to_string(&tm).unwrap();
         let deserialized: Telemetry = serde_json::from_str(&json).unwrap();
         assert_eq!(tm.sequence(), deserialized.sequence());

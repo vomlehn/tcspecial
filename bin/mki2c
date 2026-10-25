@@ -40,7 +40,8 @@ address="${1:-0x48}"
 stub_name="SMBus stub driver"
 
 if [ "$(id -u)" -ne 0 ]; then
-	echo "mki2c: re-running under sudo, which is what loading a module needs"
+	echo "mki2c: re-running under sudo, which is what loading a module" \
+		"needs"
 	exec sudo -- "$0" "$@"
 fi
 
@@ -84,7 +85,8 @@ for dir in /sys/bus/i2c/devices/i2c-*; do
 done
 
 if [ -z "$stub" ]; then
-	echo "mki2c: i2c-stub loaded but no adapter of its is listed, which should" >&2
+	echo "mki2c: i2c-stub loaded but no adapter of its is listed, which" \
+		"should" >&2
 	echo "mki2c: not happen -- look in /sys/bus/i2c/devices" >&2
 	exit 1
 fi

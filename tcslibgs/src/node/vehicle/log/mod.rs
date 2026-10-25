@@ -16,8 +16,8 @@
 //!
 //! No `tcslog` here. The library that writes the files is the flight side's
 //! business; what this crate holds is what a file may say, which is the same
-//! question for every node type -- see [`crate::node`]. `tcspecial::node::vehicle::log`
-//! turns this into a `tcslog::Format`.
+//! question for every node type -- see [`crate::node`].
+//! `tcspecial::node::vehicle::log` turns this into a `tcslog::Format`.
 
 use std::collections::BTreeMap;
 
@@ -60,7 +60,8 @@ impl LogFormat {
     pub fn of(text: &str) -> Result<LogFormat, String> {
         if let Some(rest) = text.strip_prefix("fixed") {
             let length = rest.trim_start().strip_prefix(':').ok_or_else(|| {
-                "format: a fixed-length log says how long: fixed:<n>, as in fixed:16".to_string()
+                "format: a fixed-length log says how long: fixed:<n>, as in \
+                 fixed:16".to_string()
             })?;
             let length: u32 = length.trim().parse().map_err(|_| {
                 format!(
@@ -69,7 +70,10 @@ impl LogFormat {
                 )
             })?;
             if length == 0 {
-                return Err("format: fixed:0 is a log of records with nothing in them".to_string());
+                return Err(
+                    "format: fixed:0 is a log of records with nothing in them"
+                        .to_string(),
+                );
             }
             return Ok(LogFormat::Fixed(length));
         }
@@ -113,22 +117,27 @@ pub struct LogParams {
 /// nothing reads is refused rather than ignored, because a log whose `fromat`
 /// was misspelled would be opened in whichever format the default happens to
 /// be and would look exactly like a configured log.
-pub fn params_of(what: &str, attributes: &BTreeMap<String, Scalar>) -> Result<LogParams, String> {
+pub fn params_of(
+    what: &str,
+    attributes: &BTreeMap<String, Scalar>,
+) -> Result<LogParams, String> {
     const OWN: [&str; 3] = ["directory", "format", "segment_bytes"];
     for attribute in attributes.keys() {
         if OWN.contains(&attribute.as_str()) {
             continue;
         }
         return Err(
-            match crate::graph::spelled(attribute, |other| OWN.contains(&other)) {
+            match crate::graph::spelled(attribute, |other| OWN.contains(&other))
+            {
                 Some(hint) => {
                     format!(
-                        "\"{what}\": there is nothing called \"{attribute}\" on a log node: {hint}"
+                        "\"{what}\": there is nothing called \"{attribute}\" \
+                         on a log node: {hint}"
                     )
                 }
                 None => format!(
-                    "\"{what}\": there is nothing called \"{attribute}\" on a log node. It \
-                     takes directory, format and segment_bytes"
+                    "\"{what}\": there is nothing called \"{attribute}\" on a \
+                     log node. It takes directory, format and segment_bytes"
                 ),
             },
         );
@@ -138,8 +147,8 @@ pub fn params_of(what: &str, attributes: &BTreeMap<String, Scalar>) -> Result<Lo
         .get("directory")
         .ok_or_else(|| {
             format!(
-                "\"{what}\" is a log node, so it needs the directory its segment files \
-                 are written in: say directory"
+                "\"{what}\" is a log node, so it needs the directory its \
+                 segment files are written in: say directory"
             )
         })?
         .as_str()
@@ -149,19 +158,21 @@ pub fn params_of(what: &str, attributes: &BTreeMap<String, Scalar>) -> Result<Lo
         .get("format")
         .ok_or_else(|| {
             format!(
-                "\"{what}\" is a log node, so it needs the format of its records: one \
-                 of fixed:<n>, variable_simple or variable_ts_rc"
+                "\"{what}\" is a log node, so it needs the format of its \
+                 records: one of fixed:<n>, variable_simple or variable_ts_rc"
             )
         })
         .and_then(|stated| {
-            LogFormat::of(stated.as_str()).map_err(|why| format!("\"{what}\": {why}"))
+            LogFormat::of(stated.as_str())
+                .map_err(|why| format!("\"{what}\": {why}"))
         })?;
 
     let segment_bytes = match attributes.get("segment_bytes") {
         Some(stated) => {
             let bytes: u32 = stated.as_str().parse().map_err(|_| {
                 format!(
-                    "\"{what}\": segment_bytes: \"{}\" is not a whole number of bytes",
+                    "\"{what}\": segment_bytes: \"{}\" is not a whole number \
+                     of bytes",
                     stated.as_str()
                 )
             })?;
@@ -170,8 +181,8 @@ pub fn params_of(what: &str, attributes: &BTreeMap<String, Scalar>) -> Result<Lo
             let least = format.exactly().unwrap_or(1);
             if bytes < least {
                 return Err(format!(
-                    "\"{what}\": segment_bytes: {bytes} is less than one record, which \
-                     is {least} bytes here"
+                    "\"{what}\": segment_bytes: {bytes} is less than one \
+                     record, which is {least} bytes here"
                 ));
             }
             bytes
@@ -204,7 +215,10 @@ mod tests {
             LogFormat::of("variable_simple"),
             Ok(LogFormat::VariableSimple)
         );
-        assert_eq!(LogFormat::of("variable_ts_rc"), Ok(LogFormat::VariableTsRc));
+        assert_eq!(
+            LogFormat::of("variable_ts_rc"),
+            Ok(LogFormat::VariableTsRc)
+        );
         assert_eq!(LogFormat::of("fixed:16"), Ok(LogFormat::Fixed(16)));
         // However much space somebody left around the colon.
         assert_eq!(LogFormat::of("fixed: 16"), Ok(LogFormat::Fixed(16)));
@@ -225,7 +239,8 @@ mod tests {
             ("fixed:wide", "not a whole number"),
             ("fixed:0", "nothing in them"),
         ] {
-            let said = LogFormat::of(text).expect_err("a format that is not one");
+            let said =
+                LogFormat::of(text).expect_err("a format that is not one");
             assert!(
                 said.contains(wanted),
                 "{text}: the complaint should say {wanted}: {said}"
@@ -316,8 +331,8 @@ mod tests {
                 "segment_bytes",
             ),
         ] {
-            let said =
-                params_of("housekeeping", &attributes(&stated)).expect_err("a log that is wrong");
+            let said = params_of("housekeeping", &attributes(&stated))
+                .expect_err("a log that is wrong");
             assert!(
                 said.contains(wanted),
                 "the complaint should say {wanted}: {said}"

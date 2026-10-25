@@ -3,7 +3,9 @@ name = "beacon_example"
 version = "0.1.0"
 edition = "2021"
 license.workspace = true
-description = "The ground end of the beacon example: a window holding the beacon panel and nothing else"
+description = """\
+The ground end of the beacon example: a window holding the beacon panel and \
+nothing else"""
 build = "build.rs"
 
 [dependencies]

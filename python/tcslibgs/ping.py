@@ -112,7 +112,9 @@ def read_message(data):
     try:
         text = data.decode("utf-8")
     except UnicodeDecodeError:
-        raise ValueError(f"a ping is ASCII text, and this is not: {_said(data)}") from None
+        raise ValueError(
+            f"a ping is ASCII text, and this is not: {_said(data)}"
+        ) from None
     rest = text[len(PREFIX):] if text.startswith(PREFIX) else None
     if rest is None or " " not in rest:
         raise ValueError(
@@ -141,16 +143,16 @@ def read_reply(data):
     """What an answer says, or a ``ValueError`` saying why it is not one."""
     if len(data) > REPLY_BYTES:
         raise ValueError(
-            f"{len(data)} bytes is longer than any answer to a ping, which is at "
-            f"most {REPLY_BYTES}: {_said(data)}"
+            f"{len(data)} bytes is longer than any answer to a ping, which is "
+            f"at most {REPLY_BYTES}: {_said(data)}"
         )
     # The vehicle's time is after the last space, and the ping is everything
     # before it.
     at = data.rfind(b" ")
     if at < 0:
         raise ValueError(
-            f"{_said(data)} is not an answer to a ping, which is the ping, a space "
-            "and a time"
+            f"{_said(data)} is not an answer to a ping, which is the ping, a "
+            "space and a time"
         )
     ping = read_message(data[:at])
     try:
@@ -218,5 +220,9 @@ def _said(data):
     where it is long, so that one bad datagram cannot fill a log."""
     shown = data[:REPLY_BYTES]
     more = "..." if len(data) > len(shown) else ""
-    text = shown.decode("utf-8", errors="replace").encode("unicode_escape").decode("ascii")
+    text = (
+        shown.decode("utf-8", errors="replace")
+        .encode("unicode_escape")
+        .decode("ascii")
+    )
     return f'"{text}{more}"'

@@ -218,16 +218,18 @@ pub struct Dividers {
 /// `moc_percent` and `vehicle_percent` are the moc and vehicle panes' shares;
 /// the payload working pane takes what is left. Kept by pane rather than by
 /// position, so the settings say the same thing whichever order the panes are
-/// drawn in: the payloads on the left, then the vehicle, then the moc. The dividers are movable, so this
-/// is arithmetic rather than a pair of constants. What is kept is the
-/// percentages -- see `settings.rs`, which says why those and not pixel
-/// counts -- and this is the one place they become positions.
+/// drawn in: the payloads on the left, then the vehicle, then the moc. The
+/// dividers are movable, so this is arithmetic rather than a pair of
+/// constants. What is kept is the percentages -- see `settings.rs`, which
+/// says why those and not pixel counts -- and this is the one place they
+/// become positions.
 ///
 /// Snapped to the grid, which is not decoration: a node held against a divider
 /// is a node whose position is that divider, and a divider off the grid would
 /// put it off the grid too.
 pub fn dividers_for(moc_percent: i32, vehicle_percent: i32) -> Dividers {
-    let (moc_percent, vehicle_percent) = settings::shares(moc_percent, vehicle_percent);
+    let (moc_percent, vehicle_percent) =
+        settings::shares(moc_percent, vehicle_percent);
     Dividers {
         payloads: at_percent(100 - moc_percent - vehicle_percent),
         vehicle: at_percent(100 - moc_percent),
@@ -256,7 +258,8 @@ fn at_percent(percent: i32) -> i32 {
 /// the grid come back to themselves -- and `tests::the_dividers_survive_being
 /// _written_down` is what says so.
 pub fn percents_for(dividers: Dividers) -> (i32, i32) {
-    let whole = |x: i32| (x as f32 * 100.0 / WORKING_WIDTH as f32).round() as i32;
+    let whole =
+        |x: i32| (x as f32 * 100.0 / WORKING_WIDTH as f32).round() as i32;
     settings::shares(
         100 - whole(dividers.vehicle),
         whole(dividers.vehicle) - whole(dividers.payloads),
@@ -401,7 +404,11 @@ pub fn edges_of(pane: Pane, dividers: Dividers) -> (i32, i32) {
 /// them on opening would be an editor that changed a file by being pointed at
 /// it. A node read in from the wrong side stays where the file put it until
 /// somebody drags it, and then it comes home.
-pub fn confine(node_type: &str, dividers: Dividers, (x, y): (i32, i32)) -> (i32, i32) {
+pub fn confine(
+    node_type: &str,
+    dividers: Dividers,
+    (x, y): (i32, i32),
+) -> (i32, i32) {
     let (left, right) = pane_for(node_type, dividers);
     // The lower bound first: a pane narrower than a node -- which the five per
     // cent rule allows, any pane at its narrowest being 48 pixels --
@@ -458,15 +465,14 @@ pub fn place_in(
     // `NAMES`.
     let bands = names_bands(dividers);
     let clear = |x: i32, y: i32| {
-        !taken
-            .iter()
-            .chain(bands.iter())
-            .any(|(theirs, tall, their_width, their_height)| {
+        !taken.iter().chain(bands.iter()).any(
+            |(theirs, tall, their_width, their_height)| {
                 x < theirs + *their_width as i32
                     && *theirs < x + width as i32
                     && y < tall + *their_height as i32
                     && *tall < y + height as i32
-            })
+            },
+        )
     };
     // Every place tried is one a node may be, a step apart.
     let across = |y: i32| {
@@ -608,7 +614,9 @@ mod tests {
 
             // Each band is its pane's, from its left edge to the next
             // divider, at the top of the sheet and of the one depth.
-            for (band, pane) in bands.iter().zip([Pane::Payloads, Pane::Vehicle, Pane::Moc]) {
+            for (band, pane) in
+                bands.iter().zip([Pane::Payloads, Pane::Vehicle, Pane::Moc])
+            {
                 let (left, right) = edges_of(pane, dividers);
                 assert_eq!(
                     *band,

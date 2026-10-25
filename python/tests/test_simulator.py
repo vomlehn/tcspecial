@@ -35,10 +35,15 @@ def playing(mode, state):
                 data, came = sock.recvfrom(64)
             except socket.timeout:
                 continue
-            if len(data) != ready.REQUEST_BYTES or data[:4] != ready.REQUEST_MAGIC:
+            if (
+                len(data) != ready.REQUEST_BYTES
+                or data[:4] != ready.REQUEST_MAGIC
+            ):
                 continue
             sequence = int.from_bytes(data[4:8], "big")
-            answer = ready.Answer(sequence, state[0], set_up(mode), "temp_3: no pty")
+            answer = ready.Answer(
+                sequence, state[0], set_up(mode), "temp_3: no pty"
+            )
             sock.sendto(ready.encode_answer(answer), came)
         sock.close()
 
@@ -48,8 +53,12 @@ def playing(mode, state):
 
 class SimulatorTest(unittest.TestCase):
     def test_an_answer_comes_back_as_it_went(self):
-        answer = ready.Answer(0xDEADBEEF, "failed", set_up("all"), "temp_3: taken")
-        self.assertEqual(ready.decode_answer(ready.encode_answer(answer)), answer)
+        answer = ready.Answer(
+            0xDEADBEEF, "failed", set_up("all"), "temp_3: taken"
+        )
+        self.assertEqual(
+            ready.decode_answer(ready.encode_answer(answer)), answer
+        )
         self.assertIsNone(ready.decode_answer(b"TSRA"))
 
     def test_a_ready_simulator_set_up_for_this_run_is_waited_for(self):

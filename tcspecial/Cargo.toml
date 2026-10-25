@@ -5,7 +5,9 @@ edition = "2021"
 license.workspace = true
 # The repository's README, which is the crate's page on crates.io.
 readme = "../README.md"
-description = "TCSpecial flight software: the spacecraft's command interpreter and data handler manager, being integrated with NASA's cFS and JPL's F Prime"
+description = """\
+TCSpecial flight software: the spacecraft's command interpreter and data \
+handler manager, being integrated with NASA's cFS and JPL's F Prime"""
 
 [dependencies]
 tcslibgs = { path = "../tcslibgs" }
@@ -39,7 +41,8 @@ slint-build = { version = "1.18", optional = true }
 # flies, and a configuration with a node of another type is refused as it is
 # loaded:
 #
-#   cargo build -p tcspecial --release --no-default-features --features serial,i2c
+#   cargo build -p tcspecial --release --no-default-features \
+#       --features serial,i2c
 #
 # The network type over UDP, TCP and Unix-domain sockets is in every build --
 # the link to the ground is UDP -- and so is every node that reaches no

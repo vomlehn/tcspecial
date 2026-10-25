@@ -16,10 +16,11 @@
 //! Arguments, all optional: the configuration, the `moc` node to get the data
 //! from, `--yaml` or `--xml` but not both -- which of the example's two files
 //! to read, YAML where neither is given -- and `-v` or `--verbose`. Run from
-//! the repository's root none need be given. Quiet unless `-v` or `--verbose` is given: the line is what this
-//! prints, on standard output, and errors are said on standard error whatever
-//! the flag. Verbose, it also says on standard error when the node is open,
-//! so that whoever started this knows the vehicle can be started.
+//! the repository's root none need be given. Quiet unless `-v` or `--verbose`
+//! is given: the line is what this prints, on standard output, and errors are
+//! said on standard error whatever the flag. Verbose, it also says on standard
+//! error when the node is open, so that whoever started this knows the
+//! vehicle can be started.
 
 use std::io::Write;
 use std::process::ExitCode;
@@ -61,14 +62,14 @@ impl Arguments {
                 "-v" | "--verbose" => verbose = true,
                 flag if flag.starts_with('-') => {
                     return Err(format!(
-                        "{flag} is not an option: the options are --yaml, --xml, -v \
-                         and --verbose"
+                        "{flag} is not an option: the options are --yaml, \
+                         --xml, -v and --verbose"
                     ))
                 }
                 _ if names.len() == 2 => {
                     return Err(format!(
-                        "{arg}: a configuration and a moc node may be named, and \
-                         nothing more"
+                        "{arg}: a configuration and a moc node may be named, \
+                         and nothing more"
                     ))
                 }
                 _ => names.push(arg),
@@ -76,7 +77,11 @@ impl Arguments {
         }
         let mut names = names.into_iter();
         Ok(Arguments {
-            configuration: spelling.configuration(names.next(), CONFIGURATION, SPELLING)?,
+            configuration: spelling.configuration(
+                names.next(),
+                CONFIGURATION,
+                SPELLING,
+            )?,
             moc_name: names.next().unwrap_or_else(|| MOC.to_string()),
             verbose,
         })
@@ -93,7 +98,8 @@ fn main() -> ExitCode {
         Err(why) => {
             eprintln!("lorem_moc: {why}");
             eprintln!(
-                "usage: lorem_moc [--yaml | --xml] [-v | --verbose] [configuration [moc node]]"
+                "usage: lorem_moc [--yaml | --xml] [-v | --verbose] \
+                 [configuration [moc node]]"
             );
             return ExitCode::from(2);
         }

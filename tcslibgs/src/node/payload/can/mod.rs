@@ -27,7 +27,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::endpoint_config::reject_foreign_fields;
 use crate::endpoint_config::reject_stream;
-use crate::endpoint_config::{bad, parse_flag, EndpointConfigResult, GroupKind, LinkTerms};
+use crate::endpoint_config::{
+    bad, parse_flag, EndpointConfigResult, GroupKind, LinkTerms,
+};
 
 /// What a CAN payload's bus is set to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -90,8 +92,8 @@ pub fn check_can_id(name: &str, can_id: u32) -> EndpointConfigResult<u32> {
             name,
             &format!(
                 "can_id {can_id:#x} is above {LARGEST_EXTENDED_ID:#x}: a CAN \
-                 identifier is eleven bits in a base frame and twenty-nine in an \
-                 extended one"
+                 identifier is eleven bits in a base frame and twenty-nine in \
+                 an extended one"
             ),
         ));
     }
@@ -105,7 +107,10 @@ pub fn check_can_id(name: &str, can_id: u32) -> EndpointConfigResult<u32> {
 /// one whose rate is set where it is brought up, which is every bus the
 /// simulator uses, and classic frames and loopback are what a bus does
 /// unless a file says otherwise.
-pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<GroupKind> {
+pub(crate) fn group_kind_of(
+    name: &str,
+    g: LinkTerms,
+) -> EndpointConfigResult<GroupKind> {
     reject_foreign_fields(name, "can", &g, &["can_fd", "loopback"])?;
 
     // A frame is its own length, so there is nothing for a stream rule to
@@ -116,13 +121,15 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
 
     // On unless a file says otherwise, which is the kernel's own default and
     // what two programs on one host need of a virtual bus.
-    let loopback = parse_flag(name, "loopback", g.loopback.as_ref())?.unwrap_or(true);
+    let loopback =
+        parse_flag(name, "loopback", g.loopback.as_ref())?.unwrap_or(true);
 
     Ok(GroupKind::Can(CanParams { fd, loopback }))
 }
 
 /// What `--simulate` asks to change on a CAN node that is not a stand-in.
-const TO_STAND_IN: &str = "point interface at a vcan interface, which bin/mkvcan makes";
+const TO_STAND_IN: &str =
+    "point interface at a vcan interface, which bin/mkvcan makes";
 
 /// The type the kernel gives a CAN interface, `ARPHRD_CAN`.
 const ARPHRD_CAN: &str = "280";
@@ -133,7 +140,10 @@ const ARPHRD_CAN: &str = "280";
 /// A `vcan` has no device behind it, so the kernel keeps it under
 /// `devices/virtual/net`; a controller is kept under the bus it is on. The
 /// interface's name is anyone's to choose and says nothing.
-pub fn judged(host: &crate::simulate::Host, interface: &str) -> crate::simulate::Judged {
+pub fn judged(
+    host: &crate::simulate::Host,
+    interface: &str,
+) -> crate::simulate::Judged {
     use crate::simulate::{read_line, Judged};
     let listed = host.sys.join("class/net").join(interface);
     let Ok(device) = std::fs::canonicalize(&listed) else {
@@ -162,7 +172,9 @@ pub fn judged(host: &crate::simulate::Host, interface: &str) -> crate::simulate:
     }
     let driver = std::fs::canonicalize(device.join("device/driver"))
         .ok()
-        .and_then(|driver| driver.file_name().map(|n| n.to_string_lossy().into_owned()))
+        .and_then(|driver| {
+            driver.file_name().map(|n| n.to_string_lossy().into_owned())
+        })
         .unwrap_or_else(|| "a controller".to_string());
     Judged::hardware(
         format!("{interface} is a real CAN controller ({driver})"),
@@ -181,7 +193,8 @@ mod stand_in_tests {
         std::fs::create_dir_all(&device).unwrap();
         std::fs::write(device.join("type"), format!("{kind}\n")).unwrap();
         std::fs::create_dir_all(sys.join("class/net")).unwrap();
-        std::os::unix::fs::symlink(&device, sys.join("class/net").join(name)).unwrap();
+        std::os::unix::fs::symlink(&device, sys.join("class/net").join(name))
+            .unwrap();
     }
 
     #[test]
@@ -286,7 +299,8 @@ mod tests {
         assert!(is_extended(LARGEST_EXTENDED_ID));
 
         assert_eq!(
-            check_can_id("p", LARGEST_EXTENDED_ID).expect("the largest there is"),
+            check_can_id("p", LARGEST_EXTENDED_ID)
+                .expect("the largest there is"),
             LARGEST_EXTENDED_ID
         );
         let said = check_can_id("p", LARGEST_EXTENDED_ID + 1)

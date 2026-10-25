@@ -21,8 +21,8 @@ use super::{Function, Out};
 /// taking the first two bytes of it would turn that into a plausible
 /// temperature. Shorter is the same mistake the other way.
 ///
-/// The format itself is `tcslibgs::node::vehicle::compute::Format`, where the ground
-/// tool can see it; what a byte means is arithmetic and lives here.
+/// The format itself is `tcslibgs::node::vehicle::compute::Format`, where the
+/// ground tool can see it; what a byte means is arithmetic and lives here.
 fn read(format: Format, data: &[u8]) -> Result<f64, String> {
     if data.len() != format.width() {
         return Err(format!(
@@ -37,7 +37,9 @@ fn read(format: Format, data: &[u8]) -> Result<f64, String> {
         Format::I16Be => i16::from_be_bytes([data[0], data[1]]) as f64,
         Format::U16Be => u16::from_be_bytes([data[0], data[1]]) as f64,
         Format::I16Le => i16::from_le_bytes([data[0], data[1]]) as f64,
-        Format::U24Be => u32::from_be_bytes([0, data[0], data[1], data[2]]) as f64,
+        Format::U24Be => {
+            u32::from_be_bytes([0, data[0], data[1], data[2]]) as f64
+        }
     })
 }
 
@@ -64,7 +66,11 @@ impl ToKelvin {
 }
 
 impl Function for ToKelvin {
-    fn give(&mut self, _input: Option<&str>, data: &[u8]) -> Result<Option<Out>, String> {
+    fn give(
+        &mut self,
+        _input: Option<&str>,
+        data: &[u8],
+    ) -> Result<Option<Out>, String> {
         let counts = read(self.format, data)?;
         // A scale and an offset that put the part's counts outside what a
         // value carries are refused here, naming the temperature: a part
@@ -87,8 +93,8 @@ mod tests {
     ///
     /// What a file may say -- that the format is one of four, that a scale of
     /// nought is refused, that an offset has no default -- is
-    /// `tcslibgs::node::vehicle::compute`'s rule, where the ground tool applies it.
-    /// These tests are about the arithmetic.
+    /// `tcslibgs::node::vehicle::compute`'s rule, where the ground tool applies
+    /// it. These tests are about the arithmetic.
     fn conversion(format: Format, scale: f64, offset: f64) -> ToKelvin {
         ToKelvin::of(ToKelvinParams {
             format,
@@ -163,8 +169,8 @@ mod tests {
 
     /// What cannot convert anything is refused where a file is read.
     ///
-    /// By the one set of rules, in `tcslibgs::node::vehicle::compute`, which the
-    /// ground tool applies too: a format nobody has written, a scale of
+    /// By the one set of rules, in `tcslibgs::node::vehicle::compute`, which
+    /// the ground tool applies too: a format nobody has written, a scale of
     /// nought -- every reading would become the offset, which looks exactly
     /// like a working sensor reporting a steady temperature -- and a missing
     /// offset, which is not nought by default.
@@ -185,7 +191,11 @@ mod tests {
 
         for (pairs, wanted) in [
             (
-                vec![("function", "to_kelvin"), ("scale", "1"), ("offset", "0")],
+                vec![
+                    ("function", "to_kelvin"),
+                    ("scale", "1"),
+                    ("offset", "0"),
+                ],
                 "how they are laid out",
             ),
             (

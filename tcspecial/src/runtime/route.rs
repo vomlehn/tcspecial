@@ -172,7 +172,10 @@ impl Routes {
             .ground_links
             .iter()
             .filter_map(|link| match &link.via {
-                Via::Moc(moc) => Some(((link.source.clone(), moc.clone()), link.name.clone())),
+                Via::Moc(moc) => Some((
+                    (link.source.clone(), moc.clone()),
+                    link.name.clone(),
+                )),
                 Via::PayloadTelemetry => None,
             })
             .collect();
@@ -189,14 +192,16 @@ impl Routes {
             let stream = stream_of(graph, link);
 
             for destination in link.to.each() {
-                let Destination { node, input } = Destination::parse(destination);
+                let Destination { node, input } =
+                    Destination::parse(destination);
                 // And the same at the other end, with one difference: a
                 // computation's named input is which *of several* ways in, and
                 // the table is built on it. A terminal is not one of those, so
                 // it is dropped here rather than carried to a port that would
                 // refuse it as an input a device does not have.
-                let input =
-                    input.filter(|named| tcslibgs::graph::terminals::stream_of(named).is_none());
+                let input = input.filter(|named| {
+                    tcslibgs::graph::terminals::stream_of(named).is_none()
+                });
 
                 // A line into a moc node goes to this source's own link to
                 // that node's ground_base.
@@ -205,16 +210,14 @@ impl Routes {
                     .cloned()
                     .unwrap_or_else(|| node.clone());
 
-                routes
-                    .deliveries
-                    .entry(from.clone())
-                    .or_default()
-                    .push(Delivery {
+                routes.deliveries.entry(from.clone()).or_default().push(
+                    Delivery {
                         to,
                         input: input.clone(),
                         stream,
                         line: Some(line),
-                    });
+                    },
+                );
                 line += 1;
 
                 if let Some(input) = input {
@@ -328,10 +331,9 @@ impl Routes {
     /// mentions cannot be set from the ground: what is changeable in flight is
     /// written down, which is what makes it checkable before it flies.
     pub fn is_commanded(&self, node: &str, attribute: &str) -> bool {
-        self.commands
-            .values()
-            .flatten()
-            .any(|commanded| commanded.node == node && commanded.attribute == attribute)
+        self.commands.values().flatten().any(|commanded| {
+            commanded.node == node && commanded.attribute == attribute
+        })
     }
 
     /// Every node whose output arrives here, in order and once each.
@@ -363,7 +365,8 @@ mod tests {
     /// The shipped thermostat, as the routing sees it.
     fn thermostat() -> Graph {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        Graph::load(root.join("tests/manual/thermostat.yaml")).expect("the example reads")
+        Graph::load(root.join("tests/manual/thermostat.yaml"))
+            .expect("the example reads")
     }
 
     /// A link with several destinations delivers to all of them.
@@ -384,7 +387,8 @@ mod tests {
 
         // The one to the ground goes to k_1's own link to the moc node's
         // ground_base: see `a_line_into_a_moc_node_goes_to_its_own_link`.
-        let places: Vec<&str> = from_k_fore.iter().map(|d| d.to.as_str()).collect();
+        let places: Vec<&str> =
+            from_k_fore.iter().map(|d| d.to.as_str()).collect();
         assert!(places.contains(&"k_1 to moc"), "{places:?}");
         assert!(places.contains(&"cabin_temp"), "{places:?}");
         assert!(places.contains(&"housekeeping"), "{places:?}");
@@ -396,7 +400,8 @@ mod tests {
             .find(|d| d.to == "cabin_temp")
             .expect("a delivery into the mean");
         assert_eq!(into_mean.input.as_deref(), Some("in0"));
-        let payload_out = from_k_fore.iter().find(|d| d.to == "k_1 to moc").unwrap();
+        let payload_out =
+            from_k_fore.iter().find(|d| d.to == "k_1 to moc").unwrap();
         assert_eq!(payload_out.input, None);
     }
 
@@ -427,7 +432,11 @@ mod tests {
             description: None,
             tcspecial: None,
             groups: Vec::new(),
-            nodes: vec![node("a", "i2c"), node("c", "moc"), node("m", "compute")],
+            nodes: vec![
+                node("a", "i2c"),
+                node("c", "moc"),
+                node("m", "compute"),
+            ],
             links: vec![tcslibgs::graph::Link {
                 from: from.to_string(),
                 to: Destinations::of(vec![to.to_string()]),
@@ -548,7 +557,8 @@ mod tests {
             .filter(|l| l.via == Via::PayloadTelemetry)
             .count();
         let expected = drawn + untouched;
-        let held: usize = graph.nodes.iter().map(|n| routes.from(&n.name).len()).sum();
+        let held: usize =
+            graph.nodes.iter().map(|n| routes.from(&n.name).len()).sum();
         assert_eq!(held, expected, "the table and the file disagree");
     }
 

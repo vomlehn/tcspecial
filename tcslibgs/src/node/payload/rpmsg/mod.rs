@@ -30,8 +30,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::endpoint_config::{
-    bad, parse_u32, reject_foreign_fields, reject_stream, require, EndpointConfigResult, GroupKind,
-    LinkTerms,
+    bad, parse_u32, reject_foreign_fields, reject_stream, require,
+    EndpointConfigResult, GroupKind, LinkTerms,
 };
 
 /// What an rpmsg payload's channel is.
@@ -65,8 +65,16 @@ pub fn message_bytes(max_message_bytes: Option<u32>) -> u32 {
 }
 
 /// What an rpmsg payload says about its channel, and what it must say.
-pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<GroupKind> {
-    reject_foreign_fields(name, "rpmsg", &g, &["service", "max_message_bytes"])?;
+pub(crate) fn group_kind_of(
+    name: &str,
+    g: LinkTerms,
+) -> EndpointConfigResult<GroupKind> {
+    reject_foreign_fields(
+        name,
+        "rpmsg",
+        &g,
+        &["service", "max_message_bytes"],
+    )?;
 
     // A read of an rpmsg device hands over one whole message, so there is
     // nothing for a rule about where a read ends to say.
@@ -77,8 +85,8 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
     if service.is_empty() {
         return Err(bad(
             name,
-            "service must not be empty: it is the name the remote announced the \
-             channel with, and the only thing that identifies it",
+            "service must not be empty: it is the name the remote announced \
+             the channel with, and the only thing that identifies it",
         ));
     }
 
@@ -88,8 +96,8 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
             if bytes == 0 {
                 return Err(bad(
                     name,
-                    "max_message_bytes must be greater than zero: a message of no \
-                     bytes is not a message",
+                    "max_message_bytes must be greater than zero: a message of \
+                     no bytes is not a message",
                 ));
             }
             Some(bytes)
@@ -154,7 +162,8 @@ mod tests {
             }
         );
 
-        let said = group_kind_of("remote", terms(&[])).expect_err("a channel with no name");
+        let said = group_kind_of("remote", terms(&[]))
+            .expect_err("a channel with no name");
         assert!(
             format!("{said}").contains("service"),
             "the error should name what is missing: {said}"
@@ -175,7 +184,8 @@ mod tests {
         assert_eq!(message_bytes(Some(2048)), 2048);
 
         assert_eq!(
-            params(&[("service", "x"), ("max_message_bytes", "2048")]).max_message_bytes,
+            params(&[("service", "x"), ("max_message_bytes", "2048")])
+                .max_message_bytes,
             Some(2048)
         );
 
@@ -193,8 +203,11 @@ mod tests {
     /// A term of another kind of link is refused.
     #[test]
     fn a_term_of_another_link_is_refused() {
-        let said = group_kind_of("remote", terms(&[("service", "x"), ("datarate", "9600")]))
-            .expect_err("a line's rate on a channel");
+        let said = group_kind_of(
+            "remote",
+            terms(&[("service", "x"), ("datarate", "9600")]),
+        )
+        .expect_err("a line's rate on a channel");
         assert!(
             format!("{said}").contains("datarate"),
             "the error should name the term: {said}"

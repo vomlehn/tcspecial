@@ -135,7 +135,8 @@ impl<const N: usize> Write for Text<N> {
                 self.cut();
                 return Err(fmt::Error);
             }
-            self.bytes[self.len..self.len + encoded.len()].copy_from_slice(encoded);
+            self.bytes[self.len..self.len + encoded.len()]
+                .copy_from_slice(encoded);
             self.len += encoded.len();
         }
         self.bytes[self.len] = 0;
@@ -171,7 +172,8 @@ impl Notes {
             for (line, text) in self.lines.iter_mut().zip(&said[..kept]) {
                 line.set(text);
             }
-            self.lines[kept].set(format_args!("... and {} more", said.len() - kept));
+            self.lines[kept]
+                .set(format_args!("... and {} more", said.len() - kept));
             self.count = MAX_REMARKS;
         }
     }
@@ -181,11 +183,12 @@ impl Notes {
     }
 }
 
-// ---- Errors -------------------------------------------------------------------
+// ---- Errors -----------------------------------------------------------------
 
 thread_local! {
     /// What went wrong with this thread's last call that failed.
-    static LAST_ERROR: RefCell<Text<ERROR_BYTES>> = const { RefCell::new(Text::EMPTY) };
+    static LAST_ERROR: RefCell<Text<ERROR_BYTES>> =
+        const { RefCell::new(Text::EMPTY) };
 }
 
 /// That a call failed, its reason already left for [`tcs_last_error`].
@@ -203,7 +206,10 @@ fn guard<T>(otherwise: T, body: impl FnOnce() -> Result<T, Failed>) -> T {
         Ok(Ok(value)) => value,
         Ok(Err(Failed)) => otherwise,
         Err(_) => {
-            fail("an internal error in tcslib: this is a bug, and worth reporting");
+            fail(
+                "an internal error in tcslib: this is a bug, and worth \
+                 reporting",
+            );
             otherwise
         }
     }
@@ -214,7 +220,10 @@ fn guard<T>(otherwise: T, body: impl FnOnce() -> Result<T, Failed>) -> T {
 /// # Safety
 ///
 /// `text` is NULL or points to a NUL-terminated string.
-unsafe fn text_of<'a>(text: *const c_char, what: &str) -> Result<&'a str, Failed> {
+unsafe fn text_of<'a>(
+    text: *const c_char,
+    what: &str,
+) -> Result<&'a str, Failed> {
     if text.is_null() {
         return Err(fail(format_args!("{what} is NULL")));
     }
@@ -228,7 +237,10 @@ unsafe fn text_of<'a>(text: *const c_char, what: &str) -> Result<&'a str, Failed
 /// # Safety
 ///
 /// `handle` is NULL or was made by this library and not yet closed.
-unsafe fn handle_of<'a, T>(handle: *const T, what: &str) -> Result<&'a T, Failed> {
+unsafe fn handle_of<'a, T>(
+    handle: *const T,
+    what: &str,
+) -> Result<&'a T, Failed> {
     handle
         .as_ref()
         .ok_or_else(|| fail(format_args!("{what} is NULL")))
@@ -239,7 +251,10 @@ unsafe fn handle_of<'a, T>(handle: *const T, what: &str) -> Result<&'a T, Failed
 /// # Safety
 ///
 /// As [`handle_of`], and used from one thread at a time.
-unsafe fn handle_of_mut<'a, T>(handle: *mut T, what: &str) -> Result<&'a mut T, Failed> {
+unsafe fn handle_of_mut<'a, T>(
+    handle: *mut T,
+    what: &str,
+) -> Result<&'a mut T, Failed> {
     handle
         .as_mut()
         .ok_or_else(|| fail(format_args!("{what} is NULL")))
@@ -255,7 +270,7 @@ unsafe fn out_of<'a, T>(out: *mut T, what: &str) -> Result<&'a mut T, Failed> {
         .ok_or_else(|| fail(format_args!("{what} is NULL")))
 }
 
-// ---- The library ----------------------------------------------------------
+// ---- The library ------------------------------------------------------------
 
 /// This library's version: `"0.1.0"`.
 #[no_mangle]
@@ -288,15 +303,17 @@ pub struct tcs_configuration {
 ///
 /// `path` is NULL or a NUL-terminated string.
 #[no_mangle]
-pub unsafe extern "C" fn tcs_configuration_open(path: *const c_char) -> *mut tcs_configuration {
+pub unsafe extern "C" fn tcs_configuration_open(
+    path: *const c_char,
+) -> *mut tcs_configuration {
     guard(std::ptr::null_mut(), || {
         // Allocates, once, at startup: the path, the graph a whole
         // configuration is read into, and the handle, which outlives this
         // call and whose size C does not see. Nothing of this is done again
         // as a station runs.
         let path = PathBuf::from(text_of(path, "the path")?);
-        let graph =
-            Graph::load(&path).map_err(|e| fail(format_args!("{}: {e}", path.display())))?;
+        let graph = Graph::load(&path)
+            .map_err(|e| fail(format_args!("{}: {e}", path.display())))?;
         // The checks the vehicle runs before it opens anything: a station
         // should not run on a configuration the vehicle would refuse.
         let problems = graph.check();
@@ -307,8 +324,8 @@ pub unsafe extern "C" fn tcs_configuration_open(path: *const c_char) -> *mut tcs
                 problem.describe()
             )));
         }
-        let digest =
-            digest_of_graph(&graph).map_err(|e| fail(format_args!("{}: {e}", path.display())))?;
+        let digest = digest_of_graph(&graph)
+            .map_err(|e| fail(format_args!("{}: {e}", path.display())))?;
         let mut digest_text = Text::EMPTY;
         digest_text.set(digest);
         Ok(Box::into_raw(Box::new(tcs_configuration {
@@ -327,7 +344,9 @@ pub unsafe extern "C" fn tcs_configuration_open(path: *const c_char) -> *mut tcs
 /// `configuration` is NULL or was made by `tcs_configuration_open` and not
 /// yet closed.
 #[no_mangle]
-pub unsafe extern "C" fn tcs_configuration_close(configuration: *mut tcs_configuration) {
+pub unsafe extern "C" fn tcs_configuration_close(
+    configuration: *mut tcs_configuration,
+) {
     if !configuration.is_null() {
         drop(Box::from_raw(configuration));
     }
@@ -380,7 +399,7 @@ pub unsafe extern "C" fn tcs_configuration_node_id(
     })
 }
 
-// ---- Beacons ------------------------------------------------------------------
+// ---- Beacons ----------------------------------------------------------------
 
 /// `tcs_stage`, as the header numbers it.
 fn stage_number(stage: Stage) -> c_int {
@@ -453,7 +472,9 @@ pub unsafe extern "C" fn tcs_beacons_listen(
             Schedule::for_interval(interval),
             Some(configuration.digest),
         )
-        .map_err(|e| fail(format_args!("{place}: beacons cannot be received: {e}")))?;
+        .map_err(|e| {
+            fail(format_args!("{place}: beacons cannot be received: {e}"))
+        })?;
         let mut said = Text::EMPTY;
         said.set(tcslib::beacon::NO_BEACON_MESSAGE);
         // Allocates, once, at startup: the handle, which outlives this call
@@ -474,7 +495,10 @@ pub unsafe extern "C" fn tcs_beacons_listen(
 /// `beacons` NULL or made by `tcs_beacons_listen` and not yet closed, used
 /// from one thread at a time; `pass` NULL or writable.
 #[no_mangle]
-pub unsafe extern "C" fn tcs_beacons_pass(beacons: *mut tcs_beacons, pass: *mut tcs_pass) -> c_int {
+pub unsafe extern "C" fn tcs_beacons_pass(
+    beacons: *mut tcs_beacons,
+    pass: *mut tcs_pass,
+) -> c_int {
     guard(-1, || {
         let watch = handle_of_mut(beacons, "the beacons")?;
         let out = out_of(pass, "the pass")?;
@@ -507,7 +531,9 @@ pub unsafe extern "C" fn tcs_beacons_pass(beacons: *mut tcs_beacons, pass: *mut 
 ///
 /// `beacons` as [`tcs_beacons_pass`].
 #[no_mangle]
-pub unsafe extern "C" fn tcs_beacons_said(beacons: *const tcs_beacons) -> *const c_char {
+pub unsafe extern "C" fn tcs_beacons_said(
+    beacons: *const tcs_beacons,
+) -> *const c_char {
     guard(std::ptr::null(), || {
         Ok(handle_of(beacons, "the beacons")?.said.as_ptr())
     })
@@ -519,7 +545,9 @@ pub unsafe extern "C" fn tcs_beacons_said(beacons: *const tcs_beacons) -> *const
 ///
 /// `beacons` as [`tcs_beacons_pass`].
 #[no_mangle]
-pub unsafe extern "C" fn tcs_beacons_remark_count(beacons: *const tcs_beacons) -> usize {
+pub unsafe extern "C" fn tcs_beacons_remark_count(
+    beacons: *const tcs_beacons,
+) -> usize {
     guard(0, || Ok(handle_of(beacons, "the beacons")?.remarks.count))
 }
 
@@ -551,7 +579,9 @@ pub unsafe extern "C" fn tcs_beacons_remark(
 ///
 /// `beacons` as [`tcs_beacons_pass`].
 #[no_mangle]
-pub unsafe extern "C" fn tcs_beacons_warning_count(beacons: *const tcs_beacons) -> usize {
+pub unsafe extern "C" fn tcs_beacons_warning_count(
+    beacons: *const tcs_beacons,
+) -> usize {
     guard(0, || Ok(handle_of(beacons, "the beacons")?.warnings.count))
 }
 
@@ -589,7 +619,7 @@ pub unsafe extern "C" fn tcs_beacons_close(beacons: *mut tcs_beacons) {
     }
 }
 
-// ---- The vehicle's data -------------------------------------------------------
+// ---- The vehicle's data -----------------------------------------------------
 
 /// A `moc` node, open, and the last datum it received.
 pub struct tcs_moc {
@@ -625,15 +655,18 @@ pub unsafe extern "C" fn tcs_moc_open(
     guard(std::ptr::null_mut(), || {
         let configuration = handle_of(configuration, "the configuration")?;
         let name = text_of(moc, "the moc node's name")?;
-        let moc = Moc::open(&configuration.graph, name)
-            .map_err(|e| fail(format_args!("{}: {e}", configuration.path.display())))?;
+        let moc = Moc::open(&configuration.graph, name).map_err(|e| {
+            fail(format_args!("{}: {e}", configuration.path.display()))
+        })?;
         // Allocates, once, at startup: the handle, which outlives this call;
         // the names of the node's sources, which are known now and read by
         // every receive after; and the buffer every datum is received in.
         let names = moc
             .sources()
             .iter()
-            .map(|source| CString::new(source.replace('\0', " ")).unwrap_or_default())
+            .map(|source| {
+                CString::new(source.replace('\0', " ")).unwrap_or_default()
+            })
             .collect();
         Ok(Box::into_raw(Box::new(tcs_moc {
             moc,
@@ -659,12 +692,15 @@ pub unsafe extern "C" fn tcs_moc_receive(
         let node = handle_of_mut(moc, "the moc node")?;
         let out = out_of(datum, "the datum")?;
         let wait = u64::try_from(wait_ms).ok().map(Duration::from_millis);
-        let Some(arrival) = node.moc.receive_into(wait, &mut node.data).map_err(fail)? else {
+        let Some(arrival) =
+            node.moc.receive_into(wait, &mut node.data).map_err(fail)?
+        else {
             return Ok(0);
         };
         let Some(source) = node.names.get(arrival.source) else {
             return Err(fail(format_args!(
-                "a datum came from source {}, which this moc node does not draw",
+                "a datum came from source {}, which this moc node does not \
+                 draw",
                 arrival.source
             )));
         };
@@ -689,7 +725,7 @@ pub unsafe extern "C" fn tcs_moc_close(moc: *mut tcs_moc) {
     }
 }
 
-// ---- Commands -----------------------------------------------------------------
+// ---- Commands ---------------------------------------------------------------
 
 /// `tcs_status`, as the header numbers it.
 fn status_number(status: CommandStatus) -> c_int {
@@ -751,7 +787,8 @@ pub unsafe extern "C" fn tcs_client_open(
                     "{place} has no tcspecial section, so names no command link"
                 ))
             })?;
-        let client = TcsClient::open(&links).map_err(|e| fail(format_args!("{place}: {e}")))?;
+        let client = TcsClient::open(&links)
+            .map_err(|e| fail(format_args!("{place}: {e}")))?;
         // Allocates, once, at startup: the handle, which outlives this call,
         // and the client's two links.
         Ok(Box::into_raw(Box::new(tcs_client {
@@ -774,7 +811,10 @@ pub unsafe extern "C" fn tcs_client_open(
 /// `client` NULL or made by `tcs_client_open` and not yet closed, used from
 /// one thread at a time; `agrees` NULL or writable.
 #[no_mangle]
-pub unsafe extern "C" fn tcs_client_connect(client: *mut tcs_client, agrees: *mut c_int) -> c_int {
+pub unsafe extern "C" fn tcs_client_connect(
+    client: *mut tcs_client,
+    agrees: *mut c_int,
+) -> c_int {
     guard(-1, || {
         let link = handle_of_mut(client, "the client")?;
         let out = out_of(agrees, "agrees")?;
@@ -824,11 +864,12 @@ unsafe fn command_a_node(
         } else {
             link.client.stop_node(asked)
         };
-        let (answered, about) = answer.map_err(|e| fail(format_args!("{verb} {node}: {e}")))?;
+        let (answered, about) =
+            answer.map_err(|e| fail(format_args!("{verb} {node}: {e}")))?;
         if about != asked {
             return Err(fail(format_args!(
-                "{verb} {node} was answered about node {}: the two ends are not reading \
-                 the same configuration",
+                "{verb} {node} was answered about node {}: the two ends are \
+                 not reading the same configuration",
                 about.0
             )));
         }
@@ -1005,15 +1046,15 @@ pub unsafe extern "C" fn tcs_client_set_node(
         // Nothing until there is an answer, so that a SET_NODE that never got
         // one does not leave the last one's reason looking like its own.
         link.reason.set("");
-        let (answered, about, reason) = link
-            .client
-            .set_node(asked, attribute, value)
-            .map_err(|e| fail(format_args!("SET_NODE {node} {attribute}: {e}")))?;
+        let (answered, about, reason) =
+            link.client.set_node(asked, attribute, value).map_err(|e| {
+                fail(format_args!("SET_NODE {node} {attribute}: {e}"))
+            })?;
         link.reason.set(reason);
         if about != asked {
             return Err(fail(format_args!(
-                "SET_NODE {node} was answered about node {}: the two ends are not reading \
-                 the same configuration",
+                "SET_NODE {node} was answered about node {}: the two ends \
+                 are not reading the same configuration",
                 about.0
             )));
         }
@@ -1030,7 +1071,9 @@ pub unsafe extern "C" fn tcs_client_set_node(
 /// `client` is a handle [`tcs_client_open`] returned and not yet closed. The
 /// text is the client's, good until the next SET_NODE on it.
 #[no_mangle]
-pub unsafe extern "C" fn tcs_client_reason(client: *const tcs_client) -> *const c_char {
+pub unsafe extern "C" fn tcs_client_reason(
+    client: *const tcs_client,
+) -> *const c_char {
     guard(std::ptr::null(), || {
         Ok(handle_of(client, "the client")?.reason.as_ptr())
     })
@@ -1090,7 +1133,7 @@ pub unsafe extern "C" fn tcs_client_query_node_sample(
     })
 }
 
-// ---- Pinging a ping node --------------------------------------------------------
+// ---- Pinging a ping node ----------------------------------------------------
 
 /// What the header's `tcs_exchange` is.
 #[repr(C)]
@@ -1148,8 +1191,8 @@ pub unsafe extern "C" fn tcs_pinger_open(
         let place = configuration.path.display();
         let route = route_of(&configuration.graph).ok_or_else(|| {
             fail(format_args!(
-                "{place} has no ping node the ground can reach both ways, through a moc \
-                 node that binds an address aboard"
+                "{place} has no ping node the ground can reach both ways, \
+                 through a moc node that binds an address aboard"
             ))
         })?;
         let uplink = Uplink::open(&configuration.graph, &route.moc)
@@ -1177,7 +1220,9 @@ pub unsafe extern "C" fn tcs_pinger_open(
 ///
 /// `pinger` NULL or made by `tcs_pinger_open` and not yet closed.
 #[no_mangle]
-pub unsafe extern "C" fn tcs_pinger_node(pinger: *const tcs_pinger) -> *const c_char {
+pub unsafe extern "C" fn tcs_pinger_node(
+    pinger: *const tcs_pinger,
+) -> *const c_char {
     guard(std::ptr::null(), || {
         Ok(handle_of(pinger, "the pinger")?.node.as_ptr())
     })
@@ -1189,7 +1234,9 @@ pub unsafe extern "C" fn tcs_pinger_node(pinger: *const tcs_pinger) -> *const c_
 ///
 /// As [`tcs_pinger_node`].
 #[no_mangle]
-pub unsafe extern "C" fn tcs_pinger_moc(pinger: *const tcs_pinger) -> *const c_char {
+pub unsafe extern "C" fn tcs_pinger_moc(
+    pinger: *const tcs_pinger,
+) -> *const c_char {
     guard(std::ptr::null(), || {
         Ok(handle_of(pinger, "the pinger")?.moc.as_ptr())
     })
@@ -1280,7 +1327,9 @@ pub unsafe extern "C" fn tcs_pinger_exchange(
 ///
 /// As [`tcs_pinger_node`].
 #[no_mangle]
-pub unsafe extern "C" fn tcs_pinger_sent(pinger: *const tcs_pinger) -> *const c_char {
+pub unsafe extern "C" fn tcs_pinger_sent(
+    pinger: *const tcs_pinger,
+) -> *const c_char {
     guard(std::ptr::null(), || {
         Ok(handle_of(pinger, "the pinger")?.sent.as_ptr())
     })
@@ -1292,7 +1341,9 @@ pub unsafe extern "C" fn tcs_pinger_sent(pinger: *const tcs_pinger) -> *const c_
 ///
 /// As [`tcs_pinger_node`].
 #[no_mangle]
-pub unsafe extern "C" fn tcs_pinger_received(pinger: *const tcs_pinger) -> *const c_char {
+pub unsafe extern "C" fn tcs_pinger_received(
+    pinger: *const tcs_pinger,
+) -> *const c_char {
     guard(std::ptr::null(), || {
         Ok(handle_of(pinger, "the pinger")?.received.as_ptr())
     })
@@ -1318,8 +1369,11 @@ mod tests {
     /// and CommandStatus's names, every one, in the header's numbering.
     #[test]
     fn the_names_are_the_librarys() {
-        for stage in [Stage::Unheard, Stage::Heard, Stage::Aging, Stage::Waiting] {
-            let said = unsafe { CStr::from_ptr(tcs_stage_label(stage_number(stage))) };
+        for stage in
+            [Stage::Unheard, Stage::Heard, Stage::Aging, Stage::Waiting]
+        {
+            let said =
+                unsafe { CStr::from_ptr(tcs_stage_label(stage_number(stage))) };
             assert_eq!(said.to_str(), Ok(stage.label()));
         }
         for status in [
@@ -1332,7 +1386,9 @@ mod tests {
             CommandStatus::AlreadyExists,
             CommandStatus::Timeout,
         ] {
-            let said = unsafe { CStr::from_ptr(tcs_status_name(status_number(status))) };
+            let said = unsafe {
+                CStr::from_ptr(tcs_status_name(status_number(status)))
+            };
             assert_eq!(said.to_str(), Ok(format!("{status:?}").as_str()));
         }
     }
@@ -1418,7 +1474,8 @@ mod tests {
     #[test]
     fn the_header_states_these_sizes() {
         let header = std::fs::read_to_string(
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("include/tcs.h"),
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("include/tcs.h"),
         )
         .expect("the header reads");
         for (name, size) in [

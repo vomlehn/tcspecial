@@ -79,7 +79,10 @@ impl AppPayloadVeh {
     }
 
     /// The same, into the fabric's buffer, allocating nothing.
-    pub fn take_moc_data_now_into(&mut self, out: &mut [u8]) -> Result<ReadInto, String> {
+    pub fn take_moc_data_now_into(
+        &mut self,
+        out: &mut [u8],
+    ) -> Result<ReadInto, String> {
         self.running.read_moc_now_into(out)
     }
 
@@ -159,7 +162,8 @@ mod tests {
         let where_ = tempfile::tempdir().expect("a directory");
         let program = stands_in(where_.path());
         let mut node =
-            crate::when_not_busy(|| AppPayloadVeh::of(&says(&program))).expect("it starts");
+            crate::when_not_busy(|| AppPayloadVeh::of(&says(&program)))
+                .expect("it starts");
 
         node.give_payload_data(b"293.15")
             .expect("it takes a packet");
@@ -188,8 +192,9 @@ mod tests {
     #[test]
     fn a_program_that_cannot_be_started_is_said_so() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let said = AppPayloadVeh::of(&says(&where_.path().join("nothing-here")))
-            .expect_err("a program that is not there");
+        let said =
+            AppPayloadVeh::of(&says(&where_.path().join("nothing-here")))
+                .expect_err("a program that is not there");
         assert!(said.contains("nothing-here"), "{said}");
         assert!(said.contains("could not be started"), "{said}");
     }
@@ -205,7 +210,8 @@ mod tests {
         let mut params = says(&stands_in(where_.path()));
         params.kind = Kind::MocVeh;
 
-        let said = AppPayloadVeh::of(&params).expect_err("a node of another kind");
+        let said =
+            AppPayloadVeh::of(&params).expect_err("a node of another kind");
         assert!(said.contains(Kind::MocVeh.node_type()), "{said}");
         assert!(said.contains(Kind::PayloadVeh.node_type()), "{said}");
     }

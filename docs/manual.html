@@ -2976,8 +2976,10 @@ opening a socket or a device node. It takes one file, two or three, the
 tcspecial configuration first, and <tt class="docutils literal"><span class="pre">-h</span></tt> or <tt class="docutils literal"><span class="pre">--help</span></tt> prints how:</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcsverify<span class="whitespace"> </span>--<span class="whitespace"> </span>examples/minimal/minimal.yaml<span class="whitespace">
-</span><span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcsverify<span class="whitespace"> </span>--<span class="whitespace"> </span>examples/minimal/minimal.yaml<span class="whitespace"> </span>examples/minimal/minimal-sim.yaml<span class="whitespace">
-</span><span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcsverify<span class="whitespace"> </span>--<span class="whitespace"> </span>examples/minimal/minimal.xml<span class="whitespace"> </span>examples/minimal/minimal-sim.yaml
+</span><span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcsverify<span class="whitespace"> </span>--<span class="whitespace"> </span>examples/minimal/minimal.yaml<span class="whitespace"> </span><span class="literal string escape">\
+</span><span class="whitespace">    </span>examples/minimal/minimal-sim.yaml<span class="whitespace">
+</span><span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcsverify<span class="whitespace"> </span>--<span class="whitespace"> </span>examples/minimal/minimal.xml<span class="whitespace"> </span><span class="literal string escape">\
+</span><span class="whitespace">    </span>examples/minimal/minimal-sim.yaml
 </pre>
 <p>Either spelling of the configuration will do -- the last line reads the XML of
 the same set -- and the simulator configuration is named in full rather than
@@ -2986,7 +2988,8 @@ worked out from the first file's name.</p>
 an XML file and a YAML file, in either order, and then the simulator file.</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcsverify<span class="whitespace"> </span>--<span class="whitespace"> </span>examples/thermostat/thermostat.xml<span class="whitespace"> </span><span class="literal string escape">\
-</span><span class="whitespace">    </span>examples/thermostat/thermostat.yaml<span class="whitespace"> </span>examples/thermostat/thermostat-sim.yaml
+</span><span class="whitespace">    </span>examples/thermostat/thermostat.yaml<span class="whitespace"> </span><span class="literal string escape">\
+</span><span class="whitespace">    </span>examples/thermostat/thermostat-sim.yaml
 </pre>
 <p>Each spelling is checked with the simulator file, the first named first, and
 then the two are compared: every section, every attribute and every value, as
@@ -3054,7 +3057,8 @@ payload types it names, separated by commas, and reports each node of another
 type as that tcspecial would refuse it. It takes what <tt class="docutils literal">tcspecial <span class="pre">--types</span></tt>
 prints, so a configuration can be held to the binary that will fly:</p>
 <pre class="literal-block">
-$ cargo run --bin tcsverify -- --types=$(tcspecial --types) examples/thermostat/thermostat.yaml
+$ cargo run --bin tcsverify -- --types=$(tcspecial --types) \
+    examples/thermostat/thermostat.yaml
 </pre>
 <p>Without it, every type is taken to be built. See <a class="reference internal" href="#building-tcspecial-for-a-vehicle">Building tcspecial for a
 vehicle</a>.</p>
@@ -3462,7 +3466,8 @@ Each type is a Cargo feature named as a configuration writes the type --
 with the defaults has all of them, which is what <tt class="docutils literal">cargo build <span class="pre">--workspace</span></tt>
 and the tests make. A build for a vehicle names the types it flies:</p>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>build<span class="whitespace"> </span>-p<span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--release<span class="whitespace"> </span>--no-default-features<span class="whitespace"> </span>--features<span class="whitespace"> </span>serial,i2c
+<span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>build<span class="whitespace"> </span>-p<span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--release<span class="whitespace"> </span>--no-default-features<span class="whitespace"> </span><span class="literal string escape">\
+</span><span class="whitespace">    </span>--features<span class="whitespace"> </span>serial,i2c
 </pre>
 <p>Build it with <tt class="docutils literal"><span class="pre">-p</span> tcspecial</tt> and nothing else beside it: Cargo turns on,
 for everything built in one command, every feature anything in that command
@@ -3494,7 +3499,8 @@ vehicle; see <a class="reference internal" href="#checking-a-set-without-running
 build a tcspecial that flies this way: the feature is for a vehicle on a desk.</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>build<span class="whitespace"> </span>-p<span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--features<span class="whitespace"> </span>visual<span class="whitespace">
-</span><span class="generic prompt">$ </span>target/debug/tcspecial<span class="whitespace"> </span>--visual<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>examples/simple-app/simple-app.yaml
+</span><span class="generic prompt">$ </span>target/debug/tcspecial<span class="whitespace"> </span>--visual<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span><span class="literal string escape">\
+</span><span class="whitespace">    </span>examples/simple-app/simple-app.yaml
 </pre>
 <p>The window draws the configuration as tcsgui does -- the three working panes,
 every node where the editor puts it, every link along its route -- and lights

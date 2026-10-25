@@ -1,19 +1,21 @@
 //! The ground's commands, answered on a thread of their own.
 //!
 //! The vehicle takes commands on two UDP links, each from the one address the
-//! configuration states, and answers them from a thread that is not the thread making the pass. That is the
-//! whole reason this is a module and not a branch inside the loop: a command
-//! interpreter that took its turn inside a pass would answer at the rate of
-//! the slowest group in the configuration, and the one command that matters
-//! most -- stop that node -- would be the one waiting on it.
+//! configuration states, and answers them from a thread that is not the thread
+//! making the pass. That is the whole reason this is a module and not a branch
+//! inside the loop: a command interpreter that took its turn inside a pass
+//! would answer at the rate of the slowest group in the configuration, and the
+//! one command that matters most -- stop that node -- would be the one waiting
+//! on it.
 //!
 //! # The two links
 //!
 //! One for the spacecraft and one for commands about nodes, because what the
-//! ground needs in a hurry must never be queued behind what it asked for at leisure, and a RESTART waiting behind a
-//! node's statistics is a vehicle that cannot be rescued while it is busy. On
-//! a space link the two become two virtual channels, which is where the
-//! priority between them is really decided; over IP they are two ports.
+//! ground needs in a hurry must never be queued behind what it asked for at
+//! leisure, and a RESTART waiting behind a node's statistics is a vehicle that
+//! cannot be rescued while it is busy. On a space link the two become two
+//! virtual channels, which is where the priority between them is really
+//! decided; over IP they are two ports.
 //!
 //! The second link is one socket, at `payload_command.dest_base` with nothing
 //! added to it. The node id in the message says which node a command is about
@@ -57,9 +59,10 @@ use std::os::fd::BorrowedFd;
 
 use tcslibgs::config_digest::{ConfigDigest, ConfigVersion};
 use tcslibgs::{
-    answer_to, came_from, ArmKey, CIConfig, Command, CommandLink, CommandStatus, ConfigTelemetry,
-    ConnectTelemetry, HostPort, NodeTelemetry, PingTelemetry, QueryNodeSampleTelemetry,
-    QueryNodeTelemetry, Reason, SetNodeTelemetry, TcsError, TcsResult, Telemetry,
+    answer_to, came_from, ArmKey, CIConfig, Command, CommandLink,
+    CommandStatus, ConfigTelemetry, ConnectTelemetry, HostPort, NodeTelemetry,
+    PingTelemetry, QueryNodeSampleTelemetry, QueryNodeTelemetry, Reason,
+    SetNodeTelemetry, TcsError, TcsResult, Telemetry,
 };
 
 use crate::beacon_send::BeaconSend;
@@ -164,7 +167,10 @@ impl Commands {
             from: ci.moc_cmd_send.clone(),
         };
         let nodes = Link {
-            socket: bound("the node command link", &ci.payload_command_dest_base)?,
+            socket: bound(
+                "the node command link",
+                &ci.payload_command_dest_base,
+            )?,
             which: CommandLink::Payload,
             from: ci.payload_command_source_base.clone(),
         };
@@ -419,8 +425,8 @@ impl Serving {
         // be reliable.
         if !command.cmd_type().may_arrive_on(arrived) {
             error!(
-                "{:?} arrived on the {} link and belongs on the {} one: the two \
-                 ends are not reading the same configuration",
+                "{:?} arrived on the {} link and belongs on the {} one: the \
+                 two ends are not reading the same configuration",
                 command.cmd_type(),
                 spelling(arrived),
                 spelling(command.link())
@@ -429,9 +435,10 @@ impl Serving {
         }
 
         match command {
-            Command::Ping(_) => {
-                Telemetry::Ping(PingTelemetry::new(sequence, CommandStatus::Success))
-            }
+            Command::Ping(_) => Telemetry::Ping(PingTelemetry::new(
+                sequence,
+                CommandStatus::Success,
+            )),
 
             // What this vehicle is flying, which is what licenses every
             // command that carries a node id: a ground station whose digest
@@ -448,22 +455,31 @@ impl Serving {
                 if let Some(beacon) = self.beacon.as_mut() {
                     beacon.set_interval(cmd.beacon_interval.duration());
                 }
-                Telemetry::Config(ConfigTelemetry::new(sequence, CommandStatus::Success))
+                Telemetry::Config(ConfigTelemetry::new(
+                    sequence,
+                    CommandStatus::Success,
+                ))
             }
 
             Command::StartNode(cmd) => {
                 let status = self.set_state(cmd.node, true);
-                Telemetry::StartNode(NodeTelemetry::started(sequence, status, cmd.node))
+                Telemetry::StartNode(NodeTelemetry::started(
+                    sequence, status, cmd.node,
+                ))
             }
             Command::StopNode(cmd) => {
                 let status = self.set_state(cmd.node, false);
-                Telemetry::StopNode(NodeTelemetry::stopped(sequence, status, cmd.node))
+                Telemetry::StopNode(NodeTelemetry::stopped(
+                    sequence, status, cmd.node,
+                ))
             }
 
             Command::SetNode(cmd) => {
-                let (status, reason) = self.set_attribute(cmd.node, cmd.attribute, cmd.value);
+                let (status, reason) =
+                    self.set_attribute(cmd.node, cmd.attribute, cmd.value);
                 Telemetry::SetNode(
-                    SetNodeTelemetry::new(sequence, status, cmd.node).because(reason),
+                    SetNodeTelemetry::new(sequence, status, cmd.node)
+                        .because(reason),
                 )
             }
 
@@ -527,19 +543,26 @@ impl Serving {
             // leaves the arm as it was, so an operator who mistyped it can
             // send the RESTART again without arming again.
             Command::Restart(cmd) => match self.armed {
-                Some((key, taken)) if key == cmd.arm_key && taken.elapsed() < self.arm_valid => {
+                Some((key, taken))
+                    if key == cmd.arm_key
+                        && taken.elapsed() < self.arm_valid =>
+                {
                     self.armed = None;
                     self.restarting = true;
                     answer_to(command, CommandStatus::Success)
                 }
                 Some((key, _)) if key != cmd.arm_key => {
-                    warn!("a RESTART came with a key that is not the arm's: refused");
+                    warn!(
+                        "a RESTART came with a key that is not the arm's: \
+                           refused"
+                    );
                     answer_to(command, CommandStatus::NotArmed)
                 }
                 _ => {
                     warn!(
-                        "a RESTART came with no RESTART_ARM in the last {:?}, which is \
-                         how long restart_arm_valid says an arm lasts: refused",
+                        "a RESTART came with no RESTART_ARM in the last {:?}, \
+                         which is how long restart_arm_valid says an arm \
+                         lasts: refused",
                         self.arm_valid
                     );
                     answer_to(command, CommandStatus::NotArmed)
@@ -577,7 +600,11 @@ impl Serving {
     /// Allocates nothing of its own: the work is handed over by the node's
     /// shared name. What starting the node again takes is the pass's -- see
     /// `System::reopen` -- and a failure is logged in words, which are made.
-    fn set_state(&self, node: tcslibgs::NodeId, enabled: bool) -> CommandStatus {
+    fn set_state(
+        &self,
+        node: tcslibgs::NodeId,
+        enabled: bool,
+    ) -> CommandStatus {
         let Some(state) = self.states.at(node) else {
             self.no_such_node(node);
             return CommandStatus::NotFound;
@@ -590,7 +617,8 @@ impl Serving {
         // below, because stopping begins the moment this is asked.
         if !state.is_switchable() {
             warn!(
-                "\"{name}\" may not be {} from the ground, and is left as it was",
+                "\"{name}\" may not be {} from the ground, and is left as it \
+                 was",
                 if enabled { "started" } else { "stopped" }
             );
             return CommandStatus::InvalidCommand;
@@ -726,10 +754,11 @@ mod tests {
         std::fs::write(
             &path,
             "payloads:\n\
-             \x20 - { name: inside, type: i2c, path: /dev/i2c-1, address: \"0x48\", \
-             poll_interval: \"1 s\", payload-out: average }\n\
+             \x20 - { name: inside, type: i2c, path: /dev/i2c-1, address: \
+             \"0x48\", poll_interval: \"1 s\", payload-out: average }\n\
              vehicle:\n\
-             \x20 - { name: average, type: compute, function: mean, inputs: 1 }\n",
+             \x20 - { name: average, type: compute, function: mean, inputs: 1 \
+             }\n",
         )
         .expect("written");
         Graph::load(&path).expect("it reads")
@@ -743,7 +772,11 @@ mod tests {
     }
 
     /// Ask on a link and read the answer, or say nothing came.
-    fn ask(ground: &UdpSocket, at: SocketAddr, command: &Command) -> Option<Telemetry> {
+    fn ask(
+        ground: &UdpSocket,
+        at: SocketAddr,
+        command: &Command,
+    ) -> Option<Telemetry> {
         let asked = serde_json::to_vec(command).expect("a command");
         ground.send_to(&asked, at).expect("it is sent");
         let mut buffer = [0u8; COMMAND_BYTES];
@@ -751,13 +784,16 @@ mod tests {
             match ground.recv_from(&mut buffer) {
                 Ok((size, _)) => {
                     return Some(
-                        serde_json::from_slice::<Telemetry>(&buffer[..size]).expect("telemetry"),
+                        serde_json::from_slice::<Telemetry>(&buffer[..size])
+                            .expect("telemetry"),
                     )
                 }
                 // A child of this test binary exiting interrupts a blocking
                 // receive; the links' own loops wait again for the same
                 // reason.
-                Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => {
+                    continue
+                }
                 Err(_) => return None,
             }
         }
@@ -789,7 +825,10 @@ mod tests {
         started_with(states, bench)
     }
 
-    fn started_with(states: Arc<NodeStates>, bench: Workbench) -> (UdpSocket, Commands) {
+    fn started_with(
+        states: Arc<NodeStates>,
+        bench: Workbench,
+    ) -> (UdpSocket, Commands) {
         let ground = UdpSocket::bind("127.0.0.1:0").expect("a ground socket");
         ground
             .set_read_timeout(Some(Duration::from_secs(5)))
@@ -821,7 +860,10 @@ mod tests {
 
         match ask(&ground, at, &Command::Ping(tcslibgs::PingCommand::new(7))) {
             Some(Telemetry::Ping(tm)) => {
-                assert_eq!(tm.header.sequence, 7, "the answer carries the command's");
+                assert_eq!(
+                    tm.header.sequence, 7,
+                    "the answer carries the command's"
+                );
                 assert_eq!(tm.header.status, CommandStatus::Success);
             }
             other => panic!("expected a ping answer, got {other:?}"),
@@ -835,8 +877,16 @@ mod tests {
         match ask(&ground, at, &connect) {
             Some(Telemetry::Connect(tm)) => {
                 assert_eq!(tm.header.status, CommandStatus::Success);
-                assert_eq!(tm.digest, ConfigDigest([0x5Au8; 16]), "the file it read");
-                assert_eq!(tm.version, ConfigVersion::of_this_build(), "this build");
+                assert_eq!(
+                    tm.digest,
+                    ConfigDigest([0x5Au8; 16]),
+                    "the file it read"
+                );
+                assert_eq!(
+                    tm.version,
+                    ConfigVersion::of_this_build(),
+                    "this build"
+                );
             }
             other => panic!("expected a connect answer, got {other:?}"),
         }
@@ -897,7 +947,11 @@ mod tests {
             &Command::StopNode(NodeCommand::stop(2, inside)),
         ) {
             Some(Telemetry::StopNode(tm)) => {
-                assert_eq!(tm.header.status, CommandStatus::Success, "asked twice")
+                assert_eq!(
+                    tm.header.status,
+                    CommandStatus::Success,
+                    "asked twice"
+                )
             }
             other => panic!("expected a stop answer, got {other:?}"),
         }
@@ -929,15 +983,16 @@ mod tests {
         std::fs::write(
             &path,
             "moc:\n\
-             \x20 - { name: ground, type: moc, address: 127.0.0.1, port: \"5000\", \
-             ground_base: \"127.0.0.1:5100\", moc-out: pinger }\n\
+             \x20 - { name: ground, type: moc, address: 127.0.0.1, port: \
+             \"5000\", ground_base: \"127.0.0.1:5100\", moc-out: pinger }\n\
              vehicle:\n\
              \x20 - { name: pinger, type: ping, payload-out: ground }\n",
         )
         .expect("written");
         let graph = Graph::load(&path).expect("it reads");
         let states = Arc::new(NodeStates::of(&graph).expect("states"));
-        let pinger = NodeId::of(tcslibgs::graph::telemetry::ids(&graph)["pinger"]);
+        let pinger =
+            NodeId::of(tcslibgs::graph::telemetry::ids(&graph)["pinger"]);
 
         let (bench, done) = a_pass_answering(|_| Ok(()));
         let (ground, commands) = started_with(states.clone(), bench);
@@ -1004,7 +1059,8 @@ mod tests {
             Work::Set {
                 node, attribute, ..
             } => Err(format!(
-                "no command binding says the ground may set \"{node}.{attribute}\""
+                "no command binding says the ground may set \
+                 \"{node}.{attribute}\""
             )),
             _ => Ok(()),
         });
@@ -1013,7 +1069,8 @@ mod tests {
 
         let set = |sequence, attribute: &str, value: &[u8]| {
             Command::SetNode(
-                SetNodeCommand::new(sequence, average, attribute, value).expect("it fits"),
+                SetNodeCommand::new(sequence, average, attribute, value)
+                    .expect("it fits"),
             )
         };
 
@@ -1021,7 +1078,10 @@ mod tests {
             Some(Telemetry::SetNode(tm)) => {
                 assert_eq!(tm.header.status, CommandStatus::Success);
                 assert_eq!(tm.node, average, "the answer says which node");
-                assert!(tm.reason.is_empty(), "a SET_NODE done says nothing of why");
+                assert!(
+                    tm.reason.is_empty(),
+                    "a SET_NODE done says nothing of why"
+                );
             }
             other => panic!("expected a set answer, got {other:?}"),
         }
@@ -1047,7 +1107,8 @@ mod tests {
                 // to change, not only that something was refused.
                 assert_eq!(
                     tm.reason.as_str(),
-                    "no command binding says the ground may set \"average.address\""
+                    "no command binding says the ground may set \
+                     \"average.address\""
                 );
             }
             other => panic!("expected a set answer, got {other:?}"),
@@ -1060,7 +1121,8 @@ mod tests {
             &ground,
             at,
             &Command::SetNode(
-                SetNodeCommand::new(3, nowhere, "setpoint", b"295.0").expect("it fits"),
+                SetNodeCommand::new(3, nowhere, "setpoint", b"295.0")
+                    .expect("it fits"),
             ),
         ) {
             Some(Telemetry::SetNode(tm)) => {
@@ -1213,8 +1275,11 @@ mod tests {
             .set_read_timeout(Some(Duration::from_millis(300)))
             .expect("a timeout");
 
-        let asked = serde_json::to_vec(&Command::StopNode(NodeCommand::stop(9, NodeId::of(0))))
-            .expect("a command");
+        let asked = serde_json::to_vec(&Command::StopNode(NodeCommand::stop(
+            9,
+            NodeId::of(0),
+        )))
+        .expect("a command");
         stranger
             .send_to(&asked, commands.node_address())
             .expect("it is sent");
@@ -1238,7 +1303,8 @@ mod tests {
     /// asks for one, and running a test binary again is not that.
     #[test]
     fn a_restart_is_taken_only_with_the_arms_key() {
-        static ASKED: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        static ASKED: std::sync::atomic::AtomicU32 =
+            std::sync::atomic::AtomicU32::new(0);
         fn counted() {
             ASKED.fetch_add(1, Ordering::SeqCst);
         }
@@ -1264,7 +1330,10 @@ mod tests {
         let restart = |sequence, key| match ask(
             &ground,
             at,
-            &Command::Restart(tcslibgs::RestartCommand::new(sequence, ArmKey(key))),
+            &Command::Restart(tcslibgs::RestartCommand::new(
+                sequence,
+                ArmKey(key),
+            )),
         ) {
             Some(Telemetry::Restart(tm)) => tm.header.status,
             other => panic!("expected a restart answer, got {other:?}"),
@@ -1276,9 +1345,14 @@ mod tests {
         match ask(
             &ground,
             at,
-            &Command::RestartArm(tcslibgs::RestartArmCommand::new(2, ArmKey(42))),
+            &Command::RestartArm(tcslibgs::RestartArmCommand::new(
+                2,
+                ArmKey(42),
+            )),
         ) {
-            Some(Telemetry::RestartArm(tm)) => assert_eq!(tm.header.status, CommandStatus::Success),
+            Some(Telemetry::RestartArm(tm)) => {
+                assert_eq!(tm.header.status, CommandStatus::Success)
+            }
             other => panic!("expected an arm answer, got {other:?}"),
         }
 
@@ -1292,7 +1366,11 @@ mod tests {
 
         // The right key: taken, once.
         assert_eq!(restart(4, 42), CommandStatus::Success);
-        assert_eq!(ASKED.load(Ordering::SeqCst), 1, "the restart was asked for");
+        assert_eq!(
+            ASKED.load(Ordering::SeqCst),
+            1,
+            "the restart was asked for"
+        );
 
         // And the arm is used up.
         assert_eq!(restart(5, 42), CommandStatus::NotArmed);
@@ -1333,7 +1411,10 @@ mod tests {
             serving
                 .answer(
                     CommandLink::Spacecraft,
-                    &Command::Restart(tcslibgs::RestartCommand::new(1, ArmKey(7))),
+                    &Command::Restart(tcslibgs::RestartCommand::new(
+                        1,
+                        ArmKey(7),
+                    )),
                 )
                 .status()
         };

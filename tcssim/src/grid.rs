@@ -53,7 +53,8 @@ impl Sizes {
         // ui/main.slint -- and the chrome from the real one, which knows its
         // own padding and the two rows above and below the grid. The probe is
         // built, read and dropped here; it is never shown.
-        let probe = crate::PanelProbe::new().expect("a window to measure a panel in");
+        let probe =
+            crate::PanelProbe::new().expect("a window to measure a panel in");
         let sizes = Self {
             panel_width: probe.get_panel_width(),
             panel_height: probe.get_panel_height(),
@@ -118,7 +119,11 @@ pub fn height_for_rows(sizes: &Sizes, rows: usize) -> f32 {
 }
 
 /// The size the window opens at for a grid of `shape` holding `panels`.
-pub fn window_size(sizes: &Sizes, shape: &GridShape, panels: usize) -> slint::LogicalSize {
+pub fn window_size(
+    sizes: &Sizes,
+    shape: &GridShape,
+    panels: usize,
+) -> slint::LogicalSize {
     slint::LogicalSize::new(
         shape.width,
         height_for_rows(sizes, rows_of_room(shape.rows, panels)),

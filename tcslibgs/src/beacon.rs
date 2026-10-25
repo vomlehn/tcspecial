@@ -47,7 +47,11 @@ pub struct Beacon {
 }
 
 impl Beacon {
-    pub fn new(sequence: u32, version: ConfigVersion, digest: ConfigDigest) -> Self {
+    pub fn new(
+        sequence: u32,
+        version: ConfigVersion,
+        digest: ConfigDigest,
+    ) -> Self {
         Self {
             sequence,
             version,
@@ -71,7 +75,8 @@ impl Beacon {
         // is freed before this returns, and a beacon arrives once an
         // interval. tcs-xtce's C decoder fills fixed arrays instead, and its
         // Rust one would be worth the same.
-        let packet = beacon_packet::Beacon::decode(datagram).map_err(BeaconError::Packet)?;
+        let packet = beacon_packet::Beacon::decode(datagram)
+            .map_err(BeaconError::Packet)?;
         let mut digest = [0u8; 16];
         digest.copy_from_slice(&packet.digest);
         Ok(Beacon {
@@ -152,14 +157,14 @@ impl fmt::Display for BeaconError {
         match self {
             BeaconError::Length(length) => write!(
                 f,
-                "{length} bytes, where a beacon is {BEACON_BYTES}: something other \
-                 than tcspecial, or a tcspecial of another layout, is sending to \
-                 the beacon port"
+                "{length} bytes, where a beacon is {BEACON_BYTES}: something \
+                 other than tcspecial, or a tcspecial of another layout, is \
+                 sending to the beacon port"
             ),
             BeaconError::Packet(why) => write!(
                 f,
-                "not a beacon ({why}): something other than tcspecial is sending \
-                 to the beacon port"
+                "not a beacon ({why}): something other than tcspecial is \
+                 sending to the beacon port"
             ),
         }
     }
@@ -177,8 +182,8 @@ mod tests {
 
     fn digest() -> ConfigDigest {
         ConfigDigest([
-            0xd4, 0x1d, 0x8c, 0xd9, 0x8f, 0x00, 0xb2, 0x04, 0xe9, 0x80, 0x09, 0x98, 0xec, 0xf8,
-            0x42, 0x7e,
+            0xd4, 0x1d, 0x8c, 0xd9, 0x8f, 0x00, 0xb2, 0x04, 0xe9, 0x80, 0x09,
+            0x98, 0xec, 0xf8, 0x42, 0x7e,
         ])
     }
 
@@ -205,7 +210,11 @@ mod tests {
     fn one_packer_packs_beacon_after_beacon_in_the_one_buffer() {
         let mut packer = BeaconPacker::new();
         let first = packer.pack(&Beacon::new(1, version(), digest())).as_ptr();
-        let other = Beacon::new(2, ConfigVersion::of_this_build(), ConfigDigest([9; 16]));
+        let other = Beacon::new(
+            2,
+            ConfigVersion::of_this_build(),
+            ConfigDigest([9; 16]),
+        );
         let second = packer.pack(&other);
         assert_eq!(second.as_ptr(), first);
         assert_eq!(Beacon::read(second), Ok(other));

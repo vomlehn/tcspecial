@@ -106,8 +106,8 @@ impl std::fmt::Debug for Reply {
 /// and that a ping exists to show.
 pub fn now() -> Result<Duration, String> {
     SystemTime::now().duration_since(UNIX_EPOCH).map_err(|_| {
-        "the clock says a time before the UNIX epoch, so no time since it can be \
-         written: set the clock"
+        "the clock says a time before the UNIX epoch, so no time since it can \
+         be written: set the clock"
             .to_string()
     })
 }
@@ -164,11 +164,17 @@ pub fn message(count: u64, sent: Duration) -> Result<String, String> {
 
 /// [`message`], written onto the end of `out`: how a ground station that
 /// keeps the room for one pings without allocating.
-pub fn write_message(count: u64, sent: Duration, out: &mut String) -> Result<(), String> {
+pub fn write_message(
+    count: u64,
+    sent: Duration,
+    out: &mut String,
+) -> Result<(), String> {
     use std::fmt::Write;
 
     if count == 0 {
-        return Err("a ping's count starts at one, and this one is nought".to_string());
+        return Err(
+            "a ping's count starts at one, and this one is nought".to_string()
+        );
     }
     let mut stamp = [0u8; TIME_BYTES];
     let len = write_time(sent, &mut stamp).unwrap_or(0);
@@ -181,25 +187,30 @@ pub fn write_message(count: u64, sent: Duration, out: &mut String) -> Result<(),
 pub fn read_message(bytes: &[u8]) -> Result<Ping, String> {
     if bytes.len() > MESSAGE_BYTES {
         return Err(format!(
-            "{} bytes is longer than any ping, which is at most {MESSAGE_BYTES}: {}",
+            "{} bytes is longer than any ping, which is at most \
+             {MESSAGE_BYTES}: {}",
             bytes.len(),
             said(bytes)
         ));
     }
-    let text = std::str::from_utf8(bytes)
-        .map_err(|_| format!("a ping is ASCII text, and this is not: {}", said(bytes)))?;
+    let text = std::str::from_utf8(bytes).map_err(|_| {
+        format!("a ping is ASCII text, and this is not: {}", said(bytes))
+    })?;
     let (count, sent) = text
         .strip_prefix(PREFIX)
         .and_then(|rest| rest.split_once(' '))
         .ok_or_else(|| {
             format!(
-                "{} is not a ping, which is \"{PREFIX}<count> <seconds>.<nanoseconds>\"",
+                "{} is not a ping, which is \"{PREFIX}<count> \
+                 <seconds>.<nanoseconds>\"",
                 said(bytes)
             )
         })?;
     Ok(Ping {
-        count: read_count(count).map_err(|why| format!("{}: {why}", said(bytes)))?,
-        sent: read_time(sent).map_err(|why| format!("{}: {why}", said(bytes)))?,
+        count: read_count(count)
+            .map_err(|why| format!("{}: {why}", said(bytes)))?,
+        sent: read_time(sent)
+            .map_err(|why| format!("{}: {why}", said(bytes)))?,
     })
 }
 
@@ -240,7 +251,8 @@ pub fn read_reply(bytes: &[u8]) -> Result<Pong, String> {
     // before it.
     let at = bytes.iter().rposition(|&b| b == b' ').ok_or_else(|| {
         format!(
-            "{} is not an answer to a ping, which is the ping, a space and a time",
+            "{} is not an answer to a ping, which is the ping, a space and a \
+             time",
             said(bytes)
         )
     })?;
@@ -252,7 +264,9 @@ pub fn read_reply(bytes: &[u8]) -> Result<Pong, String> {
                 said(bytes)
             )
         })
-        .and_then(|text| read_time(text).map_err(|why| format!("{}: {why}", said(bytes))))?;
+        .and_then(|text| {
+            read_time(text).map_err(|why| format!("{}: {why}", said(bytes)))
+        })?;
     Ok(Pong { ping, answered })
 }
 
@@ -263,12 +277,13 @@ fn read_count(text: &str) -> Result<u64, String> {
     }
     if text.starts_with('0') {
         return Err(format!(
-            "the count \"{text}\" starts with a nought: counts start at one and are \
-             written without leading noughts"
+            "the count \"{text}\" starts with a nought: counts start at one \
+             and are written without leading noughts"
         ));
     }
-    text.parse()
-        .map_err(|_| format!("the count \"{text}\" is larger than {}", u64::MAX))
+    text.parse().map_err(|_| {
+        format!("the count \"{text}\" is larger than {}", u64::MAX)
+    })
 }
 
 /// A time: whole seconds, a point, and exactly nine digits of nanoseconds.
@@ -285,7 +300,9 @@ fn read_time(text: &str) -> Result<Duration, String> {
         )
     };
     let (seconds, nanoseconds) = text.split_once('.').ok_or_else(wrong)?;
-    let digits = |part: &str| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit());
+    let digits = |part: &str| {
+        !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit())
+    };
     if !digits(seconds)
         || !digits(nanoseconds)
         || nanoseconds.len() != 9
@@ -293,9 +310,9 @@ fn read_time(text: &str) -> Result<Duration, String> {
     {
         return Err(wrong());
     }
-    let seconds: u64 = seconds
-        .parse()
-        .map_err(|_| format!("the time \"{text}\" has more seconds than {}", u64::MAX))?;
+    let seconds: u64 = seconds.parse().map_err(|_| {
+        format!("the time \"{text}\" has more seconds than {}", u64::MAX)
+    })?;
     let nanoseconds: u32 = nanoseconds.parse().map_err(|_| wrong())?;
     Ok(Duration::new(seconds, nanoseconds))
 }
@@ -404,7 +421,10 @@ mod tests {
         ] {
             let why = read_message(message.as_bytes()).expect_err(message);
             assert!(why.contains(says), "{message:?}: {why}");
-            assert!(reply(message.as_bytes(), ANSWERED).is_err(), "{message:?}");
+            assert!(
+                reply(message.as_bytes(), ANSWERED).is_err(),
+                "{message:?}"
+            );
         }
 
         let why = read_message(&[0xff; 8]).expect_err("not text");

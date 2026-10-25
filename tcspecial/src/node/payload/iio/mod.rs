@@ -29,7 +29,8 @@ use tcslibgs::{IioConfig, TcsError, TcsResult};
 
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
 use crate::endpoint::{
-    wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable, WaitResult,
+    wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable,
+    WaitResult,
 };
 
 /// A sensor's sample buffer, open for reading.
@@ -54,17 +55,19 @@ impl IioEndpoint {
     /// say is whether the device is there and readable, which is the failure
     /// a device set gets wrong.
     pub fn new(what: &str, config: &IioConfig) -> TcsResult<Self> {
-        let file = OpenOptions::new()
-            .read(true)
-            .open(&config.path)
-            .map_err(|e| {
-                TcsError::Endpoint(format!(
-                    "{what}: cannot open the sample buffer {}: {e}. An IIO buffer is a \
-                     character device, and one that is not there is commonly a sensor \
-                     whose channels and buffer nobody enabled",
+        let file =
+            OpenOptions::new()
+                .read(true)
+                .open(&config.path)
+                .map_err(|e| {
+                    TcsError::Endpoint(format!(
+                    "{what}: cannot open the sample buffer {}: {e}. An IIO \
+                     buffer is a character device, and one that is not there \
+                     is commonly a sensor whose channels and buffer nobody \
+                     enabled",
                     config.path
                 ))
-            })?;
+                })?;
 
         Ok(Self {
             what: what.to_string(),
@@ -94,7 +97,11 @@ impl EndpointWaitable for IioEndpoint {
         self.file.as_raw_fd()
     }
 
-    fn wait_for_event(&self, cmd_fd: RawFd, timeout_ms: i32) -> TcsResult<WaitResult> {
+    fn wait_for_event(
+        &self,
+        cmd_fd: RawFd,
+        timeout_ms: i32,
+    ) -> TcsResult<WaitResult> {
         wait_for_fds(self.io_fd(), cmd_fd, PollFlags::POLLIN, timeout_ms)
     }
 }
@@ -152,10 +159,13 @@ mod tests {
 
         let said = match IioEndpoint::new("sensor", &config) {
             Err(e) => format!("{e}"),
-            Ok(_) => panic!("this host has a device called iio:device-nonesuch"),
+            Ok(_) => {
+                panic!("this host has a device called iio:device-nonesuch")
+            }
         };
         assert!(
-            said.contains("iio:device-nonesuch") && said.contains("nobody enabled"),
+            said.contains("iio:device-nonesuch")
+                && said.contains("nobody enabled"),
             "the error should name the device and the usual cause: {said}"
         );
     }
@@ -167,7 +177,8 @@ mod tests {
     /// device produced, byte for byte.
     #[test]
     fn the_samples_a_buffer_offers_are_read() {
-        let mut file = tempfile::NamedTempFile::new().expect("a temporary file");
+        let mut file =
+            tempfile::NamedTempFile::new().expect("a temporary file");
         // Two channels of two bytes, twice: what a packed sample set looks
         // like.
         file.write_all(&[0x01, 0x00, 0x02, 0x00, 0x03, 0x00, 0x04, 0x00])

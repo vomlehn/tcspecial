@@ -269,8 +269,8 @@ pub fn read_tree(root: &Path) -> (Vec<Described>, Vec<String>) {
     for (name, count) in seen {
         if count > 1 {
             trouble.push(format!(
-                "{count} descriptions are of a node called \"{name}\", and a name \
-                 picks out one node"
+                "{count} descriptions are of a node called \"{name}\", \
+                 and a name picks out one node"
             ));
         }
     }
@@ -279,7 +279,12 @@ pub fn read_tree(root: &Path) -> (Vec<Described>, Vec<String>) {
 }
 
 /// Every description file under `where_`, as paths relative to `root`.
-fn walk(root: &Path, where_: &Path, found: &mut Vec<PathBuf>, trouble: &mut Vec<String>) {
+fn walk(
+    root: &Path,
+    where_: &Path,
+    found: &mut Vec<PathBuf>,
+    trouble: &mut Vec<String>,
+) {
     let entries = match std::fs::read_dir(where_) {
         Ok(entries) => entries,
         Err(e) => {
@@ -309,7 +314,9 @@ fn walk(root: &Path, where_: &Path, found: &mut Vec<PathBuf>, trouble: &mut Vec<
         }
         match path.strip_prefix(root) {
             Ok(relative) => found.push(relative.to_path_buf()),
-            Err(_) => trouble.push(format!("{}: not under the tree", path.display())),
+            Err(_) => {
+                trouble.push(format!("{}: not under the tree", path.display()))
+            }
         }
     }
 }
@@ -317,8 +324,8 @@ fn walk(root: &Path, where_: &Path, found: &mut Vec<PathBuf>, trouble: &mut Vec<
 /// One description, read from `root`-relative `path`.
 fn read_one(root: &Path, path: &Path) -> Result<Described, String> {
     let whole = root.join(path);
-    let said: Said =
-        tcslibgs::load_config_file(&whole).map_err(|e| format!("{}: {e}", whole.display()))?;
+    let said: Said = tcslibgs::load_config_file(&whole)
+        .map_err(|e| format!("{}: {e}", whole.display()))?;
 
     let named = |what: &str| format!("{}: {what}", whole.display());
     let node = said.node.as_str().trim().to_string();
@@ -330,8 +337,8 @@ fn read_one(root: &Path, path: &Path) -> Result<Described, String> {
     let node_type = said.node_type.as_str().trim().to_string();
     if node_type.is_empty() {
         return Err(named(&format!(
-            "\"{node}\" says no type: a description names the configuration's own \
-             word for what it is"
+            "\"{node}\" says no type: a description names the \
+             configuration's own word for what it is"
         )));
     }
 
@@ -339,7 +346,9 @@ fn read_one(root: &Path, path: &Path) -> Result<Described, String> {
     for attribute in &said.attributes {
         let name = attribute.name.as_str().trim().to_string();
         if name.is_empty() {
-            return Err(named(&format!("\"{node}\" has an attribute with no name")));
+            return Err(named(&format!(
+                "\"{node}\" has an attribute with no name"
+            )));
         }
         let required = match attribute
             .required
@@ -352,8 +361,8 @@ fn read_one(root: &Path, path: &Path) -> Result<Described, String> {
                 "false" => false,
                 other => {
                     return Err(named(&format!(
-                        "\"{node}\", attribute \"{name}\": required is true or false, \
-                         and this says \"{other}\""
+                        "\"{node}\", attribute \"{name}\": required is \
+                         true or false, and this says \"{other}\""
                     )))
                 }
             },
@@ -395,7 +404,8 @@ fn read_one(root: &Path, path: &Path) -> Result<Described, String> {
                 "true" => Ok(true),
                 "false" => Ok(false),
                 other => Err(named(&format!(
-                    "\"{node}\": {what} is true or false, and this says \"{other}\""
+                    "\"{node}\": {what} is true or false, and this says \
+                     \"{other}\""
                 ))),
             },
         }
@@ -414,7 +424,9 @@ fn read_one(root: &Path, path: &Path) -> Result<Described, String> {
         sets: said
             .sets
             .iter()
-            .map(|(name, value)| (name.clone(), value.as_str().trim().to_string()))
+            .map(|(name, value)| {
+                (name.clone(), value.as_str().trim().to_string())
+            })
             .collect(),
         attributes,
         terminals,
@@ -652,7 +664,8 @@ mod tests {
         let (described, trouble) = read_tree(&shipped());
         assert_eq!(trouble, Vec::<String>::new());
 
-        let names: Vec<&str> = described.iter().map(|one| one.node.as_str()).collect();
+        let names: Vec<&str> =
+            described.iter().map(|one| one.node.as_str()).collect();
         assert_eq!(
             names,
             vec![
@@ -701,7 +714,10 @@ mod tests {
             .find(|one| one.node == "vote")
             .expect("vote");
         assert_eq!(voter.node_type, "compute");
-        assert_eq!(voter.sets.get("function").map(String::as_str), Some("vote"));
+        assert_eq!(
+            voter.sets.get("function").map(String::as_str),
+            Some("vote")
+        );
         assert_eq!(voter.attributes.len(), 2);
         assert_eq!(voter.attributes[0].name, "inputs");
         assert!(voter.attributes[0].required);
@@ -724,7 +740,8 @@ mod tests {
             process.sets.get("function").map(String::as_str),
             Some("process")
         );
-        let asked: Vec<&str> = process.attributes.iter().map(|a| a.name.as_str()).collect();
+        let asked: Vec<&str> =
+            process.attributes.iter().map(|a| a.name.as_str()).collect();
         assert_eq!(asked, vec!["executable", "timeout", "restart"]);
         assert!(process.attributes.iter().all(|a| a.required));
 
@@ -771,7 +788,8 @@ mod tests {
             for attribute in &one.attributes {
                 assert!(
                     KINDS.contains(&attribute.kind.as_str()),
-                    "{}: \"{}\" takes a kind called \"{}\", which is not one of {}",
+                    "{}: \"{}\" takes a kind called \"{}\", which is not \
+                     one of {}",
                     one.path.display(),
                     attribute.name,
                     attribute.kind,
@@ -780,8 +798,8 @@ mod tests {
                 assert_eq!(
                     attribute.kind == "boolean",
                     booleans.contains(&attribute.name.as_str()),
-                    "{}: \"{}\" says the kind \"{}\", and the rules read it the \
-                     other way",
+                    "{}: \"{}\" says the kind \"{}\", and the rules read \
+                     it the other way",
                     one.path.display(),
                     attribute.name,
                     attribute.kind
@@ -801,7 +819,9 @@ mod tests {
                 .attributes
                 .iter()
                 .find(|attribute| attribute.name == "restart")
-                .unwrap_or_else(|| panic!("{} says nothing about restarting", app.node));
+                .unwrap_or_else(|| {
+                    panic!("{} says nothing about restarting", app.node)
+                });
             assert_eq!(restart.kind, "boolean", "{}", app.node);
         }
     }
@@ -825,15 +845,19 @@ mod tests {
         assert!(!described.is_empty());
 
         for one in &described {
-            let Some(table) = tcslibgs::graph::terminals::terminals_of(&one.node_type) else {
+            let Some(table) =
+                tcslibgs::graph::terminals::terminals_of(&one.node_type)
+            else {
                 continue;
             };
             for (terminal, said) in one.terminals.each() {
-                let known = table.sinks.contains(&terminal) || table.sources.contains(&terminal);
+                let known = table.sinks.contains(&terminal)
+                    || table.sources.contains(&terminal);
                 assert_eq!(
                     said,
                     known,
-                    "{}: {terminal} is {} in the description and {} in the table",
+                    "{}: {terminal} is {} in the description and {} in the \
+                     table",
                     one.path.display(),
                     if said { "declared" } else { "not declared" },
                     if known { "declared" } else { "not" }
@@ -927,14 +951,17 @@ mod tests {
     /// one, which is what keeps a family from being half described.
     #[test]
     fn every_description_has_its_rust() {
-        let code = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tcspecial/src/node");
+        let code =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../tcspecial/src/node");
         let (described, _) = read_tree(&shipped());
         assert!(!described.is_empty());
 
         let mut families: Vec<PathBuf> = Vec::new();
         for one in &described {
             // The gateway nodes, which have none: see above.
-            if one.path == Path::new("moc.yaml") || one.path == Path::new("gateway_fprime.yaml") {
+            if one.path == Path::new("moc.yaml")
+                || one.path == Path::new("gateway_fprime.yaml")
+            {
                 continue;
             }
             // The same path, with the extension taken off:
@@ -951,7 +978,9 @@ mod tests {
                 directory.display()
             );
             if let Some(family) = stem.parent() {
-                if !family.as_os_str().is_empty() && !families.contains(&family.to_path_buf()) {
+                if !family.as_os_str().is_empty()
+                    && !families.contains(&family.to_path_buf())
+                {
                     families.push(family.to_path_buf());
                 }
             }
@@ -959,7 +988,8 @@ mod tests {
 
         for family in families {
             let where_ = code.join(&family);
-            for entry in std::fs::read_dir(&where_).expect("the family's code") {
+            for entry in std::fs::read_dir(&where_).expect("the family's code")
+            {
                 let path = entry.expect("an entry").path();
                 // `mod.rs` is the family's own module rather than one of its
                 // nodes, and a directory is a node whose code is several
@@ -978,7 +1008,8 @@ mod tests {
                 assert!(
                     described
                         .iter()
-                        .any(|one| one.path.with_extension("") == family.join(&stem)),
+                        .any(|one| one.path.with_extension("")
+                            == family.join(&stem)),
                     "{} is implemented and nothing in {} describes it",
                     path.display(),
                     shipped().join(&family).display()
@@ -991,9 +1022,9 @@ mod tests {
     ///
     /// The other correspondence, and the one that would drift: the parameters
     /// of each computation are the flight software's own list -- see
-    /// `tcslibgs::node::vehicle::compute::attributes_of` -- and a description that asked
-    /// for something else would be a panel that fills in a field the checking
-    /// then refuses, or leaves out one it requires.
+    /// `tcslibgs::node::vehicle::compute::attributes_of` -- and a description
+    /// that asked for something else would be a panel that fills in a field
+    /// the checking then refuses, or leaves out one it requires.
     #[test]
     fn a_computations_description_asks_for_what_it_takes() {
         let (described, _) = read_tree(&shipped());
@@ -1004,16 +1035,19 @@ mod tests {
         assert_eq!(computations.len(), 4, "every computation is described");
 
         for one in computations {
-            let function = one
-                .sets
-                .get("function")
-                .unwrap_or_else(|| panic!("{}: a computation says which", one.node));
-            let takes = tcslibgs::node::vehicle::compute::attributes_of(function)
-                .unwrap_or_else(|| panic!("{}: there is no such computation", one.node));
+            let function = one.sets.get("function").unwrap_or_else(|| {
+                panic!("{}: a computation says which", one.node)
+            });
+            let takes =
+                tcslibgs::node::vehicle::compute::attributes_of(function)
+                    .unwrap_or_else(|| {
+                        panic!("{}: there is no such computation", one.node)
+                    });
 
             // What the file asks for, plus what it fills in itself, is what
             // the computation takes -- no more and no less.
-            let mut said: Vec<&str> = one.attributes.iter().map(|a| a.name.as_str()).collect();
+            let mut said: Vec<&str> =
+                one.attributes.iter().map(|a| a.name.as_str()).collect();
             said.extend(one.sets.keys().map(String::as_str));
             said.sort_unstable();
             let mut wanted: Vec<&str> = takes.to_vec();
@@ -1039,8 +1073,9 @@ mod tests {
                 .collect::<BTreeMap<String, String>>()
         };
 
-        let voter = matching(&described, "compute", &said(&[("function", "vote")]))
-            .expect("a compute node with a function is described");
+        let voter =
+            matching(&described, "compute", &said(&[("function", "vote")]))
+                .expect("a compute node with a function is described");
         assert_eq!(voter.node, "vote");
         // What the panel asks: the function it is, and then what a vote says.
         assert_eq!(
@@ -1072,7 +1107,8 @@ mod tests {
 
         // A type described without answering anything matches whatever it is
         // told, there being nothing to disagree with.
-        let null = matching(&described, "null-moc", &said(&[])).expect("the null-moc node");
+        let null = matching(&described, "null-moc", &said(&[]))
+            .expect("the null-moc node");
         assert_eq!(null.node, "null-moc");
         assert!(null.asked().is_empty(), "a null node says nothing");
 
@@ -1109,13 +1145,17 @@ mod tests {
         )
         .expect("a bad one");
         // And one that says nothing about which node it is.
-        std::fs::write(root.join("nameless.yaml"), "node: \"\"\ntype: compute\n")
-            .expect("a nameless one");
+        std::fs::write(
+            root.join("nameless.yaml"),
+            "node: \"\"\ntype: compute\n",
+        )
+        .expect("a nameless one");
         // Not a description at all, and not complained about either.
         std::fs::write(root.join("README"), "The tree.\n").expect("a readme");
 
         let (described, trouble) = read_tree(root);
-        let names: Vec<&str> = described.iter().map(|one| one.node.as_str()).collect();
+        let names: Vec<&str> =
+            described.iter().map(|one| one.node.as_str()).collect();
         assert_eq!(names, vec!["mean"], "the good one is still read");
         assert_eq!(trouble.len(), 2, "{trouble:?}");
         assert!(
@@ -1185,23 +1225,27 @@ mod tests {
     /// its own terms fails here until they are offered.
     #[test]
     fn the_compute_fields_are_every_computations_terms() {
-        let tree = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("share/nodes");
+        let tree = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("share/nodes");
         let (described, trouble) = read_tree(&tree);
         assert!(trouble.is_empty(), "{trouble:?}");
 
         let offered = tcsdiagram::style::NodeType::Compute.attributes();
         let mut asked = 0;
         for one in described.iter().filter(|one| one.node_type == "compute") {
-            let function = one
-                .sets
-                .get("function")
-                .unwrap_or_else(|| panic!("{}: a computation sets its function", one.node));
-            let terms = tcslibgs::node::vehicle::compute::attributes_of(function)
-                .unwrap_or_else(|| panic!("{function} is not a computation"));
+            let function = one.sets.get("function").unwrap_or_else(|| {
+                panic!("{}: a computation sets its function", one.node)
+            });
+            let terms =
+                tcslibgs::node::vehicle::compute::attributes_of(function)
+                    .unwrap_or_else(|| {
+                        panic!("{function} is not a computation")
+                    });
             for term in terms {
                 assert!(
                     offered.iter().any(|(name, _)| name == term),
-                    "a {function} takes \"{term}\" and the compute fields do not offer it"
+                    "a {function} takes \"{term}\" and the compute fields \
+                     do not offer it"
                 );
                 asked += 1;
             }

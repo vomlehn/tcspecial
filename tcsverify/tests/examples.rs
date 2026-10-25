@@ -52,7 +52,8 @@ fn sim_for(config: &Path) -> PathBuf {
 /// that is not finished teaches somebody to leave theirs unfinished.
 #[test]
 fn every_example_verifies() {
-    let configs: Vec<PathBuf> = yaml_files().into_iter().filter(|p| !is_sim(p)).collect();
+    let configs: Vec<PathBuf> =
+        yaml_files().into_iter().filter(|p| !is_sim(p)).collect();
     assert!(
         !configs.is_empty(),
         "no examples in {}",
@@ -69,7 +70,8 @@ fn every_example_verifies() {
         );
 
         let report = verify(&config, Some(&sim), tcsverify::Limits::EVERYTHING);
-        let findings: Vec<String> = report.findings.iter().map(|f| f.to_string()).collect();
+        let findings: Vec<String> =
+            report.findings.iter().map(|f| f.to_string()).collect();
         assert!(
             findings.is_empty(),
             "{}:\n{}",
@@ -104,7 +106,8 @@ fn every_example_reads_the_same_in_both_formats() {
         // Where each was read from is the one thing the two differ in by
         // rights.
         let load = |path: &Path| {
-            let mut graph = Graph::load(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+            let mut graph = Graph::load(path)
+                .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
             graph.files.clear();
             graph.homes.clear();
             graph
@@ -140,7 +143,10 @@ fn every_xml_example_has_its_yaml() {
 fn every_simulator_file_has_its_configuration() {
     for sim in yaml_files().into_iter().filter(|p| is_sim(p)) {
         let name = sim.to_str().expect("a UTF-8 path");
-        let config = PathBuf::from(format!("{}.yaml", &name[..name.len() - SIM_SUFFIX.len()]));
+        let config = PathBuf::from(format!(
+            "{}.yaml",
+            &name[..name.len() - SIM_SUFFIX.len()]
+        ));
         assert!(
             config.is_file(),
             "{} has no {}",
@@ -166,7 +172,8 @@ fn every_example_has_a_diagram_of_its_nodes() {
                 svg.display()
             )
         });
-        let graph = Graph::load(&config).unwrap_or_else(|e| panic!("{}: {e}", config.display()));
+        let graph = Graph::load(&config)
+            .unwrap_or_else(|e| panic!("{}: {e}", config.display()));
         for node in &graph.nodes {
             assert!(
                 drawn.contains(&format!(">{}<", node.name)),
@@ -182,9 +189,10 @@ fn every_example_has_a_diagram_of_its_nodes() {
 /// And every example has a section in the manual, which shows its diagram.
 #[test]
 fn every_example_is_in_the_manual() {
-    let manual = Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs/manual.rst");
-    let text =
-        std::fs::read_to_string(&manual).unwrap_or_else(|e| panic!("{}: {e}", manual.display()));
+    let manual =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs/manual.rst");
+    let text = std::fs::read_to_string(&manual)
+        .unwrap_or_else(|e| panic!("{}: {e}", manual.display()));
     for config in yaml_files().into_iter().filter(|p| !is_sim(p)) {
         let name = config.file_stem().and_then(|s| s.to_str()).expect("a name");
         let figure = format!(".. figure:: ../examples/{name}/{name}.svg");
@@ -213,10 +221,11 @@ fn every_example_is_in_the_manual() {
 fn every_node_in_the_manual_verifies() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let manual = root.join("docs/manual.rst");
-    let text =
-        std::fs::read_to_string(&manual).unwrap_or_else(|e| panic!("{}: {e}", manual.display()));
-    let worked = std::fs::read_to_string(root.join("tests/manual/thermostat.yaml"))
-        .expect("the worked example");
+    let text = std::fs::read_to_string(&manual)
+        .unwrap_or_else(|e| panic!("{}: {e}", manual.display()));
+    let worked =
+        std::fs::read_to_string(root.join("tests/manual/thermostat.yaml"))
+            .expect("the worked example");
     let section = top_level_section(&worked, "tcspecial");
     let dir = tempfile::tempdir().expect("a directory");
 
@@ -230,8 +239,11 @@ fn every_node_in_the_manual_verifies() {
                 .lines()
                 .find_map(|l| l.trim().strip_prefix("type:"))
                 .map(str::trim)
-                .unwrap_or_else(|| panic!("manual.rst:{line}: a node with no type"));
-            let nested: String = block.lines().map(|l| format!("  {l}\n")).collect();
+                .unwrap_or_else(|| {
+                    panic!("manual.rst:{line}: a node with no type")
+                });
+            let nested: String =
+                block.lines().map(|l| format!("  {l}\n")).collect();
             let under = tcslibgs::graph::section_of(node_type).name();
             format!("{section}{under}:\n{nested}")
         } else {
@@ -262,7 +274,8 @@ fn every_node_in_the_manual_verifies() {
 /// One top-level section of a YAML file, its key line included.
 fn top_level_section(yaml: &str, key: &str) -> String {
     let mut lines = yaml.lines().skip_while(|l| *l != format!("{key}:"));
-    let mut section: String = lines.next().map(|l| format!("{l}\n")).unwrap_or_default();
+    let mut section: String =
+        lines.next().map(|l| format!("{l}\n")).unwrap_or_default();
     for l in lines.take_while(|l| l.is_empty() || l.starts_with(' ')) {
         section.push_str(l);
         section.push('\n');
@@ -288,7 +301,9 @@ fn yaml_blocks(text: &str) -> Vec<(usize, String)> {
         let deeper = indent(lines[i]) + 1;
         i += 1;
         let start = i;
-        while i < lines.len() && (lines[i].trim().is_empty() || indent(lines[i]) >= deeper) {
+        while i < lines.len()
+            && (lines[i].trim().is_empty() || indent(lines[i]) >= deeper)
+        {
             i += 1;
         }
         let body = &lines[start..i];

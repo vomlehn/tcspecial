@@ -5,8 +5,8 @@
 //! behind it, and a handler opens it, sets it and reads it exactly as it would
 //! a port. And a SPI peripheral, where it is not: a pty carries the bytes and
 //! has no clock, so what the handler sets a real peripheral to has nowhere to
-//! go. See [`crate::node::payload::serial`] and [`crate::node::payload::spi`] for what each
-//! makes of that.
+//! go. See [`crate::node::payload::serial`] and
+//! [`crate::node::payload::spi`] for what each makes of that.
 //!
 //! What they share is here: opening the pty, taking the line discipline out of
 //! the way, and making the path a handler was told to open lead to the slave
@@ -141,7 +141,10 @@ pub(crate) fn make_raw(fd: RawFd) -> Result<(), String> {
 /// Reads must not wait: one thread does the receiving and the sending both.
 fn set_nonblocking(fd: RawFd) -> Result<(), String> {
     let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
-    if flags < 0 || unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) } < 0 {
+    if flags < 0
+        || unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) }
+            < 0
+    {
         return Err(format!(
             "the pseudo-terminal cannot be made non-blocking: {}",
             std::io::Error::last_os_error()

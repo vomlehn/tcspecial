@@ -19,11 +19,13 @@ use nix::poll::PollFlags;
 use tcslibgs::{NetworkConfig, TcsError, TcsResult};
 
 use crate::config::constants::{
-    ENDPOINT_BUFFER_SIZE, ENDPOINT_CONNECT_BUDGET, ENDPOINT_DELAY_INIT, ENDPOINT_DELAY_MAX,
+    ENDPOINT_BUFFER_SIZE, ENDPOINT_CONNECT_BUDGET, ENDPOINT_DELAY_INIT,
+    ENDPOINT_DELAY_MAX,
 };
 use crate::endpoint::bind_failed;
 use crate::endpoint::{
-    wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable, WaitResult,
+    wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable,
+    WaitResult,
 };
 
 /// TCP endpoint for stream communication
@@ -37,8 +39,9 @@ pub struct TcpEndpoint {
 impl TcpEndpoint {
     pub fn new_server(what: &str, config: &NetworkConfig) -> TcsResult<Self> {
         let addr = format!("{}:{}", config.address, config.port);
-        let listener = TcpListener::bind(&addr)
-            .map_err(|e| bind_failed(&format!("{what} TCP endpoint"), &addr, e))?;
+        let listener = TcpListener::bind(&addr).map_err(|e| {
+            bind_failed(&format!("{what} TCP endpoint"), &addr, e)
+        })?;
         listener.set_nonblocking(true)?;
 
         Ok(Self {
@@ -69,8 +72,9 @@ impl TcpEndpoint {
 
     pub fn new_client(what: &str, config: &NetworkConfig) -> TcsResult<Self> {
         let addr = format!("{}:{}", config.address, config.port);
-        let stream = TcpStream::connect(&addr)
-            .map_err(|e| TcsError::Config(format!("{what}: cannot reach {addr}: {e}")))?;
+        let stream = TcpStream::connect(&addr).map_err(|e| {
+            TcsError::Config(format!("{what}: cannot reach {addr}: {e}"))
+        })?;
         stream.set_nonblocking(true)?;
 
         Ok(Self {
@@ -86,9 +90,13 @@ impl TcpEndpoint {
     /// See this module's `connect_retrying`. A node may be started before
     /// the device it reaches, and a device that is not listening yet refuses
     /// rather than failing in any way that waiting cannot fix.
-    pub fn connect_retrying(what: &str, config: &NetworkConfig) -> TcsResult<Self> {
+    pub fn connect_retrying(
+        what: &str,
+        config: &NetworkConfig,
+    ) -> TcsResult<Self> {
         let addr = format!("{}:{}", config.address, config.port);
-        let stream = connect_retrying(what, &addr, || TcpStream::connect(&addr))?;
+        let stream =
+            connect_retrying(what, &addr, || TcpStream::connect(&addr))?;
         stream.set_nonblocking(true)?;
 
         Ok(Self {
@@ -107,7 +115,9 @@ impl TcpEndpoint {
                     self.stream = Some(stream);
                     Ok(true)
                 }
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Ok(false),
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    Ok(false)
+                }
                 Err(e) => Err(TcsError::Io(e)),
             }
         } else {
@@ -131,7 +141,11 @@ impl EndpointWaitable for TcpEndpoint {
         }
     }
 
-    fn wait_for_event(&self, cmd_fd: RawFd, timeout_ms: i32) -> TcsResult<WaitResult> {
+    fn wait_for_event(
+        &self,
+        cmd_fd: RawFd,
+        timeout_ms: i32,
+    ) -> TcsResult<WaitResult> {
         wait_for_fds(self.io_fd(), cmd_fd, PollFlags::POLLIN, timeout_ms)
     }
 }
@@ -194,8 +208,8 @@ pub(crate) fn connect_retrying<T>(
             Ok(opened) => {
                 if refusals > 0 {
                     info!(
-                        "{what}: reached {addr} after {refusals} refusal(s): the far \
-                         end was not listening yet"
+                        "{what}: reached {addr} after {refusals} refusal(s): \
+                         the far end was not listening yet"
                     );
                 }
                 return Ok(opened);
@@ -205,9 +219,10 @@ pub(crate) fn connect_retrying<T>(
                 let left = deadline.saturating_duration_since(Instant::now());
                 if left.is_zero() {
                     return Err(TcsError::Config(format!(
-                        "{what}: cannot reach {addr}: connection refused for {:?}. \
-                         Nothing is listening there -- a simulated device has to be \
-                         started before the handler that reaches it",
+                        "{what}: cannot reach {addr}: connection refused for \
+                         {:?}. Nothing is listening there -- a simulated \
+                         device has to be started before the handler that \
+                         reaches it",
                         ENDPOINT_CONNECT_BUDGET
                     )));
                 }
@@ -246,7 +261,8 @@ mod tests {
 
         let listening = std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(300));
-            let listener = TcpListener::bind(addr).expect("the far end starts late");
+            let listener =
+                TcpListener::bind(addr).expect("the far end starts late");
             listener.accept().expect("and accepts");
         });
 
@@ -264,7 +280,8 @@ mod tests {
         assert!(endpoint.is_connected());
         assert!(
             waited >= Duration::from_millis(300),
-            "it cannot have connected before the far end was listening: {waited:?}"
+            "it cannot have connected before the far end was listening: \
+             {waited:?}"
         );
 
         drop(endpoint);

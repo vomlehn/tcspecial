@@ -149,14 +149,15 @@ pub const MOC_RUNGS: &[&str] = &["#0073b5"];
 
 /// The vehicle's own graph, in the order the panel lists it: compute, log,
 /// null-moc (which took the null node's), ping, subdiagram.
-pub const VEHICLE_RUNGS: &[&str] = &["#547800", "#4b7000", "#446600", "#3d5d00"];
+pub const VEHICLE_RUNGS: &[&str] =
+    &["#547800", "#4b7000", "#446600", "#3d5d00"];
 
 /// And what it carries, which is the longest ramp: ten rungs from 46.2 of
 /// lightness down to 15.0, three and a half units apart, which is as far as
 /// the floor allows.
 pub const PAYLOAD_RUNGS: &[&str] = &[
-    "#007a7d", "#007173", "#00676a", "#005e61", "#005557", "#004c4e", "#004446", "#003b3d",
-    "#003335", "#002b2c",
+    "#007a7d", "#007173", "#00676a", "#005e61", "#005557", "#004c4e",
+    "#004446", "#003b3d", "#003335", "#002b2c",
 ];
 
 /// Each panel's own node types in the order the ramp is walked: the types the
@@ -211,7 +212,8 @@ pub fn ground_of(ground: style::Ground) -> String {
 /// before this was shared: a colour that could not be read is drawn, as a
 /// line of the wrong colour is, rather than left out.
 pub fn rgb(hex: &str) -> (u8, u8, u8) {
-    let value = u32::from_str_radix(hex.trim_start_matches('#'), 16).unwrap_or(0x33_33_33);
+    let value = u32::from_str_radix(hex.trim_start_matches('#'), 16)
+        .unwrap_or(0x33_33_33);
     (
         ((value >> 16) & 0xff) as u8,
         ((value >> 8) & 0xff) as u8,

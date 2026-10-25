@@ -27,13 +27,15 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
-use crate::endpoint_config::{bad, parse_flag, EndpointConfigResult, LinkTerms};
+use crate::endpoint_config::{
+    bad, parse_flag, EndpointConfigResult, LinkTerms,
+};
 
 /// What a line's RS-485 turnaround is set to.
 ///
-/// Carried to the handler, where `tcspecial::node::payload::serial::rs485` asks the port
-/// for it. Absent -- `None` on a [`crate::SerialConfig`] -- is a line that is
-/// not an RS-485 bus and is left exactly as it was before any of this
+/// Carried to the handler, where `tcspecial::node::payload::serial::rs485` asks
+/// the port for it. Absent -- `None` on a [`crate::SerialConfig`] -- is a line
+/// that is not an RS-485 bus and is left exactly as it was before any of this
 /// existed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Rs485Params {
@@ -96,14 +98,17 @@ pub(crate) fn rs485_of(
     // A synchronous line is driven through generic HDLC rather than through a
     // UART's own settings, so there is nothing to tell about a turnaround.
     if !asynchronous {
-        for (field, stated) in details.iter().chain([("rs485", g.rs485.is_some())].iter()) {
+        for (field, stated) in
+            details.iter().chain([("rs485", g.rs485.is_some())].iter())
+        {
             if *stated {
                 return Err(bad(
                     name,
                     &format!(
-                        "{field} does not apply to a synchronous line: RS-485 is the \
-                         electrical layer under a start-stop line, and a line whose \
-                         bits are on a clock is driven through generic HDLC instead"
+                        "{field} does not apply to a synchronous line: RS-485 \
+                         is the electrical layer under a start-stop line, and \
+                         a line whose bits are on a clock is driven through \
+                         generic HDLC instead"
                     ),
                 ));
             }
@@ -119,8 +124,8 @@ pub(crate) fn rs485_of(
                 name,
                 &format!(
                     "{field} applies only to a line that states rs485: true: a \
-                     turnaround on a line that is not an RS-485 bus is a driver \
-                     nothing ever releases"
+                     turnaround on a line that is not an RS-485 bus is a \
+                     driver nothing ever releases"
                 ),
             ));
         }
@@ -130,39 +135,41 @@ pub(crate) fn rs485_of(
     // Which level drives the transceiver, and no default for it: see
     // Rs485Params::rts_on_send.
     let rts_on_send = match g.rs485_rts_on_send.as_ref() {
-        Some(stated) => {
-            parse_flag(name, "rs485_rts_on_send", Some(stated))?.expect("a value was given")
-        }
+        Some(stated) => parse_flag(name, "rs485_rts_on_send", Some(stated))?
+            .expect("a value was given"),
         None => {
             return Err(bad(
                 name,
-                "an RS-485 line states rs485_rts_on_send: which level of RTS drives \
-                 the transceiver is a property of the board, and a line that drove \
-                 the bus the wrong way round would transmit exactly when it should \
-                 be listening",
+                "an RS-485 line states rs485_rts_on_send: which level of RTS \
+                 drives the transceiver is a property of the board, and a line \
+                 that drove the bus the wrong way round would transmit exactly \
+                 when it should be listening",
             ))
         }
     };
 
-    let delay = |field: &str, stated: Option<&crate::endpoint_config::Scalar>| match stated {
-        Some(s) => {
-            let held = crate::graph::parse_interval(s.as_str())
-                .map_err(|why| bad(name, &format!("{field}: {why}")))?;
-            if held > LONGEST_DELAY {
-                return Err(bad(
-                    name,
-                    &format!(
-                        "{field} is longer than {} ms: a turnaround is a few bit \
-                             times, and a line that held the bus for this long would \
-                             look like one that had failed",
+    let delay =
+        |field: &str, stated: Option<&crate::endpoint_config::Scalar>| {
+            match stated {
+                Some(s) => {
+                    let held = crate::graph::parse_interval(s.as_str())
+                        .map_err(|why| bad(name, &format!("{field}: {why}")))?;
+                    if held > LONGEST_DELAY {
+                        return Err(bad(
+                            name,
+                            &format!(
+                        "{field} is longer than {} ms: a turnaround is a few \
+                         bit times, and a line that held the bus for this long \
+                         would look like one that had failed",
                         LONGEST_DELAY.as_millis()
                     ),
-                ));
+                        ));
+                    }
+                    Ok(held)
+                }
+                None => Ok(Duration::ZERO),
             }
-            Ok(held)
-        }
-        None => Ok(Duration::ZERO),
-    };
+        };
 
     Ok(Some(Rs485Params {
         rts_on_send,
@@ -170,7 +177,10 @@ pub(crate) fn rs485_of(
             "rs485_delay_before_send",
             g.rs485_delay_before_send.as_ref(),
         )?,
-        delay_after_send: delay("rs485_delay_after_send", g.rs485_delay_after_send.as_ref())?,
+        delay_after_send: delay(
+            "rs485_delay_after_send",
+            g.rs485_delay_after_send.as_ref(),
+        )?,
     }))
 }
 
@@ -207,7 +217,8 @@ mod tests {
             None
         );
         assert_eq!(
-            rs485_of("line", &terms(&[("rs485", "false")]), true).expect("a plain line"),
+            rs485_of("line", &terms(&[("rs485", "false")]), true)
+                .expect("a plain line"),
             None
         );
     }
@@ -234,7 +245,8 @@ mod tests {
                 delay_before_send: Duration::from_millis(0),
                 delay_after_send: Duration::from_millis(0),
             }),
-            "and the delays default to nought, which is right for a quick transceiver"
+            "and the delays default to nought, which is right for a quick \
+             transceiver"
         );
     }
 
@@ -290,7 +302,8 @@ mod tests {
             let said = rs485_of("line", &terms(&[(field, "1")]), true)
                 .expect_err("a turnaround with the mode off");
             assert!(
-                format!("{said}").contains(field) && format!("{said}").contains("rs485: true"),
+                format!("{said}").contains(field)
+                    && format!("{said}").contains("rs485: true"),
                 "the error should name the field and what it needs: {said}"
             );
         }

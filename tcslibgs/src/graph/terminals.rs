@@ -101,7 +101,8 @@ pub fn answers(terminal: &str) -> Option<&'static str> {
 /// editor, which will not draw one in the first place: a gesture that cannot
 /// make a bad link is better than a bad link reported after the fact.
 pub fn pairs_with(leaves: &str, arrives: &str) -> bool {
-    answers(leaves) == Some(arrives) && stream_of(leaves).is_some_and(|(sink, _)| !sink)
+    answers(leaves) == Some(arrives)
+        && stream_of(leaves).is_some_and(|(sink, _)| !sink)
 }
 
 /// A node type's data sinks and data sources, by name.
@@ -241,8 +242,8 @@ pub fn terminals_of(node_type: &str) -> Option<Terminals> {
     };
 
     match node_type {
-        "i2c" | "spi" | "serial" | "hdlc" | "can" | "iio" | "rpmsg" | "network" | "device-file"
-        | "gpio" => Some(PAYLOAD),
+        "i2c" | "spi" | "serial" | "hdlc" | "can" | "iio" | "rpmsg"
+        | "network" | "device-file" | "gpio" => Some(PAYLOAD),
         gateway if crate::gateway::is_gateway(gateway) => Some(MOC),
         "null-moc" => Some(NULL_MOC),
         "null-payload" => Some(NULL_PAYLOAD),
@@ -312,8 +313,8 @@ pub fn terminal_at(
             if sink { "arrives" } else { "leaves" }
         )),
         Some(named) => Err(format!(
-            "a {node_type} node has no {which} called \"{named}\". Its {which}s \
-             are {}",
+            "a {node_type} node has no {which} called \"{named}\". Its \
+             {which}s are {}",
             said(ours)
         )),
         // Nothing named, which is every link in a file written before there
@@ -441,13 +442,15 @@ mod tests {
         let null_moc = terminals_of("null-moc").expect("the null-moc node");
         assert_eq!(null_moc.sinks, &["moc-in"]);
         assert!(null_moc.sources.is_empty());
-        let null_payload = terminals_of("null-payload").expect("the null-payload node");
+        let null_payload =
+            terminals_of("null-payload").expect("the null-payload node");
         assert_eq!(null_payload.sinks, &["payload-in"]);
         assert!(null_payload.sources.is_empty());
 
         let tee_moc = terminals_of("tee-moc").expect("the tee-moc node");
         assert_eq!(tee_moc.sinks, &["moc-in"]);
-        let tee_payload = terminals_of("tee-payload").expect("the tee-payload node");
+        let tee_payload =
+            terminals_of("tee-payload").expect("the tee-payload node");
         assert_eq!(tee_payload.sinks, &["payload-in"]);
         for tee in [tee_moc, tee_payload] {
             for name in ["payload-out", "moc-out"] {
@@ -480,7 +483,8 @@ mod tests {
         // The vehicle's own three. On the interface where it reads payload
         // data it writes MOC data, so the first wears the ground link's shape
         // and the second a payload's.
-        let payload_veh = terminals_of("app_payload_veh").expect("a kind of app");
+        let payload_veh =
+            terminals_of("app_payload_veh").expect("a kind of app");
         assert_eq!(payload_veh.sinks, &["payload-in"]);
         assert_eq!(payload_veh.sources, &["moc-out"]);
         assert_eq!(
@@ -509,13 +513,15 @@ mod tests {
     /// they have to know is that there is nowhere for the line to go.
     #[test]
     fn a_link_to_a_node_with_no_sink_is_told_there_is_none() {
-        let said = terminal_at("app_pl", None, true).expect_err("nothing may arrive");
+        let said =
+            terminal_at("app_pl", None, true).expect_err("nothing may arrive");
         assert!(said.contains("no data sink at all"), "{said}");
         assert!(!said.contains("which of them"), "{said}");
 
         // Named, and the name is one of the four: still refused, and by the
         // rule that was there already.
-        let said = terminal_at("app_pl", Some("moc-in"), true).expect_err("nothing may arrive");
+        let said = terminal_at("app_pl", Some("moc-in"), true)
+            .expect_err("nothing may arrive");
         assert!(said.contains("none at all"), "{said}");
 
         // What it does have needs no naming.
@@ -588,18 +594,21 @@ mod tests {
     /// a link drawn backwards, which is worth saying in those words.
     #[test]
     fn a_terminal_is_refused_by_name_and_by_end() {
-        let said = terminal_at("i2c", Some("to_ground"), false).expect_err("no such");
+        let said =
+            terminal_at("i2c", Some("to_ground"), false).expect_err("no such");
         assert!(
             said.contains("to_ground") && said.contains("payload-out"),
             "{said}"
         );
 
-        let said = terminal_at("moc", Some("moc-out"), true).expect_err("wrong end");
+        let said =
+            terminal_at("moc", Some("moc-out"), true).expect_err("wrong end");
         assert!(
             said.contains("moc-out") && said.contains("leaves"),
             "{said}"
         );
-        let said = terminal_at("tee-moc", Some("moc-in"), false).expect_err("wrong end");
+        let said = terminal_at("tee-moc", Some("moc-in"), false)
+            .expect_err("wrong end");
         assert!(
             said.contains("moc-in") && said.contains("arrives"),
             "{said}"

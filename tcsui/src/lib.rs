@@ -223,7 +223,9 @@ mod tests {
                     ((v + 0.055) / 1.055).powf(2.4)
                 }
             };
-            0.2126 * linear(c.red()) + 0.7152 * linear(c.green()) + 0.0722 * linear(c.blue())
+            0.2126 * linear(c.red())
+                + 0.7152 * linear(c.green())
+                + 0.0722 * linear(c.blue())
         };
         let (light, dark) = {
             let (x, y) = (luminance(a), luminance(b));
@@ -322,14 +324,16 @@ mod tests {
         let schedule = Schedule::standard();
 
         // Nothing has arrived: grey, as the window opens.
-        let nothing = Shown::at(&schedule.after(None, SystemTime::now()), None, "<none>");
+        let nothing =
+            Shown::at(&schedule.after(None, SystemTime::now()), None, "<none>");
         assert_eq!(nothing.indicator, palette::unknown());
 
         // A beacon, then every moment after it over the whole schedule: a
         // colour or white, and never grey.
         let at = Some(SystemTime::UNIX_EPOCH + Duration::from_secs(3661));
         for ms in (0..60_000).step_by(100) {
-            let shown = Shown::at(&schedule.at(Duration::from_millis(ms)), at, "said");
+            let shown =
+                Shown::at(&schedule.at(Duration::from_millis(ms)), at, "said");
             assert_ne!(shown.indicator, palette::unknown(), "at {ms} ms");
         }
 
@@ -361,7 +365,8 @@ mod tests {
         // Before anything has arrived, the time says so rather than being
         // left empty: an empty line next to a label reads as a line the
         // program has not filled in.
-        let nothing = Shown::at(&schedule.after(None, SystemTime::now()), None, "<none>");
+        let nothing =
+            Shown::at(&schedule.after(None, SystemTime::now()), None, "<none>");
         assert_eq!(nothing.received, "--:--:--");
         assert_eq!(nothing.indicator, palette::unknown());
     }
@@ -388,7 +393,8 @@ mod tests {
         let mut pinger = Pinger::new();
         let message = pinger.ping(at).expect("a ping");
         let answer =
-            ping::reply(message.as_bytes(), at + Duration::from_millis(3)).expect("an answer");
+            ping::reply(message.as_bytes(), at + Duration::from_millis(3))
+                .expect("an answer");
         pinger.answered(answer.as_bytes(), at + Duration::from_millis(5));
 
         let shown = PingShown::of(pinger.exchange());

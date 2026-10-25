@@ -1,6 +1,7 @@
 # yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial.schema.json
 
-description: "A payload that is a program, sending a line of text a word at a time"
+description: "A payload that is a program, sending a line of text a word at a
+  time"
 
 tcspecial:
   beacon:

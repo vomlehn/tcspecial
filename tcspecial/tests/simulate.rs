@@ -19,8 +19,10 @@ fn configuration(dir: &std::path::Path) -> std::path::PathBuf {
   gateway: radio
   beacon: {{ interval: \"5 s\", recv: \"127.0.0.1:1\", send: \"127.0.0.1:2\" }}
   log: {{ directory: \"{}\", segment_size: \"65536\" }}
-  payload_command: {{ dest_base: \"127.0.0.1:3\", source_base: \"127.0.0.1:4\" }}
-  payload_telemetry: {{ dest_base: \"127.0.0.1:5\", source_base: \"127.0.0.1:6\" }}
+  payload_command: {{ dest_base: \"127.0.0.1:3\", \
+  source_base: \"127.0.0.1:4\" }}
+  payload_telemetry: {{ dest_base: \"127.0.0.1:5\", \
+  source_base: \"127.0.0.1:6\" }}
   tcs_cmd: {{ recv: \"127.0.0.1:7\", send: \"127.0.0.1:8\" }}
 payloads:
   - name: sensor
@@ -57,7 +59,9 @@ fn a_stand_in_is_refused_in_the_flight_setting() {
         let said = run(args);
         assert!(said.contains("simulation mode: none"), "{said}");
         assert!(
-            said.contains("sensor: a stand-in: 127.0.0.1 is a loopback address"),
+            said.contains(
+                "sensor: a stand-in: 127.0.0.1 is a loopback address"
+            ),
             "{said}"
         );
         assert!(
@@ -94,7 +98,8 @@ fn a_stand_in_is_where_a_simulated_channel_is_reached() {
   gateway: radio
   beacon: { interval: \"5 s\", recv: \"127.0.0.1:1\", send: \"127.0.0.1:2\" }
   payload_command: { dest_base: \"127.0.0.1:3\", source_base: \"127.0.0.1:4\" }
-  payload_telemetry: { dest_base: \"127.0.0.1:5\", source_base: \"127.0.0.1:6\" }
+  payload_telemetry: { dest_base: \"127.0.0.1:5\", \
+  source_base: \"127.0.0.1:6\" }
   tcs_cmd: { recv: \"127.0.0.1:7\", send: \"127.0.0.1:8\" }
 payloads:
   - name: channel
@@ -122,7 +127,10 @@ payloads:
     );
     let none = said("--simulate=none");
     assert!(
-        none.contains("channel: taken for hardware, as what could not be told: nothing is at /nonexistent/rpmsg0"),
+        none.contains(
+            "channel: taken for hardware, as what could not be told: \
+                       nothing is at /nonexistent/rpmsg0"
+        ),
         "{none}"
     );
 }

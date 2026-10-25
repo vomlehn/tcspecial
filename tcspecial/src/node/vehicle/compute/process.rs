@@ -115,8 +115,8 @@ impl Process {
     ///
     /// Nothing to refuse: what a file may say -- the program, the deadline it
     /// cannot do without, and whether it may be restarted -- is
-    /// `tcslibgs::node::vehicle::compute`'s, where the ground tool checks it. What is
-    /// found here is the machine's answer: see [`Process::start`].
+    /// `tcslibgs::node::vehicle::compute`'s, where the ground tool checks it.
+    /// What is found here is the machine's answer: see [`Process::start`].
     pub fn of(params: ProcessParams) -> Process {
         Process {
             quoted: format!("\"{}\"", params.executable),
@@ -166,18 +166,18 @@ impl Process {
             // wherever this program's own complaints do.
             .stderr(Stdio::inherit())
             .spawn()
-            .map_err(|e| format!("\"{}\" cannot be run: {e}", self.executable))?;
+            .map_err(|e| {
+                format!("\"{}\" cannot be run: {e}", self.executable)
+            })?;
 
         // Both pipes are taken out of the child, which is why they were asked
         // for; a child without them is one nothing could be said to.
-        let stdin = child
-            .stdin
-            .take()
-            .ok_or_else(|| format!("\"{}\" has no standard input", self.executable))?;
-        let stdout = child
-            .stdout
-            .take()
-            .ok_or_else(|| format!("\"{}\" has no standard output", self.executable))?;
+        let stdin = child.stdin.take().ok_or_else(|| {
+            format!("\"{}\" has no standard input", self.executable)
+        })?;
+        let stdout = child.stdout.take().ok_or_else(|| {
+            format!("\"{}\" has no standard output", self.executable)
+        })?;
 
         Ok(Running {
             child,
@@ -230,8 +230,9 @@ impl Process {
             // SAFETY: both descriptors are owned by something that outlives
             // the call -- the child's pipe by `running`, the node's wakeup by
             // the Arc inside `abandon` -- and neither is kept.
-            let borrowed =
-                unsafe { std::os::fd::BorrowedFd::borrow_raw(running.stdout.as_raw_fd()) };
+            let borrowed = unsafe {
+                std::os::fd::BorrowedFd::borrow_raw(running.stdout.as_raw_fd())
+            };
             let woken = self
                 .abandon
                 .io_fd()
@@ -257,7 +258,9 @@ impl Process {
             match poll(fds, waiting) {
                 Ok(0) => continue,
                 Ok(_) => {}
-                Err(e) => return Err(format!("waiting for its answer failed: {e}")),
+                Err(e) => {
+                    return Err(format!("waiting for its answer failed: {e}"))
+                }
             }
 
             // The node has been disabled. The wait is given up where it
@@ -280,7 +283,9 @@ impl Process {
                 Ok(0) => return Err(exit_of(&mut running.child)),
                 Ok(n) => running.partial.extend_from_slice(&buffer[..n]),
                 Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => {}
-                Err(e) => return Err(format!("its answer could not be read: {e}")),
+                Err(e) => {
+                    return Err(format!("its answer could not be read: {e}"))
+                }
             }
         }
     }
@@ -398,9 +403,16 @@ impl Function for Process {
     /// datum is refused with the reason. Nothing is swallowed. A computation
     /// that has stopped must look stopped, because the alternative is a
     /// control loop acting on numbers that stopped changing.
-    fn give(&mut self, input: Option<&str>, data: &[u8]) -> Result<Option<Out>, String> {
+    fn give(
+        &mut self,
+        input: Option<&str>,
+        data: &[u8],
+    ) -> Result<Option<Out>, String> {
         if let Some(why) = self.why_stopped() {
-            return Err(format!("\"{}\" is not running: {why}", self.executable));
+            return Err(format!(
+                "\"{}\" is not running: {why}",
+                self.executable
+            ));
         }
 
         // Not running and not stopped is a node nobody started, which the
@@ -469,8 +481,8 @@ impl Function for Process {
                         ));
                     }
                     return Err(format!(
-                        "\"{}\" {why}; it has been started again, and this datum is \
-                         lost",
+                        "\"{}\" {why}; it has been started again, and this \
+                         datum is lost",
                         self.executable
                     ));
                 }
@@ -516,9 +528,13 @@ mod tests {
     ///
     /// What a file may say about one -- that the program and the deadline are
     /// required, that a restart allowance is a number or "never" -- is
-    /// `tcslibgs::node::vehicle::compute`'s rule, where the ground tool applies it.
-    /// These tests are about what the supervision does.
-    fn process(executable: &str, timeout: Duration, restart: Restart) -> Process {
+    /// `tcslibgs::node::vehicle::compute`'s rule, where the ground tool applies
+    /// it. These tests are about what the supervision does.
+    fn process(
+        executable: &str,
+        timeout: Duration,
+        restart: Restart,
+    ) -> Process {
         Process::of(ProcessParams {
             executable: executable.to_string(),
             timeout,
@@ -529,7 +545,11 @@ mod tests {
     /// A program told nothing is a program left stopped.
     #[test]
     fn restarting_is_never_unless_it_is_asked_for() {
-        let p = process("/usr/bin/mean", Duration::from_millis(500), Restart::Never);
+        let p = process(
+            "/usr/bin/mean",
+            Duration::from_millis(500),
+            Restart::Never,
+        );
         assert_eq!(p.restart(), Restart::Never);
         assert!(!p.may_restart());
 
@@ -570,7 +590,11 @@ mod tests {
     /// A program that will not restart holds why, so every refusal says it.
     #[test]
     fn a_stopped_program_keeps_its_reason() {
-        let mut p = process("/usr/bin/mean", Duration::from_millis(500), Restart::Never);
+        let mut p = process(
+            "/usr/bin/mean",
+            Duration::from_millis(500),
+            Restart::Never,
+        );
 
         assert_eq!(p.why_stopped(), None, "it has not stopped yet");
         assert!(!p.stopped("it could not be executed"));
@@ -588,7 +612,8 @@ mod tests {
 
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("computation");
-        let mut file = std::fs::File::create(&path).expect("the program is written");
+        let mut file =
+            std::fs::File::create(&path).expect("the program is written");
         write!(file, "#!/bin/sh\n{script}").expect("the program is written");
         file.flush().expect("flushed");
         drop(file);
@@ -599,7 +624,10 @@ mod tests {
         (where_, name)
     }
 
-    fn running(script: &str, timeout: Duration) -> (tempfile::TempDir, Process) {
+    fn running(
+        script: &str,
+        timeout: Duration,
+    ) -> (tempfile::TempDir, Process) {
         let (where_, name) = program(script);
         let mut p = process(&name, timeout, Restart::Never);
         start_despite_the_race(&mut p);
@@ -660,8 +688,8 @@ mod tests {
     #[test]
     fn a_named_input_arrives_named() {
         let (_where, mut p) = running(
-            "while read line; do case \"$line\" in in1=293.15) echo 1;; *) echo 0;; esac; \
-             done\n",
+            "while read line; do case \"$line\" in in1=293.15) echo 1;; *) \
+             echo 0;; esac; done\n",
             Duration::from_secs(2),
         );
 
@@ -702,7 +730,8 @@ mod tests {
     #[test]
     fn an_answer_split_across_writes_is_one_answer() {
         let (_where, mut p) = running(
-            "while read line; do printf '29'; sleep 0.2; printf '1.5\\n'; done\n",
+            "while read line; do printf '29'; sleep 0.2; printf '1.5\\n'; \
+             done\n",
             Duration::from_secs(3),
         );
 
@@ -721,7 +750,8 @@ mod tests {
             .give(None, &kelvin(1_f64))
             .expect_err("a program that took too long");
         assert!(
-            said.contains("did not answer within") && said.contains("rather than waited for"),
+            said.contains("did not answer within")
+                && said.contains("rather than waited for"),
             "{said}"
         );
 
@@ -738,7 +768,8 @@ mod tests {
     /// A program that exits is reported with what it exited with.
     #[test]
     fn a_program_that_exits_is_reported() {
-        let (_where, mut p) = running("read line\nexit 3\n", Duration::from_secs(2));
+        let (_where, mut p) =
+            running("read line\nexit 3\n", Duration::from_secs(2));
 
         let said = p
             .give(None, &kelvin(1_f64))
@@ -759,7 +790,8 @@ mod tests {
 
         let said = p.start().expect_err("a program that is not there");
         assert!(
-            said.contains("/nonesuch/computation") && said.contains("cannot be run"),
+            said.contains("/nonesuch/computation")
+                && said.contains("cannot be run"),
             "{said}"
         );
         assert!(!p.is_running());
@@ -770,7 +802,8 @@ mod tests {
     #[test]
     fn a_restart_is_taken_and_the_datum_is_still_lost() {
         let (_where, name) = program("read line\nexit 1\n");
-        let mut p = process(&name, Duration::from_secs(2), Restart::WhenItStops);
+        let mut p =
+            process(&name, Duration::from_secs(2), Restart::WhenItStops);
         start_despite_the_race(&mut p);
 
         // The first datum kills it, and it is started again. The datum is
@@ -780,7 +813,8 @@ mod tests {
             .give(None, &kelvin(1_f64))
             .expect_err("the program exited");
         assert!(
-            said.contains("started again") && said.contains("this datum is lost"),
+            said.contains("started again")
+                && said.contains("this datum is lost"),
             "{said}"
         );
         assert!(p.is_running(), "it should have been started again");
@@ -791,7 +825,8 @@ mod tests {
             .give(None, &kelvin(2_f64))
             .expect_err("the program exited again");
         assert!(
-            said.contains("started again") && said.contains("this datum is lost"),
+            said.contains("started again")
+                && said.contains("this datum is lost"),
             "{said}"
         );
         assert!(p.is_running(), "it should have been started again");

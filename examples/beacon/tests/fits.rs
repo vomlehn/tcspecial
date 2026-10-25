@@ -21,20 +21,26 @@ fn fits_exactly(window: &WatchWindow, what: &str) {
     let panel = ElementHandle::find_by_element_id(window, "WatchWindow::panel")
         .next()
         .expect("the window has the panel");
-    let button = ElementHandle::find_by_element_id(window, "WatchWindow::tcspecial-button")
-        .next()
-        .expect("the window has the button");
+    let button = ElementHandle::find_by_element_id(
+        window,
+        "WatchWindow::tcspecial-button",
+    )
+    .next()
+    .expect("the window has the button");
 
     let right = panel.absolute_position().x + panel.size().width;
     let bottom = button.absolute_position().y + button.size().height;
-    let (width, height) = (window.get_window_width(), window.get_window_height());
+    let (width, height) =
+        (window.get_window_width(), window.get_window_height());
     assert!(
         (width - border - right).abs() <= 1.0,
-        "{what}: the panel ends at {right} in a window {width} wide, border {border}"
+        "{what}: the panel ends at {right} in a window {width} wide, \
+         border {border}"
     );
     assert!(
         (height - border - bottom).abs() <= 1.0,
-        "{what}: the button ends at {bottom} in a window {height} tall, border {border}"
+        "{what}: the button ends at {bottom} in a window {height} tall, \
+         border {border}"
     );
     assert_eq!(
         panel.absolute_position().x,
@@ -127,9 +133,12 @@ fn the_button_is_as_wide_as_its_longer_label() {
 
     // And centred across the window: as much room on its left as on its
     // right, to within a pixel of rounding.
-    let button = ElementHandle::find_by_element_id(&window, "WatchWindow::tcspecial-button")
-        .next()
-        .expect("the window has the button");
+    let button = ElementHandle::find_by_element_id(
+        &window,
+        "WatchWindow::tcspecial-button",
+    )
+    .next()
+    .expect("the window has the button");
     let left = button.absolute_position().x;
     let right = window.get_window_width() - (left + button.size().width);
     assert!(

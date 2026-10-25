@@ -25,7 +25,8 @@ fn arguments() -> Vec<String> {
 /// Payload data in, the same bytes out as MOC data.
 #[test]
 fn a_packet_of_payload_data_comes_back_as_moc_data() {
-    let mut running = parent::start(&app(), &arguments(), Supports::PAYLOAD).expect("it starts");
+    let mut running = parent::start(&app(), &arguments(), Supports::PAYLOAD)
+        .expect("it starts");
 
     running.write_payload(b"293.15").expect("it takes a packet");
     assert_eq!(
@@ -57,7 +58,8 @@ fn a_packet_of_payload_data_comes_back_as_moc_data() {
 /// is the one that proves the second survives the round trip.
 #[test]
 fn a_zero_length_packet_comes_back() {
-    let mut running = parent::start(&app(), &arguments(), Supports::PAYLOAD).expect("it starts");
+    let mut running = parent::start(&app(), &arguments(), Supports::PAYLOAD)
+        .expect("it starts");
 
     running
         .write_payload(b"")
@@ -75,7 +77,8 @@ fn a_zero_length_packet_comes_back() {
 /// mistake, which is what the strictness of this arrangement is for.
 #[test]
 fn the_interface_it_has_not_got_cannot_be_reached() {
-    let mut running = parent::start(&app(), &arguments(), Supports::PAYLOAD).expect("it starts");
+    let mut running = parent::start(&app(), &arguments(), Supports::PAYLOAD)
+        .expect("it starts");
 
     let said = running
         .write_moc(b"SET 300")
@@ -101,7 +104,8 @@ fn the_interface_it_has_not_got_cannot_be_reached() {
 /// goes.
 #[test]
 fn run_as_a_kind_it_is_not_it_refuses_and_says_why() {
-    let mut running = parent::start(&app(), &arguments(), Supports::ALL).expect("it starts");
+    let mut running =
+        parent::start(&app(), &arguments(), Supports::ALL).expect("it starts");
     running.waits(Some(Duration::from_secs(5)));
 
     let said = running
@@ -127,7 +131,8 @@ fn run_as_a_kind_it_is_not_it_refuses_and_says_why() {
 #[test]
 fn run_with_the_wrong_arguments_it_refuses_and_says_why() {
     let mut running =
-        parent::start(&app(), &["fore".to_string()], Supports::PAYLOAD).expect("it starts");
+        parent::start(&app(), &["fore".to_string()], Supports::PAYLOAD)
+            .expect("it starts");
 
     let said = running
         .read_complaint()

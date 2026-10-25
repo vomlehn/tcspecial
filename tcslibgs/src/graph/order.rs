@@ -32,7 +32,8 @@ pub fn declared(path: &Path) -> TcsResult<Vec<String>> {
 /// In YAML each section is a key once, so the order is the keys' order and
 /// then each section's entries'.
 fn yaml(text: &str) -> Result<Vec<String>, String> {
-    let file: serde_norway::Value = serde_norway::from_str(text).map_err(|e| e.to_string())?;
+    let file: serde_norway::Value =
+        serde_norway::from_str(text).map_err(|e| e.to_string())?;
     let mut names = Vec::new();
     let Some(mapping) = file.as_mapping() else {
         return Ok(names);
@@ -95,7 +96,10 @@ fn xml(text: &str) -> Result<Vec<String>, String> {
 mod tests {
     use super::*;
 
-    fn written(name: &str, text: &str) -> (tempfile::TempDir, std::path::PathBuf) {
+    fn written(
+        name: &str,
+        text: &str,
+    ) -> (tempfile::TempDir, std::path::PathBuf) {
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join(name);
         std::fs::write(&path, text).expect("written");

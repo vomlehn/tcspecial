@@ -279,7 +279,10 @@ pub struct HdlcParams {
 /// of either delivers noise rather than nothing. The encoding and the frame
 /// check have the plain defaults the kernel's own are, since a short cable
 /// commonly wants neither clock recovery nor a CRC.
-pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<GroupKind> {
+pub(crate) fn group_kind_of(
+    name: &str,
+    g: LinkTerms,
+) -> EndpointConfigResult<GroupKind> {
     reject_foreign_fields(
         name,
         "hdlc",
@@ -300,29 +303,32 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
 
     let standard = require(name, "hdlc", "standard", g.standard.as_ref())?;
     let standard =
-        Standard::from_spelling(&standard.as_str().to_ascii_lowercase()).ok_or_else(|| {
-            bad(
-                name,
-                &format!(
-                    "standard: \"{}\" is not one this knows. There are {}",
-                    standard.as_str(),
-                    Standard::spellings()
-                ),
-            )
-        })?;
+        Standard::from_spelling(&standard.as_str().to_ascii_lowercase())
+            .ok_or_else(|| {
+                bad(
+                    name,
+                    &format!(
+                        "standard: \"{}\" is not one this knows. There are {}",
+                        standard.as_str(),
+                        Standard::spellings()
+                    ),
+                )
+            })?;
 
-    let clock_type = require(name, "hdlc", "clock_type", g.clock_type.as_ref())?;
-    let clock_type = ClockType::from_spelling(&clock_type.as_str().to_ascii_lowercase())
-        .ok_or_else(|| {
-            bad(
-                name,
-                &format!(
-                    "clock_type: \"{}\" is not one this knows. There are external, \
-                     internal, tx_internal and tx_from_rx",
-                    clock_type.as_str()
-                ),
-            )
-        })?;
+    let clock_type =
+        require(name, "hdlc", "clock_type", g.clock_type.as_ref())?;
+    let clock_type =
+        ClockType::from_spelling(&clock_type.as_str().to_ascii_lowercase())
+            .ok_or_else(|| {
+                bad(
+                    name,
+                    &format!(
+                        "clock_type: \"{}\" is not one this knows. There are \
+                         external, internal, tx_internal and tx_from_rx",
+                        clock_type.as_str()
+                    ),
+                )
+            })?;
 
     // The rate belongs to whoever generates the clock. Required where that is
     // this end, and refused where it is not: a rate written against a clock
@@ -334,8 +340,8 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
             if rate == 0 {
                 return Err(bad(
                     name,
-                    "clock_rate must be greater than zero: a clock of no bits a \
-                     second is a line that carries nothing",
+                    "clock_rate must be greater than zero: a clock of no bits \
+                     a second is a line that carries nothing",
                 ));
             }
             Some(rate)
@@ -344,9 +350,9 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
             return Err(bad(
                 name,
                 &format!(
-                    "clock_rate is required with clock_type: {clock_type}, which is \
-                     this end generating the clock -- so what rate it generates has \
-                     to be said"
+                    "clock_rate is required with clock_type: {clock_type}, \
+                     which is this end generating the clock -- so what rate it \
+                     generates has to be said"
                 ),
             ))
         }
@@ -354,46 +360,50 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
             return Err(bad(
                 name,
                 &format!(
-                    "clock_rate does not apply with clock_type: {clock_type}, which \
-                     is the far end generating the clock: this end cannot set a rate \
-                     it does not drive"
+                    "clock_rate does not apply with clock_type: {clock_type}, \
+                     which is the far end generating the clock: this end \
+                     cannot set a rate it does not drive"
                 ),
             ))
         }
         (false, None) => None,
     };
 
-    let loopback = parse_flag(name, "loopback", g.loopback.as_ref())?.unwrap_or(false);
+    let loopback =
+        parse_flag(name, "loopback", g.loopback.as_ref())?.unwrap_or(false);
 
     let encoding = match g.encoding.as_ref() {
         Some(stated) => {
-            Encoding::from_spelling(&stated.as_str().to_ascii_lowercase()).ok_or_else(|| {
-                bad(
-                    name,
-                    &format!(
-                        "encoding: \"{}\" is not one this knows. There are nrz, nrzi, \
-                         fm_mark, fm_space and manchester",
+            Encoding::from_spelling(&stated.as_str().to_ascii_lowercase())
+                .ok_or_else(|| {
+                    bad(
+                        name,
+                        &format!(
+                        "encoding: \"{}\" is not one this knows. There are \
+                         nrz, nrzi, fm_mark, fm_space and manchester",
                         stated.as_str()
                     ),
-                )
-            })?
+                    )
+                })?
         }
         None => Encoding::Nrz,
     };
 
     let frame_check = match g.frame_check.as_ref() {
-        Some(stated) => FrameCheck::from_spelling(&stated.as_str().to_ascii_lowercase())
-            .ok_or_else(|| {
-                bad(
-                    name,
-                    &format!(
-                        "frame_check: \"{}\" is not one this knows. There are none, \
-                         crc16_pr0, crc16_pr1, crc16_pr0_ccitt, crc16_pr1_ccitt, \
-                         crc32_pr0_ccitt and crc32_pr1_ccitt",
+        Some(stated) => {
+            FrameCheck::from_spelling(&stated.as_str().to_ascii_lowercase())
+                .ok_or_else(|| {
+                    bad(
+                        name,
+                        &format!(
+                        "frame_check: \"{}\" is not one this knows. There are \
+                         none, crc16_pr0, crc16_pr1, crc16_pr0_ccitt, \
+                         crc16_pr1_ccitt, crc32_pr0_ccitt and crc32_pr1_ccitt",
                         stated.as_str()
                     ),
-                )
-            })?,
+                    )
+                })?
+        }
         None => FrameCheck::None,
     };
 
@@ -412,7 +422,9 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
 /// [`crate::simulate`].
 pub fn judged(interface: &str) -> crate::simulate::Judged {
     crate::simulate::Judged::hardware(
-        format!("{interface} is a synchronous line, which nothing stands in for"),
+        format!(
+            "{interface} is a synchronous line, which nothing stands in for"
+        ),
         "interface",
         "leave the hdlc node out of a run that must exercise no hardware",
     )
@@ -467,7 +479,8 @@ mod tests {
         // However the file capitalised them, as every other word of a link is
         // read.
         assert_eq!(
-            params(&[("standard", "X21"), ("clock_type", "TX_FROM_RX")]).standard,
+            params(&[("standard", "X21"), ("clock_type", "TX_FROM_RX")])
+                .standard,
             Standard::X21
         );
     }
@@ -512,8 +525,11 @@ mod tests {
     fn the_rate_belongs_to_whoever_drives_the_clock() {
         // This end drives it, so the rate is required.
         for ours in ["internal", "tx_internal"] {
-            let said = group_kind_of("link", terms(&[("standard", "v35"), ("clock_type", ours)]))
-                .expect_err("a clock this end drives at no stated rate");
+            let said = group_kind_of(
+                "link",
+                terms(&[("standard", "v35"), ("clock_type", ours)]),
+            )
+            .expect_err("a clock this end drives at no stated rate");
             assert!(
                 format!("{said}").contains("clock_rate is required"),
                 "{ours}: {said}"
@@ -609,7 +625,8 @@ mod tests {
             terminators: None,
             length_prefix: None,
         });
-        let said = group_kind_of("link", g).expect_err("a stream rule on frames");
+        let said =
+            group_kind_of("link", g).expect_err("a stream rule on frames");
         assert!(format!("{said}").contains("stream"), "{said}");
     }
 }

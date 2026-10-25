@@ -307,7 +307,9 @@ impl Problem {
             Problem::NotBuilt { node, .. } => About::Node(node.clone()),
             Problem::DuplicateGroup { name } => About::NodeGroup(name.clone()),
             Problem::EmptyGroup { group } => About::NodeGroup(group.clone()),
-            Problem::BadInterval { group, .. } => About::NodeGroup(group.clone()),
+            Problem::BadInterval { group, .. } => {
+                About::NodeGroup(group.clone())
+            }
             // A link's problem is reported on the node it leaves, which is
             // where the link is written: a link is an attribute of that node.
             Problem::NoSuchNode { from, .. } => About::Node(from.clone()),
@@ -334,14 +336,24 @@ impl Problem {
             // about where it sends, and the payload is where the trigger
             // would have to be written.
             Problem::UntriggeredInput { node, .. } => About::Node(node.clone()),
-            Problem::InitBeforeItSpeaks { node, .. } => About::Node(node.clone()),
-            Problem::SendsFromSpokenTo { node, .. } => About::Node(node.clone()),
-            Problem::LinesAgainstTheirDirection { node, .. } => About::Node(node.clone()),
-            Problem::TwoNodesWantOneThing { node, .. } => About::Node(node.clone()),
+            Problem::InitBeforeItSpeaks { node, .. } => {
+                About::Node(node.clone())
+            }
+            Problem::SendsFromSpokenTo { node, .. } => {
+                About::Node(node.clone())
+            }
+            Problem::LinesAgainstTheirDirection { node, .. } => {
+                About::Node(node.clone())
+            }
+            Problem::TwoNodesWantOneThing { node, .. } => {
+                About::Node(node.clone())
+            }
             // The section, where there is one to point at. A missing section
             // has no line of its own and is reported on the file, which is
             // where it would have to be written.
-            Problem::NoTcspecial | Problem::BadTcspecial { .. } => About::Section("tcspecial"),
+            Problem::NoTcspecial | Problem::BadTcspecial { .. } => {
+                About::Section("tcspecial")
+            }
             Problem::BadNode { node, .. } => About::Node(node.clone()),
             Problem::BadLog { node, .. } => About::Node(node.clone()),
             Problem::BadCompute { node, .. } => About::Node(node.clone()),
@@ -349,7 +361,9 @@ impl Problem {
             // Reported on the source and not on the log: the log is right
             // about what it wants, and the source is the thing a reader will
             // have to change or unlink.
-            Problem::LogSourceMismatch { source, .. } => About::Node(source.clone()),
+            Problem::LogSourceMismatch { source, .. } => {
+                About::Node(source.clone())
+            }
         }
     }
 
@@ -406,8 +420,9 @@ impl Problem {
                     ""
                 };
                 format!(
-                    "\"{node}\": there is no node type called \"{node_type}\".{was_null} \
-                     Write one of these: in moc, {}; in vehicle, {}; in payloads, {}",
+                    "\"{node}\": there is no node type called \"{node_type}\"\
+                     .{was_null} Write one of these: in moc, {}; in vehicle, \
+                     {}; in payloads, {}",
                     listed(Section::Moc),
                     listed(Section::Vehicle),
                     listed(Section::Payloads)
@@ -420,7 +435,9 @@ impl Problem {
                 format!("\"{node}\" is linked to itself")
             }
             Problem::NoSuchGroup { node, group } => {
-                format!("\"{node}\" is in group \"{group}\", which is not there")
+                format!(
+                    "\"{node}\" is in group \"{group}\", which is not there"
+                )
             }
             Problem::BadInterval { group, why } => {
                 format!("group \"{group}\": {why}")
@@ -430,29 +447,32 @@ impl Problem {
                 group,
                 attribute,
             } => format!(
-                "\"{node}\" states {attribute} and is in group \"{group}\", which \
-                 says when it is read"
+                "\"{node}\" states {attribute} and is in group \"{group}\", \
+                 which says when it is read"
             ),
             Problem::TriggerIntervalWithoutTrigger { node } => format!(
-                "\"{node}\" states trigger_interval and has no trigger: that is how \
-                 often the trigger goes out, and there is nothing to send"
+                "\"{node}\" states trigger_interval and has no trigger: that \
+                 is how often the trigger goes out, and there is nothing to \
+                 send"
             ),
             Problem::ReadDelayWithoutTrigger { node } => format!(
-                "\"{node}\" states read_delay and has no trigger: that is how long \
-                 to wait between asking and reading, and nothing asks it"
+                "\"{node}\" states read_delay and has no trigger: that is how \
+                 long to wait between asking and reading, and nothing asks it"
             ),
             Problem::PollIntervalWithTrigger { node } => format!(
-                "\"{node}\" states poll_interval and a trigger: a node that is asked \
-                 is read when it has been asked, so say trigger_interval"
+                "\"{node}\" states poll_interval and a trigger: a node that is \
+                 asked is read when it has been asked, so say trigger_interval"
             ),
             Problem::RateOnASender { node, node_type } => format!(
-                "\"{node}\" states poll_interval, and a {node_type} payload sends when \
-                 it has something: nothing aboard decides when its data exists, so \
-                 it is read as the data arrives and states no rate"
+                "\"{node}\" states poll_interval, and a {node_type} payload \
+                 sends when it has something: nothing aboard decides when its \
+                 data exists, so it is read as the data arrives and states no \
+                 rate"
             ),
             Problem::TwoRates { node } => format!(
-                "\"{node}\" states both trigger_interval and poll_interval: a node is \
-                 asked or it is read, and the one it is says which rate it has"
+                "\"{node}\" states both trigger_interval and poll_interval: a \
+                 node is asked or it is read, and the one it is says which \
+                 rate it has"
             ),
             Problem::InputBoundTwice { node, input } => {
                 format!("two links arrive at \"{node}.{input}\"")
@@ -464,40 +484,40 @@ impl Problem {
                 arrives,
                 ..
             } => format!(
-                "{link}: it leaves by \"{leaves}\" and arrives at \"{arrives}\", \
-                 which are opposite ways for the data to be going -- one end of \
-                 this link is drawn backwards"
+                "{link}: it leaves by \"{leaves}\" and arrives at \"{arrives}\"\
+                 , which are opposite ways for the data to be going -- one end \
+                 of this link is drawn backwards"
             ),
             Problem::NodeOnNoLink { node, node_type } => format!(
-                "\"{node}\" is a {node_type} node with no link on it: a payload \
-                 or a ground link needs a data sink or a data source, or there \
-                 is nothing for it to do"
+                "\"{node}\" is a {node_type} node with no link on it: a \
+                 payload or a ground link needs a data sink or a data source, \
+                 or there is nothing for it to do"
             ),
             Problem::DuplicateLink { from, to } => format!(
                 "\"{from}\" is linked to \"{to}\" twice: one link is one \
-                 delivery, and the second is a datum sent again with nothing in \
-                 the drawing to show it"
+                 delivery, and the second is a datum sent again with nothing \
+                 in the drawing to show it"
             ),
             Problem::NoSuchTarget { sets } => {
                 format!("a command sets \"{sets}\", and there is no such node")
             }
             Problem::NoAttributeNamed { sets } => format!(
-                "a command sets \"{sets}\", which names no attribute: a binding \
-                 is written node.attribute"
+                "a command sets \"{sets}\", which names no attribute: a \
+                 binding is written node.attribute"
             ),
             Problem::AttributeTooLong { sets } => format!(
-                "a command sets \"{sets}\", whose attribute is longer than the {} \
-                 bytes a SET_NODE carries, so the ground could never name it: give \
-                 the attribute a shorter name",
+                "a command sets \"{sets}\", whose attribute is longer than the \
+                 {} bytes a SET_NODE carries, so the ground could never name \
+                 it: give the attribute a shorter name",
                 crate::ATTRIBUTE_BYTES
             ),
             Problem::NotAMocLink { from } => format!(
-                "a command arrives on \"{from}\", which is not a gateway node -- \
-                 commands come from what the vehicle answers to"
+                "a command arrives on \"{from}\", which is not a gateway node \
+                 -- commands come from what the vehicle answers to"
             ),
             Problem::Unconnected { node } => format!(
-                "\"{node}\" has no link to or from it, so nothing reaches it and \
-                 nothing reads it"
+                "\"{node}\" has no link to or from it, so nothing reaches it \
+                 and nothing reads it"
             ),
             // The reason already names the node: see reach_of, whose
             // complaints are written to be read on their own.
@@ -512,43 +532,43 @@ impl Problem {
                 if *driven {
                     format!(
                         "something is delivered to \"{node}\", whose lines are \
-                         inputs: inputs are read and not written, and driving one \
-                         would be commanding a device rather than reading it. Say \
-                         \"direction: output\" to drive them -- lines with no \
-                         direction are inputs"
+                         inputs: inputs are read and not written, and driving \
+                         one would be commanding a device rather than reading \
+                         it. Say \"direction: output\" to drive them -- lines \
+                         with no direction are inputs"
                     )
                 } else {
                     format!(
-                        "\"{node}\" is read, and its lines are driven: a driven \
-                         line reports nothing, so reading one would be reporting \
-                         what this node itself asked for. Leave direction unsaid, \
-                         or say input, to read them"
+                        "\"{node}\" is read, and its lines are driven: a \
+                         driven line reports nothing, so reading one would be \
+                         reporting what this node itself asked for. Leave \
+                         direction unsaid, or say input, to read them"
                     )
                 }
             }
             Problem::InitBeforeItSpeaks { node, protocol } => format!(
                 "\"{node}\" states an init and is read over {protocol} with no \
-                 trigger, so the payload speaks first and the vehicle learns where \
-                 it is from what arrives: as the node opens nothing has, so there \
-                 is nowhere to write the init. Give it a trigger, and the vehicle \
-                 reaches it at its address; reach it over a stream (tcp or \
-                 unix_stream); or take init out"
+                 trigger, so the payload speaks first and the vehicle learns \
+                 where it is from what arrives: as the node opens nothing has, \
+                 so there is nowhere to write the init. Give it a trigger, and \
+                 the vehicle reaches it at its address; reach it over a stream \
+                 (tcp or unix_stream); or take init out"
             ),
             Problem::SendsFromSpokenTo { node, asked: true } => format!(
-                "\"{node}\" states sends_from and a trigger: it is asked, so the \
-                 vehicle reaches it at its address and reads only what comes from \
-                 there already. Take sends_from out"
+                "\"{node}\" states sends_from and a trigger: it is asked, so \
+                 the vehicle reaches it at its address and reads only what \
+                 comes from there already. Take sends_from out"
             ),
             Problem::SendsFromSpokenTo { node, asked: false } => format!(
-                "\"{node}\" states sends_from, and nothing is read from it: it is \
-                 only driven, so where it sends from is read by nothing. Take \
-                 sends_from out"
+                "\"{node}\" states sends_from, and nothing is read from it: it \
+                 is only driven, so where it sends from is read by nothing. \
+                 Take sends_from out"
             ),
             Problem::UntriggeredInput { node, from } => format!(
-                "\"{from}\" is delivered to \"{node}\", which states no trigger: \
-                 what is written to a payload that is read is what asks it for \
-                 a reading, so a payload with no trigger is one nothing may be \
-                 delivered to"
+                "\"{from}\" is delivered to \"{node}\", which states no \
+                 trigger: what is written to a payload that is read is what \
+                 asks it for a reading, so a payload with no trigger is one \
+                 nothing may be delivered to"
             ),
             Problem::BadLog { node, why } => format!("log \"{node}\": {why}"),
             // The reason already names the node and the computation: see
@@ -571,9 +591,9 @@ impl Problem {
                 wanted,
                 produces: Some(produces),
             } => format!(
-                "\"{source}\" produces records of {produces} bytes and log \"{log}\" \
-                 holds records of exactly {wanted}: a fixed-length log cannot hold \
-                 both"
+                "\"{source}\" produces records of {produces} bytes and log \"\
+                 {log}\" holds records of exactly {wanted}: a fixed-length log \
+                 cannot hold both"
             ),
             Problem::LogSourceMismatch {
                 log,
@@ -581,10 +601,11 @@ impl Problem {
                 wanted,
                 produces: None,
             } => format!(
-                "log \"{log}\" holds records of exactly {wanted} bytes, and nothing \
-                 says how long \"{source}\"'s records are: a fixed-length log takes \
-                 only sources whose length the configuration states, and a \
-                 computation's length is its function's rather than the file's"
+                "log \"{log}\" holds records of exactly {wanted} bytes, and \
+                 nothing says how long \"{source}\"'s records are: a \
+                 fixed-length log takes only sources whose length the \
+                 configuration states, and a computation's length is its \
+                 function's rather than the file's"
             ),
         }
     }
@@ -634,7 +655,10 @@ fn section_refusal(
 /// What is wrong with a node of `node_type` in a configuration that answers to
 /// `kind`, or `None` where nothing is: a type that is no gateway's, or one of
 /// the kind's own.
-fn gateway_stray(kind: crate::gateway::GatewayKind, node_type: &str) -> Option<String> {
+fn gateway_stray(
+    kind: crate::gateway::GatewayKind,
+    node_type: &str,
+) -> Option<String> {
     let of = crate::gateway::GatewayKind::of_node_type(node_type)?;
     (of != kind).then(|| {
         format!(
@@ -786,7 +810,9 @@ impl Graph {
         // then: a datagram payload that speaks first has not said where it is
         // yet.
         for node in self.nodes.iter().filter(|node| {
-            node.is_payload() && node.node_type == "network" && node.attributes.contains_key("init")
+            node.is_payload()
+                && node.node_type == "network"
+                && node.attributes.contains_key("init")
         }) {
             let protocol = node
                 .attributes
@@ -796,10 +822,9 @@ impl Graph {
             if !matches!(protocol.as_str(), "udp" | "unix_dgram") {
                 continue;
             }
-            let read = self
-                .links
-                .iter()
-                .any(|link| link.from.split('.').next().unwrap_or(&link.from) == node.name);
+            let read = self.links.iter().any(|link| {
+                link.from.split('.').next().unwrap_or(&link.from) == node.name
+            });
             let asked = node.attributes.contains_key("trigger");
             if crate::graph::interface::speaks_first(read, asked) {
                 problems.push(Problem::InitBeforeItSpeaks {
@@ -812,15 +837,12 @@ impl Graph {
         // And where a payload sends from is said of one that speaks first,
         // and of no other: see `Problem::SendsFromSpokenTo`. Whether the
         // node is a datagram one is `reach`'s to say, and said there.
-        for node in self
-            .nodes
-            .iter()
-            .filter(|node| node.is_payload() && node.attributes.contains_key("sends_from"))
-        {
-            let read = self
-                .links
-                .iter()
-                .any(|link| link.from.split('.').next().unwrap_or(&link.from) == node.name);
+        for node in self.nodes.iter().filter(|node| {
+            node.is_payload() && node.attributes.contains_key("sends_from")
+        }) {
+            let read = self.links.iter().any(|link| {
+                link.from.split('.').next().unwrap_or(&link.from) == node.name
+            });
             let asked = node.attributes.contains_key("trigger");
             // A payload with no line at all is neither, and is reported as
             // one with nothing joined to it: said here, it would be called
@@ -865,7 +887,11 @@ impl Graph {
                     linked.entry(node.name.as_str()).or_default().1 = true;
                     // Which of its data sources this link leaves by, and what
                     // stream that carries.
-                    match terminals::terminal_at(&node.node_type, origin.input.as_deref(), false) {
+                    match terminals::terminal_at(
+                        &node.node_type,
+                        origin.input.as_deref(),
+                        false,
+                    ) {
                         Ok(terminal) => terminal,
                         Err(why) => {
                             problems.push(Problem::BadTerminal {
@@ -887,7 +913,8 @@ impl Graph {
                     });
                     continue;
                 }
-                let Destination { node, input } = Destination::parse(destination);
+                let Destination { node, input } =
+                    Destination::parse(destination);
                 if node == origin.node {
                     problems.push(Problem::SelfLink { node });
                     continue;
@@ -903,12 +930,17 @@ impl Graph {
                     }
                     Some(at) => {
                         linked.entry(at.name.as_str()).or_default().0 = true;
-                        match terminals::terminal_at(&at.node_type, input.as_deref(), true) {
+                        match terminals::terminal_at(
+                            &at.node_type,
+                            input.as_deref(),
+                            true,
+                        ) {
                             // Carried with the terminal: whether this one is
                             // held to a single source, which is the node
                             // type's business and not the link's.
-                            Ok(terminal) => terminal
-                                .map(|terminal| (terminal, terminals::merges(&at.node_type))),
+                            Ok(terminal) => terminal.map(|terminal| {
+                                (terminal, terminals::merges(&at.node_type))
+                            }),
                             Err(why) => {
                                 problems.push(Problem::BadTerminal {
                                     from: origin.node.clone(),
@@ -925,8 +957,12 @@ impl Graph {
                 // the readings into a sink that takes commands is a link drawn
                 // backwards, and it would be found at run time as a payload
                 // that answers nothing.
-                if let (Some(leaves), Some((arrives, _))) = (&leaves, &arrives) {
-                    match (terminals::stream_of(leaves), terminals::stream_of(arrives)) {
+                if let (Some(leaves), Some((arrives, _))) = (&leaves, &arrives)
+                {
+                    match (
+                        terminals::stream_of(leaves),
+                        terminals::stream_of(arrives),
+                    ) {
                         (Some((_, one)), Some((_, two))) if one != two => {
                             problems.push(Problem::CrossedStreams {
                                 from: origin.node.clone(),
@@ -980,7 +1016,9 @@ impl Graph {
             .map(|links| {
                 links
                     .into_iter()
-                    .filter(|l| l.via == crate::graph::telemetry::Via::PayloadTelemetry)
+                    .filter(|l| {
+                        l.via == crate::graph::telemetry::Via::PayloadTelemetry
+                    })
                     .map(|l| l.source)
                     .collect()
             })
@@ -988,10 +1026,13 @@ impl Graph {
         for node in self
             .nodes
             .iter()
-            .filter(|node| node.is_payload() || crate::gateway::is_gateway(&node.node_type))
+            .filter(|node| {
+                node.is_payload() || crate::gateway::is_gateway(&node.node_type)
+            })
             .filter(|node| !telemetered.contains(&node.name))
         {
-            let (sink, source) = linked.get(node.name.as_str()).copied().unwrap_or_default();
+            let (sink, source) =
+                linked.get(node.name.as_str()).copied().unwrap_or_default();
             if !sink && !source {
                 problems.push(Problem::NodeOnNoLink {
                     node: node.name.clone(),
@@ -1042,7 +1083,9 @@ impl Graph {
         }
 
         for node in &self.nodes {
-            if !node.name.trim().is_empty() && !touched.contains(node.name.as_str()) {
+            if !node.name.trim().is_empty()
+                && !touched.contains(node.name.as_str())
+            {
                 problems.push(Problem::Unconnected {
                     node: node.name.clone(),
                 });
@@ -1084,9 +1127,9 @@ impl Graph {
                 problems.push(Problem::BadNode {
                     node: node.name.clone(),
                     why: format!(
-                        "\"{}\" receives from the ground -- {} -- so it needs an \
-                         address and port for the ground to send to: say address \
-                         and port",
+                        "\"{}\" receives from the ground -- {} -- so it needs \
+                         an address and port for the ground to send to: say \
+                         address and port",
                         node.name,
                         if commanded {
                             "a command binding comes from it"
@@ -1119,11 +1162,9 @@ impl Graph {
                     sets: binding.sets.clone(),
                 });
             }
-            if target
-                .input
-                .as_deref()
-                .is_some_and(|attribute| crate::Attribute::of(attribute).is_err())
-            {
+            if target.input.as_deref().is_some_and(|attribute| {
+                crate::Attribute::of(attribute).is_err()
+            }) {
                 problems.push(Problem::AttributeTooLong {
                     sets: binding.sets.clone(),
                 });
@@ -1136,8 +1177,10 @@ impl Graph {
         // these rules used to live in the flight software, where this tool
         // could not reach them.
         for node in self.nodes.iter().filter(|n| n.node_type == "compute") {
-            let what = match crate::node::vehicle::compute::params_of(&node.name, &node.attributes)
-            {
+            let what = match crate::node::vehicle::compute::params_of(
+                &node.name,
+                &node.attributes,
+            ) {
                 Ok(what) => what,
                 Err(why) => {
                     problems.push(Problem::BadCompute {
@@ -1154,7 +1197,9 @@ impl Graph {
             // bound exactly once, and would otherwise quietly become a vote
             // over two -- which is no vote at all, two readings that disagree
             // having no majority between them.
-            if let crate::node::vehicle::compute::Computation::Vote(vote) = &what {
+            if let crate::node::vehicle::compute::Computation::Vote(vote) =
+                &what
+            {
                 let mut bound = self.inputs_bound_at(&node.name);
                 let mut declared = vote.inputs.clone();
                 bound.sort();
@@ -1175,32 +1220,34 @@ impl Graph {
         // They have nothing to say: none is opened, none has parameters, and
         // what each does is fixed -- a null node drops what arrives, a tee
         // sends it on both ways, and a ping node answers each ping with the
-        // time (see `crate::node::vehicle::ping`). So an attribute on one is a word
-        // nothing reads -- most likely a node whose type was changed and whose
-        // attributes were left behind -- and it is refused by name rather than
-        // ignored, which is the rule every other type is held to.
+        // time (see `crate::node::vehicle::ping`). So an attribute on one is a
+        // word nothing reads -- most likely a node whose type was changed and
+        // whose attributes were left behind -- and it is refused by name rather
+        // than ignored, which is the rule every other type is held to.
         for node in self.nodes.iter() {
             let does = match node.node_type.as_str() {
                 "null-moc" => "drops what the ground sends it",
                 "null-payload" => "drops the payload data it is sent",
                 "tee-moc" => {
-                    "sends what the ground sends it on as MOC data and again as \
-                     payload data"
+                    "sends what the ground sends it on as MOC data and again \
+                     as payload data"
                 }
                 "tee-payload" => {
                     "sends the payload data it is sent on as payload data and \
                      again as MOC data"
                 }
-                "ping" => "answers each ping from the ground with the vehicle's time",
+                "ping" => {
+                    "answers each ping from the ground with the vehicle's time"
+                }
                 _ => continue,
             };
             for attribute in node.attributes.keys() {
                 problems.push(Problem::BadNode {
                     node: node.name.clone(),
                     why: format!(
-                        "\"{}\": \"{attribute}\" is not an attribute of a {} node: a \
-                         {} node {does} and has nothing to be told, so take the \
-                         attribute out",
+                        "\"{}\": \"{attribute}\" is not an attribute of a {} \
+                         node: a {} node {does} and has nothing to be told, so \
+                         take the attribute out",
                         node.name, node.node_type, node.node_type
                     ),
                 });
@@ -1218,9 +1265,11 @@ impl Graph {
             .iter()
             .filter(|n| crate::node::app::Kind::of(&n.node_type).is_some())
         {
-            if let Err(why) =
-                crate::node::app::params_of(&node.name, &node.node_type, &node.attributes)
-            {
+            if let Err(why) = crate::node::app::params_of(
+                &node.name,
+                &node.node_type,
+                &node.attributes,
+            ) {
                 problems.push(Problem::BadNode {
                     node: node.name.clone(),
                     why,
@@ -1233,7 +1282,10 @@ impl Graph {
         // would have to refuse a record in flight loses telemetry at the
         // moment telemetry is worth most.
         for node in self.nodes.iter().filter(|n| n.node_type == "log") {
-            let params = match crate::node::vehicle::log::params_of(&node.name, &node.attributes) {
+            let params = match crate::node::vehicle::log::params_of(
+                &node.name,
+                &node.attributes,
+            ) {
                 Ok(params) => params,
                 Err(why) => {
                     problems.push(Problem::BadLog {
@@ -1285,7 +1337,8 @@ impl Graph {
                 // two masters a command came from.
                 Ok(kind) => {
                     for node in self.nodes.iter() {
-                        if let Some(why) = gateway_stray(kind, &node.node_type) {
+                        if let Some(why) = gateway_stray(kind, &node.node_type)
+                        {
                             problems.push(Problem::BadNode {
                                 node: node.name.clone(),
                                 why,
@@ -1316,7 +1369,8 @@ impl Graph {
         // refuse every `app_pl` in every file for want of an address it has no
         // use for.
         for node in self.nodes.iter().filter(|node| {
-            (node.is_payload() && crate::node::app::Kind::of(&node.node_type).is_none())
+            (node.is_payload()
+                && crate::node::app::Kind::of(&node.node_type).is_none())
                 || crate::gateway::is_gateway(&node.node_type)
         }) {
             if let Err(why) = crate::graph::reach::reach_of(node) {
@@ -1332,7 +1386,8 @@ impl Graph {
         // claim which came first is the one that stands.
         let mut taken: BTreeMap<Claim, String> = BTreeMap::new();
         for node in self.nodes.iter().filter(|node| {
-            (node.is_payload() && crate::node::app::Kind::of(&node.node_type).is_none())
+            (node.is_payload()
+                && crate::node::app::Kind::of(&node.node_type).is_none())
                 || crate::gateway::is_gateway(&node.node_type)
         }) {
             // A node whose terms will not parse has no claim to compare: the
@@ -1343,14 +1398,16 @@ impl Graph {
             };
             for (claim, what) in claims_of(&node.name, &reach.endpoint) {
                 match taken.get(&claim) {
-                    Some(first) => problems.push(Problem::TwoNodesWantOneThing {
-                        node: node.name.clone(),
-                        message: format!(
+                    Some(first) => {
+                        problems.push(Problem::TwoNodesWantOneThing {
+                            node: node.name.clone(),
+                            message: format!(
                             "{first} and {what} both want {}: neither could be \
                              opened beside the other",
                             claim_text(&claim)
                         ),
-                    }),
+                        })
+                    }
                     None => {
                         taken.insert(claim, what);
                     }
@@ -1374,14 +1431,14 @@ impl Graph {
             let Ok(reach) = crate::graph::reach::reach_of(node) else {
                 continue;
             };
-            let crate::types::EndpointConfig::Gpio(gpio) = &reach.endpoint else {
+            let crate::types::EndpointConfig::Gpio(gpio) = &reach.endpoint
+            else {
                 continue;
             };
 
-            let read = self
-                .links
-                .iter()
-                .any(|link| link.from.split('.').next().unwrap_or(&link.from) == node.name);
+            let read = self.links.iter().any(|link| {
+                link.from.split('.').next().unwrap_or(&link.from) == node.name
+            });
             let driven = !self.sources_of(&node.name).is_empty();
 
             if driven && !gpio.direction.is_output() {
@@ -1419,20 +1476,17 @@ impl Graph {
         // ask are the datum itself and there is no trigger to state. An
         // `app_pl` is asked nothing at all and has no sink for a link to
         // arrive at, so nothing reaches this rule by that road either.
-        for node in self
-            .nodes
-            .iter()
-            .filter(|n| n.is_payload() && crate::node::app::Kind::of(&n.node_type).is_none())
-        {
+        for node in self.nodes.iter().filter(|n| {
+            n.is_payload() && crate::node::app::Kind::of(&n.node_type).is_none()
+        }) {
             if node.attributes.contains_key("trigger") {
                 continue;
             }
             // Whatever terminal it leaves by: a payload read through its
             // `payload-out` is a payload that is read.
-            let read = self
-                .links
-                .iter()
-                .any(|link| link.from.split('.').next().unwrap_or(&link.from) == node.name);
+            let read = self.links.iter().any(|link| {
+                link.from.split('.').next().unwrap_or(&link.from) == node.name
+            });
             if !read {
                 continue;
             }
@@ -1459,7 +1513,8 @@ impl Graph {
         let mut inputs = Vec::new();
         for link in &self.links {
             for destination in link.to.each() {
-                let Destination { node: to, input } = Destination::parse(destination);
+                let Destination { node: to, input } =
+                    Destination::parse(destination);
                 if to == node {
                     if let Some(input) = input {
                         if terminals::stream_of(&input).is_none() {
@@ -1483,10 +1538,9 @@ impl Graph {
     fn sources_of(&self, node: &str) -> Vec<&str> {
         let mut sources: Vec<&str> = Vec::new();
         for link in &self.links {
-            let arrives =
-                link.to.each().iter().any(|destination| {
-                    destination.split('.').next().unwrap_or(destination) == node
-                });
+            let arrives = link.to.each().iter().any(|destination| {
+                destination.split('.').next().unwrap_or(destination) == node
+            });
             let from = link.from.split('.').next().unwrap_or(&link.from);
             if arrives && !sources.contains(&from) {
                 sources.push(from);
@@ -1615,17 +1669,25 @@ fn claim_text(claim: &Claim) -> String {
     match claim {
         Claim::Port { host, port } => format!("{host}:{port}"),
         Claim::Path(path) => path.clone(),
-        Claim::OnBus { bus, address } => format!("address {address:#04X} on {bus}"),
-        Claim::OnCanBus { interface, can_id } => format!("can_id {can_id:#x} on {interface}"),
+        Claim::OnBus { bus, address } => {
+            format!("address {address:#04X} on {bus}")
+        }
+        Claim::OnCanBus { interface, can_id } => {
+            format!("can_id {can_id:#x} on {interface}")
+        }
         Claim::OnChip { chip, line } => format!("line {line} on {chip}"),
-        Claim::Raw { host, protocol } => format!("IP protocol {protocol} from {host}"),
+        Claim::Raw { host, protocol } => {
+            format!("IP protocol {protocol} from {host}")
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::graph::{CommandBinding, Destinations, Group, Link, Node, Section};
+    use crate::graph::{
+        CommandBinding, Destinations, Group, Link, Node, Section,
+    };
     use crate::Scalar;
     use std::collections::BTreeMap;
 
@@ -1671,7 +1733,8 @@ mod tests {
     #[test]
     fn a_gateway_node_of_another_kind_is_refused() {
         use crate::gateway::GatewayKind;
-        let why = gateway_stray(GatewayKind::Cfs, "moc").expect("a radio under cfs");
+        let why =
+            gateway_stray(GatewayKind::Cfs, "moc").expect("a radio under cfs");
         assert!(why.contains("radio") && why.contains("cfs"), "{why}");
         assert_eq!(gateway_stray(GatewayKind::Radio, "moc"), None);
         assert_eq!(gateway_stray(GatewayKind::Cfs, "log"), None);
@@ -1725,14 +1788,23 @@ mod tests {
     fn a_raw_node_claims_its_protocol_from_its_host() {
         let raw = |address: &str, number: u8| {
             EndpointConfig::Network(crate::NetworkConfig {
-                protocol: NetworkProtocol::Raw(crate::IpProtocol::of(number).expect("a number")),
+                protocol: NetworkProtocol::Raw(
+                    crate::IpProtocol::of(number).expect("a number"),
+                ),
                 address: address.to_string(),
                 port: 0,
             })
         };
-        let claim = |endpoint: &EndpointConfig| claims_of("n", endpoint)[0].0.clone();
-        assert_eq!(claim(&raw("localhost", 253)), claim(&raw("127.0.0.1", 253)));
-        assert_ne!(claim(&raw("127.0.0.1", 253)), claim(&raw("127.0.0.1", 254)));
+        let claim =
+            |endpoint: &EndpointConfig| claims_of("n", endpoint)[0].0.clone();
+        assert_eq!(
+            claim(&raw("localhost", 253)),
+            claim(&raw("127.0.0.1", 253))
+        );
+        assert_ne!(
+            claim(&raw("127.0.0.1", 253)),
+            claim(&raw("127.0.0.1", 254))
+        );
         assert_ne!(claim(&raw("10.0.0.7", 253)), claim(&raw("10.0.0.8", 253)));
         assert_eq!(
             claim_text(&claim(&raw("10.0.0.7", 253))),
@@ -1782,7 +1854,9 @@ mod tests {
                 ("executable", "/bin/cat"),
                 ("app-payload-arg", "--readings"),
             ],
-            "app_moc_veh" => &[("executable", "/bin/cat"), ("app-moc-arg", "--commands")],
+            "app_moc_veh" => {
+                &[("executable", "/bin/cat"), ("app-moc-arg", "--commands")]
+            }
             "app_all_veh" | "app_all_pl" => &[
                 ("executable", "/bin/cat"),
                 ("app-payload-arg", "--readings"),
@@ -1846,7 +1920,8 @@ mod tests {
             assert!(
                 problems.iter().any(|p| matches!(
                     p,
-                    Problem::BadNode { node, why } if node == node_name && why.contains(wanted)
+                    Problem::BadNode { node, why }
+                        if node == node_name && why.contains(wanted)
                 )),
                 "{node_name} should be told about {wanted}: {problems:?}"
             );
@@ -1855,21 +1930,28 @@ mod tests {
         for missing in ["bridge_base", "fprime_id_base"] {
             let mut fsw = node("fsw", "gateway_fprime");
             fsw.attributes.remove(missing);
-            let g = answering_fprime(vec![node("a", "i2c"), fsw], vec![link("a", &["fsw"])]);
+            let g = answering_fprime(
+                vec![node("a", "i2c"), fsw],
+                vec![link("a", &["fsw"])],
+            );
             refused(&g, "fsw", missing);
         }
 
         let mut fsw = node("fsw", "gateway_fprime");
         fsw.attributes
             .insert("ground_base".to_string(), Scalar::of("10.0.0.2:5100"));
-        let g = answering_fprime(vec![node("a", "i2c"), fsw], vec![link("a", &["fsw"])]);
+        let g = answering_fprime(
+            vec![node("a", "i2c"), fsw],
+            vec![link("a", &["fsw"])],
+        );
         refused(&g, "fsw", "say bridge_base");
 
         let mut ground = node("ground", "moc");
         ground
             .attributes
             .insert("fprime_id_base".to_string(), Scalar::of("0x3000"));
-        let g = graph(vec![node("a", "i2c"), ground], vec![link("a", &["ground"])]);
+        let g =
+            graph(vec![node("a", "i2c"), ground], vec![link("a", &["ground"])]);
         refused(&g, "ground", "only a gateway_fprime node");
     }
 
@@ -1929,7 +2011,9 @@ mod tests {
             let said = problems
                 .iter()
                 .find_map(|p| match p {
-                    Problem::BadNode { node: named, why } if named == node => Some(why.clone()),
+                    Problem::BadNode { node: named, why } if named == node => {
+                        Some(why.clone())
+                    }
                     _ => None,
                 })
                 .unwrap_or_else(|| panic!("{node}: {problems:?}"));
@@ -2048,7 +2132,9 @@ mod tests {
             .check()
             .iter()
             .find_map(|p| match p {
-                Problem::BadNode { node, why } if node == "fore" => Some(why.clone()),
+                Problem::BadNode { node, why } if node == "fore" => {
+                    Some(why.clone())
+                }
                 _ => None,
             })
             .expect("a node with no program");
@@ -2118,7 +2204,9 @@ mod tests {
                 vec![node("a", "i2c"), node("c", "moc")],
                 vec![link("a", &["c"])],
             );
-            let mut flat = crate::graph::parameters::flatten(g.tcspecial.as_ref().unwrap());
+            let mut flat = crate::graph::parameters::flatten(
+                g.tcspecial.as_ref().unwrap(),
+            );
             flat.insert(attribute.to_string(), Scalar::of(value));
             g.tcspecial = Some(crate::graph::parameters::nest(&flat));
 
@@ -2129,7 +2217,9 @@ mod tests {
                     Problem::BadTcspecial { why } => Some(why.clone()),
                     _ => None,
                 })
-                .unwrap_or_else(|| panic!("{attribute} = {value}: {problems:?}"));
+                .unwrap_or_else(|| {
+                    panic!("{attribute} = {value}: {problems:?}")
+                });
             assert!(
                 said.contains(expected),
                 "{attribute} = {value} was refused as {said:?}"
@@ -2167,8 +2257,11 @@ mod tests {
             // A payload nothing touches, so its telemetry is the section's,
             // and a ground link with nothing on it: both of what the example
             // had when the section was half written.
-            let mut g = graph(vec![node("a", "i2c"), node("c", "moc")], Vec::new());
-            let mut flat = crate::graph::parameters::flatten(g.tcspecial.as_ref().unwrap());
+            let mut g =
+                graph(vec![node("a", "i2c"), node("c", "moc")], Vec::new());
+            let mut flat = crate::graph::parameters::flatten(
+                g.tcspecial.as_ref().unwrap(),
+            );
             flat.remove(left_out);
             g.tcspecial = Some(crate::graph::parameters::nest(&flat));
 
@@ -2204,7 +2297,8 @@ mod tests {
         assert!(
             problems.iter().any(|p| matches!(
                 p,
-                Problem::UntriggeredInput { node, from } if node == "sensor" && from == "moc"
+                Problem::UntriggeredInput { node, from }
+                    if node == "sensor" && from == "moc"
             )),
             "{problems:?}"
         );
@@ -2260,8 +2354,10 @@ mod tests {
                 );
             }
             "network" => {
-                made.attributes
-                    .insert("port".to_string(), Scalar::of((5100 + which).to_string()));
+                made.attributes.insert(
+                    "port".to_string(),
+                    Scalar::of((5100 + which).to_string()),
+                );
             }
             _ => {
                 made.attributes.insert(
@@ -2308,8 +2404,8 @@ mod tests {
         // One device file, which is one stream split between two.
         let first = named("device-file", "a");
         let mut second = named("device-file", "b");
-        let said =
-            wanted(&two(first.clone(), second.clone())).expect("two nodes on one device file");
+        let said = wanted(&two(first.clone(), second.clone()))
+            .expect("two nodes on one device file");
         assert!(said.contains("/dev/urandom"), "{said}");
         assert!(said.contains("\"a\"") && said.contains("\"b\""), "{said}");
 
@@ -2347,7 +2443,8 @@ mod tests {
         driving
             .attributes
             .insert("lines".to_string(), Scalar::of("5,6,7"));
-        let said = wanted(&two(watching.clone(), driving.clone())).expect("two nodes on one line");
+        let said = wanted(&two(watching.clone(), driving.clone()))
+            .expect("two nodes on one line");
         assert!(said.contains("line 5"), "{said}");
         assert!(
             said.contains("/dev/gpiochip0"),
@@ -2369,7 +2466,8 @@ mod tests {
         theirs
             .attributes
             .insert("address".to_string(), Scalar::of("localhost"));
-        let said = wanted(&two(mine.clone(), theirs.clone())).expect("two nodes at one port");
+        let said = wanted(&two(mine.clone(), theirs.clone()))
+            .expect("two nodes at one port");
         assert!(said.contains("5100"), "{said}");
         theirs
             .attributes
@@ -2394,8 +2492,9 @@ mod tests {
                 .insert("read_timeout".to_string(), Scalar::of("none"));
             made
         };
-        let said = wanted(&two(named_socket("a", "5200"), named_socket("b", "5201")))
-            .expect("one socket path, whatever the ports say");
+        let said =
+            wanted(&two(named_socket("a", "5200"), named_socket("b", "5201")))
+                .expect("one socket path, whatever the ports say");
         assert!(said.contains("/tmp/node.sock"), "{said}");
 
         // And a path is a path, whichever kind of node opens it: a device
@@ -2446,7 +2545,9 @@ mod tests {
         let said = problems
             .iter()
             .find(|p| matches!(p, Problem::LinesAgainstTheirDirection { .. }))
-            .unwrap_or_else(|| panic!("driven inputs were allowed: {problems:?}"));
+            .unwrap_or_else(|| {
+                panic!("driven inputs were allowed: {problems:?}")
+            });
         assert_eq!(said.about(), About::Node("heaters".to_string()));
         assert!(
             said.describe().contains("direction: output"),
@@ -2467,9 +2568,10 @@ mod tests {
             vec![link("thermostat", &["heaters", "moc"])],
         );
         assert!(
-            !g.check()
-                .iter()
-                .any(|p| matches!(p, Problem::LinesAgainstTheirDirection { .. })),
+            !g.check().iter().any(|p| matches!(
+                p,
+                Problem::LinesAgainstTheirDirection { .. }
+            )),
             "{:?}",
             g.check()
         );
@@ -2484,11 +2586,19 @@ mod tests {
         let problems = g.check();
         let said = problems
             .iter()
-            .find(|p| matches!(
-                p,
-                Problem::LinesAgainstTheirDirection { node, driven } if node == "heaters" && !driven
-            ))
-            .unwrap_or_else(|| panic!("a read of driven lines was allowed: {problems:?}"));
+            .find(|p| {
+                matches!(
+                    p,
+                    Problem::LinesAgainstTheirDirection { node, driven }
+                        if node == "heaters" && !driven
+                )
+            })
+            .unwrap_or_else(|| {
+                panic!(
+                    "a read of driven lines was allowed: \
+                                       {problems:?}"
+                )
+            });
         assert!(
             said.describe().contains("reports nothing"),
             "{}",
@@ -2502,9 +2612,10 @@ mod tests {
             vec![link("switch", &["moc"])],
         );
         assert!(
-            !g.check()
-                .iter()
-                .any(|p| matches!(p, Problem::LinesAgainstTheirDirection { .. })),
+            !g.check().iter().any(|p| matches!(
+                p,
+                Problem::LinesAgainstTheirDirection { .. }
+            )),
             "{:?}",
             g.check()
         );
@@ -2624,7 +2735,8 @@ mod tests {
         assert!(
             problems.iter().any(|p| matches!(
                 p,
-                Problem::InputBoundTwice { node, input } if node == "m" && input == "in0"
+                Problem::InputBoundTwice { node, input }
+                    if node == "m" && input == "in0"
             )),
             "{problems:?}"
         );
@@ -2685,12 +2797,17 @@ mod tests {
             g.check()
         };
         let refused = |found: &[Problem]| {
-            found
-                .iter()
-                .any(|p| matches!(p, Problem::RateOnASender { node, .. } if node == "a"))
+            found.iter().any(|p| {
+                matches!(
+                    p,
+                    Problem::RateOnASender { node, .. } if node == "a"
+                )
+            })
         };
 
-        for sender in ["network", "serial", "hdlc", "can", "rpmsg", "iio", "gpio"] {
+        for sender in
+            ["network", "serial", "hdlc", "can", "rpmsg", "iio", "gpio"]
+        {
             let found = paced(sender, &[("poll_interval", "1 s")]);
             assert!(refused(&found), "{sender}: {found:?}");
             let said = found
@@ -2704,7 +2821,10 @@ mod tests {
             );
 
             // Asked on a timer of its own, it is not refused for that.
-            let found = paced(sender, &[("trigger", "[55]"), ("trigger_interval", "1 s")]);
+            let found = paced(
+                sender,
+                &[("trigger", "[55]"), ("trigger_interval", "1 s")],
+            );
             assert!(!refused(&found), "{sender} asked: {found:?}");
         }
         for quiet in ["i2c", "spi", "device-file"] {
@@ -2831,9 +2951,10 @@ mod tests {
                 name: "temps".to_string(),
                 interval: "3 s".to_string(),
             });
-            g.nodes[0]
-                .attributes
-                .insert(rate.to_string(), crate::endpoint_config::Scalar::of("1 s"));
+            g.nodes[0].attributes.insert(
+                rate.to_string(),
+                crate::endpoint_config::Scalar::of("1 s"),
+            );
             if rate == "trigger_interval" {
                 g.nodes[0].attributes.insert(
                     "trigger".to_string(),
@@ -2844,7 +2965,8 @@ mod tests {
             assert!(
                 found.iter().any(|p| matches!(
                     p,
-                    Problem::IntervalInAGroup { attribute, .. } if *attribute == rate
+                    Problem::IntervalInAGroup { attribute, .. }
+                        if *attribute == rate
                 )),
                 "{rate} in a group should be refused: {found:?}"
             );
@@ -2896,9 +3018,10 @@ mod tests {
         let g = graph(vec![node("lonely", "null-payload")], Vec::new());
         let problems = g.check();
         assert!(
-            problems
-                .iter()
-                .any(|p| matches!(p, Problem::Unconnected { node } if node == "lonely")),
+            problems.iter().any(|p| matches!(
+                p,
+                Problem::Unconnected { node } if node == "lonely"
+            )),
             "{problems:?}"
         );
     }
@@ -2934,9 +3057,10 @@ mod tests {
         *section = crate::graph::parameters::nest(&flat);
         let problems = g.check();
         assert!(
-            problems
-                .iter()
-                .any(|p| matches!(p, Problem::BadTcspecial { why } if why.contains("65535"))),
+            problems.iter().any(|p| matches!(
+                p,
+                Problem::BadTcspecial { why } if why.contains("65535")
+            )),
             "{problems:?}"
         );
     }
@@ -2954,7 +3078,8 @@ mod tests {
         );
         assert_eq!(g.check(), Vec::new());
 
-        let mut g = graph(vec![sends, node("thermostat", "compute")], Vec::new());
+        let mut g =
+            graph(vec![sends, node("thermostat", "compute")], Vec::new());
         g.commands = vec![CommandBinding {
             from: "moc".to_string(),
             sets: "thermostat.setpoint".to_string(),
@@ -2963,7 +3088,8 @@ mod tests {
         assert!(
             problems.iter().any(|p| matches!(
                 p,
-                Problem::BadNode { node, why } if node == "moc" && why.contains("address and port")
+                Problem::BadNode { node, why }
+                    if node == "moc" && why.contains("address and port")
             )),
             "{problems:?}"
         );
@@ -3027,12 +3153,14 @@ mod tests {
 
         // Naming one too long for a SET_NODE to carry, which the ground could
         // never set.
-        g.commands[0].sets = format!("t.{}", "s".repeat(crate::ATTRIBUTE_BYTES + 1));
+        g.commands[0].sets =
+            format!("t.{}", "s".repeat(crate::ATTRIBUTE_BYTES + 1));
         assert!(g
             .check()
             .iter()
             .any(|p| matches!(p, Problem::AttributeTooLong { .. })));
-        g.commands[0].sets = format!("t.{}", "s".repeat(crate::ATTRIBUTE_BYTES));
+        g.commands[0].sets =
+            format!("t.{}", "s".repeat(crate::ATTRIBUTE_BYTES));
         assert!(!g
             .check()
             .iter()
@@ -3078,7 +3206,8 @@ mod tests {
 
         // A thermostat with no band, which used to pass here and be refused
         // when the vehicle started.
-        let problems = computation(&[("function", "hysteresis"), ("setpoint", "293.15")]);
+        let problems =
+            computation(&[("function", "hysteresis"), ("setpoint", "293.15")]);
         assert!(
             problems.iter().any(|p| matches!(
                 p,
@@ -3089,7 +3218,8 @@ mod tests {
         );
 
         // A program with no deadline.
-        let problems = computation(&[("function", "process"), ("executable", "/bin/cat")]);
+        let problems =
+            computation(&[("function", "process"), ("executable", "/bin/cat")]);
         assert!(
             problems.iter().any(|p| matches!(
                 p,
@@ -3143,7 +3273,8 @@ mod tests {
             g.check()
         };
 
-        let two = || vec![link("a", &["average.in0"]), link("b", &["average.in1"])];
+        let two =
+            || vec![link("a", &["average.in0"]), link("b", &["average.in1"])];
         let three = || {
             let mut links = two();
             links.push(link("c", &["average.in2"]));
@@ -3156,7 +3287,8 @@ mod tests {
             problems.iter().any(|p| matches!(
                 p,
                 Problem::VoteInputs { node, declared, bound }
-                    if node == "average" && declared.len() == 3 && bound.len() == 2
+                    if node == "average"
+                       && declared.len() == 3 && bound.len() == 2
             )),
             "{problems:?}"
         );
@@ -3244,7 +3376,8 @@ mod tests {
         assert!(
             problems.iter().any(|p| matches!(
                 p,
-                Problem::BadLog { node, why } if node == "housekeeping" && why.contains("compressed")
+                Problem::BadLog { node, why }
+                    if node == "housekeeping" && why.contains("compressed")
             )),
             "{problems:?}"
         );
@@ -3261,8 +3394,10 @@ mod tests {
             let mut log = node("housekeeping", "log");
             log.attributes
                 .insert("format".to_string(), Scalar::of(format));
-            log.attributes
-                .insert("directory".to_string(), Scalar::of("/var/log/tcspecial"));
+            log.attributes.insert(
+                "directory".to_string(),
+                Scalar::of("/var/log/tcspecial"),
+            );
             log
         };
         let sensor = |name: &str, read_size: Option<&str>| {
@@ -3317,8 +3452,12 @@ mod tests {
         assert_eq!(mismatches.len(), 1, "{problems:?}");
         assert!(matches!(
             mismatches[0],
-            Problem::LogSourceMismatch { source, wanted: 2, produces: Some(3), .. }
-                if source == "temp_3"
+            Problem::LogSourceMismatch {
+                source,
+                wanted: 2,
+                produces: Some(3),
+                ..
+            } if source == "temp_3"
         ));
         assert!(
             mismatches[0].describe().contains("3 bytes")
@@ -3344,7 +3483,10 @@ mod tests {
         assert_eq!(
             problems
                 .iter()
-                .filter(|p| matches!(p, Problem::LogSourceMismatch { produces: None, .. }))
+                .filter(|p| matches!(
+                    p,
+                    Problem::LogSourceMismatch { produces: None, .. }
+                ))
                 .count(),
             2,
             "{problems:?}"
@@ -3512,7 +3654,9 @@ mod tests {
         assert!(
             problems.iter().any(|p| matches!(
                 p,
-                Problem::BadTerminal { why, .. } if why.contains("no data source at all")
+                Problem::BadTerminal { why, .. } if why.contains("no data \
+                                                                  source at \
+                                                                  all")
             )),
             "{problems:?}"
         );
@@ -3520,7 +3664,8 @@ mod tests {
         // And none of them has anything to be told: an attribute on one is a
         // word nothing reads, most likely left behind by a type that was
         // changed.
-        for node_type in ["null-moc", "null-payload", "tee-moc", "tee-payload"] {
+        for node_type in ["null-moc", "null-payload", "tee-moc", "tee-payload"]
+        {
             let mut said_something = node("n", node_type);
             said_something
                 .attributes
@@ -3530,7 +3675,8 @@ mod tests {
             assert!(
                 problems.iter().any(|p| matches!(
                     p,
-                    Problem::BadNode { node, why } if node == "n" && why.contains("address")
+                    Problem::BadNode { node, why }
+                        if node == "n" && why.contains("address")
                 )),
                 "{node_type}: {problems:?}"
             );
@@ -3551,7 +3697,9 @@ mod tests {
         assert_eq!(unknown.about(), About::Node("a".to_string()));
         let said = unknown.describe();
         assert!(
-            said.contains("\"bogus\"") && said.contains("ping") && said.contains("i2c"),
+            said.contains("\"bogus\"")
+                && said.contains("ping")
+                && said.contains("i2c"),
             "{said}"
         );
 
@@ -3627,7 +3775,8 @@ mod tests {
             problems.iter().any(|p| matches!(
                 p,
                 Problem::BadNode { node, why }
-                    if node == "p" && why.contains("\"interval\" is not an attribute of a ping node")
+                    if node == "p" && why.contains("\"interval\" is not an \
+                                                    attribute of a ping node")
             )),
             "{problems:?}"
         );
@@ -3688,7 +3837,8 @@ mod tests {
         // Reached by a command binding, so the older `Unconnected` rule is
         // satisfied and this one is what is left to catch it: a ground link
         // that commands a computation and carries no telemetry at all.
-        let mut g = graph(vec![node("moc", "moc"), node("t", "compute")], Vec::new());
+        let mut g =
+            graph(vec![node("moc", "moc"), node("t", "compute")], Vec::new());
         g.commands.push(CommandBinding {
             from: "moc".to_string(),
             sets: "t.setpoint".to_string(),
@@ -3696,7 +3846,12 @@ mod tests {
         let problems = g.check();
         let said = problems
             .iter()
-            .find(|p| matches!(p, Problem::NodeOnNoLink { node, .. } if node == "moc"))
+            .find(|p| {
+                matches!(
+                    p,
+                    Problem::NodeOnNoLink { node, .. } if node == "moc"
+                )
+            })
             .unwrap_or_else(|| panic!("{problems:?}"));
         assert_eq!(said.about(), About::Node("moc".to_string()));
         assert!(said.describe().contains("data sink"), "{}", said.describe());
@@ -3802,7 +3957,8 @@ mod tests {
             },
             Problem::BadLog {
                 node: "l".into(),
-                why: "format: \"compressed\" is not a format a log knows".into(),
+                why: "format: \"compressed\" is not a format a log knows"
+                    .into(),
             },
             Problem::LogSourceMismatch {
                 log: "l".into(),
@@ -3846,7 +4002,9 @@ mod tests {
             graph
                 .check()
                 .into_iter()
-                .filter(|problem| matches!(problem, Problem::InitBeforeItSpeaks { .. }))
+                .filter(|problem| {
+                    matches!(problem, Problem::InitBeforeItSpeaks { .. })
+                })
                 .collect::<Vec<_>>()
         };
         let link = |from: &str, to: &str| Link {
@@ -3884,10 +4042,10 @@ mod tests {
                 .insert(attribute.to_string(), Scalar::of(value));
         }
         assert!(
-            !asked
-                .check()
-                .iter()
-                .any(|problem| matches!(problem, Problem::InitBeforeItSpeaks { .. })),
+            !asked.check().iter().any(|problem| matches!(
+                problem,
+                Problem::InitBeforeItSpeaks { .. }
+            )),
             "a datagram payload that is asked is reached at its address"
         );
     }
@@ -3923,7 +4081,9 @@ mod tests {
             graph
                 .check()
                 .into_iter()
-                .filter(|problem| matches!(problem, Problem::SendsFromSpokenTo { .. }))
+                .filter(|problem| {
+                    matches!(problem, Problem::SendsFromSpokenTo { .. })
+                })
                 .collect::<Vec<_>>()
         };
 
@@ -3932,7 +4092,8 @@ mod tests {
             "a payload that speaks first says where it sends from"
         );
 
-        let asked = said(&[("trigger", "\"READ\"")], vec![link("sensor", "decide")]);
+        let asked =
+            said(&[("trigger", "\"READ\"")], vec![link("sensor", "decide")]);
         assert_eq!(asked.len(), 1, "{asked:?}");
         assert!(asked[0].describe().contains("trigger"), "{:?}", asked[0]);
 

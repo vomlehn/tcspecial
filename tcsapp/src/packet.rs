@@ -82,7 +82,10 @@ pub fn read<R: Read>(from: &mut R) -> io::Result<Option<Vec<u8>>> {
     if got != length {
         return Err(io::Error::new(
             io::ErrorKind::UnexpectedEof,
-            format!("a packet said {length} bytes and the interface ended after {got}"),
+            format!(
+                "a packet said {length} bytes and the interface ended \
+                 after {got}"
+            ),
         ));
     }
     Ok(Some(data))

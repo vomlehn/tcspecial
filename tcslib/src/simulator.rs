@@ -41,14 +41,14 @@ impl std::fmt::Display for NotReady {
         match self {
             NotReady::Silent { at, waited } => write!(
                 f,
-                "nothing answered at {at} in {} s: tcssim is not running, or tcssim.ready in \
-                 the simulator file is not where it is",
+                "nothing answered at {at} in {} s: tcssim is not running, or \
+                 tcssim.ready in the simulator file is not where it is",
                 waited.as_secs_f32()
             ),
             NotReady::StillStarting { at, waited } => write!(
                 f,
-                "the simulator at {at} was still making its stand-ins after {} s: look at \
-                 what tcssim says, or give it longer",
+                "the simulator at {at} was still making its stand-ins after {} \
+                 s: look at what tcssim says, or give it longer",
                 waited.as_secs_f32()
             ),
             NotReady::Failed { at, reason } => {
@@ -56,8 +56,8 @@ impl std::fmt::Display for NotReady {
             }
             NotReady::Differs { at, differences } => write!(
                 f,
-                "the simulator at {at} is set up for another run, and so is not used -- {}: \
-                 stop it, or start this run on what it read",
+                "the simulator at {at} is set up for another run, and so is \
+                 not used -- {}: stop it, or start this run on what it read",
                 differences.join("; ")
             ),
             NotReady::Socket { at, why } => {
@@ -74,16 +74,20 @@ impl std::fmt::Display for NotReady {
 /// up; each carries its own number, and an answer to an earlier one counts,
 /// since the state it gives is the state then and the next answer would say
 /// the same or later.
-pub fn ask(at: SocketAddr, patience: Duration) -> Result<Option<Answer>, NotReady> {
+pub fn ask(
+    at: SocketAddr,
+    patience: Duration,
+) -> Result<Option<Answer>, NotReady> {
     let unspecified: SocketAddr = if at.is_ipv4() {
         "0.0.0.0:0".parse().expect("an address")
     } else {
         "[::]:0".parse().expect("an address")
     };
-    let socket = UdpSocket::bind(unspecified).map_err(|e| NotReady::Socket {
-        at,
-        why: e.to_string(),
-    })?;
+    let socket =
+        UdpSocket::bind(unspecified).map_err(|e| NotReady::Socket {
+            at,
+            why: e.to_string(),
+        })?;
     let started = Instant::now();
     let mut sequence = 0u32;
     let mut buffer = [0u8; ANSWER_BYTES];
@@ -117,7 +121,8 @@ pub fn ask(at: SocketAddr, patience: Duration) -> Result<Option<Answer>, NotRead
                 Err(e)
                     if matches!(
                         e.kind(),
-                        std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                        std::io::ErrorKind::WouldBlock
+                            | std::io::ErrorKind::TimedOut
                     ) =>
                 {
                     break
@@ -126,7 +131,9 @@ pub fn ask(at: SocketAddr, patience: Duration) -> Result<Option<Answer>, NotRead
                 // told at once: waited out as silence is, so that asking
                 // nobody does not spin.
                 Err(_) => {
-                    std::thread::sleep(until.saturating_duration_since(Instant::now()));
+                    std::thread::sleep(
+                        until.saturating_duration_since(Instant::now()),
+                    );
                     break;
                 }
             }
@@ -142,7 +149,11 @@ pub fn ask(at: SocketAddr, patience: Duration) -> Result<Option<Answer>, NotRead
 /// at once, being things more waiting does not mend; silence and a simulator
 /// still starting are said when the time is up, and are told apart, being
 /// different faults with different remedies.
-pub fn wait(at: SocketAddr, ours: &SetUpFor, patience: Duration) -> Result<(), NotReady> {
+pub fn wait(
+    at: SocketAddr,
+    ours: &SetUpFor,
+    patience: Duration,
+) -> Result<(), NotReady> {
     let started = Instant::now();
     let mut heard = false;
     loop {
@@ -238,7 +249,8 @@ mod tests {
     #[test]
     fn a_failure_and_a_difference_are_said_at_once() {
         let at = simulator(Mode::All, Arc::new(AtomicU8::new(2)));
-        let said = wait(at, &set_up(Mode::All), Duration::from_secs(5)).unwrap_err();
+        let said =
+            wait(at, &set_up(Mode::All), Duration::from_secs(5)).unwrap_err();
         assert_eq!(
             said,
             NotReady::Failed {
@@ -248,14 +260,16 @@ mod tests {
         );
 
         let at = simulator(Mode::Some, Arc::new(AtomicU8::new(1)));
-        let said = wait(at, &set_up(Mode::All), Duration::from_secs(5)).unwrap_err();
+        let said =
+            wait(at, &set_up(Mode::All), Duration::from_secs(5)).unwrap_err();
         assert!(matches!(said, NotReady::Differs { .. }), "{said}");
     }
 
     #[test]
     fn silence_and_starting_are_told_apart() {
         let at = simulator(Mode::All, Arc::new(AtomicU8::new(0)));
-        let said = wait(at, &set_up(Mode::All), Duration::from_millis(500)).unwrap_err();
+        let said = wait(at, &set_up(Mode::All), Duration::from_millis(500))
+            .unwrap_err();
         assert!(matches!(said, NotReady::StillStarting { .. }), "{said}");
 
         // A port nothing answers at.
@@ -263,7 +277,8 @@ mod tests {
             .unwrap()
             .local_addr()
             .unwrap();
-        let said = wait(nobody, &set_up(Mode::All), Duration::from_millis(500)).unwrap_err();
+        let said = wait(nobody, &set_up(Mode::All), Duration::from_millis(500))
+            .unwrap_err();
         assert!(matches!(said, NotReady::Silent { .. }), "{said}");
     }
 }

@@ -161,7 +161,8 @@ impl Framer {
     /// or stop letting go of one too long to hold, so that the next byte is
     /// read as a prefix.
     fn give_up_on_a_late_frame(&mut self, now: Instant) {
-        let (Some(timeout), Some(began)) = (self.rule.timeout, self.began) else {
+        let (Some(timeout), Some(began)) = (self.rule.timeout, self.began)
+        else {
             return;
         };
         if !timed_out(began, now, timeout) {
@@ -185,7 +186,8 @@ impl Framer {
         if let Some(prefix) = self.rule.length_prefix {
             // Only ever whole: what the timeout ends is let go, not
             // delivered, and room() never asks past the frame's end.
-            return frame_length(prefix, &self.held).filter(|&whole| self.held.len() == whole);
+            return frame_length(prefix, &self.held)
+                .filter(|&whole| self.held.len() == whole);
         }
         if let Some(end) = self.terminated() {
             return Some(end);
@@ -194,7 +196,9 @@ impl Framer {
             return Some(self.held.len());
         }
         match (self.rule.timeout, self.began) {
-            (Some(timeout), Some(began)) if timed_out(began, now, timeout) => Some(self.held.len()),
+            (Some(timeout), Some(began)) if timed_out(began, now, timeout) => {
+                Some(self.held.len())
+            }
             _ => None,
         }
     }
@@ -236,7 +240,11 @@ mod tests {
     use super::*;
 
     /// A rule whose terminators are each one of these bytes.
-    fn rule(max_length: u32, timeout: Option<Duration>, terminators: &[u8]) -> StreamParams {
+    fn rule(
+        max_length: u32,
+        timeout: Option<Duration>,
+        terminators: &[u8],
+    ) -> StreamParams {
         StreamParams {
             max_length,
             timeout,
@@ -253,7 +261,11 @@ mod tests {
         }
     }
 
-    fn prefixed(max_length: u32, timeout: Option<Duration>, prefix: LengthPrefix) -> StreamParams {
+    fn prefixed(
+        max_length: u32,
+        timeout: Option<Duration>,
+        prefix: LengthPrefix,
+    ) -> StreamParams {
         StreamParams {
             length_prefix: Some(prefix),
             ..rule(max_length, timeout, &[])
@@ -263,7 +275,11 @@ mod tests {
     /// Hold as much of `bytes` as is asked for, as a line would hand them
     /// over, and say what read, if any, has ended by then. What is not asked
     /// for is dropped, as though it were left in the line.
-    fn after(framer: &mut Framer, bytes: &[u8], now: Instant) -> Option<Vec<u8>> {
+    fn after(
+        framer: &mut Framer,
+        bytes: &[u8],
+        now: Instant,
+    ) -> Option<Vec<u8>> {
         feed(framer, bytes, now);
         let mut out = [0u8; 64];
         framer.frame(now, &mut out).map(|n| out[..n].to_vec())
@@ -339,7 +355,10 @@ mod tests {
     fn two_reads_that_arrive_together_come_out_in_turn() {
         let now = Instant::now();
         let mut framer = Framer::new(rule(64, None, b"\r\n"));
-        assert_eq!(after(&mut framer, b"ab\rcd\n", now), Some(b"ab\r".to_vec()));
+        assert_eq!(
+            after(&mut framer, b"ab\rcd\n", now),
+            Some(b"ab\r".to_vec())
+        );
         assert_eq!(after(&mut framer, b"", now), Some(b"cd\n".to_vec()));
         assert_eq!(after(&mut framer, b"", now), None);
     }
@@ -370,7 +389,8 @@ mod tests {
     #[test]
     fn a_timeout_ends_a_read_with_what_has_arrived() {
         let start = Instant::now();
-        let mut framer = Framer::new(rule(64, Some(Duration::from_millis(250)), &[]));
+        let mut framer =
+            Framer::new(rule(64, Some(Duration::from_millis(250)), &[]));
         assert_eq!(
             after(&mut framer, b"", start),
             None,
@@ -395,7 +415,8 @@ mod tests {
     #[test]
     fn max_length_bounds_every_read() {
         let now = Instant::now();
-        let mut framer = Framer::new(rule(3, Some(Duration::from_secs(1)), b"\n"));
+        let mut framer =
+            Framer::new(rule(3, Some(Duration::from_secs(1)), b"\n"));
         assert_eq!(framer.room(), 3);
         assert_eq!(after(&mut framer, b"abcdef", now), Some(b"abc".to_vec()));
         assert_eq!(framer.room(), 3, "the rest was not taken");
@@ -473,7 +494,11 @@ mod tests {
         ));
         assert_eq!(after(&mut framer, b"\x04ab", start), None);
         let late = start + Duration::from_millis(100);
-        assert_eq!(after(&mut framer, b"", late), None, "let go, not delivered");
+        assert_eq!(
+            after(&mut framer, b"", late),
+            None,
+            "let go, not delivered"
+        );
         assert_eq!(
             framer.let_go(),
             LetGo {
@@ -501,7 +526,11 @@ mod tests {
             after(&mut framer, b"ef\x02gh", now),
             Some(b"\x02gh".to_vec())
         );
-        assert_eq!(framer.let_go(), LetGo::default(), "the next was not let go");
+        assert_eq!(
+            framer.let_go(),
+            LetGo::default(),
+            "the next was not let go"
+        );
     }
 
     /// A frame too long to hold that stops arriving stops being let go at

@@ -21,8 +21,8 @@ use tcslibgs::{NetworkConfig, SendsFrom, TcsError, TcsResult};
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
 use crate::endpoint::bind_failed;
 use crate::endpoint::{
-    wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable, WaitResult,
-    STRANGERS_PER_READ,
+    wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable,
+    WaitResult, STRANGERS_PER_READ,
 };
 
 /// UDP endpoint for network communication
@@ -116,23 +116,32 @@ impl UdpEndpoint {
     ///
     /// For a link whose far end is written down: a payload's ground link, both
     /// ends of which come out of `payload_telemetry`. `dest` is that far end.
-    pub fn sending_to(what: &str, config: &NetworkConfig, dest: &NetworkConfig) -> TcsResult<Self> {
+    pub fn sending_to(
+        what: &str,
+        config: &NetworkConfig,
+        dest: &NetworkConfig,
+    ) -> TcsResult<Self> {
         let told = format!("{}:{}", dest.address, dest.port)
             .parse::<SocketAddr>()
             .map_err(|e| {
                 TcsError::Config(format!(
-                    "{what}: \"{}:{}\" is where the configuration says the ground \
-                     is, and it is not an address: {e}",
+                    "{what}: \"{}:{}\" is where the configuration says the \
+                     ground is, and it is not an address: {e}",
                     dest.address, dest.port
                 ))
             })?;
         Self::bound(what, config, Some(told))
     }
 
-    fn bound(what: &str, config: &NetworkConfig, told: Option<SocketAddr>) -> TcsResult<Self> {
+    fn bound(
+        what: &str,
+        config: &NetworkConfig,
+        told: Option<SocketAddr>,
+    ) -> TcsResult<Self> {
         let addr = format!("{}:{}", config.address, config.port);
-        let socket = UdpSocket::bind(&addr)
-            .map_err(|e| bind_failed(&format!("{what} UDP endpoint"), &addr, e))?;
+        let socket = UdpSocket::bind(&addr).map_err(|e| {
+            bind_failed(&format!("{what} UDP endpoint"), &addr, e)
+        })?;
         socket.set_nonblocking(true)?;
 
         Ok(Self {
@@ -160,8 +169,8 @@ impl UdpEndpoint {
                 Ok(())
             }
             SendsFrom::Path(path) => Err(TcsError::Config(format!(
-                "{what}: sends_from {path:?} is a path, and this is a UDP socket, \
-                 whose payload sends from a host and a port"
+                "{what}: sends_from {path:?} is a path, and this is a UDP \
+                 socket, whose payload sends from a host and a port"
             ))),
         }
     }
@@ -197,7 +206,11 @@ impl EndpointWaitable for UdpEndpoint {
         self.socket.as_raw_fd()
     }
 
-    fn wait_for_event(&self, cmd_fd: RawFd, timeout_ms: i32) -> TcsResult<WaitResult> {
+    fn wait_for_event(
+        &self,
+        cmd_fd: RawFd,
+        timeout_ms: i32,
+    ) -> TcsResult<WaitResult> {
         wait_for_fds(self.io_fd(), cmd_fd, PollFlags::POLLIN, timeout_ms)
     }
 }
@@ -213,7 +226,9 @@ impl EndpointReadable for UdpEndpoint {
         // next.
         for _ in 0..STRANGERS_PER_READ {
             match self.socket.recv_from(buffer) {
-                Ok((_, from)) if self.only_from.is_some_and(|only| from != only) => {
+                Ok((_, from))
+                    if self.only_from.is_some_and(|only| from != only) =>
+                {
                     self.strangers += 1;
                 }
                 Ok((n, from)) => {
@@ -222,7 +237,9 @@ impl EndpointReadable for UdpEndpoint {
                     }
                     return Ok(n);
                 }
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => return Ok(0),
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    return Ok(0)
+                }
                 Err(e) => return Err(TcsError::Io(e)),
             }
         }
@@ -293,7 +310,8 @@ mod tests {
             port: at.port(),
         };
 
-        let reader = UdpEndpoint::sending_to("auto-send", &mine, &theirs).unwrap();
+        let reader =
+            UdpEndpoint::sending_to("auto-send", &mine, &theirs).unwrap();
         let mut writer = reader.try_clone().unwrap();
 
         // Nothing has arrived on it, and it sends all the same.
@@ -481,10 +499,13 @@ mod tests {
     /// What arrives within two seconds: a datagram sent over the loopback is
     /// readable at once, nearly always, and the test is not about when.
     fn read_soon(reader: &mut UdpEndpoint, into: &mut [u8]) -> usize {
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        let deadline =
+            std::time::Instant::now() + std::time::Duration::from_secs(2);
         loop {
             match reader.read(into).expect("a read") {
-                0 if std::time::Instant::now() < deadline => std::thread::yield_now(),
+                0 if std::time::Instant::now() < deadline => {
+                    std::thread::yield_now()
+                }
                 size => return size,
             }
         }
@@ -526,7 +547,8 @@ mod tests {
         // Nothing has arrived, so there is nowhere to answer.
         assert!(
             writer.write(b"telemetry").is_err(),
-            "sending with no known peer should be reported, not silently dropped"
+            "sending with no known peer should be reported, not silently \
+             dropped"
         );
 
         let ground = UdpSocket::bind("127.0.0.1:0").unwrap();

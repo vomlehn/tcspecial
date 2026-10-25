@@ -55,7 +55,10 @@ fn a_window_asked_of_the_flight_setting_is_refused_saying_why() {
 
 #[test]
 fn a_mistaken_mode_is_refused_naming_the_three() {
-    let (ran, said) = tcspecial(&["--simulate=most", "/nonexistent/tcspecial-visual-test.yaml"]);
+    let (ran, said) = tcspecial(&[
+        "--simulate=most",
+        "/nonexistent/tcspecial-visual-test.yaml",
+    ]);
     assert!(!ran, "refused");
     assert!(said.contains("none, some, all"), "{said}");
     assert!(!said.contains("payload configuration:"), "{said}");

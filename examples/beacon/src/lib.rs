@@ -23,9 +23,15 @@ slint::include_modules!();
 pub fn widest_messages() -> Vec<String> {
     use tcslibgs::config_digest::{ConfigDigest, ConfigVersion};
 
-    let version = ConfigVersion::of_text("255.255.255").expect("255.255.255 is a version");
+    let version = ConfigVersion::of_text("255.255.255")
+        .expect("255.255.255 is a version");
     let mut messages: Vec<String> = (0..16u8)
-        .map(|digit| tcslib::beacon::what_it_read(version, ConfigDigest([digit * 0x11; 16])))
+        .map(|digit| {
+            tcslib::beacon::what_it_read(
+                version,
+                ConfigDigest([digit * 0x11; 16]),
+            )
+        })
         .collect();
     messages.push(tcslib::beacon::NO_BEACON_MESSAGE.to_string());
     messages
@@ -86,7 +92,10 @@ pub struct Vehicle {
 
 impl Vehicle {
     /// A vehicle that is this program with these arguments, not running yet.
-    pub fn new(program: impl Into<std::path::PathBuf>, args: &[&str]) -> Vehicle {
+    pub fn new(
+        program: impl Into<std::path::PathBuf>,
+        args: &[&str],
+    ) -> Vehicle {
         Vehicle {
             program: program.into(),
             args: args.iter().map(|arg| arg.to_string()).collect(),
@@ -100,13 +109,18 @@ impl Vehicle {
     /// Told `--quiet` unless `verbose`, so that the console is this
     /// program's: tcspecial's startup summary is for somebody watching the
     /// vehicle start, and what stops it starting it says either way.
-    pub fn beside_this_program(configuration: &str, verbose: bool) -> Result<Vehicle, String> {
-        let here = std::env::current_exe()
-            .map_err(|e| format!("cannot tell where this program is, to find tcspecial: {e}"))?;
+    pub fn beside_this_program(
+        configuration: &str,
+        verbose: bool,
+    ) -> Result<Vehicle, String> {
+        let here = std::env::current_exe().map_err(|e| {
+            format!("cannot tell where this program is, to find tcspecial: {e}")
+        })?;
         let program = here.with_file_name("tcspecial");
         if !program.is_file() {
             return Err(format!(
-                "there is no tcspecial at {}: build it with `cargo build --bin tcspecial`",
+                "there is no tcspecial at {}: build it with \
+                 `cargo build --bin tcspecial`",
                 program.display()
             ));
         }
@@ -182,9 +196,9 @@ impl Vehicle {
                 Ok(())
             });
         }
-        let child = command
-            .spawn()
-            .map_err(|e| format!("{} cannot be started: {e}", self.program.display()))?;
+        let child = command.spawn().map_err(|e| {
+            format!("{} cannot be started: {e}", self.program.display())
+        })?;
         self.running = Some(child);
         Ok(())
     }
@@ -201,7 +215,9 @@ impl Vehicle {
         let killed = child.kill();
         let waited = child.wait();
         killed.map_err(|e| format!("tcspecial cannot be stopped: {e}"))?;
-        waited.map_err(|e| format!("tcspecial was stopped and cannot be waited for: {e}"))?;
+        waited.map_err(|e| {
+            format!("tcspecial was stopped and cannot be waited for: {e}")
+        })?;
         Ok(())
     }
 
@@ -225,7 +241,8 @@ impl Vehicle {
             Err(e) => {
                 let _ = self.stop();
                 Some(Err(format!(
-                    "tcspecial could not be asked whether it is running, so it was stopped: {e}"
+                    "tcspecial could not be asked whether it is running, so \
+                     it was stopped: {e}"
                 )))
             }
         }
@@ -245,7 +262,10 @@ impl Drop for Vehicle {
 /// Here rather than in the program so that a test can press the button.
 /// Something that cannot be done is said on stderr, and the button says
 /// what is true afterwards whichever way it went.
-pub fn wire(window: &WatchWindow, vehicle: std::rc::Rc<std::cell::RefCell<Vehicle>>) {
+pub fn wire(
+    window: &WatchWindow,
+    vehicle: std::rc::Rc<std::cell::RefCell<Vehicle>>,
+) {
     window.set_start_label(START.into());
     window.set_stop_label(STOP.into());
     window.set_tcspecial_label(vehicle.borrow().label().into());

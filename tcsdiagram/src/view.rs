@@ -86,31 +86,40 @@ pub fn node_look(
     // is a shape no real type uses, and marked faulty. Showing it beats
     // refusing to open the file: a configuration written for a later build is
     // readable, and what cannot be placed is visibly what cannot be placed.
-    let (outline, edge, weight, size, tint, face, label_size, label_weight, label_italic) =
-        match appearance {
-            Some(a) => (
-                a.outline,
-                a.edge,
-                a.weight,
-                a.size,
-                tint_of(node_type),
-                a.face,
-                a.label_size,
-                a.label_weight,
-                a.label_italic,
-            ),
-            None => (
-                Outline::Square,
-                Edge::Single,
-                Weight::Narrow,
-                (104u32, 40u32),
-                ERROR_TINT.to_string(),
-                Face::Plain,
-                11,
-                400,
-                true,
-            ),
-        };
+    let (
+        outline,
+        edge,
+        weight,
+        size,
+        tint,
+        face,
+        label_size,
+        label_weight,
+        label_italic,
+    ) = match appearance {
+        Some(a) => (
+            a.outline,
+            a.edge,
+            a.weight,
+            a.size,
+            tint_of(node_type),
+            a.face,
+            a.label_size,
+            a.label_weight,
+            a.label_italic,
+        ),
+        None => (
+            Outline::Square,
+            Edge::Single,
+            Weight::Narrow,
+            (104u32, 40u32),
+            ERROR_TINT.to_string(),
+            Face::Plain,
+            11,
+            400,
+            true,
+        ),
+    };
 
     NodeLook {
         name: name.to_string(),
@@ -160,7 +169,8 @@ pub fn node_look(
         // The column the name is padded away from, plus whatever the outline
         // is missing at its widest: a slanted shape moves its terminals in,
         // and a name padded by the column alone would be padded into them.
-        terminal_column: (style::TERMINAL_COLUMN as i32 + style::room_of(outline, size)) as f32,
+        terminal_column: (style::TERMINAL_COLUMN as i32
+            + style::room_of(outline, size)) as f32,
         // The room anything drawn inside the shape has to leave at the sides,
         // which is nothing unless the shape leans: see style::room_of.
         inset: style::room_of(outline, size) as f32,
@@ -303,19 +313,20 @@ pub fn ends(nodes: &[OnSheet], line: &LineOnSheet) -> route::Ends {
     };
 
     let ((x1, y1), leaves_right) = match from {
-        Some(node) if node.here => joined(node, line.origin, false).unwrap_or_else(|| {
-            // A type this build does not know, drawn as a node with no
-            // terminals: the middle of its right edge, where every link
-            // used to leave.
-            let (w, h) = size_of(node.node_type);
-            (
+        Some(node) if node.here => joined(node, line.origin, false)
+            .unwrap_or_else(|| {
+                // A type this build does not know, drawn as a node with no
+                // terminals: the middle of its right edge, where every link
+                // used to leave.
+                let (w, h) = size_of(node.node_type);
                 (
-                    (node.at.0 + w as i32) as f32,
-                    (node.at.1 + h as i32 / 2) as f32,
-                ),
-                true,
-            )
-        }),
+                    (
+                        (node.at.0 + w as i32) as f32,
+                        (node.at.1 + h as i32 / 2) as f32,
+                    ),
+                    true,
+                )
+            }),
         // Off this page: a stub at the left edge.
         _ => (
             (0.0, to.map(|n| n.at.1 as f32 + 24.0).unwrap_or(24.0)),
@@ -400,9 +411,9 @@ pub fn link_looks(nodes: &[OnSheet], lines: &[LineOnSheet]) -> Vec<LinkLook> {
             // which says the same thing in the place a reader is already
             // looking. A label reading "payload-in" beside every line would
             // be the name of the thing the picture is showing.
-            let named_input = line
-                .input
-                .filter(|input| tcslibgs::graph::terminals::stream_of(input).is_none());
+            let named_input = line.input.filter(|input| {
+                tcslibgs::graph::terminals::stream_of(input).is_none()
+            });
             let label = match (named_input, crossing) {
                 (Some(input), false) => input.to_string(),
                 (Some(input), true) => format!("{far_end} . {input}"),
@@ -424,10 +435,9 @@ pub fn link_looks(nodes: &[OnSheet], lines: &[LineOnSheet]) -> Vec<LinkLook> {
 
             LinkLook {
                 // Which stream it carries, as a colour: see `line_ink`.
-                ink: line_ink(
-                    node(nodes, line.from)
-                        .and_then(|from| style::terminal_for(from.node_type, line.origin, false)),
-                ),
+                ink: line_ink(node(nodes, line.from).and_then(|from| {
+                    style::terminal_for(from.node_type, line.origin, false)
+                })),
                 route: drawn,
                 head: route::arrow(ends),
                 marker,
@@ -459,9 +469,11 @@ mod tests {
         // And a lit line, under it, three times as wide.
         assert!(
             markup.contains(&format!(
-                "stroke-width: 3 * (link.wide ? {WIDE_LINE}px : {NARROW_LINE}px);"
+                "stroke-width: 3 * (link.wide ? {WIDE_LINE}px : \
+                 {NARROW_LINE}px);"
             )),
-            "a lit line is no longer three times the width of the line it lights"
+            "a lit line is no longer three times the width of the line it \
+             lights"
         );
     }
 

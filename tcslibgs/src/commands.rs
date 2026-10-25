@@ -171,14 +171,16 @@ impl PingCommand {
 
 /// How long a RESTART_ARM lasts where the configuration does not say:
 /// twenty minutes from when the vehicle takes it. The `tcspecial` section's
-/// `restart_arm_valid` says otherwise -- see [`crate::CIConfig::restart_arm_valid`].
+/// `restart_arm_valid` says otherwise -- see
+/// [`crate::CIConfig::restart_arm_valid`].
 ///
 /// A RESTART is refused unless an arm with its key was taken within this long
 /// before it. Long enough for an operator to arm, confirm what the vehicle is
 /// doing and decide, over a link with minutes of latency; short enough that an
 /// arm left behind by a session that ended does not stand ready to restart the
 /// vehicle on the next RESTART anybody sends.
-pub const RESTART_ARM_VALID_DEFAULT: std::time::Duration = std::time::Duration::from_secs(20 * 60);
+pub const RESTART_ARM_VALID_DEFAULT: std::time::Duration =
+    std::time::Duration::from_secs(20 * 60);
 
 /// RESTART_ARM command - enable a restart for the next `restart_arm_valid`
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -234,7 +236,11 @@ pub struct ConnectCommand {
 }
 
 impl ConnectCommand {
-    pub fn new(sequence: u32, version: ConfigVersion, digest: ConfigDigest) -> Self {
+    pub fn new(
+        sequence: u32,
+        version: ConfigVersion,
+        digest: ConfigDigest,
+    ) -> Self {
         Self {
             header: CommandHeader {
                 sequence,
@@ -337,7 +343,12 @@ impl SetNodeCommand {
     /// A SET_NODE, or why there cannot be one: an attribute longer than
     /// [`ATTRIBUTE_BYTES`] or a value longer than [`VALUE_BYTES`] is refused
     /// here, on the ground, rather than sent to a vehicle that would refuse it.
-    pub fn new(sequence: u32, node: NodeId, attribute: &str, value: &[u8]) -> Result<Self, String> {
+    pub fn new(
+        sequence: u32,
+        node: NodeId,
+        attribute: &str,
+        value: &[u8],
+    ) -> Result<Self, String> {
         Ok(Self {
             header: CommandHeader {
                 sequence,
@@ -378,8 +389,8 @@ impl Attribute {
     pub fn of(name: &str) -> Result<Attribute, String> {
         if name.len() > ATTRIBUTE_BYTES {
             return Err(format!(
-                "the attribute \"{name}\" is {} bytes long, and a command names one \
-                 of at most {ATTRIBUTE_BYTES}",
+                "the attribute \"{name}\" is {} bytes long, and a command \
+                 names one of at most {ATTRIBUTE_BYTES}",
                 name.len()
             ));
         }
@@ -393,7 +404,8 @@ impl Attribute {
 
     pub fn as_str(&self) -> &str {
         // Made only from a `&str`, whole: see `of`.
-        std::str::from_utf8(&self.bytes[..usize::from(self.len)]).unwrap_or_default()
+        std::str::from_utf8(&self.bytes[..usize::from(self.len)])
+            .unwrap_or_default()
     }
 }
 
@@ -429,23 +441,37 @@ impl std::fmt::Display for Attribute {
 }
 
 impl Serialize for Attribute {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(self.as_str())
     }
 }
 
 impl<'de> Deserialize<'de> for Attribute {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Self, D::Error> {
         struct Name;
         impl serde::de::Visitor<'_> for Name {
             type Value = Attribute;
-            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(f, "an attribute name of at most {ATTRIBUTE_BYTES} bytes")
+            fn expecting(
+                &self,
+                f: &mut std::fmt::Formatter,
+            ) -> std::fmt::Result {
+                write!(
+                    f,
+                    "an attribute name of at most {ATTRIBUTE_BYTES} bytes"
+                )
             }
             // Copied out of whatever the reader hands over, which is the
             // datagram itself where the text has no escapes in it: nothing
             // is made to hold it.
-            fn visit_str<E: serde::de::Error>(self, name: &str) -> Result<Attribute, E> {
+            fn visit_str<E: serde::de::Error>(
+                self,
+                name: &str,
+            ) -> Result<Attribute, E> {
                 Attribute::of(name).map_err(E::custom)
             }
         }
@@ -468,8 +494,8 @@ impl Value {
     pub fn of(value: &[u8]) -> Result<Value, String> {
         if value.len() > VALUE_BYTES {
             return Err(format!(
-                "a value of {} bytes is longer than a command carries, which is at \
-                 most {VALUE_BYTES}",
+                "a value of {} bytes is longer than a command carries, which \
+                 is at most {VALUE_BYTES}",
                 value.len()
             ));
         }
@@ -500,7 +526,10 @@ impl std::fmt::Debug for Value {
 }
 
 impl Serialize for Value {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeSeq;
         let mut seq = serializer.serialize_seq(Some(self.as_bytes().len()))?;
         for byte in self.as_bytes() {
@@ -511,11 +540,16 @@ impl Serialize for Value {
 }
 
 impl<'de> Deserialize<'de> for Value {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Self, D::Error> {
         struct Bytes;
         impl<'de> serde::de::Visitor<'de> for Bytes {
             type Value = Value;
-            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            fn expecting(
+                &self,
+                f: &mut std::fmt::Formatter,
+            ) -> std::fmt::Result {
                 write!(f, "a value of at most {VALUE_BYTES} bytes")
             }
             fn visit_seq<A: serde::de::SeqAccess<'de>>(
@@ -530,8 +564,8 @@ impl<'de> Deserialize<'de> for Value {
                     let at = usize::from(value.len);
                     let Some(room) = value.bytes.get_mut(at) else {
                         return Err(serde::de::Error::custom(format!(
-                            "a value longer than a command carries, which is at most \
-                             {VALUE_BYTES} bytes"
+                            "a value longer than a command carries, which is \
+                             at most {VALUE_BYTES} bytes"
                         )));
                     };
                     *room = byte;
@@ -539,7 +573,10 @@ impl<'de> Deserialize<'de> for Value {
                 }
                 Ok(value)
             }
-            fn visit_bytes<E: serde::de::Error>(self, bytes: &[u8]) -> Result<Value, E> {
+            fn visit_bytes<E: serde::de::Error>(
+                self,
+                bytes: &[u8],
+            ) -> Result<Value, E> {
                 Value::of(bytes).map_err(E::custom)
             }
         }
@@ -683,7 +720,8 @@ mod tests {
             std::time::Duration::from_secs(20 * 60)
         );
         let manual = std::fs::read_to_string(
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs/manual.rst"),
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../docs/manual.rst"),
         )
         .expect("the manual reads");
         let said = manual.split_whitespace().collect::<Vec<_>>().join(" ");
@@ -698,11 +736,14 @@ mod tests {
     /// `Vec<u8>` would have made, and refuses what will not fit.
     #[test]
     fn a_set_node_is_the_json_it_was_and_refuses_what_will_not_fit() {
-        let command = SetNodeCommand::new(3, NodeId::of(2), "setpoint", b"295.0").expect("it fits");
+        let command =
+            SetNodeCommand::new(3, NodeId::of(2), "setpoint", b"295.0")
+                .expect("it fits");
         let json = serde_json::to_value(command).expect("it serializes");
         assert_eq!(json["attribute"], "setpoint");
         assert_eq!(json["value"], serde_json::json!([50, 57, 53, 46, 48]));
-        let back: SetNodeCommand = serde_json::from_value(json).expect("it reads");
+        let back: SetNodeCommand =
+            serde_json::from_value(json).expect("it reads");
         assert_eq!(back, command);
         assert_eq!(back.attribute, "setpoint");
         assert_eq!(back.value.as_bytes(), b"295.0");
@@ -710,11 +751,21 @@ mod tests {
         // Each limit, exactly, and one past it.
         let longest = "a".repeat(ATTRIBUTE_BYTES);
         assert!(SetNodeCommand::new(1, NodeId::of(0), &longest, b"").is_ok());
-        let said = SetNodeCommand::new(1, NodeId::of(0), &format!("{longest}a"), b"")
-            .expect_err("too long a name");
+        let said =
+            SetNodeCommand::new(1, NodeId::of(0), &format!("{longest}a"), b"")
+                .expect_err("too long a name");
         assert!(said.contains(&ATTRIBUTE_BYTES.to_string()), "{said}");
-        assert!(SetNodeCommand::new(1, NodeId::of(0), "x", &[7; VALUE_BYTES]).is_ok());
-        assert!(SetNodeCommand::new(1, NodeId::of(0), "x", &[7; VALUE_BYTES + 1]).is_err());
+        assert!(
+            SetNodeCommand::new(1, NodeId::of(0), "x", &[7; VALUE_BYTES])
+                .is_ok()
+        );
+        assert!(SetNodeCommand::new(
+            1,
+            NodeId::of(0),
+            "x",
+            &[7; VALUE_BYTES + 1]
+        )
+        .is_err());
 
         // And as read off the link: a value too long is refused, not cut short.
         let too_long = serde_json::json!({

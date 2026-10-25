@@ -69,8 +69,10 @@ fn example_configurations() -> Vec<String> {
 /// One schema, read.
 fn read(name: &str) -> serde_json::Value {
     let path = schema().join(name);
-    let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
-    serde_json::from_str(&text).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
+    let text = std::fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    serde_json::from_str(&text)
+        .unwrap_or_else(|e| panic!("{}: {e}", path.display()))
 }
 
 /// The property names of an object in a schema, at a path of keys.
@@ -139,7 +141,8 @@ fn enumerated(xsd: &str, simple_type: &str) -> Vec<String> {
     let start = xsd
         .find(&opens)
         .unwrap_or_else(|| panic!("the XSD has no simple type {simple_type}"));
-    let body = &xsd[start..start + xsd[start..].find("</xs:simpleType>").expect("closed")];
+    let body = &xsd
+        [start..start + xsd[start..].find("</xs:simpleType>").expect("closed")];
     body.lines()
         .filter_map(|line| {
             let rest = line.trim().strip_prefix("<xs:enumeration value=\"")?;
@@ -151,7 +154,8 @@ fn enumerated(xsd: &str, simple_type: &str) -> Vec<String> {
 /// The text of a schema in this repository.
 fn text_of(name: &str) -> String {
     let path = schema().join(name);
-    std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
+    std::fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("{}: {e}", path.display()))
 }
 
 /// Each section of a configuration takes the node types the software knows
@@ -171,9 +175,11 @@ fn each_section_takes_the_node_types_the_software_knows() {
         (Section::Vehicle, "vehicle", "vehicleType"),
         (Section::Payloads, "payloads", "payloadType"),
     ] {
-        let wanted: Vec<String> = types_in(section).into_iter().map(str::to_string).collect();
+        let wanted: Vec<String> =
+            types_in(section).into_iter().map(str::to_string).collect();
 
-        let said: Vec<String> = json["properties"][key]["items"]["properties"]["type"]["enum"]
+        let said: Vec<String> = json["properties"][key]["items"]["properties"]
+            ["type"]["enum"]
             .as_array()
             .unwrap_or_else(|| panic!("{key}: the JSON schema lists no types"))
             .iter()
@@ -203,9 +209,12 @@ fn the_simulator_schemas_take_the_kinds_and_words_the_simulator_reads() {
 
     let json = read("tcspecial-sim.schema.json");
     for section in ["simulated_payloads", "simulated_payload_groups"] {
-        let enumerated = json["properties"][section]["items"]["properties"]["type"]["enum"]
+        let enumerated = json["properties"][section]["items"]["properties"]
+            ["type"]["enum"]
             .as_array()
-            .unwrap_or_else(|| panic!("{section}: the JSON schema lists no kinds"));
+            .unwrap_or_else(|| {
+                panic!("{section}: the JSON schema lists no kinds")
+            });
         let said: Vec<String> = enumerated
             .iter()
             .filter_map(|value| value.as_str().map(str::to_string))
@@ -267,7 +276,9 @@ fn the_simulator_schemas_take_the_kinds_and_words_the_simulator_reads() {
         .unwrap_or_else(|e| panic!("the simulator does not read it: {e}"));
 
     if Command::new("xmllint").arg("--version").output().is_err() {
-        eprintln!("xmllint is not installed: the simulator XSD was not checked");
+        eprintln!(
+            "xmllint is not installed: the simulator XSD was not checked"
+        );
         return;
     }
     let valid = |text: &str| {
@@ -288,7 +299,8 @@ fn the_simulator_schemas_take_the_kinds_and_words_the_simulator_reads() {
         String::from_utf8_lossy(&output.stderr)
     );
     // And a kind that is not one is refused.
-    let output = valid(&every.replace("<type>gpio</type>", "<type>ping</type>"));
+    let output =
+        valid(&every.replace("<type>gpio</type>", "<type>ping</type>"));
     assert!(!output.status.success(), "ping is not a kind of payload");
 }
 
@@ -397,8 +409,9 @@ fn every_shipped_xml_file_is_valid_against_its_schema() {
 /// Every XML file this repository ships is well formed XML.
 ///
 /// Weaker than the validation above and over a wider set: a file with no
-/// schema to be held against is still XML, and XML it is not is a file no editor and no other tool can
-/// open whatever this program's own reader tolerates. Four of these said
+/// schema to be held against is still XML, and XML it is not is a file no
+/// editor and no other tool can open whatever this program's own reader
+/// tolerates. Four of these said
 /// `--` inside a comment, which XML forbids, and nothing noticed because
 /// `quick-xml` reads them anyway.
 ///
@@ -479,12 +492,16 @@ fn every_shipped_configuration_says_which_schema_describes_it() {
         shipped.push((file, "../../tcsgui/share/schema/tcspecial.schema.json"));
     }
     for file in examples("-sim.yaml") {
-        shipped.push((file, "../../tcsgui/share/schema/tcspecial-sim.schema.json"));
+        shipped.push((
+            file,
+            "../../tcsgui/share/schema/tcspecial-sim.schema.json",
+        ));
     }
     for (file, said) in &shipped {
         let (file, said) = (file.as_str(), *said);
         let path = root().join(file);
-        let text = std::fs::read_to_string(&path).expect("a shipped configuration");
+        let text =
+            std::fs::read_to_string(&path).expect("a shipped configuration");
         assert!(
             text.contains(said),
             "{file} does not say that {said} describes it"
@@ -516,9 +533,10 @@ fn every_key_of_a_shipped_configuration_is_in_the_schema() {
     for file in &files {
         let file = file.as_str();
         let path = root().join(file);
-        let text = std::fs::read_to_string(&path).expect("a shipped configuration");
-        let said: serde_norway::Value =
-            serde_norway::from_str(&text).unwrap_or_else(|e| panic!("{file}: {e}"));
+        let text =
+            std::fs::read_to_string(&path).expect("a shipped configuration");
+        let said: serde_norway::Value = serde_norway::from_str(&text)
+            .unwrap_or_else(|e| panic!("{file}: {e}"));
 
         let sections = properties(&schema, &[]);
         let mapping = said.as_mapping().expect("a configuration is a mapping");
@@ -538,11 +556,12 @@ fn every_key_of_a_shipped_configuration_is_in_the_schema() {
             for node in value.as_sequence().expect("a list of nodes") {
                 let node = node.as_mapping().expect("a node is a mapping");
                 for (attribute, _) in node {
-                    let attribute = attribute.as_str().expect("named").to_string();
+                    let attribute =
+                        attribute.as_str().expect("named").to_string();
                     assert!(
                         allowed.contains(&attribute),
-                        "{file}: {key} has a node stating {attribute}, which the \
-                         schema does not allow"
+                        "{file}: {key} has a node stating {attribute}, which \
+                         the schema does not allow"
                     );
                 }
             }
@@ -597,9 +616,12 @@ fn every_node_description_is_valid_against_its_schema() {
     let schema_json = read("node.schema.json");
     let allowed = properties(&schema_json, &[]);
     let allowed_attribute = properties(&schema_json, &["attributes"]);
-    let have_xmllint = Command::new("xmllint").arg("--version").output().is_ok();
+    let have_xmllint =
+        Command::new("xmllint").arg("--version").output().is_ok();
     if !have_xmllint {
-        eprintln!("xmllint is not installed: the XML descriptions were not validated");
+        eprintln!(
+            "xmllint is not installed: the XML descriptions were not validated"
+        );
     }
 
     for name in described() {
@@ -625,8 +647,8 @@ fn every_node_description_is_valid_against_its_schema() {
         }
 
         let text = std::fs::read_to_string(&path).expect("a description");
-        let said: serde_norway::Value =
-            serde_norway::from_str(&text).unwrap_or_else(|e| panic!("{}: {e}", name.display()));
+        let said: serde_norway::Value = serde_norway::from_str(&text)
+            .unwrap_or_else(|e| panic!("{}: {e}", name.display()));
         let mapping = said.as_mapping().expect("a description is a mapping");
         for (key, value) in mapping {
             let key = key.as_str().expect("a named word").to_string();
@@ -638,12 +660,16 @@ fn every_node_description_is_valid_against_its_schema() {
             if key != "attributes" {
                 continue;
             }
-            for attribute in value.as_sequence().expect("a list of attributes") {
-                for (word, _) in attribute.as_mapping().expect("an attribute is a mapping") {
+            for attribute in value.as_sequence().expect("a list of attributes")
+            {
+                for (word, _) in
+                    attribute.as_mapping().expect("an attribute is a mapping")
+                {
                     let word = word.as_str().expect("a named word").to_string();
                     assert!(
                         allowed_attribute.contains(&word),
-                        "{}: an attribute says {word}, which a description does not know",
+                        "{}: an attribute says {word}, which a description \
+                         does not know",
                         name.display()
                     );
                 }
@@ -662,7 +688,8 @@ fn every_node_description_is_valid_against_its_schema() {
 #[test]
 fn the_two_node_schemas_describe_the_same_node() {
     let json = read("node.schema.json");
-    let xsd = std::fs::read_to_string(schema().join("node.xsd")).expect("the XSD");
+    let xsd =
+        std::fs::read_to_string(schema().join("node.xsd")).expect("the XSD");
 
     // What the XSD allows inside <node>, read from its element declarations.
     let declared: BTreeSet<String> = xsd
@@ -672,7 +699,8 @@ fn the_two_node_schemas_describe_the_same_node() {
             let rest = line.strip_prefix("<xs:element name=\"")?;
             let name = rest.split('"').next()?;
             // The document element is the file itself, not a word inside it.
-            (line.contains("type=") && !line.contains("ref=")).then(|| name.to_string())
+            (line.contains("type=") && !line.contains("ref="))
+                .then(|| name.to_string())
         })
         .collect();
     // `node` is both the document element and the word inside it that names
@@ -727,7 +755,8 @@ fn every_node_is_described_once_and_in_one_spelling() {
             stem.display()
         );
 
-        let text = std::fs::read_to_string(nodes().join(&name)).expect("a description");
+        let text = std::fs::read_to_string(nodes().join(&name))
+            .expect("a description");
         // The node's own name, from whichever spelling this is.
         let said = if name.extension().and_then(|e| e.to_str()) == Some("xml") {
             text.lines()
@@ -740,7 +769,8 @@ fn every_node_is_described_once_and_in_one_spelling() {
                 .next()
                 .unwrap_or_else(|| panic!("{}: no node name", name.display()))
         } else {
-            let said: serde_norway::Value = serde_norway::from_str(&text).expect("a description");
+            let said: serde_norway::Value =
+                serde_norway::from_str(&text).expect("a description");
             said.get("node")
                 .and_then(|node| node.as_str().map(str::to_string))
                 .unwrap_or_else(|| panic!("{}: no node name", name.display()))

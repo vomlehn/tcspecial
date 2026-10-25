@@ -60,10 +60,12 @@ class ConfigurationTest(unittest.TestCase):
         self.assertEqual(config.uplink("moc"), HostPort("127.0.0.1", 7600))
         # ping is the second node written, device id 1.
         self.assertEqual(config.device_id("ping"), 1)
-        self.assertEqual(config.downlink("moc", "ping"), HostPort("127.0.0.1", 7701))
+        self.assertEqual(config.downlink("moc", "ping"),
+                         HostPort("127.0.0.1", 7701))
 
     def test_the_beacon_interval_is_read_as_the_rust_reads_one(self):
-        self.assertEqual(configuration.load(PING).beacon_interval(), 5_000_000_000)
+        self.assertEqual(configuration.load(PING).beacon_interval(),
+                         5_000_000_000)
         parse = configuration.parse_interval
         self.assertEqual(parse("500 ms"), 500_000_000)
         self.assertEqual(parse("1.5 s"), parse("1_500 ms"))
@@ -80,15 +82,18 @@ class ConfigurationTest(unittest.TestCase):
         # them, not within a section.
         directory, path = written(
             "<payloads><name>a</name><type>i2c</type></payloads>"
-            "<moc><name>m</name><type>moc</type><ground_base>127.0.0.1:9000</ground_base></moc>"
+            "<moc><name>m</name><type>moc</type>"
+            "<ground_base>127.0.0.1:9000</ground_base></moc>"
             "<vehicle><name>p</name><type>ping</type>"
             "<payload-out><target>m</target></payload-out></vehicle>"
             "<payloads><name>b</name><type>i2c</type></payloads>"
         )
         with directory:
             config = configuration.load(path)
-            self.assertEqual([config.device_id(n) for n in "ampb"], [0, 1, 2, 3])
-            self.assertEqual(config.downlink("m", "p"), HostPort("127.0.0.1", 9002))
+            self.assertEqual([config.device_id(n) for n in "ampb"],
+                             [0, 1, 2, 3])
+            self.assertEqual(config.downlink("m", "p"),
+                             HostPort("127.0.0.1", 9002))
             with self.assertRaisesRegex(ValueError, "sends nothing"):
                 config.downlink("m", "a")
             with self.assertRaisesRegex(ValueError, "binds nothing aboard"):
@@ -104,7 +109,8 @@ class ConfigurationTest(unittest.TestCase):
         # The YAML and the XML of one example say the same thing, so they are
         # read into the same configuration: every node in the same order, with
         # the same attributes and links, and the same tcspecial section.
-        for example in ["ping", "beacon", "minimal", "thermostat", "simple-app"]:
+        for example in ["ping", "beacon", "minimal", "thermostat",
+                        "simple-app"]:
             stem = ROOT / "examples" / example / example
             xml = configuration.load(stem.with_suffix(".xml"))
             yaml = configuration.load(stem.with_suffix(".yaml"))
@@ -117,17 +123,26 @@ class ConfigurationTest(unittest.TestCase):
 
     def test_a_datagram_is_taken_only_from_where_the_configuration_says(self):
         # types.rs's own cases.
-        self.assertTrue(came_from(HostPort("127.0.0.1", 4100), ("127.0.0.1", 4100)))
-        self.assertFalse(came_from(HostPort("127.0.0.1", 4100), ("127.0.0.1", 4101)))
-        self.assertFalse(came_from(HostPort("127.0.0.1", 4100), ("10.0.0.1", 4100)))
-        self.assertTrue(came_from(HostPort("localhost", 4100), ("127.0.0.1", 4100)))
-        self.assertTrue(came_from(HostPort("0.0.0.0", 5550), ("127.0.0.1", 5550)))
-        self.assertTrue(came_from(HostPort("0.0.0.0", 5550), ("10.0.0.1", 5550)))
-        self.assertFalse(came_from(HostPort("0.0.0.0", 5550), ("127.0.0.1", 5551)))
+        self.assertTrue(came_from(HostPort("127.0.0.1", 4100),
+                                  ("127.0.0.1", 4100)))
+        self.assertFalse(came_from(HostPort("127.0.0.1", 4100),
+                                   ("127.0.0.1", 4101)))
+        self.assertFalse(came_from(HostPort("127.0.0.1", 4100),
+                                   ("10.0.0.1", 4100)))
+        self.assertTrue(came_from(HostPort("localhost", 4100),
+                                  ("127.0.0.1", 4100)))
+        self.assertTrue(came_from(HostPort("0.0.0.0", 5550),
+                                  ("127.0.0.1", 5550)))
+        self.assertTrue(came_from(HostPort("0.0.0.0", 5550),
+                                  ("10.0.0.1", 5550)))
+        self.assertFalse(came_from(HostPort("0.0.0.0", 5550),
+                                   ("127.0.0.1", 5551)))
 
     def test_a_host_and_port_is_read_as_the_rust_reads_one(self):
-        self.assertEqual(HostPort.of("x", " 0.0.0.0:4000 "), HostPort("0.0.0.0", 4000))
-        for wrong in ["0.0.0.0", ":4000", "host:", "host:port", "host:0", "host:65536"]:
+        self.assertEqual(HostPort.of("x", " 0.0.0.0:4000 "),
+                         HostPort("0.0.0.0", 4000))
+        for wrong in ["0.0.0.0", ":4000", "host:", "host:port", "host:0",
+                      "host:65536"]:
             with self.subTest(wrong=wrong):
                 with self.assertRaises(ValueError):
                     HostPort.of("x", wrong)

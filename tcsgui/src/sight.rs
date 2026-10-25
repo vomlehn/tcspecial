@@ -135,7 +135,10 @@ pub fn lab(rgb: (u8, u8, u8)) -> (f64, f64, f64) {
 /// wanted here is a floor well above that.
 pub fn difference(a: (u8, u8, u8), b: (u8, u8, u8)) -> f64 {
     let (one, two) = (lab(a), lab(b));
-    ((one.0 - two.0).powi(2) + (one.1 - two.1).powi(2) + (one.2 - two.2).powi(2)).sqrt()
+    ((one.0 - two.0).powi(2)
+        + (one.1 - two.1).powi(2)
+        + (one.2 - two.2).powi(2))
+    .sqrt()
 }
 
 /// The contrast ratio between two colours, as the accessibility guidelines

@@ -34,10 +34,13 @@ fn configuration() -> PathBuf {
 /// into the program.
 #[test]
 fn the_configuration_says_where_the_beacons_are() {
-    let graph = Graph::load(configuration()).expect("the example's configuration reads");
+    let graph = Graph::load(configuration())
+        .expect("the example's configuration reads");
     let link = beacon_of(&graph)
         .expect("its tcspecial section reads")
-        .expect("it has a tcspecial section, which is where the beacon is stated");
+        .expect(
+            "it has a tcspecial section, which is where the beacon is stated",
+        );
 
     // Different ports, because they are different ends: one is bound by the
     // vehicle and one by the ground, and a pair that named one socket would
@@ -54,7 +57,8 @@ fn the_configuration_says_where_the_beacons_are() {
 /// as a beacon, and one from anywhere else is not.
 #[test]
 fn a_beacon_from_the_configured_address_is_heard() {
-    let graph = Graph::load(configuration()).expect("the example's configuration reads");
+    let graph = Graph::load(configuration())
+        .expect("the example's configuration reads");
     let link = beacon_of(&graph)
         .expect("its tcspecial section reads")
         .expect("it states a beacon");
@@ -64,15 +68,17 @@ fn a_beacon_from_the_configured_address_is_heard() {
     // Sent to the station's own address rather than to the configured one,
     // because the station below is listening on a port the system chose: two
     // runs of this test at once would otherwise fight over the example's.
-    let vehicle = match UdpSocket::bind(format!("{}:{}", "127.0.0.1", link.send.port)) {
-        Ok(socket) => socket,
-        // The example's send port is in use, which on a machine running the
-        // example is exactly what it looks like. Nothing is proved and
-        // nothing is broken.
-        Err(_) => return,
-    };
+    let vehicle =
+        match UdpSocket::bind(format!("{}:{}", "127.0.0.1", link.send.port)) {
+            Ok(socket) => socket,
+            // The example's send port is in use, which on a machine running the
+            // example is exactly what it looks like. Nothing is proved and
+            // nothing is broken.
+            Err(_) => return,
+        };
 
-    let listening = UdpSocket::bind("127.0.0.1:0").expect("a port for the station");
+    let listening =
+        UdpSocket::bind("127.0.0.1:0").expect("a port for the station");
     let at = listening.local_addr().expect("its address");
     drop(listening);
 
@@ -88,7 +94,9 @@ fn a_beacon_from_the_configured_address_is_heard() {
         // The digest of the file the station read, which is this example's
         // own: the beacon below carries another, so the station should say
         // the configuration differs.
-        Some(digest_of_file(configuration()).expect("the configuration digests")),
+        Some(
+            digest_of_file(configuration()).expect("the configuration digests"),
+        ),
     ) {
         Ok(station) => station,
         Err(_) => return,
@@ -131,7 +139,8 @@ fn a_beacon_from_the_configured_address_is_heard() {
     // And a second one from somewhere else is not a beacon at all: the
     // address it comes from is in the configuration, so a datagram from
     // anywhere else is somebody else's traffic.
-    let stranger = UdpSocket::bind("127.0.0.1:0").expect("a socket for the stranger");
+    let stranger =
+        UdpSocket::bind("127.0.0.1:0").expect("a socket for the stranger");
     stranger.send_to(&beacon, at).expect("the stranger sends");
     let pass = station.pass();
     assert_eq!(

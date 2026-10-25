@@ -14,10 +14,10 @@
 
   A node's content is a choice of known element names repeated in any order,
   which is as close as XSD 1.0 comes to "these words and no others". It cannot
-  say that `name` appears exactly once, because `payload-out` may appear many times
-  (several destinations are several elements) and XSD 1.0's xs:all allows
-  neither repeats nor a mixture. A node with two names is refused where the
-  file is read instead.
+  say that `name` appears exactly once, because `payload-out` may appear many
+  times (several destinations are several elements) and XSD 1.0's xs:all
+  allows neither repeats nor a mixture. A node with two names is refused where
+  the file is read instead.
 
   The attribute names below are the union over every node type: a bus address,
   a baud rate and a setpoint are all here, and which of them a given type may
@@ -48,7 +48,8 @@
   <!-- A name, with the node and terminal spelling a link end may use. -->
   <xs:simpleType name="nodename">
     <xs:restriction base="xs:string">
-      <xs:pattern value="[A-Za-z_][A-Za-z0-9_./-]*(\.[A-Za-z_][A-Za-z0-9_-]*)?"/>
+      <xs:pattern
+        value="[A-Za-z_][A-Za-z0-9_./-]*(\.[A-Za-z_][A-Za-z0-9_-]*)?"/>
     </xs:restriction>
   </xs:simpleType>
 
@@ -78,7 +79,8 @@
 
   <xs:complexType name="tcsgui">
     <xs:sequence>
-      <xs:element name="nodes" type="placed" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:element name="nodes" type="placed"
+        minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
   </xs:complexType>
 

@@ -392,8 +392,13 @@ mod tests {
                 // Read back the way the vehicle reads it: counts times the
                 // scale, plus the offset.
                 let counts = match reading.format {
-                    Format::I16Be => i16::from_be_bytes([bytes[0], bytes[1]]) as f64,
-                    Format::U24Be => u32::from_be_bytes([0, bytes[0], bytes[1], bytes[2]]) as f64,
+                    Format::I16Be => {
+                        i16::from_be_bytes([bytes[0], bytes[1]]) as f64
+                    }
+                    Format::U24Be => {
+                        u32::from_be_bytes([0, bytes[0], bytes[1], bytes[2]])
+                            as f64
+                    }
                     _ => unreachable!("the parts above"),
                 };
                 let back = counts * reading.scale + reading.offset;
@@ -440,7 +445,8 @@ mod tests {
     /// to name one that is free rather than take whatever a socket of its own
     /// was given.
     fn a_free_port() -> u16 {
-        let socket = std::net::UdpSocket::bind("127.0.0.1:0").expect("a socket");
+        let socket =
+            std::net::UdpSocket::bind("127.0.0.1:0").expect("a socket");
         let port = socket.local_addr().expect("its address").port();
         drop(socket);
         port
@@ -451,7 +457,13 @@ mod tests {
     /// `every` is the packet interval: for a sensor how often it reports, and
     /// for a heater -- which sends nothing -- how often it looks for what the
     /// vehicle decided.
-    fn attached(name: &str, at: u16, bytes: u32, every: u32, thermal: Thermal) -> PayloadConfig {
+    fn attached(
+        name: &str,
+        at: u16,
+        bytes: u32,
+        every: u32,
+        thermal: Thermal,
+    ) -> PayloadConfig {
         PayloadConfig {
             thermal: Some(thermal),
             name: name.to_string(),
@@ -484,7 +496,9 @@ mod tests {
     /// `a_temperature_encodes_as_the_bytes_the_vehicle_reads_back` holds.
     fn kelvin_of(reading: &ToKelvinParams, bytes: &[u8]) -> Option<f64> {
         let counts = match reading.format {
-            Format::I16Be if bytes.len() >= 2 => i16::from_be_bytes([bytes[0], bytes[1]]) as f64,
+            Format::I16Be if bytes.len() >= 2 => {
+                i16::from_be_bytes([bytes[0], bytes[1]]) as f64
+            }
             Format::U24Be if bytes.len() >= 3 => {
                 u32::from_be_bytes([0, bytes[0], bytes[1], bytes[2]]) as f64
             }
@@ -563,8 +577,8 @@ mod tests {
         let readings = [two_byte, two_byte, three_byte];
         let waiting: Vec<std::net::UdpSocket> = (0..3)
             .map(|_| {
-                let socket =
-                    std::net::UdpSocket::bind("127.0.0.1:0").expect("a socket for the vehicle");
+                let socket = std::net::UdpSocket::bind("127.0.0.1:0")
+                    .expect("a socket for the vehicle");
                 socket.set_nonblocking(true).expect("non-blocking");
                 socket
             })
@@ -644,16 +658,19 @@ mod tests {
             }
             assert!(
                 attempt < 10,
-                "ten pairs of ports were taken between being chosen and being bound"
+                "ten pairs of ports were taken between being chosen and being \
+                 bound"
             );
         }
 
         // The vehicle's end of the heater links: it sends where the file says
         // the heater is, which is what `reaching_endpoint_pair` does aboard.
-        let driving = std::net::UdpSocket::bind("127.0.0.1:0").expect("a socket for the vehicle");
+        let driving = std::net::UdpSocket::bind("127.0.0.1:0")
+            .expect("a socket for the vehicle");
         let drive = |on: bool| {
             for at in &heaters {
-                let _ = driving.send_to(if on { b"1" } else { b"0" }, ("127.0.0.1", *at));
+                let _ = driving
+                    .send_to(if on { b"1" } else { b"0" }, ("127.0.0.1", *at));
             }
         };
 
@@ -673,7 +690,9 @@ mod tests {
         let watch = Duration::from_secs(4);
         while start.elapsed() < watch {
             let mut arrived = false;
-            for (n, (socket, reading)) in waiting.iter().zip(&readings).enumerate() {
+            for (n, (socket, reading)) in
+                waiting.iter().zip(&readings).enumerate()
+            {
                 let mut buffer = [0u8; 64];
                 while let Ok(got) = socket.recv(&mut buffer) {
                     if let Some(kelvin) = kelvin_of(reading, &buffer[..got]) {
@@ -690,7 +709,9 @@ mod tests {
                 std::thread::sleep(Duration::from_millis(5));
                 continue;
             }
-            if let Some(reported) = latest.iter().copied().collect::<Option<Vec<f64>>>() {
+            if let Some(reported) =
+                latest.iter().copied().collect::<Option<Vec<f64>>>()
+            {
                 // Driven on every sample, which is what the vehicle does:
                 // the hysteresis node asserts its decision each time a
                 // temperature arrives and the devices are held at it. The
@@ -737,8 +758,8 @@ mod tests {
         // is loose enough for a loaded machine to be slow at it.
         let reached = reached.unwrap_or_else(|| {
             panic!(
-                "the mass never reached the band: it is at {} K, and the vehicle \
-                 {} driving the heaters",
+                "the mass never reached the band: it is at {} K, and the \
+                 vehicle {} driving the heaters",
                 mass.temperature(),
                 if heating { "is" } else { "is not" }
             )

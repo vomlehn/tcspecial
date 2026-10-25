@@ -26,8 +26,9 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, could_not_stand_in, ignore_this_request, lateness, send_in_segments, wait_out_packet,
-    wait_while_running, Pacing, PayloadConfig, PayloadStats, Produce,
+    a_packet, could_not_stand_in, ignore_this_request, lateness,
+    send_in_segments, wait_out_packet, wait_while_running, Pacing,
+    PayloadConfig, PayloadStats, Produce,
 };
 use crate::pty::SimulatedNode;
 
@@ -225,7 +226,8 @@ mod tests {
             Err(e) => e,
         };
         assert!(
-            e.contains("real serial device") || e.contains("not a link the simulator made"),
+            e.contains("real serial device")
+                || e.contains("not a link the simulator made"),
             "{e}"
         );
         assert!(Path::new("/dev/null").exists());

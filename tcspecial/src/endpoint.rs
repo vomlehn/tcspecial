@@ -22,7 +22,10 @@ use std::os::fd::BorrowedFd;
 use std::os::unix::io::RawFd;
 
 use nix::poll::{poll, PollFd, PollFlags};
-use tcslibgs::{EndpointConfig, NetworkConfig, NetworkProtocol, SendsFrom, TcsError, TcsResult};
+use tcslibgs::{
+    EndpointConfig, NetworkConfig, NetworkProtocol, SendsFrom, TcsError,
+    TcsResult,
+};
 
 #[cfg(feature = "can")]
 use crate::node::payload::can::CanEndpoint;
@@ -40,7 +43,9 @@ use crate::node::payload::iio::IioEndpoint;
 use crate::node::payload::network::raw::RawEndpoint;
 use crate::node::payload::network::tcp::TcpEndpoint;
 use crate::node::payload::network::udp::UdpEndpoint;
-use crate::node::payload::network::unix::{UnixDatagramEndpoint, UnixStreamEndpoint};
+use crate::node::payload::network::unix::{
+    UnixDatagramEndpoint, UnixStreamEndpoint,
+};
 #[cfg(feature = "rpmsg")]
 use crate::node::payload::rpmsg::RpmsgEndpoint;
 #[cfg(feature = "serial")]
@@ -50,8 +55,9 @@ use crate::node::payload::spi::SpiEndpoint;
 
 /// An open refused because this build does not contain the type.
 ///
-/// In the words the load uses: see [`tcslibgs::graph::built::not_built_message`].
-/// Only a build that leaves a type out can reach it.
+/// In the words the load uses: see
+/// [`tcslibgs::graph::built::not_built_message`]. Only a build that leaves a
+/// type out can reach it.
 #[allow(dead_code)]
 fn not_built(what: &str, node_type: &str) -> TcsError {
     TcsError::Config(tcslibgs::graph::built::not_built_message(what, node_type))
@@ -81,7 +87,11 @@ pub trait EndpointWaitable {
     fn io_fd(&self) -> RawFd;
 
     /// Wait for an event on this endpoint
-    fn wait_for_event(&self, cmd_fd: RawFd, timeout_ms: i32) -> TcsResult<WaitResult>;
+    fn wait_for_event(
+        &self,
+        cmd_fd: RawFd,
+        timeout_ms: i32,
+    ) -> TcsResult<WaitResult>;
 }
 
 /// Result of waiting for an event
@@ -241,7 +251,9 @@ pub fn bind_endpoint_pair(
             }
             #[cfg(not(feature = "raw"))]
             NetworkProtocol::Raw(_) => Err(not_built(what, tcslibgs::RAW)),
-            _ => Err(TcsError::Config("Unsupported network protocol".to_string())),
+            _ => Err(TcsError::Config(
+                "Unsupported network protocol".to_string(),
+            )),
         },
         #[cfg(feature = "device-file")]
         EndpointConfig::Device(dev_config) => {
@@ -356,7 +368,9 @@ pub fn reaching_endpoint_pair(
     Box<dyn EndpointWritable + Send>,
 )> {
     match config {
-        EndpointConfig::Network(net_config) if net_config.protocol == NetworkProtocol::Udp => {
+        EndpointConfig::Network(net_config)
+            if net_config.protocol == NetworkProtocol::Udp =>
+        {
             let reader = UdpEndpoint::reaching(what, net_config)?;
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
@@ -441,7 +455,8 @@ pub fn hearing_endpoint_pair(
             // reason: a stream is accepted and a datagram is not. The
             // difference is only that both are named by a path.
             NetworkProtocol::UnixStream => {
-                let reader = UnixStreamEndpoint::connect_retrying(what, net_config)?;
+                let reader =
+                    UnixStreamEndpoint::connect_retrying(what, net_config)?;
                 let writer = reader.try_clone()?;
                 Ok((Box::new(reader), Box::new(writer)))
             }

@@ -29,7 +29,8 @@ interface="${1:-vcan0}"
 # Everything below needs root. Re-exec rather than prefixing each command with
 # sudo, so that a password is asked for once instead of once per command.
 if [ "$(id -u)" -ne 0 ]; then
-	echo "mkvcan: re-running under sudo, which is what creating an interface needs"
+	echo "mkvcan: re-running under sudo, which is what creating an" \
+		"interface needs"
 	exec sudo -- "$0" "$@"
 fi
 

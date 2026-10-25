@@ -105,7 +105,9 @@ impl Vote {
         // -- so the comparison never falls back, and the fallback is written
         // as Equal rather than as a panic because a sort is not the place to
         // discover a bad reading.
-        readings.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        readings.sort_by(|a, b| {
+            a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         match self.algorithm {
             Algorithm::Median => middle(readings),
@@ -149,10 +151,14 @@ fn closest_pair_mean(sorted: &[f64]) -> f64 {
 }
 
 impl Function for Vote {
-    fn give(&mut self, input: Option<&str>, data: &[u8]) -> Result<Option<Out>, String> {
+    fn give(
+        &mut self,
+        input: Option<&str>,
+        data: &[u8],
+    ) -> Result<Option<Out>, String> {
         let input = input.ok_or_else(|| {
-            "a vote takes named inputs, and this arrived without a name: a link \
-             into it is written to.in0 and not to"
+            "a vote takes named inputs, and this arrived without a name: a \
+             link into it is written to.in0 and not to"
                 .to_string()
         })?;
 
@@ -206,7 +212,11 @@ mod tests {
     /// A vote over three inputs, by the algorithm named.
     fn vote(algorithm: Algorithm) -> Vote {
         Vote::of(VoteParams {
-            inputs: vec!["in0".to_string(), "in1".to_string(), "in2".to_string()],
+            inputs: vec![
+                "in0".to_string(),
+                "in1".to_string(),
+                "in2".to_string(),
+            ],
             algorithm,
         })
     }
@@ -337,7 +347,8 @@ mod tests {
         assert_eq!(
             vote.waiting_for(),
             3,
-            "a refused reading is not a reading: the input has still not reported"
+            "a refused reading is not a reading: the input has still not \
+             reported"
         );
     }
 

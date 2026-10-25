@@ -27,10 +27,13 @@ use std::mem;
 use std::os::unix::io::{AsRawFd, FromRawFd, OwnedFd, RawFd};
 
 use nix::poll::PollFlags;
-use tcslibgs::{node::payload::can::frame_bytes, CanConfig, TcsError, TcsResult};
+use tcslibgs::{
+    node::payload::can::frame_bytes, CanConfig, TcsError, TcsResult,
+};
 
 use crate::endpoint::{
-    wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable, WaitResult,
+    wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable,
+    WaitResult,
 };
 
 /// A raw CAN socket, read and written by two conduits.
@@ -56,11 +59,13 @@ impl CanEndpoint {
 
         // SAFETY: a socket call with constant arguments; the result is
         // checked before it is used.
-        let fd = unsafe { libc::socket(libc::PF_CAN, libc::SOCK_RAW, libc::CAN_RAW) };
+        let fd = unsafe {
+            libc::socket(libc::PF_CAN, libc::SOCK_RAW, libc::CAN_RAW)
+        };
         if fd < 0 {
             return Err(TcsError::Endpoint(format!(
-                "{what}: cannot open a CAN socket: {}. A kernel without CAN support \
-                 has no socket to give",
+                "{what}: cannot open a CAN socket: {}. A kernel without CAN \
+                 support has no socket to give",
                 io::Error::last_os_error()
             )));
         }
@@ -145,9 +150,9 @@ fn interface_index(what: &str, interface: &str) -> TcsResult<libc::c_uint> {
     let index = unsafe { libc::if_nametoindex(name.as_ptr()) };
     if index == 0 {
         return Err(TcsError::Config(format!(
-            "{what}: this host has no interface called \"{interface}\": {}. A virtual \
-             bus is made with \"ip link add dev {interface} type vcan\" and brought up \
-             with \"ip link set dev {interface} up\"",
+            "{what}: this host has no interface called \"{interface}\": {}. A \
+             virtual bus is made with \"ip link add dev {interface} type \
+             vcan\" and brought up with \"ip link set dev {interface} up\"",
             io::Error::last_os_error()
         )));
     }
@@ -226,7 +231,12 @@ fn set_flag(
 }
 
 /// Bind the socket to the interface, which is what puts it on that bus.
-fn bind_to(what: &str, fd: RawFd, interface: &str, index: libc::c_uint) -> TcsResult<()> {
+fn bind_to(
+    what: &str,
+    fd: RawFd,
+    interface: &str,
+    index: libc::c_uint,
+) -> TcsResult<()> {
     // SAFETY: zeroed and then filled in; sockaddr_can is the address a CAN
     // socket is bound with, and only its family and interface index are read
     // for a raw socket.
@@ -257,7 +267,10 @@ fn bind_to(what: &str, fd: RawFd, interface: &str, index: libc::c_uint) -> TcsRe
 fn set_nonblocking(what: &str, fd: RawFd) -> TcsResult<()> {
     // SAFETY: both calls take the descriptor by value and return a status.
     let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
-    if flags < 0 || unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) } < 0 {
+    if flags < 0
+        || unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) }
+            < 0
+    {
         return Err(TcsError::Endpoint(format!(
             "{what}: cannot make this CAN socket non-blocking: {}",
             io::Error::last_os_error()
@@ -287,7 +300,8 @@ fn data_of(frame: &[u8], fd: bool) -> Option<(u32, usize)> {
             return None;
         }
         // SAFETY: as above.
-        let got: libc::can_frame = unsafe { std::ptr::read_unaligned(frame.as_ptr() as *const _) };
+        let got: libc::can_frame =
+            unsafe { std::ptr::read_unaligned(frame.as_ptr() as *const _) };
         Some((got.can_id, got.can_dlc as usize))
     }
 }
@@ -301,7 +315,11 @@ impl EndpointWaitable for CanEndpoint {
         self.socket.as_raw_fd()
     }
 
-    fn wait_for_event(&self, cmd_fd: RawFd, timeout_ms: i32) -> TcsResult<WaitResult> {
+    fn wait_for_event(
+        &self,
+        cmd_fd: RawFd,
+        timeout_ms: i32,
+    ) -> TcsResult<WaitResult> {
         wait_for_fds(self.io_fd(), cmd_fd, PollFlags::POLLIN, timeout_ms)
     }
 }
@@ -321,8 +339,13 @@ impl EndpointReadable for CanEndpoint {
         };
 
         // SAFETY: reading into a buffer of at least `room` bytes.
-        let got =
-            unsafe { libc::read(self.io_fd(), frame.as_mut_ptr() as *mut libc::c_void, room) };
+        let got = unsafe {
+            libc::read(
+                self.io_fd(),
+                frame.as_mut_ptr() as *mut libc::c_void,
+                room,
+            )
+        };
         if got < 0 {
             let e = io::Error::last_os_error();
             return match e.kind() {
@@ -356,8 +379,8 @@ impl EndpointWritable for CanEndpoint {
         let room = self.frame_bytes();
         if data.len() > room {
             return Err(TcsError::Endpoint(format!(
-                "{}: {} bytes will not fit in a {} frame, which carries {room}, and \
-                 CAN does not fragment",
+                "{}: {} bytes will not fit in a {} frame, which carries \
+                 {room}, and CAN does not fragment",
                 self.what,
                 data.len(),
                 if self.fd { "CAN FD" } else { "classic CAN" }
@@ -383,8 +406,13 @@ impl EndpointWritable for CanEndpoint {
 
         // SAFETY: writing `length` bytes from a buffer at least that long,
         // laid out as the kernel's frame structure.
-        let sent =
-            unsafe { libc::write(self.io_fd(), frame.as_ptr() as *const libc::c_void, length) };
+        let sent = unsafe {
+            libc::write(
+                self.io_fd(),
+                frame.as_ptr() as *const libc::c_void,
+                length,
+            )
+        };
         if sent < 0 {
             let e = io::Error::last_os_error();
             return match e.kind() {
@@ -452,7 +480,8 @@ mod tests {
     /// tells an operator which it is.
     #[test]
     fn an_interface_that_is_not_there_says_how_to_make_one() {
-        let said = interface_index("device", "vcan-nonesuch").expect_err("no such interface");
+        let said = interface_index("device", "vcan-nonesuch")
+            .expect_err("no such interface");
         let said = format!("{said}");
         assert!(
             said.contains("vcan-nonesuch") && said.contains("ip link add"),
@@ -506,8 +535,10 @@ mod tests {
             loopback: true,
         };
 
-        let mut handler = CanEndpoint::new("handler", &config).expect("a socket on the bus");
-        let mut device = CanEndpoint::new("device", &config).expect("another socket on it");
+        let mut handler =
+            CanEndpoint::new("handler", &config).expect("a socket on the bus");
+        let mut device =
+            CanEndpoint::new("device", &config).expect("another socket on it");
 
         // The device sends; the handler reads what arrived.
         assert_eq!(
@@ -568,7 +599,8 @@ mod tests {
         };
         assert!(
             said.contains("does not fragment") && said.contains("classic CAN"),
-            "the error should say why it cannot be split, and of which frame: {said}"
+            "the error should say why it cannot be split, and of which frame: \
+             {said}"
         );
 
         // Eight is the most a classic frame carries, and is not refused.
@@ -582,7 +614,9 @@ mod tests {
 
         let said = match fd.write(&[0u8; 65]) {
             Err(e) => format!("{e}"),
-            Ok(n) => panic!("sixty-five bytes went into a sixty-four-byte frame as {n}"),
+            Ok(n) => panic!(
+                "sixty-five bytes went into a sixty-four-byte frame as {n}"
+            ),
         };
         assert!(
             said.contains("CAN FD") && said.contains("64"),
@@ -599,10 +633,14 @@ mod tests {
     /// has no carrier and reports "unknown" whether it is up or not -- so
     /// this reads `IFF_UP` itself.
     fn is_up(interface: &str) -> bool {
-        let Ok(flags) = std::fs::read_to_string(format!("/sys/class/net/{interface}/flags")) else {
+        let Ok(flags) = std::fs::read_to_string(format!(
+            "/sys/class/net/{interface}/flags"
+        )) else {
             return false;
         };
-        let Ok(flags) = u32::from_str_radix(flags.trim().trim_start_matches("0x"), 16) else {
+        let Ok(flags) =
+            u32::from_str_radix(flags.trim().trim_start_matches("0x"), 16)
+        else {
             return false;
         };
         flags & libc::IFF_UP as u32 != 0

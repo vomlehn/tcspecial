@@ -33,8 +33,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 use crate::endpoint_config::Scalar;
 use crate::graph::Graph;
 use crate::types::{
-    default_log_segment_bytes, BeaconJson, CIConfigJson, LogJson, PayloadCommandJson,
-    PayloadTelemetryJson, TcsCmdJson,
+    default_log_segment_bytes, BeaconJson, CIConfigJson, LogJson,
+    PayloadCommandJson, PayloadTelemetryJson, TcsCmdJson,
 };
 
 /// One entry of the section: a value, or a subsection of values.
@@ -99,9 +99,14 @@ impl<'de> Deserialize<'de> for Parameter {
             /// named `$text`, which is how a value and a subsection arrive in
             /// the same shape there. One entry so named is the value; anything
             /// else is the subsection it looks like.
-            fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Parameter, A::Error> {
+            fn visit_map<A: MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> Result<Parameter, A::Error> {
                 let mut group: BTreeMap<String, Scalar> = BTreeMap::new();
-                while let Some((name, value)) = map.next_entry::<String, Scalar>()? {
+                while let Some((name, value)) =
+                    map.next_entry::<String, Scalar>()?
+                {
                     group.insert(name, value);
                 }
                 match group.len() {
@@ -220,9 +225,9 @@ pub fn default_of(attribute: &str) -> Option<&'static str> {
 /// it is a file written for the spelling before this one.
 pub fn retired(attribute: &str) -> Option<&'static str> {
     match attribute {
-        "beacon.interval_ms" => {
-            Some("say beacon.interval, as a length of time: 5 s rather than 5000")
-        }
+        "beacon.interval_ms" => Some(
+            "say beacon.interval, as a length of time: 5 s rather than 5000",
+        ),
         _ => None,
     }
 }
@@ -235,7 +240,9 @@ pub fn retired(attribute: &str) -> Option<&'static str> {
 ///
 /// Every complaint names the attribute, because a configuration is read by
 /// somebody who needs to know which of ten words to change.
-pub fn ci_config_of(said: &BTreeMap<String, Scalar>) -> Result<CIConfigJson, String> {
+pub fn ci_config_of(
+    said: &BTreeMap<String, Scalar>,
+) -> Result<CIConfigJson, String> {
     // A name belonging to nothing, first. A misspelled attribute is otherwise
     // a value silently ignored -- `beacon_adress` would leave beacons going
     // wherever the rest of the file happened to say -- and nothing in the
@@ -246,19 +253,24 @@ pub fn ci_config_of(said: &BTreeMap<String, Scalar>) -> Result<CIConfigJson, Str
             // `retired`, and the note there about why it is not a
             // misspelling.
             if let Some(instead) = retired(name) {
-                return Err(format!("\"{name}\" is no longer an attribute: {instead}"));
+                return Err(format!(
+                    "\"{name}\" is no longer an attribute: {instead}"
+                ));
             }
             // And one written with hyphens for underscores, or the other way
             // round, is told its one spelling rather than handed the list to
             // find it in: see `crate::graph::spelled`.
-            let known = |other: &str| ATTRIBUTES.iter().any(|(known, _)| *known == other);
+            let known = |other: &str| {
+                ATTRIBUTES.iter().any(|(known, _)| *known == other)
+            };
             if let Some(hint) = crate::graph::spelled(name, known) {
                 return Err(format!(
                     "there is no tcspecial attribute called \"{name}\": {hint}"
                 ));
             }
             return Err(format!(
-                "there is no tcspecial attribute called \"{name}\". They are {}",
+                "there is no tcspecial attribute called \"{name}\". They are \
+                 {}",
                 ATTRIBUTES
                     .iter()
                     .map(|(name, _)| *name)
@@ -347,7 +359,9 @@ pub fn ci_config_of(said: &BTreeMap<String, Scalar>) -> Result<CIConfigJson, Str
                 .map(|value| value.as_str().trim().to_string())
                 .filter(|value| !value.is_empty()),
             segment_size: match said.get("log.segment_size") {
-                Some(value) if !value.as_str().trim().is_empty() => number("log.segment_size")?,
+                Some(value) if !value.as_str().trim().is_empty() => {
+                    number("log.segment_size")?
+                }
                 _ => default_log_segment_bytes(),
             },
         },
@@ -389,7 +403,9 @@ pub fn beacon_of(graph: &Graph) -> Result<Option<crate::BeaconLink>, String> {
 /// same section the link is, rather than assumed: a station that took every
 /// vehicle to beacon every five seconds would call a ten-second beacon late
 /// when it was on time.
-pub fn beacon_interval_of(graph: &Graph) -> Result<Option<std::time::Duration>, String> {
+pub fn beacon_interval_of(
+    graph: &Graph,
+) -> Result<Option<std::time::Duration>, String> {
     let Some(section) = graph.tcspecial.as_ref() else {
         return Ok(None);
     };
@@ -440,7 +456,8 @@ mod tests {
     /// wants.
     #[test]
     fn a_whole_section_is_what_the_command_interpreter_takes() {
-        let config = ci_config_of(&said(&whole())).expect("this one is complete");
+        let config =
+            ci_config_of(&said(&whole())).expect("this one is complete");
         assert_eq!(config.tcs_cmd.recv, "0.0.0.0:4000");
         assert_eq!(config.tcs_cmd.send, "127.0.0.1:4100");
         assert_eq!(config.payload_command.source_base, "127.0.0.1:4300");
@@ -490,7 +507,8 @@ mod tests {
             std::time::Duration::from_secs(90)
         );
         for wrong in ["0 s", "20", "soon"] {
-            let why = settled(&[("restart_arm_valid", wrong)]).expect_err(wrong);
+            let why =
+                settled(&[("restart_arm_valid", wrong)]).expect_err(wrong);
             assert!(why.contains("restart_arm_valid"), "{wrong}: {why}");
         }
     }
@@ -509,7 +527,8 @@ mod tests {
                 let why = outcome.expect_err(&format!("{name} is required"));
                 assert!(why.contains(name), "{why}");
             } else {
-                outcome.unwrap_or_else(|why| panic!("{name} is optional: {why}"));
+                outcome
+                    .unwrap_or_else(|why| panic!("{name} is optional: {why}"));
             }
         }
     }
@@ -524,7 +543,8 @@ mod tests {
         let mut cleared = whole();
         cleared.retain(|(name, _)| *name != "tcs_cmd.recv");
         cleared.push(("tcs_cmd.recv", "   "));
-        let why = ci_config_of(&said(&cleared)).expect_err("an empty command interface is none");
+        let why = ci_config_of(&said(&cleared))
+            .expect_err("an empty command interface is none");
         assert!(why.contains("tcs_cmd.recv"), "{why}");
     }
 
@@ -570,7 +590,8 @@ mod tests {
             // And a port of nought, which asks for whatever is free.
             ("0.0.0.0:0", "port 0"),
         ] {
-            let why = said(said_).expect_err(&format!("{said_} should be refused"));
+            let why =
+                said(said_).expect_err(&format!("{said_} should be refused"));
             assert!(why.contains(expected), "{said_} was refused as {why:?}");
             // Every complaint names the attribute, there being four of these
             // in one section.
@@ -635,7 +656,8 @@ mod tests {
     fn a_misspelled_attribute_is_refused_by_name() {
         let mut wrong = whole();
         wrong.push(("beacon_adress", "0.0.0.0:5550"));
-        let why = ci_config_of(&said(&wrong)).expect_err("a typo should be refused");
+        let why =
+            ci_config_of(&said(&wrong)).expect_err("a typo should be refused");
         assert!(why.contains("beacon_adress"), "{why}");
         // And the complaint lists what there is, so the typo can be fixed
         // without opening the manual.
@@ -675,8 +697,8 @@ mod tests {
     #[test]
     fn the_beacon_interval_is_the_sections() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let mut graph =
-            Graph::load(root.join("examples/ping/ping.yaml")).expect("the example reads");
+        let mut graph = Graph::load(root.join("examples/ping/ping.yaml"))
+            .expect("the example reads");
         assert_eq!(
             beacon_interval_of(&graph),
             Ok(Some(std::time::Duration::from_secs(5)))

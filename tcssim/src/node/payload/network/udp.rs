@@ -14,8 +14,9 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, could_not_stand_in, ignore_this_request, lateness, send_in_segments, wait_out_packet,
-    wait_while_running, Pacing, PayloadConfig, PayloadStats, Produce,
+    a_packet, could_not_stand_in, ignore_this_request, lateness,
+    send_in_segments, wait_out_packet, wait_while_running, Pacing,
+    PayloadConfig, PayloadStats, Produce,
 };
 
 /// Run a simulated device reached over UDP.
@@ -53,7 +54,9 @@ pub fn run_udp_node(
     // was wrong there is the reason it is right here: whichever end speaks
     // first binds nothing, and for a heater neither end would ever speak if
     // this one waited to be asked.
-    if config.driven || matches!(config.thermal, Some(crate::thermal::Thermal::Heats { .. })) {
+    if config.driven
+        || matches!(config.thermal, Some(crate::thermal::Thermal::Heats { .. }))
+    {
         run_driven_udp_node(config, running, stats, &handler);
         return;
     }
@@ -62,7 +65,8 @@ pub fn run_udp_node(
     // reason: the vehicle speaks first, with its trigger, at the address the
     // configuration gives, and the answer goes back to whoever asked. The
     // rule is the vehicle's own, so the two ends cannot disagree about it.
-    let speaks_first = tcslibgs::graph::interface::speaks_first(true, config.triggered);
+    let speaks_first =
+        tcslibgs::graph::interface::speaks_first(true, config.triggered);
 
     // What this end answers from. Nothing has to find a device that speaks
     // first at a particular port -- the handler learns where it is from the
@@ -126,7 +130,11 @@ pub fn run_udp_node(
                 // A heater is driven by what arrives: the mass is told before
                 // the statistics are, so that nothing holds the stats lock
                 // across the mass's own.
-                crate::thermal::driven(&config.thermal, &config.name, &buf[..n]);
+                crate::thermal::driven(
+                    &config.thermal,
+                    &config.name,
+                    &buf[..n],
+                );
                 let mut guard = stats.lock().unwrap();
                 guard.a_packet_has_come(&buf[..n]);
                 guard.bytes_recv += n as u64;
@@ -228,7 +236,11 @@ fn run_driven_udp_node(
             // panel has the device switched off: what arrives is counted, as
             // every stand-in counts it, and acted on by nothing.
             if pacing.sending {
-                crate::thermal::driven(&config.thermal, &config.name, &buf[..n]);
+                crate::thermal::driven(
+                    &config.thermal,
+                    &config.name,
+                    &buf[..n],
+                );
             }
             let mut guard = stats.lock().unwrap();
             guard.a_packet_has_come(&buf[..n]);
@@ -263,7 +275,8 @@ mod tests {
     #[test]
     fn a_udp_device_sends_unprompted_as_the_segments_asked_for() {
         // The handler's end of the link, which is the end that waits.
-        let handler = UdpSocket::bind("127.0.0.1:0").expect("a socket for the handler");
+        let handler =
+            UdpSocket::bind("127.0.0.1:0").expect("a socket for the handler");
         let at = handler.local_addr().expect("its address");
         handler
             .set_read_timeout(Some(Duration::from_secs(5)))
@@ -308,10 +321,9 @@ mod tests {
 
         // Line up on a packet boundary -- the short segment ends a packet --
         // and look at the packet after it.
-        let ended = sizes
-            .iter()
-            .position(|&n| n == 2)
-            .unwrap_or_else(|| panic!("no segment was the short last one: {sizes:?}"));
+        let ended = sizes.iter().position(|&n| n == 2).unwrap_or_else(|| {
+            panic!("no segment was the short last one: {sizes:?}")
+        });
         assert_eq!(
             &sizes[ended + 1..ended + 4],
             &[5, 5, 2][..],
@@ -321,7 +333,8 @@ mod tests {
         let apart = datagrams[ended + 2].1 - datagrams[ended + 1].1;
         assert!(
             apart >= Duration::from_millis(40),
-            "two segments of one packet arrived {apart:?} apart, not the 40 ms asked for"
+            "two segments of one packet arrived {apart:?} apart, not the 40 ms \
+             asked for"
         );
 
         assert!(
@@ -425,7 +438,8 @@ mod tests {
 
     /// A handler's end of the link, waiting with a deadline.
     fn handler_end(wait: Duration) -> (UdpSocket, std::net::SocketAddr) {
-        let handler = UdpSocket::bind("127.0.0.1:0").expect("a socket for the handler");
+        let handler =
+            UdpSocket::bind("127.0.0.1:0").expect("a socket for the handler");
         let at = handler.local_addr().expect("its address");
         handler
             .set_read_timeout(Some(wait))
@@ -444,7 +458,8 @@ mod tests {
     fn a_payload_says_which_device_it_is() {
         // Nothing is listening at this address and nothing will be, so the
         // device cannot reach a handler and says so.
-        let nowhere = UdpSocket::bind("127.0.0.1:0").expect("a port to take and give back");
+        let nowhere = UdpSocket::bind("127.0.0.1:0")
+            .expect("a port to take and give back");
         let at = nowhere.local_addr().expect("its address");
         drop(nowhere);
 
@@ -540,7 +555,9 @@ mod tests {
             let sample = device.stats().last_sent;
             match sample.time {
                 Some(_) => break sample,
-                None if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(10)),
+                None if Instant::now() < deadline => {
+                    std::thread::sleep(Duration::from_millis(10))
+                }
                 None => panic!("a packet arrived and nothing recorded when"),
             }
         };
@@ -595,7 +612,9 @@ mod tests {
             let sample = device.stats().last_recv;
             match sample.time {
                 Some(_) => break sample,
-                None if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(10)),
+                None if Instant::now() < deadline => {
+                    std::thread::sleep(Duration::from_millis(10))
+                }
                 None => panic!("the device was spoken to and recorded no time"),
             }
         };
@@ -683,8 +702,8 @@ mod tests {
 
         assert!(
             lengths.iter().all(|&n| (1..12).contains(&n)),
-            "a truncated packet of twelve bytes arrived as {lengths:?}: every one \
-             of these should be short of twelve and none of them empty"
+            "a truncated packet of twelve bytes arrived as {lengths:?}: every \
+             one of these should be short of twelve and none of them empty"
         );
     }
 
@@ -708,9 +727,9 @@ mod tests {
 
         let mut buf = [0u8; 64];
         for which in 1..=3 {
-            handler
-                .recv_from(&mut buf)
-                .unwrap_or_else(|e| panic!("packet {which} of three never came: {e}"));
+            handler.recv_from(&mut buf).unwrap_or_else(|e| {
+                panic!("packet {which} of three never came: {e}")
+            });
         }
 
         // Then silence, for many more intervals than the three took.
@@ -736,7 +755,8 @@ mod tests {
     /// nothing arrives afterwards however long the handler's end waits.
     #[test]
     fn a_stopped_udp_device_sends_nothing_more() {
-        let handler = UdpSocket::bind("127.0.0.1:0").expect("a socket for the handler");
+        let handler =
+            UdpSocket::bind("127.0.0.1:0").expect("a socket for the handler");
         let at = handler.local_addr().expect("its address");
         handler
             .set_read_timeout(Some(Duration::from_secs(5)))

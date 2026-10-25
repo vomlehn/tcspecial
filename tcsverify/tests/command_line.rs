@@ -35,7 +35,8 @@ payloads:
     .to_string();
     for id in 0..count {
         text.push_str(&format!(
-            "  - name: DH{id}\n    type: device-file\n    path: /dev/null{id}\n    \
+            "  - name: DH{id}\n    type: device-file\n    \
+             path: /dev/null{id}\n    \
              payload-out:\n      - target: nowhere{id}\n"
         ));
     }
@@ -85,7 +86,8 @@ fn the_options_are_taken_as_options() {
     assert_eq!(status, 0);
 
     // Every one, and what is done with warnings does not touch the errors.
-    let (lines, status) = run(&["--error-limit=unlimited", "--warnings=off", set]);
+    let (lines, status) =
+        run(&["--error-limit=unlimited", "--warnings=off", set]);
     assert_eq!(lines.len(), 12, "{lines:?}");
     assert_eq!(status, 1);
 }
@@ -176,7 +178,8 @@ fn a_digest_that_cannot_be_taken_is_a_failed_run() {
 
     // And one that does not parse has nothing to digest.
     let unreadable = dir.path().join("unreadable.yaml");
-    std::fs::write(&unreadable, "description: nonsense\npayloads: oops\n").expect("written");
+    std::fs::write(&unreadable, "description: nonsense\npayloads: oops\n")
+        .expect("written");
     let unreadable = unreadable.to_str().expect("a path");
 
     let (lines, status) = run(&["--digest", unreadable]);
@@ -258,7 +261,8 @@ vehicle:
 #[test]
 fn warnings_alone_are_a_run_that_passes() {
     let dir = tempfile::tempdir().expect("a directory");
-    let file = with_vehicle_node(dir.path(), "    type: ping\n    interval: \"1 s\"");
+    let file =
+        with_vehicle_node(dir.path(), "    type: ping\n    interval: \"1 s\"");
 
     let (lines, status) = run(&[file.to_str().expect("a path")]);
     assert_eq!(lines.len(), 1, "{lines:?}");
@@ -274,9 +278,9 @@ fn a_type_that_does_not_exist_fails_the_run() {
 
     let (lines, status) = run(&[file.to_str().expect("a path")]);
     assert!(
-        lines
-            .iter()
-            .any(|line| line.contains(": error: ") && line.contains("\"bogus\"")),
+        lines.iter().any(
+            |line| line.contains(": error: ") && line.contains("\"bogus\"")
+        ),
         "{lines:?}"
     );
     assert_eq!(status, 1);

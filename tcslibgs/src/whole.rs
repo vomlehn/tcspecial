@@ -46,10 +46,11 @@
 /// allowed among the digits. Everything else here is this with a range check.
 pub fn whole(text: &str) -> Result<u64, String> {
     let said = text.trim();
-    let (digits, radix, how) = match said.strip_prefix("0x").or_else(|| said.strip_prefix("0X")) {
-        Some(digits) => (digits, 16, "hexadecimal"),
-        None => (said, 10, "decimal"),
-    };
+    let (digits, radix, how) =
+        match said.strip_prefix("0x").or_else(|| said.strip_prefix("0X")) {
+            Some(digits) => (digits, 16, "hexadecimal"),
+            None => (said, 10, "decimal"),
+        };
 
     // The underscores come out before the parse rather than being checked
     // where they sit: they group digits for a reader and mean nothing to the

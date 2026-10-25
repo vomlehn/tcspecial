@@ -32,6 +32,7 @@ payloads:
     max_speed: "1000000"
     path: "/dev/spidev0.0"
     spi_mode: "0"
+    stand_in: "127.0.0.1:7951"
     payload-out:
       - target: moc-1
 

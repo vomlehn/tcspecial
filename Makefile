@@ -298,7 +298,8 @@ SPELLINGS = \
 	examples/minimal/minimal:examples/minimal/minimal-sim.yaml \
 	examples/thermostat/thermostat:examples/thermostat/thermostat-sim.yaml \
 	examples/simple-app/simple-app:examples/simple-app/simple-app-sim.yaml \
-	examples/beacon/beacon:examples/beacon/beacon-sim.yaml
+	examples/beacon/beacon:examples/beacon/beacon-sim.yaml \
+	example:example-sim.yaml
 
 # Compare the two spellings of every one of them.
 #

@@ -29,8 +29,15 @@
         <address>127.0.0.1</address>
         <ground_base>127.0.0.1:5100</ground_base>
         <port>5000</port>
+        <payload-in>true</payload-in>
     </moc>
+    <payloads>
+        <name>spi-1</name>
+        <type>spi</type>
+        <payload-out><target>moc-1</target></payload-out>
+    </payloads>
     <tcsgui>
         <nodes><name>moc-1</name><x>469</x><y>34</y></nodes>
+        <nodes><name>spi-1</name><x>15</x><y>34</y></nodes>
     </tcsgui>
 </configuration>

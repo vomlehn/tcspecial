@@ -24,7 +24,15 @@ moc:
     address: "127.0.0.1"
     ground_base: "127.0.0.1:5100"
     port: "5000"
+    payload-in: true
+
+payloads:
+  - name: spi-1
+    type: spi
+    payload-out:
+      - target: moc-1
 
 tcsgui:
   nodes:
     - { name: moc-1, x: 469, y: 34 }
+    - { name: spi-1, x: 15, y: 34 }

@@ -851,7 +851,7 @@ impl Port for ComputePort {
             self.ready.push_front((result, again));
             return Err(format!(
                 "{}: the result of {} is {wanted} bytes and the buffer holds \
-                 {}:                  part of a value is not a smaller value",
+                 {}: part of a value is not a smaller value",
                 self.what,
                 self.function.name(),
                 buffer.len()

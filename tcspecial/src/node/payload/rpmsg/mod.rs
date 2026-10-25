@@ -66,11 +66,9 @@ impl RpmsgEndpoint {
             .map_err(|e| {
                 TcsError::Endpoint(format!(
                     "{what}: cannot open the rpmsg channel {}: {e}. A node \
-                     exists only \\
-                     while the remote has announced its channel, so one that \
-                     is not \\
-                     there is commonly a remote processor that has not been \
-                     started",
+                     exists only while the remote has announced its \
+                     channel, so one that is not there is commonly a \
+                     remote processor that has not been started",
                     config.path
                 ))
             })?;

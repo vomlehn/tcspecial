@@ -29,6 +29,9 @@ moc:
 payloads:
   - name: spi-1
     type: spi
+    max_speed: "1000000"
+    path: "/dev/spidev0.0"
+    spi_mode: "0"
     payload-out:
       - target: moc-1
 

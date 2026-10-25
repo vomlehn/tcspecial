@@ -67,7 +67,8 @@ impl Moc {
     /// Open the `moc` node of this name in the configuration at `path`.
     pub fn open_file(path: impl AsRef<Path>, moc: &str) -> Result<Moc, String> {
         let path = path.as_ref();
-        let graph = Graph::load(path).map_err(|e| format!("{}: {e}", path.display()))?;
+        let graph = Graph::load(path)
+            .map_err(|e| format!("{}: {e}", path.display()))?;
         Moc::open(&graph, moc)
     }
 
@@ -96,8 +97,8 @@ impl Moc {
             .collect();
         if ours.is_empty() {
             return Err(format!(
-                "\"{moc}\" has nothing drawn into it, so nothing would ever arrive \
-                 at it"
+                "\"{moc}\" has nothing drawn into it, so nothing would ever \
+                 arrive at it"
             ));
         }
         Moc::binding(moc, ours)
@@ -110,7 +111,9 @@ impl Moc {
     /// Gathered as one, named for the section, because it is the same thing to
     /// a caller: data, and which node it came from. `None` where no payload
     /// reports that way.
-    pub fn open_payload_telemetry(graph: &Graph) -> Result<Option<Moc>, String> {
+    pub fn open_payload_telemetry(
+        graph: &Graph,
+    ) -> Result<Option<Moc>, String> {
         let links = telemetry::of(graph).map_err(|refused| refused.why)?;
         let ours: Vec<Telemetered> = links
             .into_iter()
@@ -178,7 +181,10 @@ impl Moc {
     /// Allocates the datum and its source's name, each time: for a caller
     /// that keeps what it receives. A loop that does not, [`Moc::receive_into`]
     /// a buffer it made before it started.
-    pub fn receive(&mut self, wait: Option<Duration>) -> Result<Option<Received>, String> {
+    pub fn receive(
+        &mut self,
+        wait: Option<Duration>,
+    ) -> Result<Option<Received>, String> {
         let mut datum = vec![0u8; DATUM_BYTES];
         let Some(arrival) = self.receive_into(wait, &mut datum)? else {
             return Ok(None);
@@ -260,8 +266,9 @@ impl Moc {
             };
             if length > out.len() {
                 return Err(format!(
-                    "\"{}\": \"{source}\" sent {length} bytes, which is more than the \
-                     {} there was room for: receive into a buffer of DATUM_BYTES",
+                    "\"{}\": \"{source}\" sent {length} bytes, which is more \
+                     than the {} there was room for: receive into a buffer of \
+                     DATUM_BYTES",
                     self.name,
                     out.len()
                 ));
@@ -296,8 +303,10 @@ mod tests {
                 "moc:
   - {{ name: ground, type: moc, ground_base: \"127.0.0.1:{}\" }}
 payloads:
-  - {{ name: a, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7001\", payload-out: ground }}
-  - {{ name: b, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7002\", payload-out: ground }}
+  - {{ name: a, type: network, protocol: udp, address: \"127.0.0.1\", \
+    port: \"7001\", payload-out: ground }}
+  - {{ name: b, type: network, protocol: udp, address: \"127.0.0.1\", \
+    port: \"7002\", payload-out: ground }}
 ",
                 port - 1
             ),
@@ -314,7 +323,8 @@ payloads:
         let mut moc = Moc::open(&graph(port), "ground").expect("it opens");
         assert_eq!(moc.sources(), vec!["a", "b"]);
 
-        let vehicle = UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
+        let vehicle =
+            UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
         vehicle
             .send_to(b"from a", ("127.0.0.1", port))
             .expect("sent");
@@ -352,9 +362,11 @@ payloads:
             &path,
             format!(
                 "moc:
-  - {{ name: fsw, type: gateway_fprime, bridge_base: \"127.0.0.1:{}\", fprime_id_base: \"0x3000\" }}
+  - {{ name: fsw, type: gateway_fprime, bridge_base: \"127.0.0.1:{}\", \
+    fprime_id_base: \"0x3000\" }}
 payloads:
-  - {{ name: a, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7001\", payload-out: fsw }}
+  - {{ name: a, type: network, protocol: udp, address: \"127.0.0.1\", \
+    port: \"7001\", payload-out: fsw }}
 ",
                 port - 1
             ),
@@ -381,7 +393,8 @@ payloads:
     /// A wait that runs out says nothing arrived.
     #[test]
     fn a_wait_that_runs_out_is_nothing() {
-        let mut moc = Moc::open(&graph(a_free_port()), "ground").expect("it opens");
+        let mut moc =
+            Moc::open(&graph(a_free_port()), "ground").expect("it opens");
         assert_eq!(moc.receive(Some(Duration::from_millis(50))), Ok(None));
     }
 
@@ -389,7 +402,8 @@ payloads:
     #[test]
     fn untouched_payloads_are_received_over_payload_telemetry() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let mut graph = Graph::load(root.join("examples/minimal/minimal.yaml")).expect("it reads");
+        let mut graph = Graph::load(root.join("examples/minimal/minimal.yaml"))
+            .expect("it reads");
         // Somewhere free instead of the example's 6100.
         let port = a_free_port();
         let section = graph.tcspecial.as_mut().expect("a section");
@@ -406,7 +420,8 @@ payloads:
         assert_eq!(ground.name(), PAYLOAD_TELEMETRY);
         assert_eq!(ground.sources(), vec!["sensor"]);
 
-        let vehicle = UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
+        let vehicle =
+            UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
         vehicle
             .send_to(b"reading", ("127.0.0.1", port))
             .expect("sent");

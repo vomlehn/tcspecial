@@ -1,4 +1,6 @@
-import { Button, CheckBox, ComboBox, LineEdit, ScrollView, TextEdit } from "std-widgets.slint";
+import {
+    Button, CheckBox, ComboBox, LineEdit, ScrollView, TextEdit
+} from "std-widgets.slint";
 import { Copyable, CopyButton } from "../../tcsverify/ui/copy.slint";
 import { Fonts } from "../../tcsui/ui/fonts.slint";
 import { Colors } from "../../tcsui/ui/colors.slint";
@@ -6,7 +8,10 @@ import { Colors } from "../../tcsui/ui/colors.slint";
 // node shapes, the link lines, the ground they are drawn on, and the globals
 // and structs they take. See tcsdiagram. Exported again from here so that this
 // program's Rust sees them as its own.
-import { Session, Space, Type, TerminalView, NodeView, LinkView, NodeShape, LinkLine, SheetGround } from "../../tcsdiagram/ui/diagram.slint";
+import {
+    Session, Space, Type, TerminalView, NodeView, LinkView, NodeShape,
+    LinkLine, SheetGround
+} from "../../tcsdiagram/ui/diagram.slint";
 export { Session, Space, Type, TerminalView, NodeView, LinkView }
 
 // One thing that might be wrong, as the concerns window shows it.
@@ -151,7 +156,9 @@ component SelectionPane inherits Rectangle {
             // taller shapes into the row below them, which made a list of
             // fourteen types read as a list of ten and a tangle.
             for p in root.palette: Rectangle {
-                height: p.is-heading ? 22px : p.node.height * root.shrink + Space.step;
+                height: p.is-heading
+                    ? 22px
+                    : p.node.height * root.shrink + Space.step;
                 background: transparent;
 
                 // A family's heading. Quiet: it is there to group the shapes
@@ -182,7 +189,9 @@ component SelectionPane inherits Rectangle {
                     // Nothing placed in a read-only session.
                     enabled: !Session.read-only;
                     mouse-cursor: MouseCursor.pointer;
-                    clicked => { root.place-node(p.node.name, p.node.node-type, p.sets); }
+                    clicked => {
+                        root.place-node(p.node.name, p.node.node-type, p.sets);
+                    }
                 }
             }
             Rectangle { }
@@ -214,7 +223,8 @@ component ListDivider inherits Rectangle {
     background: transparent;
 
     Rectangle {
-        y: parent.height / 2 + (grip.pressed ? grip.mouse-y - grip.pressed-y : 0px);
+        y: parent.height / 2
+            + (grip.pressed ? grip.mouse-y - grip.pressed-y : 0px);
         x: 0;
         width: 100%;
         height: grip.has-hover || grip.pressed ? 2px : 1px;
@@ -353,13 +363,13 @@ component Surface inherits Rectangle {
     // Rust -- see tcsdiagram::pane::WORKING_HEIGHT -- as the width is.
     in property <length> working-height: 0px;
     // What each pane's own tint is: light, neutral, and the light end of the
-    // hue family its own nodes are drawn in, so that a node's colour says
-    // which pane it belongs in. It paints two things -- the heading band at
-    // the top of that working pane, and the selection pane a node of its is
-    // taken from -- and not the working pane itself, which is one sheet with
-    // the other two. From Rust -- see tcsdiagram::style::Ground -- for the reason
-    // the tints come from there: what a colour means is a rule with tests on
-    // it, and this file paints.
+    // hue family its own nodes are drawn in, so that a node's colour says which
+    // pane it belongs in. It paints two things -- the heading band at the top
+    // of that working pane, and the selection pane a node of its is taken from
+    // -- and not the working pane itself, which is one sheet with the other
+    // two. From Rust -- see tcsdiagram::style::Ground -- for the reason the
+    // tints come from there: what a colour means is a rule with tests on it,
+    // and this file paints.
     in property <color> moc-ground: white;
     in property <color> vehicle-ground: white;
     in property <color> payload-ground: white;
@@ -506,7 +516,8 @@ component Surface inherits Rectangle {
             // decide to leave", which is worth being able to ask again -- a
             // decision somebody cannot find is a decision they cannot change.
             if concern-count > 0: Button {
-                text: concern-count + (concern-count == 1 ? " concern" : " concerns");
+                text: concern-count
+                    + (concern-count == 1 ? " concern" : " concerns");
                 clicked => { root.show-concerns(); }
             }
             if aside-count > 0: Button {
@@ -568,7 +579,8 @@ component Surface inherits Rectangle {
                 property <length> whole: self.height;
                 property <length> payload-tall: whole - moc-tall - vehicle-tall;
                 property <length> moc-tall: whole * root.moc-list-percent / 100;
-                property <length> vehicle-tall: whole * root.vehicle-list-percent / 100;
+                property <length> vehicle-tall:
+                    whole * root.vehicle-list-percent / 100;
 
                 SelectionPane {
                     x: 0;
@@ -578,14 +590,18 @@ component Surface inherits Rectangle {
                     heading: "Payload node types";
                     ground: root.payload-ground;
                     palette: root.payload-palette;
-                    place-node(name, t, sets) => { root.place-node(name, t, sets); }
+                    place-node(name, t, sets) => {
+                        root.place-node(name, t, sets);
+                    }
                 }
                 ListDivider {
                     x: 0;
                     y: lists.payload-tall - 7px;
                     width: 100%;
                     parent-height: lists.whole;
-                    moved(dy, tall) => { root.payload-list-divider-moved(dy, tall); }
+                    moved(dy, tall) => {
+                        root.payload-list-divider-moved(dy, tall);
+                    }
                 }
                 SelectionPane {
                     x: 0;
@@ -595,14 +611,18 @@ component Surface inherits Rectangle {
                     heading: "Vehicle node types";
                     ground: root.vehicle-ground;
                     palette: root.vehicle-palette;
-                    place-node(name, t, sets) => { root.place-node(name, t, sets); }
+                    place-node(name, t, sets) => {
+                        root.place-node(name, t, sets);
+                    }
                 }
                 ListDivider {
                     x: 0;
                     y: lists.payload-tall + lists.vehicle-tall - 7px;
                     width: 100%;
                     parent-height: lists.whole;
-                    moved(dy, tall) => { root.vehicle-list-divider-moved(dy, tall); }
+                    moved(dy, tall) => {
+                        root.vehicle-list-divider-moved(dy, tall);
+                    }
                 }
                 SelectionPane {
                     x: 0;
@@ -612,7 +632,9 @@ component Surface inherits Rectangle {
                     heading: "MOC node types";
                     ground: root.moc-ground;
                     palette: root.moc-palette;
-                    place-node(name, t, sets) => { root.place-node(name, t, sets); }
+                    place-node(name, t, sets) => {
+                        root.place-node(name, t, sets);
+                    }
                 }
             }
 
@@ -879,7 +901,8 @@ component ProblemsPanel inherits Rectangle {
         spacing: Space.step;
 
         Copyable {
-            text: "This configuration has problems the vehicle would not fly with";
+            text: "This configuration has problems "
+                + "the vehicle would not fly with";
             font-size: Type.strong;
             font-weight: Type.bold;
             wrap: word-wrap;
@@ -999,7 +1022,9 @@ export component MainWindow inherits Window {
     default-font-size: Fonts.window;
     // Saying in the title bar when this session changes nothing, which is
     // where somebody looks to see what a window is.
-    title: Session.read-only ? "TCSpecial Configuration (read-only)" : "TCSpecial Configuration";
+    title: Session.read-only
+        ? "TCSpecial Configuration (read-only)"
+        : "TCSpecial Configuration";
     background: Colors.window;
     // Wide enough for both working panes and both selection panes, which is
     // what the preferred width is: 960 of working area, 180 of selection
@@ -1230,8 +1255,12 @@ export component MainWindow inherits Window {
         vehicle-divider: root.vehicle-divider;
         moc-list-percent: root.moc-list-percent;
         vehicle-list-percent: root.vehicle-list-percent;
-        payload-list-divider-moved(dy, tall) => { root.payload-list-divider-moved(dy, tall); }
-        vehicle-list-divider-moved(dy, tall) => { root.vehicle-list-divider-moved(dy, tall); }
+        payload-list-divider-moved(dy, tall) => {
+            root.payload-list-divider-moved(dy, tall);
+        }
+        vehicle-list-divider-moved(dy, tall) => {
+            root.vehicle-list-divider-moved(dy, tall);
+        }
         working-width: root.working-width;
         working-height: root.working-height;
         moc-ground: root.moc-ground;
@@ -1251,7 +1280,9 @@ export component MainWindow inherits Window {
         canvas-offset <=> root.canvas-offset;
         undo-clicked => { root.undo-clicked(); }
         redo-clicked => { root.redo-clicked(); }
-        place-node(name, t, sets) => { root.place-node(name, t, sets); }
+        place-node(name, t, sets) => {
+            root.place-node(name, t, sets);
+        }
         node-moved(n, dx, dy) => { root.node-moved(n, dx, dy); }
         payload-divider-moved(dx) => { root.payload-divider-moved(dx); }
         vehicle-divider-moved(dx) => { root.vehicle-divider-moved(dx); }
@@ -1309,7 +1340,8 @@ export component MainWindow inherits Window {
     }
     if root.alert-up: AlertPanel {
         width: min(self.preferred-width, root.width - 2 * Space.wide);
-        height: min(max(self.min-height, self.preferred-height), root.height - 2 * Space.wide);
+        height: min(max(self.min-height, self.preferred-height),
+                    root.height - 2 * Space.wide);
         x: (root.width - self.width) / 2;
         y: (root.height - self.height) / 2;
         border-width: 1px;
@@ -1507,8 +1539,12 @@ export component SubWindow inherits Window {
         vehicle-divider: root.vehicle-divider;
         moc-list-percent: root.moc-list-percent;
         vehicle-list-percent: root.vehicle-list-percent;
-        payload-list-divider-moved(dy, tall) => { root.payload-list-divider-moved(dy, tall); }
-        vehicle-list-divider-moved(dy, tall) => { root.vehicle-list-divider-moved(dy, tall); }
+        payload-list-divider-moved(dy, tall) => {
+            root.payload-list-divider-moved(dy, tall);
+        }
+        vehicle-list-divider-moved(dy, tall) => {
+            root.vehicle-list-divider-moved(dy, tall);
+        }
         working-width: root.working-width;
         working-height: root.working-height;
         moc-ground: root.moc-ground;
@@ -1528,7 +1564,9 @@ export component SubWindow inherits Window {
         canvas-offset <=> root.canvas-offset;
         undo-clicked => { root.undo-clicked(); }
         redo-clicked => { root.redo-clicked(); }
-        place-node(name, t, sets) => { root.place-node(name, t, sets); }
+        place-node(name, t, sets) => {
+            root.place-node(name, t, sets);
+        }
         node-moved(n, dx, dy) => { root.node-moved(n, dx, dy); }
         payload-divider-moved(dx) => { root.payload-divider-moved(dx); }
         vehicle-divider-moved(dx) => { root.vehicle-divider-moved(dx); }
@@ -1620,7 +1658,8 @@ export component GroupWindow inherits Window {
         Text {
             text: root.members.length == 0
                 ? "no payloads are in this group, so it reads nothing"
-                : root.members.length + " payload" + (root.members.length == 1 ? "" : "s")
+                : root.members.length + " payload"
+                    + (root.members.length == 1 ? "" : "s")
                     + ": " + root.members-text;
             font-size: Type.small;
             color: root.members.length == 0 ? #c0392b : #6b7280;
@@ -2105,9 +2144,13 @@ export component NodeWindow inherits Window {
                         }
                         toggled => {
                             if (f.simulated) {
-                                root.sim-attribute-set(f.name, self.checked ? "true" : "false");
+                                root.sim-attribute-set(
+                                    f.name,
+                                    self.checked ? "true" : "false");
                             } else {
-                                root.attribute-set(f.name, self.checked ? "true" : "false");
+                                root.attribute-set(
+                                    f.name,
+                                    self.checked ? "true" : "false");
                             }
                         }
                     }

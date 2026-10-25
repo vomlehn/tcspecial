@@ -57,8 +57,14 @@ impl Answers {
     /// What is not a ping is refused and nothing is answered: an answer to it
     /// would be a message the ground could not read as one, which tells it
     /// less than the refusal, which is logged aboard.
-    pub fn give_at(&mut self, what: &str, data: &[u8], now: Duration) -> Result<(), String> {
-        let reply = ping::reply(data, now).map_err(|why| format!("{what}: {why}"))?;
+    pub fn give_at(
+        &mut self,
+        what: &str,
+        data: &[u8],
+        now: Duration,
+    ) -> Result<(), String> {
+        let reply =
+            ping::reply(data, now).map_err(|why| format!("{what}: {why}"))?;
         self.waiting.push_back(reply);
         Ok(())
     }
@@ -72,15 +78,19 @@ impl Answers {
     ///
     /// An answer that will not fit is reported and kept, as a `null` node
     /// keeps a datum: part of an answer is not a shorter answer.
-    pub fn take(&mut self, what: &str, buffer: &mut [u8]) -> Result<usize, String> {
+    pub fn take(
+        &mut self,
+        what: &str,
+        buffer: &mut [u8],
+    ) -> Result<usize, String> {
         let Some(reply) = self.waiting.front() else {
             return Ok(0);
         };
         let bytes = reply.as_bytes();
         if bytes.len() > buffer.len() {
             return Err(format!(
-                "{what}: the answer is {} bytes and the buffer holds {}: part of an \
-                 answer is not a shorter answer",
+                "{what}: the answer is {} bytes and the buffer holds {}: part \
+                 of an answer is not a shorter answer",
                 bytes.len(),
                 buffer.len()
             ));

@@ -82,38 +82,38 @@ pub const BUILT: &[&str] = &[
 // possible.
 #[cfg(all(feature = "i2c", not(target_os = "linux")))]
 compile_error!(
-    "the i2c payload type needs Linux's i2c-dev, which this platform does not have: \
-     build without the i2c feature"
+    "the i2c payload type needs Linux's i2c-dev, which this platform does not \
+     have: build without the i2c feature"
 );
 #[cfg(all(feature = "spi", not(target_os = "linux")))]
 compile_error!(
-    "the spi payload type needs Linux's spidev, which this platform does not have: \
-     build without the spi feature"
+    "the spi payload type needs Linux's spidev, which this platform does not \
+     have: build without the spi feature"
 );
 #[cfg(all(feature = "can", not(target_os = "linux")))]
 compile_error!(
-    "the can payload type needs Linux's SocketCAN, which this platform does not have: \
-     build without the can feature"
+    "the can payload type needs Linux's SocketCAN, which this platform does \
+     not have: build without the can feature"
 );
 #[cfg(all(feature = "iio", not(target_os = "linux")))]
 compile_error!(
-    "the iio payload type needs Linux's Industrial I/O subsystem, which this platform \
-     does not have: build without the iio feature"
+    "the iio payload type needs Linux's Industrial I/O subsystem, which this \
+     platform does not have: build without the iio feature"
 );
 #[cfg(all(feature = "rpmsg", not(target_os = "linux")))]
 compile_error!(
-    "the rpmsg payload type needs Linux's rpmsg character devices, which this platform \
-     does not have: build without the rpmsg feature"
+    "the rpmsg payload type needs Linux's rpmsg character devices, which this \
+     platform does not have: build without the rpmsg feature"
 );
 #[cfg(all(feature = "gpio", not(target_os = "linux")))]
 compile_error!(
-    "the gpio payload type needs Linux's GPIO character devices, which this platform \
-     does not have: build without the gpio feature"
+    "the gpio payload type needs Linux's GPIO character devices, which this \
+     platform does not have: build without the gpio feature"
 );
 #[cfg(all(feature = "hdlc", not(target_os = "linux")))]
 compile_error!(
-    "the hdlc payload type needs Linux's generic HDLC, which this platform does not \
-     have: build without the hdlc feature"
+    "the hdlc payload type needs Linux's generic HDLC, which this platform \
+     does not have: build without the hdlc feature"
 );
 
 #[cfg(test)]

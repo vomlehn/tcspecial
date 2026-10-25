@@ -47,7 +47,9 @@ class PingerTest(unittest.TestCase):
         self.vehicle.bind(("127.0.0.1", 0))
         self.vehicle.settimeout(2)
         uplink = HostPort("127.0.0.1", self.vehicle.getsockname()[1])
-        self.pinger = Pinger(uplink, HostPort("127.0.0.1", a_free_port()), clock=self.clock)
+        self.pinger = Pinger(
+            uplink, HostPort("127.0.0.1", a_free_port()), clock=self.clock
+        )
 
     def tearDown(self):
         self.pinger.close()
@@ -59,7 +61,9 @@ class PingerTest(unittest.TestCase):
 
     def test_a_ping_goes_up_numbered_and_timed(self):
         self.assertEqual(self.pinger.ping(), f"ping #1 {ping.time_text(AT)}")
-        self.assertEqual(self.the_vehicle_had(), f"ping #1 {ping.time_text(AT)}".encode())
+        self.assertEqual(
+            self.the_vehicle_had(), f"ping #1 {ping.time_text(AT)}".encode()
+        )
         self.clock.at += SECOND
         self.pinger.ping()
         self.assertEqual(ping.read_message(self.the_vehicle_had()).count, 2)
@@ -72,7 +76,10 @@ class PingerTest(unittest.TestCase):
         self.pinger.answered(ping.reply(message, answered), AT + 5_000_000)
 
         exchange = self.pinger.exchange()
-        self.assertEqual(exchange.received, f"ping #1 {ping.time_text(AT)} {ping.time_text(answered)}")
+        self.assertEqual(
+            exchange.received,
+            f"ping #1 {ping.time_text(AT)} {ping.time_text(answered)}",
+        )
         self.assertEqual(exchange.received_at, AT + 5_000_000)
         self.assertEqual(exchange.round_trip(), 5_000_000)
         self.assertEqual(exchange.up(), 3_000_000)
@@ -87,11 +94,15 @@ class PingerTest(unittest.TestCase):
         self.clock.at = AT + SECOND
         self.pinger.ping()
         exchange = self.pinger.exchange()
-        self.assertIsNone(exchange.received_at, "the answer it was about is not this ping's")
+        self.assertIsNone(
+            exchange.received_at, "the answer it was about is not this ping's"
+        )
         self.assertIsNone(exchange.round_trip())
         self.assertIsNone(exchange.up())
         self.assertIsNone(exchange.down())
-        self.assertEqual(exchange.received, received, "the last thing received is still that")
+        self.assertEqual(
+            exchange.received, received, "the last thing received is still that"
+        )
 
     def test_an_earlier_pings_answer_is_shown_and_not_timed(self):
         first = self.pinger.ping().encode()
@@ -100,14 +111,18 @@ class PingerTest(unittest.TestCase):
         self.pinger.answered(ping.reply(first, AT + 7), AT + SECOND + 9)
 
         exchange = self.pinger.exchange()
-        self.assertTrue(exchange.received.startswith("ping #1 "), exchange.received)
+        self.assertTrue(
+            exchange.received.startswith("ping #1 "), exchange.received
+        )
         self.assertIsNone(exchange.received_at, "it does not answer ping #2")
 
     def test_what_is_not_an_answer_is_shown_and_not_timed(self):
         self.pinger.ping()
         self.pinger.answered(b"hello", AT + 1)
         exchange = self.pinger.exchange()
-        self.assertTrue(exchange.received.startswith("not an answer: "), exchange.received)
+        self.assertTrue(
+            exchange.received.startswith("not an answer: "), exchange.received
+        )
         self.assertIsNone(exchange.received_at)
 
     def test_an_answer_arrives_on_the_downlink(self):
@@ -121,7 +136,9 @@ class PingerTest(unittest.TestCase):
 
 class ShowingTest(unittest.TestCase):
     def test_a_time_is_shown_to_the_nanosecond_and_utc(self):
-        self.assertEqual(precise_time((3600 + 120 + 3) * SECOND + 4), "01:02:03.000000004")
+        self.assertEqual(
+            precise_time((3600 + 120 + 3) * SECOND + 4), "01:02:03.000000004"
+        )
         self.assertEqual(precise_time(None), "--:--:--.---------")
 
     def test_an_interval_is_milliseconds_with_its_sign(self):
@@ -131,12 +148,16 @@ class ShowingTest(unittest.TestCase):
         self.assertEqual(interval(None), "--.------ ms")
 
 
-@unittest.skipUnless(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"), "no display")
+@unittest.skipUnless(
+    os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"), "no display"
+)
 class WindowTest(unittest.TestCase):
     """The window, driven as a person would drive it, with no vehicle: the
     test answers the ping itself."""
 
-    def test_pressing_ping_shows_the_ping_and_the_answer_fills_in_the_times(self):
+    def test_pressing_ping_shows_the_ping_and_the_answer_fills_in_the_times(
+        self,
+    ):
         import tkinter as tk
         from tkinter import ttk
 
@@ -146,7 +167,10 @@ class WindowTest(unittest.TestCase):
         vehicle.bind(("127.0.0.1", 0))
         vehicle.settimeout(2)
         down = a_free_port()
-        pinger = Pinger(HostPort("127.0.0.1", vehicle.getsockname()[1]), HostPort("127.0.0.1", down))
+        pinger = Pinger(
+            HostPort("127.0.0.1", vehicle.getsockname()[1]),
+            HostPort("127.0.0.1", down),
+        )
 
         class NoBeacons:
             def next_pass(self):
@@ -163,14 +187,22 @@ class WindowTest(unittest.TestCase):
 
         def mainloop(window, n=0):
             def press():
-                button = next(w for w in labels(window) if isinstance(w, ttk.Button))
+                button = next(
+                    w for w in labels(window) if isinstance(w, ttk.Button)
+                )
                 button.invoke()
                 message = vehicle.recvfrom(256)[0]
-                vehicle.sendto(ping.reply(message, ping.now()), ("127.0.0.1", down))
+                vehicle.sendto(
+                    ping.reply(message, ping.now()), ("127.0.0.1", down)
+                )
                 window.after(600, read)
 
             def read():
-                texts = [w.cget("text") for w in labels(window) if isinstance(w, ttk.Label)]
+                texts = [
+                    w.cget("text")
+                    for w in labels(window)
+                    if isinstance(w, ttk.Label)
+                ]
                 shown["texts"] = texts
                 window.destroy()
 
@@ -194,8 +226,14 @@ class WindowTest(unittest.TestCase):
             vehicle.close()
 
         texts = shown["texts"]
-        self.assertTrue(any(t.startswith("ping #1 ") and t.count(" ") == 2 for t in texts), texts)
-        self.assertTrue(any(t.startswith("ping #1 ") and t.count(" ") == 3 for t in texts), texts)
+        self.assertTrue(
+            any(t.startswith("ping #1 ") and t.count(" ") == 2 for t in texts),
+            texts,
+        )
+        self.assertTrue(
+            any(t.startswith("ping #1 ") and t.count(" ") == 3 for t in texts),
+            texts,
+        )
         self.assertTrue(any(t.endswith(" ms") for t in texts), texts)
 
 

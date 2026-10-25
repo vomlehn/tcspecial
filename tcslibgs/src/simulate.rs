@@ -152,7 +152,11 @@ pub struct Judged {
 }
 
 impl Judged {
-    pub fn stand_in(found: String, attribute: &'static str, to_stand_in: &'static str) -> Judged {
+    pub fn stand_in(
+        found: String,
+        attribute: &'static str,
+        to_stand_in: &'static str,
+    ) -> Judged {
         Judged {
             verdict: Verdict::StandIn,
             found,
@@ -161,7 +165,11 @@ impl Judged {
         }
     }
 
-    pub fn hardware(found: String, attribute: &'static str, to_stand_in: &'static str) -> Judged {
+    pub fn hardware(
+        found: String,
+        attribute: &'static str,
+        to_stand_in: &'static str,
+    ) -> Judged {
         Judged {
             verdict: Verdict::Hardware,
             found,
@@ -183,7 +191,11 @@ impl Judged {
         }
     }
 
-    pub fn absent(found: String, attribute: &'static str, to_stand_in: &'static str) -> Judged {
+    pub fn absent(
+        found: String,
+        attribute: &'static str,
+        to_stand_in: &'static str,
+    ) -> Judged {
         Judged {
             verdict: Verdict::Absent,
             found,
@@ -257,7 +269,11 @@ pub struct Unseen {
 
 impl Unseen {
     /// As the judgement of a payload.
-    pub fn judged(self, attribute: &'static str, to_stand_in: &'static str) -> Judged {
+    pub fn judged(
+        self,
+        attribute: &'static str,
+        to_stand_in: &'static str,
+    ) -> Judged {
         if self.absent {
             Judged::absent(self.said, attribute, to_stand_in)
         } else {
@@ -281,7 +297,9 @@ pub(crate) fn character_device(path: &str) -> Result<(u64, u64), Unseen> {
                 said: format!("nothing is at {path}"),
             })
         }
-        Err(e) => return Err(unseen(format!("{path} cannot be looked at ({e})"))),
+        Err(e) => {
+            return Err(unseen(format!("{path} cannot be looked at ({e})")))
+        }
     };
     #[cfg(unix)]
     {
@@ -355,7 +373,10 @@ pub(crate) fn pseudo_terminal(
             )
         }
         Ok((major, minor)) => Judged::hardware(
-            format!("{path} is a character device ({major}:{minor}) and not a pseudo-terminal"),
+            format!(
+                "{path} is a character device ({major}:{minor}) and not a \
+                 pseudo-terminal"
+            ),
             attribute,
             to_stand_in,
         ),
@@ -370,7 +391,8 @@ pub(crate) fn pseudo_terminal(
 /// gateway is the link the run is commanded over, set up by whoever started
 /// the ground station.
 pub fn counted(node: &Node) -> bool {
-    !is_gateway(&node.node_type) && DHType::from_spelling(&node.node_type).is_some()
+    !is_gateway(&node.node_type)
+        && DHType::from_spelling(&node.node_type).is_some()
 }
 
 /// What `node` was found to be under `mode`, where the mode counts it.
@@ -412,7 +434,8 @@ pub fn judge(host: &Host, node: &Node, mode: Mode) -> Option<Judged> {
     if reach.stand_in.is_some() && !mode.is_flight() {
         return Some(Judged {
             attribute: "stand_in",
-            to_stand_in: "give stand_in as a loopback address, such as 127.0.0.1:7950",
+            to_stand_in:
+                "give stand_in as a loopback address, such as 127.0.0.1:7950",
             ..judged
         });
     }
@@ -433,9 +456,9 @@ pub fn refusals(mode: Mode, payloads: &[(&str, &Judged)]) -> Vec<String> {
             .filter(|(_, judged)| judged.is_stand_in())
             .map(|(name, judged)| {
                 format!(
-                    "{name}: {}, a stand-in, and {flag}, the flight setting, allows \
-                     none: point {} at the hardware, or give {FLAG}=some or \
-                     {FLAG}=all for a run that is not a flight",
+                    "{name}: {}, a stand-in, and {flag}, the flight setting, \
+                     allows none: point {} at the hardware, or give \
+                     {FLAG}=some or {FLAG}=all for a run that is not a flight",
                     judged.found, judged.attribute
                 )
             })
@@ -458,25 +481,27 @@ pub fn refusals(mode: Mode, payloads: &[(&str, &Judged)]) -> Vec<String> {
             })
             .collect(),
         Mode::Some => {
-            let stand_ins = payloads.iter().filter(|(_, j)| j.is_stand_in()).count();
+            let stand_ins =
+                payloads.iter().filter(|(_, j)| j.is_stand_in()).count();
             if payloads.is_empty() {
                 vec![format!(
-                    "{flag} wants at least one payload that is a stand-in and one \
-                     that is not, and this configuration has no payloads: give \
-                     {FLAG}=all or {FLAG}=none"
+                    "{flag} wants at least one payload that is a stand-in and \
+                     one that is not, and this configuration has no payloads: \
+                     give {FLAG}=all or {FLAG}=none"
                 )]
             } else if stand_ins == 0 {
                 vec![format!(
-                    "{flag} wants at least one payload that is a stand-in, and none \
-                     of the {} is one ({}): give {FLAG}=none for a run on hardware \
-                     alone, or make one of them a stand-in",
+                    "{flag} wants at least one payload that is a stand-in, and \
+                     none of the {} is one ({}): give {FLAG}=none for a run on \
+                     hardware alone, or make one of them a stand-in",
                     payloads.len(),
                     names(payloads)
                 )]
             } else if stand_ins == payloads.len() {
                 vec![format!(
-                    "{flag} wants at least one payload that is not a stand-in, and \
-                     every one is ({}): give {FLAG}=all for a run on stand-ins alone",
+                    "{flag} wants at least one payload that is not a stand-in, \
+                     and every one is ({}): give {FLAG}=all for a run on \
+                     stand-ins alone",
                     names(payloads)
                 )]
             } else {
@@ -520,26 +545,28 @@ pub fn disagreement(
     let Some(simulate) = simulate else {
         return judged.is_stand_in().then(|| {
             format!(
-                "{name}: {found}, a stand-in, and the simulator file does not name \
-                 it: name it with simulate: true, for tcssim to control it and show \
-                 it as every other simulated payload is, or point {} at the real \
-                 device",
+                "{name}: {found}, a stand-in, and the simulator file does not \
+                 name it: name it with simulate: true, for tcssim to control \
+                 it and show it as every other simulated payload is, or point \
+                 {} at the real device",
                 judged.attribute
             )
         });
     };
     match (simulate, judged.verdict) {
-        (true, Verdict::StandIn) | (false, Verdict::Hardware | Verdict::CannotTell) => None,
+        (true, Verdict::StandIn)
+        | (false, Verdict::Hardware | Verdict::CannotTell) => None,
         (false, Verdict::Absent) => None,
         (true, Verdict::Absent) if tcssim_makes(node_type) => None,
         (true, _) => Some(format!(
-            "{name}: {found}, and the simulator file says simulate: true: {}, or say \
-             simulate: false for the real device",
+            "{name}: {found}, and the simulator file says simulate: true: {}, \
+             or say simulate: false for the real device",
             judged.to_stand_in
         )),
         (false, Verdict::StandIn) => Some(format!(
-            "{name}: {found}, a stand-in, and the simulator file says simulate: \
-             false: point {} at the real device, or say simulate: true",
+            "{name}: {found}, a stand-in, and the simulator file says \
+             simulate: false: point {} at the real device, or say simulate: \
+             true",
             judged.attribute
         )),
     }
@@ -586,10 +613,12 @@ mod tests {
     fn each_mode_is_taken_out_wherever_it_is() {
         for name in Mode::NAMES {
             let flag = format!("--simulate={name}");
-            let (mode, rest) = take_mode(args(&["tcspecial", &flag, "x.yaml"])).unwrap();
+            let (mode, rest) =
+                take_mode(args(&["tcspecial", &flag, "x.yaml"])).unwrap();
             assert_eq!(mode.name(), name);
             assert_eq!(rest, args(&["tcspecial", "x.yaml"]));
-            let (after, _) = take_mode(args(&["tcspecial", "x.yaml", &flag])).unwrap();
+            let (after, _) =
+                take_mode(args(&["tcspecial", "x.yaml", &flag])).unwrap();
             assert_eq!(after, mode);
         }
     }
@@ -633,7 +662,9 @@ mod tests {
         let (s, h) = (stand_in(), hardware());
         let said = refusals(Mode::None, &[("a", &s), ("b", &h), ("c", &s)]);
         assert_eq!(said.len(), 2, "{said:?}");
-        assert!(said[0].starts_with("a: /dev/i2c-7 is the i2c-stub's adapter, a stand-in"));
+        assert!(said[0].starts_with(
+            "a: /dev/i2c-7 is the i2c-stub's adapter, a stand-in"
+        ));
         assert!(
             said[0].contains("--simulate=some or --simulate=all"),
             "{}",
@@ -644,16 +675,18 @@ mod tests {
     }
 
     #[test]
-    fn all_refuses_each_payload_that_is_not_a_stand_in_and_says_what_could_not_be_told() {
+    fn all_refuses_each_payload_that_is_not_a_stand_in_and_says_what_could_not_be_told(
+    ) {
         let (s, h, u) = (stand_in(), hardware(), unknown());
         let said = refusals(Mode::All, &[("a", &s), ("b", &h), ("c", &u)]);
         assert_eq!(
             said,
             [
-                "b: /dev/i2c-1 is a real adapter (gmbus), and --simulate=all allows only \
-                 stand-ins: fix it",
-                "c: nothing is at /dev/i2c-9, so whether it is a stand-in cannot be told, \
-                 and --simulate=all allows only stand-ins: fix it",
+                "b: /dev/i2c-1 is a real adapter (gmbus), and --simulate=all \
+                 allows only stand-ins: fix it",
+                "c: nothing is at /dev/i2c-9, so whether it is a stand-in \
+                 cannot be told, and --simulate=all allows only stand-ins: fix \
+                 it",
             ]
         );
         assert!(refusals(Mode::All, &[("a", &s)]).is_empty());
@@ -676,7 +709,8 @@ mod tests {
     #[test]
     fn simulate_disagrees_with_hardware_and_with_a_stand_in_meant_to_be_real() {
         let (s, h, u) = (stand_in(), hardware(), unknown());
-        let absent = Judged::absent("nothing is at /tmp/ttyS9".into(), "path", "fix it");
+        let absent =
+            Judged::absent("nothing is at /tmp/ttyS9".into(), "path", "fix it");
 
         assert_eq!(disagreement("a", "i2c", Some(true), &s), None);
         assert_eq!(disagreement("a", "i2c", Some(false), &h), None);
@@ -688,7 +722,9 @@ mod tests {
         );
         assert!(said.contains("simulate: true: fix it"), "{said}");
         let said = disagreement("a", "i2c", Some(false), &s).expect("refused");
-        assert!(said.contains("a stand-in, and the simulator file says simulate: false"));
+        assert!(said.contains(
+            "a stand-in, and the simulator file says simulate: false"
+        ));
 
         // Nothing yet where tcssim makes the stand-in itself is where it is
         // about to go; nothing where the kernel's should be is not.

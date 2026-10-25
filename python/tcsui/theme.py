@@ -49,7 +49,11 @@ def use_in(window):
     style.theme_use(THEME)
     style.configure(".", background=BACKGROUND)
     style.configure(
-        "TLabelframe", background=BACKGROUND, bordercolor=BORDER, relief="solid", borderwidth=1
+        "TLabelframe",
+        background=BACKGROUND,
+        bordercolor=BORDER,
+        relief="solid",
+        borderwidth=1,
     )
     style.configure("TLabelframe.Label", background=BACKGROUND)
     style.configure(
@@ -80,7 +84,9 @@ def use_in(window):
     # By the families Tk's named fonts are in: a named font's name in a font
     # description is read as a family nobody has, and quietly becomes another.
     points = fonts.POINTS
-    text = tkinter.font.nametofont("TkDefaultFont", root=window).actual("family")
+    text = tkinter.font.nametofont("TkDefaultFont", root=window).actual(
+        "family"
+    )
     # A box's title, bold, as tcsui's TitledBox sets it.
     style.configure("TLabelframe.Label", font=(text, points, "bold"))
     style.configure("Value.TLabel", font=(text, points))

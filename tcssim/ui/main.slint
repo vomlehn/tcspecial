@@ -1,4 +1,7 @@
-import { Button, GroupBox, LineEdit, VerticalBox, HorizontalBox, SpinBox, ScrollView, GridBox } from "std-widgets.slint";
+import {
+    Button, GroupBox, LineEdit, VerticalBox, HorizontalBox, SpinBox,
+    ScrollView, GridBox
+} from "std-widgets.slint";
 import { Copyable, CopyButton } from "../../tcsverify/ui/copy.slint";
 import { Fonts } from "../../tcsui/ui/fonts.slint";
 import { Colors } from "../../tcsui/ui/colors.slint";
@@ -111,7 +114,9 @@ component PayloadPanel inherits Rectangle {
                             color: #c00000;
                         }
                         CopyButton {
-                            said: payload-name + ": these sizes cannot be sent\n" + sizes-problem;
+                            said: payload-name
+                                + ": these sizes cannot be sent\n"
+                                + sizes-problem;
                         }
                     }
                     Copyable {
@@ -216,7 +221,11 @@ component PayloadPanel inherits Rectangle {
         HorizontalLayout {
             min-height: 30px;
             spacing: 6px;
-            Text { text: "Pkt:"; vertical-alignment: center; font-size: Fonts.window; }
+            Text {
+                text: "Pkt:";
+                vertical-alignment: center;
+                font-size: Fonts.window;
+            }
             SpinBox {
                 value: packet-size;
                 minimum: 1;
@@ -234,7 +243,11 @@ component PayloadPanel inherits Rectangle {
                     }
                 }
             }
-            Text { text: "Seg:"; vertical-alignment: center; font-size: Fonts.window; }
+            Text {
+                text: "Seg:";
+                vertical-alignment: center;
+                font-size: Fonts.window;
+            }
             SpinBox {
                 value: segment-size;
                 minimum: 1;
@@ -257,14 +270,22 @@ component PayloadPanel inherits Rectangle {
         HorizontalLayout {
             min-height: 30px;
             spacing: 6px;
-            Text { text: "Pkt Int:"; vertical-alignment: center; font-size: Fonts.window; }
+            Text {
+                text: "Pkt Int:";
+                vertical-alignment: center;
+                font-size: Fonts.window;
+            }
             SpinBox {
                 value: packet-interval;
                 minimum: 0;
                 maximum: 10000;
                 edited(v) => { packet-interval-edited(v); }
             }
-            Text { text: "Seg Int:"; vertical-alignment: center; font-size: Fonts.window; }
+            Text {
+                text: "Seg Int:";
+                vertical-alignment: center;
+                font-size: Fonts.window;
+            }
             SpinBox {
                 value: segment-interval;
                 minimum: 0;
@@ -330,7 +351,10 @@ component PayloadPanel inherits Rectangle {
         // The three rows of data the panel ends with.
         sent-row := HorizontalLayout {
             height: 14px;
-            Text { text: "Sent: " + last-sent-time + " " + last-sent-data; font-size: Fonts.window; }
+            Text {
+                text: "Sent: " + last-sent-time + " " + last-sent-data;
+                font-size: Fonts.window;
+            }
         }
         // The line stays and its contents go, for a payload that is never
         // spoken to: a payload that sends on its own would read
@@ -352,7 +376,8 @@ component PayloadPanel inherits Rectangle {
         packets-row := HorizontalLayout {
             height: 14px;
             if triggered : Text {
-                text: "Pkts: " + packets-sent + " sent / " + packets-recv + " recv";
+                text: "Pkts: " + packets-sent + " sent / "
+                    + packets-recv + " recv";
                 font-size: Fonts.window;
             }
             if !triggered : Text {
@@ -482,15 +507,16 @@ export component MainWindow inherits Window {
                     spacing: 0px;
                     height: payload-model.length == 0
                         ? 0px
-                        : Math.ceil(payload-model.length / columns) * panel-height;
+                        : Math.ceil(payload-model.length / columns)
+                            * panel-height;
 
                     for p[i] in payload-model: PayloadPanel {
                         row: Math.floor(i / columns);
                         col: Math.mod(i, columns);
                         // A minimum rather than a size: the window opens at
-                        // exactly this, and the layout stretches the panels if it
-                        // is made larger. Below it the two spin boxes on a row
-                        // stop fitting side by side.
+                        // exactly this, and the layout stretches the panels if
+                        // it is made larger. Below it the two spin boxes on a
+                        // row stop fitting side by side.
                         min-width: panel-width;
                         min-height: panel-height;
 
@@ -514,23 +540,29 @@ export component MainWindow inherits Window {
 
                         transfer-clicked => { transfer-payload(i); }
 
-                        // An edit changes the model, so the spin box keeps showing
-                        // it, and then tells Rust the whole set for this payload.
+                        // An edit changes the model, so the spin box keeps
+                        // showing it, and then tells Rust the whole set for
+                        // this payload.
                         packet-size-edited(v) => {
                             payload-model[i].packet-size = v;
-                            config-payload(i, v, p.segment-size, p.packet-interval, p.segment-interval);
+                            config-payload(i, v, p.segment-size,
+                                           p.packet-interval,
+                                           p.segment-interval);
                     }
                     segment-size-edited(v) => {
                         payload-model[i].segment-size = v;
-                        config-payload(i, p.packet-size, v, p.packet-interval, p.segment-interval);
+                        config-payload(i, p.packet-size, v, p.packet-interval,
+                                       p.segment-interval);
                     }
                     packet-interval-edited(v) => {
                         payload-model[i].packet-interval = v;
-                        config-payload(i, p.packet-size, p.segment-size, v, p.segment-interval);
+                        config-payload(i, p.packet-size, p.segment-size, v,
+                                       p.segment-interval);
                     }
                     segment-interval-edited(v) => {
                         payload-model[i].segment-interval = v;
-                        config-payload(i, p.packet-size, p.segment-size, p.packet-interval, v);
+                        config-payload(i, p.packet-size, p.segment-size,
+                                       p.packet-interval, v);
                     }
                     }
                 }

@@ -244,17 +244,22 @@ impl End {
                             Err(io::Error::new(
                                 io::ErrorKind::UnexpectedEof,
                                 format!(
-                                    "the interface ended {} bytes into a packet",
+                                    "the interface ended {} bytes into a \
+                                     packet",
                                     self.got.len()
                                 ),
                             ))
                         };
                     }
                     Ok(some) => self.got.extend_from_slice(&byte[..some]),
-                    Err(e) if e.kind() == io::ErrorKind::WouldBlock => return Ok(Filled::Nothing),
+                    Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                        return Ok(Filled::Nothing)
+                    }
                     // What a signal leaves behind: nothing has been lost, so
                     // the read is made again.
-                    Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                    Err(e) if e.kind() == io::ErrorKind::Interrupted => {
+                        continue
+                    }
                     Err(e) => return Err(e),
                 }
             }
@@ -283,7 +288,10 @@ impl End {
     ///
     /// For a tool and for a test, which have nothing else to do until the
     /// program answers. `None` waits as long as it takes.
-    fn read_waiting(&mut self, how_long: Option<Duration>) -> io::Result<Arrived> {
+    fn read_waiting(
+        &mut self,
+        how_long: Option<Duration>,
+    ) -> io::Result<Arrived> {
         let deadline = how_long.map(|how_long| Instant::now() + how_long);
         loop {
             match self.read_now()? {
@@ -294,7 +302,8 @@ impl End {
             let left = match deadline {
                 None => None,
                 Some(deadline) => {
-                    let left = deadline.saturating_duration_since(Instant::now());
+                    let left =
+                        deadline.saturating_duration_since(Instant::now());
                     if left.is_zero() {
                         return Err(io::Error::new(
                             io::ErrorKind::TimedOut,
@@ -325,7 +334,11 @@ impl End {
         written
     }
 
-    fn write_framed(&mut self, whole: &mut Vec<u8>, data: &[u8]) -> io::Result<()> {
+    fn write_framed(
+        &mut self,
+        whole: &mut Vec<u8>,
+        data: &[u8],
+    ) -> io::Result<()> {
         packet::write(whole, data)?;
 
         let mut gone = 0;
@@ -353,7 +366,11 @@ impl End {
     /// `poll` on the one descriptor, because a non-blocking socket with
     /// nothing on it has to be waited for somehow and a sleeping loop would
     /// answer late by however long it slept.
-    fn ready(&self, for_what: libc::c_short, how_long: Option<Duration>) -> io::Result<()> {
+    fn ready(
+        &self,
+        for_what: libc::c_short,
+        how_long: Option<Duration>,
+    ) -> io::Result<()> {
         let mut asking = libc::pollfd {
             fd: self.socket.as_raw_fd(),
             events: for_what,
@@ -362,7 +379,9 @@ impl End {
         let waiting = match how_long {
             // Milliseconds, rounded up, because `poll` counts in those: a
             // wait rounded down to nothing would be a loop that spins.
-            Some(how_long) => how_long.as_millis().min(i32::MAX as u128).max(1) as i32,
+            Some(how_long) => {
+                how_long.as_millis().min(i32::MAX as u128).max(1) as i32
+            }
             None => -1,
         };
         loop {
@@ -421,17 +440,22 @@ pub fn start(
     arguments: &[String],
     supports: Supports,
 ) -> Result<Running, String> {
-    let named = |what: &str, e: io::Error| format!("{}: {what}: {e}", executable.display());
+    let named = |what: &str, e: io::Error| {
+        format!("{}: {what}: {e}", executable.display())
+    };
 
     let payload = supports
         .payload
-        .then(|| UnixStream::pair().map_err(|e| named("the payload interface", e)))
+        .then(|| {
+            UnixStream::pair().map_err(|e| named("the payload interface", e))
+        })
         .transpose()?;
     let moc = supports
         .moc
         .then(|| UnixStream::pair().map_err(|e| named("the MOC interface", e)))
         .transpose()?;
-    let errors = UnixStream::pair().map_err(|e| named("the error interface", e))?;
+    let errors =
+        UnixStream::pair().map_err(|e| named("the error interface", e))?;
 
     let mut command = Command::new(executable);
     command.args(arguments);
@@ -478,7 +502,8 @@ pub fn start(
     })?;
 
     let end = |socket: UnixStream, which: &str| {
-        End::of(socket).map_err(|e| named(&format!("{which} would not be made ready"), e))
+        End::of(socket)
+            .map_err(|e| named(&format!("{which} would not be made ready"), e))
     };
     Ok(Running {
         child,
@@ -534,7 +559,10 @@ impl Running {
     }
 
     /// The same, into `out`, allocating nothing: what the fabric reads with.
-    pub fn read_moc_now_into(&mut self, out: &mut [u8]) -> Result<ReadInto, String> {
+    pub fn read_moc_now_into(
+        &mut self,
+        out: &mut [u8],
+    ) -> Result<ReadInto, String> {
         let end = Self::held(&mut self.payload, Interface::Payload)?;
         end.read_now_into(out)
             .map_err(|e| said(Interface::Payload, "read", e))
@@ -561,7 +589,10 @@ impl Running {
     }
 
     /// The same, into `out`, allocating nothing: what the fabric reads with.
-    pub fn read_payload_now_into(&mut self, out: &mut [u8]) -> Result<ReadInto, String> {
+    pub fn read_payload_now_into(
+        &mut self,
+        out: &mut [u8],
+    ) -> Result<ReadInto, String> {
         let end = Self::held(&mut self.moc, Interface::Moc)?;
         end.read_now_into(out)
             .map_err(|e| said(Interface::Moc, "read", e))
@@ -604,8 +635,9 @@ impl Running {
             .into_iter()
             .flatten()
         {
-            end.no_more()
-                .map_err(|e| format!("an app's interface would not be shut down: {e}"))?;
+            end.no_more().map_err(|e| {
+                format!("an app's interface would not be shut down: {e}")
+            })?;
         }
         Ok(())
     }
@@ -619,9 +651,9 @@ impl Running {
 
     /// Whether it has stopped, without waiting for it to.
     pub fn stopped(&mut self) -> Result<Option<ExitStatus>, String> {
-        self.child
-            .try_wait()
-            .map_err(|e| format!("an app could not be asked whether it has stopped: {e}"))
+        self.child.try_wait().map_err(|e| {
+            format!("an app could not be asked whether it has stopped: {e}")
+        })
     }
 
     /// Stop the app, whatever it is doing.
@@ -639,7 +671,10 @@ impl Running {
     /// what its kind supports -- see `tcspecial::node` -- and here all the
     /// same, because this end of an interface is held in a structure and a
     /// structure cannot refuse at compile time what a type can.
-    fn held(end: &mut Option<End>, interface: Interface) -> Result<&mut End, String> {
+    fn held(
+        end: &mut Option<End>,
+        interface: Interface,
+    ) -> Result<&mut End, String> {
         end.as_mut().ok_or_else(|| {
             format!(
                 "this app does not support {}, on which {}: it was started \
@@ -657,7 +692,10 @@ impl Running {
 /// `None` is the interface having ended. A wait that was up is an error, and
 /// says so: a caller that asked to be told within a time and was not has
 /// learned something about the program.
-fn waited(answer: io::Result<Arrived>, interface: Interface) -> Result<Option<Vec<u8>>, String> {
+fn waited(
+    answer: io::Result<Arrived>,
+    interface: Interface,
+) -> Result<Option<Vec<u8>>, String> {
     match answer {
         Ok(Arrived::Packet(data)) => Ok(Some(data)),
         Ok(Arrived::Ended) => Ok(None),
@@ -723,7 +761,12 @@ mod tests {
                 note();
                 System.alloc_zeroed(layout)
             }
-            unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, size: usize) -> *mut u8 {
+            unsafe fn realloc(
+                &self,
+                ptr: *mut u8,
+                layout: Layout,
+                size: usize,
+            ) -> *mut u8 {
                 note();
                 System.realloc(ptr, layout, size)
             }
@@ -761,7 +804,8 @@ mod tests {
             );
             end.write_all(b"1").expect("a packet written");
             let mut whole = [0u8; packet::LENGTH + 1];
-            std::io::Read::read_exact(theirs, &mut whole).expect("the program reads");
+            std::io::Read::read_exact(theirs, &mut whole)
+                .expect("the program reads");
             read_back[..1].copy_from_slice(&whole[packet::LENGTH..]);
         };
 

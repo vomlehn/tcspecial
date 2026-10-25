@@ -23,9 +23,10 @@ use std::time::Duration;
 use tcslibgs::config_digest::{digest_of_file, ConfigVersion};
 use tcslibgs::node::vehicle::ping;
 use tcslibgs::{
-    Beacon, CommandStatus, ConfigTelemetry, ConnectTelemetry, DHSample, NodeCounts, PingTelemetry,
-    QueryNodeSampleTelemetry, QueryNodeTelemetry, Reason, RestartArmTelemetry, RestartTelemetry,
-    SetNodeTelemetry, Telemetry, Timestamp,
+    Beacon, CommandStatus, ConfigTelemetry, ConnectTelemetry, DHSample,
+    NodeCounts, PingTelemetry, QueryNodeSampleTelemetry, QueryNodeTelemetry,
+    Reason, RestartArmTelemetry, RestartTelemetry, SetNodeTelemetry, Telemetry,
+    Timestamp,
 };
 
 fn here() -> PathBuf {
@@ -138,7 +139,8 @@ fn against_a_vehicle(program: &Path) -> String {
             .set_read_timeout(Some(Duration::from_millis(100)))
             .expect("a timeout");
     }
-    let (beacons, ground_data, cmd_from, nodes_from) = (free(), free(), free(), free());
+    let (beacons, ground_data, cmd_from, nodes_from) =
+        (free(), free(), free(), free());
 
     let dir = tempfile::tempdir().expect("a directory");
     let configuration = dir.path().join("ground.yaml");
@@ -204,14 +206,18 @@ vehicle:
             let mut answered = Vec::new();
             while !stop.load(Ordering::Relaxed) {
                 sequence += 1;
-                let datagram = Beacon::new(sequence, version, digest).to_bytes();
+                let datagram =
+                    Beacon::new(sequence, version, digest).to_bytes();
                 let _ = beacon.send_to(&datagram, ("127.0.0.1", beacons));
 
                 // A ping, answered as the ping node answers it, down to where
                 // the ground takes the ping node's data.
                 if let Ok((size, _)) = uplink.recv_from(&mut buffer) {
-                    let answer = ping::reply(&buffer[..size], ping::now().expect("a clock"))
-                        .expect("it is a ping");
+                    let answer = ping::reply(
+                        &buffer[..size],
+                        ping::now().expect("a clock"),
+                    )
+                    .expect("it is a ping");
                     sender
                         .send_to(answer.as_bytes(), ("127.0.0.1", ground_data))
                         .expect("the answer");
@@ -222,16 +228,17 @@ vehicle:
                         continue;
                     };
                     let command: tcslibgs::Command =
-                        serde_json::from_slice(&buffer[..size]).expect("a command");
+                        serde_json::from_slice(&buffer[..size])
+                            .expect("a command");
                     let seq = command.sequence();
                     answered.push(command.cmd_type());
                     let answer = match &command {
-                        tcslibgs::Command::Connect(_) => {
-                            Telemetry::Connect(ConnectTelemetry::new(seq, version, digest))
-                        }
-                        tcslibgs::Command::Ping(_) => {
-                            Telemetry::Ping(PingTelemetry::new(seq, CommandStatus::Success))
-                        }
+                        tcslibgs::Command::Connect(_) => Telemetry::Connect(
+                            ConnectTelemetry::new(seq, version, digest),
+                        ),
+                        tcslibgs::Command::Ping(_) => Telemetry::Ping(
+                            PingTelemetry::new(seq, CommandStatus::Success),
+                        ),
                         tcslibgs::Command::QueryNode(cmd) => {
                             Telemetry::QueryNode(QueryNodeTelemetry::new(
                                 seq,
@@ -244,10 +251,15 @@ vehicle:
                         // Refused as the vehicle refuses one, with its
                         // reason: which the ground station prints.
                         tcslibgs::Command::SetNode(cmd) => Telemetry::SetNode(
-                            SetNodeTelemetry::new(seq, CommandStatus::InvalidParameter, cmd.node)
-                                .because(Reason::of(
-                                    "no command binding says the ground may set \"ping.count\"",
-                                )),
+                            SetNodeTelemetry::new(
+                                seq,
+                                CommandStatus::InvalidParameter,
+                                cmd.node,
+                            )
+                            .because(Reason::of(
+                                "no command binding says the ground may set \
+                                \"ping.count\"",
+                            )),
                         ),
                         tcslibgs::Command::QueryNodeSample(cmd) => {
                             // What it took: "ping", four bytes of a transfer
@@ -257,24 +269,32 @@ vehicle:
                             taken.len = 4;
                             taken.total = 6;
                             taken.bytes[..4].copy_from_slice(b"ping");
-                            Telemetry::QueryNodeSample(QueryNodeSampleTelemetry::new(
+                            Telemetry::QueryNodeSample(
+                                QueryNodeSampleTelemetry::new(
+                                    seq,
+                                    CommandStatus::Success,
+                                    cmd.node,
+                                    taken,
+                                    DHSample::new(),
+                                ),
+                            )
+                        }
+                        tcslibgs::Command::Config(_) => Telemetry::Config(
+                            ConfigTelemetry::new(seq, CommandStatus::Success),
+                        ),
+                        tcslibgs::Command::RestartArm(_) => {
+                            Telemetry::RestartArm(RestartArmTelemetry::new(
                                 seq,
                                 CommandStatus::Success,
-                                cmd.node,
-                                taken,
-                                DHSample::new(),
                             ))
                         }
-                        tcslibgs::Command::Config(_) => {
-                            Telemetry::Config(ConfigTelemetry::new(seq, CommandStatus::Success))
-                        }
-                        tcslibgs::Command::RestartArm(_) => Telemetry::RestartArm(
-                            RestartArmTelemetry::new(seq, CommandStatus::Success),
+                        tcslibgs::Command::Restart(_) => Telemetry::Restart(
+                            RestartTelemetry::new(seq, CommandStatus::Success),
                         ),
-                        tcslibgs::Command::Restart(_) => {
-                            Telemetry::Restart(RestartTelemetry::new(seq, CommandStatus::Success))
-                        }
-                        other => panic!("the ground station sent {:?}", other.cmd_type()),
+                        other => panic!(
+                            "the ground station sent {:?}",
+                            other.cmd_type()
+                        ),
                     };
                     let data = serde_json::to_vec(&answer).expect("telemetry");
                     link.send_to(&data, from).expect("an answer");
@@ -283,7 +303,10 @@ vehicle:
                     // would from a node that is running.
                     if matches!(command, tcslibgs::Command::QueryNode(_)) {
                         sender
-                            .send_to(b"hello from ping", ("127.0.0.1", ground_data))
+                            .send_to(
+                                b"hello from ping",
+                                ("127.0.0.1", ground_data),
+                            )
                             .expect("the datum");
                     }
                 }
@@ -331,14 +354,17 @@ vehicle:
         "connect: agrees".to_string(),
         "ping: answered".to_string(),
         "query ping (node 1): Success, running".to_string(),
-        "set ping count: refused -- no command binding says the ground may set \"ping.count\""
+        "set ping count: refused -- no command binding says the ground \
+        may set \"ping.count\""
             .to_string(),
         "sample ping: took \"ping\" of 6 bytes, gave nothing".to_string(),
         "configure: beacon every 5 s, done".to_string(),
         "restart: armed done, restarted done".to_string(),
         "ping ping through moc: sent".to_string(),
         "data from ping: hello from ping".to_string(),
-        "ping ping: answered, round trip timed, up and down summing to it yes".to_string(),
+        "ping ping: answered, round trip timed, up and down summing to it \
+        yes"
+        .to_string(),
     ];
     let lines: Vec<&str> = printed.lines().collect();
     assert_eq!(lines, expected, "{}", program.display());
@@ -385,7 +411,9 @@ fn the_header_stands_alone_in_c_and_in_cpp() {
         "#include \"tcs.h\"\nint main(void) { return 0; }\n",
     )
     .expect("written");
-    for (compiler, language, standard) in [("gcc", "c", "-std=c99"), ("g++", "c++", "-std=c++11")] {
+    for (compiler, language, standard) in
+        [("gcc", "c", "-std=c99"), ("g++", "c++", "-std=c++11")]
+    {
         let ran = Command::new(compiler)
             .args([
                 "-x",
@@ -410,7 +438,10 @@ fn the_header_stands_alone_in_c_and_in_cpp() {
                 String::from_utf8_lossy(&ran.stderr)
             ),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                eprintln!("there is no {compiler}, so the header is not compiled as {language}")
+                eprintln!(
+                    "there is no {compiler}, so the header is not compiled \
+                    as {language}"
+                )
             }
             Err(e) => panic!("{compiler} could not be run: {e}"),
         }

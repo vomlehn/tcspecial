@@ -5813,7 +5813,11 @@ information is provided to the Rust Socket::new() interface as follows:
 
    use socket2::{Domain, Type, Protocol, Socket};
 
-   pub fn new(domain: Domain, type_: Type, protocol: Option<Protocol>) -> io::Result<Socket>
+   pub fn new(
+       domain: Domain,
+       type_: Type,
+       protocol: Option<Protocol>,
+   ) -> io::Result<Socket>
 
 
 What a ``network`` node takes today is one of five protocols, named by its
@@ -6070,7 +6074,8 @@ Requirement
     before the types were made optional, and a build for a target says what
     it flies::
 
-       cargo build -p tcspecial --release --no-default-features --features serial,i2c
+       cargo build -p tcspecial --release --no-default-features \
+           --features serial,i2c
 
 Requirement
     The types a build contains are listed in one place, made from those
@@ -8730,7 +8735,8 @@ Requirement
     This is the harness for a run started by hand::
 
        tcssim --simulate=all x.yaml x-sim.yaml &
-       tcssim --wait --simulate=all x.yaml x-sim.yaml && tcspecial --simulate=all x.yaml
+       tcssim --wait --simulate=all x.yaml x-sim.yaml &&
+           tcspecial --simulate=all x.yaml
 
 Requirement
     Under ``none`` there is nothing to wait for: tcssim refuses to start, and

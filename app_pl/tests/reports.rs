@@ -29,7 +29,8 @@ fn arguments() -> Vec<String> {
 /// whose telemetry arrived under the wrong name.
 #[test]
 fn readings_arrive_without_being_asked() {
-    let mut running = parent::start(&app(), &arguments(), Supports::MOC).expect("it starts");
+    let mut running =
+        parent::start(&app(), &arguments(), Supports::MOC).expect("it starts");
 
     assert_eq!(
         running.read_payload().expect("a reading"),
@@ -53,7 +54,8 @@ fn readings_arrive_without_being_asked() {
 /// interface payload data is written on is the other one.
 #[test]
 fn the_interface_it_has_not_got_cannot_be_reached() {
-    let mut running = parent::start(&app(), &arguments(), Supports::MOC).expect("it starts");
+    let mut running =
+        parent::start(&app(), &arguments(), Supports::MOC).expect("it starts");
 
     let said = running
         .write_payload(b"293.15")
@@ -73,7 +75,8 @@ fn the_interface_it_has_not_got_cannot_be_reached() {
 /// goes.
 #[test]
 fn run_as_a_kind_it_is_not_it_refuses_and_says_why() {
-    let mut running = parent::start(&app(), &arguments(), Supports::ALL).expect("it starts");
+    let mut running =
+        parent::start(&app(), &arguments(), Supports::ALL).expect("it starts");
 
     let said = running
         .read_complaint()
@@ -94,7 +97,8 @@ fn run_as_a_kind_it_is_not_it_refuses_and_says_why() {
 #[test]
 fn run_with_the_wrong_arguments_it_refuses_and_says_why() {
     let mut running =
-        parent::start(&app(), &["bay".to_string()], Supports::MOC).expect("it starts");
+        parent::start(&app(), &["bay".to_string()], Supports::MOC)
+            .expect("it starts");
 
     let said = running
         .read_complaint()

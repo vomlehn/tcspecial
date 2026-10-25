@@ -25,7 +25,8 @@ configfs="/sys/kernel/config"
 gpio_sim="$configfs/gpio-sim"
 
 if [ "$(id -u)" -ne 0 ]; then
-	echo "rmgpio: re-running under sudo, which is what unloading a module needs"
+	echo "rmgpio: re-running under sudo, which is what unloading a module" \
+		"needs"
 	exec sudo -- "$0" "$@"
 fi
 
@@ -35,12 +36,14 @@ fi
 if [ -d "$gpio_sim/$sim_device" ]; then
 	echo "rmgpio: removing the simulated GPIO chip"
 
-	# A live device cannot be removed and its bank cannot go before it is not
-	# live, so the order matters: stop it, take the bank, take the device.
+	# A live device cannot be removed and its bank cannot go before it is
+	# not live, so the order matters: stop it, take the bank, take the
+	# device.
 	if [ -w "$gpio_sim/$sim_device/live" ]; then
 		echo 0 > "$gpio_sim/$sim_device/live"
 	fi
-	[ -d "$gpio_sim/$sim_device/$sim_bank" ] && rmdir "$gpio_sim/$sim_device/$sim_bank"
+	[ -d "$gpio_sim/$sim_device/$sim_bank" ] &&
+		rmdir "$gpio_sim/$sim_device/$sim_bank"
 	rmdir "$gpio_sim/$sim_device"
 else
 	echo "rmgpio: no simulated GPIO chip of ours to remove"
@@ -56,7 +59,8 @@ fi
 if [ -d /sys/module/gpio_sim ]; then
 	if [ -z "$(ls -A "$gpio_sim" 2>/dev/null)" ]; then
 		echo "rmgpio: unloading gpio-sim, which now holds no chips"
-		modprobe -r gpio-sim || echo "rmgpio: gpio-sim is in use, so it stays loaded"
+		modprobe -r gpio-sim ||
+			echo "rmgpio: gpio-sim is in use, so it stays loaded"
 	else
 		echo "rmgpio: gpio-sim holds another chip, so it stays loaded"
 	fi

@@ -29,8 +29,9 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, could_not_stand_in, ignore_this_request, lateness, send_in_segments, wait_out_packet,
-    wait_while_running, Pacing, PayloadConfig, PayloadStats, Produce,
+    a_packet, could_not_stand_in, ignore_this_request, lateness,
+    send_in_segments, wait_out_packet, wait_while_running, Pacing,
+    PayloadConfig, PayloadStats, Produce,
 };
 use crate::pty::SimulatedNode;
 
@@ -117,7 +118,11 @@ mod tests {
     use tcslibgs::Faults;
 
     /// A channel the handler would open at `path`.
-    fn channel_at(path: &str, triggered: bool, interval_ms: u32) -> PayloadConfig {
+    fn channel_at(
+        path: &str,
+        triggered: bool,
+        interval_ms: u32,
+    ) -> PayloadConfig {
         PayloadConfig {
             thermal: None,
             name: "remote".to_string(),
@@ -155,7 +160,8 @@ mod tests {
         let got = (0..100)
             .find_map(|_| {
                 std::thread::sleep(Duration::from_millis(20));
-                let mut file = OpenOptions::new().read(true).open(&path).ok()?;
+                let mut file =
+                    OpenOptions::new().read(true).open(&path).ok()?;
                 let mut buffer = [0u8; 64];
                 match file.read(&mut buffer) {
                     Ok(n) if n > 0 => Some(n),
@@ -242,8 +248,13 @@ mod tests {
             // return a status.
             let flags = unsafe { libc::fcntl(self.as_raw_fd(), libc::F_GETFL) };
             if flags < 0
-                || unsafe { libc::fcntl(self.as_raw_fd(), libc::F_SETFL, flags | libc::O_NONBLOCK) }
-                    < 0
+                || unsafe {
+                    libc::fcntl(
+                        self.as_raw_fd(),
+                        libc::F_SETFL,
+                        flags | libc::O_NONBLOCK,
+                    )
+                } < 0
             {
                 return Err(std::io::Error::last_os_error());
             }

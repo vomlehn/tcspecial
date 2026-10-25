@@ -47,8 +47,8 @@ fn main() -> ExitCode {
             Ok(Some(data)) => {
                 if let Err(e) = payload.write_moc(&data) {
                     let _ = errors.say(&format!(
-                        "app_payload_veh {name}: {} bytes of MOC data could not \
-                         be written: {e}",
+                        "app_payload_veh {name}: {} bytes of MOC data could \
+                         not be written: {e}",
                         data.len()
                     ));
                     return ExitCode::FAILURE;
@@ -59,7 +59,8 @@ fn main() -> ExitCode {
             Ok(None) => return ExitCode::SUCCESS,
             Err(e) => {
                 let _ = errors.say(&format!(
-                    "app_payload_veh {name}: payload data could not be read: {e}"
+                    "app_payload_veh {name}: payload data could not be read: \
+                     {e}"
                 ));
                 return ExitCode::FAILURE;
             }

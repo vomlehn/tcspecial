@@ -3,7 +3,8 @@
 //! ```text
 //! tcsverify tests/manual/tcspecial2.yaml
 //! tcsverify tests/manual/tcspecial2.yaml tests/manual/tcspecial2sim.yaml
-//! tcsverify tests/manual/tcspecial2.xml tests/manual/tcspecial2.yaml tests/manual/tcspecial2sim.yaml
+//! tcsverify tests/manual/tcspecial2.xml tests/manual/tcspecial2.yaml \
+//!     tests/manual/tcspecial2sim.yaml
 //! tcsverify --digest tests/manual/tcspecial2.yaml
 //! ```
 //!
@@ -25,8 +26,10 @@ use std::process::ExitCode;
 /// a number of its own: a script that treats "no files named" as "the files
 /// are bad" would be reporting a configuration error that nobody wrote.
 const USAGE: &str = "\
-usage: tcsverify [options] <tcspecial configuration file> [payload simulator file]
-       tcsverify [options] <configuration> <configuration> <payload simulator file>
+usage: tcsverify [options] <tcspecial configuration file> \
+[payload simulator file]
+       tcsverify [options] <configuration> <configuration> \
+<payload simulator file>
        tcsverify -h | --help
 
 Checks the files and prints the problems it finds, each as
@@ -129,7 +132,9 @@ fn main() -> ExitCode {
 
     let report = match files.as_slice() {
         [payload] => tcsverify::verify_built(payload, None, limits, &built),
-        [payload, sim] => tcsverify::verify_built(payload, Some(sim), limits, &built),
+        [payload, sim] => {
+            tcsverify::verify_built(payload, Some(sim), limits, &built)
+        }
         [first, second, sim] => {
             if let Err(why) = one_of_each(first, second) {
                 eprintln!("tcsverify: {why}\n\n{USAGE}");
@@ -160,7 +165,9 @@ fn main() -> ExitCode {
         for path in configurations(&files) {
             match tcslibgs::config_digest::digest_of_file(path) {
                 Ok(said) => {
-                    if let Err(e) = writeln!(out, "{}: md5 {said}", path.display()) {
+                    if let Err(e) =
+                        writeln!(out, "{}: md5 {said}", path.display())
+                    {
                         eprintln!("tcsverify: cannot write the digest: {e}");
                         return ExitCode::from(2);
                     }
@@ -173,7 +180,10 @@ fn main() -> ExitCode {
                 // without this the run would end silently and successfully
                 // having answered nothing.
                 Err(why) => {
-                    eprintln!("tcsverify: {}: no digest: {why}", path.display());
+                    eprintln!(
+                        "tcsverify: {}: no digest: {why}",
+                        path.display()
+                    );
                     digest_failed = true;
                 }
             }
@@ -196,9 +206,14 @@ fn main() -> ExitCode {
                 first.display(),
                 second.display()
             ),
-            _ => format!("{}, which has problems of its own", payload.display()),
+            _ => {
+                format!("{}, which has problems of its own", payload.display())
+            }
         };
-        eprintln!("tcsverify: the simulator file was read but not checked against {against}");
+        eprintln!(
+            "tcsverify: the simulator file was read but not checked \
+             against {against}"
+        );
     }
 
     if digest_failed {
@@ -234,8 +249,8 @@ fn error_limit(value: &str) -> Result<Option<usize>, String> {
     }
     value.parse::<usize>().map(Some).map_err(|_| {
         format!(
-            "{ERROR_LIMIT_FLAG}{value}: the limit is a whole number, 0 included, \
-             or \"unlimited\""
+            "{ERROR_LIMIT_FLAG}{value}: the limit is a whole number, \
+             0 included, or \"unlimited\""
         )
     })
 }
@@ -256,14 +271,19 @@ fn warnings(value: &str) -> Result<tcsverify::Warnings, String> {
 
 /// Whether two configurations are one XML file and one YAML file, in either
 /// order, which is what comparing two spellings of one configuration is.
-fn one_of_each(first: &std::path::Path, second: &std::path::Path) -> Result<(), String> {
+fn one_of_each(
+    first: &std::path::Path,
+    second: &std::path::Path,
+) -> Result<(), String> {
     use tcslibgs::ConfigFormat;
 
     let format = |path: &std::path::Path| {
-        ConfigFormat::of_file(path).map_err(|e| format!("{}: {e}", path.display()))
+        ConfigFormat::of_file(path)
+            .map_err(|e| format!("{}: {e}", path.display()))
     };
     match (format(first)?, format(second)?) {
-        (ConfigFormat::Xml, ConfigFormat::Yaml) | (ConfigFormat::Yaml, ConfigFormat::Xml) => Ok(()),
+        (ConfigFormat::Xml, ConfigFormat::Yaml)
+        | (ConfigFormat::Yaml, ConfigFormat::Xml) => Ok(()),
         _ => Err(format!(
             "{} and {} are compared as two spellings of one configuration, so \
              one must be an XML file and the other a YAML file",

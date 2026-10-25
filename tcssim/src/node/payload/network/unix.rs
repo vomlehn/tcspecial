@@ -33,8 +33,9 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, could_not_stand_in, hangs_up, ignore_this_request, lateness, send_in_segments,
-    wait_out_packet, wait_while_running, Pacing, PayloadConfig, PayloadStats, Produce,
+    a_packet, could_not_stand_in, hangs_up, ignore_this_request, lateness,
+    send_in_segments, wait_out_packet, wait_while_running, Pacing,
+    PayloadConfig, PayloadStats, Produce,
 };
 
 /// What a datagram device's own path is called, given the handler's.
@@ -77,29 +78,31 @@ fn clear_a_dead_socket(path: &Path) -> Result<(), String> {
     use std::os::unix::fs::FileTypeExt;
     if !found.file_type().is_socket() {
         return Err(format!(
-            "{} already exists and is not a socket, so the simulator will not take \
-             its place",
+            "{} already exists and is not a socket, so the simulator will not \
+             take its place",
             path.display()
         ));
     }
 
     // A datagram sent to it is the question: a live socket takes it, a dead
     // one answers that there is nothing there.
-    let probe = UnixDatagram::unbound().map_err(|e| format!("no socket to ask with: {e}"))?;
+    let probe = UnixDatagram::unbound()
+        .map_err(|e| format!("no socket to ask with: {e}"))?;
     match probe.send_to(&[], path) {
         Ok(_) => Err(format!(
-            "{} is a socket something is already listening on: another simulator, or \
-             a handler, is using that path",
+            "{} is a socket something is already listening on: another \
+             simulator, or a handler, is using that path",
             path.display()
         )),
         Err(_) => {
             eprintln!(
-                "{} is a socket nothing answers, left by a run that was killed rather \
-                 than stopped; replacing it",
+                "{} is a socket nothing answers, left by a run that was killed \
+                 rather than stopped; replacing it",
                 path.display()
             );
-            std::fs::remove_file(path)
-                .map_err(|e| format!("{} cannot be replaced: {e}", path.display()))
+            std::fs::remove_file(path).map_err(|e| {
+                format!("{} cannot be replaced: {e}", path.display())
+            })
         }
     }
 }
@@ -241,16 +244,20 @@ pub fn run_unix_dgram_node(
     // the configuration gives instead. Then this end is the one that has to
     // be findable, so it binds that path rather than one of its own.
     //
-    // The vehicle's end is unbound, so nothing arrives here from a path: see
-    // `tcspecial::node::payload::network::unix::UnixDatagramEndpoint::reaching`.
-    if config.driven || matches!(config.thermal, Some(crate::thermal::Thermal::Heats { .. })) {
+    // The vehicle's end is unbound, so nothing arrives here from a path:
+    // see `tcspecial::node::payload::network::unix::UnixDatagramEndpoint::
+    // reaching`.
+    if config.driven
+        || matches!(config.thermal, Some(crate::thermal::Thermal::Heats { .. }))
+    {
         run_driven_unix_dgram_node(config, running, stats, &handler);
         return;
     }
     // And a device that is asked waits at the path as a heater does: the
     // vehicle speaks first, with its trigger, and the answer goes back to
     // the name it asked from. The rule is the vehicle's own.
-    let speaks_first = tcslibgs::graph::interface::speaks_first(true, config.triggered);
+    let speaks_first =
+        tcslibgs::graph::interface::speaks_first(true, config.triggered);
 
     // The path this end answers from: the one the simulator file asked for,
     // or one beside the handler's. A file that says nothing gets the second,
@@ -273,7 +280,10 @@ pub fn run_unix_dgram_node(
     let socket = match UnixDatagram::bind(&mine) {
         Ok(socket) => socket,
         Err(e) => {
-            could_not_stand_in(&config, format!("failed to bind {}: {}", mine.display(), e));
+            could_not_stand_in(
+                &config,
+                format!("failed to bind {}: {}", mine.display(), e),
+            );
             return;
         }
     };
@@ -340,7 +350,9 @@ pub fn run_unix_dgram_node(
                 pacing.segment_interval,
                 &running,
                 &mut |segment| match &asker {
-                    Some(to) if !speaks_first => socket.send_to_addr(segment, to),
+                    Some(to) if !speaks_first => {
+                        socket.send_to_addr(segment, to)
+                    }
                     _ => socket.send_to(segment, &handler),
                 },
             );
@@ -393,7 +405,11 @@ fn run_driven_unix_dgram_node(
         Err(e) => {
             could_not_stand_in(
                 &config,
-                format!("failed to wait for the vehicle at {}: {}", at.display(), e),
+                format!(
+                    "failed to wait for the vehicle at {}: {}",
+                    at.display(),
+                    e
+                ),
             );
             return;
         }
@@ -431,7 +447,11 @@ fn run_driven_unix_dgram_node(
             // panel has the device switched off: what arrives is counted, as
             // every stand-in counts it, and acted on by nothing.
             if pacing.sending {
-                crate::thermal::driven(&config.thermal, &config.name, &buf[..n]);
+                crate::thermal::driven(
+                    &config.thermal,
+                    &config.name,
+                    &buf[..n],
+                );
             }
             let mut guard = stats.lock().unwrap();
             guard.a_packet_has_come(&buf[..n]);
@@ -500,7 +520,8 @@ mod tests {
         assert!(path.exists(), "{} was never bound", path.display());
 
         // Standing in for the handler.
-        let mut handler = UnixStream::connect(&path).expect("the handler connects");
+        let mut handler =
+            UnixStream::connect(&path).expect("the handler connects");
         handler
             .set_read_timeout(Some(Duration::from_secs(5)))
             .expect("a read timeout");
@@ -530,7 +551,8 @@ mod tests {
     fn a_datagram_device_sends_to_where_the_handler_waits() {
         let path = a_path("dgram");
         std::fs::remove_file(&path).ok();
-        std::fs::remove_file(a_path_of_its_own(&path.display().to_string())).ok();
+        std::fs::remove_file(a_path_of_its_own(&path.display().to_string()))
+            .ok();
 
         // Standing in for the handler, which is the end that binds.
         let handler = UnixDatagram::bind(&path).expect("the handler binds");
@@ -554,10 +576,9 @@ mod tests {
 
         device.stop();
 
-        let ended = sizes
-            .iter()
-            .position(|&n| n == 2)
-            .unwrap_or_else(|| panic!("no segment was the short last one: {sizes:?}"));
+        let ended = sizes.iter().position(|&n| n == 2).unwrap_or_else(|| {
+            panic!("no segment was the short last one: {sizes:?}")
+        });
         assert_eq!(
             &sizes[ended + 1..ended + 4],
             &[5, 5, 2][..],
@@ -698,7 +719,8 @@ mod tests {
         // of its own and may not have reached it yet.
         let vehicle = UnixDatagram::unbound().expect("the vehicle's socket");
         let deadline = Instant::now() + Duration::from_secs(5);
-        while Instant::now() < deadline && vehicle.send_to(b"1", &path).is_err() {
+        while Instant::now() < deadline && vehicle.send_to(b"1", &path).is_err()
+        {
             std::thread::sleep(Duration::from_millis(10));
         }
         vehicle
@@ -728,7 +750,8 @@ mod tests {
         drop(UnixListener::bind(&path).expect("a socket to abandon"));
         assert!(path.exists(), "the file should outlive the socket");
 
-        clear_a_dead_socket(&path).expect("a dead socket is not a reason to refuse");
+        clear_a_dead_socket(&path)
+            .expect("a dead socket is not a reason to refuse");
         assert!(!path.exists(), "it was not cleared");
     }
 
@@ -738,9 +761,11 @@ mod tests {
     fn a_live_socket_is_not_taken() {
         let path = a_path("live");
         std::fs::remove_file(&path).ok();
-        let live = UnixDatagram::bind(&path).expect("a socket that is listening");
+        let live =
+            UnixDatagram::bind(&path).expect("a socket that is listening");
 
-        let e = clear_a_dead_socket(&path).expect_err("a live socket is not ours");
+        let e =
+            clear_a_dead_socket(&path).expect_err("a live socket is not ours");
         assert!(e.contains("already listening"), "{e}");
 
         drop(live);

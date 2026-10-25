@@ -58,10 +58,12 @@ impl Qualified {
     /// it.
     pub fn parse(name: &str) -> Qualified {
         match name.split_once('/') {
-            Some((home, node)) if !home.is_empty() && !node.is_empty() => Qualified {
-                in_: Some(home.to_string()),
-                node: node.to_string(),
-            },
+            Some((home, node)) if !home.is_empty() && !node.is_empty() => {
+                Qualified {
+                    in_: Some(home.to_string()),
+                    node: node.to_string(),
+                }
+            }
             _ => Qualified {
                 in_: None,
                 node: name.to_string(),

@@ -2729,8 +2729,10 @@ tcspecial configuration first, and ``-h`` or ``--help`` prints how:
 .. code-block:: console
 
    $ cargo run --bin tcsverify -- examples/minimal/minimal.yaml
-   $ cargo run --bin tcsverify -- examples/minimal/minimal.yaml examples/minimal/minimal-sim.yaml
-   $ cargo run --bin tcsverify -- examples/minimal/minimal.xml examples/minimal/minimal-sim.yaml
+   $ cargo run --bin tcsverify -- examples/minimal/minimal.yaml \
+       examples/minimal/minimal-sim.yaml
+   $ cargo run --bin tcsverify -- examples/minimal/minimal.xml \
+       examples/minimal/minimal-sim.yaml
 
 Either spelling of the configuration will do -- the last line reads the XML of
 the same set -- and the simulator configuration is named in full rather than
@@ -2742,7 +2744,8 @@ an XML file and a YAML file, in either order, and then the simulator file.
 .. code-block:: console
 
    $ cargo run --bin tcsverify -- examples/thermostat/thermostat.xml \
-       examples/thermostat/thermostat.yaml examples/thermostat/thermostat-sim.yaml
+       examples/thermostat/thermostat.yaml \
+       examples/thermostat/thermostat-sim.yaml
 
 Each spelling is checked with the simulator file, the first named first, and
 then the two are compared: every section, every attribute and every value, as
@@ -2820,7 +2823,8 @@ payload types it names, separated by commas, and reports each node of another
 type as that tcspecial would refuse it. It takes what ``tcspecial --types``
 prints, so a configuration can be held to the binary that will fly::
 
-   $ cargo run --bin tcsverify -- --types=$(tcspecial --types) examples/thermostat/thermostat.yaml
+   $ cargo run --bin tcsverify -- --types=$(tcspecial --types) \
+       examples/thermostat/thermostat.yaml
 
 Without it, every type is taken to be built. See `Building tcspecial for a
 vehicle`_.
@@ -3301,7 +3305,8 @@ and the tests make. A build for a vehicle names the types it flies:
 
 .. code-block:: console
 
-   $ cargo build -p tcspecial --release --no-default-features --features serial,i2c
+   $ cargo build -p tcspecial --release --no-default-features \
+       --features serial,i2c
 
 Build it with ``-p tcspecial`` and nothing else beside it: Cargo turns on,
 for everything built in one command, every feature anything in that command
@@ -3342,7 +3347,8 @@ build a tcspecial that flies this way: the feature is for a vehicle on a desk.
 .. code-block:: console
 
    $ cargo build -p tcspecial --features visual
-   $ target/debug/tcspecial --visual --simulate=all examples/simple-app/simple-app.yaml
+   $ target/debug/tcspecial --visual --simulate=all \
+       examples/simple-app/simple-app.yaml
 
 The window draws the configuration as tcsgui does -- the three working panes,
 every node where the editor puts it, every link along its route -- and lights

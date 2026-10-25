@@ -123,7 +123,9 @@ impl BeaconReceive {
             // contact is lost by nothing arriving, which is what the passes
             // that time out are.
             let was = match held.lock() {
-                Ok(mut contact) => std::mem::replace(&mut *contact, pass.contact),
+                Ok(mut contact) => {
+                    std::mem::replace(&mut *contact, pass.contact)
+                }
                 Err(_) => pass.contact,
             };
             // And what the nodes do about a change, once, as it happens. A

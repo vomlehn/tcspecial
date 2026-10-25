@@ -83,7 +83,8 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
     // Set once: a RESTART runs this again in the same process, with the mode
     // it was started with, and the first is the one that holds.
     let _ = MODE.set(mode);
-    let graph = Graph::load(path).map_err(|why| vec![format!("{path}: {why}")])?;
+    let graph =
+        Graph::load(path).map_err(|why| vec![format!("{path}: {why}")])?;
 
     // The same checks the ground tool runs, against the same code. A
     // configuration that arrived here unchecked is exactly the configuration
@@ -125,10 +126,11 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
     }
 
     // What this vehicle is serving: the build and the configuration's
-    // digest. The ground compares the digest in every beacon with its own, which is how it knows the vehicle
-    // is running the configuration it is reading -- the same ports, the same
-    // device ids, the same nodes.
-    let digest = digest_of_graph(&graph).map_err(|why| vec![format!("{path}: {why}")])?;
+    // digest. The ground compares the digest in every beacon with its own,
+    // which is how it knows the vehicle is running the configuration it is
+    // reading -- the same ports, the same device ids, the same nodes.
+    let digest = digest_of_graph(&graph)
+        .map_err(|why| vec![format!("{path}: {why}")])?;
     summary(format!(
         "tcspecial v{} md5 {digest}",
         ConfigVersion::of_this_build()
@@ -136,7 +138,8 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
 
     // What every log hands its filled segments to, found before any log is
     // opened: opening one hands over what an earlier run left in it.
-    let segsend = segsend_for(&graph).map_err(|why| vec![format!("{path}: {why}")])?;
+    let segsend =
+        segsend_for(&graph).map_err(|why| vec![format!("{path}: {why}")])?;
 
     let mut system = System::of(&graph, Instant::now(), segsend.clone())?;
     // What was opened, which the line above already says the shape of: for
@@ -147,8 +150,8 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
     // says: opened before anything that records into it, so that a log
     // directory that is not there stops the start rather than losing the
     // first beacons to it.
-    let telemetry_log =
-        telemetry_log(&graph, &segsend).map_err(|why| vec![format!("{path}: {why}")])?;
+    let telemetry_log = telemetry_log(&graph, &segsend)
+        .map_err(|why| vec![format!("{path}: {why}")])?;
 
     // Beacons, once everything has opened: a vehicle that will not start has
     // nothing to announce. Held until the vehicle stops.
@@ -205,13 +208,16 @@ fn judged_against(graph: &Graph, mode: Mode) -> Vec<String> {
     let judged: Vec<(&str, Judged)> = graph
         .nodes
         .iter()
-        .filter_map(|node| judge(&host, node, mode).map(|judged| (node.name.as_str(), judged)))
+        .filter_map(|node| {
+            judge(&host, node, mode).map(|judged| (node.name.as_str(), judged))
+        })
         .collect();
     summary(format!("simulation mode: {mode}"));
     for (name, judged) in &judged {
         summary(format!("  {name}: {}", judged.said()));
     }
-    let pairs: Vec<(&str, &Judged)> = judged.iter().map(|(name, j)| (*name, j)).collect();
+    let pairs: Vec<(&str, &Judged)> =
+        judged.iter().map(|(name, j)| (*name, j)).collect();
     refusals(mode, &pairs)
 }
 
@@ -257,13 +263,17 @@ fn shape_of(graph: &Graph) -> String {
 ///
 /// A configuration with no `tcspecial` section, or one naming no log
 /// directory, records nothing: see `TelemetryLog::open`.
-fn telemetry_log(graph: &Graph, segsend: &SegSend) -> Result<TelemetryLog, String> {
+fn telemetry_log(
+    graph: &Graph,
+    segsend: &SegSend,
+) -> Result<TelemetryLog, String> {
     let Some(section) = graph.tcspecial.as_ref() else {
         return Ok(TelemetryLog::disabled());
     };
-    let ci =
-        tcslibgs::graph::parameters::ci_config_of(&tcslibgs::graph::parameters::flatten(section))?
-            .to_ci_config()?;
+    let ci = tcslibgs::graph::parameters::ci_config_of(
+        &tcslibgs::graph::parameters::flatten(section),
+    )?
+    .to_ci_config()?;
     let log = TelemetryLog::open(&ci, segsend).map_err(|e| e.to_string())?;
     if log.is_enabled() {
         summary(format!(
@@ -321,9 +331,10 @@ fn beacons(
     let Some(section) = graph.tcspecial.as_ref() else {
         return Ok(None);
     };
-    let ci =
-        tcslibgs::graph::parameters::ci_config_of(&tcslibgs::graph::parameters::flatten(section))?
-            .to_ci_config()?;
+    let ci = tcslibgs::graph::parameters::ci_config_of(
+        &tcslibgs::graph::parameters::flatten(section),
+    )?
+    .to_ci_config()?;
     let sending = BeaconSend::new(
         ci.beacon_interval,
         ci.beacon_send.clone(),
@@ -366,9 +377,10 @@ fn command_links(
     let Some(section) = graph.tcspecial.as_ref() else {
         return Ok(None);
     };
-    let ci =
-        tcslibgs::graph::parameters::ci_config_of(&tcslibgs::graph::parameters::flatten(section))?
-            .to_ci_config()?;
+    let ci = tcslibgs::graph::parameters::ci_config_of(
+        &tcslibgs::graph::parameters::flatten(section),
+    )?
+    .to_ci_config()?;
 
     let commands = Commands::start(
         &ci,

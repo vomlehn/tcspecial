@@ -36,35 +36,38 @@ pub struct SockInfo<'a> {
     //    link_type:  LinkType,
 }
 
-pub static PROTOCOLS: LazyLock<BTreeMap<&str, AddressFamily>> = LazyLock::new(|| {
-    BTreeMap::from([(
-        "unix",
-        AddressFamily {
-            af: Domain::UNIX,
-            sock_info: BTreeMap::from([(
-                "stream",
-                SockInfo {
-                    sock_type: Type::STREAM,
-                    ipproto: BTreeMap::from([
-                        ("tcp", IPPROTO_TCP),
-                        ("udp", IPPROTO_UDP),
-                        ("sctp", IPPROTO_SCTP),
-                        ("udplite", IPPROTO_UDPLITE),
-                        // SOCK_RAW is handled, as `protocol: raw` with an
-                        // `ip_protocol`: see raw.rs.
-                    ]),
-                },
-            )]),
-        },
-    )])
-});
+pub static PROTOCOLS: LazyLock<BTreeMap<&str, AddressFamily>> =
+    LazyLock::new(|| {
+        BTreeMap::from([(
+            "unix",
+            AddressFamily {
+                af: Domain::UNIX,
+                sock_info: BTreeMap::from([(
+                    "stream",
+                    SockInfo {
+                        sock_type: Type::STREAM,
+                        ipproto: BTreeMap::from([
+                            ("tcp", IPPROTO_TCP),
+                            ("udp", IPPROTO_UDP),
+                            ("sctp", IPPROTO_SCTP),
+                            ("udplite", IPPROTO_UDPLITE),
+                            // SOCK_RAW is handled, as `protocol: raw` with an
+                            // `ip_protocol`: see raw.rs.
+                        ]),
+                    },
+                )]),
+            },
+        )])
+    });
 
 //                SockInfo{sock_type: Type::STREAM, protocol: &[],
 //                    link_type: LinkType::Stream},
 //            }])}
 /*
-                "dgram",  {type: SOCK_dgram, protocol: None, link_type: LinkType::Packet},
-                "seqpacket", {type: SOCK_seqpacket, protocol: None, link_type: LinkType::Packet},
+                "dgram",  {type: SOCK_dgram, protocol: None, link_type:
+                    LinkType::Packet},
+                "seqpacket", {type: SOCK_seqpacket, protocol: None, link_type:
+                    LinkType::Packet},
 */
 /*
         {"local", AddressFamily(AF_local,
@@ -81,13 +84,18 @@ pub static PROTOCOLS: LazyLock<BTreeMap<&str, AddressFamily>> = LazyLock::new(||
 /*
         {"ax25", AddressFamily(AF_ax25, :tbd:tbd:tbd
         {"ipx", AddressFamily(AF_ipx, :tbd:tbd:tbd
-        {"appletalk", AddressFamily(AF_appletalk, BTreeMap::from(["dgram", SOCK_dgram, None,:yes:datagram sock_raw:yes:datagram
-        {"x25", AddressFamily(AF_x25, BTreeMap::from(["seqpacket", SOCK_seqpacket, None,:0:datagram
-        {"inet6", AddressFamily(AF_inet6, BTreeMap::from(["stream", SOCK_stream, None,:yes:stream sock_dgram:yes:datagram sock_raw:yes:datagram
+        {"appletalk", AddressFamily(AF_appletalk, BTreeMap::from(["dgram",
+            SOCK_dgram, None,:yes:datagram sock_raw:yes:datagram
+        {"x25", AddressFamily(AF_x25, BTreeMap::from(["seqpacket",
+            SOCK_seqpacket, None,:0:datagram
+        {"inet6", AddressFamily(AF_inet6, BTreeMap::from(["stream", SOCK_stream,
+            None,:yes:stream sock_dgram:yes:datagram sock_raw:yes:datagram
         {"decnet", AddressFamily(AF_decnet, :tbd:tbd:tbd
         {"key", AddressFamily(AF_key, :tbd:tbd:tbd
-        {"netlink", AddressFamily(AF_netlink, BTreeMap::from(["dgram", SOCK_dgram, None,:yes:datagram sock_raw:yes:datagram
-        {"packet", AddressFamily(AF_packet, BTreeMap::from(["dgram", SOCK_dgram, None,:yes:datagram sock_raw:yes:datagram
+        {"netlink", AddressFamily(AF_netlink, BTreeMap::from(["dgram",
+            SOCK_dgram, None,:yes:datagram sock_raw:yes:datagram
+        {"packet", AddressFamily(AF_packet, BTreeMap::from(["dgram", SOCK_dgram,
+            None,:yes:datagram sock_raw:yes:datagram
         {"rds", AddressFamily(AF_rds, :tbd:tbd:tbd
         {"pppox", AddressFamily(AF_pppox, :tbd:tbd:tbd
         {"llc", AddressFamily(AF_llc, :tbd:tbd:tbd
@@ -97,7 +105,8 @@ pub static PROTOCOLS: LazyLock<BTreeMap<&str, AddressFamily>> = LazyLock::new(||
         {"tipc", AddressFamily(AF_tipc, :tbd:tbd:tbd
         {"bluetooth", AddressFamily(AF_bluetooth, :tbd:tbd:tbd
         {"alg", AddressFamily(AF_alg, :tbd:tbd:tbd
-        {"vsock", AddressFamily(AF_vsock, BTreeMap::from(["dgram", SOCK_dgram, None,:yes:datagram sock_raw:yes:datagram
+        {"vsock", AddressFamily(AF_vsock, BTreeMap::from(["dgram", SOCK_dgram,
+            None,:yes:datagram sock_raw:yes:datagram
         {"xdp", AddressFamily(AF_xdp, :tbd:tbd:tbd
     ])
 });
@@ -200,9 +209,11 @@ socket.send_to(b"ping", &SockAddr::from(remote_addr))?;
 
 Key mappings to C
 C                                           socket2
-socket(AF_INET, SOCK_STREAM, 0) Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))
+socket(AF_INET, SOCK_STREAM, 0) Socket::new(Domain::IPV4, Type::STREAM,
+    Some(Protocol::TCP))
 
-socket(AF_INET6, SOCK_DGRAM, 0) Socket::new(Domain::IPV6, Type::DGRAM, Some(Protocol::UDP))
+socket(AF_INET6, SOCK_DGRAM, 0) Socket::new(Domain::IPV6, Type::DGRAM,
+    Some(Protocol::UDP))
 
 socket(AF_UNIX, SOCK_STREAM, 0) Socket::new(Domain::UNIX, Type::STREAM, None)
 
@@ -211,9 +222,11 @@ setsockopt(...)                 socket.set_reuse_address(true), etc.
 bind(), listen(), accept(), connect()   Same method names on Socket
 
 Converting to std types
-You can convert a socket2::Socket into a std::net::TcpStream (or TcpListener, UdpSocket) when you're done with low-level setup:
+You can convert a socket2::Socket into a std::net::TcpStream (or TcpListener,
+UdpSocket) when you're done with low-level setup:
 
 let std_stream: std::net::TcpStream = socket.into();
 
-This is a common pattern: use socket2 for fine-grained control during setup, then convert to std types for ergonomic I/O.
+This is a common pattern: use socket2 for fine-grained control during setup,
+then convert to std types for ergonomic I/O.
  */

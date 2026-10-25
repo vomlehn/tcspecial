@@ -102,20 +102,27 @@ help:
 	@echo "  make buildgui    - Build tcsgui"
 	@echo "  make test        - Run all tests"
 	@echo "  make run         - Run tcspecial"
-	@echo "  make runmocy     - Run tcsmoc, which starts tcspecial and tcssim"
+	@echo "  make runmocy     - Run tcsmoc, which starts tcspecial and" \
+		"tcssim"
 	@echo "  make runmocx     - As runmocy, on the XML configuration"
 	@echo "  make runsim      - Run tcssim alone"
 	@echo "  make runguiy     - Run tcsgui on the YAML configuration"
 	@echo "  make runguix     - Run tcsgui on the XML configuration"
-	@echo "  make runsimguiy  - Run tcsgui on the YAML configuration and the simulator's"
-	@echo "  make runsimguix  - Run tcsgui on the XML configuration and the simulator's"
+	@echo "  make runsimguiy  - Run tcsgui on the YAML configuration and" \
+		"the simulator's"
+	@echo "  make runsimguix  - Run tcsgui on the XML configuration and" \
+		"the simulator's"
 	@echo "  make runverifyy  - Check the payload set, reading its YAML"
 	@echo "  make runverifyx  - Check the payload set, reading its XML"
-	@echo "  make runcomparexy - Check the payload set's XML and YAML say the same thing"
-	@echo "  make comparespellings - Do that for every shipped configuration"
+	@echo "  make runcomparexy - Check the payload set's XML and YAML say" \
+		"the same thing"
+	@echo "  make comparespellings - Do that for every shipped" \
+		"configuration"
 	@echo "  make verify      - Check one version 2 configuration"
-	@echo "  make mkvcan      - Make the virtual CAN bus a CAN payload needs"
-	@echo "  make mkstubs     - Make every stand-in: I2C, GPIO, IIO and virtual CAN"
+	@echo "  make mkvcan      - Make the virtual CAN bus a CAN payload" \
+		"needs"
+	@echo "  make mkstubs     - Make every stand-in: I2C, GPIO, IIO and" \
+		"virtual CAN"
 	@echo "  make rmvcan      - Remove the virtual CAN buses"
 	@echo "  make rmstubs     - Remove every stand-in those made"
 	@echo "  make check       - cargo check, clippy, and a format check"
@@ -126,7 +133,8 @@ help:
 	@echo "  make install     - Install tcspecial globally, data and all"
 	@echo "  make install-data - Install tcsgui's descriptions and schemas"
 	@echo ""
-	@echo "Configuration: make runmocy TCSPECIAL_CONFIG_FILE=examples/minimal/minimal"
+	@echo "Configuration: make runmocy" \
+		"TCSPECIAL_CONFIG_FILE=examples/minimal/minimal"
 	@echo "Logging:     make runmocy RUST_LOG=debug"
 
 # Build the project
@@ -185,7 +193,9 @@ run:
 	( \
 		set -eu; \
 		echo "Running $(PROJECT_NAME)..."; \
-		cd $(RUST) && RUST_LOG=$(RUST_LOG) cargo run -q --bin tcspecial -- --simulate=$(SIMULATE) $(TCSPECIAL_CONFIG_FILE).yaml \
+		cd $(RUST) && RUST_LOG=$(RUST_LOG) \
+			cargo run -q --bin tcspecial -- --simulate=$(SIMULATE) \
+			$(TCSPECIAL_CONFIG_FILE).yaml \
 	)
 
 # Running tcsmoc on one spelling of the tcspecial configuration.
@@ -201,8 +211,12 @@ run:
 define runmoc_on
 	( \
 		set -eu; \
-		echo "Running $(MOC_NAME) on $(basename $(TCSPECIAL_CONFIG_FILE)).$(1)..."; \
-		cd $(RUST) && RUST_LOG=$(RUST_LOG) PAYLOAD_SIM_YAML=$(TCSPECIAL_SIM_FILE) cargo run -q --bin tcsmoc -- --simulate=$(SIMULATE) $(basename $(TCSPECIAL_CONFIG_FILE).$(1)).$(1) \
+		echo "Running $(MOC_NAME) on" \
+			"$(basename $(TCSPECIAL_CONFIG_FILE)).$(1)..."; \
+		cd $(RUST) && RUST_LOG=$(RUST_LOG) \
+			PAYLOAD_SIM_YAML=$(TCSPECIAL_SIM_FILE) \
+			cargo run -q --bin tcsmoc -- --simulate=$(SIMULATE) \
+			$(basename $(TCSPECIAL_CONFIG_FILE).$(1)).$(1) \
 	)
 endef
 
@@ -234,7 +248,9 @@ define runverify_on
 	( \
 		set -eu; \
 		echo "Verifying $(basename $(TCSPECIAL_CONFIG_FILE)).$(1)..."; \
-		cd $(RUST) && cargo run -q --bin tcsverify -- $(basename $(TCSPECIAL_CONFIG_FILE).$(1)).$(1) $(TCSPECIAL_SIM_FILE) \
+		cd $(RUST) && cargo run -q --bin tcsverify -- \
+			$(basename $(TCSPECIAL_CONFIG_FILE).$(1)).$(1) \
+			$(TCSPECIAL_SIM_FILE) \
 	)
 endef
 
@@ -263,8 +279,12 @@ runverifyx:
 runcomparexy:
 	( \
 		set -eu; \
-		echo "Comparing $(TCSPECIAL_CONFIG_FILE).xml with $(TCSPECIAL_CONFIG_FILE).yaml..."; \
-		cd $(RUST) && cargo run -q --bin tcsverify -- $(TCSPECIAL_CONFIG_FILE).xml $(TCSPECIAL_CONFIG_FILE).yaml $(TCSPECIAL_SIM_FILE) \
+		echo "Comparing $(TCSPECIAL_CONFIG_FILE).xml with" \
+			"$(TCSPECIAL_CONFIG_FILE).yaml..."; \
+		cd $(RUST) && cargo run -q --bin tcsverify -- \
+			$(TCSPECIAL_CONFIG_FILE).xml \
+			$(TCSPECIAL_CONFIG_FILE).yaml \
+			$(TCSPECIAL_SIM_FILE) \
 	)
 
 # Every configuration shipped in both spellings, with the simulator file each
@@ -294,13 +314,17 @@ comparespellings:
 		for pair in $(SPELLINGS); do \
 			stem=$${pair%%:*}; sim=$${pair#*:}; \
 			echo "Comparing $$stem.xml with $$stem.yaml..."; \
-			cargo run -q --bin tcsverify -- $$stem.xml $$stem.yaml $$sim || failed="$$failed $$stem"; \
+			cargo run -q --bin tcsverify -- \
+				$$stem.xml $$stem.yaml $$sim \
+				|| failed="$$failed $$stem"; \
 		done; \
 		if [ -n "$$failed" ]; then \
-			echo "The two spellings differ, or do not verify, for:$$failed"; \
+			echo "The two spellings differ, or do not verify," \
+				"for:$$failed"; \
 			exit 1; \
 		fi; \
-		echo "Every configuration says the same thing in both spellings" \
+		echo "Every configuration says the same thing in both" \
+			"spellings" \
 	)
 
 # Run the simulation application
@@ -309,7 +333,10 @@ runsim:
 	( \
 		set -eu; \
 		echo "Running $(SIM_NAME)..."; \
-		cd $(RUST) && RUST_LOG=$(RUST_LOG) PAYLOAD_SIM_YAML=$(TCSPECIAL_SIM_FILE) cargo run -q --bin tcssim -- --simulate=$(SIMULATE) $(TCSPECIAL_CONFIG_FILE).yaml \
+		cd $(RUST) && RUST_LOG=$(RUST_LOG) \
+			PAYLOAD_SIM_YAML=$(TCSPECIAL_SIM_FILE) \
+			cargo run -q --bin tcssim -- --simulate=$(SIMULATE) \
+			$(TCSPECIAL_CONFIG_FILE).yaml \
 	)
 
 # Make the virtual CAN bus a CAN payload needs.
@@ -458,8 +485,10 @@ define rungui_on
 	( \
 		set -eu; \
 		mkdir -p $(dir $(TCSGUI_FILE)); \
-		echo "Running $(GUI_NAME) on $(basename $(TCSGUI_FILE)).$(1)..."; \
-		cd $(RUST) && cargo run -q --bin tcsgui -- $(basename $(TCSGUI_FILE)).$(1) \
+		echo "Running $(GUI_NAME) on" \
+			"$(basename $(TCSGUI_FILE)).$(1)..."; \
+		cd $(RUST) && cargo run -q --bin tcsgui -- \
+			$(basename $(TCSGUI_FILE)).$(1) \
 	)
 endef
 
@@ -478,8 +507,9 @@ define tcssimgui_on
 	( \
 		set -eu; \
 		mkdir -p $(dir $(TCSGUI_FILE)) $(dir $(2)); \
-		echo "Running $(GUI_NAME) on $(basename $(TCSGUI_FILE)).$(1) and \
-$(basename $(2)).yaml..."; \
+		echo "Running $(GUI_NAME) on" \
+			"$(basename $(TCSGUI_FILE)).$(1) and" \
+			"$(basename $(2)).yaml..."; \
 		cd $(RUST) && cargo run -q --bin tcsgui -- \
 			$(basename $(TCSGUI_FILE)).$(1) $(basename $(2)).yaml \
 	)
@@ -581,8 +611,10 @@ install: install-data
 .PHONY: install-data
 install-data:
 	@echo "Installing $(GUI_NAME) data into $(TCSGUI_DATA)..."
-	@cd $(GUI_NAME)/share && find . -type d -exec install -d -m 755 $(TCSGUI_DATA)/{} \;
-	@cd $(GUI_NAME)/share && find . -type f -exec install -m 644 {} $(TCSGUI_DATA)/{} \;
+	@cd $(GUI_NAME)/share && find . -type d \
+		-exec install -d -m 755 $(TCSGUI_DATA)/{} \;
+	@cd $(GUI_NAME)/share && find . -type f \
+		-exec install -m 644 {} $(TCSGUI_DATA)/{} \;
 	@echo "✓ $(GUI_NAME) data installed"
 
 # Check code quality
@@ -600,15 +632,21 @@ check:
 	@echo "Running cargo check..."
 	cd $(RUST) && cargo check
 	cd $(RUST) && cargo clippy -- -D warnings
-	cd $(RUST) && cargo clippy -p $(PROJECT_NAME) --no-default-features -- -D warnings
-	cd $(RUST) && for type in $$(cargo run -q -p $(PROJECT_NAME) --bin $(PROJECT_NAME) -- --types | tr , ' '); do \
+	cd $(RUST) && cargo clippy -p $(PROJECT_NAME) --no-default-features \
+		-- -D warnings
+	cd $(RUST) && for type in $$(cargo run -q -p $(PROJECT_NAME) \
+			--bin $(PROJECT_NAME) -- --types | tr , ' '); do \
 		echo "tcspecial with $$type alone"; \
-		cargo clippy -q -p $(PROJECT_NAME) --no-default-features --features $$type \
+		cargo clippy -q -p $(PROJECT_NAME) --no-default-features \
+			--features $$type \
 			-- -D warnings || exit 1; \
 	done
-	cd $(RUST) && cargo clippy -p $(PROJECT_NAME) --features visual --all-targets -- -D warnings
-	cd $(RUST) && cargo test -q -p $(PROJECT_NAME) --features visual --lib visual
-	cd $(RUST) && cargo test -q -p $(PROJECT_NAME) --features visual --test visual
+	cd $(RUST) && cargo clippy -p $(PROJECT_NAME) --features visual \
+		--all-targets -- -D warnings
+	cd $(RUST) && cargo test -q -p $(PROJECT_NAME) --features visual \
+		--lib visual
+	cd $(RUST) && cargo test -q -p $(PROJECT_NAME) --features visual \
+		--test visual
 	cd $(RUST) && cargo fmt -- --check
 
 # Format code

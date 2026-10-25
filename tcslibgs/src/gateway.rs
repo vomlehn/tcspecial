@@ -41,7 +41,8 @@ pub enum GatewayKind {
 
 impl GatewayKind {
     /// Every kind, in the order the design names them.
-    pub const ALL: [GatewayKind; 3] = [GatewayKind::Radio, GatewayKind::Cfs, GatewayKind::Fprime];
+    pub const ALL: [GatewayKind; 3] =
+        [GatewayKind::Radio, GatewayKind::Cfs, GatewayKind::Fprime];
 
     /// The kind as a configuration writes it.
     pub fn name(self) -> &'static str {
@@ -98,7 +99,9 @@ impl GatewayKind {
     /// called and early about when it can be flown.
     pub fn of(said: &str) -> Result<GatewayKind, String> {
         let said = said.trim();
-        let Some(kind) = GatewayKind::ALL.into_iter().find(|k| k.name() == said) else {
+        let Some(kind) =
+            GatewayKind::ALL.into_iter().find(|k| k.name() == said)
+        else {
             return Err(format!(
                 "gateway is \"{said}\", which is not a kind of gateway: say {}",
                 GatewayKind::built_names()

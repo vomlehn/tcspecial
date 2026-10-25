@@ -13,7 +13,8 @@
 
 use std::fmt;
 use xtce::packet::{
-    self as pk, BitReader, BitWriter, IntEncoding, Packet, PacketError, Result, StringSpec,
+    self as pk, BitReader, BitWriter, IntEncoding, Packet, PacketError, Result,
+    StringSpec,
 };
 
 /// Sequence container `/TcsBeacon/Beacon`.
@@ -97,9 +98,21 @@ impl Packet for Beacon {
             &"tcspecial ",
             "Name",
         )?;
-        w.uint_order(8, false, pk::from_unsigned(self.major as u64, 8, "Major")?);
-        w.uint_order(8, false, pk::from_unsigned(self.minor as u64, 8, "Minor")?);
-        w.uint_order(8, false, pk::from_unsigned(self.patch as u64, 8, "Patch")?);
+        w.uint_order(
+            8,
+            false,
+            pk::from_unsigned(self.major as u64, 8, "Major")?,
+        );
+        w.uint_order(
+            8,
+            false,
+            pk::from_unsigned(self.minor as u64, 8, "Minor")?,
+        );
+        w.uint_order(
+            8,
+            false,
+            pk::from_unsigned(self.patch as u64, 8, "Patch")?,
+        );
         pk::write_string(
             w,
             &StringSpec {

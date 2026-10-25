@@ -61,7 +61,9 @@ pub use error::*;
 pub use format::*;
 pub use node::payload::can::CanParams;
 pub use node::payload::gpio::{Bias, Edge as LineEdge, GpioParams};
-pub use node::payload::hdlc::{ClockType, Encoding, FrameCheck, HdlcParams, Standard};
+pub use node::payload::hdlc::{
+    ClockType, Encoding, FrameCheck, HdlcParams, Standard,
+};
 pub use node::payload::iio::IioParams;
 pub use node::payload::rpmsg::RpmsgParams;
 pub use node::payload::serial::rs485::Rs485Params;

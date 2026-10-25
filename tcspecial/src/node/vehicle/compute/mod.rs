@@ -123,7 +123,11 @@ pub trait Function: Send {
     /// from a function waiting for the rest of its inputs, and from one that
     /// decided nothing needs to change. An error is a datum the function
     /// cannot use, and is reported rather than guessed at.
-    fn give(&mut self, input: Option<&str>, data: &[u8]) -> Result<Option<Out>, String>;
+    fn give(
+        &mut self,
+        input: Option<&str>,
+        data: &[u8],
+    ) -> Result<Option<Out>, String>;
 
     /// Set one of this function's parameters, as a command from the ground
     /// does.
@@ -140,8 +144,8 @@ pub trait Function: Send {
     /// refused here however it was reached.
     fn set(&mut self, attribute: &str, _value: &[u8]) -> Result<(), String> {
         Err(format!(
-            "{} has nothing called \"{attribute}\" to set, and takes no settings \
-             from the ground at all",
+            "{} has nothing called \"{attribute}\" to set, and takes no \
+             settings from the ground at all",
             self.name()
         ))
     }
@@ -176,14 +180,20 @@ pub trait Function: Send {
 /// `inputs` is what the routing found bound to this node, which a function
 /// over several of them needs: a vote cannot know it is waiting for three
 /// until something tells it how many links arrive.
-pub fn make(node: &Node, inputs: &[&str], abandon: &Abandon) -> Result<Box<dyn Function>, String> {
+pub fn make(
+    node: &Node,
+    inputs: &[&str],
+    abandon: &Abandon,
+) -> Result<Box<dyn Function>, String> {
     // What the node says, by the rules the ground tool checks it against: see
-    // tcslibgs::node::vehicle::compute. Every complaint from there already names the
-    // node and the computation.
+    // tcslibgs::node::vehicle::compute. Every complaint from there already
+    // names the node and the computation.
     let what = compute::params_of(&node.name, &node.attributes)?;
 
     match what {
-        Computation::ToKelvin(params) => Ok(Box::new(to_kelvin::ToKelvin::of(params))),
+        Computation::ToKelvin(params) => {
+            Ok(Box::new(to_kelvin::ToKelvin::of(params)))
+        }
         Computation::Vote(params) => {
             // The declared inputs and the bound ones are checked against each
             // other by `Graph::check`, so a vote that reaches here is one
@@ -193,7 +203,8 @@ pub fn make(node: &Node, inputs: &[&str], abandon: &Abandon) -> Result<Box<dyn F
             // would never produce anything, and nothing in the telemetry
             // would say why.
             let mut bound: Vec<&str> = inputs.to_vec();
-            let mut declared: Vec<&str> = params.inputs.iter().map(String::as_str).collect();
+            let mut declared: Vec<&str> =
+                params.inputs.iter().map(String::as_str).collect();
             bound.sort();
             declared.sort();
             if bound != declared {
@@ -206,7 +217,9 @@ pub fn make(node: &Node, inputs: &[&str], abandon: &Abandon) -> Result<Box<dyn F
 
             Ok(Box::new(vote::Vote::of(params)))
         }
-        Computation::Hysteresis(params) => Ok(Box::new(hysteresis::Hysteresis::of(params))),
+        Computation::Hysteresis(params) => {
+            Ok(Box::new(hysteresis::Hysteresis::of(params)))
+        }
         // Started here, as the configuration is loaded: a program that
         // cannot be executed is a fault found on the ground rather than three
         // days into a mission. See node::vehicle::compute::process.
@@ -214,7 +227,8 @@ pub fn make(node: &Node, inputs: &[&str], abandon: &Abandon) -> Result<Box<dyn F
             // The node's own wakeup, so that disabling the node gives up the
             // wait for an answer rather than waiting out a deadline that may
             // be seconds long.
-            let mut program = process::Process::of(params).abandoned_for(abandon.clone());
+            let mut program =
+                process::Process::of(params).abandoned_for(abandon.clone());
             program
                 .start()
                 .map_err(|why| format!("\"{}\" (process): {why}", node.name))?;
@@ -229,7 +243,9 @@ pub fn make(node: &Node, inputs: &[&str], abandon: &Abandon) -> Result<Box<dyn F
 // checks on a desk. Named here because every computation in this tree calls
 // these by their short names, and because this is where a reader of the
 // arithmetic looks for them.
-pub(crate) use tcslibgs::node::vehicle::compute::{from_text, from_value, value_bytes};
+pub(crate) use tcslibgs::node::vehicle::compute::{
+    from_text, from_value, value_bytes,
+};
 // What the vehicle no longer makes as it runs -- a value as a `Vec` -- and the
 // tests still compare against.
 #[cfg(test)]
@@ -250,11 +266,13 @@ mod tests {
     #[test]
     fn the_thermostat_runs_from_counts_to_a_decision() {
         let sensor = |scale: f64, offset: f64| {
-            to_kelvin::ToKelvin::of(tcslibgs::node::vehicle::compute::ToKelvinParams {
-                format: tcslibgs::node::vehicle::compute::Format::I16Be,
-                scale,
-                offset,
-            })
+            to_kelvin::ToKelvin::of(
+                tcslibgs::node::vehicle::compute::ToKelvinParams {
+                    format: tcslibgs::node::vehicle::compute::Format::I16Be,
+                    scale,
+                    offset,
+                },
+            )
         };
 
         use tcslibgs::node::vehicle::compute::{Algorithm, VoteParams};
@@ -267,15 +285,20 @@ mod tests {
             sensor(0.0625, 273.15),
         ];
         let mut voted = vote::Vote::of(VoteParams {
-            inputs: vec!["in0".to_string(), "in1".to_string(), "in2".to_string()],
+            inputs: vec![
+                "in0".to_string(),
+                "in1".to_string(),
+                "in2".to_string(),
+            ],
             algorithm: Algorithm::Median,
         });
 
-        let mut thermostat =
-            hysteresis::Hysteresis::of(tcslibgs::node::vehicle::compute::HysteresisParams {
+        let mut thermostat = hysteresis::Hysteresis::of(
+            tcslibgs::node::vehicle::compute::HysteresisParams {
                 setpoint: 293.15,
                 half_band: 2.0,
-            });
+            },
+        );
 
         /// One pass: three readings in, a decision out if there is one.
         fn pass(
@@ -291,7 +314,9 @@ mod tests {
                     .expect("a conversion")
                     .expect("a value");
                 let input = ["in0", "in1", "in2"][n];
-                if let Some(out) = voted.give(Some(input), &kelvin).expect("the mean") {
+                if let Some(out) =
+                    voted.give(Some(input), &kelvin).expect("the mean")
+                {
                     averaged = Some(out);
                 }
             }
@@ -358,7 +383,9 @@ mod tests {
     /// another, each with its own conversion, averaged into one number.
     #[test]
     fn three_unlike_sensors_average_to_one_temperature() {
-        use tcslibgs::node::vehicle::compute::{Algorithm, Format, ToKelvinParams, VoteParams};
+        use tcslibgs::node::vehicle::compute::{
+            Algorithm, Format, ToKelvinParams, VoteParams,
+        };
 
         let part = |format: Format, scale: f64| {
             to_kelvin::ToKelvin::of(ToKelvinParams {
@@ -373,7 +400,11 @@ mod tests {
         let mut bay = part(Format::U24Be, 0.001);
 
         let mut voted = vote::Vote::of(VoteParams {
-            inputs: vec!["in0".to_string(), "in1".to_string(), "in2".to_string()],
+            inputs: vec![
+                "in0".to_string(),
+                "in1".to_string(),
+                "in2".to_string(),
+            ],
             algorithm: Algorithm::Median,
         });
 
@@ -417,7 +448,8 @@ mod tests {
     #[test]
     fn an_unknown_function_is_refused() {
         let mut attributes = BTreeMap::new();
-        attributes.insert("function".to_string(), tcslibgs::Scalar::of("sorcery"));
+        attributes
+            .insert("function".to_string(), tcslibgs::Scalar::of("sorcery"));
         let node = Node {
             name: "n".to_string(),
             node_type: "compute".to_string(),
@@ -434,13 +466,14 @@ mod tests {
 
     /// A node whose computation is wrong is refused by the one set of rules.
     ///
-    /// Which is in `tcslibgs::node::vehicle::compute` now, so the ground tool applies
-    /// it too: what this holds is that `make` goes through those rules rather
-    /// than having a second set of its own.
+    /// Which is in `tcslibgs::node::vehicle::compute` now, so the ground tool
+    /// applies it too: what this holds is that `make` goes through those rules
+    /// rather than having a second set of its own.
     #[test]
     fn a_parameter_with_no_sensible_default_is_required() {
         let mut attributes = BTreeMap::new();
-        attributes.insert("function".to_string(), tcslibgs::Scalar::of("to_kelvin"));
+        attributes
+            .insert("function".to_string(), tcslibgs::Scalar::of("to_kelvin"));
         attributes.insert("format".to_string(), tcslibgs::Scalar::of("i16_be"));
         attributes.insert("offset".to_string(), tcslibgs::Scalar::of("273.15"));
         let node = Node {

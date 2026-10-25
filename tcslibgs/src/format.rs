@@ -6,8 +6,9 @@
 //! adding a variant here, never a second set of structs.
 //!
 //! The format-level structs (`CIConfigJson`, and a node's map of attributes)
-//! are deliberately flat -- scalars and `Option`s only, no enums. XML has no native sequence or
-//! variant type, so a flat shape is the subset both formats agree on.
+//! are deliberately flat -- scalars and `Option`s only, no enums. XML has no
+//! native sequence or variant type, so a flat shape is the subset both formats
+//! agree on.
 //!
 //! There were three. JSON was read as well, and was the format an
 //! extensionless or unrecognised file was assumed to be, which meant a
@@ -59,8 +60,8 @@ impl ConfigFormat {
         let path = path.as_ref();
         Self::from_path(path).ok_or_else(|| {
             TcsError::Config(format!(
-                "{}: a configuration file is named .yaml, .yml or .xml, and this \
-                 is none of those",
+                "{}: a configuration file is named .yaml, .yml or .xml, and \
+                 this is none of those",
                 path.display()
             ))
         })
@@ -69,11 +70,14 @@ impl ConfigFormat {
     /// Parse `text` in this format into `T`.
     pub fn parse<T: DeserializeOwned>(self, text: &str) -> TcsResult<T> {
         match self {
-            ConfigFormat::Yaml => serde_norway::from_str(text).map_err(TcsError::from),
+            ConfigFormat::Yaml => {
+                serde_norway::from_str(text).map_err(TcsError::from)
+            }
             ConfigFormat::Xml => {
                 let mut reader = quick_xml::de::Deserializer::from_str(text);
                 T::deserialize(&mut reader).map_err(|error| {
-                    let (line, column) = xml_position(text, &error, reader.get_ref().get_ref());
+                    let (line, column) =
+                        xml_position(text, &error, reader.get_ref().get_ref());
                     TcsError::Xml {
                         error,
                         line,
@@ -102,7 +106,8 @@ fn xml_position(
         _ => reader.buffer_position(),
     };
     let bytes = text.as_bytes();
-    let before = &bytes[..usize::try_from(offset).map_or(bytes.len(), |at| at.min(bytes.len()))];
+    let before = &bytes[..usize::try_from(offset)
+        .map_or(bytes.len(), |at| at.min(bytes.len()))];
     let line_start = before
         .iter()
         .rposition(|b| *b == b'\n')
@@ -139,8 +144,8 @@ impl Spelling {
         };
         match self.0 {
             Some(already) if already != said => Err(
-                "--yaml and --xml each say which configuration to read: give one of \
-                 them, or neither"
+                "--yaml and --xml each say which configuration to read: give \
+                 one of them, or neither"
                     .to_string(),
             ),
             _ => {
@@ -166,15 +171,17 @@ impl Spelling {
         match named {
             Some(path) => match (self.0, ConfigFormat::from_path(&path)) {
                 (Some(asked), Some(is)) if asked != is => Err(format!(
-                    "{path} is {} and {} asks for {}: name the other file, or leave \
-                     the flag off",
+                    "{path} is {} and {} asks for {}: name the other file, or \
+                     leave the flag off",
                     is.name(),
                     asked.flag(),
                     asked.name()
                 )),
                 _ => Ok(path),
             },
-            None => Ok(format!("{stem}.{}", self.0.unwrap_or(default).extension())),
+            None => {
+                Ok(format!("{stem}.{}", self.0.unwrap_or(default).extension()))
+            }
         }
     }
 }
@@ -208,7 +215,9 @@ impl ConfigFormat {
 /// Read and parse a configuration file, choosing the parser from its extension.
 ///
 /// This is the single entry point every configuration loader should use.
-pub fn load_config_file<T: DeserializeOwned, P: AsRef<Path>>(path: P) -> TcsResult<T> {
+pub fn load_config_file<T: DeserializeOwned, P: AsRef<Path>>(
+    path: P,
+) -> TcsResult<T> {
     let path = path.as_ref();
     let format = ConfigFormat::of_file(path)?;
     let text = fs::read_to_string(path)?;
@@ -243,15 +252,19 @@ mod tests {
             Ok(format!("{stem}.xml"))
         );
         assert_eq!(
-            chosen(&["--xml"])
-                .unwrap()
-                .configuration(None, stem, ConfigFormat::Yaml),
+            chosen(&["--xml"]).unwrap().configuration(
+                None,
+                stem,
+                ConfigFormat::Yaml
+            ),
             Ok(format!("{stem}.xml"))
         );
         assert_eq!(
-            chosen(&["--yaml", "--yaml"])
-                .unwrap()
-                .configuration(None, stem, ConfigFormat::Xml),
+            chosen(&["--yaml", "--yaml"]).unwrap().configuration(
+                None,
+                stem,
+                ConfigFormat::Xml
+            ),
             Ok(format!("{stem}.yaml"))
         );
 
@@ -272,7 +285,11 @@ mod tests {
             .configuration(Some("a.yaml".into()), stem, ConfigFormat::Yaml)
             .is_err());
         assert_eq!(
-            neither.configuration(Some("a.yaml".into()), stem, ConfigFormat::Xml),
+            neither.configuration(
+                Some("a.yaml".into()),
+                stem,
+                ConfigFormat::Xml
+            ),
             Ok("a.yaml".to_string())
         );
     }

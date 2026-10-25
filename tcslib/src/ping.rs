@@ -75,7 +75,10 @@ pub fn route_of(graph: &Graph) -> Option<Route> {
             down.iter()
                 .filter(|link| link.source == node.name)
                 .find_map(|link| match &link.via {
-                    Via::Moc(moc) if feeds(graph, moc, &node.name) && binds(graph, moc) => {
+                    Via::Moc(moc)
+                        if feeds(graph, moc, &node.name)
+                            && binds(graph, moc) =>
+                    {
                         Some(Route {
                             node: node.name.clone(),
                             moc: moc.clone(),
@@ -129,8 +132,8 @@ impl Uplink {
         }
         if !tcslibgs::graph::reach::binds(node) {
             return Err(format!(
-                "\"{moc}\" states no address and port, so it binds nothing aboard \
-                 and the ground has nowhere to send to it"
+                "\"{moc}\" states no address and port, so it binds nothing \
+                 aboard and the ground has nowhere to send to it"
             ));
         }
         let EndpointConfig::Network(at) = reach_of(node)?.endpoint else {
@@ -138,11 +141,18 @@ impl Uplink {
         };
         let to = (at.address.as_str(), at.port)
             .to_socket_addrs()
-            .map_err(|e| format!("\"{moc}\" at {}:{}: {e}", at.address, at.port))?
+            .map_err(|e| {
+                format!("\"{moc}\" at {}:{}: {e}", at.address, at.port)
+            })?
             .next()
-            .ok_or_else(|| format!("\"{moc}\" at {}:{} is no address", at.address, at.port))?;
-        let socket = UdpSocket::bind(if to.is_ipv4() { "0.0.0.0:0" } else { "[::]:0" })
-            .map_err(|e| format!("a socket to send to \"{moc}\" from: {e}"))?;
+            .ok_or_else(|| {
+                format!("\"{moc}\" at {}:{} is no address", at.address, at.port)
+            })?;
+        let socket =
+            UdpSocket::bind(if to.is_ipv4() { "0.0.0.0:0" } else { "[::]:0" })
+                .map_err(|e| {
+                    format!("a socket to send to \"{moc}\" from: {e}")
+                })?;
         Ok(Uplink { socket, to })
     }
 
@@ -377,7 +387,8 @@ mod tests {
     fn the_answer_to_the_last_ping_is_timed() {
         let mut pinger = Pinger::new();
         let message = pinger.ping(AT).expect("a ping");
-        let answer = ping::reply(message.as_bytes(), after(3_000_000)).expect("answered");
+        let answer = ping::reply(message.as_bytes(), after(3_000_000))
+            .expect("answered");
         pinger.answered(answer.as_bytes(), after(5_000_000));
 
         let exchange = pinger.exchange();
@@ -470,7 +481,8 @@ mod tests {
     #[test]
     fn the_example_is_routed_and_its_moc_node_is_sent_to() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let graph = Graph::load(root.join("examples/ping/ping.yaml")).expect("it reads");
+        let graph = Graph::load(root.join("examples/ping/ping.yaml"))
+            .expect("it reads");
         assert_eq!(
             route_of(&graph),
             Some(Route {
@@ -482,7 +494,8 @@ mod tests {
         assert_eq!(uplink.to().to_string(), "127.0.0.1:7600");
 
         // And a configuration whose moc node binds nothing has no way up.
-        let beacon = Graph::load(root.join("examples/beacon/beacon.yaml")).expect("it reads");
+        let beacon = Graph::load(root.join("examples/beacon/beacon.yaml"))
+            .expect("it reads");
         assert_eq!(route_of(&beacon), None);
     }
 
@@ -499,8 +512,8 @@ mod tests {
         std::fs::write(
             &path,
             format!(
-                "moc:\n  - {{ name: moc, type: moc, address: \"127.0.0.1\", port: \"{port}\", \
-                 ground_base: \"127.0.0.1:9000\" }}\n"
+                "moc:\n  - {{ name: moc, type: moc, address: \"127.0.0.1\", \
+                 port: \"{port}\", ground_base: \"127.0.0.1:9000\" }}\n"
             ),
         )
         .expect("written");

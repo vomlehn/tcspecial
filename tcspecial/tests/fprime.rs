@@ -58,7 +58,12 @@ fn moved(text: &str, was: &str, now: &str) -> String {
 
 /// Send `datum` to `to` until something arrives at `at`, which is how long
 /// tcspecial takes to start; what arrived is returned.
-fn until_heard(from: &UdpSocket, to: SocketAddr, datum: &[u8], at: &UdpSocket) -> Vec<u8> {
+fn until_heard(
+    from: &UdpSocket,
+    to: SocketAddr,
+    datum: &[u8],
+    at: &UdpSocket,
+) -> Vec<u8> {
     let deadline = Instant::now() + Duration::from_secs(20);
     let mut buffer = [0u8; 256];
     while Instant::now() < deadline {
@@ -71,15 +76,18 @@ fn until_heard(from: &UdpSocket, to: SocketAddr, datum: &[u8], at: &UdpSocket) -
 }
 
 #[test]
-fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands() {
-    let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/fprime/fprime.yaml");
+fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands()
+{
+    let example = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../examples/fprime/fprime.yaml");
     let text = std::fs::read_to_string(&example).expect("the example reads");
 
     // Where the example's own bridge hears the thermometer, which its
     // comments and the manual say: bridge_base, 9700, plus the thermometer's
     // device id, 2.
-    let shipped = telemetry::of(&Graph::load(&example).expect("the example reads"))
-        .expect("its links to the bridge work out");
+    let shipped =
+        telemetry::of(&Graph::load(&example).expect("the example reads"))
+            .expect("its links to the bridge work out");
     let reading = shipped
         .iter()
         .find(|link| link.source == "thermometer")
@@ -89,7 +97,8 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands() 
     let dir = tempfile::tempdir().expect("a directory");
     // tcspecial writes its log into a directory that is there, and does not
     // make one.
-    std::fs::create_dir(dir.path().join("telemetry")).expect("the log's directory");
+    std::fs::create_dir(dir.path().join("telemetry"))
+        .expect("the log's directory");
 
     // The heater is driven and never heard from, so tcspecial sends to it:
     // the test is the heater, bound where the configuration says it is.
@@ -122,14 +131,18 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands() 
     // Where the bridge hears the thermometer, as the vehicle works it out:
     // the gateway node's bridge_base plus the thermometer's device id.
     let graph = Graph::load(&configuration).expect("it reads");
-    let links = telemetry::of(&graph).expect("its links to the bridge work out");
+    let links =
+        telemetry::of(&graph).expect("its links to the bridge work out");
     let link = links
         .iter()
         .find(|link| link.source == "thermometer")
         .expect("the thermometer reports");
     assert_eq!(link.ground.port, base + 2);
-    let bridge = UdpSocket::bind(format!("{}:{}", link.ground.address, link.ground.port))
-        .expect("the bridge's port");
+    let bridge = UdpSocket::bind(format!(
+        "{}:{}",
+        link.ground.address, link.ground.port
+    ))
+    .expect("the bridge's port");
     bridge
         .set_read_timeout(Some(Duration::from_millis(100)))
         .expect("a timeout");
@@ -156,6 +169,7 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands() 
     // A command: from the bridge, up to the gateway node, and on to the
     // heater.
     let commander = bound();
-    let up: SocketAddr = format!("127.0.0.1:{uplink}").parse().expect("an address");
+    let up: SocketAddr =
+        format!("127.0.0.1:{uplink}").parse().expect("an address");
     assert_eq!(until_heard(&commander, up, b"on", &heater), b"on");
 }

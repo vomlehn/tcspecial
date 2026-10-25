@@ -29,8 +29,8 @@ use tcslibgs::{NetworkConfig, SendsFrom, TcsError, TcsResult};
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
 use crate::endpoint::bind_failed;
 use crate::endpoint::{
-    wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable, WaitResult,
-    STRANGERS_PER_READ,
+    wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable,
+    WaitResult, STRANGERS_PER_READ,
 };
 use crate::node::payload::network::tcp::connect_retrying;
 
@@ -48,9 +48,13 @@ impl UnixStreamEndpoint {
     /// `connect_retrying`. A path with no socket at all is a different
     /// matter and is not waited out: it will not become one by being asked
     /// again.
-    pub fn connect_retrying(what: &str, config: &NetworkConfig) -> TcsResult<Self> {
+    pub fn connect_retrying(
+        what: &str,
+        config: &NetworkConfig,
+    ) -> TcsResult<Self> {
         let path = config.address.clone();
-        let stream = connect_retrying(what, &path, || UnixStream::connect(&path))?;
+        let stream =
+            connect_retrying(what, &path, || UnixStream::connect(&path))?;
         stream.set_nonblocking(true)?;
 
         Ok(Self {
@@ -73,7 +77,11 @@ impl EndpointWaitable for UnixStreamEndpoint {
         self.stream.as_raw_fd()
     }
 
-    fn wait_for_event(&self, cmd_fd: RawFd, timeout_ms: i32) -> TcsResult<WaitResult> {
+    fn wait_for_event(
+        &self,
+        cmd_fd: RawFd,
+        timeout_ms: i32,
+    ) -> TcsResult<WaitResult> {
         wait_for_fds(self.io_fd(), cmd_fd, PollFlags::POLLIN, timeout_ms)
     }
 }
@@ -116,7 +124,9 @@ pub struct UnixDatagramEndpoint {
     ///
     /// Shared between the two endpoints of a conduit pair, so that the one
     /// writing sends where the one reading learnt.
-    peer: std::sync::Arc<std::sync::Mutex<Option<std::os::unix::net::SocketAddr>>>,
+    peer: std::sync::Arc<
+        std::sync::Mutex<Option<std::os::unix::net::SocketAddr>>,
+    >,
     /// Where the configuration says the device is, for a node that is
     /// spoken to first.
     ///
@@ -144,8 +154,9 @@ impl UnixDatagramEndpoint {
         let path = config.address.clone();
         clear_a_dead_socket(what, Path::new(&path))?;
 
-        let socket = UnixDatagram::bind(&path)
-            .map_err(|e| bind_failed(&format!("{what} Unix datagram endpoint"), &path, e))?;
+        let socket = UnixDatagram::bind(&path).map_err(|e| {
+            bind_failed(&format!("{what} Unix datagram endpoint"), &path, e)
+        })?;
         socket.set_nonblocking(true)?;
 
         Ok(Self {
@@ -180,8 +191,8 @@ impl UnixDatagramEndpoint {
             .and_then(|socket| autobind(&socket).map(|()| socket))
             .map_err(|e| {
                 TcsError::Endpoint(format!(
-                    "{what}: a Unix datagram socket to reach \"{}\" with could not \
-                     be made: {e}",
+                    "{what}: a Unix datagram socket to reach \"{}\" with could \
+                     not be made: {e}",
                     config.address
                 ))
             })?;
@@ -207,8 +218,8 @@ impl UnixDatagramEndpoint {
                 Ok(())
             }
             SendsFrom::Socket(at) => Err(TcsError::Config(format!(
-                "{what}: sends_from {at} is a host and a port, and this is a Unix \
-                 datagram socket, whose device sends from a path"
+                "{what}: sends_from {at} is a host and a port, and this is a \
+                 Unix datagram socket, whose device sends from a path"
             ))),
         }
     }
@@ -233,7 +244,11 @@ impl EndpointWaitable for UnixDatagramEndpoint {
         self.socket.as_raw_fd()
     }
 
-    fn wait_for_event(&self, cmd_fd: RawFd, timeout_ms: i32) -> TcsResult<WaitResult> {
+    fn wait_for_event(
+        &self,
+        cmd_fd: RawFd,
+        timeout_ms: i32,
+    ) -> TcsResult<WaitResult> {
         wait_for_fds(self.io_fd(), cmd_fd, PollFlags::POLLIN, timeout_ms)
     }
 }
@@ -246,10 +261,9 @@ impl EndpointReadable for UnixDatagramEndpoint {
         for _ in 0..STRANGERS_PER_READ {
             match self.socket.recv_from(buffer) {
                 Ok((_, from))
-                    if self
-                        .only_from
-                        .as_deref()
-                        .is_some_and(|only| from.as_pathname() != Some(only)) =>
+                    if self.only_from.as_deref().is_some_and(|only| {
+                        from.as_pathname() != Some(only)
+                    }) =>
                 {
                     self.strangers += 1;
                 }
@@ -259,7 +273,9 @@ impl EndpointReadable for UnixDatagramEndpoint {
                     }
                     return Ok(n);
                 }
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => return Ok(0),
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    return Ok(0)
+                }
                 Err(e) => return Err(TcsError::Io(e)),
             }
         }
@@ -290,8 +306,8 @@ impl EndpointWritable for UnixDatagramEndpoint {
                     .and_then(|guard| guard.clone())
                     .ok_or_else(|| {
                         TcsError::Endpoint(format!(
-                            "{}: nothing has been received on this socket yet, so \
-                             there is no path to send to",
+                            "{}: nothing has been received on this socket yet, \
+                             so there is no path to send to",
                             self.what
                         ))
                     })?;
@@ -302,9 +318,9 @@ impl EndpointWritable for UnixDatagramEndpoint {
                 // gone wrong.
                 if peer.as_pathname().is_none() {
                     return Err(TcsError::Endpoint(format!(
-                        "{}: the far end of this socket has no path of its own, \
-                         so it cannot be sent to: a datagram device binds a path \
-                         in order to be answered",
+                        "{}: the far end of this socket has no path of its \
+                         own, so it cannot be sent to: a datagram device binds \
+                         a path in order to be answered",
                         self.what
                     )));
                 }
@@ -382,8 +398,8 @@ fn clear_a_dead_socket(what: &str, path: &Path) -> TcsResult<()> {
         ))),
         Err(_) => {
             info!(
-                "{what}: {} is a socket nothing answers, left by a handler that was \
-                 killed rather than stopped; replacing it",
+                "{what}: {} is a socket nothing answers, left by a handler \
+                 that was killed rather than stopped; replacing it",
                 path.display()
             );
             std::fs::remove_file(path).map_err(TcsError::Io)
@@ -440,8 +456,11 @@ mod tests {
         accepted.write_all(b"from the device").expect("it sends");
         let mut buffer = [0u8; 64];
         let mut got = Vec::new();
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
-        while got.len() < b"from the device".len() && std::time::Instant::now() < deadline {
+        let deadline =
+            std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while got.len() < b"from the device".len()
+            && std::time::Instant::now() < deadline
+        {
             match endpoint.read(&mut buffer) {
                 Ok(n) if n > 0 => got.extend_from_slice(&buffer[..n]),
                 _ => std::thread::sleep(std::time::Duration::from_millis(10)),
@@ -480,13 +499,15 @@ mod tests {
 
         // Standing in for tcssim: the device binds a path of its own, so
         // that it can be answered, and speaks first.
-        let device = UnixDatagram::bind(&device_path).expect("the device binds");
+        let device =
+            UnixDatagram::bind(&device_path).expect("the device binds");
         device
             .send_to(b"from the device", &handler_path)
             .expect("the device sends");
 
         let mut buffer = [0u8; 64];
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let deadline =
+            std::time::Instant::now() + std::time::Duration::from_secs(5);
         let mut got = 0;
         while got == 0 && std::time::Instant::now() < deadline {
             got = endpoint.read(&mut buffer).expect("a read");
@@ -520,7 +541,8 @@ mod tests {
 
         // The device, standing in for tcssim: it binds the path the
         // configuration names and waits to be driven, saying nothing.
-        let device = UnixDatagram::bind(&device_path).expect("the device binds");
+        let device =
+            UnixDatagram::bind(&device_path).expect("the device binds");
 
         let mut endpoint = UnixDatagramEndpoint::reaching(
             "heaters",
@@ -544,7 +566,8 @@ mod tests {
         // once: the endpoint holds where the device is rather than learning
         // it, so the second write goes the same way as the first.
         endpoint.write(b"0").expect("the next decision goes out");
-        let (n, _) = device.recv_from(&mut back).expect("the device reads again");
+        let (n, _) =
+            device.recv_from(&mut back).expect("the device reads again");
         assert_eq!(&back[..n], b"0");
 
         // And nothing of this end is in the filesystem to clear up.
@@ -561,7 +584,8 @@ mod tests {
 
         let device_path = a_path("asked-device");
         std::fs::remove_file(&device_path).ok();
-        let device = UnixDatagram::bind(&device_path).expect("the device binds");
+        let device =
+            UnixDatagram::bind(&device_path).expect("the device binds");
 
         let mut endpoint = UnixDatagramEndpoint::reaching(
             "temp",
@@ -582,10 +606,13 @@ mod tests {
             .send_to_addr(b"21.5", &from)
             .expect("the answer goes");
         let mut into = [0u8; 64];
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        let deadline =
+            std::time::Instant::now() + std::time::Duration::from_secs(2);
         let n = loop {
             match endpoint.read(&mut into).expect("a read") {
-                0 if std::time::Instant::now() < deadline => std::thread::yield_now(),
+                0 if std::time::Instant::now() < deadline => {
+                    std::thread::yield_now()
+                }
                 n => break n,
             }
         };
@@ -604,8 +631,10 @@ mod tests {
         for path in [&device_path, &stranger_path] {
             std::fs::remove_file(path).ok();
         }
-        let device = UnixDatagram::bind(&device_path).expect("the device binds");
-        let stranger = UnixDatagram::bind(&stranger_path).expect("a stranger binds");
+        let device =
+            UnixDatagram::bind(&device_path).expect("the device binds");
+        let stranger =
+            UnixDatagram::bind(&stranger_path).expect("a stranger binds");
 
         let mut endpoint = UnixDatagramEndpoint::reaching(
             "temp",
@@ -616,7 +645,8 @@ mod tests {
         // device something is how to learn it.
         endpoint.write(b"READ").expect("the trigger goes out");
         let mut asked = [0u8; 64];
-        let (_, vehicle) = device.recv_from(&mut asked).expect("the device reads");
+        let (_, vehicle) =
+            device.recv_from(&mut asked).expect("the device reads");
 
         stranger
             .send_to_addr(b"99.9", &vehicle)
@@ -626,10 +656,13 @@ mod tests {
             .expect("the answer goes");
 
         let mut into = [0u8; 64];
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        let deadline =
+            std::time::Instant::now() + std::time::Duration::from_secs(2);
         let n = loop {
             match endpoint.read(&mut into).expect("a read") {
-                0 if std::time::Instant::now() < deadline => std::thread::yield_now(),
+                0 if std::time::Instant::now() < deadline => {
+                    std::thread::yield_now()
+                }
                 n => break n,
             }
         };
@@ -662,11 +695,16 @@ mod tests {
         )
         .expect("the vehicle binds");
         endpoint
-            .hear_only("temp", &SendsFrom::Path(device_path.display().to_string()))
+            .hear_only(
+                "temp",
+                &SendsFrom::Path(device_path.display().to_string()),
+            )
             .expect("a path for a path");
 
-        let device = UnixDatagram::bind(&device_path).expect("the device binds");
-        let stranger = UnixDatagram::bind(&stranger_path).expect("a stranger binds");
+        let device =
+            UnixDatagram::bind(&device_path).expect("the device binds");
+        let stranger =
+            UnixDatagram::bind(&stranger_path).expect("a stranger binds");
         stranger
             .send_to(b"99.9", &vehicle_path)
             .expect("the stranger sends");
@@ -675,10 +713,13 @@ mod tests {
             .expect("the device sends");
 
         let mut into = [0u8; 64];
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        let deadline =
+            std::time::Instant::now() + std::time::Duration::from_secs(2);
         let n = loop {
             match endpoint.read(&mut into).expect("a read") {
-                0 if std::time::Instant::now() < deadline => std::thread::yield_now(),
+                0 if std::time::Instant::now() < deadline => {
+                    std::thread::yield_now()
+                }
                 n => break n,
             }
         };
@@ -706,9 +747,11 @@ mod tests {
         drop(UnixDatagram::bind(&path).expect("a socket to abandon"));
         assert!(path.exists(), "the file should outlive the socket");
 
-        let endpoint =
-            UnixDatagramEndpoint::bind("beacon", &config_at(&path, NetworkProtocol::UnixDgram))
-                .expect("a dead socket is not a reason to refuse");
+        let endpoint = UnixDatagramEndpoint::bind(
+            "beacon",
+            &config_at(&path, NetworkProtocol::UnixDgram),
+        )
+        .expect("a dead socket is not a reason to refuse");
         drop(endpoint);
 
         std::fs::remove_file(&path).ok();
@@ -721,7 +764,8 @@ mod tests {
         let path = a_path("live");
         std::fs::remove_file(&path).ok();
 
-        let live = UnixDatagram::bind(&path).expect("a socket that is listening");
+        let live =
+            UnixDatagram::bind(&path).expect("a socket that is listening");
 
         let e = match UnixDatagramEndpoint::bind(
             "beacon",

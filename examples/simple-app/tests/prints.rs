@@ -29,7 +29,8 @@ fn configuration() -> (tempfile::TempDir, PathBuf, u16) {
             "moc:
   - {{ name: moc, type: moc, ground_base: \"127.0.0.1:{}\" }}
 payloads:
-  - {{ name: lorem, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7001\", payload-out: moc }}
+  - {{ name: lorem, type: network, protocol: udp, address: \"127.0.0.1\", \
+port: \"7001\", payload-out: moc }}
 ",
             port - 1
         ),
@@ -78,7 +79,8 @@ fn printed(ground: &mut Child) -> String {
 fn the_words_are_written_out_as_one_line() {
     let (_dir, path, port) = configuration();
     let mut ground = ground(&path);
-    let vehicle = UdpSocket::bind("127.0.0.1:0").expect("the vehicle's own socket");
+    let vehicle =
+        UdpSocket::bind("127.0.0.1:0").expect("the vehicle's own socket");
 
     let first = simple_app::line(1).expect("a paragraph has a first line");
     for word in first.words() {
@@ -116,7 +118,8 @@ fn the_words_are_written_out_as_one_line() {
 fn a_datum_that_is_only_the_terminator_ends_it() {
     let (_dir, path, port) = configuration();
     let mut ground = ground(&path);
-    let vehicle = UdpSocket::bind("127.0.0.1:0").expect("the vehicle's own socket");
+    let vehicle =
+        UdpSocket::bind("127.0.0.1:0").expect("the vehicle's own socket");
 
     vehicle
         .send_to(simple_app::TERMINATOR.as_bytes(), ("127.0.0.1", port))

@@ -15,7 +15,8 @@ fn suite(directory: &str, pattern: &str, top: &str) {
     let ran = Command::new("python3")
         .current_dir(&root)
         .args([
-            "-m", "unittest", "discover", "-s", directory, "-p", pattern, "-t", top,
+            "-m", "unittest", "discover", "-s", directory, "-p", pattern, "-t",
+            top,
         ])
         .output()
         .expect("python3 runs: the example's ground station is Python 3");

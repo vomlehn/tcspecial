@@ -48,7 +48,8 @@ static ASKED: AtomicBool = AtomicBool::new(false);
 /// The first thing `main` does, before anything is opened: a descriptor
 /// opened before this is one a restart would keep, and would then have twice.
 pub fn note_how_started() {
-    let program = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("/proc/self/exe"));
+    let program = std::env::current_exe()
+        .unwrap_or_else(|_| PathBuf::from("/proc/self/exe"));
     let _ = STARTED.set(Started {
         program,
         args: std::env::args_os().collect(),
@@ -79,7 +80,9 @@ pub fn if_asked() {
         return;
     }
     let why = match STARTED.get() {
-        None => "how tcspecial was started was not noted as it started".to_string(),
+        None => {
+            "how tcspecial was started was not noted as it started".to_string()
+        }
         Some(started) => match &started.inherited {
             Err(why) => why.clone(),
             Ok(inherited) => {
@@ -88,7 +91,9 @@ pub fn if_asked() {
             }
         },
     };
-    eprintln!("tcspecial: cannot restart on this system: {why}; exiting instead");
+    eprintln!(
+        "tcspecial: cannot restart on this system: {why}; exiting instead"
+    );
     std::process::exit(1);
 }
 
@@ -97,7 +102,12 @@ pub fn if_asked() {
 fn run_again(started: &Started, inherited: &[libc::c_int]) -> String {
     let program = match CString::new(started.program.as_os_str().as_bytes()) {
         Ok(program) => program,
-        Err(_) => return format!("{} has a nul in its name", started.program.display()),
+        Err(_) => {
+            return format!(
+                "{} has a nul in its name",
+                started.program.display()
+            )
+        }
     };
     let args: Vec<CString> = match started
         .args
@@ -108,7 +118,8 @@ fn run_again(started: &Started, inherited: &[libc::c_int]) -> String {
         Ok(args) => args,
         Err(_) => return "an argument has a nul in it".to_string(),
     };
-    let mut argv: Vec<*const libc::c_char> = args.iter().map(|arg| arg.as_ptr()).collect();
+    let mut argv: Vec<*const libc::c_char> =
+        args.iter().map(|arg| arg.as_ptr()).collect();
     argv.push(std::ptr::null());
 
     // Everything open now that the process was not started with. Asked
@@ -160,8 +171,8 @@ fn open_descriptors() -> Result<Vec<libc::c_int>, String> {
         .iter()
         .find_map(|dir| std::fs::read_dir(dir).ok())
         .ok_or_else(|| {
-            "neither /proc/self/fd nor /dev/fd can be read, so which descriptors \
-             tcspecial was started with cannot be known"
+            "neither /proc/self/fd nor /dev/fd can be read, so which \
+             descriptors tcspecial was started with cannot be known"
                 .to_string()
         })?
         .filter_map(|entry| entry.ok())

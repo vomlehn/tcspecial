@@ -46,8 +46,8 @@ pub use crate::node::payload::serial::rs485::Rs485Params;
 pub use crate::node::payload::serial::{ByteLength, StopBits};
 pub use crate::node::payload::spi::{BitOrder, BitsPerWord, CsActive, SpiMode};
 use crate::types::{
-    CanConfig, EndpointConfig, GpioConfig, I2cConfig, IioConfig, RpmsgConfig, SerialConfig,
-    SpiConfig,
+    CanConfig, EndpointConfig, GpioConfig, I2cConfig, IioConfig, RpmsgConfig,
+    SerialConfig, SpiConfig,
 };
 use crate::TcsError;
 
@@ -68,7 +68,10 @@ pub enum EndpointConfigError {
         field: &'static str,
     },
 
-    #[error("payload \"{group}\" is on a {kind} link, so {field} does not apply to it")]
+    #[error(
+        "payload \"{group}\" is on a {kind} link, so {field} does not apply to \
+         it"
+    )]
     UnusedGroupField {
         group: String,
         kind: &'static str,
@@ -79,27 +82,30 @@ pub enum EndpointConfigError {
     StreamMissingMaxLength(String),
 
     #[error(
-        "payload \"{0}\": a line must say where a read of it ends: give read_timeout, \
-         terminators or length_prefix. To read max_length bytes at a time with none \
-         of them, say read_timeout: none"
+        "payload \"{0}\": a line must say where a read of it ends: give \
+         read_timeout, terminators or length_prefix. To read max_length bytes \
+         at a time with none of them, say read_timeout: none"
     )]
     StreamNeedsTimeoutOrTerminators(String),
 
     #[error(
-        "payload \"{0}\": length_prefix and terminators cannot both end a read: a \
-         terminator byte can be part of a frame whose length was given. Remove one"
+        "payload \"{0}\": length_prefix and terminators cannot both end a \
+         read: a terminator byte can be part of a frame whose length was \
+         given. Remove one"
     )]
     StreamPrefixAndTerminators(String),
 
     #[error(
-        "payload \"{0}\": a line with a length_prefix must also say read_timeout, as a \
-         length of time or as none. A timeout is what puts the reads back in step after \
-         a byte is lost; none says there is to be no such recovery"
+        "payload \"{0}\": a line with a length_prefix must also say \
+         read_timeout, as a length of time or as none. A timeout is what puts \
+         the reads back in step after a byte is lost; none says there is to be \
+         no such recovery"
     )]
     StreamPrefixNeedsTimeout(String),
 
     #[error(
-        "payload \"{0}\": terminators is empty, which names no terminator: leave it out, \
+        "payload \"{0}\": terminators is empty, which names no terminator: \
+         leave it out, \
          or give at least one, as \"\\r\\n\" or [03]"
     )]
     StreamEmptyTerminators(String),
@@ -153,20 +159,23 @@ pub(crate) fn endpoint_of(
         // the interface is the whole of where it is, there being no address
         // on it -- a frame carries none, so one line is one payload.
         EndpointLocation::Interface { interface } => match kind {
-            GroupKind::Hdlc(hdlc) => Ok(EndpointConfig::Hdlc(crate::types::HdlcConfig {
-                interface: interface.clone(),
-                standard: hdlc.standard,
-                clock_type: hdlc.clock_type,
-                clock_rate: hdlc.clock_rate,
-                loopback: hdlc.loopback,
-                encoding: hdlc.encoding,
-                frame_check: hdlc.frame_check,
-            })),
+            GroupKind::Hdlc(hdlc) => {
+                Ok(EndpointConfig::Hdlc(crate::types::HdlcConfig {
+                    interface: interface.clone(),
+                    standard: hdlc.standard,
+                    clock_type: hdlc.clock_type,
+                    clock_rate: hdlc.clock_rate,
+                    loopback: hdlc.loopback,
+                    encoding: hdlc.encoding,
+                    frame_check: hdlc.frame_check,
+                }))
+            }
             // Only an hdlc payload is located by an interface alone, so this
             // is unreachable through the parser; an error rather than a
             // panic, for the reason the arms below give.
             _ => Err(format!(
-                "\"{what}\" is on an interface, which a {} link does not put it on",
+                "\"{what}\" is on an interface, which a {} link does not put \
+                 it on",
                 kind.type_name()
             )),
         },
@@ -181,7 +190,8 @@ pub(crate) fn endpoint_of(
             // unreachable through the parser; an error rather than a panic,
             // for the reason the bus arm above gives.
             _ => Err(format!(
-                "\"{what}\" is on a CAN interface, which a {} link does not put it on",
+                "\"{what}\" is on a CAN interface, which a {} link does not \
+                 put it on",
                 kind.type_name()
             )),
         },
@@ -192,14 +202,16 @@ pub(crate) fn endpoint_of(
         // whatever rate the port was last left at, a SPI peripheral at
         // whatever mode.
         EndpointLocation::Path { path } => match kind {
-            GroupKind::Serial(serial) => Ok(EndpointConfig::Serial(SerialConfig {
-                path: path.clone(),
-                datarate: serial.datarate,
-                stop_bits: serial.stop_bits,
-                parity: serial.parity,
-                byte_length: serial.byte_length.bits(),
-                rs485: serial.rs485,
-            })),
+            GroupKind::Serial(serial) => {
+                Ok(EndpointConfig::Serial(SerialConfig {
+                    path: path.clone(),
+                    datarate: serial.datarate,
+                    stop_bits: serial.stop_bits,
+                    parity: serial.parity,
+                    byte_length: serial.byte_length.bits(),
+                    rs485: serial.rs485,
+                }))
+            }
             GroupKind::Spi(spi) => Ok(EndpointConfig::Spi(SpiConfig {
                 path: path.clone(),
                 max_speed: spi.max_speed,
@@ -213,10 +225,12 @@ pub(crate) fn endpoint_of(
             // shape it cannot produce. A CAN payload is on an interface and
             // not a path at all, for the same reason.
             GroupKind::I2c(_) => Err(format!(
-                "\"{what}\" names a device alone, but a device on an I2C bus needs the \
-                 bus and the address on it"
+                "\"{what}\" names a device alone, but a device on an I2C bus \
+                 needs the bus and the address on it"
             )),
-            GroupKind::Iio(_) => Ok(EndpointConfig::Iio(IioConfig { path: path.clone() })),
+            GroupKind::Iio(_) => {
+                Ok(EndpointConfig::Iio(IioConfig { path: path.clone() }))
+            }
             GroupKind::Gpio(gpio) => Ok(EndpointConfig::Gpio(GpioConfig {
                 path: path.clone(),
                 lines: gpio.lines.clone(),
@@ -232,14 +246,14 @@ pub(crate) fn endpoint_of(
                 max_message_bytes: rpmsg.max_message_bytes,
             })),
             GroupKind::Can(_) => Err(format!(
-                "\"{what}\" names a device file, but a CAN payload is on an interface \
-                 and the identifier its frames carry"
+                "\"{what}\" names a device file, but a CAN payload is on an \
+                 interface and the identifier its frames carry"
             )),
             // A synchronous line is a network interface and not a device
             // file, for the reason a CAN controller is not one.
             GroupKind::Hdlc(_) => Err(format!(
-                "\"{what}\" names a device file, but a synchronous line is a network \
-                 interface: say interface, not path"
+                "\"{what}\" names a device file, but a synchronous line is a \
+                 network interface: say interface, not path"
             )),
         },
     }
@@ -324,7 +338,9 @@ impl StreamParams {
     /// True exactly for the file that said `read_timeout: none` and gave
     /// nothing else -- the "hand me this many bytes at a time" case.
     pub fn is_fixed_length(&self) -> bool {
-        self.timeout.is_none() && self.terminators.is_empty() && self.length_prefix.is_none()
+        self.timeout.is_none()
+            && self.terminators.is_empty()
+            && self.length_prefix.is_none()
     }
 }
 
@@ -348,7 +364,8 @@ pub enum LengthPrefix {
 
 impl LengthPrefix {
     /// Every prefix, in the order the documentation gives them.
-    pub const ALL: [LengthPrefix; 3] = [LengthPrefix::U8, LengthPrefix::U16Be, LengthPrefix::U16Le];
+    pub const ALL: [LengthPrefix; 3] =
+        [LengthPrefix::U8, LengthPrefix::U16Be, LengthPrefix::U16Le];
 
     /// How this prefix is spelled in a configuration file.
     pub fn as_str(self) -> &'static str {
@@ -372,8 +389,12 @@ impl LengthPrefix {
     pub fn length(self, bytes: &[u8]) -> usize {
         match self {
             LengthPrefix::U8 => bytes[0] as usize,
-            LengthPrefix::U16Be => u16::from_be_bytes([bytes[0], bytes[1]]) as usize,
-            LengthPrefix::U16Le => u16::from_le_bytes([bytes[0], bytes[1]]) as usize,
+            LengthPrefix::U16Be => {
+                u16::from_be_bytes([bytes[0], bytes[1]]) as usize
+            }
+            LengthPrefix::U16Le => {
+                u16::from_le_bytes([bytes[0], bytes[1]]) as usize
+            }
         }
     }
 }
@@ -603,13 +624,19 @@ impl<'de> Deserialize<'de> for Scalar {
             /// element, so this is the form it comes in there; the endpoint
             /// language wrote them as attributes, which is why this was not
             /// needed before.
-            fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Scalar, A::Error> {
+            fn visit_map<A: MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> Result<Scalar, A::Error> {
                 let mut text: Option<String> = None;
-                while let Some((_, value)) = map.next_entry::<String, String>()? {
+                while let Some((_, value)) =
+                    map.next_entry::<String, String>()?
+                {
                     text = Some(value);
                 }
-                text.map(Scalar)
-                    .ok_or_else(|| de::Error::custom("an element with no value in it"))
+                text.map(Scalar).ok_or_else(|| {
+                    de::Error::custom("an element with no value in it")
+                })
             }
             fn visit_u64<E: de::Error>(self, v: u64) -> Result<Scalar, E> {
                 Ok(Scalar(v.to_string()))
@@ -657,12 +684,14 @@ impl<'de> Deserialize<'de> for Scalar {
 // ---------------------------------------------------------------------------
 
 /// Apply the rules governing a stream section.
-pub(crate) fn validate_stream(group: &str, s: StreamTerms) -> EndpointConfigResult<StreamParams> {
+pub(crate) fn validate_stream(
+    group: &str,
+    s: StreamTerms,
+) -> EndpointConfigResult<StreamParams> {
     // 1. max_length is required.
-    let max_length = s
-        .max_length
-        .as_ref()
-        .ok_or_else(|| EndpointConfigError::StreamMissingMaxLength(group.to_string()))?;
+    let max_length = s.max_length.as_ref().ok_or_else(|| {
+        EndpointConfigError::StreamMissingMaxLength(group.to_string())
+    })?;
     let max_length = parse_u32(group, "max_length", max_length)?;
     if max_length == 0 {
         return Err(bad(group, "max_length must be greater than zero"));
@@ -686,14 +715,20 @@ pub(crate) fn validate_stream(group: &str, s: StreamTerms) -> EndpointConfigResu
                     group.to_string(),
                 ));
             }
-            let each = crate::trigger::sequences_of(&crate::trigger::TERMINATOR, list.as_str())
-                .map_err(|why| bad(group, &format!("terminators: {why}")))?;
-            if let Some(long) = each.iter().find(|t| t.len() > max_length as usize) {
+            let each = crate::trigger::sequences_of(
+                &crate::trigger::TERMINATOR,
+                list.as_str(),
+            )
+            .map_err(|why| bad(group, &format!("terminators: {why}")))?;
+            if let Some(long) =
+                each.iter().find(|t| t.len() > max_length as usize)
+            {
                 return Err(bad(
                     group,
                     &format!(
-                        "the terminator {} is {} bytes, more than max_length {max_length}: \
-                         a read could never hold it, so it would end none",
+                        "the terminator {} is {} bytes, more than max_length \
+                         {max_length}: a read could never hold it, so it would \
+                         end none",
                         crate::trigger::trigger_as_written(long),
                         long.len()
                     ),
@@ -735,8 +770,8 @@ pub(crate) fn validate_stream(group: &str, s: StreamTerms) -> EndpointConfigResu
             return Err(bad(
                 group,
                 &format!(
-                    "max_length {max_length} cannot hold a length_prefix of {prefix}, \
-                     which is {} bytes on its own",
+                    "max_length {max_length} cannot hold a length_prefix of \
+                     {prefix}, which is {} bytes on its own",
                     prefix.width()
                 ),
             ));
@@ -765,7 +800,10 @@ pub(crate) fn validate_stream(group: &str, s: StreamTerms) -> EndpointConfigResu
 }
 
 /// Which length prefix a file's word names.
-fn parse_length_prefix(group: &str, s: &Scalar) -> EndpointConfigResult<LengthPrefix> {
+fn parse_length_prefix(
+    group: &str,
+    s: &Scalar,
+) -> EndpointConfigResult<LengthPrefix> {
     let said = s.as_str().trim().to_ascii_lowercase();
     LengthPrefix::ALL
         .into_iter()
@@ -774,8 +812,9 @@ fn parse_length_prefix(group: &str, s: &Scalar) -> EndpointConfigResult<LengthPr
             bad(
                 group,
                 &format!(
-                    "length_prefix: \"{}\" is not one of u8, u16be or u16le -- one \
-                     byte, or two with the more or the less significant first",
+                    "length_prefix: \"{}\" is not one of u8, u16be or u16le -- \
+                     one byte, or two with the more or the less significant \
+                     first",
                     s.as_str()
                 ),
             )
@@ -923,8 +962,13 @@ pub(crate) fn reject_stream(
 /// The grammar is [`crate::whole`]'s and is the same for every integer in
 /// every one of these files: decimal, or hexadecimal with an `0x` prefix,
 /// underscores allowed among the digits.
-pub(crate) fn parse_u32(group: &str, field: &str, s: &Scalar) -> EndpointConfigResult<u32> {
-    crate::whole::whole_u32(s.as_str()).map_err(|why| bad(group, &format!("{field}: {why}")))
+pub(crate) fn parse_u32(
+    group: &str,
+    field: &str,
+    s: &Scalar,
+) -> EndpointConfigResult<u32> {
+    crate::whole::whole_u32(s.as_str())
+        .map_err(|why| bad(group, &format!("{field}: {why}")))
 }
 
 /// Parse a flag written `true` or `false`.
@@ -965,7 +1009,10 @@ pub(crate) fn parse_flag(
 ///
 /// Nought is refused, as it is of any interval: a read that times out at once
 /// reads nothing, and `none` is the way to ask for a read that is waited out.
-pub(crate) fn parse_timeout(group: &str, s: &Scalar) -> EndpointConfigResult<Option<Duration>> {
+pub(crate) fn parse_timeout(
+    group: &str,
+    s: &Scalar,
+) -> EndpointConfigResult<Option<Duration>> {
     let text = s.as_str();
     if text.trim().eq_ignore_ascii_case("none") {
         return Ok(None);
@@ -999,7 +1046,8 @@ mod a_scalar_of_nothing {
         }
 
         let said: Said =
-            serde_norway::from_str("payload_port:\npacket_size: 4\n").expect("it reads");
+            serde_norway::from_str("payload_port:\npacket_size: 4\n")
+                .expect("it reads");
         // An optional field never reaches the scalar: the reader answers the
         // Option itself, and nothing is None. Which is the same meaning by a
         // shorter road.
@@ -1009,7 +1057,8 @@ mod a_scalar_of_nothing {
         // And a map of them, which is how a node's attributes and a simulated
         // payload's settings are read.
         let mut settings: std::collections::BTreeMap<String, Scalar> =
-            serde_norway::from_str("drop_percent:\njitter_ms: 20\n").expect("it reads");
+            serde_norway::from_str("drop_percent:\njitter_ms: 20\n")
+                .expect("it reads");
         assert_eq!(
             settings
                 .remove("drop_percent")

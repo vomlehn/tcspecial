@@ -20,4 +20,6 @@ def use_in(window):
     them too. A positive size is points to Tk, as it is to Slint.
     """
     for name in tkinter.font.names(window):
-        tkinter.font.Font(root=window, name=name, exists=True).configure(size=POINTS)
+        tkinter.font.Font(root=window, name=name, exists=True).configure(
+            size=POINTS
+        )

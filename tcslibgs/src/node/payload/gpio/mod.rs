@@ -27,8 +27,8 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::endpoint_config::{
-    bad, parse_u32, reject_foreign_fields, reject_stream, require, EndpointConfigResult, GroupKind,
-    LinkTerms, Scalar,
+    bad, parse_u32, reject_foreign_fields, reject_stream, require,
+    EndpointConfigResult, GroupKind, LinkTerms, Scalar,
 };
 
 /// How many bytes one line event takes as payload data.
@@ -84,7 +84,9 @@ pub enum Bias {
 /// an output produces no edges to read -- so which it is has to be stated,
 /// and stating it is what lets a configuration be refused for driving
 /// something it declared it would watch.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum Direction {
     /// Watched: changes on these lines are events. The default, because a set
@@ -147,7 +149,11 @@ pub struct GpioParams {
 /// at all is a line with no debouncing, and a report every no time at all is
 /// a line read as fast as the chip will answer -- so neither needs a rule of
 /// its own here.
-fn length_of_time(name: &str, term: &str, stated: &Scalar) -> EndpointConfigResult<Duration> {
+fn length_of_time(
+    name: &str,
+    term: &str,
+    stated: &Scalar,
+) -> EndpointConfigResult<Duration> {
     crate::graph::parse_interval(stated.as_str())
         .map_err(|why| bad(name, &format!("{term}: {why}")))
 }
@@ -170,8 +176,8 @@ pub fn lines_of(name: &str, stated: &Scalar) -> EndpointConfigResult<Vec<u32>> {
             return Err(bad(
                 name,
                 &format!(
-                    "lines names offset {offset} twice: a line watched twice would \
-                     report every change of it twice"
+                    "lines names offset {offset} twice: a line watched twice \
+                     would report every change of it twice"
                 ),
             ));
         }
@@ -181,8 +187,8 @@ pub fn lines_of(name: &str, stated: &Scalar) -> EndpointConfigResult<Vec<u32>> {
     if lines.is_empty() {
         return Err(bad(
             name,
-            "lines must name at least one line: a payload watching no lines has \
-             nothing to report",
+            "lines must name at least one line: a payload watching no lines \
+             has nothing to report",
         ));
     }
 
@@ -200,7 +206,10 @@ pub fn lines_of(name: &str, stated: &Scalar) -> EndpointConfigResult<Vec<u32>> {
 }
 
 /// What a GPIO payload says about its lines, and what it must say.
-pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<GroupKind> {
+pub(crate) fn group_kind_of(
+    name: &str,
+    g: LinkTerms,
+) -> EndpointConfigResult<GroupKind> {
     reject_foreign_fields(
         name,
         "gpio",
@@ -231,7 +240,9 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
             other => {
                 return Err(bad(
                     name,
-                    &format!("edge: \"{other}\" is not rising, falling, both or none"),
+                    &format!(
+                    "edge: \"{other}\" is not rising, falling, both or none"
+                ),
                 ))
             }
         },
@@ -246,7 +257,9 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
             other => {
                 return Err(bad(
                     name,
-                    &format!("bias: \"{other}\" is not none, pull_up or pull_down"),
+                    &format!(
+                        "bias: \"{other}\" is not none, pull_up or pull_down"
+                    ),
                 ))
             }
         },
@@ -264,9 +277,8 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
     };
 
     let direction = match g.direction.as_ref() {
-        Some(stated) => {
-            Direction::of(&stated.as_str().to_ascii_lowercase()).map_err(|why| bad(name, &why))?
-        }
+        Some(stated) => Direction::of(&stated.as_str().to_ascii_lowercase())
+            .map_err(|why| bad(name, &why))?,
         None => Direction::Input,
     };
 
@@ -300,7 +312,8 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
     // report -- and that is a payload that would send nothing at all: the
     // configuration asked for the lines and then asked for nothing about
     // them.
-    if !direction.is_output() && edge == Edge::None && state_interval.is_none() {
+    if !direction.is_output() && edge == Edge::None && state_interval.is_none()
+    {
         return Err(bad(
             name,
             "these lines are watched for no edges and reported at no interval, \
@@ -320,7 +333,8 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
 }
 
 /// What `--simulate` asks to change on a GPIO node that is not a stand-in.
-const TO_STAND_IN: &str = "point path at the gpio-sim chip, which bin/mkgpio makes";
+const TO_STAND_IN: &str =
+    "point path at the gpio-sim chip, which bin/mkgpio makes";
 
 /// Whether the chip at `path` belongs to the kernel's `gpio-sim`, from where
 /// the kernel puts it. See [`crate::simulate`].
@@ -328,7 +342,10 @@ const TO_STAND_IN: &str = "point path at the gpio-sim chip, which bin/mkgpio mak
 /// A simulated chip is a child of a `gpio-sim.<n>` platform device, and a
 /// real one the child of whatever controller it is on; the chip's number is
 /// given out as chips appear and says nothing.
-pub fn judged(host: &crate::simulate::Host, path: &str) -> crate::simulate::Judged {
+pub fn judged(
+    host: &crate::simulate::Host,
+    path: &str,
+) -> crate::simulate::Judged {
     match host.device_of(path) {
         Ok(device) => chip_judged(path, &device),
         Err(found) => found.judged("path", TO_STAND_IN),
@@ -336,7 +353,10 @@ pub fn judged(host: &crate::simulate::Host, path: &str) -> crate::simulate::Judg
 }
 
 /// The judgement of a chip whose kernel directory is `device`.
-fn chip_judged(path: &str, device: &std::path::Path) -> crate::simulate::Judged {
+fn chip_judged(
+    path: &str,
+    device: &std::path::Path,
+) -> crate::simulate::Judged {
     use crate::simulate::Judged;
     let simulated = device.components().any(|part| {
         part.as_os_str()
@@ -448,7 +468,11 @@ mod tests {
 
         // A report and no edges, which is a set of lines read for what they
         // are rather than for when they changed.
-        let said = params(&[("lines", "0"), ("edge", "none"), ("state_interval", "5 s")]);
+        let said = params(&[
+            ("lines", "0"),
+            ("edge", "none"),
+            ("state_interval", "5 s"),
+        ]);
         assert_eq!(said.edge, Edge::None);
         assert_eq!(said.state_interval, Some(Duration::from_secs(5)));
 
@@ -458,8 +482,11 @@ mod tests {
         assert_eq!(said.state_interval, Some(Duration::from_secs(1)));
 
         // Neither is refused, and the complaint says both ways out.
-        let why = group_kind_of("discretes", terms(&[("lines", "0"), ("edge", "none")]))
-            .expect_err("lines nobody watches");
+        let why = group_kind_of(
+            "discretes",
+            terms(&[("lines", "0"), ("edge", "none")]),
+        )
+        .expect_err("lines nobody watches");
         let why = format!("{why}");
         assert!(
             why.contains("state_interval") && why.contains("edge"),
@@ -514,9 +541,11 @@ mod tests {
             "the error should say what is wrong: {said}"
         );
 
-        let many: Vec<String> = (0..=MOST_LINES as u32).map(|n| n.to_string()).collect();
-        let said = group_kind_of("discretes", terms(&[("lines", &many.join(","))]))
-            .expect_err("more lines than a request may name");
+        let many: Vec<String> =
+            (0..=MOST_LINES as u32).map(|n| n.to_string()).collect();
+        let said =
+            group_kind_of("discretes", terms(&[("lines", &many.join(","))]))
+                .expect_err("more lines than a request may name");
         assert!(
             format!("{said}").contains("64"),
             "the error should say the limit: {said}"
@@ -541,18 +570,25 @@ mod tests {
             ("edge", "sideways", "rising, falling, both or none"),
             ("bias", "pull_sideways", "none, pull_up or pull_down"),
         ] {
-            let said = group_kind_of("discretes", terms(&[("lines", "0"), (field, value)]))
-                .expect_err("a word that is not a value");
+            let said = group_kind_of(
+                "discretes",
+                terms(&[("lines", "0"), (field, value)]),
+            )
+            .expect_err("a word that is not a value");
             assert!(
                 format!("{said}").contains(expected),
                 "the error should list the values: {said}"
             );
         }
 
-        let said = group_kind_of("discretes", terms(&[("lines", "0"), ("debounce", "0 s")]))
-            .expect_err("no debouncing at all");
+        let said = group_kind_of(
+            "discretes",
+            terms(&[("lines", "0"), ("debounce", "0 s")]),
+        )
+        .expect_err("no debouncing at all");
         assert!(
-            format!("{said}").contains("debounce") && format!("{said}").contains("no interval"),
+            format!("{said}").contains("debounce")
+                && format!("{said}").contains("no interval"),
             "the error should name the term: {said}"
         );
     }
@@ -560,8 +596,11 @@ mod tests {
     /// A term of another kind of link is refused.
     #[test]
     fn a_term_of_another_link_is_refused() {
-        let said = group_kind_of("discretes", terms(&[("lines", "0"), ("datarate", "9600")]))
-            .expect_err("a line's rate on a set of discretes");
+        let said = group_kind_of(
+            "discretes",
+            terms(&[("lines", "0"), ("datarate", "9600")]),
+        )
+        .expect_err("a line's rate on a set of discretes");
         assert!(
             format!("{said}").contains("datarate"),
             "the error should name the term: {said}"
@@ -577,7 +616,8 @@ mod tests {
             Direction::Input
         );
         assert_eq!(
-            params(&[("lines", "17, 18, 19"), ("direction", "output")]).direction,
+            params(&[("lines", "17, 18, 19"), ("direction", "output")])
+                .direction,
             Direction::Output
         );
 
@@ -588,8 +628,11 @@ mod tests {
             Direction::Output
         );
 
-        let said = group_kind_of("discretes", terms(&[("lines", "0"), ("direction", "both")]))
-            .expect_err("a direction that is neither");
+        let said = group_kind_of(
+            "discretes",
+            terms(&[("lines", "0"), ("direction", "both")]),
+        )
+        .expect_err("a direction that is neither");
         assert!(
             format!("{said}").contains("neither input nor output"),
             "the error should say what the choices are: {said}"
@@ -610,7 +653,11 @@ mod tests {
         ] {
             let said = group_kind_of(
                 "heaters",
-                terms(&[("lines", "17"), ("direction", "output"), (term, value)]),
+                terms(&[
+                    ("lines", "17"),
+                    ("direction", "output"),
+                    (term, value),
+                ]),
             )
             .expect_err("a watching term on a driven line");
             let said = format!("{said}");

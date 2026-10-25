@@ -90,7 +90,8 @@ fn is_lit(line: usize, now: Instant) -> bool {
     let Some(sent) = SENT.get() else {
         return false;
     };
-    let Some(at) = sent.at.get(line).map(|slot| slot.load(Ordering::Relaxed)) else {
+    let Some(at) = sent.at.get(line).map(|slot| slot.load(Ordering::Relaxed))
+    else {
         return false;
     };
     if at == 0 {
@@ -184,7 +185,10 @@ pub fn run(path: &str, mode: tcslibgs::simulate::Mode) -> i32 {
     let flying = match flying {
         Ok(flying) => flying,
         Err(why) => {
-            eprintln!("tcspecial --visual: the vehicle's thread cannot be started: {why}");
+            eprintln!(
+                "tcspecial --visual: the vehicle's thread cannot be \
+                       started: {why}"
+            );
             return 1;
         }
     };
@@ -239,9 +243,15 @@ struct Shown {
 /// settles a file it opens -- so a node is drawn where the editor would draw
 /// it. A node in an included file is on that file's page, not this one; a
 /// line to it is drawn to a stub, as the editor draws it.
-fn draw(window: &ui::VisualWindow, path: &str, graph: &Graph, lines: &[Line]) -> Shown {
+fn draw(
+    window: &ui::VisualWindow,
+    path: &str,
+    graph: &Graph,
+    lines: &[Line],
+) -> Shown {
     let settings = tcsdiagram::settings::read().settings;
-    let dividers = pane::dividers_for(settings.moc_percent, settings.vehicle_percent);
+    let dividers =
+        pane::dividers_for(settings.moc_percent, settings.vehicle_percent);
 
     let top = graph.files.first();
     let here = |name: &str| graph.homes.get(name) == top || top.is_none();
@@ -418,8 +428,9 @@ mod tests {
     #[test]
     fn the_lines_are_numbered_as_the_routes_number_them() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let graph = Graph::load(root.join("examples/thermostat/thermostat.yaml"))
-            .expect("the example reads");
+        let graph =
+            Graph::load(root.join("examples/thermostat/thermostat.yaml"))
+                .expect("the example reads");
         let lines = lines_of(&graph);
         let routes = crate::runtime::route::Routes::of(&graph);
         let mut checked = 0;
@@ -438,12 +449,12 @@ mod tests {
     #[test]
     fn every_line_of_a_configuration_in_one_file_is_drawn() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let graph = Graph::load(root.join("examples/thermostat/thermostat.yaml"))
-            .expect("the example reads");
+        let graph =
+            Graph::load(root.join("examples/thermostat/thermostat.yaml"))
+                .expect("the example reads");
         let lines = lines_of(&graph);
         let top = graph.files.first();
-        assert!(lines
-            .iter()
-            .all(|line| graph.homes.get(&line.from) == top && graph.homes.get(&line.to) == top));
+        assert!(lines.iter().all(|line| graph.homes.get(&line.from) == top
+            && graph.homes.get(&line.to) == top));
     }
 }

@@ -5888,7 +5888,11 @@ information is provided to the Rust Socket::new() interface as follows:</p>
 <pre class="code rust literal-block">
 <span class="keyword">use</span><span class="whitespace"> </span><span class="name">socket2</span><span class="punctuation">::{</span><span class="name">Domain</span><span class="punctuation">,</span><span class="whitespace"> </span><span class="name">Type</span><span class="punctuation">,</span><span class="whitespace"> </span><span class="name">Protocol</span><span class="punctuation">,</span><span class="whitespace"> </span><span class="name">Socket</span><span class="punctuation">};</span><span class="whitespace">
 
-</span><span class="keyword">pub</span><span class="whitespace"> </span><span class="keyword">fn</span><span class="whitespace"> </span><span class="name function">new</span><span class="punctuation">(</span><span class="name">domain</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name class">Domain</span><span class="punctuation">,</span><span class="whitespace"> </span><span class="name">type_</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name class">Type</span><span class="punctuation">,</span><span class="whitespace"> </span><span class="name">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name builtin">Option</span><span class="operator">&lt;</span><span class="name">Protocol</span><span class="operator">&gt;</span><span class="punctuation">)</span><span class="whitespace"> </span><span class="punctuation">-&gt;</span><span class="whitespace"> </span><span class="name class">io</span><span class="punctuation">::</span><span class="name builtin">Result</span><span class="operator">&lt;</span><span class="name">Socket</span><span class="operator">&gt;</span>
+</span><span class="keyword">pub</span><span class="whitespace"> </span><span class="keyword">fn</span><span class="whitespace"> </span><span class="name function">new</span><span class="punctuation">(</span><span class="whitespace">
+    </span><span class="name">domain</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name class">Domain</span><span class="punctuation">,</span><span class="whitespace">
+    </span><span class="name">type_</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name class">Type</span><span class="punctuation">,</span><span class="whitespace">
+    </span><span class="name">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name builtin">Option</span><span class="operator">&lt;</span><span class="name">Protocol</span><span class="operator">&gt;</span><span class="punctuation">,</span><span class="whitespace">
+</span><span class="punctuation">)</span><span class="whitespace"> </span><span class="punctuation">-&gt;</span><span class="whitespace"> </span><span class="name class">io</span><span class="punctuation">::</span><span class="name builtin">Result</span><span class="operator">&lt;</span><span class="name">Socket</span><span class="operator">&gt;</span>
 </pre>
 <p>What a <tt class="docutils literal">network</tt> node takes today is one of five protocols, named by its
 <tt class="docutils literal">protocol</tt> attribute: <tt class="docutils literal">tcp</tt>, <tt class="docutils literal">udp</tt>, <tt class="docutils literal">unix_stream</tt>, <tt class="docutils literal">unix_dgram</tt> and
@@ -6272,7 +6276,8 @@ tcspecial does.</dd>
 before the types were made optional, and a build for a target says what
 it flies:</p>
 <pre class="last literal-block">
-cargo build -p tcspecial --release --no-default-features --features serial,i2c
+cargo build -p tcspecial --release --no-default-features \
+    --features serial,i2c
 </pre>
 </dd>
 <dt>Requirement</dt>
@@ -8932,7 +8937,8 @@ saying why, on <tt class="docutils literal">failed</tt>, on a difference, or whe
 This is the harness for a run started by hand:</p>
 <pre class="last literal-block">
 tcssim --simulate=all x.yaml x-sim.yaml &amp;
-tcssim --wait --simulate=all x.yaml x-sim.yaml &amp;&amp; tcspecial --simulate=all x.yaml
+tcssim --wait --simulate=all x.yaml x-sim.yaml &amp;&amp;
+    tcspecial --simulate=all x.yaml
 </pre>
 </dd>
 <dt>Requirement</dt>

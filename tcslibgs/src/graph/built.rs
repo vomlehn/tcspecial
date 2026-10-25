@@ -82,9 +82,9 @@ pub fn not_built_message(node: &str, node_type: &str) -> String {
         _ => "a",
     };
     format!(
-        "\"{node}\" is {article} {node_type} node, and the tcspecial it is for is built \
-         without {node_type}: build tcspecial with --features {node_type}, or take the \
-         node out of the configuration"
+        "\"{node}\" is {article} {node_type} node, and the tcspecial it is for \
+         is built without {node_type}: build tcspecial with --features \
+         {node_type}, or take the node out of the configuration"
     )
 }
 
@@ -110,7 +110,8 @@ pub fn types_from(list: &str) -> Result<Vec<&'static str>, String> {
             }
             None => {
                 return Err(format!(
-                    "\"{word}\" is not a payload type a build may leave out: those are {}",
+                    "\"{word}\" is not a payload type a build may leave out: \
+                     those are {}",
                     OPTIONAL_TYPES.join(", ")
                 ))
             }
@@ -130,7 +131,9 @@ mod tests {
             node_type: node_type.into(),
             group: None,
             attributes: protocol
-                .map(|protocol| ("protocol".to_string(), crate::Scalar::of(protocol)))
+                .map(|protocol| {
+                    ("protocol".to_string(), crate::Scalar::of(protocol))
+                })
                 .into_iter()
                 .collect(),
         }

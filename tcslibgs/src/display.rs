@@ -44,7 +44,11 @@ pub enum Edge {
 /// A window taller than the display sits at the top whichever edge it asked
 /// for: there is no position that shows the bottom of it, and the top is
 /// where its name and its controls are.
-pub fn top_of(edge: Edge, screen_height: Option<u32>, window_height: u32) -> Option<i32> {
+pub fn top_of(
+    edge: Edge,
+    screen_height: Option<u32>,
+    window_height: u32,
+) -> Option<i32> {
     let screen_height = screen_height?;
 
     let y = match edge {
@@ -93,7 +97,8 @@ pub fn screen_height() -> Option<u32> {
         };
 
         if let Some(height) = modes.lines().next().and_then(height_of) {
-            tallest = Some(tallest.map_or(height, |so_far: u32| so_far.max(height)));
+            tallest =
+                Some(tallest.map_or(height, |so_far: u32| so_far.max(height)));
         }
     }
 

@@ -132,9 +132,10 @@ impl Drop for Wakeup {
 ///
 /// Carried down into the ports and into a computation's own waiting, which is
 /// the convention [`crate::endpoint`]'s waits take: an endpoint is handed a
-/// `cmd_fd` and polls it beside the device's. The descriptor is readable exactly while
-/// the node is disabled, and nothing but enabling the node drains it, so a
-/// wait that finds it readable has been told to stop and not merely nudged.
+/// `cmd_fd` and polls it beside the device's. The descriptor is readable
+/// exactly while the node is disabled, and nothing but enabling the node drains
+/// it, so a wait that finds it readable has been told to stop and not merely
+/// nudged.
 ///
 /// [`Abandon::nothing`] is a port nothing can disable -- a link to the ground,
 /// or a port in a test -- whose waits run to their deadlines as they always
@@ -189,7 +190,8 @@ impl Abandon {
 
         // SAFETY: the descriptor is owned by the Wakeup this holds an Arc of,
         // which therefore outlives the poll.
-        let borrowed = unsafe { std::os::fd::BorrowedFd::borrow_raw(wakeup.io_fd()) };
+        let borrowed =
+            unsafe { std::os::fd::BorrowedFd::borrow_raw(wakeup.io_fd()) };
         let mut set = [PollFd::new(&borrowed, PollFlags::POLLIN)];
         let waiting = how_long.as_millis().min(i32::MAX as u128) as i32;
         matches!(poll(&mut set, waiting), Ok(n) if n > 0)
@@ -232,7 +234,8 @@ impl Nudge {
         if !how_long.is_zero() {
             // SAFETY: the descriptor is owned by the Wakeup this holds an Arc
             // of, which therefore outlives the poll.
-            let borrowed = unsafe { std::os::fd::BorrowedFd::borrow_raw(self.0.io_fd()) };
+            let borrowed =
+                unsafe { std::os::fd::BorrowedFd::borrow_raw(self.0.io_fd()) };
             let mut set = [PollFd::new(&borrowed, PollFlags::POLLIN)];
             let waiting = how_long.as_millis().min(i32::MAX as u128) as i32;
             // A failed poll is waited out instead. The failure is the poll's
@@ -563,7 +566,9 @@ impl NodeStates {
                 .nodes
                 .iter()
                 .find(|node| node.name == name)
-                .is_none_or(|node| tcslibgs::graph::starts_and_stops(&node.node_type));
+                .is_none_or(|node| {
+                    tcslibgs::graph::starts_and_stops(&node.node_type)
+                });
             let state = Arc::new(state);
             states.by_name.insert(name.to_string(), state.clone());
             states.by_id.push(state);
@@ -741,7 +746,8 @@ mod tests {
         assert!(state.is_enabled());
         assert!(
             !readable(),
-            "an enabled node's next wait must not be woken by the disable before it"
+            "an enabled node's next wait must not be woken by the disable \
+             before it"
         );
     }
 
@@ -758,10 +764,11 @@ mod tests {
         std::fs::write(
             &path,
             "payloads:\n\
-             \x20 - { name: inside, type: i2c, path: /dev/i2c-1, address: \"0x48\", \
-             poll_interval: \"1 s\", payload-out: average }\n\
+             \x20 - { name: inside, type: i2c, path: /dev/i2c-1, address: \
+             \"0x48\", poll_interval: \"1 s\", payload-out: average }\n\
              vehicle:\n\
-             \x20 - { name: average, type: compute, function: mean, inputs: 1 }\n",
+             \x20 - { name: average, type: compute, function: mean, inputs: 1 \
+             }\n",
         )
         .expect("written");
         let graph = Graph::load(&path).expect("it reads");

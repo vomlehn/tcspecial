@@ -120,7 +120,9 @@ impl Concern {
     /// word changed here is a decision somebody made and lost.
     pub fn kind(&self) -> String {
         match self {
-            Concern::GoesNowhere { terminal, .. } => format!("{terminal}-goes-nowhere"),
+            Concern::GoesNowhere { terminal, .. } => {
+                format!("{terminal}-goes-nowhere")
+            }
             Concern::NothingLeaves { .. } => "nothing-leaves".to_string(),
             Concern::NothingArrives { .. } => "nothing-arrives".to_string(),
         }
@@ -174,7 +176,10 @@ pub struct Document {
     /// were drawn: two people editing one configuration should not each have
     /// to decide again that a payload nobody reads yet is on purpose. See
     /// [`Concern::key`].
-    #[serde(default, skip_serializing_if = "std::collections::BTreeSet::is_empty")]
+    #[serde(
+        default,
+        skip_serializing_if = "std::collections::BTreeSet::is_empty"
+    )]
     pub aside: std::collections::BTreeSet<(String, String)>,
     /// What the configuration says it is, as the file's `description`.
     ///
@@ -262,7 +267,9 @@ fn reach_of_node(node: &Node) -> Result<(), String> {
                 // neither belongs in what the rules are shown.
                 *attribute != "group" && !value.trim().is_empty()
             })
-            .map(|(attribute, value)| (attribute.clone(), Scalar::of(value.as_str())))
+            .map(|(attribute, value)| {
+                (attribute.clone(), Scalar::of(value.as_str()))
+            })
             .collect(),
     };
 
@@ -272,8 +279,12 @@ fn reach_of_node(node: &Node) -> Result<(), String> {
     // same rule tcspecial reads it by, so what this says is what is missing
     // rather than that an app has no address, which no app has.
     if tcslibgs::node::app::Kind::of(&theirs.node_type).is_some() {
-        return tcslibgs::node::app::params_of(&theirs.name, &theirs.node_type, &theirs.attributes)
-            .map(|_| ());
+        return tcslibgs::node::app::params_of(
+            &theirs.name,
+            &theirs.node_type,
+            &theirs.attributes,
+        )
+        .map(|_| ());
     }
 
     // Only the nodes that are opened. A computation and a log have rules of
@@ -358,7 +369,9 @@ impl Fault {
             Fault::DanglingLink { from, to } => {
                 format!("\"{from}\" to \"{to}\": one of them is not here")
             }
-            Fault::SelfLink { node } => format!("\"{node}\" is linked to itself"),
+            Fault::SelfLink { node } => {
+                format!("\"{node}\" is linked to itself")
+            }
             Fault::InputBoundTwice { node, input } => {
                 format!("two links arrive at \"{node}.{input}\"")
             }
@@ -481,11 +494,15 @@ impl Document {
                 continue;
             }
             let (parent, name) = match attribute.split_once('.') {
-                Some((parent, child)) => (parent.to_string(), child.to_string()),
+                Some((parent, child)) => {
+                    (parent.to_string(), child.to_string())
+                }
                 None => (String::new(), attribute.clone()),
             };
             match out.last_mut() {
-                Some((had, under)) if *had == parent => under.push((name, value.clone())),
+                Some((had, under)) if *had == parent => {
+                    under.push((name, value.clone()))
+                }
                 _ => out.push((parent, vec![(name, value.clone())])),
             }
         }
@@ -531,7 +548,8 @@ impl Document {
             })
             .collect();
         let moved = crate::pane::settle(&mut placing, dividers);
-        let settled: Vec<(i32, i32)> = placing.iter().map(|placing| placing.at).collect();
+        let settled: Vec<(i32, i32)> =
+            placing.iter().map(|placing| placing.at).collect();
         for (node, at) in self.nodes.iter_mut().zip(settled) {
             node.at = at;
         }
@@ -601,8 +619,10 @@ impl Document {
                         ) == Some(terminal)
                 })
             };
-            let anything_leaves = self.links.iter().any(|link| link.from == name);
-            let anything_arrives = self.links.iter().any(|link| link.to == name);
+            let anything_leaves =
+                self.links.iter().any(|link| link.from == name);
+            let anything_arrives =
+                self.links.iter().any(|link| link.to == name);
 
             match crate::pane::pane_of(&node.node_type) {
                 // Where a stream begins: what it sends has to reach
@@ -621,11 +641,21 @@ impl Document {
                 // is the exception by having no data source at all: it is
                 // where data stops on purpose.
                 crate::pane::Pane::Vehicle => {
-                    if anything_arrives && !anything_leaves && !terminals.sources.is_empty() {
-                        concerns.push(Concern::NothingLeaves { node: name.clone() });
+                    if anything_arrives
+                        && !anything_leaves
+                        && !terminals.sources.is_empty()
+                    {
+                        concerns.push(Concern::NothingLeaves {
+                            node: name.clone(),
+                        });
                     }
-                    if anything_leaves && !anything_arrives && !terminals.sinks.is_empty() {
-                        concerns.push(Concern::NothingArrives { node: name.clone() });
+                    if anything_leaves
+                        && !anything_arrives
+                        && !terminals.sinks.is_empty()
+                    {
+                        concerns.push(Concern::NothingArrives {
+                            node: name.clone(),
+                        });
                     }
                 }
             }
@@ -679,7 +709,9 @@ impl Document {
         whole
             .iter()
             .enumerate()
-            .filter(|(_, name)| count.get(name.as_str()).copied().unwrap_or(0) > 1)
+            .filter(|(_, name)| {
+                count.get(name.as_str()).copied().unwrap_or(0) > 1
+            })
             .map(|(at, _)| at)
             .collect()
     }
@@ -712,10 +744,9 @@ impl Document {
         }
         self.nodes[at].name = now.to_string();
 
-        let shared = self
-            .nodes
-            .iter()
-            .any(|node| Qualified::of(&node.name, &node.home).absolute() == was);
+        let shared = self.nodes.iter().any(|node| {
+            Qualified::of(&node.name, &node.home).absolute() == was
+        });
         if shared {
             return;
         }
@@ -756,7 +787,8 @@ impl Document {
         // `i2c-1` twice should offer `i2c-2`, not `i2c-1-1`.
         let stem = match node.name.rsplit_once('-') {
             Some((stem, number))
-                if !number.is_empty() && number.bytes().all(|b| b.is_ascii_digit()) =>
+                if !number.is_empty()
+                    && number.bytes().all(|b| b.is_ascii_digit()) =>
             {
                 stem
             }
@@ -769,9 +801,9 @@ impl Document {
         };
         let taken = |name: &str| {
             let whole = Qualified::of(name, &home).absolute();
-            self.nodes
-                .iter()
-                .any(|node| Qualified::of(&node.name, &node.home).absolute() == whole)
+            self.nodes.iter().any(|node| {
+                Qualified::of(&node.name, &node.home).absolute() == whole
+            })
         };
         (1..)
             .map(|n| format!("{stem}-{n}"))
@@ -830,7 +862,10 @@ impl Document {
     /// whole sheet from the top, because arranging is what a person does to
     /// bring everything into view rather than to fit it around what they are
     /// looking at now.
-    pub fn arranged(&self, dividers: crate::pane::Dividers) -> Vec<(String, (i32, i32))> {
+    pub fn arranged(
+        &self,
+        dividers: crate::pane::Dividers,
+    ) -> Vec<(String, (i32, i32))> {
         let mut taken: Vec<(i32, i32, u32, u32)> = Vec::new();
         let mut moved = Vec::new();
 
@@ -852,10 +887,15 @@ impl Document {
     }
 
     /// Where each of these nodes is now, for the undo of an arrangement.
-    pub fn where_each_is(&self, named: &[(String, (i32, i32))]) -> Vec<(String, (i32, i32))> {
+    pub fn where_each_is(
+        &self,
+        named: &[(String, (i32, i32))],
+    ) -> Vec<(String, (i32, i32))> {
         named
             .iter()
-            .filter_map(|(name, _)| self.node(name).map(|node| (name.clone(), node.at)))
+            .filter_map(|(name, _)| {
+                self.node(name).map(|node| (name.clone(), node.at))
+            })
             .collect()
     }
 
@@ -873,10 +913,13 @@ impl Document {
     }
 
     /// The same, to be changed.
-    fn payloads_of_mut<'a>(&'a mut self, group: &'a str) -> impl Iterator<Item = &'a mut Node> {
-        self.nodes
-            .iter_mut()
-            .filter(move |node| in_group(node, group) && is_payload(&node.node_type))
+    fn payloads_of_mut<'a>(
+        &'a mut self,
+        group: &'a str,
+    ) -> impl Iterator<Item = &'a mut Node> {
+        self.nodes.iter_mut().filter(move |node| {
+            in_group(node, group) && is_payload(&node.node_type)
+        })
     }
 
     /// What a group may set on its payloads, and what they say now.
@@ -921,9 +964,9 @@ impl Document {
         shared
             .into_iter()
             .map(|attribute| {
-                let mut values = payloads
-                    .iter()
-                    .map(|node| node.attributes.get(attribute).map(|v| v.trim().to_string()));
+                let mut values = payloads.iter().map(|node| {
+                    node.attributes.get(attribute).map(|v| v.trim().to_string())
+                });
                 let first = values.next().flatten();
                 let agreed = values.all(|value| value == first);
                 GroupField {
@@ -941,7 +984,9 @@ impl Document {
     /// inside it and the count of connections that cross its edge are the two
     /// things worth knowing about a diagram you are not looking at.
     pub fn crossings(&self, subdiagram: &str) -> usize {
-        let inside = |name: &str| Qualified::parse(name).in_.as_deref() == Some(subdiagram);
+        let inside = |name: &str| {
+            Qualified::parse(name).in_.as_deref() == Some(subdiagram)
+        };
         self.links
             .iter()
             .filter(|l| inside(&l.from) != inside(&l.to))
@@ -1013,7 +1058,8 @@ impl Document {
                 if let Some(node) = self.node_mut(node) {
                     match now {
                         Some(value) => {
-                            node.attributes.insert(attribute.clone(), value.clone());
+                            node.attributes
+                                .insert(attribute.clone(), value.clone());
                         }
                         // Absent and empty are different things, so removing
                         // is removing.
@@ -1125,7 +1171,8 @@ impl Document {
                 ..
             } => {
                 if let Some(simulator) = &mut self.simulator {
-                    let said = simulator.payloads.entry(payload.clone()).or_default();
+                    let said =
+                        simulator.payloads.entry(payload.clone()).or_default();
                     match now {
                         Some(value) => {
                             said.insert(setting.clone(), value.clone());
@@ -1171,9 +1218,10 @@ impl Document {
             }
             Edit::RestoreSimGroup { name, settings } => {
                 if let Some(simulator) = &mut self.simulator {
-                    simulator
-                        .groups
-                        .insert(name.clone(), settings.iter().cloned().collect());
+                    simulator.groups.insert(
+                        name.clone(),
+                        settings.iter().cloned().collect(),
+                    );
                 }
             }
             Edit::AddGroup { name, interval } => {
@@ -1198,8 +1246,11 @@ impl Document {
                 // its interval, so a rename that left them behind would be a
                 // rename that silently unscheduled a dozen sensors.
                 for node in &mut self.nodes {
-                    if node.attributes.get("group").map(|g| g.trim()) == Some(was.as_str()) {
-                        node.attributes.insert("group".to_string(), now.clone());
+                    if node.attributes.get("group").map(|g| g.trim())
+                        == Some(was.as_str())
+                    {
+                        node.attributes
+                            .insert("group".to_string(), now.clone());
                     }
                 }
             }
@@ -1212,7 +1263,8 @@ impl Document {
                 for node in self.payloads_of_mut(group) {
                     match now {
                         Some(value) => {
-                            node.attributes.insert(attribute.clone(), value.clone());
+                            node.attributes
+                                .insert(attribute.clone(), value.clone());
                         }
                         // An empty field clears the attribute rather than
                         // setting it to nothing: absent and empty are
@@ -1232,7 +1284,8 @@ impl Document {
                     };
                     match value {
                         Some(value) => {
-                            node.attributes.insert(attribute.clone(), value.clone());
+                            node.attributes
+                                .insert(attribute.clone(), value.clone());
                         }
                         None => {
                             node.attributes.remove(attribute);
@@ -1246,7 +1299,9 @@ impl Document {
                 }
             }
             Edit::SetLinkComment { link, now, .. } => {
-                if let Some(existing) = self.links.iter_mut().find(|l| l.same_connection(link)) {
+                if let Some(existing) =
+                    self.links.iter_mut().find(|l| l.same_connection(link))
+                {
                     existing.comment = now.clone();
                 }
             }
@@ -1313,7 +1368,8 @@ impl Document {
                     if filled {
                         if let Err(why) = reach_of_node(node) {
                             faults.push(Fault::BadNode {
-                                node: Qualified::of(&node.name, &node.home).absolute(),
+                                node: Qualified::of(&node.name, &node.home)
+                                    .absolute(),
                                 why,
                             });
                         }
@@ -1341,10 +1397,10 @@ impl Document {
             }
         }
         for group in self.groups.keys() {
-            let used = self
-                .nodes
-                .iter()
-                .any(|n| n.attributes.get("group").map(|g| g.trim()) == Some(group.as_str()));
+            let used = self.nodes.iter().any(|n| {
+                n.attributes.get("group").map(|g| g.trim())
+                    == Some(group.as_str())
+            });
             if !used {
                 faults.push(Fault::EmptyGroup {
                     group: group.clone(),
@@ -1371,7 +1427,9 @@ impl Document {
                 .tcspecial
                 .iter()
                 .filter(|(_, value)| !value.trim().is_empty())
-                .map(|(attribute, value)| (attribute.clone(), Scalar::of(value.as_str())))
+                .map(|(attribute, value)| {
+                    (attribute.clone(), Scalar::of(value.as_str()))
+                })
                 .collect();
             let outcome = tcslibgs::graph::parameters::ci_config_of(&said)
                 .and_then(|section| section.to_ci_config().map(|_| ()));
@@ -1420,7 +1478,8 @@ impl Document {
                 });
                 continue;
             }
-            if self.node(&link.from).is_none() || self.node(&link.to).is_none() {
+            if self.node(&link.from).is_none() || self.node(&link.to).is_none()
+            {
                 faults.push(Fault::DanglingLink {
                     from: link.from.clone(),
                     to: link.to.clone(),
@@ -1428,7 +1487,9 @@ impl Document {
                 continue;
             }
             if let Some(input) = &link.input {
-                *bound.entry((link.to.as_str(), input.as_str())).or_insert(0) += 1;
+                *bound
+                    .entry((link.to.as_str(), input.as_str()))
+                    .or_insert(0) += 1;
             }
         }
         for ((node, input), count) in bound {
@@ -1513,7 +1574,11 @@ impl Document {
     }
 
     /// One file's worth: the nodes at `home` and the links that start there.
-    fn text_for(&self, home: &Home, path: &std::path::Path) -> Result<String, String> {
+    fn text_for(
+        &self,
+        home: &Home,
+        path: &std::path::Path,
+    ) -> Result<String, String> {
         match format_of(path)? {
             Format::Yaml => Ok(self.to_yaml_for(home, path)),
             Format::Xml => Ok(self.to_xml_for(home, path)),
@@ -1552,9 +1617,12 @@ impl Document {
         // Which schema describes this file, in the one spelling every XML
         // tool reads: an editor opening a configuration then validates it
         // without being set up to.
-        let schema = crate::nodes::schema_reference(path, crate::nodes::CONFIG_XSD);
+        let schema =
+            crate::nodes::schema_reference(path, crate::nodes::CONFIG_XSD);
         out.push_str("<configuration\n");
-        out.push_str("    xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n");
+        out.push_str(
+            "    xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n",
+        );
         out.push_str(&format!(
             "    xsi:noNamespaceSchemaLocation=\"{schema}\">\n"
         ));
@@ -1596,14 +1664,20 @@ impl Document {
 
         if home.is_none() {
             for name in self.subdiagrams() {
-                out.push_str(&format!("    <include>{}</include>\n", escape(&name)));
+                out.push_str(&format!(
+                    "    <include>{}</include>\n",
+                    escape(&name)
+                ));
             }
         }
 
         if home.is_none() {
             for (name, interval) in &self.groups {
                 out.push_str("    <payload_groups>\n");
-                out.push_str(&format!("        <name>{}</name>\n", escape(name)));
+                out.push_str(&format!(
+                    "        <name>{}</name>\n",
+                    escape(name)
+                ));
                 out.push_str(&format!(
                     "        <interval>{}</interval>\n",
                     escape(interval)
@@ -1623,12 +1697,18 @@ impl Document {
             {
                 if let Some(comment) = &node.comment {
                     for line in comment_lines(comment, 4) {
-                        out.push_str(&format!("    <!-- {} -->\n", escape(&comment_safe(&line))));
+                        out.push_str(&format!(
+                            "    <!-- {} -->\n",
+                            escape(&comment_safe(&line))
+                        ));
                     }
                 }
                 let tag = section.name();
                 out.push_str(&format!("    <{tag}>\n"));
-                out.push_str(&format!("        <name>{}</name>\n", escape(&node.name)));
+                out.push_str(&format!(
+                    "        <name>{}</name>\n",
+                    escape(&node.name)
+                ));
                 out.push_str(&format!(
                     "        <type>{}</type>\n",
                     escape(&node.node_type)
@@ -1654,7 +1734,9 @@ impl Document {
                         escape(value)
                     ));
                 }
-                for (terminal, destinations, comment) in self.leaving(node, home) {
+                for (terminal, destinations, comment) in
+                    self.leaving(node, home)
+                {
                     if let Some(comment) = &comment {
                         for line in comment_lines(comment, 8) {
                             out.push_str(&format!(
@@ -1673,9 +1755,13 @@ impl Document {
                                 escape(&target),
                                 escape(&input)
                             ),
-                            None => format!("<target>{}</target>", escape(&target)),
+                            None => {
+                                format!("<target>{}</target>", escape(&target))
+                            }
                         };
-                        out.push_str(&format!("        <{terminal}>{said}</{terminal}>\n"));
+                        out.push_str(&format!(
+                            "        <{terminal}>{said}</{terminal}>\n"
+                        ));
                     }
                 }
                 for sink in self.arriving(node, home) {
@@ -1692,12 +1778,21 @@ impl Document {
             for command in &self.commands {
                 if let Some(comment) = &command.comment {
                     for line in comment_lines(comment, 4) {
-                        out.push_str(&format!("    <!-- {} -->\n", escape(&comment_safe(&line))));
+                        out.push_str(&format!(
+                            "    <!-- {} -->\n",
+                            escape(&comment_safe(&line))
+                        ));
                     }
                 }
                 out.push_str("    <commands>\n");
-                out.push_str(&format!("        <from>{}</from>\n", escape(&command.from)));
-                out.push_str(&format!("        <sets>{}</sets>\n", escape(&command.sets)));
+                out.push_str(&format!(
+                    "        <from>{}</from>\n",
+                    escape(&command.from)
+                ));
+                out.push_str(&format!(
+                    "        <sets>{}</sets>\n",
+                    escape(&command.sets)
+                ));
                 out.push_str("    </commands>\n");
             }
         }
@@ -1708,7 +1803,8 @@ impl Document {
             out.push_str("    <tcsgui>\n");
             for node in placed {
                 out.push_str(&format!(
-                    "        <nodes><name>{}</name><x>{}</x><y>{}</y></nodes>\n",
+                    "        <nodes><name>{}</name><x>{}</x>\
+                     <y>{}</y></nodes>\n",
                     escape(&node.name),
                     node.at.0,
                     node.at.1
@@ -1716,12 +1812,13 @@ impl Document {
             }
             // And what was set aside about the nodes in this file.
             for (node, concern) in self.aside.iter().filter(|(node, _)| {
-                self.nodes_in(home)
-                    .iter()
-                    .any(|drawn| Qualified::of(&drawn.name, home).absolute() == *node)
+                self.nodes_in(home).iter().any(|drawn| {
+                    Qualified::of(&drawn.name, home).absolute() == *node
+                })
             }) {
                 out.push_str(&format!(
-                    "        <set-aside><node>{}</node><concern>{}</concern></set-aside>\n",
+                    "        <set-aside><node>{}</node>\
+                     <concern>{}</concern></set-aside>\n",
                     escape(&Qualified::parse(node).written_from(home)),
                     escape(concern)
                 ));
@@ -1758,7 +1855,10 @@ impl Document {
         // than about the first entry: see `read::comments_of`.
         out.push_str(&format!(
             "# yaml-language-server: $schema={}\n\n",
-            crate::nodes::schema_reference(path, crate::nodes::CONFIG_JSON_SCHEMA)
+            crate::nodes::schema_reference(
+                path,
+                crate::nodes::CONFIG_JSON_SCHEMA
+            )
         ));
         // No version: a configuration has no such field.
         if let Some(description) = &self.description {
@@ -1785,13 +1885,19 @@ impl Document {
                 for (parent, under) in said {
                     if parent.is_empty() {
                         for (attribute, value) in under {
-                            out.push_str(&format!("  {attribute}: {}\n", quoted(&value)));
+                            out.push_str(&format!(
+                                "  {attribute}: {}\n",
+                                quoted(&value)
+                            ));
                         }
                         continue;
                     }
                     out.push_str(&format!("  {parent}:\n"));
                     for (attribute, value) in under {
-                        out.push_str(&format!("    {attribute}: {}\n", quoted(&value)));
+                        out.push_str(&format!(
+                            "    {attribute}: {}\n",
+                            quoted(&value)
+                        ));
                     }
                 }
             }
@@ -1885,12 +1991,17 @@ impl Document {
                         }
                         continue;
                     }
-                    out.push_str(&format!("    {attribute}: {}\n", quoted(value)));
+                    out.push_str(&format!(
+                        "    {attribute}: {}\n",
+                        quoted(value)
+                    ));
                 }
                 // And the links out of it, each under the data source it
                 // leaves by. One destination is written as itself and several
                 // as a list, which is what a reader of either would write.
-                for (terminal, destinations, comment) in self.leaving(node, home) {
+                for (terminal, destinations, comment) in
+                    self.leaving(node, home)
+                {
                     if let Some(comment) = &comment {
                         for line in comment_lines(comment, 8) {
                             out.push_str(&format!("    # {line}\n"));
@@ -1943,9 +2054,9 @@ impl Document {
             .aside
             .iter()
             .filter(|(node, _)| {
-                placed
-                    .iter()
-                    .any(|drawn| Qualified::of(&drawn.name, home).absolute() == *node)
+                placed.iter().any(|drawn| {
+                    Qualified::of(&drawn.name, home).absolute() == *node
+                })
             })
             .collect();
         if !placed.is_empty() || !here.is_empty() {
@@ -1981,7 +2092,10 @@ impl Document {
     /// `vehicle.yaml` beside `vehicle.xml`, in either direction, and `None`
     /// where the sibling is not there -- which is every ordinary
     /// configuration. See [`Document::files`], which writes it.
-    fn other_spelling(&self, path: &std::path::Path) -> Option<std::path::PathBuf> {
+    fn other_spelling(
+        &self,
+        path: &std::path::Path,
+    ) -> Option<std::path::PathBuf> {
         let said = path.extension().and_then(|e| e.to_str())?.to_lowercase();
         let others: &[&str] = match said.as_str() {
             "yaml" | "yml" => &["xml"],
@@ -2017,8 +2131,13 @@ impl Document {
     /// several entries, so nothing in a file pairs by position: two lists read
     /// against each other, one of them a name short, would be a configuration
     /// that reads as valid and delivers a reading to the wrong input.
-    fn leaving(&self, node: &Node, home: &Home) -> Vec<(&'static str, Vec<Bound>, Option<String>)> {
-        let mut leaving: Vec<(&'static str, Vec<Bound>, Option<String>)> = Vec::new();
+    fn leaving(
+        &self,
+        node: &Node,
+        home: &Home,
+    ) -> Vec<(&'static str, Vec<Bound>, Option<String>)> {
+        let mut leaving: Vec<(&'static str, Vec<Bound>, Option<String>)> =
+            Vec::new();
         for terminal in ["payload-out", "moc-out"] {
             let mut destinations: Vec<Bound> = Vec::new();
             // One line carries one comment, so the attribute's comment is the
@@ -2031,7 +2150,11 @@ impl Document {
             // is in -- because a node's own name is the one inside its file.
             let ours = Qualified::of(&node.name, home).absolute();
             for link in self.links.iter().filter(|l| l.from == ours) {
-                let by = crate::style::terminal_for(&node.node_type, link.origin.as_deref(), false);
+                let by = crate::style::terminal_for(
+                    &node.node_type,
+                    link.origin.as_deref(),
+                    false,
+                );
                 if by != Some(terminal) {
                     continue;
                 }
@@ -2054,8 +2177,8 @@ impl Document {
     ///
     /// The other end of what `leaving` writes, and a record of it rather than
     /// the link itself: `payload-in: true` on the node a reading reaches
-    /// says that something arrives there, where the `payload-out` on the node it
-    /// left says what and where. Written so that a node's entry says it is
+    /// says that something arrives there, where the `payload-out` on the node
+    /// it left says what and where. Written so that a node's entry says it is
     /// connected at both ends, instead of only where it leaves -- which, for
     /// a node that is mostly fed, was most of a node's entry saying nothing.
     ///
@@ -2066,10 +2189,10 @@ impl Document {
     /// else".
     ///
     /// Which sink a line arrives at is the stream's own answer: what leaves by
-    /// `payload-out` arrives at a `payload-in` and nowhere else, so a destination
-    /// that named an input -- `cabin_temp.in0` -- counts at the stream's sink.
-    /// Only the sinks something arrives at are written, as a node with nothing
-    /// leaving it writes no `payload-out`.
+    /// `payload-out` arrives at a `payload-in` and nowhere else, so a
+    /// destination that named an input -- `cabin_temp.in0` -- counts at the
+    /// stream's sink. Only the sinks something arrives at are written, as a
+    /// node with nothing leaving it writes no `payload-out`.
     fn arriving(&self, node: &Node, home: &Home) -> Vec<&'static str> {
         let mut arriving: Vec<&'static str> = Vec::new();
         let ours = Qualified::of(&node.name, home).absolute();
@@ -2078,13 +2201,21 @@ impl Document {
                 // Which sink of this node the line arrives at, which needs the
                 // terminal it left by: the two are one stream read from either
                 // end.
-                let Some(from) = self.nodes.iter().find(|n| n.name == link.from) else {
+                let Some(from) =
+                    self.nodes.iter().find(|n| n.name == link.from)
+                else {
                     return false;
                 };
-                let left_by =
-                    crate::style::terminal_for(&from.node_type, link.origin.as_deref(), false);
+                let left_by = crate::style::terminal_for(
+                    &from.node_type,
+                    link.origin.as_deref(),
+                    false,
+                );
                 let at = match link.input.as_deref() {
-                    Some(named) if tcslibgs::graph::terminals::stream_of(named).is_some() => {
+                    Some(named)
+                        if tcslibgs::graph::terminals::stream_of(named)
+                            .is_some() =>
+                    {
                         Some(named)
                     }
                     _ => left_by.and_then(tcslibgs::graph::terminals::answers),
@@ -2161,8 +2292,9 @@ fn quoted(value: &str) -> String {
 /// wrong.
 fn plain(value: &str) -> String {
     const RESERVED: &[&str] = &[
-        "null", "Null", "NULL", "~", "true", "True", "TRUE", "false", "False", "FALSE", "yes",
-        "Yes", "YES", "no", "No", "NO", "on", "On", "ON", "off", "Off", "OFF",
+        "null", "Null", "NULL", "~", "true", "True", "TRUE", "false", "False",
+        "FALSE", "yes", "Yes", "YES", "no", "No", "NO", "on", "On", "ON",
+        "off", "Off", "OFF",
     ];
 
     let bare = !value.is_empty()
@@ -2281,13 +2413,17 @@ pub(crate) fn comment_lines(comment: &str, indent: usize) -> Vec<String> {
 ///
 /// Built here rather than written out by hand in two formats, so that the
 /// shipped `tests/manual/thermostat.yaml` and `.xml` are what this editor
-/// writes and not an approximation of it. `the_shipped_example_is_what_the_editor_writes`
-/// is what keeps the files and this agreeing.
+/// writes and not an approximation of it.
+/// `the_shipped_example_is_what_the_editor_writes` is what keeps the files and
+/// this agreeing.
 #[cfg(test)]
 pub fn thermostat_example() -> Document {
     let mut document = Document::new();
 
-    let place = |document: &mut Document, name: &str, node_type: &str, at: (i32, i32)| {
+    let place = |document: &mut Document,
+                 name: &str,
+                 node_type: &str,
+                 at: (i32, i32)| {
         document.apply(&Edit::AddNode {
             name: name.to_string(),
             node_type: node_type.to_string(),
@@ -2299,14 +2435,15 @@ pub fn thermostat_example() -> Document {
             now: at,
         });
     };
-    let set = |document: &mut Document, node: &str, attribute: &str, value: &str| {
-        document.apply(&Edit::SetAttribute {
-            node: node.to_string(),
-            attribute: attribute.to_string(),
-            was: None,
-            now: Some(value.to_string()),
-        });
-    };
+    let set =
+        |document: &mut Document, node: &str, attribute: &str, value: &str| {
+            document.apply(&Edit::SetAttribute {
+                node: node.to_string(),
+                attribute: attribute.to_string(),
+                was: None,
+                now: Some(value.to_string()),
+            });
+        };
     let note = |document: &mut Document, node: &str, comment: &str| {
         document.apply(&Edit::SetNodeComment {
             node: node.to_string(),
@@ -2354,7 +2491,9 @@ pub fn thermostat_example() -> Document {
     note(
         &mut document,
         "temp_1",
-        "One of three sensors of the same place, a trio, so that the\ntemperature survives one of them going wrong. Two bytes, signed,\nbig endian.",
+        "One of three sensors of the same place, a trio, so that \
+         the\ntemperature survives one of them going wrong. Two bytes, \
+         signed,\nbig endian.",
     );
 
     place(&mut document, "temp_2", "i2c", (34, 166));
@@ -2377,7 +2516,9 @@ pub fn thermostat_example() -> Document {
     note(
         &mut document,
         "temp_3",
-        "The third. A different part on a different bus: three bytes,\nunsigned, its own scale and so its own conversion, so that no one\nbus and no one part number can take the whole trio out.",
+        "The third. A different part on a different bus: three \
+         bytes,\nunsigned, its own scale and so its own conversion, so that no \
+         one\nbus and no one part number can take the whole trio out.",
     );
 
     for (name, at, format, scale, offset) in [
@@ -2399,7 +2540,12 @@ pub fn thermostat_example() -> Document {
     note(
         &mut document,
         "cabin_temp",
-        "One temperature out of the three, by the algorithm named: median\ntakes the middle reading, closest_mean the mean of the two that\nagree best. Either leaves a sensor that has gone wrong out of the\nanswer, which a mean over all three would not, and it produces a\nvalue on every arrival, so one sensor that stops reporting is\noutvoted rather than stopping the vehicle from deciding anything.",
+        "One temperature out of the three, by the algorithm named: \
+         median\ntakes the middle reading, closest_mean the mean of the two \
+         that\nagree best. Either leaves a sensor that has gone wrong out of \
+         the\nanswer, which a mean over all three would not, and it produces \
+         a\nvalue on every arrival, so one sensor that stops reporting \
+         is\noutvoted rather than stopping the vehicle from deciding anything.",
     );
 
     place(&mut document, "thermostat", "compute", (601, 242));
@@ -2409,7 +2555,9 @@ pub fn thermostat_example() -> Document {
     note(
         &mut document,
         "thermostat",
-        "setpoint is set from the ground; half_band is how far either side\nof it the heaters are switched at, the setpoint being in the middle\nof the band.",
+        "setpoint is set from the ground; half_band is how far either side\nof \
+         it the heaters are switched at, the setpoint being in the middle\nof \
+         the band.",
     );
 
     place(&mut document, "moc", "moc", (790, 34));
@@ -2431,7 +2579,10 @@ pub fn thermostat_example() -> Document {
     note(
         &mut document,
         "heaters_1",
-        "Two heaters, each three circuits driven together, both near the\nsensors on the same thermal mass. Separate nodes rather than six\nlines on one, so that one can be stopped from the ground while the\nother goes on holding the temperature.",
+        "Two heaters, each three circuits driven together, both near \
+         the\nsensors on the same thermal mass. Separate nodes rather than \
+         six\nlines on one, so that one can be stopped from the ground while \
+         the\nother goes on holding the temperature.",
     );
 
     place(&mut document, "housekeeping", "log", (469, 374));
@@ -2446,7 +2597,11 @@ pub fn thermostat_example() -> Document {
     // Every link names the data source it leaves by, which is the attribute
     // it is written under: the readings go groundward and what drives a
     // payload goes vehicleward.
-    let link = |document: &mut Document, from: &str, by: &str, to: &str, input: Option<&str>| {
+    let link = |document: &mut Document,
+                from: &str,
+                by: &str,
+                to: &str,
+                input: Option<&str>| {
         document.apply(&Edit::AddLink {
             link: Link::joining(from, Some(by), to, input),
         });
@@ -2498,7 +2653,10 @@ pub fn thermostat_example() -> Document {
             link: Link::joining("thermostat", Some("moc-out"), heater, None),
             was: None,
             now: Some(
-                "asserted below the setpoint, unasserted above it. Two heaters,\nbecause one failing must not leave the mass with no way to be\nwarmed: either alone holds the band, and both together hold it\ntwice as fast."
+                "asserted below the setpoint, unasserted above it. Two \
+                 heaters,\nbecause one failing must not leave the mass with no \
+                 way to be\nwarmed: either alone holds the band, and both \
+                 together hold it\ntwice as fast."
                     .to_string(),
             ),
         });
@@ -2510,7 +2668,10 @@ pub fn thermostat_example() -> Document {
     document.commands.push(Command {
         from: "moc".to_string(),
         sets: "thermostat.setpoint".to_string(),
-        comment: Some("the cabin temperature the heaters are held at, in kelvin".to_string()),
+        comment: Some(
+            "the cabin temperature the heaters are held at, in kelvin"
+                .to_string(),
+        ),
     });
 
     document
@@ -2555,7 +2716,8 @@ mod tests {
         assert!(
             faults.iter().any(|f| matches!(
                 f,
-                Fault::UntriggeredInput { node, from } if node == "sensor" && from == "k"
+                Fault::UntriggeredInput { node, from }
+                    if node == "sensor" && from == "k"
             )),
             "{faults:?}"
         );
@@ -2569,7 +2731,8 @@ mod tests {
         // of the node sending to it.
         assert_eq!(
             said.describe(),
-            "\"sensor\" states no trigger, so what \"k\" sends it has nowhere to go"
+            "\"sensor\" states no trigger, so what \"k\" sends it has nowhere \
+             to go"
         );
 
         // A trigger clears it.
@@ -2780,7 +2943,9 @@ mod tests {
                     Fault::BadTcspecial { why } => Some(why),
                     _ => None,
                 })
-                .unwrap_or_else(|| panic!("{attribute} = {instead} should be refused"));
+                .unwrap_or_else(|| {
+                    panic!("{attribute} = {instead} should be refused")
+                });
             assert!(
                 said.contains(expected),
                 "{attribute} = {instead} was refused as {said:?}"
@@ -3063,7 +3228,9 @@ mod tests {
             now: Some("/dev/i2c-1".into()),
         });
 
-        let path = |name: &str| document.node(name).unwrap().attributes.get("path").cloned();
+        let path = |name: &str| {
+            document.node(name).unwrap().attributes.get("path").cloned()
+        };
         assert_eq!(path("temp_1").as_deref(), Some("/dev/i2c-1"));
         assert_eq!(path("temp_2").as_deref(), Some("/dev/i2c-1"));
         assert_eq!(path("temp_3"), None, "another group was written to");
@@ -3113,10 +3280,10 @@ mod tests {
         );
         // And the group is not left looking empty, which is a fault.
         assert!(
-            !document
-                .faults()
-                .iter()
-                .any(|f| matches!(f, Fault::EmptyGroup { .. } | Fault::NoSuchGroup { .. })),
+            !document.faults().iter().any(|f| matches!(
+                f,
+                Fault::EmptyGroup { .. } | Fault::NoSuchGroup { .. }
+            )),
             "{:?}",
             document.faults()
         );
@@ -3311,7 +3478,12 @@ mod tests {
             let before = document.clone();
             document.apply(&edit);
             document.apply(&edit.inverse());
-            assert_eq!(document, before, "{} did not undo cleanly", edit.describe());
+            assert_eq!(
+                document,
+                before,
+                "{} did not undo cleanly",
+                edit.describe()
+            );
         }
     }
 
@@ -3500,9 +3672,9 @@ mod tests {
             });
             // A simulator configuration, so that the edits which set one of
             // its settings have somewhere to put them.
-            document.simulator = Some(crate::sim::Simulator::new(std::path::Path::new(
-                "vehiclesim.yaml",
-            )));
+            document.simulator = Some(crate::sim::Simulator::new(
+                std::path::Path::new("vehiclesim.yaml"),
+            ));
             document.apply(&Edit::AddSimGroup {
                 name: "steady_1hz".into(),
             });
@@ -3520,7 +3692,9 @@ mod tests {
             });
             // What tcspecial is configured with, so that the edits which set
             // one of its parameters have something to change.
-            for (attribute, value) in [("port", "4000"), ("log.directory", "/var/log/tcspecial")] {
+            for (attribute, value) in
+                [("port", "4000"), ("log.directory", "/var/log/tcspecial")]
+            {
                 document.apply(&Edit::SetTcspecial {
                     attribute: attribute.into(),
                     was: None,
@@ -3702,7 +3876,12 @@ mod tests {
             let before = document.clone();
             document.apply(edit);
             document.apply(&edit.inverse());
-            assert_eq!(document, before, "{} did not undo cleanly", edit.describe());
+            assert_eq!(
+                document,
+                before,
+                "{} did not undo cleanly",
+                edit.describe()
+            );
 
             // And an undo followed by a redo lands where the edit did, which
             // is the other half of what undo has to mean.
@@ -3823,9 +4002,10 @@ mod tests {
     /// which XML writes longer than it is.
     #[test]
     fn a_long_comment_is_broken_to_fit_eighty_characters() {
-        let long = "the second of the two sensors on the forward bulkhead, which \
-                    was moved there after the rework & is read at its own address \
-                    <see ECR-114> now that the first one shares the bus";
+        let long = "the second of the two sensors on the forward bulkhead, \
+                    which was moved there after the rework & is read at its \
+                    own address <see ECR-114> now that the first one shares \
+                    the bus";
         let mut document = Document::new();
         document.apply(&add("a", "i2c"));
         document.apply(&add("b", "compute"));
@@ -3845,9 +4025,12 @@ mod tests {
         assert!(lines.len() > 1, "{lines:?}");
         assert_eq!(lines.join(" "), long, "only the line breaks change");
 
-        for (format, text) in [("yaml", document.to_yaml()), ("xml", document.to_xml())] {
+        for (format, text) in
+            [("yaml", document.to_yaml()), ("xml", document.to_xml())]
+        {
             for line in text.lines() {
-                let comment = line.trim_start().starts_with('#') || line.contains("<!--");
+                let comment =
+                    line.trim_start().starts_with('#') || line.contains("<!--");
                 if comment && !line.contains("yaml-language-server") {
                     assert!(
                         line.chars().count() <= COMMENT_LINE,
@@ -3952,7 +4135,8 @@ mod tests {
         std::fs::write(&xml, "<configuration/>\n").expect("a sibling");
         let files = document.files(&yaml).expect("the files");
         assert_eq!(files.len(), 2, "{files:?}");
-        let written: Vec<&std::path::PathBuf> = files.iter().map(|(path, _)| path).collect();
+        let written: Vec<&std::path::PathBuf> =
+            files.iter().map(|(path, _)| path).collect();
         assert!(
             written.contains(&&yaml) && written.contains(&&xml),
             "{written:?}"
@@ -3992,13 +4176,17 @@ mod tests {
 
         let yaml = document.to_yaml();
         assert!(
-            yaml.contains("    terminators:\n      - \"\\\"\\\\r\\\\n\\\"\"\n      - \"[03]\"\n"),
+            yaml.contains(
+                "    terminators:\n      - \
+                           \"\\\"\\\\r\\\\n\\\"\"\n      - \"[03]\"\n"
+            ),
             "{yaml}"
         );
         let xml = document.to_xml();
         assert!(
             xml.contains("<terminators>\"\\r\\n\"</terminators>")
-                || xml.contains("<terminators>&quot;\\r\\n&quot;</terminators>"),
+                || xml
+                    .contains("<terminators>&quot;\\r\\n&quot;</terminators>"),
             "{xml}"
         );
         assert!(xml.contains("<terminators>[03]</terminators>"), "{xml}");
@@ -4135,7 +4323,8 @@ mod tests {
         for name in ["i2c", "i2c", "moc"] {
             document.apply(&Edit::AddNode {
                 name: name.to_string(),
-                node_type: if name == "moc" { "moc" } else { "i2c" }.to_string(),
+                node_type: if name == "moc" { "moc" } else { "i2c" }
+                    .to_string(),
                 home: None,
             });
         }
@@ -4224,7 +4413,8 @@ mod tests {
         // what the ground sends. The two vehicle nodes are not accused of
         // anything -- a node nothing is linked to either way is a node
         // somebody has just placed.
-        let said: Vec<String> = document.concerns().iter().map(|c| c.kind()).collect();
+        let said: Vec<String> =
+            document.concerns().iter().map(|c| c.kind()).collect();
         assert_eq!(
             said,
             vec![
@@ -4238,9 +4428,15 @@ mod tests {
         // The readings reach a computation: the payload is answered, and the
         // computation is now one a stream stops at.
         document.apply(&Edit::AddLink {
-            link: Link::joining("sensor", Some("payload-out"), "cabin_temp", Some("in0")),
+            link: Link::joining(
+                "sensor",
+                Some("payload-out"),
+                "cabin_temp",
+                Some("in0"),
+            ),
         });
-        let said: Vec<String> = document.concerns().iter().map(|c| c.kind()).collect();
+        let said: Vec<String> =
+            document.concerns().iter().map(|c| c.kind()).collect();
         assert!(
             !said.contains(&"payload-out-goes-nowhere".to_string()),
             "{said:?}"
@@ -4250,9 +4446,15 @@ mod tests {
         // And on to the ground, which is the shape the whole graph is: a
         // payload, vehicle nodes, a MOC link.
         document.apply(&Edit::AddLink {
-            link: Link::joining("cabin_temp", Some("payload-out"), "ground", None),
+            link: Link::joining(
+                "cabin_temp",
+                Some("payload-out"),
+                "ground",
+                None,
+            ),
         });
-        let said: Vec<String> = document.concerns().iter().map(|c| c.kind()).collect();
+        let said: Vec<String> =
+            document.concerns().iter().map(|c| c.kind()).collect();
         assert_eq!(
             said,
             vec!["moc-out-goes-nowhere".to_string()],
@@ -4263,7 +4465,12 @@ mod tests {
         // A log is where a stream stops on purpose: something arrives and
         // nothing leaves, and that is what a log is for.
         document.apply(&Edit::AddLink {
-            link: Link::joining("cabin_temp", Some("payload-out"), "housekeeping", None),
+            link: Link::joining(
+                "cabin_temp",
+                Some("payload-out"),
+                "housekeeping",
+                None,
+            ),
         });
         assert!(
             !document
@@ -4354,13 +4561,17 @@ mod tests {
         let yaml = document.to_yaml();
         assert!(
             yaml.contains(
-                "  set-aside:\n    - { node: sensor, concern: payload-out-goes-nowhere }"
+                "  set-aside:\n    - { node: sensor, concern: \
+                 payload-out-goes-nowhere }"
             ),
             "{yaml}"
         );
         let xml = document.to_xml();
         assert!(
-            xml.contains("<set-aside><node>sensor</node><concern>payload-out-goes-nowhere</concern></set-aside>"),
+            xml.contains(concat!(
+                "<set-aside><node>sensor</node>",
+                "<concern>payload-out-goes-nowhere</concern></set-aside>"
+            )),
             "{xml}"
         );
     }
@@ -4401,7 +4612,8 @@ mod tests {
         // Each in its own pane, and none of them below the first screenful:
         // the point of the command is that everything is in view.
         for node in &document.nodes {
-            let (left, right) = crate::pane::pane_for(&node.node_type, dividers);
+            let (left, right) =
+                crate::pane::pane_for(&node.node_type, dividers);
             assert!(
                 node.at.0 >= left && node.at.0 <= right.max(left),
                 "{} is at {:?}, outside {left}..{right}",
@@ -4506,10 +4718,12 @@ mod tests {
             let path = root.join(name);
             // Written for the place it is going, which is what decides how it
             // names its schema: see `nodes::schema_reference`.
-            let written = document.to_text(&path).expect("a format this writes");
+            let written =
+                document.to_text(&path).expect("a format this writes");
 
             if std::env::var("TCSGUI_WRITE_EXAMPLE").is_ok() {
-                std::fs::write(&path, &written).expect("the example is writable");
+                std::fs::write(&path, &written)
+                    .expect("the example is writable");
                 continue;
             }
 
@@ -4558,14 +4772,19 @@ mod tests {
                     node.name
                 );
                 assert!(
-                    xml.contains(&format!("<{attribute}>{value}</{attribute}>")),
+                    xml.contains(&format!(
+                        "<{attribute}>{value}</{attribute}>"
+                    )),
                     "{}.{attribute} is missing from the XML",
                     node.name
                 );
             }
             if let Some(comment) = &node.comment {
                 let first = comment.lines().next().unwrap();
-                assert!(yaml.contains(first), "a comment is missing from the YAML");
+                assert!(
+                    yaml.contains(first),
+                    "a comment is missing from the YAML"
+                );
                 // The XML spelling folds a run of hyphens to one, there being
                 // no way to write two of them inside a comment: see
                 // `comment_safe`.
@@ -4584,7 +4803,10 @@ mod tests {
             let (yaml_said, xml_said) = match &link.input {
                 Some(input) => (
                     format!("- target: {}\n        input: {input}\n", link.to),
-                    format!("<target>{}</target><input>{input}</input>", link.to),
+                    format!(
+                        "<target>{}</target><input>{input}</input>",
+                        link.to
+                    ),
                 ),
                 None => (
                     format!("- target: {}\n", link.to),
@@ -4710,10 +4932,10 @@ mod tests {
             "only the link leaving the subdiagram crosses it"
         );
         assert!(
-            !document
-                .faults()
-                .iter()
-                .any(|f| matches!(f, Fault::DanglingLink { .. } | Fault::SelfLink { .. })),
+            !document.faults().iter().any(|f| matches!(
+                f,
+                Fault::DanglingLink { .. } | Fault::SelfLink { .. }
+            )),
             "a crossing link was taken for a broken one: {:?}",
             document.faults()
         );
@@ -4853,7 +5075,10 @@ mod tests {
         assert!(yaml.contains("\npayloads:\n"), "{yaml}");
         assert!(yaml.contains("\nvehicle:\n"), "{yaml}");
         assert!(
-            yaml.contains("    payload-out:\n      - target: cabin_temp\n        input: in0\n"),
+            yaml.contains(
+                "    payload-out:\n      - target: \
+                           cabin_temp\n        input: in0\n"
+            ),
             "a link into a named input is written as one entry: {yaml}"
         );
         assert!(

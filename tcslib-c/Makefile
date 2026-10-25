@@ -21,7 +21,8 @@ docs: README.html
 # A page of its own, so pandoc's --standalone: it carries its own head and
 # styling, and reads the same wherever it is copied to.
 README.html: README.md
-	pandoc --standalone --metadata pagetitle=tcslib-c README.md -o README.html
+	pandoc --standalone --metadata pagetitle=tcslib-c README.md \
+		-o README.html
 
 .PHONY: clean
 clean:

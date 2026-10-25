@@ -67,7 +67,8 @@ export component WatchWindow inherits Window {
     }
     // How wide the button is, for a test to hold it to its labels.
     out property <length> button-width: tcspecial-button.width;
-    out property <length> button-needs: max(start-probe.preferred-width, stop-probe.preferred-width);
+    out property <length> button-needs:
+        max(start-probe.preferred-width, stop-probe.preferred-width);
 
     content := VerticalLayout {
         // The border, for looks: the panel's edge drawn against the window's

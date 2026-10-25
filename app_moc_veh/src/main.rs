@@ -37,8 +37,8 @@ fn main() -> ExitCode {
             Ok(Some(data)) => {
                 if let Err(e) = moc.write_payload(&data) {
                     let _ = errors.say(&format!(
-                        "app_moc_veh {name}: {} bytes of payload data could not \
-                         be written: {e}",
+                        "app_moc_veh {name}: {} bytes of payload data could \
+                         not be written: {e}",
                         data.len()
                     ));
                     return ExitCode::FAILURE;

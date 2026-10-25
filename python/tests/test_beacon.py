@@ -16,7 +16,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tcslib import beacon  # noqa: E402
-from tcslib.beacon import Blink, Contact, Counted, Schedule, Stage, Step  # noqa: E402
+from tcslib.beacon import (  # noqa: E402
+    Blink,
+    Contact,
+    Counted,
+    Schedule,
+    Stage,
+    Step,
+)
 from tcslibgs.beacon import BEACON_BYTES, Beacon, BeaconError  # noqa: E402
 from tcslibgs.configuration import HostPort  # noqa: E402
 
@@ -28,8 +35,10 @@ AT = 1_000_000 * SECOND
 def a_beacon(sequence=2, digest=None, version=(0, 1, 0)):
     """A beacon, as tcspecial sends one: the name, the version a byte a part,
     a space, the digest, and the number, four bytes big-endian."""
-    digest = digest or [36, 195, 155, 114, 7, 4, 241, 185, 121, 87, 153, 67, 108, 53, 167, 176]
-    return b"tcspecial " + bytes(version) + b" " + bytes(digest) + struct.pack(">I", sequence)
+    digest = digest or [36, 195, 155, 114, 7, 4, 241, 185,
+                        121, 87, 153, 67, 108, 53, 167, 176]
+    return (b"tcspecial " + bytes(version) + b" " + bytes(digest)
+            + struct.pack(">I", sequence))
 
 
 def schedule():
@@ -60,7 +69,8 @@ class ScheduleTest(unittest.TestCase):
     def test_a_blinking_stage_of_contact_is_still_contact(self):
         s = Schedule([
             Step(holds=4 * SECOND, stage=Stage.HEARD),
-            Step(holds=4 * SECOND, stage=Stage.HEARD, blink=Blink(on=SECOND, off=SECOND)),
+            Step(holds=4 * SECOND, stage=Stage.HEARD,
+                 blink=Blink(on=SECOND, off=SECOND)),
             Step(holds=6 * SECOND, stage=Stage.WAITING),
             Step(holds=beacon.FOREVER, stage=Stage.HEARD),
         ])
@@ -72,19 +82,23 @@ class ScheduleTest(unittest.TestCase):
     def test_a_blinking_stage_says_when_it_next_changes(self):
         s = Schedule([
             Step(holds=2 * SECOND, stage=Stage.HEARD),
-            Step(holds=beacon.FOREVER, stage=Stage.WAITING, blink=Blink(on=500 * MS, off=500 * MS)),
+            Step(holds=beacon.FOREVER, stage=Stage.WAITING,
+                 blink=Blink(on=500 * MS, off=500 * MS)),
         ])
         fresh = s.at(0)
-        self.assertEqual((fresh.stage, fresh.lit, fresh.until), (Stage.HEARD, True, 2 * SECOND))
+        self.assertEqual((fresh.stage, fresh.lit, fresh.until),
+                         (Stage.HEARD, True, 2 * SECOND))
         lit = s.at(2_100 * MS)
-        self.assertEqual((lit.stage, lit.lit, lit.until), (Stage.WAITING, True, 400 * MS))
+        self.assertEqual((lit.stage, lit.lit, lit.until),
+                         (Stage.WAITING, True, 400 * MS))
         dark = s.at(2_600 * MS)
         self.assertEqual((dark.lit, dark.until), (False, 400 * MS))
         old = s.at(3_600 * SECOND)
         self.assertEqual(old.stage, Stage.WAITING)
         self.assertIsNotNone(old.until)
 
-    def test_the_standard_schedule_holds_contact_through_one_missed_beacon(self):
+    def test_the_standard_schedule_holds_contact_through_one_missed_beacon(
+            self):
         s = Schedule.standard()
         self.assertEqual(s.at(0).stage, Stage.HEARD)
         self.assertEqual(s.at(6 * SECOND).stage, Stage.HEARD)
@@ -105,14 +119,17 @@ class ScheduleTest(unittest.TestCase):
 
         standard = Schedule.standard()
         ten = Schedule.for_interval(10 * SECOND)
-        self.assertEqual(holds(Schedule.for_interval(5 * SECOND)), holds(standard))
-        self.assertEqual(holds(ten), [20 * SECOND, 20 * SECOND, 40 * SECOND, None])
+        self.assertEqual(holds(Schedule.for_interval(5 * SECOND)),
+                         holds(standard))
+        self.assertEqual(holds(ten),
+                         [20 * SECOND, 20 * SECOND, 40 * SECOND, None])
         self.assertEqual(blinks(ten), blinks(standard))
         self.assertEqual(ten.while_in_contact(), 40 * SECOND)
         self.assertEqual(ten.at(39 * SECOND).stage, Stage.HEARD)
         self.assertEqual(ten.at(41 * SECOND).stage, Stage.AGING)
         self.assertEqual(ten.at(81 * SECOND).stage, Stage.WAITING)
-        self.assertEqual(Schedule.for_interval(250 * MS).steps()[0].holds, 500 * MS)
+        self.assertEqual(Schedule.for_interval(250 * MS).steps()[0].holds,
+                         500 * MS)
         self.assertEqual(holds(Schedule.for_interval(0)), holds(standard))
 
 
@@ -126,17 +143,20 @@ class ScheduleTest(unittest.TestCase):
 
         # tcslib::beacon's thresholds, figure for figure.
         self.assertEqual(
-            (beacon.BLINKING_AFTER_MISSED, beacon.AGING_AFTER_MISSED, beacon.WAITING_AFTER_MISSED),
+            (beacon.BLINKING_AFTER_MISSED, beacon.AGING_AFTER_MISSED,
+             beacon.WAITING_AFTER_MISSED),
             (2, 4, 8),
         )
         for interval in [250 * MS, 5 * SECOND, 60 * SECOND]:
             s = Schedule.for_interval(interval)
             for count in range(12):
-                for elapsed in [interval * count, interval * count + interval // 2,
+                for elapsed in [interval * count,
+                                interval * count + interval // 2,
                                 interval * (count + 1) - 1]:
-                    self.assertEqual(s.at(elapsed).stage,
-                                     stage_for(beacon.missed(elapsed, interval)),
-                                     (elapsed, interval))
+                    self.assertEqual(
+                        s.at(elapsed).stage,
+                        stage_for(beacon.missed(elapsed, interval)),
+                        (elapsed, interval))
         self.assertEqual(beacon.missed(9 * SECOND, 5 * SECOND), 1)
         self.assertEqual(beacon.missed(10 * SECOND, 5 * SECOND), 2)
         self.assertEqual(beacon.missed(10 * SECOND, 0), 0)
@@ -145,11 +165,15 @@ class ScheduleTest(unittest.TestCase):
 class LayoutTest(unittest.TestCase):
     """tcslibgs/beacon.py, held to the layout and to the Rust's own example."""
 
-    def test_a_beacon_is_the_name_the_version_a_space_the_digest_and_its_number(self):
+    def test_a_beacon_is_the_name_the_version_a_space_the_digest_and_its_number(
+            self):
         digest = bytes([0xD4, 0x1D, 0x8C, 0xD9, 0x8F, 0x00, 0xB2, 0x04,
                         0xE9, 0x80, 0x09, 0x98, 0xEC, 0xF8, 0x42, 0x7E])
-        packed = Beacon(sequence=0x01020304, version=(1, 2, 3), digest=digest).to_bytes()
-        self.assertEqual(packed, a_beacon(sequence=0x01020304, digest=list(digest), version=(1, 2, 3)))
+        packed = Beacon(sequence=0x01020304, version=(1, 2, 3),
+                        digest=digest).to_bytes()
+        self.assertEqual(packed, a_beacon(sequence=0x01020304,
+                                          digest=list(digest),
+                                          version=(1, 2, 3)))
         self.assertEqual(len(packed), BEACON_BYTES)
         self.assertEqual(BEACON_BYTES, 34)
 
@@ -171,7 +195,8 @@ class HearingTest(unittest.TestCase):
         datagram = a_beacon(digest=[0xCD] * 16)
         heard = beacon.hear(datagram, ours)
         self.assertIsNotNone(heard.differs)
-        self.assertTrue(heard.message.startswith("CONFIGURATION DIFFERS"), heard.message)
+        self.assertTrue(heard.message.startswith("CONFIGURATION DIFFERS"),
+                        heard.message)
         self.assertIsNone(beacon.hear(datagram, theirs).differs)
         self.assertIsNone(beacon.hear(datagram, None).differs)
 
@@ -202,7 +227,8 @@ class HearingTest(unittest.TestCase):
         self.assertIsNone(beacon.hear(good + b"\0", None).sequence)
         self.assertIsNone(beacon.hear(good[:-1], None).sequence)
         self.assertIsNone(beacon.hear(b"T" + good[1:], None).sequence)
-        self.assertIsNone(beacon.hear(good[:13] + b"-" + good[14:], None).sequence)
+        self.assertIsNone(
+            beacon.hear(good[:13] + b"-" + good[14:], None).sequence)
 
     def test_a_beacons_number_says_what_happened_before_it(self):
         self.assertEqual(beacon.counted(None, 7), (Counted.FIRST, 0))
@@ -213,7 +239,9 @@ class HearingTest(unittest.TestCase):
 
     def test_a_beacon_is_shown_by_when_it_arrived(self):
         self.assertEqual(beacon.received_at(None), "--:--:--")
-        self.assertEqual(beacon.received_at((3600 + 2 * 60 + 3) * SECOND + 999), "01:02:03")
+        self.assertEqual(
+            beacon.received_at((3600 + 2 * 60 + 3) * SECOND + 999),
+            "01:02:03")
 
 
 class LoopTest(unittest.TestCase):
@@ -222,7 +250,8 @@ class LoopTest(unittest.TestCase):
     def setUp(self):
         self.now = AT
         link = beacon_link()
-        self.beacons = beacon.Beacons(link, Schedule.standard(), "24c39b72" + "0" * 24,
+        self.beacons = beacon.Beacons(link, Schedule.standard(),
+                                      "24c39b72" + "0" * 24,
                                       clock=lambda: self.now)
 
     def test_every_pass_says_when_the_last_beacon_arrived(self):
@@ -233,7 +262,9 @@ class LoopTest(unittest.TestCase):
 
         self.now = AT + 25 * SECOND
         later = self.beacons.after(beacon.Arrived.NOTHING, [])
-        self.assertEqual(later.at, AT, "a pass that found nothing keeps the beacon before it")
+        self.assertEqual(
+            later.at, AT,
+            "a pass that found nothing keeps the beacon before it")
         self.assertEqual(later.said, first.said)
         self.assertEqual(later.showing.stage, Stage.AGING)
         self.assertEqual(later.contact, Contact.LOST)
@@ -242,33 +273,43 @@ class LoopTest(unittest.TestCase):
         self.assertEqual(broken.showing.stage, Stage.UNHEARD)
         self.assertEqual(broken.at, AT)
 
-    def test_missed_beacons_a_restart_and_a_differing_configuration_are_remarked_on(self):
+    def test_missed_beacons_a_restart_and_a_differing_configuration_are_remarked_on(
+            self):
         sender = ("127.0.0.1", 7500)
         first = self.beacons.heard(a_beacon(sequence=1), sender)
-        self.assertTrue(any("CONFIGURATION DIFFERS" in r for r in first.remarks), first.remarks)
+        self.assertTrue(
+            any("CONFIGURATION DIFFERS" in r for r in first.remarks),
+            first.remarks)
         again = self.beacons.heard(a_beacon(sequence=4), sender)
-        self.assertIn("2 beacons did not arrive: #4 came after #1", again.remarks)
-        self.assertFalse(any("DIFFERS" in r for r in again.remarks), "said once, when it starts")
+        self.assertIn("2 beacons did not arrive: #4 came after #1",
+                      again.remarks)
+        self.assertFalse(any("DIFFERS" in r for r in again.remarks),
+                         "said once, when it starts")
         restart = self.beacons.heard(a_beacon(sequence=1), sender)
-        self.assertTrue(any("start again at #1" in r for r in restart.remarks), restart.remarks)
+        self.assertTrue(
+            any("start again at #1" in r for r in restart.remarks),
+            restart.remarks)
 
     def test_a_datagram_from_the_wrong_place_is_not_a_beacon(self):
         wrong = self.beacons.heard(a_beacon(), ("127.0.0.1", 9999))
         self.assertEqual(wrong.arrived, beacon.Arrived.NOTHING)
         self.assertIsNone(wrong.at)
         # A warning, said whether or not the console was asked to talk.
-        self.assertTrue(any("ignored" in r for r in wrong.warnings), wrong.warnings)
+        self.assertTrue(any("ignored" in r for r in wrong.warnings),
+                        wrong.warnings)
         self.assertEqual(wrong.remarks, [])
         # The same stranger is not warned of again; another one is.
         again = self.beacons.heard(a_beacon(), ("127.0.0.1", 9999))
         self.assertEqual(again.warnings, [])
         other = self.beacons.heard(a_beacon(), ("127.0.0.1", 9998))
-        self.assertTrue(any("127.0.0.1:9998" in r for r in other.warnings), other.warnings)
+        self.assertTrue(any("127.0.0.1:9998" in r for r in other.warnings),
+                        other.warnings)
 
 
 def beacon_link():
     from tcslibgs.configuration import BeaconLink
-    return BeaconLink(send=HostPort("0.0.0.0", 7500), recv=HostPort("127.0.0.1", 7510))
+    return BeaconLink(send=HostPort("0.0.0.0", 7500),
+                      recv=HostPort("127.0.0.1", 7510))
 
 
 class PanelTest(unittest.TestCase):
@@ -297,7 +338,8 @@ class PanelTest(unittest.TestCase):
 
         s = Schedule.standard()
         for ms in range(0, 60_000, 100):
-            self.assertNotEqual(indicator(s.at(ms * MS), True), palette.UNKNOWN, ms)
+            self.assertNotEqual(indicator(s.at(ms * MS), True),
+                                palette.UNKNOWN, ms)
         # A last beacon a moved clock puts in the future is unheard, and white.
         in_the_future = s.after(AT, AT - SECOND)
         self.assertEqual(in_the_future.stage, Stage.UNHEARD)

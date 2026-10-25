@@ -42,11 +42,9 @@ impl Startup {
     /// do not stop the program, and errors anywhere else do.
     pub fn report_loosely(&mut self, report: &Report, loose: &Path) {
         self.lines.extend(report.lines());
-        if report
-            .findings
-            .iter()
-            .any(|finding| finding.severity == crate::Severity::Error && finding.file != loose)
-        {
+        if report.findings.iter().any(|finding| {
+            finding.severity == crate::Severity::Error && finding.file != loose
+        }) {
             self.fatal = true;
         }
     }
@@ -141,7 +139,8 @@ mod tests {
         startup.error("cannot listen on 10.0.0.1:5000");
         assert_eq!(
             startup.copied("Something is wrong."),
-            "Something is wrong.\na.yaml:1: warning: unfinished\ncannot listen on 10.0.0.1:5000"
+            "Something is wrong.\na.yaml:1: warning: unfinished\n\
+             cannot listen on 10.0.0.1:5000"
         );
     }
 

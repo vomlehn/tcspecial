@@ -14,7 +14,8 @@ use std::time::Duration;
 use serde::Serialize;
 
 use crate::endpoint_config::{
-    bad, parse_u32, reject_foreign_fields, EndpointConfigResult, GroupKind, LinkTerms,
+    bad, parse_u32, reject_foreign_fields, EndpointConfigResult, GroupKind,
+    LinkTerms,
 };
 use crate::endpoint_config::{parse_flag, parse_timeout, reject_stream};
 
@@ -78,8 +79,8 @@ pub(crate) fn parse_i2c_address(
     // hexadecimal with an `0x` prefix, underscores allowed among the digits.
     // An address is the field that wants the hexadecimal most -- a datasheet
     // says 0x48 and never 72 -- and the same spelling works everywhere else.
-    let value =
-        crate::whole::whole_u32(text).map_err(|why| bad(group, &format!("address: {why}")))?;
+    let value = crate::whole::whole_u32(text)
+        .map_err(|why| bad(group, &format!("address: {why}")))?;
 
     let (limit, width) = if ten_bit { (0x3FF, 10) } else { (0x7F, 7) };
     if value > limit {
@@ -92,19 +93,25 @@ pub(crate) fn parse_i2c_address(
         };
         return Err(bad(
             group,
-            &format!("address {text} does not fit in {width} bits: expected 0 to {limit:#X}{hint}"),
+            &format!(
+                "address {text} does not fit in {width} bits: expected 0 to \
+                 {limit:#X}{hint}"
+            ),
         ));
     }
 
     // A reserved address is in range and still cannot name a device, so it is
     // worth catching here rather than as a silent failure to answer on a bus.
-    if !ten_bit && (I2C_RESERVED_LOW.contains(&value) || I2C_RESERVED_HIGH.contains(&value)) {
+    if !ten_bit
+        && (I2C_RESERVED_LOW.contains(&value)
+            || I2C_RESERVED_HIGH.contains(&value))
+    {
         return Err(bad(
             group,
             &format!(
-                "address {text} is reserved by the I2C specification and cannot name a \
-                 device: {:#04X} to {:#04X} and {:#04X} to {:#04X} are reserved, leaving \
-                 {:#04X} to {:#04X} for devices",
+                "address {text} is reserved by the I2C specification and \
+                 cannot name a device: {:#04X} to {:#04X} and {:#04X} to \
+                 {:#04X} are reserved, leaving {:#04X} to {:#04X} for devices",
                 I2C_RESERVED_LOW.start(),
                 I2C_RESERVED_LOW.end(),
                 I2C_RESERVED_HIGH.start(),
@@ -124,11 +131,20 @@ pub(crate) fn parse_i2c_address(
 /// no packet error check, no retries, and whatever rate the platform has it
 /// at. There is no stream section, because a transfer on a bus is delimited
 /// by the transfer itself rather than by anything in the data.
-pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<GroupKind> {
-    reject_foreign_fields(name, "i2c", &g, &["ten_bit", "pec", "retries", "timeout"])?;
+pub(crate) fn group_kind_of(
+    name: &str,
+    g: LinkTerms,
+) -> EndpointConfigResult<GroupKind> {
+    reject_foreign_fields(
+        name,
+        "i2c",
+        &g,
+        &["ten_bit", "pec", "retries", "timeout"],
+    )?;
     reject_stream(name, "i2c", g.stream.is_some())?;
 
-    let ten_bit = parse_flag(name, "ten_bit", g.ten_bit.as_ref())?.unwrap_or(false);
+    let ten_bit =
+        parse_flag(name, "ten_bit", g.ten_bit.as_ref())?.unwrap_or(false);
     let pec = parse_flag(name, "pec", g.pec.as_ref())?.unwrap_or(false);
 
     let retries = match g.retries.as_ref() {
@@ -154,7 +170,8 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
 pub const STUB_ADAPTER: &str = "SMBus stub driver";
 
 /// What `--simulate` asks to change on an I2C node that is not a stand-in.
-const TO_STAND_IN: &str = "point path at the i2c-stub bus, which bin/mki2c makes";
+const TO_STAND_IN: &str =
+    "point path at the i2c-stub bus, which bin/mki2c makes";
 
 /// Whether the bus at `bus` is the kernel's `i2c-stub`, from the name of the
 /// adapter behind it. See [`crate::simulate`].
@@ -162,7 +179,10 @@ const TO_STAND_IN: &str = "point path at the i2c-stub bus, which bin/mki2c makes
 /// By the adapter's name and not the bus number, which is given out as
 /// adapters appear: `/dev/i2c-7` is the stub on one host and a display's
 /// gmbus on the next.
-pub fn judged(host: &crate::simulate::Host, bus: &str) -> crate::simulate::Judged {
+pub fn judged(
+    host: &crate::simulate::Host,
+    bus: &str,
+) -> crate::simulate::Judged {
     match host.device_of(bus) {
         Ok(device) => adapter_judged(bus, &device),
         Err(found) => found.judged("path", TO_STAND_IN),
@@ -171,7 +191,10 @@ pub fn judged(host: &crate::simulate::Host, bus: &str) -> crate::simulate::Judge
 
 /// The judgement of a bus whose kernel directory is `device`: an i2c-dev
 /// class device, whose `name` is its adapter's.
-fn adapter_judged(bus: &str, device: &std::path::Path) -> crate::simulate::Judged {
+fn adapter_judged(
+    bus: &str,
+    device: &std::path::Path,
+) -> crate::simulate::Judged {
     use crate::simulate::{read_line, Judged};
     match read_line(&device.join("name")) {
         Some(name) if name == STUB_ADAPTER => Judged::stand_in(
@@ -200,7 +223,8 @@ mod stand_in_tests {
     fn adapter(name: Option<&str>) -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();
         if let Some(name) = name {
-            std::fs::write(dir.path().join("name"), format!("{name}\n")).unwrap();
+            std::fs::write(dir.path().join("name"), format!("{name}\n"))
+                .unwrap();
         }
         dir
     }
@@ -230,7 +254,8 @@ mod stand_in_tests {
 
     #[test]
     fn a_bus_with_nothing_at_it_cannot_be_told() {
-        let judged = judged(&crate::simulate::Host::this(), "/nonexistent/i2c-99");
+        let judged =
+            judged(&crate::simulate::Host::this(), "/nonexistent/i2c-99");
         assert_eq!(judged.verdict, Verdict::Absent);
         assert_eq!(judged.found, "nothing is at /nonexistent/i2c-99");
     }

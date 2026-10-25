@@ -18,7 +18,8 @@
 set -euo pipefail
 
 if [ "$(id -u)" -ne 0 ]; then
-	echo "rmi2c: re-running under sudo, which is what unloading a module needs"
+	echo "rmi2c: re-running under sudo, which is what unloading a module" \
+		"needs"
 	exec sudo -- "$0" "$@"
 fi
 

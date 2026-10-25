@@ -38,7 +38,8 @@ use socket2::{Domain, Protocol, Socket, Type};
 use tcslibgs::{NetworkConfig, NetworkProtocol, TcsError, TcsResult};
 
 use crate::endpoint::{
-    wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable, WaitResult,
+    wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable,
+    WaitResult,
 };
 
 /// A raw socket connected to one payload.
@@ -68,8 +69,8 @@ impl RawEndpoint {
             .and_then(|mut found| found.next())
             .ok_or_else(|| {
                 TcsError::Config(format!(
-                    "{what}: \"{}\" is where the configuration says the payload is, \
-                     and it does not resolve to an address",
+                    "{what}: \"{}\" is where the configuration says the \
+                     payload is, and it does not resolve to an address",
                     config.address
                 ))
             })?;
@@ -80,14 +81,17 @@ impl RawEndpoint {
             Some(Protocol::from(i32::from(protocol.number()))),
         )
         .map_err(|e| match e.raw_os_error() {
-            Some(libc::EPERM) | Some(libc::EACCES) => TcsError::Config(format!(
-                "{what}: a raw socket for IP protocol {protocol} cannot be opened \
-                 without CAP_NET_RAW, which this tcspecial has not got: give it \
-                 the capability (setcap cap_net_raw+ep on the executable), or \
-                 reach the payload over udp"
-            )),
+            Some(libc::EPERM) | Some(libc::EACCES) => {
+                TcsError::Config(format!(
+                "{what}: a raw socket for IP protocol {protocol} cannot be \
+                 opened without CAP_NET_RAW, which this tcspecial has not got: \
+                 give it the capability (setcap cap_net_raw+ep on the \
+                 executable), or reach the payload over udp"
+            ))
+            }
             _ => TcsError::Config(format!(
-                "{what}: a raw socket for IP protocol {protocol} cannot be opened: {e}"
+                "{what}: a raw socket for IP protocol {protocol} cannot be \
+                 opened: {e}"
             )),
         })?;
         socket.connect(&to.into()).map_err(|e| {
@@ -122,7 +126,11 @@ impl RawEndpoint {
 /// words of four bytes -- since options make it longer than twenty. A
 /// datagram shorter than the header it claims is refused rather than handed
 /// on as data.
-fn without_ipv4_header(what: &str, buffer: &mut [u8], got: usize) -> TcsResult<usize> {
+fn without_ipv4_header(
+    what: &str,
+    buffer: &mut [u8],
+    got: usize,
+) -> TcsResult<usize> {
     let header = buffer
         .first()
         .map(|first| usize::from(first & 0x0f) * 4)
@@ -132,8 +140,8 @@ fn without_ipv4_header(what: &str, buffer: &mut [u8], got: usize) -> TcsResult<u
     }
     if header < 20 || header > got {
         return Err(TcsError::Endpoint(format!(
-            "{what}: a {got}-byte datagram arrived with a {header}-byte IPv4 header, \
-             which is not a datagram"
+            "{what}: a {got}-byte datagram arrived with a {header}-byte IPv4 \
+             header, which is not a datagram"
         )));
     }
     buffer.copy_within(header..got, 0);
@@ -145,7 +153,11 @@ impl EndpointWaitable for RawEndpoint {
         self.socket.as_raw_fd()
     }
 
-    fn wait_for_event(&self, cmd_fd: RawFd, timeout_ms: i32) -> TcsResult<WaitResult> {
+    fn wait_for_event(
+        &self,
+        cmd_fd: RawFd,
+        timeout_ms: i32,
+    ) -> TcsResult<WaitResult> {
         wait_for_fds(self.io_fd(), cmd_fd, PollFlags::POLLIN, timeout_ms)
     }
 }
@@ -178,7 +190,9 @@ mod tests {
 
     fn raw(address: &str) -> NetworkConfig {
         NetworkConfig {
-            protocol: NetworkProtocol::Raw(IpProtocol::of(253).expect("a protocol")),
+            protocol: NetworkProtocol::Raw(
+                IpProtocol::of(253).expect("a protocol"),
+            ),
             address: address.to_string(),
             port: 0,
         }
@@ -211,7 +225,8 @@ mod tests {
         // Shorter than the header it claims.
         let mut buffer = [0u8; 64];
         buffer[0] = 0x45;
-        let said = without_ipv4_header("n", &mut buffer, 10).expect_err("not a datagram");
+        let said = without_ipv4_header("n", &mut buffer, 10)
+            .expect_err("not a datagram");
         assert!(said.to_string().contains("n:"), "{said}");
     }
 
@@ -238,10 +253,11 @@ mod tests {
     /// An address that is not one is refused naming it.
     #[test]
     fn an_address_that_does_not_resolve_is_refused() {
-        let said = RawEndpoint::connect("sounder", &raw("no-such-host.invalid"))
-            .err()
-            .expect("refused")
-            .to_string();
+        let said =
+            RawEndpoint::connect("sounder", &raw("no-such-host.invalid"))
+                .err()
+                .expect("refused")
+                .to_string();
         assert!(said.contains("no-such-host.invalid"), "{said}");
     }
 
@@ -249,8 +265,11 @@ mod tests {
     /// on an experimental protocol arrives as its payload alone.
     #[test]
     fn a_datagram_arrives_as_its_payload_where_raw_sockets_can_be_opened() {
-        let Ok(mut here) = RawEndpoint::connect("here", &raw("127.0.0.1")) else {
-            eprintln!("no CAP_NET_RAW: a raw datagram cannot be sent from this test");
+        let Ok(mut here) = RawEndpoint::connect("here", &raw("127.0.0.1"))
+        else {
+            eprintln!(
+                "no CAP_NET_RAW: a raw datagram cannot be sent from this test"
+            );
             return;
         };
         let mut there = here.try_clone().expect("a second endpoint");

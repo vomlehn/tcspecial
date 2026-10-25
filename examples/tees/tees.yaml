@@ -1,6 +1,7 @@
 # yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial.schema.json
 
-description: "Tees and null nodes: a command copied back to the ground, a reading copied aboard, and data dropped"
+description: "Tees and null nodes: a command copied back to the ground, a
+  reading copied aboard, and data dropped"
 
 tcspecial:
   # Every port is in the eight thousands, which no other example uses, so this

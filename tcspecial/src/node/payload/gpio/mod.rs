@@ -40,7 +40,8 @@ use tcslibgs::{
 };
 
 use crate::endpoint::{
-    wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable, WaitResult,
+    wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable,
+    WaitResult,
 };
 
 /// The kernel's limits on one line request, from `linux/gpio.h`.
@@ -264,7 +265,8 @@ impl GpioEndpoint {
             })?;
 
         let request = request_for(what, config)?;
-        let lines = ask_for_lines(what, chip.as_raw_fd(), request, &config.path)?;
+        let lines =
+            ask_for_lines(what, chip.as_raw_fd(), request, &config.path)?;
 
         let state_interval = config.state_interval;
 
@@ -328,7 +330,9 @@ fn request_for(what: &str, config: &GpioConfig) -> TcsResult<LineRequest> {
     let edges = match config.edge {
         LineEdge::Rising => GPIO_V2_LINE_FLAG_EDGE_RISING,
         LineEdge::Falling => GPIO_V2_LINE_FLAG_EDGE_FALLING,
-        LineEdge::Both => GPIO_V2_LINE_FLAG_EDGE_RISING | GPIO_V2_LINE_FLAG_EDGE_FALLING,
+        LineEdge::Both => {
+            GPIO_V2_LINE_FLAG_EDGE_RISING | GPIO_V2_LINE_FLAG_EDGE_FALLING
+        }
         // Asked for as a plain input: there are no events to read, and what
         // the lines are is taken when the report is due.
         LineEdge::None => 0,
@@ -373,15 +377,22 @@ fn request_for(what: &str, config: &GpioConfig) -> TcsResult<LineRequest> {
 }
 
 /// Make the request, and hand back the descriptor the events arrive on.
-fn ask_for_lines(what: &str, chip: RawFd, mut request: LineRequest, path: &str) -> TcsResult<File> {
+fn ask_for_lines(
+    what: &str,
+    chip: RawFd,
+    mut request: LineRequest,
+    path: &str,
+) -> TcsResult<File> {
     // SAFETY: the structure is laid out as the kernel's own -- the tests
     // below hold it to the kernel's sizes -- and lives across the call, which
     // writes the descriptor into it.
-    let asked = unsafe { libc::ioctl(chip, GPIO_V2_GET_LINE_IOCTL, &mut request) };
+    let asked =
+        unsafe { libc::ioctl(chip, GPIO_V2_GET_LINE_IOCTL, &mut request) };
     if asked < 0 {
         return Err(TcsError::Endpoint(format!(
-            "{what}: {path} will not give up its lines: {}. A line is given to one \
-             request at a time, so this is commonly a line another program holds",
+            "{what}: {path} will not give up its lines: {}. A line is given to \
+             one request at a time, so this is commonly a line another program \
+             holds",
             std::io::Error::last_os_error()
         )));
     }
@@ -399,7 +410,10 @@ fn ask_for_lines(what: &str, chip: RawFd, mut request: LineRequest, path: &str) 
     // the events it had already gathered unreported.
     // SAFETY: both calls take the descriptor by value and return a status.
     let flags = unsafe { libc::fcntl(request.fd, libc::F_GETFL) };
-    if flags < 0 || unsafe { libc::fcntl(request.fd, libc::F_SETFL, flags | libc::O_NONBLOCK) } < 0
+    if flags < 0
+        || unsafe {
+            libc::fcntl(request.fd, libc::F_SETFL, flags | libc::O_NONBLOCK)
+        } < 0
     {
         return Err(TcsError::Endpoint(format!(
             "{what}: cannot make {path}'s line request non-blocking: {}",
@@ -482,7 +496,11 @@ impl EndpointWaitable for GpioEndpoint {
         self.lines.as_raw_fd()
     }
 
-    fn wait_for_event(&self, cmd_fd: RawFd, timeout_ms: i32) -> TcsResult<WaitResult> {
+    fn wait_for_event(
+        &self,
+        cmd_fd: RawFd,
+        timeout_ms: i32,
+    ) -> TcsResult<WaitResult> {
         wait_for_fds(self.io_fd(), cmd_fd, PollFlags::POLLIN, timeout_ms)
     }
 }
@@ -519,10 +537,13 @@ impl EndpointReadable for GpioEndpoint {
         // every one after it. A report missed by more than an interval --
         // which a long pause would do -- is not made up for; what the ground
         // wants is what the lines are now.
-        if let (Some(interval), Some(due)) = (self.state_interval, self.next_report) {
+        if let (Some(interval), Some(due)) =
+            (self.state_interval, self.next_report)
+        {
             let now = Instant::now();
             if now >= due {
-                let bits = levels_of(&self.what, self.lines.as_raw_fd(), self.count)?;
+                let bits =
+                    levels_of(&self.what, self.lines.as_raw_fd(), self.count)?;
                 let at = SystemTime::now();
                 for (n, offset) in self.offsets.iter().enumerate() {
                     if filled + EVENT_BYTES > buffer.len() {
@@ -563,10 +584,13 @@ impl EndpointReadable for GpioEndpoint {
                 }
                 Ok(_) => {
                     let record = record_of(&event, SystemTime::now());
-                    buffer[filled..filled + EVENT_BYTES].copy_from_slice(&record);
+                    buffer[filled..filled + EVENT_BYTES]
+                        .copy_from_slice(&record);
                     filled += EVENT_BYTES;
                 }
-                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => break,
+                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    break
+                }
                 Err(e) => {
                     if filled > 0 {
                         break;
@@ -596,9 +620,9 @@ impl EndpointWritable for GpioEndpoint {
     fn write(&mut self, data: &[u8]) -> TcsResult<usize> {
         if !self.direction.is_output() {
             return Err(TcsError::Endpoint(format!(
-                "{}: the lines of {} are inputs, which are read and not written: \
-                 driving one would be commanding a device rather than reading \
-                 it. Say direction: output to drive them",
+                "{}: the lines of {} are inputs, which are read and not \
+                 written: driving one would be commanding a device rather than \
+                 reading it. Say direction: output to drive them",
                 self.what, self.path
             )));
         }
@@ -741,7 +765,8 @@ mod tests {
             offset: 7,
             ..LineEvent::default()
         };
-        let at = UNIX_EPOCH + std::time::Duration::from_millis(1_700_000_000_123);
+        let at =
+            UNIX_EPOCH + std::time::Duration::from_millis(1_700_000_000_123);
 
         let record = record_of(&rising, at);
         assert_eq!(record.len(), EVENT_BYTES);
@@ -821,7 +846,8 @@ mod tests {
             Ok(n) => panic!("a set of input lines took {n} bytes"),
         };
         assert!(
-            said.contains("read and not written") && said.contains("commanding"),
+            said.contains("read and not written")
+                && said.contains("commanding"),
             "the error should say what a GPIO device is: {said}"
         );
     }
@@ -1032,7 +1058,9 @@ mod tests {
 
         let said = match endpoint.write(b"1") {
             Err(e) => format!("{e}"),
-            Ok(n) => panic!("a pipe took a line request's ioctl, and {n} bytes"),
+            Ok(n) => {
+                panic!("a pipe took a line request's ioctl, and {n} bytes")
+            }
         };
         assert!(
             said.contains("cannot drive") && said.contains("/dev/gpiochip0"),

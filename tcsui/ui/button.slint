@@ -25,7 +25,9 @@ export component PlainButton {
     preferred-height: self.min-height;
 
     face := Rectangle {
-        background: touch.pressed ? #d3d9df : touch.has-hover ? #e2e6ea : #f1f3f5;
+        background: touch.pressed
+            ? #d3d9df
+            : touch.has-hover ? #e2e6ea : #f1f3f5;
         border-color: #9aa1a9;
         border-width: 1px;
 

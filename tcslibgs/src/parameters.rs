@@ -30,7 +30,8 @@ pub fn payload_parameters(dh: &DHConfig, sim: Option<&ResolvedSim>) -> String {
     // the ground controls it -- which is why it is first.
     let _ = writeln!(out, "From the payload configuration");
     let _ = writeln!(out, "  name             {}", dh.name.0);
-    let _ = writeln!(out, "  type             {}", dh.endpoint.kind().spelling());
+    let _ =
+        writeln!(out, "  type             {}", dh.endpoint.kind().spelling());
     endpoint_parameters(&mut out, &dh.endpoint);
     let _ = writeln!(out, "  packet_size      {} bytes", dh.packet_size);
 
@@ -51,10 +52,16 @@ pub fn payload_parameters(dh: &DHConfig, sim: Option<&ResolvedSim>) -> String {
 
     match &dh.mode {
         DHMode::Periodic => {
-            let _ = writeln!(out, "  mode             periodic, so it sends on its own");
+            let _ = writeln!(
+                out,
+                "  mode             periodic, so it sends on its own"
+            );
         }
         DHMode::Triggered { trigger, interval } => {
-            let _ = writeln!(out, "  mode             triggered, so it answers requests");
+            let _ = writeln!(
+                out,
+                "  mode             triggered, so it answers requests"
+            );
             // As a file could have written it: a trigger is bytes, and the
             // notation every trigger can be written in is hexadecimal.
             let _ = writeln!(
@@ -78,13 +85,15 @@ pub fn payload_parameters(dh: &DHConfig, sim: Option<&ResolvedSim>) -> String {
         Some(ms) => {
             let _ = writeln!(
                 out,
-                "  stale_interval   {ms} ms, after which the ground calls its data stale"
+                "  stale_interval   {ms} ms, after which the ground calls its \
+                 data stale"
             );
         }
         None => {
             let _ = writeln!(
                 out,
-                "  stale_interval   none stated, so the ground does not judge its data"
+                "  stale_interval   none stated, so the ground does not judge \
+                 its data"
             );
         }
     }
@@ -98,8 +107,8 @@ pub fn payload_parameters(dh: &DHConfig, sim: Option<&ResolvedSim>) -> String {
             let _ = writeln!(out, "From the simulator configuration");
             let _ = writeln!(
                 out,
-                "  not read by this program, so what a simulated payload does is \
-                 not shown here"
+                "  not read by this program, so what a simulated payload does \
+                 is not shown here"
             );
         }
     }
@@ -111,12 +120,17 @@ pub fn payload_parameters(dh: &DHConfig, sim: Option<&ResolvedSim>) -> String {
 fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
     match endpoint {
         EndpointConfig::Network(net) => {
-            let _ = writeln!(out, "  protocol         {}", net.protocol.spelling());
+            let _ =
+                writeln!(out, "  protocol         {}", net.protocol.spelling());
             match net.protocol {
                 // A Unix socket is named by a path, and its port means
                 // nothing: shown as the address it is, not as a port of zero.
                 NetworkProtocol::UnixStream | NetworkProtocol::UnixDgram => {
-                    let _ = writeln!(out, "  address          {} (a socket path)", net.address);
+                    let _ = writeln!(
+                        out,
+                        "  address          {} (a socket path)",
+                        net.address
+                    );
                 }
                 NetworkProtocol::Tcp | NetworkProtocol::Udp => {
                     let _ = writeln!(out, "  address          {}", net.address);
@@ -134,8 +148,13 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
         }
         EndpointConfig::Serial(serial) => {
             let _ = writeln!(out, "  path             {}", serial.path);
-            let _ = writeln!(out, "  datarate         {} bit/s", serial.datarate);
-            let _ = writeln!(out, "  byte_length      {} data bits", serial.byte_length);
+            let _ =
+                writeln!(out, "  datarate         {} bit/s", serial.datarate);
+            let _ = writeln!(
+                out,
+                "  byte_length      {} data bits",
+                serial.byte_length
+            );
             let _ = writeln!(out, "  stop_bits        {}", serial.stop_bits);
             let _ = writeln!(out, "  parity           {}", serial.parity);
 
@@ -144,7 +163,8 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
             // is, and three lines saying a line is not an RS-485 bus would
             // say it of every line there is.
             if let Some(rs485) = serial.rs485 {
-                let _ = writeln!(out, "  rs485            yes, a half-duplex bus");
+                let _ =
+                    writeln!(out, "  rs485            yes, a half-duplex bus");
                 let _ = writeln!(
                     out,
                     "  rs485_rts_on_send {}, while sending",
@@ -160,7 +180,8 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
         }
         EndpointConfig::Gpio(gpio) => {
             let _ = writeln!(out, "  path             {}", gpio.path);
-            let offsets: Vec<String> = gpio.lines.iter().map(|n| n.to_string()).collect();
+            let offsets: Vec<String> =
+                gpio.lines.iter().map(|n| n.to_string()).collect();
             let _ = writeln!(out, "  lines            {}", offsets.join(", "));
             let _ = writeln!(
                 out,
@@ -192,10 +213,17 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
             );
             match gpio.debounce {
                 Some(steady) => {
-                    let _ = writeln!(out, "  debounce         {} us", steady.as_micros());
+                    let _ = writeln!(
+                        out,
+                        "  debounce         {} us",
+                        steady.as_micros()
+                    );
                 }
                 None => {
-                    let _ = writeln!(out, "  debounce         none, so every change is an event");
+                    let _ = writeln!(
+                        out,
+                        "  debounce         none, so every change is an event"
+                    );
                 }
             }
         }
@@ -205,7 +233,9 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
             let _ = writeln!(
                 out,
                 "  max_message_bytes {} bytes{}",
-                crate::node::payload::rpmsg::message_bytes(rpmsg.max_message_bytes),
+                crate::node::payload::rpmsg::message_bytes(
+                    rpmsg.max_message_bytes
+                ),
                 match rpmsg.max_message_bytes {
                     Some(_) => "",
                     None => ", which is what the usual transport leaves",
@@ -235,13 +265,16 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
             );
             match hdlc.clock_rate {
                 Some(rate) => {
-                    let _ = writeln!(out, "  clock_rate       {rate} bit/s, generated here");
+                    let _ = writeln!(
+                        out,
+                        "  clock_rate       {rate} bit/s, generated here"
+                    );
                 }
                 None => {
                     let _ = writeln!(
                         out,
-                        "  clock_rate       none, the far end's clock being whatever \
-                         the far end makes it"
+                        "  clock_rate       none, the far end's clock being \
+                         whatever the far end makes it"
                     );
                 }
             }
@@ -335,8 +368,8 @@ fn simulator_parameters(out: &mut String, dh: &DHConfig, sim: &ResolvedSim) {
         // above, which is flight behaviour.
         let _ = writeln!(
             out,
-            "  packet_interval  none, this payload answering requests rather than \
-             sending on its own"
+            "  packet_interval  none, this payload answering requests rather \
+             than sending on its own"
         );
     } else {
         let _ = writeln!(
@@ -442,7 +475,9 @@ fn simulator_parameters(out: &mut String, dh: &DHConfig, sim: &ResolvedSim) {
 mod tests {
     use super::*;
     use crate::sim_config::SimConfigFile;
-    use crate::{ConfigFormat, DHName, DeviceConfig, I2cConfig, NetworkConfig, SpiConfig};
+    use crate::{
+        ConfigFormat, DHName, DeviceConfig, I2cConfig, NetworkConfig, SpiConfig,
+    };
     use std::time::Duration;
 
     fn udp(name: &str) -> DHConfig {
@@ -469,7 +504,8 @@ mod tests {
     }
 
     fn settled(text: &str, dh: &DHConfig) -> ResolvedSim {
-        let file: SimConfigFile = ConfigFormat::Yaml.parse(text).expect("parses");
+        let file: SimConfigFile =
+            ConfigFormat::Yaml.parse(text).expect("parses");
         file.resolve(std::slice::from_ref(dh))
             .expect("fits the payload")
             .remove(0)
@@ -487,8 +523,10 @@ mod tests {
     fn both_files_are_shown_and_told_apart() {
         let dh = udp("DH2");
         let sim = settled(
-            "simulated_payloads:\n  - name: DH2\n    simulate: true\n    type: network\n    protocol: udp\n    \
-             packet_interval: 500 ms\n    segment_size: 5\n    segment_interval: 40 ms\n",
+            "simulated_payloads:\n  - name: DH2\n    simulate: true\n    type: \
+             network\n    protocol: udp\n    \
+             packet_interval: 500 ms\n    segment_size: 5\n    \
+             segment_interval: 40 ms\n",
             &dh,
         );
 
@@ -516,7 +554,8 @@ mod tests {
 
         // The simulator's half is below the payload's, and each value is
         // under the heading of the file it was read from.
-        let payload_half = shown.find("From the payload configuration").unwrap();
+        let payload_half =
+            shown.find("From the payload configuration").unwrap();
         let sim_half = shown.find("From the simulator configuration").unwrap();
         assert!(payload_half < sim_half);
         assert!(
@@ -564,7 +603,8 @@ mod tests {
         };
 
         let sim = settled(
-            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: network\n    protocol: tcp\n",
+            "simulated_payloads:\n  - name: DH0\n    simulate: true\n    type: \
+             network\n    protocol: tcp\n",
             &dh,
         );
         let shown = payload_parameters(&dh, Some(&sim));
@@ -576,7 +616,9 @@ mod tests {
         assert!(shown.contains("trigger          \"READ\\r\""), "{shown}");
         // The rate its trigger goes out at, which is this file's to state.
         assert!(
-            shown.contains("packet_interval  500 ms, the rate its trigger goes out at"),
+            shown.contains(
+                "packet_interval  500 ms, the rate its trigger goes out at"
+            ),
             "{shown}"
         );
         // And the simulator file states no rate for such a payload at all.
@@ -593,8 +635,10 @@ mod tests {
     fn only_the_faults_that_were_asked_for_are_listed() {
         let dh = udp("DH2");
         let sim = settled(
-            "simulated_payloads:\n  - name: DH2\n    simulate: true\n    type: network\n    protocol: udp\n    \
-             packet_interval: 100 ms\n    drop_percent: 10\n    jitter: 25 ms\n",
+            "simulated_payloads:\n  - name: DH2\n    simulate: true\n    type: \
+             network\n    protocol: udp\n    \
+             packet_interval: 100 ms\n    drop_percent: 10\n    jitter: 25 \
+             ms\n",
             &dh,
         );
 
@@ -608,7 +652,8 @@ mod tests {
             "{shown}"
         );
         assert!(
-            !shown.contains("corrupt_percent") && !shown.contains("silent_after"),
+            !shown.contains("corrupt_percent")
+                && !shown.contains("silent_after"),
             "a fault nobody asked for is not worth a line of nought:\n{shown}"
         );
         assert!(!shown.contains("faults           none"), "{shown}");
@@ -693,7 +738,8 @@ mod tests {
     fn nothing_shown_is_a_measurement() {
         let dh = udp("DH2");
         let sim = settled(
-            "simulated_payloads:\n  - name: DH2\n    simulate: true\n    type: network\n    protocol: udp\n    \
+            "simulated_payloads:\n  - name: DH2\n    simulate: true\n    type: \
+             network\n    protocol: udp\n    \
              packet_interval: 100 ms\n",
             &dh,
         );

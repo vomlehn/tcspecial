@@ -94,12 +94,18 @@ fn took_it(asked: &SerialRs485, got: &SerialRs485) -> bool {
 /// this handler is trying to read. The error says the mode was asked for and
 /// not taken, which is the fact that tells a wrong port from a wrong
 /// configuration.
-pub(crate) fn apply(fd: RawFd, what: &str, terms: &Rs485Params) -> TcsResult<()> {
+pub(crate) fn apply(
+    fd: RawFd,
+    what: &str,
+    terms: &Rs485Params,
+) -> TcsResult<()> {
     let asked = asked_for(terms);
 
     // SAFETY: the fd is an open serial port, and the structure is laid out as
     // the kernel's own and lives for the call.
-    let set = unsafe { libc::ioctl(fd, libc::TIOCSRS485, &asked as *const SerialRs485) };
+    let set = unsafe {
+        libc::ioctl(fd, libc::TIOCSRS485, &asked as *const SerialRs485)
+    };
     if set < 0 {
         return Err(TcsError::Config(format!(
             "{what}: this line will not go into RS-485 mode: {}",
@@ -109,19 +115,22 @@ pub(crate) fn apply(fd: RawFd, what: &str, terms: &Rs485Params) -> TcsResult<()>
 
     let mut got = SerialRs485::default();
     // SAFETY: as above, and the kernel writes through the pointer.
-    let read_back = unsafe { libc::ioctl(fd, libc::TIOCGRS485, &mut got as *mut SerialRs485) };
+    let read_back = unsafe {
+        libc::ioctl(fd, libc::TIOCGRS485, &mut got as *mut SerialRs485)
+    };
     if read_back < 0 {
         return Err(TcsError::Config(format!(
-            "{what}: this line took RS-485 mode and will not say what it is in: {}",
+            "{what}: this line took RS-485 mode and will not say what it is \
+             in: {}",
             std::io::Error::last_os_error()
         )));
     }
 
     if !took_it(&asked, &got) {
         return Err(TcsError::Config(format!(
-            "{what}: this line did not take RS-485 mode: it was asked for flags \
-             {:#x} with {} ms before and {} ms after, and holds flags {:#x} with \
-             {} ms and {} ms",
+            "{what}: this line did not take RS-485 mode: it was asked for \
+             flags {:#x} with {} ms before and {} ms after, and holds flags \
+             {:#x} with {} ms and {} ms",
             asked.flags,
             asked.delay_rts_before_send,
             asked.delay_rts_after_send,

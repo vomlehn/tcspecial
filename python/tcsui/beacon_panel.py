@@ -22,7 +22,12 @@ import tkinter.font
 from tkinter import ttk
 from dataclasses import dataclass
 
-from tcslib.beacon import NO_BEACON_MESSAGE, NO_TRANSFER_TIME, Stage, received_at
+from tcslib.beacon import (
+    NO_BEACON_MESSAGE,
+    NO_TRANSFER_TIME,
+    Stage,
+    received_at,
+)
 from tcsui import theme
 
 
@@ -87,7 +92,9 @@ class Shown:
     def of(beacon_pass):
         """What to show for a pass of the beacon loop."""
         return Shown(
-            indicator=indicator(beacon_pass.showing, beacon_pass.at is not None),
+            indicator=indicator(
+                beacon_pass.showing, beacon_pass.at is not None
+            ),
             received=received_at(beacon_pass.at),
             message=beacon_pass.said,
             stage=beacon_pass.showing.stage.label(),
@@ -118,10 +125,14 @@ class BeaconPanel(ttk.LabelFrame):
         super().__init__(parent, text="Beacon", padding=theme.INSIDE, **options)
         self.columnconfigure(1, weight=1)
 
-        ttk.Label(self, text="Status:").grid(row=0, column=0, sticky="w", pady=2)
+        ttk.Label(self, text="Status:").grid(
+            row=0, column=0, sticky="w", pady=2
+        )
         # As tall as the line beside it, measured from the type rather than
         # stated in pixels, as the Slint indicator is sized from Fonts.window.
-        size = round(tkinter.font.nametofont("TkDefaultFont").metrics("linespace") * 1.1)
+        size = round(
+            tkinter.font.nametofont("TkDefaultFont").metrics("linespace") * 1.1
+        )
         self._indicator = tk.Canvas(
             self,
             width=size,
@@ -130,17 +141,32 @@ class BeaconPanel(ttk.LabelFrame):
             background=theme.background(self),
         )
         self._oval = self._indicator.create_oval(
-            1, 1, size - 1, size - 1, fill=NOTHING_YET.indicator, outline="#808080"
+            1,
+            1,
+            size - 1,
+            size - 1,
+            fill=NOTHING_YET.indicator,
+            outline="#808080",
         )
-        self._indicator.grid(row=0, column=1, sticky="w", padx=(theme.BETWEEN, 0), pady=2)
+        self._indicator.grid(
+            row=0, column=1, sticky="w", padx=(theme.BETWEEN, 0), pady=2
+        )
 
-        ttk.Label(self, text="Last rcvd:").grid(row=1, column=0, sticky="w", pady=2)
+        ttk.Label(self, text="Last rcvd:").grid(
+            row=1, column=0, sticky="w", pady=2
+        )
         self._received = ttk.Label(self, text=NOTHING_YET.received)
-        self._received.grid(row=1, column=1, sticky="w", padx=(theme.BETWEEN, 0), pady=2)
+        self._received.grid(
+            row=1, column=1, sticky="w", padx=(theme.BETWEEN, 0), pady=2
+        )
 
-        ttk.Label(self, text="Last msg:").grid(row=2, column=0, sticky="w", pady=2)
+        ttk.Label(self, text="Last msg:").grid(
+            row=2, column=0, sticky="w", pady=2
+        )
         self._message = ttk.Label(self, text=NOTHING_YET.message)
-        self._message.grid(row=2, column=1, sticky="w", padx=(theme.BETWEEN, 0), pady=2)
+        self._message.grid(
+            row=2, column=1, sticky="w", padx=(theme.BETWEEN, 0), pady=2
+        )
 
     def show(self, shown):
         """Put what a pass of the beacon loop reported on the panel: all three

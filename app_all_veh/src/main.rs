@@ -4,9 +4,10 @@
 //! a stream *through*: payload data read on the first interface is written as
 //! payload data on the second, and MOC data read on the second is written as
 //! MOC data on the first. Which makes it a pass-through for both streams,
-//! written as a program -- and that is what makes it the one to test with, because a packet
-//! put in at either end comes out at the other and nothing else does. An app
-//! that crossed the two streams would pass an echo test and fail this one.
+//! written as a program -- and that is what makes it the one to test with,
+//! because a packet put in at either end comes out at the other and nothing
+//! else does. An app that crossed the two streams would pass an echo test and
+//! fail this one.
 //!
 //! One thread per stream, because both interfaces are read and a program
 //! waiting on the one is not waiting on the other. Each thread reads one
@@ -50,8 +51,8 @@ fn main() -> ExitCode {
             }
             _ => {
                 let _ = errors.say(&format!(
-                    "app_all_veh {name}: its interfaces could not be held twice \
-                     over, and it carries one stream on each"
+                    "app_all_veh {name}: its interfaces could not be held \
+                     twice over, and it carries one stream on each"
                 ));
                 return ExitCode::FAILURE;
             }
@@ -110,7 +111,8 @@ fn carry(
             Ok(Some(data)) => {
                 if let Err(e) = write(&data) {
                     let _ = errors.say(&format!(
-                        "app_all_veh: {} bytes of {what} could not be passed on: {e}",
+                        "app_all_veh: {} bytes of {what} could not be passed \
+                         on: {e}",
                         data.len()
                     ));
                     return false;
@@ -120,7 +122,9 @@ fn carry(
             // nothing more is coming.
             Ok(None) => return true,
             Err(e) => {
-                let _ = errors.say(&format!("app_all_veh: {what} could not be read: {e}"));
+                let _ = errors.say(&format!(
+                    "app_all_veh: {what} could not be read: {e}"
+                ));
                 return false;
             }
         }

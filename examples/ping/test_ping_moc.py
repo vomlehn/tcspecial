@@ -41,7 +41,9 @@ class VehicleTest(unittest.TestCase):
 
         vehicle.stop()
         self.assertIsNone(vehicle.process)
-        self.assertFalse(alive(pid), "killed, and reaped rather than left a zombie")
+        self.assertFalse(
+            alive(pid), "killed, and reaped rather than left a zombie"
+        )
 
         # Stopping what is stopped is nothing.
         vehicle.stop()
@@ -53,7 +55,8 @@ class VehicleTest(unittest.TestCase):
             [
                 sys.executable,
                 "-c",
-                "import sys, time; sys.path[:0] = sys.argv[1:3]; import ping_moc; "
+                "import sys, time; sys.path[:0] = sys.argv[1:3]; "
+                "import ping_moc; "
                 "v = ping_moc.Vehicle('sleep', ['1000']); v.start(); "
                 "print(v.process.pid, flush=True); time.sleep(1000)",
                 str(HERE),
@@ -113,10 +116,18 @@ class SpellingTest(unittest.TestCase):
 
         stem = str(ping_moc.STEM)
         self.assertEqual(ping_moc.arguments([]).configuration, stem + ".xml")
-        self.assertEqual(ping_moc.arguments(["--xml"]).configuration, stem + ".xml")
-        self.assertEqual(ping_moc.arguments(["--yaml"]).configuration, stem + ".yaml")
+        self.assertEqual(
+            ping_moc.arguments(["--xml"]).configuration, stem + ".xml"
+        )
+        self.assertEqual(
+            ping_moc.arguments(["--yaml"]).configuration, stem + ".yaml"
+        )
         self.assertEqual(ping_moc.arguments(["a.yaml"]).configuration, "a.yaml")
-        for refused in (["--yaml", "--xml"], ["--yaml", "a.xml"], ["--xml", "a.yaml"]):
+        for refused in (
+            ["--yaml", "--xml"],
+            ["--yaml", "a.xml"],
+            ["--xml", "a.yaml"],
+        ):
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(
                 SystemExit, msg=refused
             ):

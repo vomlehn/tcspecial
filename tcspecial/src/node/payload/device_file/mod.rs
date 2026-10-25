@@ -25,7 +25,8 @@ use tcslibgs::{DeviceConfig, TcsError, TcsResult};
 
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
 use crate::endpoint::{
-    wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable, WaitResult,
+    wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable,
+    WaitResult,
 };
 
 /// A node reached by opening a device file.
@@ -50,7 +51,10 @@ impl DeviceEndpoint {
             // which handler could not start nor what it was reaching for.
             .open(&config.path)
             .map_err(|e| {
-                TcsError::Endpoint(format!("{what}: {} cannot be opened: {e}", config.path))
+                TcsError::Endpoint(format!(
+                    "{what}: {} cannot be opened: {e}",
+                    config.path
+                ))
             })?;
 
         Ok(Self {
@@ -77,7 +81,11 @@ impl EndpointWaitable for DeviceEndpoint {
         self.file.as_raw_fd()
     }
 
-    fn wait_for_event(&self, cmd_fd: RawFd, timeout_ms: i32) -> TcsResult<WaitResult> {
+    fn wait_for_event(
+        &self,
+        cmd_fd: RawFd,
+        timeout_ms: i32,
+    ) -> TcsResult<WaitResult> {
         wait_for_fds(self.io_fd(), cmd_fd, PollFlags::POLLIN, timeout_ms)
     }
 }

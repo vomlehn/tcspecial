@@ -19,9 +19,10 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 use tcslibgs::{
-    ArmKey, BeaconInterval, Command, CommandLink, CommandStatus, ConfigCommand, ConfigDigest,
-    ConfigVersion, ConnectCommand, DHSample, NodeCommand, NodeCounts, NodeId, PingCommand, Reason,
-    RestartArmCommand, RestartCommand, SetNodeCommand, TcsError, TcsResult, Telemetry, Timestamp,
+    ArmKey, BeaconInterval, Command, CommandLink, CommandStatus, ConfigCommand,
+    ConfigDigest, ConfigVersion, ConnectCommand, DHSample, NodeCommand,
+    NodeCounts, NodeId, PingCommand, Reason, RestartArmCommand, RestartCommand,
+    SetNodeCommand, TcsError, TcsResult, Telemetry, Timestamp,
 };
 
 use crate::connection::Connection;
@@ -55,7 +56,9 @@ pub struct CommandLinks {
 ///
 /// One reading of them, here, for every ground station: tcsmoc and the C/C++
 /// library alike.
-pub fn command_links_of(graph: &tcslibgs::graph::Graph) -> Result<Option<CommandLinks>, String> {
+pub fn command_links_of(
+    graph: &tcslibgs::graph::Graph,
+) -> Result<Option<CommandLinks>, String> {
     use tcslibgs::graph::parameters::{ci_config_of, flatten};
 
     let Some(section) = graph.tcspecial.as_ref() else {
@@ -111,7 +114,10 @@ impl TcsClient {
     /// 1 bound one socket for each payload, that being how a command said
     /// which payload it was about, so a client without a payload's link
     /// could not send anything about that payload.
-    pub fn of_a_graph(connection: Box<dyn Connection>, nodes: Box<dyn Connection>) -> Self {
+    pub fn of_a_graph(
+        connection: Box<dyn Connection>,
+        nodes: Box<dyn Connection>,
+    ) -> Self {
         Self {
             connection,
             nodes: Some(nodes),
@@ -124,9 +130,12 @@ impl TcsClient {
 
     /// A client on a configuration's two command links, over UDP.
     pub fn open(links: &CommandLinks) -> TcsResult<Self> {
-        let connection = crate::UdpConnection::new(&links.from, &links.interpreter)?;
-        let nodes =
-            crate::UdpConnection::new(&links.nodes_from.to_string(), &links.nodes_to.to_string())?;
+        let connection =
+            crate::UdpConnection::new(&links.from, &links.interpreter)?;
+        let nodes = crate::UdpConnection::new(
+            &links.nodes_from.to_string(),
+            &links.nodes_to.to_string(),
+        )?;
         Ok(Self::of_a_graph(Box::new(connection), Box::new(nodes)))
     }
 
@@ -176,14 +185,17 @@ impl TcsClient {
     /// the spacecraft would refuse it on. A CONNECT goes on the spacecraft
     /// link here, that being the one every caller has; [`Self::connect`] asks
     /// the other one as well.
-    fn link_for(&mut self, command: &Command) -> TcsResult<&mut Box<dyn Connection>> {
+    fn link_for(
+        &mut self,
+        command: &Command,
+    ) -> TcsResult<&mut Box<dyn Connection>> {
         match command.link() {
             // Every node command on the one link, the id in the message
             // saying which node it is about.
             CommandLink::Payload => self.nodes.as_mut().ok_or_else(|| {
                 TcsError::Config(format!(
-                    "{:?} is about a node and this client has no link for one: it \
-                     was given the spacecraft's link and nothing else",
+                    "{:?} is about a node and this client has no link for one: \
+                     it was given the spacecraft's link and nothing else",
                     command.cmd_type()
                 ))
             }),
@@ -220,7 +232,9 @@ impl TcsClient {
 
         match response {
             Telemetry::Ping(tm) => Ok(tm),
-            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
+            _ => {
+                Err(TcsError::Protocol("Unexpected telemetry type".to_string()))
+            }
         }
     }
 
@@ -232,7 +246,9 @@ impl TcsClient {
 
         match response {
             Telemetry::RestartArm(tm) => Ok(tm.header.status),
-            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
+            _ => {
+                Err(TcsError::Protocol("Unexpected telemetry type".to_string()))
+            }
         }
     }
 
@@ -249,7 +265,8 @@ impl TcsClient {
         digest: ConfigDigest,
     ) -> TcsResult<(ConfigVersion, ConfigDigest)> {
         let seq = self.next_sequence();
-        let command = Command::Connect(ConnectCommand::new(seq, version, digest));
+        let command =
+            Command::Connect(ConnectCommand::new(seq, version, digest));
         let timeout = self.timeout;
 
         // The spacecraft's own link, and only that one. A CONNECT is about
@@ -265,7 +282,9 @@ impl TcsClient {
 
         match answer {
             Telemetry::Connect(tm) => Ok((tm.version, tm.digest)),
-            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
+            _ => {
+                Err(TcsError::Protocol("Unexpected telemetry type".to_string()))
+            }
         }
     }
 
@@ -277,7 +296,9 @@ impl TcsClient {
 
         match response {
             Telemetry::Restart(tm) => Ok(tm.header.status),
-            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
+            _ => {
+                Err(TcsError::Protocol("Unexpected telemetry type".to_string()))
+            }
         }
     }
 
@@ -294,12 +315,17 @@ impl TcsClient {
     ///
     /// The answer carries the id that was sent, so an answer can be placed
     /// without the name even if two overtake one another.
-    pub fn start_node(&mut self, node: NodeId) -> TcsResult<(CommandStatus, NodeId)> {
+    pub fn start_node(
+        &mut self,
+        node: NodeId,
+    ) -> TcsResult<(CommandStatus, NodeId)> {
         let seq = self.next_sequence();
         let cmd = Command::StartNode(NodeCommand::start(seq, node));
         match self.send_command(cmd)? {
             Telemetry::StartNode(tm) => Ok((tm.header.status, tm.node)),
-            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
+            _ => {
+                Err(TcsError::Protocol("Unexpected telemetry type".to_string()))
+            }
         }
     }
 
@@ -307,12 +333,17 @@ impl TcsClient {
     ///
     /// Answered when the node has stopped *and* given up what it held, so a
     /// success means its device, bus address or socket is free.
-    pub fn stop_node(&mut self, node: NodeId) -> TcsResult<(CommandStatus, NodeId)> {
+    pub fn stop_node(
+        &mut self,
+        node: NodeId,
+    ) -> TcsResult<(CommandStatus, NodeId)> {
         let seq = self.next_sequence();
         let cmd = Command::StopNode(NodeCommand::stop(seq, node));
         match self.send_command(cmd)? {
             Telemetry::StopNode(tm) => Ok((tm.header.status, tm.node)),
-            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
+            _ => {
+                Err(TcsError::Protocol("Unexpected telemetry type".to_string()))
+            }
         }
     }
 
@@ -344,11 +375,16 @@ impl TcsClient {
     ) -> TcsResult<(CommandStatus, NodeId, Reason)> {
         let seq = self.next_sequence();
         let cmd = Command::SetNode(
-            SetNodeCommand::new(seq, node, attribute, value).map_err(TcsError::Command)?,
+            SetNodeCommand::new(seq, node, attribute, value)
+                .map_err(TcsError::Command)?,
         );
         match self.send_command(cmd)? {
-            Telemetry::SetNode(tm) => Ok((tm.header.status, tm.node, tm.reason)),
-            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
+            Telemetry::SetNode(tm) => {
+                Ok((tm.header.status, tm.node, tm.reason))
+            }
+            _ => {
+                Err(TcsError::Protocol("Unexpected telemetry type".to_string()))
+            }
         }
     }
 
@@ -359,12 +395,19 @@ impl TcsClient {
     /// that is running. A disabled node answers with its counters all the
     /// same -- they say what it has done since the vehicle started, not since
     /// it was last enabled.
-    pub fn query_node(&mut self, node: NodeId) -> TcsResult<(CommandStatus, bool, NodeCounts)> {
+    pub fn query_node(
+        &mut self,
+        node: NodeId,
+    ) -> TcsResult<(CommandStatus, bool, NodeCounts)> {
         let seq = self.next_sequence();
         let cmd = Command::QueryNode(NodeCommand::query(seq, node));
         match self.send_command(cmd)? {
-            Telemetry::QueryNode(tm) => Ok((tm.header.status, tm.enabled, tm.counts)),
-            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
+            Telemetry::QueryNode(tm) => {
+                Ok((tm.header.status, tm.enabled, tm.counts))
+            }
+            _ => {
+                Err(TcsError::Protocol("Unexpected telemetry type".to_string()))
+            }
         }
     }
 
@@ -379,24 +422,34 @@ impl TcsClient {
         node: NodeId,
     ) -> TcsResult<(CommandStatus, DHSample, DHSample)> {
         let seq = self.next_sequence();
-        let cmd = Command::QueryNodeSample(NodeCommand::query_sample(seq, node));
+        let cmd =
+            Command::QueryNodeSample(NodeCommand::query_sample(seq, node));
         match self.send_command(cmd)? {
-            Telemetry::QueryNodeSample(tm) => Ok((tm.header.status, tm.taken, tm.given)),
-            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
+            Telemetry::QueryNodeSample(tm) => {
+                Ok((tm.header.status, tm.taken, tm.given))
+            }
+            _ => {
+                Err(TcsError::Protocol("Unexpected telemetry type".to_string()))
+            }
         }
     }
 
     // -- configuring the spacecraft ----------------------------------------
 
     /// Send a CONFIG command
-    pub fn configure(&mut self, beacon_interval: BeaconInterval) -> TcsResult<CommandStatus> {
+    pub fn configure(
+        &mut self,
+        beacon_interval: BeaconInterval,
+    ) -> TcsResult<CommandStatus> {
         let seq = self.next_sequence();
         let cmd = Command::Config(ConfigCommand::new(seq, beacon_interval));
         let response = self.send_command(cmd)?;
 
         match response {
             Telemetry::Config(tm) => Ok(tm.header.status),
-            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
+            _ => {
+                Err(TcsError::Protocol("Unexpected telemetry type".to_string()))
+            }
         }
     }
 
@@ -408,7 +461,10 @@ impl TcsClient {
     }
 
     /// Receive telemetry with timeout
-    pub fn receive_telemetry_timeout(&mut self, timeout: Duration) -> TcsResult<Telemetry> {
+    pub fn receive_telemetry_timeout(
+        &mut self,
+        timeout: Duration,
+    ) -> TcsResult<Telemetry> {
         self.connection.receive_timeout(timeout)
     }
 
@@ -448,7 +504,11 @@ impl TcsClientBuilder {
         self
     }
 
-    pub fn build(self, connection: Box<dyn Connection>, nodes: Box<dyn Connection>) -> TcsClient {
+    pub fn build(
+        self,
+        connection: Box<dyn Connection>,
+        nodes: Box<dyn Connection>,
+    ) -> TcsClient {
         let mut client = TcsClient::of_a_graph(connection, nodes);
         client.set_timeout(self.timeout);
         client
@@ -497,7 +557,10 @@ mod tests {
             Ok(self.answer.clone())
         }
 
-        fn receive_timeout(&mut self, _timeout: Duration) -> TcsResult<Telemetry> {
+        fn receive_timeout(
+            &mut self,
+            _timeout: Duration,
+        ) -> TcsResult<Telemetry> {
             Ok(self.answer.clone())
         }
 

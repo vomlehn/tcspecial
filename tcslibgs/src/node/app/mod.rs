@@ -189,9 +189,9 @@ impl Kind {
     /// else by this and the editor builds a node's window from it, so an
     /// attribute added here appears in both.
     ///
-    /// Required ones first, which is the order a window asks in: the executable,
-    /// then the argument for each stream the kind handles, then what to do
-    /// when it stops.
+    /// Required ones first, which is the order a window asks in: the
+    /// executable, then the argument for each stream the kind handles, then
+    /// what to do when it stops.
     pub fn attributes(self) -> &'static [(&'static str, bool)] {
         match self {
             Kind::PayloadVeh | Kind::Pl => &[
@@ -310,16 +310,21 @@ impl AppParams {
 /// `~somebody`, there being no way to tell which was meant; and no other
 /// variable is looked up, a configuration that wanted one being a
 /// configuration that would behave differently on two vehicles.
-pub fn expanded(executable: &str, home: Option<&str>) -> Result<String, String> {
+pub fn expanded(
+    executable: &str,
+    home: Option<&str>,
+) -> Result<String, String> {
     let wants_home = executable == "~"
         || executable.starts_with("~/")
         || executable.contains("$HOME")
         || executable.contains("${HOME}");
 
-    if executable.starts_with('~') && !(executable == "~" || executable.starts_with("~/")) {
+    if executable.starts_with('~')
+        && !(executable == "~" || executable.starts_with("~/"))
+    {
         return Err(format!(
-            "\"{executable}\" starts with \"~\" and a name. A home directory other \
-             than this vehicle's is not expanded here: write the path out"
+            "\"{executable}\" starts with \"~\" and a name. A home directory \
+             other than this vehicle's is not expanded here: write the path out"
         ));
     }
 
@@ -328,9 +333,9 @@ pub fn expanded(executable: &str, home: Option<&str>) -> Result<String, String> 
         (true, Some(home)) if !home.is_empty() => home,
         (true, _) => {
             return Err(format!(
-                "\"{executable}\" needs HOME, and HOME is not set where the program \
-                 would be run: a path made from an empty home is a path to \
-                 somewhere else"
+                "\"{executable}\" needs HOME, and HOME is not set where the \
+                 program would be run: a path made from an empty home is a \
+                 path to somewhere else"
             ))
         }
     };
@@ -350,7 +355,9 @@ pub fn expanded(executable: &str, home: Option<&str>) -> Result<String, String> 
 /// [`Kind::attributes`] by another name, for a caller that has the node type
 /// and not the kind. A type that is not an app's has nothing to say here and
 /// answers `None`.
-pub fn attributes_of(node_type: &str) -> Option<&'static [(&'static str, bool)]> {
+pub fn attributes_of(
+    node_type: &str,
+) -> Option<&'static [(&'static str, bool)]> {
     Kind::of(node_type).map(Kind::attributes)
 }
 
@@ -396,12 +403,13 @@ pub fn params_of(
             return Err(named(match hint {
                 Some(hint) => {
                     format!(
-                        "there is nothing called \"{attribute}\" on an {node_type} node: {hint}"
+                        "there is nothing called \"{attribute}\" on an \
+                         {node_type} node: {hint}"
                     )
                 }
                 None => format!(
-                    "there is nothing called \"{attribute}\" on an {node_type} node. \
-                     It takes {}",
+                    "there is nothing called \"{attribute}\" on an {node_type} \
+                     node. It takes {}",
                     listed(known)
                 ),
             }));
@@ -421,7 +429,10 @@ pub fn params_of(
         .map(|executable| executable.as_str().trim().to_string())
         .filter(|executable| !executable.is_empty())
         .ok_or_else(|| {
-            named("executable is not set: an app node is the program it names".to_string())
+            named(
+                "executable is not set: an app node is the program it names"
+                    .to_string(),
+            )
         })?;
 
     // The argument for each stream the kind handles, which is required of the
@@ -429,26 +440,30 @@ pub fn params_of(
     // that said nothing would shift what the rest of the list means. Taken as
     // written, trimmed of nothing: an argument is the mission's own word for
     // something, and a space in it may be what it meant.
-    let argument = |attribute: &str, handled: bool| -> Result<Option<String>, String> {
-        match (attributes.get(attribute), handled) {
-            (Some(said), true) => Ok(Some(said.as_str().to_string())),
-            (None, true) => Err(named(format!(
-                "{attribute} is not set, and an {node_type} node is run with it: \
-                 it is the argument this kind of app is given for the stream it \
-                 handles, and the list a program is run with is a fixed one"
+    let argument =
+        |attribute: &str, handled: bool| -> Result<Option<String>, String> {
+            match (attributes.get(attribute), handled) {
+                (Some(said), true) => Ok(Some(said.as_str().to_string())),
+                (None, true) => Err(named(format!(
+                "{attribute} is not set, and an {node_type} node is run with \
+                 it: it is the argument this kind of app is given for the \
+                 stream it handles, and the list a program is run with is a \
+                 fixed one"
             ))),
-            // Refused above, where every attribute is held against the kind's
-            // own list. Here for the reader: a kind that handles no data of
-            // that stream has nothing to say with the argument for it.
-            (_, false) => Ok(None),
-        }
-    };
+                // Refused above, where every attribute is held against the
+                // kind's own list. Here for the reader: a kind that handles no
+                // data of that stream has nothing to say with the argument for
+                // it.
+                (_, false) => Ok(None),
+            }
+        };
     let payload_arg = argument("app-payload-arg", kind.handles_payload_data())?;
     let moc_arg = argument("app-moc-arg", kind.handles_moc_data())?;
 
     // The same two spellings a computation's restart has, read in the one
     // place they are read: see `Restart::of`.
-    let restart = Restart::of(attributes.get("restart").map(Scalar::as_str)).map_err(named)?;
+    let restart = Restart::of(attributes.get("restart").map(Scalar::as_str))
+        .map_err(named)?;
 
     Ok(AppParams {
         name,
@@ -494,14 +509,28 @@ mod tests {
 
         // Which interfaces each is run with: the payload one, the MOC one, or
         // both, and every kind has at least one.
-        assert!(Kind::PayloadVeh.has_payload_interface() && !Kind::PayloadVeh.has_moc_interface());
-        assert!(Kind::MocVeh.has_moc_interface() && !Kind::MocVeh.has_payload_interface());
-        assert!(Kind::AllVeh.has_payload_interface() && Kind::AllVeh.has_moc_interface());
+        assert!(
+            Kind::PayloadVeh.has_payload_interface()
+                && !Kind::PayloadVeh.has_moc_interface()
+        );
+        assert!(
+            Kind::MocVeh.has_moc_interface()
+                && !Kind::MocVeh.has_payload_interface()
+        );
+        assert!(
+            Kind::AllVeh.has_payload_interface()
+                && Kind::AllVeh.has_moc_interface()
+        );
         // A payload writes its readings, and the interface payload data is
         // written on is the MOC one: neither payload kind is run with the
         // other, whatever else it does with the one it has.
-        assert!(Kind::Pl.has_moc_interface() && !Kind::Pl.has_payload_interface());
-        assert!(Kind::AllPl.has_moc_interface() && !Kind::AllPl.has_payload_interface());
+        assert!(
+            Kind::Pl.has_moc_interface() && !Kind::Pl.has_payload_interface()
+        );
+        assert!(
+            Kind::AllPl.has_moc_interface()
+                && !Kind::AllPl.has_payload_interface()
+        );
 
         // And which side each stands on, which is which section of a file
         // holds it.
@@ -523,18 +552,34 @@ mod tests {
         // Which streams each handles, which is the question its own name
         // answers and is not the question about descriptors above: a `Pl`
         // handles payload data and holds the MOC interface to write it on.
-        assert!(Kind::PayloadVeh.handles_payload_data() && !Kind::PayloadVeh.handles_moc_data());
-        assert!(Kind::MocVeh.handles_moc_data() && !Kind::MocVeh.handles_payload_data());
-        assert!(Kind::AllVeh.handles_payload_data() && Kind::AllVeh.handles_moc_data());
-        assert!(Kind::Pl.handles_payload_data() && !Kind::Pl.handles_moc_data());
-        assert!(Kind::AllPl.handles_payload_data() && Kind::AllPl.handles_moc_data());
+        assert!(
+            Kind::PayloadVeh.handles_payload_data()
+                && !Kind::PayloadVeh.handles_moc_data()
+        );
+        assert!(
+            Kind::MocVeh.handles_moc_data()
+                && !Kind::MocVeh.handles_payload_data()
+        );
+        assert!(
+            Kind::AllVeh.handles_payload_data()
+                && Kind::AllVeh.handles_moc_data()
+        );
+        assert!(
+            Kind::Pl.handles_payload_data() && !Kind::Pl.handles_moc_data()
+        );
+        assert!(
+            Kind::AllPl.handles_payload_data()
+                && Kind::AllPl.handles_moc_data()
+        );
 
         // And so which arguments each takes. Every kind says a program and
         // may say a restart; the argument for a stream is listed by exactly
         // the kinds that handle that stream, and is required of them.
         for kind in Kind::ALL {
             let attributes = kind.attributes();
-            let says = |name: &str| attributes.iter().find(|(known, _)| *known == name);
+            let says = |name: &str| {
+                attributes.iter().find(|(known, _)| *known == name)
+            };
             assert_eq!(
                 says("executable"),
                 Some(&("executable", true)),
@@ -574,7 +619,8 @@ mod tests {
     #[test]
     fn a_program_is_run_with_the_name_and_an_argument_per_stream() {
         let of = |what: &str, node_type: &str, attributes: &[(&str, &str)]| {
-            params_of(what, node_type, &said(attributes)).map(|params| params.arguments())
+            params_of(what, node_type, &said(attributes))
+                .map(|params| params.arguments())
         };
 
         // Both streams: the name, then payload, then MOC.
@@ -670,8 +716,12 @@ mod tests {
         assert!(why.contains("app-payload-arg is not set"), "{why}");
         assert!(why.contains("fore"), "{why}");
 
-        let why = params_of("back", "app_moc_veh", &said(&[("executable", "/bin/true")]))
-            .expect_err("a kind that handles MOC data and said nothing");
+        let why = params_of(
+            "back",
+            "app_moc_veh",
+            &said(&[("executable", "/bin/true")]),
+        )
+        .expect_err("a kind that handles MOC data and said nothing");
         assert!(why.contains("app-moc-arg is not set"), "{why}");
 
         // And both of them, where the kind handles both: the first missing one
@@ -679,7 +729,10 @@ mod tests {
         let why = params_of(
             "through",
             "app_all_veh",
-            &said(&[("executable", "/bin/true"), ("app-moc-arg", "--commands")]),
+            &said(&[
+                ("executable", "/bin/true"),
+                ("app-moc-arg", "--commands"),
+            ]),
         )
         .expect_err("a kind that handles both and stated one");
         assert!(why.contains("app-payload-arg is not set"), "{why}");
@@ -871,7 +924,8 @@ mod tests {
         // leaves a stopped program stopped.
         assert_eq!(params.restart, Restart::Never);
 
-        let why = params_of("fore", "app_payload_veh", &said(&[])).expect_err("no program");
+        let why = params_of("fore", "app_payload_veh", &said(&[]))
+            .expect_err("no program");
         assert!(why.contains("executable is not set"), "{why}");
         assert!(why.contains("fore"), "{why}");
 
@@ -984,7 +1038,8 @@ mod tests {
         )
         .expect_err("one spelling");
         assert!(
-            why.contains("\"app_payload_arg\"") && why.contains("it is spelled app-payload-arg"),
+            why.contains("\"app_payload_arg\"")
+                && why.contains("it is spelled app-payload-arg"),
             "{why}"
         );
     }
@@ -992,11 +1047,14 @@ mod tests {
     /// And a type that is not an app's is not read as one.
     #[test]
     fn a_type_that_is_not_an_apps_is_refused() {
-        let why = params_of("k", "compute", &said(&[("executable", "/bin/true")]))
-            .expect_err("a type that is not an app");
+        let why =
+            params_of("k", "compute", &said(&[("executable", "/bin/true")]))
+                .expect_err("a type that is not an app");
         assert!(why.contains("not an app node type"), "{why}");
         assert!(
-            why.contains("app_payload_veh, app_moc_veh, app_all_veh, app_pl, app_all_pl"),
+            why.contains(
+                "app_payload_veh, app_moc_veh, app_all_veh, app_pl, app_all_pl"
+            ),
             "{why}"
         );
     }

@@ -30,8 +30,9 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, could_not_stand_in, lateness, make_the_path_lead_to, send_in_segments,
-    wait_out_packet, wait_while_running, Pacing, PayloadConfig, PayloadStats, Produce,
+    a_packet, could_not_stand_in, lateness, make_the_path_lead_to,
+    send_in_segments, wait_out_packet, wait_while_running, Pacing,
+    PayloadConfig, PayloadStats, Produce,
 };
 
 /// Where the kernel lists its I2C adapters, and what the stub's is called.
@@ -97,19 +98,21 @@ impl SimulatedBus {
             make_the_path_lead_to(&named, &stub)?;
         }
 
-        let bus = File::options()
-            .read(true)
-            .write(true)
-            .open(&stub)
-            .map_err(|e| {
+        let bus = File::options().read(true).write(true).open(&stub).map_err(
+            |e| {
                 format!(
-                    "{stub} cannot be opened: {e}. A stub bus belongs to root unless \
-                     something has been done about it -- a udev rule, or a group"
+                    "{stub} cannot be opened: {e}. A stub bus belongs to root \
+                     unless something has been done about it -- a udev rule, \
+                     or a group"
                 )
-            })?;
+            },
+        )?;
 
         // SAFETY: the bus is open, and the request takes an integer by value.
-        if unsafe { libc::ioctl(bus.as_raw_fd(), I2C_SLAVE, address as libc::c_int) } < 0 {
+        if unsafe {
+            libc::ioctl(bus.as_raw_fd(), I2C_SLAVE, address as libc::c_int)
+        } < 0
+        {
             return Err(format!(
                 "{stub} would not take the address {address:#04X}: {}",
                 std::io::Error::last_os_error()
@@ -141,7 +144,11 @@ impl SimulatedBus {
     /// with others, or with none. The remedy is in the message, because
     /// "no such device or address" on a bus that is plainly there explains
     /// nothing by itself.
-    fn prove_a_chip_answers(&self, stub: &str, address: u16) -> Result<(), String> {
+    fn prove_a_chip_answers(
+        &self,
+        stub: &str,
+        address: u16,
+    ) -> Result<(), String> {
         let mut bytes = SmbusData {
             block: [0u8; I2C_SMBUS_BLOCK_MAX + 2],
         };
@@ -149,9 +156,9 @@ impl SimulatedBus {
 
         if let Err(e) = block_write(self.bus.as_raw_fd(), &mut bytes) {
             return Err(format!(
-                "{stub} has no chip at {address:#04X} ({e}): the stub's chips are fixed \
-                 when it is loaded, so load it with this one -- \
-                 sudo modprobe i2c-stub chip_addr={address:#04X}"
+                "{stub} has no chip at {address:#04X} ({e}): the stub's chips \
+                 are fixed when it is loaded, so load it with this one -- sudo \
+                 modprobe i2c-stub chip_addr={address:#04X}"
             ));
         }
         Ok(())
@@ -201,9 +208,9 @@ fn find_stub(adapters: &Path) -> Result<String, String> {
     match found.first() {
         Some((_, adapter)) => Ok(format!("/dev/{adapter}")),
         None => Err(
-            "no I2C stub bus is loaded, so there is nothing to stand in for a device \
-             on one: sudo modprobe i2c-stub chip_addr=0x48, with the address the \
-             tcspecial configuration gives"
+            "no I2C stub bus is loaded, so there is nothing to stand in for a \
+             device on one: sudo modprobe i2c-stub chip_addr=0x48, with the \
+             address the tcspecial configuration gives"
                 .to_string(),
         ),
     }
@@ -298,7 +305,11 @@ pub fn run_i2c_node(
     running: Arc<AtomicBool>,
     stats: Arc<std::sync::Mutex<PayloadStats>>,
 ) {
-    let bus = match SimulatedBus::open(&config.name, &config.address, config.bus_address) {
+    let bus = match SimulatedBus::open(
+        &config.name,
+        &config.address,
+        config.bus_address,
+    ) {
         Ok(bus) => bus,
         Err(e) => {
             could_not_stand_in(
@@ -420,7 +431,9 @@ mod tests {
         let root = adapters(&[("i2c-0", "Synopsys DesignWare I2C adapter")]);
 
         let e = match find_stub(root.path()) {
-            Ok(found) => panic!("a real adapter was taken for the stub: {found}"),
+            Ok(found) => {
+                panic!("a real adapter was taken for the stub: {found}")
+            }
             Err(e) => e,
         };
         assert!(

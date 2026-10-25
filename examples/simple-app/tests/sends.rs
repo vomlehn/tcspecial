@@ -44,7 +44,8 @@ fn the_line_arrives_a_word_at_a_time() {
     if !python3() {
         return;
     }
-    let mut running = parent::start(&app(), &arguments("1"), Supports::MOC).expect("it starts");
+    let mut running = parent::start(&app(), &arguments("1"), Supports::MOC)
+        .expect("it starts");
     // The payload waits for a ground station to have said hello before its
     // first word, and no ground station is coming: see `lorem_pl.py`.
     running.waits(Some(Duration::from_secs(20)));
@@ -81,7 +82,8 @@ fn a_line_that_is_not_there_is_refused() {
     if !python3() {
         return;
     }
-    let mut running = parent::start(&app(), &arguments("99"), Supports::MOC).expect("it starts");
+    let mut running = parent::start(&app(), &arguments("99"), Supports::MOC)
+        .expect("it starts");
 
     let said = running
         .read_complaint()
@@ -98,7 +100,8 @@ fn an_argument_that_is_not_a_line_number_is_refused() {
     if !python3() {
         return;
     }
-    let mut running = parent::start(&app(), &arguments("two"), Supports::MOC).expect("it starts");
+    let mut running = parent::start(&app(), &arguments("two"), Supports::MOC)
+        .expect("it starts");
 
     let said = running
         .read_complaint()

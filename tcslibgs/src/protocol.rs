@@ -223,7 +223,8 @@ impl MessageFrame {
         if bytes.len() < 4 {
             return None;
         }
-        let length = u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+        let length =
+            u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
         if bytes.len() < 4 + length as usize {
             return None;
         }

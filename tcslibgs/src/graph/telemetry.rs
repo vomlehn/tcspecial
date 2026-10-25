@@ -24,10 +24,10 @@
 //!
 //! * A payload that nothing in the drawing touches -- no link to it or from
 //!   it, no command binding naming it -- reports over the `tcspecial` section's
-//!   `payload_telemetry`: from `source_base` plus its id to `dest_base` plus its
-//!   id. That is the only way such a payload's readings can reach the ground. A
-//!   payload the drawing does touch goes where the drawing says and nowhere
-//!   else.
+//!   `payload_telemetry`: from `source_base` plus its id to `dest_base` plus
+//!   its id. That is the only way such a payload's readings can reach the
+//!   ground. A payload the drawing does touch goes where the drawing says and
+//!   nowhere else.
 //!
 //! Two links landing on one port of one host would be two sources whose data
 //! arrived interleaved with nothing to tell them apart, so that is refused.
@@ -121,9 +121,10 @@ pub fn of(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
             // Each kind names its far end by what is there: a radio's
             // ground_base, an F´ gateway's bridge_base. One rule counts on
             // from either.
-            let attribute = crate::gateway::GatewayKind::of_node_type(&moc.node_type)
-                .expect("a gateway node")
-                .base_attribute();
+            let attribute =
+                crate::gateway::GatewayKind::of_node_type(&moc.node_type)
+                    .expect("a gateway node")
+                    .base_attribute();
             let Some(base) = moc
                 .attributes
                 .get(attribute)
@@ -188,10 +189,13 @@ pub fn of(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
             return Err(Refused {
                 node: Some(link.source.clone()),
                 why: format!(
-                    "\"{}\" and \"{}\" would both send to the ground at {}:{}, and \
-                     their data would arrive interleaved with nothing to tell it \
-                     apart: move a base so the ports do not overlap",
-                    first.source, link.source, link.ground.address, link.ground.port
+                    "\"{}\" and \"{}\" would both send to the ground at {}:{}, \
+                     and their data would arrive interleaved with nothing to \
+                     tell it apart: move a base so the ports do not overlap",
+                    first.source,
+                    link.source,
+                    link.ground.address,
+                    link.ground.port,
                 ),
             });
         }
@@ -223,7 +227,8 @@ mod tests {
 
     fn example(name: &str) -> Graph {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        Graph::load(root.join(format!("examples/{name}/{name}.yaml"))).expect("the example reads")
+        Graph::load(root.join(format!("examples/{name}/{name}.yaml")))
+            .expect("the example reads")
     }
 
     fn summary(links: &[Telemetered]) -> Vec<(&str, usize, &str, u16)> {

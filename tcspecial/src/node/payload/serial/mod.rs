@@ -29,7 +29,8 @@ use tcslibgs::{Parity, SerialConfig, StopBits, TcsError, TcsResult};
 
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
 use crate::endpoint::{
-    wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable, WaitResult,
+    wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable,
+    WaitResult,
 };
 
 /// The flags that ask a port for this parity.
@@ -118,7 +119,11 @@ impl SerialEndpoint {
 ///
 /// A rate the platform cannot express is reported with the rate in hand,
 /// because the alternative is a line running at a rate nobody chose.
-fn apply_line_terms(what: &str, file: &File, config: &SerialConfig) -> TcsResult<()> {
+fn apply_line_terms(
+    what: &str,
+    file: &File,
+    config: &SerialConfig,
+) -> TcsResult<()> {
     let fd = file.as_raw_fd();
     let speed = baud_of(config.datarate)?;
 
@@ -135,12 +140,18 @@ fn apply_line_terms(what: &str, file: &File, config: &SerialConfig) -> TcsResult
 
     unsafe { libc::cfmakeraw(&mut terms) };
 
-    terms.c_cflag &= !(libc::CSIZE | libc::CSTOPB | libc::PARENB | libc::PARODD | libc::CMSPAR);
+    terms.c_cflag &= !(libc::CSIZE
+        | libc::CSTOPB
+        | libc::PARENB
+        | libc::PARODD
+        | libc::CMSPAR);
     terms.c_cflag |= byte_length_of(config.byte_length)?;
     match config.stop_bits {
         StopBits::One => {}
         StopBits::Two => terms.c_cflag |= libc::CSTOPB,
-        StopBits::OnePointFive => return Err(stop_bits_unsupported(what, &config.path)),
+        StopBits::OnePointFive => {
+            return Err(stop_bits_unsupported(what, &config.path))
+        }
     }
 
     // And the parity, which termios computes per character. Mark and space
@@ -172,9 +183,12 @@ fn apply_line_terms(what: &str, file: &File, config: &SerialConfig) -> TcsResult
             what,
             &config.path,
             &format!(
-                "cannot be set to those terms: {} bits per second, {} data bits, \
-                 {} stop bits, {} parity",
-                config.datarate, config.byte_length, config.stop_bits, config.parity
+                "cannot be set to those terms: {} bits per second, {} data \
+                 bits, {} stop bits, {} parity",
+                config.datarate,
+                config.byte_length,
+                config.stop_bits,
+                config.parity
             ),
         ));
     }
@@ -203,9 +217,10 @@ fn apply_line_terms(what: &str, file: &File, config: &SerialConfig) -> TcsResult
             what,
             &config.path,
             &format!(
-                "will not take {wanted} parity: it reports {} after being set to it, \
-                 and a handler cannot check what the port is not checking. A \
-                 simulated line is a pseudo-terminal, which takes no parity but none",
+                "will not take {wanted} parity: it reports {} after being set \
+                 to it, and a handler cannot check what the port is not \
+                 checking. A simulated line is a pseudo-terminal, which takes \
+                 no parity but none",
                 parity_of(got.c_cflag)
             ),
         ));
@@ -232,7 +247,8 @@ fn stop_bits_unsupported(what: &str, path: &str) -> TcsError {
     not_a_line(
         what,
         path,
-        "cannot be set to one and a half stop bits: a serial port offers one or two",
+        "cannot be set to one and a half stop bits: a serial port offers one \
+         or two",
     )
 }
 
@@ -271,8 +287,8 @@ fn baud_of(datarate: u32) -> TcsResult<libc::speed_t> {
         4_000_000 => libc::B4000000,
         other => {
             return Err(TcsError::Config(format!(
-                "{other} bits per second is not a rate a serial port can be set to"
-            )))
+            "{other} bits per second is not a rate a serial port can be set to"
+        )))
         }
     };
     Ok(speed)
@@ -300,7 +316,11 @@ impl EndpointWaitable for SerialEndpoint {
         self.file.as_raw_fd()
     }
 
-    fn wait_for_event(&self, cmd_fd: RawFd, timeout_ms: i32) -> TcsResult<WaitResult> {
+    fn wait_for_event(
+        &self,
+        cmd_fd: RawFd,
+        timeout_ms: i32,
+    ) -> TcsResult<WaitResult> {
         wait_for_fds(self.io_fd(), cmd_fd, PollFlags::POLLIN, timeout_ms)
     }
 }
@@ -374,7 +394,8 @@ mod tests {
     fn a_line_is_set_to_the_parity_it_was_given() {
         use std::os::unix::io::FromRawFd;
 
-        let master_fd = unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY) };
+        let master_fd =
+            unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY) };
         assert!(
             master_fd >= 0,
             "no pty: {}",
@@ -386,7 +407,9 @@ mod tests {
 
         let mut name = [0 as libc::c_char; 128];
         assert_eq!(
-            unsafe { libc::ptsname_r(master_fd, name.as_mut_ptr(), name.len()) },
+            unsafe {
+                libc::ptsname_r(master_fd, name.as_mut_ptr(), name.len())
+            },
             0
         );
         let slave = unsafe { std::ffi::CStr::from_ptr(name.as_ptr()) }
@@ -406,8 +429,8 @@ mod tests {
 
         // No parity, which is what a device link commonly runs and what a
         // pty will take: the port comes back with the bit disabled.
-        let endpoint =
-            SerialEndpoint::new("telemetry", &line(Parity::None)).expect("a pty takes none");
+        let endpoint = SerialEndpoint::new("telemetry", &line(Parity::None))
+            .expect("a pty takes none");
         let mut terms: libc::termios = unsafe { std::mem::zeroed() };
         assert_eq!(
             unsafe { libc::tcgetattr(endpoint.file.as_raw_fd(), &mut terms) },
@@ -436,7 +459,8 @@ mod tests {
             // both name the parity that was asked for.
             assert!(
                 said.contains(parity.as_str())
-                    && (said.contains("cannot be set") || said.contains("will not take")),
+                    && (said.contains("cannot be set")
+                        || said.contains("will not take")),
                 "{parity}: {said}"
             );
         }
@@ -477,7 +501,8 @@ mod tests {
         use std::os::unix::io::FromRawFd;
 
         // A pty, as tcssim makes one.
-        let master_fd = unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY) };
+        let master_fd =
+            unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY) };
         assert!(
             master_fd >= 0,
             "no pty: {}",
@@ -489,7 +514,9 @@ mod tests {
 
         let mut name = [0 as libc::c_char; 128];
         assert_eq!(
-            unsafe { libc::ptsname_r(master_fd, name.as_mut_ptr(), name.len()) },
+            unsafe {
+                libc::ptsname_r(master_fd, name.as_mut_ptr(), name.len())
+            },
             0
         );
         let slave = unsafe { std::ffi::CStr::from_ptr(name.as_ptr()) }
@@ -507,7 +534,9 @@ mod tests {
             rs485: None,
         };
         let mut endpoint = SerialEndpoint::new("telemetry", &config)
-            .unwrap_or_else(|e| panic!("{slave} would not open as a line: {e}"));
+            .unwrap_or_else(|e| {
+                panic!("{slave} would not open as a line: {e}")
+            });
 
         // What the device's end writes, the handler's end reads. Raw terms
         // were applied when the endpoint was opened, so these bytes are not
@@ -518,9 +547,12 @@ mod tests {
         master.flush().ok();
 
         let mut buffer = [0u8; 64];
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let deadline =
+            std::time::Instant::now() + std::time::Duration::from_secs(5);
         let mut got = Vec::new();
-        while got.len() < b"from the device".len() && std::time::Instant::now() < deadline {
+        while got.len() < b"from the device".len()
+            && std::time::Instant::now() < deadline
+        {
             match endpoint.read(&mut buffer) {
                 Ok(n) if n > 0 => got.extend_from_slice(&buffer[..n]),
                 _ => std::thread::sleep(std::time::Duration::from_millis(10)),

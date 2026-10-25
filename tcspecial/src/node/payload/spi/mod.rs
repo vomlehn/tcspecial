@@ -24,7 +24,8 @@ use tcslibgs::{BitOrder, CsActive, SpiConfig, SpiMode, TcsError, TcsResult};
 
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
 use crate::endpoint::{
-    wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable, WaitResult,
+    wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable,
+    WaitResult,
 };
 
 /// Requests of an open spidev node, from `linux/spi/spidev.h`.
@@ -129,7 +130,9 @@ impl SpiEndpoint {
             // reasons that have nothing to do with its device.
             .custom_flags(libc::O_NOCTTY)
             .open(&config.path)
-            .map_err(|e| TcsError::Endpoint(format!("{on} cannot be opened: {e}")))?;
+            .map_err(|e| {
+                TcsError::Endpoint(format!("{on} cannot be opened: {e}"))
+            })?;
 
         let fd = device.as_raw_fd();
 
@@ -149,9 +152,9 @@ impl SpiEndpoint {
                 make_raw(fd, &on)?;
 
                 info!(
-                    "{} is a terminal standing in for a SPI peripheral: it will carry \
-                     bytes raw, and the mode, clock rate and word width in the \
-                     configuration are not applied to anything",
+                    "{} is a terminal standing in for a SPI peripheral: it \
+                     will carry bytes raw, and the mode, clock rate and word \
+                     width in the configuration are not applied to anything",
                     on
                 );
                 return Ok(Self {
@@ -218,7 +221,13 @@ fn mode_bits(config: &SpiConfig) -> u8 {
     bits
 }
 
-fn set_u8(fd: RawFd, request: libc::c_ulong, value: u8, on: &str, wanted: &str) -> TcsResult<()> {
+fn set_u8(
+    fd: RawFd,
+    request: libc::c_ulong,
+    value: u8,
+    on: &str,
+    wanted: &str,
+) -> TcsResult<()> {
     set(
         fd,
         request,
@@ -228,7 +237,13 @@ fn set_u8(fd: RawFd, request: libc::c_ulong, value: u8, on: &str, wanted: &str) 
     )
 }
 
-fn set_u32(fd: RawFd, request: libc::c_ulong, value: u32, on: &str, wanted: &str) -> TcsResult<()> {
+fn set_u32(
+    fd: RawFd,
+    request: libc::c_ulong,
+    value: u32,
+    on: &str,
+    wanted: &str,
+) -> TcsResult<()> {
     set(
         fd,
         request,
@@ -268,7 +283,11 @@ impl EndpointWaitable for SpiEndpoint {
     /// As for an I2C bus: a transfer is one the controller starts, so there is
     /// nothing to wait for on the device itself, and the wait is really on the
     /// command pipe.
-    fn wait_for_event(&self, cmd_fd: RawFd, timeout_ms: i32) -> TcsResult<WaitResult> {
+    fn wait_for_event(
+        &self,
+        cmd_fd: RawFd,
+        timeout_ms: i32,
+    ) -> TcsResult<WaitResult> {
         wait_for_fds(self.io_fd(), cmd_fd, PollFlags::POLLIN, timeout_ms)
     }
 }
@@ -326,7 +345,8 @@ mod tests {
         use std::io::Write;
         use std::os::unix::io::FromRawFd;
 
-        let master_fd = unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY) };
+        let master_fd =
+            unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY) };
         assert!(
             master_fd >= 0,
             "no pty: {}",
@@ -338,7 +358,9 @@ mod tests {
 
         let mut name = [0 as libc::c_char; 128];
         assert_eq!(
-            unsafe { libc::ptsname_r(master_fd, name.as_mut_ptr(), name.len()) },
+            unsafe {
+                libc::ptsname_r(master_fd, name.as_mut_ptr(), name.len())
+            },
             0
         );
         let slave = unsafe { std::ffi::CStr::from_ptr(name.as_ptr()) }
@@ -354,7 +376,9 @@ mod tests {
             cs_active: CsActive::Low,
         };
         let mut endpoint = SpiEndpoint::new("instrument", &config)
-            .unwrap_or_else(|e| panic!("{slave} was not taken as a stand-in: {e}"));
+            .unwrap_or_else(|e| {
+                panic!("{slave} was not taken as a stand-in: {e}")
+            });
         assert_eq!(
             endpoint.clocking,
             Clocking::StandIn,
@@ -366,9 +390,12 @@ mod tests {
             .expect("the far end writes");
         master.flush().ok();
         let mut buffer = [0u8; 64];
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let deadline =
+            std::time::Instant::now() + std::time::Duration::from_secs(5);
         let mut got = Vec::new();
-        while got.len() < b"from the peripheral".len() && std::time::Instant::now() < deadline {
+        while got.len() < b"from the peripheral".len()
+            && std::time::Instant::now() < deadline
+        {
             match endpoint.read(&mut buffer) {
                 Ok(n) if n > 0 => got.extend_from_slice(&buffer[..n]),
                 _ => std::thread::sleep(std::time::Duration::from_millis(10)),
@@ -398,7 +425,8 @@ mod tests {
         let said = format!("{e}");
         assert!(
             said.contains(&config.path) && said.contains("mode"),
-            "the complaint names neither the device nor what was being set: {said}"
+            "the complaint names neither the device nor what was being set: \
+             {said}"
         );
         // And which handler it was for, as the device configuration names it.
         assert!(

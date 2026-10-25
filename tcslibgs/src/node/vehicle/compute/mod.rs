@@ -147,7 +147,8 @@ pub fn value_bytes(number: f64) -> Result<[u8; VALUE_BYTES], String> {
 pub fn from_value(data: &[u8], what: &str) -> Result<f64, String> {
     let bytes: [u8; VALUE_BYTES] = data.try_into().map_err(|_| {
         format!(
-            "{what}: a value is {VALUE_BYTES} bytes of micro-kelvin, and {} arrived",
+            "{what}: a value is {VALUE_BYTES} bytes of micro-kelvin, and {} \
+             arrived",
             data.len()
         )
     })?;
@@ -184,7 +185,10 @@ pub fn result_is_a_value(function: &str) -> bool {
 /// [`result_is_a_value`]. Everything else sends what it was given or what its
 /// part produced -- a sensor's own bytes, a log record, whatever a program
 /// wrote -- and none of that is a number in this form.
-pub fn node_sends_a_value(node_type: &str, attributes: &BTreeMap<String, Scalar>) -> bool {
+pub fn node_sends_a_value(
+    node_type: &str,
+    attributes: &BTreeMap<String, Scalar>,
+) -> bool {
     node_type == "compute"
         && attributes
             .get("function")
@@ -327,9 +331,9 @@ impl Algorithm {
             "median" => Ok(Algorithm::Median),
             "closest_mean" => Ok(Algorithm::ClosestMean),
             other => Err(format!(
-                "algorithm: \"{other}\" is not one this knows. There are median, \
-                 which takes the middle reading, and closest_mean, which takes \
-                 the mean of the two that agree best"
+                "algorithm: \"{other}\" is not one this knows. There are \
+                 median, which takes the middle reading, and closest_mean, \
+                 which takes the mean of the two that agree best"
             )),
         }
     }
@@ -407,16 +411,19 @@ pub fn attributes_of(function: &str) -> Option<&'static [&'static str]> {
 }
 
 /// What this compute node computes, or what is wrong with what it says.
-pub fn params_of(what: &str, attributes: &BTreeMap<String, Scalar>) -> Result<Computation, String> {
+pub fn params_of(
+    what: &str,
+    attributes: &BTreeMap<String, Scalar>,
+) -> Result<Computation, String> {
     let function = attributes
         .get("function")
         .map(|f| f.as_str().to_string())
         .ok_or_else(|| {
-            format!(
-                "\"{what}\" is a compute node and says no function: one of {}",
-                functions()
-            )
-        })?;
+        format!(
+            "\"{what}\" is a compute node and says no function: one of {}",
+            functions()
+        )
+    })?;
 
     // Every attribute, so that one nothing reads is refused rather than
     // ignored: a thermostat whose `setpiont` was misspelled would be a
@@ -436,15 +443,18 @@ pub fn params_of(what: &str, attributes: &BTreeMap<String, Scalar>) -> Result<Co
     for attribute in attributes.keys() {
         if !own.contains(&attribute.as_str()) {
             return Err(named(
-                match crate::graph::spelled(attribute, |other| own.contains(&other)) {
+                match crate::graph::spelled(attribute, |other| {
+                    own.contains(&other)
+                }) {
                     Some(hint) => {
                         format!(
-                            "there is nothing called \"{attribute}\" on this computation: {hint}"
+                            "there is nothing called \"{attribute}\" on this \
+                             computation: {hint}"
                         )
                     }
                     None => format!(
-                        "there is nothing called \"{attribute}\" on this computation. It \
-                         takes {}",
+                        "there is nothing called \"{attribute}\" on this \
+                         computation. It takes {}",
                         own.join(", ")
                     ),
                 },
@@ -458,8 +468,8 @@ pub fn params_of(what: &str, attributes: &BTreeMap<String, Scalar>) -> Result<Co
                 .get("format")
                 .ok_or_else(|| {
                     named(
-                        "format is not set: a sensor's bytes cannot be read without \
-                         knowing how they are laid out"
+                        "format is not set: a sensor's bytes cannot be read \
+                         without knowing how they are laid out"
                             .to_string(),
                     )
                 })
@@ -471,7 +481,8 @@ pub fn params_of(what: &str, attributes: &BTreeMap<String, Scalar>) -> Result<Co
                 // whose value never changes -- and that looks like a working
                 // sensor reporting a steady temperature.
                 return Err(named(
-                    "scale: nought would make every reading the same".to_string(),
+                    "scale: nought would make every reading the same"
+                        .to_string(),
                 ));
             }
 
@@ -486,9 +497,9 @@ pub fn params_of(what: &str, attributes: &BTreeMap<String, Scalar>) -> Result<Co
         "vote" => {
             let inputs = attributes.get("inputs").ok_or_else(|| {
                 named(
-                    "inputs is not set: a vote says which inputs it is over, so \
-                     that a link deleted from it is a fault and not a vote over \
-                     fewer"
+                    "inputs is not set: a vote says which inputs it is over, \
+                     so that a link deleted from it is a fault and not a vote \
+                     over fewer"
                         .to_string(),
                 )
             })?;
@@ -502,9 +513,9 @@ pub fn params_of(what: &str, attributes: &BTreeMap<String, Scalar>) -> Result<Co
 
             if inputs.len() < 3 {
                 return Err(named(format!(
-                    "a vote is over at least three inputs, and this says {}: two \
-                     readings that disagree have no majority between them, and \
-                     one is the number itself",
+                    "a vote is over at least three inputs, and this says {}: \
+                     two readings that disagree have no majority between them, \
+                     and one is the number itself",
                     inputs.len()
                 )));
             }
@@ -513,8 +524,8 @@ pub fn params_of(what: &str, attributes: &BTreeMap<String, Scalar>) -> Result<Co
             once.dedup();
             if once.len() != inputs.len() {
                 return Err(named(
-                    "an input is named twice: a vote over an input counted twice \
-                     gives that sensor two votes"
+                    "an input is named twice: a vote over an input counted \
+                     twice gives that sensor two votes"
                         .to_string(),
                 ));
             }
@@ -523,9 +534,9 @@ pub fn params_of(what: &str, attributes: &BTreeMap<String, Scalar>) -> Result<Co
                 .get("algorithm")
                 .ok_or_else(|| {
                     named(
-                        "algorithm is not set: a vote says how it picks the one \
-                         value out of its readings, there being more than one way \
-                         to and no reason to prefer either by default"
+                        "algorithm is not set: a vote says how it picks the \
+                         one value out of its readings, there being more than \
+                         one way to and no reason to prefer either by default"
                             .to_string(),
                     )
                 })
@@ -536,12 +547,13 @@ pub fn params_of(what: &str, attributes: &BTreeMap<String, Scalar>) -> Result<Co
         "hysteresis" => {
             // Both are temperatures -- a goal and the width of a band around
             // it -- so both are held to what a value carries.
-            let half_band = temperature(attributes, "half_band").map_err(named)?;
+            let half_band =
+                temperature(attributes, "half_band").map_err(named)?;
             if half_band <= 0.0 {
                 return Err(named(
-                    "half_band is how far from the setpoint the decision changes, \
-                     and must be more than nought: a band of nothing is a bare \
-                     comparison, which cycles a relay on a wobble"
+                    "half_band is how far from the setpoint the decision \
+                     changes, and must be more than nought: a band of nothing \
+                     is a bare comparison, which cycles a relay on a wobble"
                         .to_string(),
                 ));
             }
@@ -557,8 +569,8 @@ pub fn params_of(what: &str, attributes: &BTreeMap<String, Scalar>) -> Result<Co
                 .map(|p| p.as_str().to_string())
                 .ok_or_else(|| {
                     named(
-                        "executable is not set: a compute node whose function is \
-                         \"process\" is the program it names"
+                        "executable is not set: a compute node whose function \
+                         is \"process\" is the program it names"
                             .to_string(),
                     )
                 })?;
@@ -571,8 +583,8 @@ pub fn params_of(what: &str, attributes: &BTreeMap<String, Scalar>) -> Result<Co
                 .get("timeout")
                 .ok_or_else(|| {
                     named(
-                        "timeout is not set, and there is no default for it: how \
-                         long a computation may take is a property of the \
+                        "timeout is not set, and there is no default for it: \
+                         how long a computation may take is a property of the \
                          computation"
                             .to_string(),
                     )
@@ -585,7 +597,8 @@ pub fn params_of(what: &str, attributes: &BTreeMap<String, Scalar>) -> Result<Co
             // The one place the two spellings are read, an app node taking the
             // same attribute: see `Restart::of`.
             let restart =
-                Restart::of(attributes.get("restart").map(Scalar::as_str)).map_err(named)?;
+                Restart::of(attributes.get("restart").map(Scalar::as_str))
+                    .map_err(named)?;
 
             Ok(Computation::Process(ProcessParams {
                 executable,
@@ -607,10 +620,13 @@ pub fn params_of(what: &str, attributes: &BTreeMap<String, Scalar>) -> Result<Co
 /// arithmetic cannot be done without. A scale of nought or an absent setpoint
 /// is not a default worth inventing -- it is a configuration that has not said
 /// what it wants, and saying so is better than averaging against zero.
-fn number(attributes: &BTreeMap<String, Scalar>, name: &str) -> Result<f64, String> {
-    let text = attributes
-        .get(name)
-        .ok_or_else(|| format!("{name} is not set, and there is no sensible default for it"))?;
+fn number(
+    attributes: &BTreeMap<String, Scalar>,
+    name: &str,
+) -> Result<f64, String> {
+    let text = attributes.get(name).ok_or_else(|| {
+        format!("{name} is not set, and there is no sensible default for it")
+    })?;
     text.as_str()
         .parse()
         .map_err(|_| format!("{name}: \"{}\" is not a number", text.as_str()))
@@ -628,7 +644,10 @@ fn number(attributes: &BTreeMap<String, Scalar>, name: &str) -> Result<f64, Stri
 /// [`number`] and not through this: it is a number of kelvin per count, not a
 /// temperature, and what it may be depends on the part's counts, which no
 /// file states.
-fn temperature(attributes: &BTreeMap<String, Scalar>, name: &str) -> Result<f64, String> {
+fn temperature(
+    attributes: &BTreeMap<String, Scalar>,
+    name: &str,
+) -> Result<f64, String> {
     let said = number(attributes, name)?;
     micro_kelvin(said).map_err(|why| format!("{name}: {why}"))?;
     Ok(said)
@@ -674,8 +693,11 @@ mod tests {
         // micro-kelvin, which is every temperature a value carries.
         for number in [0.0, 273.15, 293.15, -40.0, 0.0625, 1000.0, 0.000_001] {
             assert_eq!(
-                from_value(&as_value(number).expect("a temperature"), "a value")
-                    .expect("it reads back"),
+                from_value(
+                    &as_value(number).expect("a temperature"),
+                    "a value"
+                )
+                .expect("it reads back"),
                 number
             );
         }
@@ -683,7 +705,8 @@ mod tests {
         // And what is finer than the unit is rounded to it, rather than
         // truncated: a third of a kelvin is 333_333 micro-kelvin and a hair.
         let third =
-            from_value(&as_value(1.0 / 3.0).expect("a third"), "a third").expect("it reads back");
+            from_value(&as_value(1.0 / 3.0).expect("a third"), "a third")
+                .expect("it reads back");
         assert_eq!(third, 0.333_333);
     }
 
@@ -696,7 +719,8 @@ mod tests {
     #[test]
     fn a_temperature_outside_the_range_is_refused() {
         for wrong in [2200.0, -2200.0, 1.0e9, f64::NAN, f64::INFINITY] {
-            let said = as_value(wrong).expect_err("outside what a value carries");
+            let said =
+                as_value(wrong).expect_err("outside what a value carries");
             assert!(
                 said.contains("2147.483647") || said.contains("number"),
                 "the complaint should say what the range is: {said}"
@@ -709,7 +733,10 @@ mod tests {
             Ok(2147.483647)
         );
         assert_eq!(
-            from_value(&as_value(-2147.483648).expect("the bottom"), "the bottom"),
+            from_value(
+                &as_value(-2147.483648).expect("the bottom"),
+                "the bottom"
+            ),
             Ok(-2147.483648)
         );
     }
@@ -719,7 +746,8 @@ mod tests {
     fn a_datum_that_is_not_a_value_is_reported() {
         // A width that is not four: a sensor's own bytes delivered where a
         // conversion's output was meant, or a decision, which is text.
-        let said = from_value(b"293.15", "the fore sensor").expect_err("not a value");
+        let said =
+            from_value(b"293.15", "the fore sensor").expect_err("not a value");
         assert!(said.contains("fore sensor"), "{said}");
         assert!(said.contains('6'), "the width is worth saying: {said}");
         assert!(from_value(b"1", "a decision").is_err());
@@ -784,7 +812,8 @@ mod tests {
 
         for number in [0.0, 293.15, 0.333_333, -40.0, 1.0e-9] {
             assert_eq!(
-                from_text(&as_text(number), "a program").expect("it reads back"),
+                from_text(&as_text(number), "a program")
+                    .expect("it reads back"),
                 number
             );
         }
@@ -796,7 +825,8 @@ mod tests {
         );
         // And the range a reading is held to, because what a program answers
         // with becomes a reading: see `from_text`.
-        let said = from_text("3000", "a program").expect_err("outside the range");
+        let said =
+            from_text("3000", "a program").expect_err("outside the range");
         assert!(
             said.contains("a program") && said.contains("2147.483647"),
             "the refusal should name the program and the range: {said}"
@@ -811,11 +841,13 @@ mod tests {
     }
 
     fn params(pairs: &[(&str, &str)]) -> Computation {
-        params_of("node", &attributes(pairs)).unwrap_or_else(|why| panic!("{why}"))
+        params_of("node", &attributes(pairs))
+            .unwrap_or_else(|why| panic!("{why}"))
     }
 
     fn refused(pairs: &[(&str, &str)]) -> String {
-        params_of("node", &attributes(pairs)).expect_err("a computation that is wrong")
+        params_of("node", &attributes(pairs))
+            .expect_err("a computation that is wrong")
     }
 
     /// A temperature a value could not carry is refused in the file.
@@ -908,7 +940,11 @@ mod tests {
                 ("algorithm", "median"),
             ]),
             Computation::Vote(VoteParams {
-                inputs: vec!["in0".to_string(), "in1".to_string(), "in2".to_string()],
+                inputs: vec![
+                    "in0".to_string(),
+                    "in1".to_string(),
+                    "in2".to_string()
+                ],
                 algorithm: Algorithm::Median,
             })
         );
@@ -968,7 +1004,11 @@ mod tests {
     fn a_computation_that_says_too_little_is_refused() {
         for (pairs, wanted) in [
             (
-                vec![("function", "to_kelvin"), ("scale", "1"), ("offset", "0")],
+                vec![
+                    ("function", "to_kelvin"),
+                    ("scale", "1"),
+                    ("offset", "0"),
+                ],
                 "format",
             ),
             (
@@ -1115,7 +1155,9 @@ mod tests {
             ("algorithm", "average"),
         ]);
         assert!(
-            said.contains("average") && said.contains("median") && said.contains("closest_mean"),
+            said.contains("average")
+                && said.contains("median")
+                && said.contains("closest_mean"),
             "{said}"
         );
     }

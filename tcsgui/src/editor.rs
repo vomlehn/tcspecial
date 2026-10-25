@@ -157,7 +157,8 @@ impl Editor {
                 editor.document = document;
             }
             Err(why) => {
-                editor.trouble = Some(format!("{} cannot be read: {why}", path.display()));
+                editor.trouble =
+                    Some(format!("{} cannot be read: {why}", path.display()));
                 // No history either: a journal belongs to the document it
                 // describes, and the document is not the one that was meant.
                 return editor;
@@ -212,7 +213,9 @@ impl Editor {
                     .nodes
                     .iter()
                     .filter(|node| crate::pane::is_payload(&node.node_type))
-                    .map(|node| crate::Qualified::of(&node.name, &node.home).absolute())
+                    .map(|node| {
+                        crate::Qualified::of(&node.name, &node.home).absolute()
+                    })
                     .collect();
                 let stray: Vec<&String> = simulator
                     .payloads
@@ -500,7 +503,8 @@ fn describe(why: &SaveError) -> String {
 /// "and" before the last. A message that said `["a", "b"]` would be a message
 /// written for a programmer.
 fn said_list(names: &[&String]) -> String {
-    let quoted: Vec<String> = names.iter().map(|name| format!("\"{name}\"")).collect();
+    let quoted: Vec<String> =
+        names.iter().map(|name| format!("\"{name}\"")).collect();
     match quoted.len() {
         0 => String::new(),
         1 => quoted[0].clone(),
@@ -533,7 +537,8 @@ mod tests {
         let mut editor = Editor::new(&path);
 
         editor.edit(add("temp_1", "i2c"));
-        let after_one = std::fs::read_to_string(&path).expect("the file exists already");
+        let after_one =
+            std::fs::read_to_string(&path).expect("the file exists already");
         assert!(after_one.contains("temp_1"), "{after_one}");
         assert!(editor.trouble().is_none(), "{:?}", editor.trouble());
 
@@ -681,7 +686,10 @@ tcsgui:
         let written = std::fs::read_to_string(&path).unwrap();
         assert_ne!(written, by_hand);
         assert!(
-            written.contains(&format!("x: {}", crate::pane::node_ceil(dividers.vehicle))),
+            written.contains(&format!(
+                "x: {}",
+                crate::pane::node_ceil(dividers.vehicle)
+            )),
             "the settled position was not written: {written}"
         );
     }
@@ -727,7 +735,8 @@ tcsgui:
         let mut editor = Editor::new(&path);
 
         let shut = |mode: u32| {
-            let mut permissions = std::fs::metadata(&locked).unwrap().permissions();
+            let mut permissions =
+                std::fs::metadata(&locked).unwrap().permissions();
             permissions.set_mode(mode);
             std::fs::set_permissions(&locked, permissions).unwrap();
         };
@@ -777,7 +786,8 @@ tcsgui:
         });
 
         // Both files, from the one edit.
-        let written = std::fs::read_to_string(&sim).expect("the simulator file");
+        let written =
+            std::fs::read_to_string(&sim).expect("the simulator file");
         assert!(written.contains("simulated_payloads"), "{written}");
         assert!(written.contains("payload"), "{written}");
         assert!(written.contains("1000"), "{written}");
@@ -839,15 +849,19 @@ tcsgui:
     fn a_simulator_file_that_does_not_join_up_is_refused() {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("vehicle.yaml");
-        std::fs::write(&path, "payloads:\n  - name: payload\n    type: network\n")
-            .expect("a configuration");
+        std::fs::write(
+            &path,
+            "payloads:\n  - name: payload\n    type: network\n",
+        )
+        .expect("a configuration");
 
         // Two entries of one name.
         let twice = where_.path().join("twicesim.yaml");
         std::fs::write(
             &twice,
-            "simulated_payloads:\n  - name: payload\n    simulate: true\n    packet_interval: 500 ms\n  \
-             - name: payload\n    simulate: true\n    packet_interval: 900 ms\n",
+            "simulated_payloads:\n  - name: payload\n    simulate: \
+             true\n    packet_interval: 500 ms\n  - name: payload\n    \
+             simulate: true\n    packet_interval: 900 ms\n",
         )
         .expect("a simulator file");
         let mut editor = Editor::open(&path, crate::pane::default_dividers());
@@ -867,7 +881,8 @@ tcsgui:
         let stray = where_.path().join("straysim.yaml");
         std::fs::write(
             &stray,
-            "simulated_payloads:\n  - name: payload\n    simulate: true\n  - name: paylod\n    simulate: true\n",
+            "simulated_payloads:\n  - name: payload\n    simulate: \
+             true\n  - name: paylod\n    simulate: true\n",
         )
         .expect("a simulator file");
         let mut editor = Editor::open(&path, crate::pane::default_dividers());
@@ -880,7 +895,8 @@ tcsgui:
         let good = where_.path().join("goodsim.yaml");
         std::fs::write(
             &good,
-            "simulated_payloads:\n  - name: payload\n    simulate: true\n    packet_interval: 500 ms\n",
+            "simulated_payloads:\n  - name: payload\n    simulate: \
+             true\n    packet_interval: 500 ms\n",
         )
         .expect("a simulator file");
         let mut editor = Editor::open(&path, crate::pane::default_dividers());
@@ -895,7 +911,8 @@ tcsgui:
             was: "payload".to_string(),
             now: "payload-1".to_string(),
         });
-        let written = std::fs::read_to_string(&good).expect("the simulator file");
+        let written =
+            std::fs::read_to_string(&good).expect("the simulator file");
         assert!(written.contains("payload-1"), "{written}");
         let mut again = Editor::open(&path, crate::pane::default_dividers());
         again.open_simulator(&good);
@@ -925,7 +942,8 @@ tcsgui:
 
         // On the disk at once, because the document and the file must not
         // disagree about a name while the session carries on.
-        let written = std::fs::read_to_string(&path).expect("the configuration");
+        let written =
+            std::fs::read_to_string(&path).expect("the configuration");
         assert!(written.contains(&spare), "{written}");
 
         // And not in the history: an undo would put back a configuration that
@@ -944,8 +962,11 @@ tcsgui:
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("vehicle.yaml");
         let sim = where_.path().join("vehiclesim.yaml");
-        std::fs::write(&path, "payloads:\n  - name: payload\n    type: network\n")
-            .expect("a configuration");
+        std::fs::write(
+            &path,
+            "payloads:\n  - name: payload\n    type: network\n",
+        )
+        .expect("a configuration");
 
         let mut editor = Editor::open(&path, crate::pane::default_dividers());
         editor.open_simulator(&sim);
@@ -958,7 +979,8 @@ tcsgui:
             now: Some("1 s".to_string()),
         });
 
-        let written = std::fs::read_to_string(&sim).expect("the simulator file");
+        let written =
+            std::fs::read_to_string(&sim).expect("the simulator file");
         assert!(
             written.contains("packet_interval: \"1 s\""),
             "the setting did not reach the file: {written}"
@@ -998,7 +1020,8 @@ tcsgui:
             now: Some("the forward bulkhead".to_string()),
         });
 
-        let written = std::fs::read_to_string(&sim).expect("the simulator file");
+        let written =
+            std::fs::read_to_string(&sim).expect("the simulator file");
         for payload in ["sensor", "payload"] {
             assert!(
                 written.contains(&format!("name: \"{payload}\"")),
@@ -1014,7 +1037,9 @@ tcsgui:
         // rather than `""`, which would say somebody had typed two quotation
         // marks -- and the two read the same, so the honest spelling is the
         // one a person would have written.
-        for setting in ["group", "packet_interval", "drop_percent", "close_after"] {
+        for setting in
+            ["group", "packet_interval", "drop_percent", "close_after"]
+        {
             assert!(
                 written.contains(&format!("    {setting}:\n")),
                 "{setting}: {written}"
@@ -1067,7 +1092,8 @@ tcsgui:
             );
             assert!(
                 editor.document().simulator.is_none(),
-                "{name}: nothing should be opened for a name that cannot be written"
+                "{name}: nothing should be opened for a name that cannot \
+                 be written"
             );
         }
 
@@ -1082,7 +1108,11 @@ tcsgui:
             );
             editor.open_simulator(&sim);
 
-            assert!(editor.trouble().is_none(), "{name}: {:?}", editor.trouble());
+            assert!(
+                editor.trouble().is_none(),
+                "{name}: {:?}",
+                editor.trouble()
+            );
             assert!(editor.document().simulator.is_some(), "{name}");
         }
     }
@@ -1153,7 +1183,8 @@ tcsgui:
             // And the process dies here, with no chance to tidy up.
         }
 
-        let mut recovered = Editor::open(&path, crate::pane::default_dividers());
+        let mut recovered =
+            Editor::open(&path, crate::pane::default_dividers());
         assert_eq!(
             recovered.document().nodes.len(),
             3,
@@ -1214,7 +1245,8 @@ tcsgui:
 
         {
             use std::os::unix::fs::PermissionsExt;
-            let mut permissions = std::fs::metadata(&locked).unwrap().permissions();
+            let mut permissions =
+                std::fs::metadata(&locked).unwrap().permissions();
             permissions.set_mode(0o500);
             std::fs::set_permissions(&locked, permissions).unwrap();
         }
@@ -1232,7 +1264,8 @@ tcsgui:
 
         {
             use std::os::unix::fs::PermissionsExt;
-            let mut permissions = std::fs::metadata(&locked).unwrap().permissions();
+            let mut permissions =
+                std::fs::metadata(&locked).unwrap().permissions();
             permissions.set_mode(0o700);
             std::fs::set_permissions(&locked, permissions).unwrap();
         }
@@ -1263,14 +1296,16 @@ tcsgui:
 
         {
             use std::os::unix::fs::PermissionsExt;
-            let mut permissions = std::fs::metadata(&locked).unwrap().permissions();
+            let mut permissions =
+                std::fs::metadata(&locked).unwrap().permissions();
             permissions.set_mode(0o500);
             std::fs::set_permissions(&locked, permissions).unwrap();
         }
         editor.edit(add("b", "spi"));
         {
             use std::os::unix::fs::PermissionsExt;
-            let mut permissions = std::fs::metadata(&locked).unwrap().permissions();
+            let mut permissions =
+                std::fs::metadata(&locked).unwrap().permissions();
             permissions.set_mode(0o700);
             std::fs::set_permissions(&locked, permissions).unwrap();
         }
@@ -1312,8 +1347,8 @@ tcsgui:
         assert!(editor.trouble().is_none(), "{:?}", editor.trouble());
 
         let top = std::fs::read_to_string(&path).expect("the top diagram");
-        let inner =
-            std::fs::read_to_string(where_.path().join("cabin.yaml")).expect("the subdiagram");
+        let inner = std::fs::read_to_string(where_.path().join("cabin.yaml"))
+            .expect("the subdiagram");
 
         // The top file names what it includes and holds its own nodes.
         assert!(top.contains("include:\n  - cabin"), "{top}");

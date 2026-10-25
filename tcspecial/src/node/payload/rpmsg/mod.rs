@@ -29,10 +29,13 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::path::Path;
 
 use nix::poll::PollFlags;
-use tcslibgs::{node::payload::rpmsg::message_bytes, RpmsgConfig, TcsError, TcsResult};
+use tcslibgs::{
+    node::payload::rpmsg::message_bytes, RpmsgConfig, TcsError, TcsResult,
+};
 
 use crate::endpoint::{
-    wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable, WaitResult,
+    wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable,
+    WaitResult,
 };
 
 /// Where the kernel publishes what an rpmsg node is.
@@ -62,14 +65,22 @@ impl RpmsgEndpoint {
             .open(&config.path)
             .map_err(|e| {
                 TcsError::Endpoint(format!(
-                    "{what}: cannot open the rpmsg channel {}: {e}. A node exists only \\
-                     while the remote has announced its channel, so one that is not \\
-                     there is commonly a remote processor that has not been started",
+                    "{what}: cannot open the rpmsg channel {}: {e}. A node \
+                     exists only \\
+                     while the remote has announced its channel, so one that \
+                     is not \\
+                     there is commonly a remote processor that has not been \
+                     started",
                     config.path
                 ))
             })?;
 
-        is_that_service(what, Path::new(RPMSG_CLASS), &config.path, &config.service)?;
+        is_that_service(
+            what,
+            Path::new(RPMSG_CLASS),
+            &config.path,
+            &config.service,
+        )?;
 
         Ok(Self {
             what: what.to_string(),
@@ -93,7 +104,12 @@ impl RpmsgEndpoint {
 /// `class` is where the kernel publishes it, given so that a test can hand
 /// over a tree of its own. Nothing is refused where the entry is absent; see
 /// the module's own note for why.
-fn is_that_service(what: &str, class: &Path, path: &str, service: &str) -> TcsResult<()> {
+fn is_that_service(
+    what: &str,
+    class: &Path,
+    path: &str,
+    service: &str,
+) -> TcsResult<()> {
     let Some(node) = Path::new(path).file_name() else {
         return Ok(());
     };
@@ -106,9 +122,9 @@ fn is_that_service(what: &str, class: &Path, path: &str, service: &str) -> TcsRe
 
     if announced != service {
         return Err(TcsError::Config(format!(
-            "{what}: {path} is the channel \"{announced}\", not \"{service}\". A node's \
-             number is assigned as channels announce themselves, so the node a file \
-             names can become another core's channel"
+            "{what}: {path} is the channel \"{announced}\", not \"{service}\". \
+             A node's number is assigned as channels announce themselves, so \
+             the node a file names can become another core's channel"
         )));
     }
 
@@ -120,7 +136,11 @@ impl EndpointWaitable for RpmsgEndpoint {
         self.file.as_raw_fd()
     }
 
-    fn wait_for_event(&self, cmd_fd: RawFd, timeout_ms: i32) -> TcsResult<WaitResult> {
+    fn wait_for_event(
+        &self,
+        cmd_fd: RawFd,
+        timeout_ms: i32,
+    ) -> TcsResult<WaitResult> {
         wait_for_fds(self.io_fd(), cmd_fd, PollFlags::POLLIN, timeout_ms)
     }
 }
@@ -151,8 +171,8 @@ impl EndpointWritable for RpmsgEndpoint {
     fn write(&mut self, data: &[u8]) -> TcsResult<usize> {
         if data.len() > self.room as usize {
             return Err(TcsError::Endpoint(format!(
-                "{}: {} bytes will not fit in an rpmsg message, which carries {}, and \
-                 rpmsg does not fragment",
+                "{}: {} bytes will not fit in an rpmsg message, which carries \
+                 {}, and rpmsg does not fragment",
                 self.what,
                 data.len(),
                 self.room
@@ -185,7 +205,8 @@ mod tests {
             Ok(_) => panic!("this host has a device called rpmsg-nonesuch"),
         };
         assert!(
-            said.contains("rpmsg-nonesuch") && said.contains("not been started"),
+            said.contains("rpmsg-nonesuch")
+                && said.contains("not been started"),
             "the error should name the node and the usual cause: {said}"
         );
     }
@@ -201,17 +222,29 @@ mod tests {
         let class = tempfile::tempdir().expect("a class directory");
         let node = class.path().join("rpmsg0");
         std::fs::create_dir(&node).expect("the node's directory");
-        std::fs::write(node.join("name"), "payload-telemetry\n").expect("what it is");
+        std::fs::write(node.join("name"), "payload-telemetry\n")
+            .expect("what it is");
 
-        is_that_service("remote", class.path(), "/dev/rpmsg0", "payload-telemetry")
-            .expect("the channel the file asked for");
+        is_that_service(
+            "remote",
+            class.path(),
+            "/dev/rpmsg0",
+            "payload-telemetry",
+        )
+        .expect("the channel the file asked for");
 
-        let said = match is_that_service("remote", class.path(), "/dev/rpmsg0", "something-else") {
+        let said = match is_that_service(
+            "remote",
+            class.path(),
+            "/dev/rpmsg0",
+            "something-else",
+        ) {
             Err(e) => format!("{e}"),
             Ok(()) => panic!("the wrong channel was accepted"),
         };
         assert!(
-            said.contains("payload-telemetry") && said.contains("something-else"),
+            said.contains("payload-telemetry")
+                && said.contains("something-else"),
             "the error should name both channels: {said}"
         );
     }
@@ -262,7 +295,9 @@ mod tests {
             let mut buffer = [0i8; 128];
             // SAFETY: a buffer of the length given, filled by the call.
             assert_eq!(
-                unsafe { libc::ttyname_r(slave, buffer.as_mut_ptr(), buffer.len()) },
+                unsafe {
+                    libc::ttyname_r(slave, buffer.as_mut_ptr(), buffer.len())
+                },
                 0
             );
             unsafe { std::ffi::CStr::from_ptr(buffer.as_ptr()) }
@@ -284,13 +319,17 @@ mod tests {
         assert_eq!(endpoint.write(b"READ").expect("a message goes out"), 4);
         let mut got = [0u8; 32];
         // SAFETY: reading into a buffer of the length given.
-        let read = unsafe { libc::read(master, got.as_mut_ptr() as *mut libc::c_void, got.len()) };
+        let read = unsafe {
+            libc::read(master, got.as_mut_ptr() as *mut libc::c_void, got.len())
+        };
         assert!(read >= 4, "the remote got {read} bytes");
         assert_eq!(&got[..4], b"READ");
 
         // And the remote's answer reaches the handler.
         // SAFETY: writing the slice's own length from the slice.
-        let sent = unsafe { libc::write(master, b"DATA".as_ptr() as *const libc::c_void, 4) };
+        let sent = unsafe {
+            libc::write(master, b"DATA".as_ptr() as *const libc::c_void, 4)
+        };
         assert_eq!(sent, 4);
         let answered = (0..50)
             .find_map(|_| {
@@ -308,7 +347,9 @@ mod tests {
         // reason, rather than being split into two the remote cannot join.
         let said = match endpoint.write(&[0u8; 17]) {
             Err(e) => format!("{e}"),
-            Ok(n) => panic!("seventeen bytes went into a sixteen-byte message as {n}"),
+            Ok(n) => panic!(
+                "seventeen bytes went into a sixteen-byte message as {n}"
+            ),
         };
         assert!(
             said.contains("does not fragment"),

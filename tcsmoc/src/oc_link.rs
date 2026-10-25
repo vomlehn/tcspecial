@@ -85,9 +85,14 @@ mod tests {
     /// the datagram is received.
     #[test]
     fn a_reading_is_shown_as_a_temperature() {
-        let at = Timestamp::at(std::time::UNIX_EPOCH + std::time::Duration::from_secs(3661));
+        let at = Timestamp::at(
+            std::time::UNIX_EPOCH + std::time::Duration::from_secs(3661),
+        );
         let mut data = DHSample::new();
-        data.record(&tcslibgs::node::vehicle::compute::as_value(293.15).expect("a temperature"));
+        data.record(
+            &tcslibgs::node::vehicle::compute::as_value(293.15)
+                .expect("a temperature"),
+        );
 
         let arrival = Arrival {
             at,
@@ -120,7 +125,9 @@ mod tests {
     /// where the receiving is tested.
     #[test]
     fn an_arrival_says_when_it_came_and_what_it_was() {
-        let at = Timestamp::at(std::time::UNIX_EPOCH + std::time::Duration::from_secs(3661));
+        let at = Timestamp::at(
+            std::time::UNIX_EPOCH + std::time::Duration::from_secs(3661),
+        );
         let mut data = DHSample::new();
         data.record(b"hello");
         let arrival = Arrival {

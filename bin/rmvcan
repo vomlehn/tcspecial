@@ -18,7 +18,8 @@
 set -euo pipefail
 
 if [ "$(id -u)" -ne 0 ]; then
-	echo "rmvcan: re-running under sudo, which is what removing an interface needs"
+	echo "rmvcan: re-running under sudo, which is what removing an" \
+		"interface needs"
 	exec sudo -- "$0" "$@"
 fi
 
@@ -32,7 +33,8 @@ fi
 # so the name is the second colon-separated field; the sed strips the "@parent"
 # suffix that some link types carry, which vcan does not but which costs
 # nothing to allow for.
-existing="$(ip -o link show type vcan | awk -F': ' '{ print $2 }' | sed 's/@.*//')"
+existing="$(ip -o link show type vcan | awk -F': ' '{ print $2 }' |
+	sed 's/@.*//')"
 if [ -z "$existing" ]; then
 	echo "rmvcan: no virtual CAN interface to remove"
 	exit 0

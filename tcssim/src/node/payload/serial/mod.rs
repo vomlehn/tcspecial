@@ -28,8 +28,9 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, could_not_stand_in, ignore_this_request, lateness, send_in_segments, wait_out_packet,
-    wait_while_running, Pacing, PayloadConfig, PayloadStats, Produce,
+    a_packet, could_not_stand_in, ignore_this_request, lateness,
+    send_in_segments, wait_out_packet, wait_while_running, Pacing,
+    PayloadConfig, PayloadStats, Produce,
 };
 use crate::pty::SimulatedNode;
 
@@ -44,17 +45,19 @@ pub fn run_serial_node(
     running: Arc<AtomicBool>,
     stats: Arc<std::sync::Mutex<PayloadStats>>,
 ) {
-    let mut line =
-        match SimulatedNode::open(&format!("{}: a serial line", config.name), &config.address) {
-            Ok(line) => line,
-            Err(e) => {
-                could_not_stand_in(
-                    &config,
-                    format!("failed to stand in for a serial line: {}", e),
-                );
-                return;
-            }
-        };
+    let mut line = match SimulatedNode::open(
+        &format!("{}: a serial line", config.name),
+        &config.address,
+    ) {
+        Ok(line) => line,
+        Err(e) => {
+            could_not_stand_in(
+                &config,
+                format!("failed to stand in for a serial line: {}", e),
+            );
+            return;
+        }
+    };
     config.standing.made();
 
     let mut rng = rand::thread_rng();
@@ -244,12 +247,16 @@ mod tests {
     #[test]
     fn a_real_device_at_the_path_is_left_alone() {
         let real = Path::new("/dev/null");
-        let e = match SimulatedNode::open("a serial line", &real.display().to_string()) {
+        let e = match SimulatedNode::open(
+            "a serial line",
+            &real.display().to_string(),
+        ) {
             Ok(_) => panic!("a real device is not ours to displace"),
             Err(e) => e,
         };
         assert!(
-            e.contains("real serial device") || e.contains("not a link the simulator made"),
+            e.contains("real serial device")
+                || e.contains("not a link the simulator made"),
             "the refusal does not say what is there: {e}"
         );
         assert!(real.exists(), "/dev/null was displaced");
@@ -261,7 +268,10 @@ mod tests {
         let path = a_path("occupied");
         std::fs::write(&path, b"not a line").expect("a file in the way");
 
-        let e = match SimulatedNode::open("a serial line", &path.display().to_string()) {
+        let e = match SimulatedNode::open(
+            "a serial line",
+            &path.display().to_string(),
+        ) {
             Ok(_) => panic!("a file is not ours to displace"),
             Err(e) => e,
         };
@@ -282,8 +292,9 @@ mod tests {
         std::fs::remove_file(&path).ok();
         symlink("/dev/pts/999", &path).expect("a stale link");
 
-        let line = SimulatedNode::open("a serial line", &path.display().to_string())
-            .expect("a link of our own making is ours to replace");
+        let line =
+            SimulatedNode::open("a serial line", &path.display().to_string())
+                .expect("a link of our own making is ours to replace");
         assert_eq!(
             std::fs::read_link(&path).expect("where it leads now"),
             Path::new(line.slave())

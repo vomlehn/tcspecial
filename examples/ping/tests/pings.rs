@@ -55,7 +55,8 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
             "<configuration>
     <tcspecial>
         <gateway>radio</gateway>
-        <beacon><interval>5 s</interval><recv>127.0.0.1:{beacons}</recv><send>127.0.0.1:{}</send></beacon>
+        <beacon><interval>5 s</interval><recv>127.0.0.1:{beacons}</recv>\
+<send>127.0.0.1:{}</send></beacon>
     </tcspecial>
     <moc>
         <name>moc</name><type>moc</type>
@@ -123,7 +124,8 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
             let mut sequence = 0;
             while !stop.load(Ordering::Relaxed) {
                 sequence += 1;
-                let datagram = Beacon::new(sequence, version, digest).to_bytes();
+                let datagram =
+                    Beacon::new(sequence, version, digest).to_bytes();
                 let _ = beacon.send_to(&datagram, ("127.0.0.1", beacons));
                 std::thread::sleep(Duration::from_millis(100));
             }
@@ -137,7 +139,8 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
         let (got, _) = uplink.recv_from(&mut buffer).expect("a ping arrives");
         let had = ping::read_message(&buffer[..got]).expect("it is a ping");
         assert_eq!(had.count, count);
-        let answer = ping::reply(&buffer[..got], ping::now().expect("a clock")).expect("answered");
+        let answer = ping::reply(&buffer[..got], ping::now().expect("a clock"))
+            .expect("answered");
         uplink
             .send_to(answer.as_bytes(), ("127.0.0.1", answers))
             .expect("sent down");

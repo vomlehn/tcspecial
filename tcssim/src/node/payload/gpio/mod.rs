@@ -32,7 +32,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
-use crate::payload::{could_not_stand_in, wait_out_packet, Pacing, PayloadConfig, PayloadStats};
+use crate::payload::{
+    could_not_stand_in, wait_out_packet, Pacing, PayloadConfig, PayloadStats,
+};
 
 /// Where the kernel puts a simulated chip's lines.
 ///
@@ -76,7 +78,11 @@ const WATCH_EVERY: std::time::Duration = std::time::Duration::from_millis(20);
 /// `chip_name` file holds that node's name. The number is not an identity: a
 /// simulated chip's node is numbered as chips appear, exactly as an
 /// `i2c-stub` adapter's bus is.
-pub(crate) fn lines_of(devices: &Path, chip: &str, lines: &[u32]) -> Option<Vec<SimulatedLine>> {
+pub(crate) fn lines_of(
+    devices: &Path,
+    chip: &str,
+    lines: &[u32],
+) -> Option<Vec<SimulatedLine>> {
     let node = Path::new(chip).file_name()?.to_string_lossy().into_owned();
 
     for device in std::fs::read_dir(devices).ok()? {
@@ -108,7 +114,10 @@ pub(crate) fn lines_of(devices: &Path, chip: &str, lines: &[u32]) -> Option<Vec<
                 lines
                     .iter()
                     .map(|line| SimulatedLine {
-                        pull: bank.path().join(format!("sim_gpio{line}")).join("pull"),
+                        pull: bank
+                            .path()
+                            .join(format!("sim_gpio{line}"))
+                            .join("pull"),
                     })
                     .collect(),
             );
@@ -128,8 +137,8 @@ pub(crate) fn how_to_make_one(chip: &str) -> String {
     format!(
         "no simulated GPIO chip stands in for {chip}. Load the module with \
          \"modprobe gpio-sim\" and make a chip through configfs under \
-         /sys/kernel/config/gpio-sim, which needs root; the chip's node has to be \
-         the one this device names"
+         /sys/kernel/config/gpio-sim, which needs root; the chip's node has to \
+         be the one this device names"
     )
 }
 
@@ -139,7 +148,11 @@ pub fn run_gpio_node(
     running: Arc<AtomicBool>,
     stats: Arc<std::sync::Mutex<PayloadStats>>,
 ) {
-    let lines = match lines_of(Path::new(SIM_DEVICES), &config.address, &config.gpio_lines) {
+    let lines = match lines_of(
+        Path::new(SIM_DEVICES),
+        &config.address,
+        &config.gpio_lines,
+    ) {
         Some(lines) => lines,
         None => {
             could_not_stand_in(&config, how_to_make_one(&config.address));
@@ -173,7 +186,11 @@ pub fn run_gpio_node(
                 match std::fs::write(&line.pull, pull) {
                     Ok(()) => moved += 1,
                     Err(e) => {
-                        eprintln!("{}: cannot move {}: {e}", config.name, line.pull.display());
+                        eprintln!(
+                            "{}: cannot move {}: {e}",
+                            config.name,
+                            line.pull.display()
+                        );
                     }
                 }
             }
@@ -229,7 +246,11 @@ fn watch_driven_lines(
         }
         if now != was && !first {
             if sending && now.iter().all(|&v| v == now[0]) {
-                crate::thermal::driven(&config.thermal, &config.name, &now[..1]);
+                crate::thermal::driven(
+                    &config.thermal,
+                    &config.name,
+                    &now[..1],
+                );
             }
             let mut guard = stats.lock().unwrap();
             guard.a_packet_has_come(&now);
@@ -256,12 +277,14 @@ mod tests {
         let tree = tempfile::tempdir().expect("a tree of our own");
 
         // Something that is not a simulated chip, to be passed over.
-        std::fs::create_dir(tree.path().join("serial8250")).expect("another device");
+        std::fs::create_dir(tree.path().join("serial8250"))
+            .expect("another device");
 
         // And one that is, whose bank became gpiochip3.
         let bank = tree.path().join("gpio-sim.0").join("gpiochip1");
         std::fs::create_dir_all(&bank).expect("the bank");
-        std::fs::write(bank.join("chip_name"), "gpiochip3\n").expect("what it became");
+        std::fs::write(bank.join("chip_name"), "gpiochip3\n")
+            .expect("what it became");
 
         let found = lines_of(tree.path(), "/dev/gpiochip3", &[0, 5])
             .expect("the chip standing in for gpiochip3");
@@ -326,8 +349,11 @@ mod tests {
         let running = Arc::new(AtomicBool::new(true));
         let stats = Arc::new(Mutex::new(PayloadStats::default()));
         let watching = {
-            let (running, stats, lines) = (running.clone(), stats.clone(), lines.clone());
-            std::thread::spawn(move || watch_driven_lines(&config, &running, &stats, &lines))
+            let (running, stats, lines) =
+                (running.clone(), stats.clone(), lines.clone());
+            std::thread::spawn(move || {
+                watch_driven_lines(&config, &running, &stats, &lines)
+            })
         };
         let settle = || std::thread::sleep(WATCH_EVERY * 5);
 
@@ -364,7 +390,8 @@ mod tests {
             said.contains("/dev/gpiochip3")
                 && said.contains("modprobe gpio-sim")
                 && said.contains("root"),
-            "the message should name the chip, the module and the privilege: {said}"
+            "the message should name the chip, the module and the privilege: \
+             {said}"
         );
     }
 
@@ -378,13 +405,17 @@ mod tests {
         let tree = tempfile::tempdir().expect("a tree of our own");
         let bank = tree.path().join("gpio-sim.0").join("gpiochip0");
         std::fs::create_dir_all(bank.join("sim_gpio2")).expect("the line");
-        std::fs::write(bank.join("chip_name"), "gpiochip0").expect("what it became");
+        std::fs::write(bank.join("chip_name"), "gpiochip0")
+            .expect("what it became");
 
-        let lines = lines_of(tree.path(), "/dev/gpiochip0", &[2]).expect("the line");
-        std::fs::write(&lines[0].pull, "pull-up").expect("the line is pulled up");
+        let lines =
+            lines_of(tree.path(), "/dev/gpiochip0", &[2]).expect("the line");
+        std::fs::write(&lines[0].pull, "pull-up")
+            .expect("the line is pulled up");
 
         assert_eq!(
-            std::fs::read_to_string(&lines[0].pull).expect("what it is pulled to"),
+            std::fs::read_to_string(&lines[0].pull)
+                .expect("what it is pulled to"),
             "pull-up"
         );
     }

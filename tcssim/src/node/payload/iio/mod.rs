@@ -32,8 +32,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, could_not_stand_in, lateness, send_in_segments, wait_out_packet, wait_while_running,
-    Pacing, PayloadConfig, PayloadStats, Produce,
+    a_packet, could_not_stand_in, lateness, send_in_segments, wait_out_packet,
+    wait_while_running, Pacing, PayloadConfig, PayloadStats, Produce,
 };
 use crate::pty::SimulatedNode;
 
@@ -53,14 +53,21 @@ pub fn run_iio_node(
     // there, as every simulated payload's is, and counts nothing -- the
     // samples go from the kernel to the vehicle, and nothing of them passes
     // here to be seen.
-    if tcslibgs::node::payload::iio::is_dummy(&tcslibgs::simulate::Host::this(), &config.address) {
+    if tcslibgs::node::payload::iio::is_dummy(
+        &tcslibgs::simulate::Host::this(),
+        &config.address,
+    ) {
         eprintln!(
-            "{}: {} is a sensor of the kernel's iio_dummy, which stands in for itself",
+            "{}: {} is a sensor of the kernel's iio_dummy, which stands in for \
+             itself",
             config.name, config.address
         );
         config.standing.made();
         while running.load(Ordering::SeqCst) {
-            crate::payload::wait_while_running(std::time::Duration::from_millis(100), &running);
+            crate::payload::wait_while_running(
+                std::time::Duration::from_millis(100),
+                &running,
+            );
         }
         return;
     }
@@ -200,10 +207,11 @@ mod tests {
     /// A path the simulator cannot make is reported and the device stops.
     #[test]
     fn a_path_that_cannot_be_made_is_reported() {
-        let said = match SimulatedNode::open("sensor", "/proc/nonesuch/iio:device0") {
-            Err(e) => e,
-            Ok(_) => panic!("a node was made under /proc"),
-        };
+        let said =
+            match SimulatedNode::open("sensor", "/proc/nonesuch/iio:device0") {
+                Err(e) => e,
+                Ok(_) => panic!("a node was made under /proc"),
+            };
         assert!(
             !said.is_empty(),
             "the error should say something about the path"

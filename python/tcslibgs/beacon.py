@@ -52,16 +52,16 @@ class Beacon:
         read as far as a beacon goes."""
         if len(datagram) != BEACON_BYTES:
             raise BeaconError(
-                f"{len(datagram)} bytes, where a beacon is {BEACON_BYTES}: something "
-                "other than tcspecial, or a tcspecial of another layout, is sending "
-                "to the beacon port"
+                f"{len(datagram)} bytes, where a beacon is {BEACON_BYTES}: "
+                "something other than tcspecial, or a tcspecial of another "
+                "layout, is sending to the beacon port"
             )
         try:
             packet = _packet.Beacon.decode(datagram)
         except _pk.PacketError as why:
             raise BeaconError(
-                f"not a beacon ({why}): something other than tcspecial is sending "
-                "to the beacon port"
+                f"not a beacon ({why}): something other than tcspecial is "
+                "sending to the beacon port"
             ) from why
         return Beacon(
             sequence=packet.sequence,

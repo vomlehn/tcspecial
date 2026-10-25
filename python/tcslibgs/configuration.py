@@ -68,7 +68,9 @@ class HostPort:
             )
         address, port = said.rsplit(":", 1)
         if not address.strip() or not port.strip().isdigit():
-            raise ValueError(f'{attribute} "{said}" is not an address and a port')
+            raise ValueError(
+                f'{attribute} "{said}" is not an address and a port'
+            )
         number = int(port)
         if not 0 < number < 65536:
             raise ValueError(f'{attribute} "{said}": a port is 1 to 65535')
@@ -108,7 +110,8 @@ class Configuration:
     nodes: list
 
     def node(self, name):
-        """The node called ``name``, or a ``ValueError`` saying there is none."""
+        """The node called ``name``, or a ``ValueError`` saying there is
+        none."""
         for node in self.nodes:
             if node.name == name:
                 return node
@@ -156,8 +159,8 @@ class Configuration:
 
     def downlink(self, moc, source):
         """Where the ground receives what ``source`` sends to the gateway node
-        called ``moc``: that node's ``ground_base`` -- or ``bridge_base``, for an
-        F´ gateway -- its port counted on by the source's device id, so that
+        called ``moc``: that node's ``ground_base`` -- or ``bridge_base``, for
+        an F´ gateway -- its port counted on by the source's device id, so that
         each source arrives on a port of its own."""
         node = self._moc(moc)
         attribute = GATEWAY_BASES[node.node_type]
@@ -172,8 +175,8 @@ class Configuration:
         port = base.port + self.device_id(source)
         if port > 65535:
             raise ValueError(
-                f'{self.path}: "{moc}" {attribute} {base} plus {source}\'s device '
-                f"id is port {port}, and a port is at most 65535"
+                f'{self.path}: "{moc}" {attribute} {base} plus {source}\'s '
+                f"device id is port {port}, and a port is at most 65535"
             )
         return HostPort(base.address, port)
 
@@ -181,7 +184,8 @@ class Configuration:
         node = self.node(name)
         if node.node_type not in GATEWAY_BASES:
             raise ValueError(
-                f'{self.path}: "{name}" is a {node.node_type} node, not a gateway node'
+                f'{self.path}: "{name}" is a {node.node_type} node, not a '
+                "gateway node"
             )
         return node
 
@@ -223,11 +227,15 @@ def parse_interval(text):
     digits, unit = parts
     if unit not in INTERVAL_UNITS:
         raise ValueError(
-            f'"{text}": "{unit}" is not a unit of time: us, ms, s, min, h, d or w'
+            f'"{text}": "{unit}" is not a unit of time: us, ms, s, min, h, d '
+            "or w"
         )
     bare = digits.replace("_", "")
     # Digits, at most one point, digits: no sign, no exponent.
-    if not re.fullmatch(r"[0-9]*\.?[0-9]*", bare, re.ASCII) or bare in ("", "."):
+    if not re.fullmatch(r"[0-9]*\.?[0-9]*", bare, re.ASCII) or bare in (
+        "",
+        ".",
+    ):
         raise ValueError(f'"{text}" is not a number of {unit}')
     micros = round(float(bare) * INTERVAL_UNITS[unit])
     if micros == 0:
@@ -254,7 +262,11 @@ def choose(named, stem, default, chosen=None):
     if named is not None:
         named = str(named)
         suffix = Path(named).suffix.lower()
-        spelled = "yaml" if suffix in (".yaml", ".yml") else "xml" if suffix == ".xml" else None
+        spelled = (
+            "yaml"
+            if suffix in (".yaml", ".yml")
+            else "xml" if suffix == ".xml" else None
+        )
         if chosen is not None and spelled is not None and spelled != chosen:
             raise ValueError(
                 f"{named} is {spelled.upper()} and --{chosen} asks for "
@@ -279,8 +291,8 @@ def load(path):
     if suffix in (".yaml", ".yml"):
         return _load_yaml(path)
     raise ValueError(
-        f"{path}: a configuration file is named .yaml, .yml or .xml, and this is "
-        "none of those"
+        f"{path}: a configuration file is named .yaml, .yml or .xml, and this "
+        "is none of those"
     )
 
 
@@ -302,7 +314,9 @@ def _load_xml(path):
         for part in section:
             if len(part):
                 for leaf in part:
-                    tcspecial[f"{part.tag}.{leaf.tag}"] = (leaf.text or "").strip()
+                    tcspecial[f"{part.tag}.{leaf.tag}"] = (
+                        leaf.text or ""
+                    ).strip()
             else:
                 tcspecial[part.tag] = (part.text or "").strip()
 
@@ -342,15 +356,17 @@ def _load_yaml(path):
         import yaml
     except ImportError as why:
         raise ValueError(
-            f"{path} is YAML, which is read with PyYAML, and this Python has none "
-            f"({why}): install it (python3-yaml on Debian and Ubuntu, or pip "
-            "install pyyaml), or read the XML spelling"
+            f"{path} is YAML, which is read with PyYAML, and this Python has "
+            f"none ({why}): install it (python3-yaml on Debian and Ubuntu, or "
+            "pip install pyyaml), or read the XML spelling"
         ) from why
 
     with open(path, encoding="utf-8") as text:
         document = yaml.safe_load(text) or {}
     if not isinstance(document, dict):
-        raise ValueError(f"{path} is not a configuration: it is not a map of sections")
+        raise ValueError(
+            f"{path} is not a configuration: it is not a map of sections"
+        )
     if "include" in document:
         raise _includes(path)
 
@@ -388,7 +404,9 @@ def _load_yaml(path):
 def one_host(address):
     """The names that mean this host, as one name: ``localhost``,
     ``127.0.0.1`` and ``::1`` are one host everywhere in these rules."""
-    return "localhost" if address in ("localhost", "127.0.0.1", "::1") else address
+    return (
+        "localhost" if address in ("localhost", "127.0.0.1", "::1") else address
+    )
 
 
 def binds_every_interface(address):
@@ -463,4 +481,7 @@ def digest(path, tcsverify=None):
     for line in done.stdout.splitlines():
         if ": md5 " in line:
             return line.rsplit(": md5 ", 1)[1].strip(), None
-    return None, f"{program} gave no digest: {done.stdout.strip() or done.stderr.strip()}"
+    return None, (
+        f"{program} gave no digest: "
+        f"{done.stdout.strip() or done.stderr.strip()}"
+    )

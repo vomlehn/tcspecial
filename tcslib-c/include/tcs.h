@@ -40,7 +40,7 @@
 extern "C" {
 #endif
 
-/* ---- The library ------------------------------------------------------- */
+/* ---- The library -------------------------------------------------------- */
 
 /* The size of the buffer tcs_last_error() returns, its NUL included. */
 #define TCS_ERROR_BYTES 512
@@ -61,7 +61,7 @@ const char *tcs_version(void);
  * none has. */
 const char *tcs_last_error(void);
 
-/* ---- A configuration ----------------------------------------------------- */
+/* ---- A configuration ---------------------------------------------------- */
 
 /* A tcspecial configuration, read and checked as the vehicle reads it. */
 typedef struct tcs_configuration tcs_configuration;
@@ -77,18 +77,19 @@ const char *tcs_configuration_digest(const tcs_configuration *configuration);
 
 /* The id of the node called name -- its place among the configuration's
  * nodes, which is what a node command names -- into *id. */
-int tcs_configuration_node_id(const tcs_configuration *configuration, const char *name,
-                              uint32_t *id);
+int tcs_configuration_node_id(const tcs_configuration *configuration,
+			      const char *name, uint32_t *id);
 
-/* ---- Beacons --------------------------------------------------------------- */
+/* ---- Beacons ------------------------------------------------------------ */
 
 /* How long it has been since the vehicle's last beacon arrived, counted in
  * beacons missed in a row at the configuration's beacon.interval. */
 typedef enum tcs_stage {
-    TCS_STAGE_UNHEARD = 0, /* nothing has arrived, or nothing can be said */
-    TCS_STAGE_HEARD = 1,   /* fewer than four missed: being heard from */
-    TCS_STAGE_AGING = 2,   /* four to seven missed */
-    TCS_STAGE_WAITING = 3  /* eight or more: waiting to be heard from again */
+	TCS_STAGE_UNHEARD = 0, /* nothing has arrived, or nothing can be said */
+	TCS_STAGE_HEARD = 1,   /* fewer than four missed: being heard from */
+	TCS_STAGE_AGING = 2,   /* four to seven missed */
+	TCS_STAGE_WAITING = 3  /* eight or more: waiting to be heard from
+	                          again */
 } tcs_stage;
 
 /* What a stage is called where a person reads it: "Unheard", "Heard",
@@ -97,12 +98,13 @@ const char *tcs_stage_label(tcs_stage stage);
 
 /* What one pass of the beacon watch found. */
 typedef struct tcs_pass {
-    tcs_stage stage;
-    int lit;          /* whether an indicator showing the stage is lit now */
-    int in_contact;   /* whether the spacecraft is being heard from */
-    int heard;        /* whether any beacon has arrived */
-    int64_t at_seconds; /* when the last one arrived: seconds since 1970, */
-    uint32_t at_nanos;  /* and nanoseconds; both 0 where none has */
+	tcs_stage stage;
+	int lit;          /* whether an indicator showing the stage is lit
+	                     now */
+	int in_contact;   /* whether the spacecraft is being heard from */
+	int heard;        /* whether any beacon has arrived */
+	int64_t at_seconds; /* when the last one arrived: seconds since 1970, */
+	uint32_t at_nanos;  /* and nanoseconds; both 0 where none has */
 } tcs_pass;
 
 /* The ground's end of the beacon link: a socket where the configuration says
@@ -132,16 +134,16 @@ const char *tcs_beacons_warning(const tcs_beacons *beacons, size_t index);
 
 void tcs_beacons_close(tcs_beacons *beacons);
 
-/* ---- The vehicle's data ------------------------------------------------------ */
+/* ---- The vehicle's data ------------------------------------------------- */
 
 /* A moc node, open on the ground: a port for each node drawn into it. */
 typedef struct tcs_moc tcs_moc;
 
 /* One datum, and the node that produced it. */
 typedef struct tcs_datum {
-    const char *source;  /* the node's name */
-    const uint8_t *data; /* what it produced, exactly as sent */
-    size_t length;
+	const char *source;  /* the node's name */
+	const uint8_t *data; /* what it produced, exactly as sent */
+	size_t length;
 } tcs_datum;
 
 /* Open the moc node called moc. */
@@ -154,18 +156,18 @@ int tcs_moc_receive(tcs_moc *moc, int64_t wait_ms, tcs_datum *datum);
 
 void tcs_moc_close(tcs_moc *moc);
 
-/* ---- Commands -------------------------------------------------------------- */
+/* ---- Commands ----------------------------------------------------------- */
 
 /* What the vehicle answered a command with. */
 typedef enum tcs_status {
-    TCS_STATUS_SUCCESS = 0,
-    TCS_STATUS_FAILURE = 1,
-    TCS_STATUS_INVALID_COMMAND = 2,
-    TCS_STATUS_INVALID_PARAMETER = 3,
-    TCS_STATUS_NOT_ARMED = 4,
-    TCS_STATUS_NOT_FOUND = 5,
-    TCS_STATUS_ALREADY_EXISTS = 6,
-    TCS_STATUS_TIMEOUT = 7
+	TCS_STATUS_SUCCESS = 0,
+	TCS_STATUS_FAILURE = 1,
+	TCS_STATUS_INVALID_COMMAND = 2,
+	TCS_STATUS_INVALID_PARAMETER = 3,
+	TCS_STATUS_NOT_ARMED = 4,
+	TCS_STATUS_NOT_FOUND = 5,
+	TCS_STATUS_ALREADY_EXISTS = 6,
+	TCS_STATUS_TIMEOUT = 7
 } tcs_status;
 
 /* A status's name: "Success", "NotFound" and so on. */
@@ -186,24 +188,30 @@ int tcs_client_ping(tcs_client *client);
 
 /* Start or stop the node whose id is node, saying what the vehicle answered
  * in *status. */
-int tcs_client_start_node(tcs_client *client, uint32_t node, tcs_status *status);
-int tcs_client_stop_node(tcs_client *client, uint32_t node, tcs_status *status);
+int tcs_client_start_node(tcs_client *client, uint32_t node,
+			  tcs_status *status);
+int tcs_client_stop_node(tcs_client *client, uint32_t node,
+			 tcs_status *status);
 
 /* Ask what the node whose id is node is doing: *enabled is 1 where it is
  * running. */
-int tcs_client_query_node(tcs_client *client, uint32_t node, tcs_status *status, int *enabled);
+int tcs_client_query_node(tcs_client *client, uint32_t node,
+			  tcs_status *status, int *enabled);
 
 /* Arm a restart with key, which the RESTART that follows must carry. */
-int tcs_client_restart_arm(tcs_client *client, uint64_t key, tcs_status *status);
+int tcs_client_restart_arm(tcs_client *client, uint64_t key,
+			   tcs_status *status);
 
 /* Restart the vehicle, which the last RESTART_ARM must have armed with the
  * same key: the process restarts, and the beacons start again at #1. */
-int tcs_client_restart(tcs_client *client, uint64_t key, tcs_status *status);
+int tcs_client_restart(tcs_client *client, uint64_t key,
+		       tcs_status *status);
 
 /* Change how often the vehicle beacons, in microseconds. A station's beacon
  * watch goes on aging beacons against the configuration's interval: see the
  * README's known limits. */
-int tcs_client_configure(tcs_client *client, uint64_t beacon_interval_us, tcs_status *status);
+int tcs_client_configure(tcs_client *client, uint64_t beacon_interval_us,
+			 tcs_status *status);
 
 /* The longest attribute name, and the longest value, a SET_NODE carries, in
  * bytes. Longer is refused here, and not sent. */
@@ -213,8 +221,9 @@ int tcs_client_configure(tcs_client *client, uint64_t beacon_interval_us, tcs_st
 /* Set attribute of the node whose id is node to the length bytes at value,
  * which the configuration must let the ground set: an attribute of at most
  * TCS_ATTRIBUTE_BYTES and a value of at most TCS_VALUE_BYTES. */
-int tcs_client_set_node(tcs_client *client, uint32_t node, const char *attribute,
-                        const uint8_t *value, size_t length, tcs_status *status);
+int tcs_client_set_node(tcs_client *client, uint32_t node,
+			const char *attribute, const uint8_t *value,
+			size_t length, tcs_status *status);
 
 /* Why the vehicle refused the last SET_NODE this client sent -- which
  * attribute no binding names, and its spelling where that was what was wrong;
@@ -227,20 +236,22 @@ const char *tcs_client_reason(const tcs_client *client);
 
 /* The last datum a node moved one way. */
 typedef struct tcs_sample {
-    int moved;          /* whether one has moved at all */
-    int64_t at_micros;  /* when, in microseconds since 1970; 0 where none has */
-    uint32_t total;     /* bytes in the whole transfer, */
-    uint8_t length;     /* of which bytes holds the first length */
-    uint8_t bytes[TCS_SAMPLE_BYTES];
+	int moved;          /* whether one has moved at all */
+	int64_t at_micros;  /* when, in microseconds since 1970; 0 where
+	                       none has */
+	uint32_t total;     /* bytes in the whole transfer, */
+	uint8_t length;     /* of which bytes holds the first length */
+	uint8_t bytes[TCS_SAMPLE_BYTES];
 } tcs_sample;
 
 /* The last datum the node whose id is node took, and the last it gave. */
-int tcs_client_query_node_sample(tcs_client *client, uint32_t node, tcs_status *status,
-                                 tcs_sample *taken, tcs_sample *given);
+int tcs_client_query_node_sample(tcs_client *client, uint32_t node,
+				 tcs_status *status, tcs_sample *taken,
+				 tcs_sample *given);
 
 void tcs_client_close(tcs_client *client);
 
-/* ---- Pinging a ping node --------------------------------------------------- */
+/* ---- Pinging a ping node ------------------------------------------------ */
 
 /* A ping goes up to a moc node, which hands it to the vehicle's ping node;
  * the answer, with the vehicle's time on the end, comes down as that ping
@@ -253,14 +264,15 @@ typedef struct tcs_pinger tcs_pinger;
  * ones are each read across the ground's clock and the vehicle's, so either
  * may be negative -- their sum is the round trip. */
 typedef struct tcs_exchange {
-    int sent;              /* whether a ping has been sent */
-    int64_t sent_at;       /* when the last went, by the ground's clock */
-    int answered;          /* whether the last ping's own answer has arrived */
-    int64_t received_at;   /* when it arrived, by the ground's clock */
-    int64_t answered_at;   /* when the vehicle had the ping, by its clock */
-    int64_t round_trip;    /* ground sent to ground received */
-    int64_t up;            /* ground sent to vehicle had */
-    int64_t down;          /* vehicle had to ground received */
+	int sent;              /* whether a ping has been sent */
+	int64_t sent_at;       /* when the last went, by the ground's clock */
+	int answered;          /* whether the last ping's own answer has
+	                          arrived */
+	int64_t received_at;   /* when it arrived, by the ground's clock */
+	int64_t answered_at;   /* when the vehicle had the ping, by its clock */
+	int64_t round_trip;    /* ground sent to ground received */
+	int64_t up;            /* ground sent to vehicle had */
+	int64_t down;          /* vehicle had to ground received */
 } tcs_exchange;
 
 /* Ping the first ping node the configuration lets the ground reach both
@@ -276,7 +288,8 @@ const char *tcs_pinger_moc(const tcs_pinger *pinger);
 int tcs_pinger_ping(tcs_pinger *pinger);
 
 /* Fold in a datum the ping node sent down, which has just arrived. */
-int tcs_pinger_answered(tcs_pinger *pinger, const uint8_t *data, size_t length);
+int tcs_pinger_answered(tcs_pinger *pinger, const uint8_t *data,
+			size_t length);
 
 /* What there is to know now. */
 int tcs_pinger_exchange(const tcs_pinger *pinger, tcs_exchange *exchange);

@@ -11,7 +11,9 @@
 //! simulating something else at that address.
 //!
 //! What a payload then does with the endpoint is in the file for its kind:
-//! [`crate::node::payload::network::tcp`], [`crate::node::payload::network::udp`], [`crate::node::payload::device_file`].
+//! [`crate::node::payload::network::tcp`],
+//! [`crate::node::payload::network::udp`],
+//! [`crate::node::payload::device_file`].
 
 use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
@@ -34,7 +36,10 @@ use tcslibgs::ResolvedSim;
 /// form the tests of the pacing, the faults and the addresses use, and saying
 /// `None` in each of them would say nothing to them.
 #[cfg(test)]
-pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadConfig, String> {
+pub fn payload_config_from(
+    dh: &DHConfig,
+    sim: &ResolvedSim,
+) -> Result<PayloadConfig, String> {
     payload_config_attached(dh, sim, None)
 }
 
@@ -56,103 +61,126 @@ pub fn payload_config_attached(
     // asks it too: see `tcslibgs::simulable`.
     tcslibgs::simulable(dh)?;
 
-    let (protocol, address, port, bus_address) = match (&dh.endpoint, dh.stand_in) {
-        // A payload of a type the operating system cannot stand in for, whose
-        // node gives a stand_in: tcspecial reaches it over UDP there when the
-        // run has stand-ins, which is the only kind of run tcssim takes part
-        // in, so the simulator is a UDP payload there, by the same rule of
-        // which end speaks first. See `tcslibgs::graph::reach::Reach::opened`.
-        (_, Some(at)) => (PayloadProtocol::Udp, at.ip().to_string(), at.port(), 0),
-        (EndpointConfig::Network(net), None) => {
-            // A Unix socket divides as TCP and UDP divide, and which end binds
-            // its path divides with it: the simulator listens at the
-            // configured path for a stream, and sends to it from a path of its
-            // own for a datagram. See payload_unix.
-            let protocol = match net.protocol {
-                NetworkProtocol::Tcp => PayloadProtocol::Tcp,
-                NetworkProtocol::Udp => PayloadProtocol::Udp,
-                NetworkProtocol::UnixStream => PayloadProtocol::UnixStream,
-                NetworkProtocol::UnixDgram => PayloadProtocol::UnixDgram,
-                // Refused by `simulable` above, which says why; here only so
-                // that a raw payload reaching this is refused and not run.
-                NetworkProtocol::Raw(_) => {
-                    return Err(format!(
-                        "{} is reached on a raw socket, which the simulator does not \
-                         stand in for",
-                        dh.name.0
-                    ))
-                }
-            };
-            (protocol, net.address.clone(), net.port, 0)
-        }
-        (EndpointConfig::Device(dev), None) => (PayloadProtocol::Device, dev.path.clone(), 0, 0),
-        // A bus the simulator can simply be on: a CAN controller carries
-        // every member's frames to every other, so the simulator opens a
-        // socket on the same interface and sends the payload's frames with
-        // the payload's identifier. Nothing has to stand in for anything --
-        // which makes this the one experimental kind whose stand-in is as
-        // faithful as a socket.
-        (EndpointConfig::Can(can), None) => (PayloadProtocol::Can, can.interface.clone(), 0, 0),
-        // A sensor's buffer the simulator can be: a pty's slave is a
-        // character device a handler reads the same way, so the path the
-        // handler was told to open is made to lead there. What it does not
-        // stand in for is the sysfs around it -- the channels and the buffer
-        // -- which a handler does not touch either; see payload_iio.
-        (EndpointConfig::Iio(iio), None) => (PayloadProtocol::Iio, iio.path.clone(), 0, 0),
-        // A channel to another core, which a pty stands in for both ways: a
-        // handler writes a message and reads an answer, and that is what a
-        // pty carries. What it does not reproduce is the channel's identity
-        // -- there is no sysfs entry saying which service it is -- which the
-        // handler's own check allows for; see payload_rpmsg.
-        (EndpointConfig::Rpmsg(rpmsg), None) => (PayloadProtocol::Rpmsg, rpmsg.path.clone(), 0, 0),
-        // Discrete lines, which nothing in user space can drive: what stands
-        // in is the kernel's gpio-sim, whose lines the simulator pulls one way
-        // and the other. Found rather than made, as the I2C stub is; see
-        // payload_gpio.
-        (EndpointConfig::Gpio(gpio), None) => (PayloadProtocol::Gpio, gpio.path.clone(), 0, 0),
-        // A synchronous line, which nothing in the kernel stands in for.
-        // Refused by `simulable` above, where the reason is written; said
-        // again here rather than assumed.
-        (EndpointConfig::Hdlc(_), None) => {
-            return Err(format!(
-                "simulated payload \"{}\" is on a synchronous line, which \
-                 nothing stands in for",
-                dh.name.0
-            ))
-        }
-        // A line the simulator can be: a pty's slave is a device file with a
-        // line discipline behind it, so a handler opens it, sets its terms and
-        // reads it exactly as it would a port. The path the handler was told
-        // to open is made to lead there; see node::payload::serial.
-        //
-        // The line's terms do not come this way. A pty takes a data rate and
-        // ignores it, so what the handler sets them to is between the handler
-        // and the kernel, and the simulator has only the path to be at.
-        (EndpointConfig::Serial(serial), None) => {
-            (PayloadProtocol::Serial, serial.path.clone(), 0, 0)
-        }
-        // A bus the simulator can be on, though not by being a device: the
-        // kernel's i2c-stub is an adapter whose chips are a bank of registers
-        // in memory, and every master on that bus reads and writes the same
-        // bank. So the bank is the payload, and the simulator fills it; see
-        // node::payload::i2c. The bus the handler was told to open is made to lead to
-        // the stub, as a line's path is made to lead to a pty.
-        (EndpointConfig::I2c(i2c), None) => (PayloadProtocol::I2c, i2c.bus.clone(), 0, i2c.address),
-        // A peripheral the simulator can carry the bytes of, though not be:
-        // nothing emulates one, a peripheral being a thing a controller
-        // clocks, so what stands in is a pty as for a serial line. The bytes
-        // and their pacing are real; the clock, the mode and the word are not
-        // simulated at all. See payload_spi, which says what that does and
-        // does not test.
-        //
-        // Nothing of the terms comes this way, for the same reason a line's
-        // do not: what the handler sets is between the handler and the
-        // kernel, and a pty has nowhere to put it.
-        (EndpointConfig::Spi(spi), None) => (PayloadProtocol::Spi, spi.path.clone(), 0, 0),
-    };
+    let (protocol, address, port, bus_address) =
+        match (&dh.endpoint, dh.stand_in) {
+            // A payload of a type the operating system cannot stand in for,
+            // whose node gives a stand_in: tcspecial reaches it over UDP there
+            // when the run has stand-ins, which is the only kind of run tcssim
+            // takes part in, so the simulator is a UDP payload there, by the
+            // same rule of which end speaks first. See
+            // `tcslibgs::graph::reach::Reach::opened`.
+            (_, Some(at)) => {
+                (PayloadProtocol::Udp, at.ip().to_string(), at.port(), 0)
+            }
+            (EndpointConfig::Network(net), None) => {
+                // A Unix socket divides as TCP and UDP divide, and which end
+                // binds its path divides with it: the simulator listens at the
+                // configured path for a stream, and sends to it from a path of
+                // its own for a datagram. See payload_unix.
+                let protocol = match net.protocol {
+                    NetworkProtocol::Tcp => PayloadProtocol::Tcp,
+                    NetworkProtocol::Udp => PayloadProtocol::Udp,
+                    NetworkProtocol::UnixStream => PayloadProtocol::UnixStream,
+                    NetworkProtocol::UnixDgram => PayloadProtocol::UnixDgram,
+                    // Refused by `simulable` above, which says why; here only
+                    // so that a raw payload reaching this is refused and not
+                    // run.
+                    NetworkProtocol::Raw(_) => {
+                        return Err(format!(
+                            "{} is reached on a raw socket, which the \
+                             simulator does not stand in for",
+                            dh.name.0
+                        ))
+                    }
+                };
+                (protocol, net.address.clone(), net.port, 0)
+            }
+            (EndpointConfig::Device(dev), None) => {
+                (PayloadProtocol::Device, dev.path.clone(), 0, 0)
+            }
+            // A bus the simulator can simply be on: a CAN controller carries
+            // every member's frames to every other, so the simulator opens a
+            // socket on the same interface and sends the payload's frames with
+            // the payload's identifier. Nothing has to stand in for anything --
+            // which makes this the one experimental kind whose stand-in is as
+            // faithful as a socket.
+            (EndpointConfig::Can(can), None) => {
+                (PayloadProtocol::Can, can.interface.clone(), 0, 0)
+            }
+            // A sensor's buffer the simulator can be: a pty's slave is a
+            // character device a handler reads the same way, so the path the
+            // handler was told to open is made to lead there. What it does not
+            // stand in for is the sysfs around it -- the channels and the
+            // buffer -- which a handler does not touch either; see payload_iio.
+            (EndpointConfig::Iio(iio), None) => {
+                (PayloadProtocol::Iio, iio.path.clone(), 0, 0)
+            }
+            // A channel to another core, which a pty stands in for both ways: a
+            // handler writes a message and reads an answer, and that is what a
+            // pty carries. What it does not reproduce is the channel's identity
+            // -- there is no sysfs entry saying which service it is -- which
+            // the handler's own check allows for; see payload_rpmsg.
+            (EndpointConfig::Rpmsg(rpmsg), None) => {
+                (PayloadProtocol::Rpmsg, rpmsg.path.clone(), 0, 0)
+            }
+            // Discrete lines, which nothing in user space can drive: what
+            // stands in is the kernel's gpio-sim, whose lines the simulator
+            // pulls one way and the other. Found rather than made, as the I2C
+            // stub is; see payload_gpio.
+            (EndpointConfig::Gpio(gpio), None) => {
+                (PayloadProtocol::Gpio, gpio.path.clone(), 0, 0)
+            }
+            // A synchronous line, which nothing in the kernel stands in for.
+            // Refused by `simulable` above, where the reason is written; said
+            // again here rather than assumed.
+            (EndpointConfig::Hdlc(_), None) => {
+                return Err(format!(
+                    "simulated payload \"{}\" is on a synchronous line, which \
+                     nothing stands in for",
+                    dh.name.0
+                ))
+            }
+            // A line the simulator can be: a pty's slave is a device file with
+            // a line discipline behind it, so a handler opens it, sets its
+            // terms and reads it exactly as it would a port. The path the
+            // handler was told to open is made to lead there; see
+            // node::payload::serial.
+            //
+            // The line's terms do not come this way. A pty takes a data rate
+            // and ignores it, so what the handler sets them to is between the
+            // handler and the kernel, and the simulator has only the path to be
+            // at.
+            (EndpointConfig::Serial(serial), None) => {
+                (PayloadProtocol::Serial, serial.path.clone(), 0, 0)
+            }
+            // A bus the simulator can be on, though not by being a device: the
+            // kernel's i2c-stub is an adapter whose chips are a bank of
+            // registers in memory, and every master on that bus reads and
+            // writes the same bank. So the bank is the payload, and the
+            // simulator fills it; see node::payload::i2c. The bus the handler
+            // was told to open is made to lead to the stub, as a line's path is
+            // made to lead to a pty.
+            (EndpointConfig::I2c(i2c), None) => {
+                (PayloadProtocol::I2c, i2c.bus.clone(), 0, i2c.address)
+            }
+            // A peripheral the simulator can carry the bytes of, though not be:
+            // nothing emulates one, a peripheral being a thing a controller
+            // clocks, so what stands in is a pty as for a serial line. The
+            // bytes and their pacing are real; the clock, the mode and the word
+            // are not simulated at all. See payload_spi, which says what that
+            // does and does not test.
+            //
+            // Nothing of the terms comes this way, for the same reason a line's
+            // do not: what the handler sets is between the handler and the
+            // kernel, and a pty has nowhere to put it.
+            (EndpointConfig::Spi(spi), None) => {
+                (PayloadProtocol::Spi, spi.path.clone(), 0, 0)
+            }
+        };
 
-    let packet_size = u32::try_from(dh.packet_size)
-        .map_err(|_| format!("{} has a packet size too large to simulate", dh.name.0))?;
+    let packet_size = u32::try_from(dh.packet_size).map_err(|_| {
+        format!("{} has a packet size too large to simulate", dh.name.0)
+    })?;
 
     // What a CAN payload is identified by, which no other kind has: taken
     // from the endpoint rather than from `bus_address`, a CAN identifier
@@ -188,8 +216,12 @@ pub fn payload_config_attached(
         port,
         packet_size: Arc::new(AtomicU32::new(packet_size)),
         segment_size: Arc::new(AtomicU32::new(sim.segment_size)),
-        packet_interval_ms: Arc::new(AtomicU32::new(sim.packet_interval.as_millis() as u32)),
-        segment_interval_ms: Arc::new(AtomicU32::new(sim.segment_interval.as_millis() as u32)),
+        packet_interval_ms: Arc::new(AtomicU32::new(
+            sim.packet_interval.as_millis() as u32,
+        )),
+        segment_interval_ms: Arc::new(AtomicU32::new(
+            sim.segment_interval.as_millis() as u32,
+        )),
         sending: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         standing: Default::default(),
         driven: dh.driven,
@@ -225,13 +257,20 @@ pub fn endpoint_description(endpoint: &EndpointConfig) -> String {
         EndpointConfig::Serial(serial) => {
             format!("Serial {} at {}", serial.path, serial.datarate)
         }
-        EndpointConfig::I2c(i2c) => format!("I2C {} at {:#04X}", i2c.bus, i2c.address),
+        EndpointConfig::I2c(i2c) => {
+            format!("I2C {} at {:#04X}", i2c.bus, i2c.address)
+        }
         EndpointConfig::Spi(spi) => format!("SPI {} {}", spi.path, spi.mode),
-        EndpointConfig::Can(can) => format!("CAN {} id {:#x}", can.interface, can.can_id),
+        EndpointConfig::Can(can) => {
+            format!("CAN {} id {:#x}", can.interface, can.can_id)
+        }
         EndpointConfig::Iio(iio) => format!("IIO {}", iio.path),
-        EndpointConfig::Rpmsg(rpmsg) => format!("rpmsg {} ({})", rpmsg.path, rpmsg.service),
+        EndpointConfig::Rpmsg(rpmsg) => {
+            format!("rpmsg {} ({})", rpmsg.path, rpmsg.service)
+        }
         EndpointConfig::Gpio(gpio) => {
-            let offsets: Vec<String> = gpio.lines.iter().map(|n| n.to_string()).collect();
+            let offsets: Vec<String> =
+                gpio.lines.iter().map(|n| n.to_string()).collect();
             format!("GPIO {} lines {}", gpio.path, offsets.join(","))
         }
         // A synchronous line: the interface, and whose clock it is on, which
@@ -250,15 +289,24 @@ mod tests {
     use std::time::Duration;
     use tcslibgs::ResolvedSim;
     use tcslibgs::{
-        BitOrder, CsActive, DHMode, DHName, DeviceConfig, I2cConfig, NetworkConfig,
-        NetworkProtocol, SerialConfig, SpiConfig, SpiMode, StopBits,
+        BitOrder, CsActive, DHMode, DHName, DeviceConfig, I2cConfig,
+        NetworkConfig, NetworkProtocol, SerialConfig, SpiConfig, SpiMode,
+        StopBits,
     };
 
-    fn sim(packet_interval_ms: u32, segment_interval_ms: u32, segment_size: u32) -> ResolvedSim {
+    fn sim(
+        packet_interval_ms: u32,
+        segment_interval_ms: u32,
+        segment_size: u32,
+    ) -> ResolvedSim {
         ResolvedSim {
             attached: None,
-            packet_interval: Duration::from_millis(u64::from(packet_interval_ms)),
-            segment_interval: Duration::from_millis(u64::from(segment_interval_ms)),
+            packet_interval: Duration::from_millis(u64::from(
+                packet_interval_ms,
+            )),
+            segment_interval: Duration::from_millis(u64::from(
+                segment_interval_ms,
+            )),
             segment_size,
             triggered: false,
             faults: Default::default(),
@@ -322,21 +370,22 @@ mod tests {
         assert_eq!((config.address.as_str(), config.port), ("127.0.0.1", 7950));
 
         let mut line = rpmsg.clone();
-        line.endpoint = tcslibgs::graph::reach::reach_of(&tcslibgs::graph::Node {
-            name: "DH7".to_string(),
-            node_type: "hdlc".to_string(),
-            group: None,
-            attributes: [
-                ("interface", "hdlc0"),
-                ("standard", "v35"),
-                ("clock_type", "external"),
-            ]
-            .into_iter()
-            .map(|(k, v)| (k.to_string(), tcslibgs::Scalar::of(v)))
-            .collect(),
-        })
-        .expect("an hdlc node")
-        .endpoint;
+        line.endpoint =
+            tcslibgs::graph::reach::reach_of(&tcslibgs::graph::Node {
+                name: "DH7".to_string(),
+                node_type: "hdlc".to_string(),
+                group: None,
+                attributes: [
+                    ("interface", "hdlc0"),
+                    ("standard", "v35"),
+                    ("clock_type", "external"),
+                ]
+                .into_iter()
+                .map(|(k, v)| (k.to_string(), tcslibgs::Scalar::of(v)))
+                .collect(),
+            })
+            .expect("an hdlc node")
+            .endpoint;
         assert!(payload_config_from(&line, &sim(250, 100, 2)).is_ok());
         line.stand_in = None;
         assert!(payload_config_from(&line, &sim(250, 100, 2)).is_err());
@@ -390,8 +439,13 @@ mod tests {
         ];
 
         for (name, endpoint, what) in deaf {
-            let e = match payload_config_from(&triggered(name, endpoint), &sim(0, 0, 4)) {
-                Ok(_) => panic!("{name}: the simulator cannot be asked on a {what}"),
+            let e = match payload_config_from(
+                &triggered(name, endpoint),
+                &sim(0, 0, 4),
+            ) {
+                Ok(_) => {
+                    panic!("{name}: the simulator cannot be asked on a {what}")
+                }
                 Err(e) => e,
             };
             assert!(
@@ -425,7 +479,8 @@ mod tests {
             driven: false,
         };
 
-        let config = payload_config_from(&dh, &sim(0, 100, 2)).expect("a stream can be asked");
+        let config = payload_config_from(&dh, &sim(0, 100, 2))
+            .expect("a stream can be asked");
         assert!(
             config.triggered,
             "the simulator was not told to wait to be asked"
@@ -466,8 +521,8 @@ mod tests {
                 driven: false,
             };
 
-            let config =
-                payload_config_from(&dh, &sim(250, 250, 4)).expect("a socket is simulable");
+            let config = payload_config_from(&dh, &sim(250, 250, 4))
+                .expect("a socket is simulable");
             assert!(config.protocol == expected, "{protocol:?}");
             assert_eq!(config.address, "/tmp/dh8.sock");
             // A Unix socket is named by a path, so its port means nothing.
@@ -500,7 +555,8 @@ mod tests {
             driven: false,
         };
 
-        let config = payload_config_from(&dh, &sim(250, 100, 2)).expect("a line is simulable");
+        let config = payload_config_from(&dh, &sim(250, 100, 2))
+            .expect("a line is simulable");
         assert!(config.protocol == PayloadProtocol::Serial);
         assert_eq!(config.address, "/tmp/ttyS0");
         // The line's terms are not the simulator's business: a pty takes a
@@ -538,7 +594,8 @@ mod tests {
             driven: false,
         };
 
-        let config = payload_config_from(&dh, &sim(250, 100, 2)).expect("a bus is simulable");
+        let config = payload_config_from(&dh, &sim(250, 100, 2))
+            .expect("a bus is simulable");
         assert!(config.protocol == PayloadProtocol::I2c);
         assert_eq!(config.address, "/tmp/i2c-sim");
         assert_eq!(config.bus_address, 0x48);
@@ -575,8 +632,8 @@ mod tests {
             driven: false,
         };
 
-        let config =
-            payload_config_from(&dh, &sim(250, 100, 2)).expect("a peripheral is stood in for");
+        let config = payload_config_from(&dh, &sim(250, 100, 2))
+            .expect("a peripheral is stood in for");
         assert!(config.protocol == PayloadProtocol::Spi);
         assert_eq!(config.address, "/tmp/spidev0.0");
         // None of the clocking comes this way: there is nothing at the other

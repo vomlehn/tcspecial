@@ -78,7 +78,8 @@
         <xs:element name="node" type="xs:string"/>
         <!-- The configuration's own word for the type. Several descriptions
              may share one: `compute` is one node type, and `mean`,
-             `hysteresis`, `to_kelvin` and `process` are four things to place. -->
+             `hysteresis`, `to_kelvin` and `process` are four things to
+             place. -->
         <xs:element name="type" type="xs:string"/>
         <xs:element name="about" type="xs:string"/>
         <xs:element name="sets" type="sets"/>

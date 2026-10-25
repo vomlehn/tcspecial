@@ -32,13 +32,21 @@ help:
 	@echo "  make README.html     - Build README.html from README.md"
 	@echo "  make run-simple      - Run tcsmoc on the minimal example"
 	@echo "  make run-thermostat  - Run tcsmoc on the thermostat example"
-	@echo "  make run-simple-app  - Run the simple-app example, printing its line"
-	@echo "  make run-beacon      - Run the beacon example: a window watching the beacon, with a button that starts and stops tcspecial"
-	@echo "  make run-ping        - Run the ping example: a Python window that pings the vehicle"
-	@echo "  make run-tees        - Run tcsmoc on the tees example: tees and null nodes"
-	@echo "  make run-fprime      - Run tcsmoc on the fprime example, playing the F´ bridge"
-	@echo "  make check-python3   - Check for the Python 3 simple-app's payload needs"
-	@echo "  make check-tkinter   - Check for the tkinter the ping example's window needs"
+	@echo "  make run-simple-app  - Run the simple-app example, printing" \
+		"its line"
+	@echo "  make run-beacon      - Run the beacon example: a window" \
+		"watching the beacon, with a button that starts and stops" \
+		"tcspecial"
+	@echo "  make run-ping        - Run the ping example: a Python window" \
+		"that pings the vehicle"
+	@echo "  make run-tees        - Run tcsmoc on the tees example: tees" \
+		"and null nodes"
+	@echo "  make run-fprime      - Run tcsmoc on the fprime example," \
+		"playing the F´ bridge"
+	@echo "  make check-python3   - Check for the Python 3 simple-app's" \
+		"payload needs"
+	@echo "  make check-tkinter   - Check for the tkinter the ping" \
+		"example's window needs"
 
 # Running tcsmoc on one of the examples.
 #
@@ -63,7 +71,8 @@ define runexample_on
 		rm -rf $(TELEMETRY); \
 		mkdir $(TELEMETRY); \
 		cargo build -q --bin tcspecial --bin tcssim --bin tcsmoc; \
-		RUST_LOG=$(RUST_LOG) cargo run -q --bin tcsmoc -- --simulate=$(SIMULATE) examples/$(1)/$(1).yaml \
+		RUST_LOG=$(RUST_LOG) cargo run -q --bin tcsmoc -- \
+			--simulate=$(SIMULATE) examples/$(1)/$(1).yaml \
 	)
 endef
 
@@ -79,7 +88,8 @@ docs: README.html
 # README.html, with style.html in its head: see that file for what is in it
 # and why it is not in the markdown.
 README.html: README.md style.html
-	pandoc --standalone --metadata pagetitle=Examples -H style.html README.md -o README.html
+	pandoc --standalone --metadata pagetitle=Examples -H style.html \
+		README.md -o README.html
 
 # Run tcsmoc on the thermostat example.
 .PHONY: run-thermostat
@@ -122,13 +132,18 @@ run-simple-app: check-python3
 	cd $(ROOT) && cargo build -q --bin tcspecial --bin lorem_moc
 	( \
 		set -eu; \
-		echo "Running $(PROJECT_NAME) on examples/simple-app/simple-app.yaml..."; \
+		echo "Running $(PROJECT_NAME) on" \
+			"examples/simple-app/simple-app.yaml..."; \
 		cd $(ROOT); \
 		rm -rf $(TELEMETRY); \
 		mkdir $(TELEMETRY); \
-		RUST_LOG=$(RUST_LOG) target/debug/tcspecial --quiet --simulate=$(SIMULATE) examples/simple-app/simple-app.yaml & \
+		RUST_LOG=$(RUST_LOG) target/debug/tcspecial --quiet \
+			--simulate=$(SIMULATE) \
+			examples/simple-app/simple-app.yaml & \
 		vehicle=$$!; \
-		trap 'pkill -P $$vehicle || true; kill -INT $$vehicle 2>/dev/null || true; wait $$vehicle || true' EXIT; \
+		trap 'pkill -P $$vehicle || true; \
+			kill -INT $$vehicle 2>/dev/null || true; \
+			wait $$vehicle || true' EXIT; \
 		trap 'exit 130' INT TERM; \
 		timeout $(SIMPLE_APP_WAITS) target/debug/lorem_moc \
 	)
@@ -152,11 +167,13 @@ run-beacon:
 	cd $(ROOT) && cargo build -q --bin tcspecial --bin beacon
 	( \
 		set -eu; \
-		echo "Watching $(PROJECT_NAME)'s beacon from examples/beacon/beacon.yaml..."; \
+		echo "Watching $(PROJECT_NAME)'s beacon from" \
+			"examples/beacon/beacon.yaml..."; \
 		cd $(ROOT); \
 		rm -rf $(TELEMETRY); \
 		mkdir $(TELEMETRY); \
-		RUST_LOG=$(RUST_LOG) target/debug/beacon examples/beacon/beacon.yaml \
+		RUST_LOG=$(RUST_LOG) target/debug/beacon \
+			examples/beacon/beacon.yaml \
 	)
 
 # Run the ping example: tcspecial answering pings, and a window sending them.
@@ -183,7 +200,8 @@ run-ping: check-tkinter
 		cd $(ROOT); \
 		rm -rf $(TELEMETRY); \
 		mkdir $(TELEMETRY); \
-		RUST_LOG=$(RUST_LOG) python3 examples/ping/ping_moc.py examples/ping/ping.xml \
+		RUST_LOG=$(RUST_LOG) python3 examples/ping/ping_moc.py \
+			examples/ping/ping.xml \
 	)
 
 # Whether there is a tkinter for the ping example's window to be drawn with.
@@ -195,7 +213,11 @@ run-ping: check-tkinter
 .PHONY: check-tkinter
 check-tkinter: check-python3
 	@python3 -c 'import tkinter' 2>/dev/null || { \
-		echo "the ping example's window is drawn with tkinter, and this python3 has none: install it (python3-tk on Debian and Ubuntu), or run python3 examples/ping/ping_moc.py --pings 3 for no window" >&2; \
+		echo "the ping example's window is drawn with tkinter, and" \
+			"this python3 has none: install it" \
+			"(python3-tk on Debian and Ubuntu), or run python3" \
+			"examples/ping/ping_moc.py --pings 3 for no" \
+			"window" >&2; \
 		exit 1; \
 	}
 
@@ -208,11 +230,15 @@ check-tkinter: check-python3
 .PHONY: check-python3
 check-python3:
 	@command -v python3 >/dev/null 2>&1 || { \
-		echo "simple-app's payload, lorem_pl.py, is a Python 3 program, and there is no python3 on the PATH: install Python 3.6 or later" >&2; \
+		echo "simple-app's payload, lorem_pl.py, is a Python 3" \
+			"program, and there is no python3 on the PATH:" \
+			"install Python 3.6 or later" >&2; \
 		exit 1; \
 	}
 	@python3 -c 'import sys; sys.exit(sys.version_info < (3, 6))' || { \
-		echo "simple-app's payload, lorem_pl.py, needs Python 3.6 or later, and python3 is $$(python3 --version 2>&1)" >&2; \
+		echo "simple-app's payload, lorem_pl.py, needs Python 3.6 or" \
+			"later, and python3 is" \
+			"$$(python3 --version 2>&1)" >&2; \
 		exit 1; \
 	}
 

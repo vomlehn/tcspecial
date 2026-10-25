@@ -52,7 +52,8 @@ pub fn save(settings: Settings) {
         return;
     };
     let (moc, vehicle) = shares(settings.moc_percent, settings.vehicle_percent);
-    let (list_moc, list_vehicle) = shares(settings.list_moc_percent, settings.list_vehicle_percent);
+    let (list_moc, list_vehicle) =
+        shares(settings.list_moc_percent, settings.list_vehicle_percent);
     if let Err(why) = crate::save::write_atomically(
         &path,
         written(moc, vehicle, list_moc, list_vehicle).as_bytes(),
@@ -113,7 +114,10 @@ mod tests {
         let older = where_.path().join(".tcsgui/config.xml");
         std::fs::write(
             &older,
-            "<settings><vehicle_pane_percent>30</vehicle_pane_percent></settings>",
+            concat!(
+                "<settings><vehicle_pane_percent>30",
+                "</vehicle_pane_percent></settings>"
+            ),
         )
         .expect("a file");
         assert_eq!(load().vehicle_percent, 30 - DEFAULT_MOC);

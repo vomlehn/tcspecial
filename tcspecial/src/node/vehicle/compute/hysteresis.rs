@@ -83,8 +83,8 @@ impl Hysteresis {
     /// The thermostat these settled parameters describe.
     ///
     /// Nothing to refuse: that a band must be more than nought is
-    /// `tcslibgs::node::vehicle::compute`'s rule, where the ground tool applies it.
-    /// What is refused here is a *command* that would break it -- see
+    /// `tcslibgs::node::vehicle::compute`'s rule, where the ground tool applies
+    /// it. What is refused here is a *command* that would break it -- see
     /// [`Hysteresis::set`] -- because a command arrives after the checking.
     pub fn of(params: HysteresisParams) -> Hysteresis {
         Hysteresis {
@@ -122,7 +122,11 @@ impl Hysteresis {
 }
 
 impl Function for Hysteresis {
-    fn give(&mut self, _input: Option<&str>, data: &[u8]) -> Result<Option<Out>, String> {
+    fn give(
+        &mut self,
+        _input: Option<&str>,
+        data: &[u8],
+    ) -> Result<Option<Out>, String> {
         let temperature = from_value(data, "the temperature")?;
 
         let Some(wanted) = self.decide(temperature) else {
@@ -160,12 +164,13 @@ impl Function for Hysteresis {
     /// anything changes -- so a command that is refused leaves a thermostat
     /// running on what it had.
     fn set(&mut self, attribute: &str, value: &[u8]) -> Result<(), String> {
-        // Text, where a reading is four bytes of micro-kelvin: a command's value
-        // is what an operator typed, and it travels as the characters they
-        // typed rather than as a number the ground station assembled. See
+        // Text, where a reading is four bytes of micro-kelvin: a command's
+        // value is what an operator typed, and it travels as the characters
+        // they typed rather than as a number the ground station assembled. See
         // `super::from_text`.
-        let said = std::str::from_utf8(value)
-            .map_err(|_| format!("{attribute}: what the ground sent is not text"))?;
+        let said = std::str::from_utf8(value).map_err(|_| {
+            format!("{attribute}: what the ground sent is not text")
+        })?;
         let wanted = from_text(said, attribute)?;
 
         match attribute {
@@ -173,9 +178,9 @@ impl Function for Hysteresis {
             "half_band" => {
                 if wanted <= 0.0 {
                     return Err(format!(
-                        "half_band: {wanted} is not more than nought, and a band \
-                         of nothing is a bare comparison, which cycles a relay on \
-                         a wobble"
+                        "half_band: {wanted} is not more than nought, and a \
+                         band of nothing is a bare comparison, which cycles a \
+                         relay on a wobble"
                     ));
                 }
                 self.half_band = wanted;
@@ -186,14 +191,14 @@ impl Function for Hysteresis {
             // is the one fact the sender needs.
             retired @ ("above" | "below") => {
                 return Err(format!(
-                    "\"{retired}\" is now half_band, one width with the setpoint in \
-                     the middle of it"
+                    "\"{retired}\" is now half_band, one width with the \
+                     setpoint in the middle of it"
                 ))
             }
             other => {
                 return Err(format!(
-                    "a hysteresis has nothing called \"{other}\" to set: there are \
-                     setpoint and half_band"
+                    "a hysteresis has nothing called \"{other}\" to set: there \
+                     are setpoint and half_band"
                 ))
             }
         }

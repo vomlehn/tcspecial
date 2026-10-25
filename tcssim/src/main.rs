@@ -36,7 +36,9 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use tcslibgs::config::{payload_path_from_args, SIM_PAYLOAD_CONFIG_PATH_VAR};
-use tcslibgs::{payload_parameters, DHConfig, DHSample, Edge, NO_TRANSFER_TIME};
+use tcslibgs::{
+    payload_parameters, DHConfig, DHSample, Edge, NO_TRANSFER_TIME,
+};
 
 use std::collections::BTreeMap;
 
@@ -52,7 +54,9 @@ use endpoint::{endpoint_description, payload_config_attached};
 use payload::{PayloadConfig, PayloadStats, SimulatedPayload};
 use tcslibgs::graph::Graph;
 use tcslibgs::ready::SetUpFor;
-use tcslibgs::simulate::{counted, disagreement, judge, refusals, Host, Judged, Mode};
+use tcslibgs::simulate::{
+    counted, disagreement, judge, refusals, Host, Judged, Mode,
+};
 use tcslibgs::{ResolvedSim, SimConfigFile};
 use tcsverify::startup::Startup;
 
@@ -100,7 +104,11 @@ fn handle_config_edits(
     model: Rc<VecModel<PayloadInfo>>,
 ) {
     ui.on_config_payload(
-        move |row, packet_size, segment_size, packet_interval, segment_interval| {
+        move |row,
+              packet_size,
+              segment_size,
+              packet_interval,
+              segment_interval| {
             let guard = payloads.lock().unwrap();
             if let Some(payload) = guard.get(row as usize) {
                 payload.set_packet_size(packet_size as u32);
@@ -137,9 +145,9 @@ fn sizes_problem(packet_size: i32, segment_size: i32) -> String {
 
     format!(
         "A segment of {segment_size} bytes cannot be part of a packet of \
-         {packet_size}: a segment is a piece of a packet. Raise the packet size \
-         to {segment_size} or more, or lower the segment size to {packet_size} \
-         or less."
+         {packet_size}: a segment is a piece of a packet. Raise the packet \
+         size to {segment_size} or more, or lower the segment size to \
+         {packet_size} or less."
     )
 }
 
@@ -190,7 +198,11 @@ fn show_traffic(info: &mut PayloadInfo, stats: &PayloadStats) {
 
 /// Turn a data handler and its settled simulator settings into the panel the
 /// window shows for it.
-fn payload_info_from(dev_id: usize, dh: &DHConfig, sim: &ResolvedSim) -> PayloadInfo {
+fn payload_info_from(
+    dev_id: usize,
+    dh: &DHConfig,
+    sim: &ResolvedSim,
+) -> PayloadInfo {
     PayloadInfo {
         name: SharedString::from(dh.name.0.clone()),
         // Its place in the payload configuration, which is the only number a
@@ -231,7 +243,11 @@ fn payload_info_from(dev_id: usize, dh: &DHConfig, sim: &ResolvedSim) -> Payload
 ///
 /// A Slint model row is a value rather than a place, so a field is changed by
 /// reading the row, changing it, and putting it back.
-fn update_row(model: &Rc<VecModel<PayloadInfo>>, row: usize, f: impl FnOnce(&mut PayloadInfo)) {
+fn update_row(
+    model: &Rc<VecModel<PayloadInfo>>,
+    row: usize,
+    f: impl FnOnce(&mut PayloadInfo),
+) {
     if let Some(mut info) = model.row_data(row) {
         f(&mut info);
         model.set_row_data(row, info);
@@ -293,7 +309,8 @@ fn thermal_masses(
         match &sim.attached {
             None => {}
             Some(Attached::Reads(mass)) => {
-                let reading = tcslibgs::graph::simulated::reading_of(graph, &name)?;
+                let reading =
+                    tcslibgs::graph::simulated::reading_of(graph, &name)?;
                 attached.insert(
                     name,
                     crate::thermal::Thermal::Reads {
@@ -336,7 +353,12 @@ type Loaded = (
 /// asked again rather than assumed: the files can change between the two
 /// reads, and a simulator running on a half-read pair would be worse than one
 /// that says so.
-fn load(payload_path: &str, sim_path: &str, mode: Mode, startup: &mut Startup) -> Option<Loaded> {
+fn load(
+    payload_path: &str,
+    sim_path: &str,
+    mode: Mode,
+    startup: &mut Startup,
+) -> Option<Loaded> {
     let sim_file = match SimConfigFile::load(sim_path) {
         Ok(sim_file) => sim_file,
         Err(e) => {
@@ -357,7 +379,8 @@ fn load(payload_path: &str, sim_path: &str, mode: Mode, startup: &mut Startup) -
     let loaded = tcslibgs::graph::Graph::load(payload_path)
         .map_err(|e| e.to_string())
         .and_then(|read| {
-            let handlers = tcslibgs::graph::simulated::handlers(&read, &sim_file);
+            let handlers =
+                tcslibgs::graph::simulated::handlers(&read, &sim_file);
             graph = Some(read);
             handlers
         });
@@ -377,7 +400,9 @@ fn load(payload_path: &str, sim_path: &str, mode: Mode, startup: &mut Startup) -
     let sims = match sim_file.resolve(&dh_configs) {
         Ok(sims) => sims,
         Err(e) => {
-            startup.error(format!("Error in {sim_path} against {payload_path}: {e}"));
+            startup.error(format!(
+                "Error in {sim_path} against {payload_path}: {e}"
+            ));
             return None;
         }
     };
@@ -403,18 +428,21 @@ fn load(payload_path: &str, sim_path: &str, mode: Mode, startup: &mut Startup) -
     // The thermal masses, built once and shared: the sensors attached to one
     // read the same state the heaters attached to it warm, which is the whole
     // point of a mass being a thing rather than a figure per payload.
-    let masses = match thermal_masses(&sim_file, graph.as_ref(), &sims, &dh_configs) {
-        Ok(masses) => masses,
-        Err(e) => {
-            startup.error(format!("Error in {sim_path}: {e}"));
-            return None;
-        }
-    };
+    let masses =
+        match thermal_masses(&sim_file, graph.as_ref(), &sims, &dh_configs) {
+            Ok(masses) => masses,
+            Err(e) => {
+                startup.error(format!("Error in {sim_path}: {e}"));
+                return None;
+            }
+        };
 
     let configs: Vec<PayloadConfig> = match dh_configs
         .iter()
         .zip(&sims)
-        .map(|(dh, sim)| payload_config_attached(dh, sim, masses.get(&dh.name.0).cloned()))
+        .map(|(dh, sim)| {
+            payload_config_attached(dh, sim, masses.get(&dh.name.0).cloned())
+        })
         .collect()
     {
         Ok(configs) => configs,
@@ -441,7 +469,8 @@ fn load(payload_path: &str, sim_path: &str, mode: Mode, startup: &mut Startup) -
     }
 
     if configs.is_empty() {
-        startup.error(format!("{payload_path} describes no payloads to simulate"));
+        startup
+            .error(format!("{payload_path} describes no payloads to simulate"));
         return None;
     }
 
@@ -476,7 +505,12 @@ fn stand_ins_refused(
                 .iter()
                 .find(|simulated| simulated.name == node.name)
                 .and_then(|simulated| sim_file.simulate_of(simulated).ok());
-            disagreements.extend(disagreement(&node.name, &node.node_type, said, &found));
+            disagreements.extend(disagreement(
+                &node.name,
+                &node.node_type,
+                said,
+                &found,
+            ));
             let judged = match said {
                 Some(true) => Judged::stand_in(
                     format!("{sim_path} says simulate: true"),
@@ -491,13 +525,14 @@ fn stand_ins_refused(
     if !disagreements.is_empty() {
         return disagreements;
     }
-    let pairs: Vec<(&str, &Judged)> = judged.iter().map(|(name, j)| (*name, j)).collect();
+    let pairs: Vec<(&str, &Judged)> =
+        judged.iter().map(|(name, j)| (*name, j)).collect();
     refusals(mode, &pairs)
         .into_iter()
         .map(|refusal| match mode {
             Mode::All => format!(
-                "{refusal}, or name it in {sim_path} with simulate: true for tcssim to \
-                 stand in for"
+                "{refusal}, or name it in {sim_path} with simulate: true for \
+                 tcssim to stand in for"
             ),
             _ => refusal,
         })
@@ -521,7 +556,11 @@ fn ready_socket(
 
 /// What a simulator started on these files under `mode` is set up for, as
 /// its readiness answers say and a harness compares.
-fn set_up_for(payload_path: &str, sim_path: &str, mode: Mode) -> Result<SetUpFor, String> {
+fn set_up_for(
+    payload_path: &str,
+    sim_path: &str,
+    mode: Mode,
+) -> Result<SetUpFor, String> {
     Ok(SetUpFor {
         configuration: tcslibgs::config_digest::digest_of_file(payload_path)
             .map_err(|e| format!("{payload_path}: {e}"))?,
@@ -536,7 +575,9 @@ const WAIT_DEFAULT: std::time::Duration = std::time::Duration::from_secs(30);
 
 /// Take `--wait` or `--wait=<seconds>` out of the arguments: how long to
 /// wait, where it was given, and what is left.
-fn take_wait(args: Vec<String>) -> Result<(Option<std::time::Duration>, Vec<String>), String> {
+fn take_wait(
+    args: Vec<String>,
+) -> Result<(Option<std::time::Duration>, Vec<String>), String> {
     let mut waiting = None;
     let mut rest = Vec::with_capacity(args.len());
     for arg in args {
@@ -549,8 +590,8 @@ fn take_wait(args: Vec<String>) -> Result<(Option<std::time::Duration>, Vec<Stri
                 }
                 _ => {
                     return Err(format!(
-                        "--wait={seconds} is not a number of seconds: give --wait=30, or \
-                         --wait for thirty seconds"
+                        "--wait={seconds} is not a number of seconds: give \
+                         --wait=30, or --wait for thirty seconds"
                     ))
                 }
             }
@@ -576,7 +617,9 @@ fn wait_for_another(
 ) -> i32 {
     let wanted = SimConfigFile::load(sim_path)
         .map_err(|e| format!("{sim_path}: {e}"))
-        .and_then(|sim_file| sim_file.ready().map_err(|e| format!("{sim_path}: {e}")))
+        .and_then(|sim_file| {
+            sim_file.ready().map_err(|e| format!("{sim_path}: {e}"))
+        })
         .and_then(|at| Ok((at, set_up_for(payload_path, sim_path, mode)?)));
     let (at, ours) = match wanted {
         Ok(wanted) => wanted,
@@ -607,7 +650,9 @@ fn present(startup: &Startup) {
     let window = match StartupWindow::new() {
         Ok(window) => window,
         Err(e) => {
-            eprintln!("tcssim: what was found cannot be shown in a window: {e}");
+            eprintln!(
+                "tcssim: what was found cannot be shown in a window: {e}"
+            );
             return;
         }
     };
@@ -649,13 +694,14 @@ fn main() {
 
     // The mode first, and before anything is read: under the flight setting
     // there is nothing to read anything for.
-    let (mode, args) = match tcslibgs::simulate::take_mode(env::args().collect()) {
-        Ok(taken) => taken,
-        Err(e) => {
-            eprintln!("tcssim: {e}");
-            process::exit(1);
-        }
-    };
+    let (mode, args) =
+        match tcslibgs::simulate::take_mode(env::args().collect()) {
+            Ok(taken) => taken,
+            Err(e) => {
+                eprintln!("tcssim: {e}");
+                process::exit(1);
+            }
+        };
     let (waiting, args) = match take_wait(args) {
         Ok(taken) => taken,
         Err(e) => {
@@ -665,23 +711,26 @@ fn main() {
     };
     if mode.is_flight() {
         eprintln!(
-            "tcssim: --simulate={mode} is the flight setting, which allows no stand-ins, \
-             so there is nothing for a simulator to do or to wait for: give \
-             --simulate=some or --simulate=all for a run with stand-ins"
+            "tcssim: --simulate={mode} is the flight setting, which allows no \
+             stand-ins, so there is nothing for a simulator to do or to wait \
+             for: give --simulate=some or --simulate=all for a run with \
+             stand-ins"
         );
         process::exit(1);
     }
 
     // Read both configuration files before the window exists, so a file that
     // cannot be read is reported plainly rather than as an empty window.
-    let payload_path =
-        match payload_path_from_args(args.into_iter(), Some(SIM_PAYLOAD_CONFIG_PATH_VAR)) {
-            Ok(payload_path) => payload_path,
-            Err(e) => {
-                eprintln!("{}", e);
-                process::exit(1);
-            }
-        };
+    let payload_path = match payload_path_from_args(
+        args.into_iter(),
+        Some(SIM_PAYLOAD_CONFIG_PATH_VAR),
+    ) {
+        Ok(payload_path) => payload_path,
+        Err(e) => {
+            eprintln!("{}", e);
+            process::exit(1);
+        }
+    };
     // The one PAYLOAD_SIM_YAML names, and otherwise the one beside the
     // configuration and named for it, found as tcsmoc finds it.
     let sim_path = env::var(SIM_CONFIG_PATH_VAR).unwrap_or_else(|_| {
@@ -690,7 +739,12 @@ fn main() {
     });
 
     if let Some(patience) = waiting {
-        process::exit(wait_for_another(&payload_path, &sim_path, mode, patience));
+        process::exit(wait_for_another(
+            &payload_path,
+            &sim_path,
+            mode,
+            patience,
+        ));
     }
 
     // Everything wrong with the pair, in tcsverify's words and before
@@ -716,7 +770,9 @@ fn main() {
     if !startup.is_empty() {
         present(&startup);
     }
-    let Some((dh_configs, sim_file, sims, configs)) = loaded.filter(|_| !startup.fatal()) else {
+    let Some((dh_configs, sim_file, sims, configs)) =
+        loaded.filter(|_| !startup.fatal())
+    else {
         process::exit(1);
     };
 
@@ -724,15 +780,16 @@ fn main() {
     // stand-in is made: a harness asking while it starts is told so, and an
     // address already held -- by a simulator left running -- stops this one
     // before it fights that one for the payloads' paths.
-    let readiness = match ready_socket(&payload_path, &sim_path, &sim_file, mode) {
-        Ok(readiness) => readiness,
-        Err(e) => {
-            let mut refused = Startup::default();
-            refused.error(e);
-            present(&refused);
-            process::exit(1);
-        }
-    };
+    let readiness =
+        match ready_socket(&payload_path, &sim_path, &sim_file, mode) {
+            Ok(readiness) => readiness,
+            Err(e) => {
+                let mut refused = Startup::default();
+                refused.error(e);
+                present(&refused);
+                process::exit(1);
+            }
+        };
 
     eprintln!(
         "Simulating {} payloads from {} and {}",
@@ -781,12 +838,14 @@ fn main() {
             set_up_for,
         }),
     );
-    let mut made: Vec<SimulatedPayload> = configs.into_iter().map(SimulatedPayload::new).collect();
+    let mut made: Vec<SimulatedPayload> =
+        configs.into_iter().map(SimulatedPayload::new).collect();
     for payload in &mut made {
         // A payload not yet running, so this cannot be refused.
         let _ = payload.start();
     }
-    let payloads: Arc<Mutex<Vec<SimulatedPayload>>> = Arc::new(Mutex::new(made));
+    let payloads: Arc<Mutex<Vec<SimulatedPayload>>> =
+        Arc::new(Mutex::new(made));
 
     // The one button each panel has, which has its payload send or not.
     {
@@ -888,9 +947,11 @@ fn ask_for_the_edge(ui: &MainWindow, edge: Edge) {
         move || {
             let Some(ui) = ui_weak.upgrade() else { return };
             let window = ui.window();
-            if let Some(y) =
-                tcslibgs::display::top_of(edge, tcslibgs::screen_height(), window.size().height)
-            {
+            if let Some(y) = tcslibgs::display::top_of(
+                edge,
+                tcslibgs::screen_height(),
+                window.size().height,
+            ) {
                 window.set_position(slint::PhysicalPosition::new(0, y));
             }
         },
@@ -918,7 +979,8 @@ mod tests {
     fn an_example_is_simulated() {
         let payload = repo_file("examples/minimal/minimal.yaml");
         let payload = payload.to_str().expect("a path");
-        let sim = tcslibgs::config::sim_path_beside(payload).expect("its simulator file");
+        let sim = tcslibgs::config::sim_path_beside(payload)
+            .expect("its simulator file");
         assert!(sim.ends_with("minimal-sim.yaml"), "{sim}");
 
         let mut startup = Startup::default();
@@ -942,7 +1004,8 @@ mod tests {
             std::fs::write(
                 &path,
                 format!(
-                    "payloads:\n  - {{ name: sensor, type: network, protocol: udp, \
+                    "payloads:\n  \
+                     - {{ name: sensor, type: network, protocol: udp, \
                      address: \"{address}\", port: \"9\" }}\n"
                 ),
             )
@@ -952,16 +1015,25 @@ mod tests {
         let sim = |simulate: bool| -> SimConfigFile {
             tcslibgs::format::ConfigFormat::Yaml
                 .parse(&format!(
-                    "simulated_payloads:\n  - name: sensor\n    simulate: {simulate}\n"
+                    "simulated_payloads:\n  - name: sensor\n    simulate: \
+                     {simulate}\n"
                 ))
                 .unwrap()
         };
 
-        assert!(
-            stand_ins_refused(&configuration("127.0.0.1"), &sim(true), "s.yaml", Mode::All)
-                .is_empty()
+        assert!(stand_ins_refused(
+            &configuration("127.0.0.1"),
+            &sim(true),
+            "s.yaml",
+            Mode::All
+        )
+        .is_empty());
+        let said = stand_ins_refused(
+            &configuration("10.0.0.5"),
+            &sim(true),
+            "s.yaml",
+            Mode::All,
         );
-        let said = stand_ins_refused(&configuration("10.0.0.5"), &sim(true), "s.yaml", Mode::All);
         assert!(said[0].contains("says simulate: true"), "{said:?}");
         let said = stand_ins_refused(
             &configuration("127.0.0.1"),
@@ -970,7 +1042,9 @@ mod tests {
             Mode::Some,
         );
         assert!(
-            said[0].contains("a stand-in, and the simulator file says simulate: false"),
+            said[0].contains(
+                "a stand-in, and the simulator file says simulate: false"
+            ),
             "{said:?}"
         );
         assert!(stand_ins_refused(
@@ -989,15 +1063,14 @@ mod tests {
     fn an_example_with_nothing_simulated_is_refused() {
         let payload = repo_file("examples/simple-app/simple-app.yaml");
         let payload = payload.to_str().expect("a path");
-        let sim = tcslibgs::config::sim_path_beside(payload).expect("its simulator file");
+        let sim = tcslibgs::config::sim_path_beside(payload)
+            .expect("its simulator file");
 
         let mut startup = Startup::default();
         assert!(load(payload, &sim, Mode::All, &mut startup).is_none());
         assert!(
-            startup
-                .lines()
-                .iter()
-                .any(|(error, line)| *error && line.contains("no payloads to simulate")),
+            startup.lines().iter().any(|(error, line)| *error
+                && line.contains("no payloads to simulate")),
             "{:?}",
             startup.lines()
         );
@@ -1078,7 +1151,8 @@ mod tests {
         // files describe.
         let payloads: Arc<Mutex<Vec<SimulatedPayload>>> =
             Arc::new(Mutex::new(vec![SimulatedPayload::new(
-                payload_config_attached(&dh, &settings, None).expect("a payload"),
+                payload_config_attached(&dh, &settings, None)
+                    .expect("a payload"),
             )]));
         handle_config_edits(&ui, payloads, model.clone());
         ui.show().unwrap();
@@ -1114,9 +1188,10 @@ mod tests {
         // packet it is a piece of. The first spin box of the panel is the
         // packet size; Slint's testing backend does not report the last child
         // of a layout, which is why the segment's is not reached here.
-        let packet_size = ElementHandle::find_by_element_type_name(&ui, "SpinBox")
-            .next()
-            .expect("the panel has a packet size to edit");
+        let packet_size =
+            ElementHandle::find_by_element_type_name(&ui, "SpinBox")
+                .next()
+                .expect("the panel has a packet size to edit");
         packet_size.invoke_accessible_decrement_action();
         assert_eq!(packet_size.accessible_value().as_deref(), Some("11"));
 
@@ -1127,9 +1202,8 @@ mod tests {
         );
         let shown = said(&ui);
         assert!(
-            shown
-                .iter()
-                .any(|line| line.contains("segment of 12") && line.contains("packet of 11")),
+            shown.iter().any(|line| line.contains("segment of 12")
+                && line.contains("packet of 11")),
             "nothing on screen says what is wrong: {shown:?}"
         );
 
@@ -1190,7 +1264,8 @@ mod tests {
         let said = sizes_problem(11, 12);
         assert!(said.contains("12") && said.contains("11"), "{said}");
         assert!(
-            said.contains("Raise the packet size") && said.contains("lower the segment size"),
+            said.contains("Raise the packet size")
+                && said.contains("lower the segment size"),
             "the error should say either way out of it: {said}"
         );
     }
@@ -1241,7 +1316,8 @@ mod tests {
         // cannot fail on: the label is a Slint expression, so a drift between
         // the two files is a button that offers Enable and stops the
         // payload.
-        let window = Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint");
+        let window =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint");
         let source = std::fs::read_to_string(&window).unwrap();
         let offered = format!(
             "payload-status == \"{}\" ? \"{}\" : \"{}\"",
@@ -1290,7 +1366,8 @@ mod tests {
     /// traffic.
     #[test]
     fn a_panel_shows_when_the_last_packet_went_and_what_it_was() {
-        let mut info = payload_info_from(0, &handler("DH0"), &sim(1000, 1000, 12));
+        let mut info =
+            payload_info_from(0, &handler("DH0"), &sim(1000, 1000, 12));
         assert_eq!(info.last_sent_time, NO_TRANSFER_TIME);
         assert_eq!(info.last_recv_time, NO_TRANSFER_TIME);
 
@@ -1391,12 +1468,13 @@ mod tests {
         // panel and chrome sizes are right.
         let mut cases: Vec<(String, Vec<PayloadInfo>)> = Vec::new();
         for (payload_path, sim_path) in shipped_sets() {
-            let sim_file = SimConfigFile::load(&sim_path)
-                .unwrap_or_else(|e| panic!("{} failed to load: {e}", sim_path.display()));
+            let sim_file = SimConfigFile::load(&sim_path).unwrap_or_else(|e| {
+                panic!("{} failed to load: {e}", sim_path.display())
+            });
             let dh_configs = simulated_payloads_of(&payload_path, &sim_file);
-            let sims = sim_file
-                .resolve(&dh_configs)
-                .unwrap_or_else(|e| panic!("{} does not fit: {e}", sim_path.display()));
+            let sims = sim_file.resolve(&dh_configs).unwrap_or_else(|e| {
+                panic!("{} does not fit: {e}", sim_path.display())
+            });
 
             let panels: Vec<PayloadInfo> = dh_configs
                 .iter()
@@ -1445,14 +1523,17 @@ mod tests {
             // The grid fits the area it is given, across and down: it stood
             // wider and taller than that area while the padding it keeps
             // inside the scrolling area was left out of the window size.
-            let area = ElementHandle::find_by_element_id(&ui, "MainWindow::scroll")
-                .next()
-                .expect("the window has a scrolling area for the panels");
-            let grid = ElementHandle::find_by_element_id(&ui, "MainWindow::grid")
-                .next()
-                .expect("the window has a grid of panels");
+            let area =
+                ElementHandle::find_by_element_id(&ui, "MainWindow::scroll")
+                    .next()
+                    .expect("the window has a scrolling area for the panels");
+            let grid =
+                ElementHandle::find_by_element_id(&ui, "MainWindow::grid")
+                    .next()
+                    .expect("the window has a grid of panels");
             assert!(
-                grid.size().width <= area.size().width && grid.size().height <= area.size().height,
+                grid.size().width <= area.size().width
+                    && grid.size().height <= area.size().height,
                 "{set}: the grid is {}x{} in an area {}x{}",
                 grid.size().width,
                 grid.size().height,
@@ -1464,15 +1545,18 @@ mod tests {
             // that: a set of fewer payloads than the window looks ahead for
             // opens only as tall as those payloads need.
             let rows = grid::rows_of_room(shape.rows, panels);
-            let wanted = grid::height_for_rows(&sizes, rows) - sizes.chrome_height;
+            let wanted =
+                grid::height_for_rows(&sizes, rows) - sizes.chrome_height;
             assert!(
                 area.size().height >= wanted,
-                "{set}: the panels have {} of the {wanted} that {rows} rows need",
+                "{set}: the panels have {} of the {wanted} that {rows} rows \
+                 need",
                 area.size().height
             );
             assert!(
                 area.size().height < wanted + sizes.panel_height,
-                "{set}: the panels have {}, room for a row more than the {rows} wanted",
+                "{set}: the panels have {}, room for a row more than the \
+                 {rows} wanted",
                 area.size().height
             );
 
@@ -1481,7 +1565,7 @@ mod tests {
             // Button reports the width it was given, where a Text that does
             // not fit is clipped and reports the width it had.
             for button in
-                i_slint_backend_testing::ElementHandle::find_by_element_type_name(&ui, "Button")
+                ElementHandle::find_by_element_type_name(&ui, "Button")
             {
                 let right = button.absolute_position().x + button.size().width;
                 assert!(
@@ -1525,7 +1609,8 @@ mod tests {
             // Gathered once and not once per panel: finding elements walks
             // the whole tree, and a set of sixteen panels did so sixteen
             // times over, which cost the suite a minute and a half.
-            let placed: Vec<Vec<(f32, f32)>> = rows.iter().map(|id| geometry(id)).collect();
+            let placed: Vec<Vec<(f32, f32)>> =
+                rows.iter().map(|id| geometry(id)).collect();
             let sent_rows = geometry("PayloadPanel::sent-row");
             let buttons: Vec<(Option<String>, f32, f32)> =
                 ElementHandle::find_by_element_type_name(&ui, "Button")
@@ -1545,15 +1630,17 @@ mod tests {
             // No row overlaps the one below it. The buttons are measured
             // rather than their row, because it was the buttons that
             // overflowed while the row reported the height it was told.
-            for (n, (top, panel_height)) in panels_found.iter().copied().enumerate() {
+            for (n, (top, panel_height)) in
+                panels_found.iter().copied().enumerate()
+            {
                 let bottom = top + panel_height;
                 let mut lowest = top;
                 for (which, id) in rows.iter().enumerate() {
                     let (y, height) = placed[which][n];
                     assert!(
                         y >= lowest,
-                        "{set}: panel {n}'s {id} starts at {y}, above the {lowest} \
-                         the row before it reaches"
+                        "{set}: panel {n}'s {id} starts at {y}, above the \
+                         {lowest} the row before it reaches"
                     );
                     lowest = y + height;
                 }
@@ -1563,7 +1650,8 @@ mod tests {
                     if *head >= top && *foot <= bottom {
                         assert!(
                             *foot <= sent,
-                            "{set}: panel {n}'s {label:?} button reaches {foot}, over \
+                            "{set}: panel {n}'s {label:?} button \
+                             reaches {foot}, over \
                              the \"Sent:\" row at {sent}"
                         );
                     }
@@ -1576,8 +1664,8 @@ mod tests {
                 let spare = bottom - (y + height);
                 assert!(
                     spare <= PANEL_PADDING + 1.0,
-                    "{set}: panel {n} has {spare} pixels below its packet count, \
-                     where {PANEL_PADDING} of padding is all it keeps"
+                    "{set}: panel {n} has {spare} pixels below its packet \
+                     count, where {PANEL_PADDING} of padding is all it keeps"
                 );
             }
 
@@ -1592,9 +1680,12 @@ mod tests {
             // Done last in the case, because it leaves the window a different
             // size than it was opened at.
             let columns_now = |ui: &MainWindow| -> usize {
-                let tops: Vec<f32> = ElementHandle::find_by_element_type_name(ui, "PayloadPanel")
-                    .map(|e| e.absolute_position().y)
-                    .collect();
+                let tops: Vec<f32> = ElementHandle::find_by_element_type_name(
+                    ui,
+                    "PayloadPanel",
+                )
+                .map(|e| e.absolute_position().y)
+                .collect();
                 let first = tops.iter().copied().fold(f32::MAX, f32::min);
                 tops.iter().filter(|y| (**y - first).abs() < 1.0).count()
             };
@@ -1616,11 +1707,13 @@ mod tests {
                 assert_eq!(
                     columns_now(&ui),
                     1,
-                    "{set}: a window one panel wide did not come down to one column"
+                    "{set}: a window one panel wide did not come down to one \
+                     column"
                 );
 
                 // And wide enough for every panel in a row, so it goes up.
-                let wide = panels as f32 * sizes.panel_width + sizes.chrome_width;
+                let wide =
+                    panels as f32 * sizes.panel_width + sizes.chrome_width;
                 ui.window()
                     .set_size(slint::LogicalSize::new(wide, window.height));
                 assert_eq!(
@@ -1651,7 +1744,8 @@ mod tests {
                 let found: Vec<_> = if what.contains("::") {
                     ElementHandle::find_by_element_id(&ui, what).collect()
                 } else {
-                    ElementHandle::find_by_element_type_name(&ui, what).collect()
+                    ElementHandle::find_by_element_type_name(&ui, what)
+                        .collect()
                 };
 
                 assert_eq!(
@@ -1665,15 +1759,18 @@ mod tests {
                 // Against the edges of the area the panels live in, which
                 // is where they are cut off, rather than the edges of the
                 // window: below the area is the row with Quit All in it.
-                let area_bottom = area.absolute_position().y + area.size().height;
+                let area_bottom =
+                    area.absolute_position().y + area.size().height;
                 let area_right = area.absolute_position().x + area.size().width;
                 for (n, element) in found.iter().enumerate() {
-                    let bottom = element.absolute_position().y + element.size().height;
-                    let right = element.absolute_position().x + element.size().width;
+                    let bottom =
+                        element.absolute_position().y + element.size().height;
+                    let right =
+                        element.absolute_position().x + element.size().width;
                     assert!(
                         bottom <= area_bottom && right <= area_right,
-                        "{set}: {what} {n} reaches ({right},{bottom}), past the \
-                         ({area_right},{area_bottom}) the panels have in a \
+                        "{set}: {what} {n} reaches ({right},{bottom}), past \
+                         the ({area_right},{area_bottom}) the panels have in a \
                          window {}x{}",
                         window.width,
                         window.height
@@ -1701,10 +1798,13 @@ mod tests {
         configuration: &std::path::Path,
         sim_file: &SimConfigFile,
     ) -> Vec<DHConfig> {
-        let graph = tcslibgs::graph::Graph::load(configuration)
-            .unwrap_or_else(|e| panic!("{} failed to load: {e}", configuration.display()));
-        tcslibgs::graph::simulated::handlers(&graph, sim_file)
-            .unwrap_or_else(|e| panic!("{} cannot be simulated: {e}", configuration.display()))
+        let graph =
+            tcslibgs::graph::Graph::load(configuration).unwrap_or_else(|e| {
+                panic!("{} failed to load: {e}", configuration.display())
+            });
+        tcslibgs::graph::simulated::handlers(&graph, sim_file).unwrap_or_else(
+            |e| panic!("{} cannot be simulated: {e}", configuration.display()),
+        )
     }
 
     /// Every shipped configuration and the simulator file beside it.
@@ -1719,7 +1819,8 @@ mod tests {
     #[test]
     fn every_shipped_stand_in_is_named() {
         for (configuration, sim_path) in shipped_sets() {
-            let graph = tcslibgs::graph::Graph::load(&configuration).expect("it reads");
+            let graph =
+                tcslibgs::graph::Graph::load(&configuration).expect("it reads");
             let sim_file = SimConfigFile::load(&sim_path).expect("it reads");
             let refused: Vec<String> = stand_ins_refused(
                 &graph,
@@ -1742,7 +1843,9 @@ mod tests {
         let root = repo_file("examples");
         let mut sets = Vec::new();
 
-        for entry in std::fs::read_dir(&root).expect("the examples are readable") {
+        for entry in
+            std::fs::read_dir(&root).expect("the examples are readable")
+        {
             let path = entry.expect("a readable directory entry").path();
             let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
                 continue;
@@ -1794,11 +1897,19 @@ mod tests {
         }
     }
 
-    fn sim(packet_interval_ms: u32, segment_interval_ms: u32, segment_size: u32) -> ResolvedSim {
+    fn sim(
+        packet_interval_ms: u32,
+        segment_interval_ms: u32,
+        segment_size: u32,
+    ) -> ResolvedSim {
         ResolvedSim {
             attached: None,
-            packet_interval: Duration::from_millis(u64::from(packet_interval_ms)),
-            segment_interval: Duration::from_millis(u64::from(segment_interval_ms)),
+            packet_interval: Duration::from_millis(u64::from(
+                packet_interval_ms,
+            )),
+            segment_interval: Duration::from_millis(u64::from(
+                segment_interval_ms,
+            )),
             segment_size,
             triggered: false,
             faults: Default::default(),
@@ -1823,8 +1934,9 @@ mod tests {
     #[test]
     fn the_shipped_files_become_simulator_configs() {
         for (payload_path, sim_path) in shipped_sets() {
-            let sim_file = SimConfigFile::load(&sim_path)
-                .unwrap_or_else(|e| panic!("{} failed to load: {e}", sim_path.display()));
+            let sim_file = SimConfigFile::load(&sim_path).unwrap_or_else(|e| {
+                panic!("{} failed to load: {e}", sim_path.display())
+            });
             let dh_configs = simulated_payloads_of(&payload_path, &sim_file);
 
             let sims = sim_file.resolve(&dh_configs).unwrap_or_else(|e| {
@@ -1840,7 +1952,9 @@ mod tests {
                 .zip(&sims)
                 .map(|(dh, s)| payload_config_attached(dh, s, None))
                 .collect::<Result<_, _>>()
-                .unwrap_or_else(|e| panic!("{} is not simulatable: {e}", payload_path.display()));
+                .unwrap_or_else(|e| {
+                    panic!("{} is not simulatable: {e}", payload_path.display())
+                });
 
             // An example whose payloads are all programs simulates nothing,
             // which is a pair tcssim is right to accept: see `simple-app`,
@@ -1879,7 +1993,8 @@ mod tests {
             let mut in_tcspecial = false;
 
             for (number, line) in text.lines().enumerate() {
-                if !line.starts_with(char::is_whitespace) && line.contains(':') {
+                if !line.starts_with(char::is_whitespace) && line.contains(':')
+                {
                     in_tcspecial = line.starts_with("tcspecial:");
                 }
                 let line = line.trim().trim_start_matches("- ");
@@ -1909,8 +2024,8 @@ mod tests {
 
                 assert!(
                     !line.starts_with("packet_interval_ms") || triggered,
-                    "{}:{} states packet_interval_ms for a payload that sends on \
-                     its own, whose rate belongs in {}",
+                    "{}:{} states packet_interval_ms for a payload that sends \
+                     on its own, whose rate belongs in {}",
                     payload_path.display(),
                     number + 1,
                     sim_path.display()
@@ -1935,12 +2050,18 @@ mod tests {
                 .map(|(row, (dh, s))| payload_info_from(row, dh, s))
                 .collect();
 
-            assert_eq!(panels.len(), dh_configs.len(), "{}", payload_path.display());
+            assert_eq!(
+                panels.len(),
+                dh_configs.len(),
+                "{}",
+                payload_path.display()
+            );
 
             // The shape rule and not the sizes, so there is no window to
             // ask: a grid that holds its panels does so whatever a panel
             // comes to.
-            let shape = grid::grid_shape(&grid::Sizes::for_tests(), panels.len());
+            let shape =
+                grid::grid_shape(&grid::Sizes::for_tests(), panels.len());
             assert!(
                 shape.columns * shape.rows >= panels.len(),
                 "{} does not fit its grid",
@@ -1977,7 +2098,9 @@ mod tests {
         let shown = |info: PayloadInfo| {
             let ui = MainWindow::new().unwrap();
             let _ = grid::settle(&ui);
-            ui.set_payload_model(ModelRc::from(Rc::new(VecModel::from(vec![info]))));
+            ui.set_payload_model(ModelRc::from(Rc::new(VecModel::from(vec![
+                info,
+            ]))));
             ui.show().unwrap();
             (
                 lines_from(&ui, "Sent: "),
@@ -2007,7 +2130,8 @@ mod tests {
         asked.triggered = true;
         asked.packet_interval = Duration::ZERO;
         asked.segment_interval = Duration::ZERO;
-        let (sent, recv, pkts) = shown(payload_info_from(0, &handler("DH0"), &asked));
+        let (sent, recv, pkts) =
+            shown(payload_info_from(0, &handler("DH0"), &asked));
         assert_eq!(sent, vec![format!("Sent: {NO_TRANSFER_TIME} ")]);
         assert_eq!(recv, vec![format!("Recv: {NO_TRANSFER_TIME} ")]);
         assert_eq!(pkts, vec!["Pkts: 0 sent / 0 recv".to_string()]);
@@ -2034,7 +2158,8 @@ mod tests {
         assert_eq!(
             recv,
             vec!["Recv: 02:02:02 41 53 4B".to_string()],
-            "the panel does not show the time and bytes of the last packet received"
+            "the panel does not show the time and bytes of the last packet \
+             received"
         );
         assert_eq!(pkts, vec!["Pkts: 3 sent / 1 recv".to_string()]);
     }
@@ -2068,10 +2193,11 @@ mod tests {
         ui.window().set_size(grid::window_size(&sizes, &shape, 2));
         ui.show().unwrap();
 
-        let shown: Vec<String> = ElementHandle::find_by_element_type_name(&ui, "Text")
-            .filter_map(|e| e.accessible_label())
-            .map(|label| label.to_string())
-            .collect();
+        let shown: Vec<String> =
+            ElementHandle::find_by_element_type_name(&ui, "Text")
+                .filter_map(|e| e.accessible_label())
+                .map(|label| label.to_string())
+                .collect();
 
         for wanted in ["DH0 (dev id 0)", "DH1 (dev id 1)"] {
             assert!(
@@ -2128,7 +2254,8 @@ mod tests {
         );
 
         let button: Vec<_> =
-            ElementHandle::find_by_accessible_label(&ui, "Configuration").collect();
+            ElementHandle::find_by_accessible_label(&ui, "Configuration")
+                .collect();
         assert_eq!(
             button.len(),
             1,

@@ -171,7 +171,9 @@ def main(argv):
 
     # The words, then what ends the line, each a packet of its own.
     time.sleep(BEFORE_THE_FIRST_WORD)
-    for word in [w.encode("utf-8") for w in PARAGRAPH[number - 1]] + [TERMINATOR]:
+    for word in (
+        [w.encode("utf-8") for w in PARAGRAPH[number - 1]] + [TERMINATOR]
+    ):
         try:
             write_all(MOC_INTERFACE, packet(word))
         except BrokenPipeError:

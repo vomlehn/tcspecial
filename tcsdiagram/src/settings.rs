@@ -211,7 +211,8 @@ pub fn read() -> Read {
 /// rather than out of the payloads': the column somebody arranged was the
 /// payload column, and the vehicle pane is the one with room to give.
 fn settings_in(text: &str, whose: &str) -> Settings {
-    let vehicle = percent_in(text, whose, "vehicle_pane_percent", DEFAULT_VEHICLE);
+    let vehicle =
+        percent_in(text, whose, "vehicle_pane_percent", DEFAULT_VEHICLE);
     let (moc, vehicle) = match (
         element(text, "moc_pane_percent"),
         element(text, "vehicle_pane_percent"),
@@ -278,7 +279,12 @@ fn percent_in(text: &str, whose: &str, name: &str, default: i32) -> i32 {
 /// element, never an attribute -- so that a person who has read one file has
 /// read both. With a comment saying what the number means, because a bare 75
 /// in a file is a number somebody will guess at.
-pub fn written(moc: i32, vehicle: i32, list_moc: i32, list_vehicle: i32) -> String {
+pub fn written(
+    moc: i32,
+    vehicle: i32,
+    list_moc: i32,
+    list_vehicle: i32,
+) -> String {
     format!(
         "\
 <?xml version=\"1.0\" encoding=\"UTF-8\"?>
@@ -353,7 +359,9 @@ mod tests {
             // the wrong thing.
             let (list_moc, list_vehicle) = (vehicle, moc);
             let text = written(moc, vehicle, list_moc, list_vehicle);
-            let said = |name| element(&text, name).and_then(|said| said.parse::<i32>().ok());
+            let said = |name| {
+                element(&text, name).and_then(|said| said.parse::<i32>().ok())
+            };
             assert_eq!(said("moc_pane_percent"), Some(moc));
             assert_eq!(said("vehicle_pane_percent"), Some(vehicle));
             assert_eq!(said("moc_list_percent"), Some(list_moc));
@@ -424,7 +432,8 @@ mod tests {
     #[test]
     fn a_file_with_no_moc_pane_takes_its_share_from_the_vehicle() {
         let settings = settings_in(
-            "<settings><vehicle_pane_percent>75</vehicle_pane_percent></settings>",
+            "<settings><vehicle_pane_percent>75\
+             </vehicle_pane_percent></settings>",
             "a test",
         );
         assert_eq!(settings.moc_percent, DEFAULT_MOC);
@@ -464,9 +473,15 @@ mod tests {
             ("three quarters", DEFAULT_VEHICLE),
             ("", DEFAULT_VEHICLE),
         ] {
-            let text = format!("<vehicle_pane_percent>{said}</vehicle_pane_percent>");
+            let text =
+                format!("<vehicle_pane_percent>{said}</vehicle_pane_percent>");
             assert_eq!(
-                percent_in(&text, "a test", "vehicle_pane_percent", DEFAULT_VEHICLE),
+                percent_in(
+                    &text,
+                    "a test",
+                    "vehicle_pane_percent",
+                    DEFAULT_VEHICLE
+                ),
                 expected,
                 "{said:?}"
             );
@@ -488,8 +503,8 @@ mod tests {
     /// somebody's home.
     #[test]
     fn reading_the_settings_leaves_nothing_behind() {
-        let where_ =
-            std::env::temp_dir().join(format!("tcsdiagram-settings-{}", std::process::id()));
+        let where_ = std::env::temp_dir()
+            .join(format!("tcsdiagram-settings-{}", std::process::id()));
         std::fs::create_dir_all(&where_).expect("a directory");
         let was = std::env::var_os("HOME");
         std::env::set_var("HOME", &where_);

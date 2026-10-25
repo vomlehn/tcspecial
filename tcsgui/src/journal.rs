@@ -260,10 +260,11 @@ pub struct Link {
     /// more than one. `None` is a node with one, which needs no naming -- see
     /// `tcslibgs::graph::terminals`.
     ///
-    /// Written into the file as part of the `from`: `from: through.payload-out`.
-    /// Kept apart from the name here because everything in the editor that
-    /// looks a link's source up looks up a node, and a field that sometimes
-    /// held `node.terminal` would be a name that sometimes is not one.
+    /// Written into the file as part of the `from`:
+    /// `from: through.payload-out`. Kept apart from the name here because
+    /// everything in the editor that looks a link's source up looks up a
+    /// node, and a field that sometimes held `node.terminal` would be a name
+    /// that sometimes is not one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<String>,
     pub to: String,
@@ -314,7 +315,12 @@ impl Link {
     /// What the canvas makes when the line was dragged from the terminal of a
     /// node that has more than one -- a `null` node, whose links have to say
     /// which stream they carry.
-    pub fn joining(from: &str, origin: Option<&str>, to: &str, input: Option<&str>) -> Link {
+    pub fn joining(
+        from: &str,
+        origin: Option<&str>,
+        to: &str,
+        input: Option<&str>,
+    ) -> Link {
         Link {
             from: from.to_string(),
             origin: origin.map(|t| t.to_string()),
@@ -461,11 +467,13 @@ impl Edit {
                 name: name.clone(),
                 interval: interval.clone(),
             },
-            Edit::SetGroupInterval { group, was, now } => Edit::SetGroupInterval {
-                group: group.clone(),
-                was: now.clone(),
-                now: was.clone(),
-            },
+            Edit::SetGroupInterval { group, was, now } => {
+                Edit::SetGroupInterval {
+                    group: group.clone(),
+                    was: now.clone(),
+                    now: was.clone(),
+                }
+            }
             Edit::RenameGroup { was, now } => Edit::RenameGroup {
                 was: now.clone(),
                 now: was.clone(),
@@ -527,7 +535,9 @@ impl Edit {
                 node_type,
                 home,
             } => match home {
-                Some(home) => format!("add {node_type} \"{name}\" to \"{home}\""),
+                Some(home) => {
+                    format!("add {node_type} \"{name}\" to \"{home}\"")
+                }
                 None => format!("add {node_type} \"{name}\""),
             },
             Edit::RemoveNode { name, .. } => format!("remove \"{name}\""),
@@ -537,8 +547,12 @@ impl Edit {
             } => {
                 format!("set {attribute} of \"{node}\"")
             }
-            Edit::RenameNode { was, now } => format!("rename \"{was}\" to \"{now}\""),
-            Edit::AddLink { link } => format!("link \"{}\" to \"{}\"", link.from, link.to),
+            Edit::RenameNode { was, now } => {
+                format!("rename \"{was}\" to \"{now}\"")
+            }
+            Edit::AddLink { link } => {
+                format!("link \"{}\" to \"{}\"", link.from, link.to)
+            }
             Edit::RemoveLink { link } => {
                 format!("unlink \"{}\" from \"{}\"", link.from, link.to)
             }
@@ -584,7 +598,9 @@ impl Edit {
                 format!("put back simulator group \"{name}\"")
             }
             Edit::AddGroup { name, .. } => format!("add group \"{name}\""),
-            Edit::RemoveGroup { name, .. } => format!("remove group \"{name}\""),
+            Edit::RemoveGroup { name, .. } => {
+                format!("remove group \"{name}\"")
+            }
             Edit::SetGroupInterval { group, .. } => {
                 format!("set how often \"{group}\" is read")
             }
@@ -596,14 +612,21 @@ impl Edit {
             } => format!("set {attribute} of every payload in \"{group}\""),
             Edit::RestoreGroupAttribute {
                 group, attribute, ..
-            } => format!("put back {attribute} on every payload in \"{group}\""),
+            } => {
+                format!("put back {attribute} on every payload in \"{group}\"")
+            }
             Edit::SetNodeComment { node, now, .. } => match now {
                 Some(_) => format!("comment on \"{node}\""),
                 None => format!("remove the comment on \"{node}\""),
             },
             Edit::SetLinkComment { link, now, .. } => match now {
-                Some(_) => format!("comment on \"{}\" to \"{}\"", link.from, link.to),
-                None => format!("remove the comment on \"{}\" to \"{}\"", link.from, link.to),
+                Some(_) => {
+                    format!("comment on \"{}\" to \"{}\"", link.from, link.to)
+                }
+                None => format!(
+                    "remove the comment on \"{}\" to \"{}\"",
+                    link.from, link.to
+                ),
             },
         }
     }
@@ -811,7 +834,11 @@ mod tests {
             } => {
                 assert_eq!(name, "k_1");
                 assert_eq!(attributes.len(), 1);
-                assert_eq!(links.len(), 2, "the node came back without its links");
+                assert_eq!(
+                    links.len(),
+                    2,
+                    "the node came back without its links"
+                );
             }
             other => panic!("{other:?}"),
         }
@@ -847,8 +874,10 @@ mod tests {
         });
         journal.undo();
 
-        let written = serde_norway::to_string(&journal).expect("a journal writes");
-        let read: Journal = serde_norway::from_str(&written).expect("and reads back");
+        let written =
+            serde_norway::to_string(&journal).expect("a journal writes");
+        let read: Journal =
+            serde_norway::from_str(&written).expect("and reads back");
 
         assert_eq!(read, journal);
         assert_eq!(read.depth(), 1);

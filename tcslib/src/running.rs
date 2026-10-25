@@ -11,7 +11,9 @@ use std::net::UdpSocket;
 use std::time::Duration;
 
 use tcslibgs::graph::Graph;
-use tcslibgs::{Beacon, Command, ConfigDigest, ConfigVersion, HostPort, PingCommand};
+use tcslibgs::{
+    Beacon, Command, ConfigDigest, ConfigVersion, HostPort, PingCommand,
+};
 
 use crate::beacon::{Arrived, Beacons, Link, Schedule};
 use crate::connection::{Connection, UdpConnection};
@@ -46,7 +48,12 @@ mod counting {
             note();
             System.alloc_zeroed(layout)
         }
-        unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, size: usize) -> *mut u8 {
+        unsafe fn realloc(
+            &self,
+            ptr: *mut u8,
+            layout: Layout,
+            size: usize,
+        ) -> *mut u8 {
             note();
             System.realloc(ptr, layout, size)
         }
@@ -102,12 +109,15 @@ fn a_beacon_pass_allocates_nothing_but_the_unpacking() {
         },
     };
     let digest = ConfigDigest([7; 16]);
-    let Ok(mut beacons) = Beacons::listening(link, Schedule::standard(), Some(digest)) else {
+    let Ok(mut beacons) =
+        Beacons::listening(link, Schedule::standard(), Some(digest))
+    else {
         // The port was taken between being chosen and being bound.
         return;
     };
-    let beacon =
-        |sequence: u32| Beacon::new(sequence, ConfigVersion::of_this_build(), digest).to_bytes();
+    let beacon = |sequence: u32| {
+        Beacon::new(sequence, ConfigVersion::of_this_build(), digest).to_bytes()
+    };
     let datagrams: Vec<Vec<u8>> = (1..=23).map(beacon).collect();
 
     // Where to, worked out once: a name and a port is looked up each time
@@ -151,7 +161,8 @@ fn a_datum_received_into_a_buffer_allocates_nothing() {
             "moc:
   - {{ name: ground, type: moc, ground_base: \"127.0.0.1:{}\" }}
 payloads:
-  - {{ name: a, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7001\", payload-out: ground }}
+  - {{ name: a, type: network, protocol: udp, address: \"127.0.0.1\", \
+    port: \"7001\", payload-out: ground }}
 ",
             port - 1
         ),
@@ -195,7 +206,8 @@ fn a_datum_longer_than_the_buffer_is_refused() {
             "moc:
   - {{ name: ground, type: moc, ground_base: \"127.0.0.1:{}\" }}
 payloads:
-  - {{ name: a, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7001\", payload-out: ground }}
+  - {{ name: a, type: network, protocol: udp, address: \"127.0.0.1\", \
+    port: \"7001\", payload-out: ground }}
 ",
             port - 1
         ),
@@ -227,7 +239,8 @@ fn pinging_allocates_nothing() {
     let mut round = |pinger: &mut Pinger| {
         at += Duration::from_millis(1);
         let sent = pinger.ping(at).expect("a ping");
-        let reply = tcslibgs::node::vehicle::ping::reply(sent.as_bytes(), at).expect("answered");
+        let reply = tcslibgs::node::vehicle::ping::reply(sent.as_bytes(), at)
+            .expect("answered");
         let length = reply.as_bytes().len();
         answer[..length].copy_from_slice(reply.as_bytes());
         pinger.answered(&answer[..length], at + Duration::from_millis(1));
@@ -248,7 +261,8 @@ fn pinging_allocates_nothing() {
 fn sending_a_command_allocates_nothing() {
     let vehicle = UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
     let at = vehicle.local_addr().expect("its address");
-    let mut link = UdpConnection::new("127.0.0.1:0", &at.to_string()).expect("a connection");
+    let mut link = UdpConnection::new("127.0.0.1:0", &at.to_string())
+        .expect("a connection");
     let command = Command::Ping(PingCommand::new(1));
     let mut taken = [0u8; 1024];
 

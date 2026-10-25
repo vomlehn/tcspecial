@@ -27,10 +27,10 @@ of it, up and down. Press Ping to send one.
 Usage, from the repository's root::
 
     python3 examples/ping/ping_moc.py [--yaml | --xml] [configuration]
-    python3 examples/ping/ping_moc.py --pings 3        # no window
-    python3 examples/ping/ping_moc.py --describe       # what it read
-    python3 examples/ping/ping_moc.py --no-vehicle     # tcspecial runs elsewhere
-    python3 examples/ping/ping_moc.py -v               # say what it is doing
+    python3 examples/ping/ping_moc.py --pings 3       # no window
+    python3 examples/ping/ping_moc.py --describe      # what it read
+    python3 examples/ping/ping_moc.py --no-vehicle    # tcspecial runs elsewhere
+    python3 examples/ping/ping_moc.py -v              # say what it is doing
 
 Quiet unless ``-v`` or ``--verbose`` is given: the console then says where it
 is listening, each remark a beacon pass makes in the window's mode -- beacons
@@ -83,7 +83,10 @@ def arguments(argv):
     parser.add_argument(
         "configuration",
         nargs="?",
-        help=f"the configuration (default: {STEM}.xml, or with --yaml {STEM}.yaml)",
+        help=(
+            f"the configuration (default: {STEM}.xml, or with --yaml "
+            f"{STEM}.yaml)"
+        ),
     )
     # Which of the example's two files: one, or neither, and never both.
     spelling = parser.add_mutually_exclusive_group()
@@ -96,28 +99,45 @@ def arguments(argv):
         help="read the XML spelling of the configuration (the default)",
     )
     parser.add_argument(
-        "--moc", help="the moc node the ping goes through, where there is more than one"
+        "--moc",
+        help=(
+            "the moc node the ping goes through, where there is more than one"
+        ),
     )
     parser.add_argument(
         "--node", help="the ping node to ping, where there is more than one"
     )
-    parser.add_argument("--tcsverify", help="the tcsverify to digest the configuration with")
     parser.add_argument(
-        "--tcspecial", help="the tcspecial to start (default: the repository's build)"
+        "--tcsverify", help="the tcsverify to digest the configuration with"
+    )
+    parser.add_argument(
+        "--tcspecial",
+        help="the tcspecial to start (default: the repository's build)",
     )
     parser.add_argument(
         "--no-vehicle",
         action="store_true",
-        help="start no tcspecial: one is running elsewhere, or a test is playing it",
+        help=(
+            "start no tcspecial: one is running elsewhere, or a test is "
+            "playing it"
+        ),
     )
     parser.add_argument(
-        "--pings", type=int, metavar="N", help="send N pings, print each, and stop: no window"
+        "--pings",
+        type=int,
+        metavar="N",
+        help="send N pings, print each, and stop: no window",
     )
     parser.add_argument(
-        "--describe", action="store_true", help="print what the configuration says, and stop"
+        "--describe",
+        action="store_true",
+        help="print what the configuration says, and stop",
     )
     parser.add_argument(
-        "-v", "--verbose", action="store_true", help="print status messages on the console"
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="print status messages on the console",
     )
     options = parser.parse_args(argv)
     try:
@@ -130,7 +150,8 @@ def arguments(argv):
 
 
 def the_one(nodes, kind, named):
-    """The node of this kind the program uses: the one named, or the only one."""
+    """The node of this kind the program uses: the one named, or the only
+    one."""
     if named is not None:
         return named
     names = [node.name for node in nodes if node.node_type == kind]
@@ -285,7 +306,10 @@ def run_without_a_window(setup, beacons, pinger, count):
         deadline = time.monotonic() + 2
         while time.monotonic() < deadline:
             left = deadline - time.monotonic()
-            if pinger.receive(timeout=max(left, 0.01)) and pinger.exchange().received_at:
+            if (
+                pinger.receive(timeout=max(left, 0.01))
+                and pinger.exchange().received_at
+            ):
                 break
         exchange = pinger.exchange()
         if exchange.received_at is None:
@@ -352,16 +376,22 @@ def run_the_window(setup, beacons, pinger):
     # times, and under that the button, centred. Titled with the node, as
     # tcsmoc's is, so that the box says what it is pinging.
     panel = ttk.LabelFrame(
-        window, text=f"Pinging {setup.node}" if setup else "Ping", padding=theme.INSIDE
+        window,
+        text=f"Pinging {setup.node}" if setup else "Ping",
+        padding=theme.INSIDE,
     )
     panel.pack(fill="x", padx=between, pady=(between // 2, between))
 
     def row(number, label):
-        ttk.Label(panel, text=label).grid(row=number, column=0, sticky="w", pady=2)
+        ttk.Label(panel, text=label).grid(
+            row=number, column=0, sticky="w", pady=2
+        )
 
     def value(number, column, width=None):
         label = ttk.Label(panel, style="Value.TLabel", width=width)
-        label.grid(row=number, column=column, sticky="w", padx=(between, 0), pady=2)
+        label.grid(
+            row=number, column=column, sticky="w", padx=(between, 0), pady=2
+        )
         return label
 
     # The message column is as wide as an answer will be, so that the window
@@ -411,9 +441,13 @@ def run_the_window(setup, beacons, pinger):
     # The default button, which Enter or Space presses wherever the focus
     # is, centred under everything else, as the beacon example's is. It never
     # takes the focus itself, so that Space on it is not a second ping.
-    ttk.Button(panel, text="Send ping", command=send, default="active", takefocus=False).grid(
-        row=6, column=0, columnspan=3, pady=(theme.INSIDE, 0)
-    )
+    ttk.Button(
+        panel,
+        text="Send ping",
+        command=send,
+        default="active",
+        takefocus=False,
+    ).grid(row=6, column=0, columnspan=3, pady=(theme.INSIDE, 0))
     for key in ("<Return>", "<KP_Enter>", "<space>"):
         window.bind(key, send)
 
@@ -466,22 +500,24 @@ def main(argv):
 
     if setup.digest is None:
         print(
-            f"{options.configuration} cannot be digested, so no beacon's digest is "
-            f"checked: {setup.why_no_digest}",
+            f"{options.configuration} cannot be digested, so no beacon's "
+            f"digest is checked: {setup.why_no_digest}",
             file=sys.stderr,
         )
     try:
         beacons = Beacons.listening(
-            setup.beacon, Schedule.for_interval(setup.beacon_interval), setup.digest
+            setup.beacon,
+            Schedule.for_interval(setup.beacon_interval),
+            setup.digest,
         )
         pinger = Pinger(setup.uplink, setup.downlink)
     except OSError as why:
         print(f"cannot listen: {why}", file=sys.stderr)
         return 1
     status(
-        f"Listening for beacons at {setup.beacon.recv}, which {setup.beacon.send} "
-        f"sends from; pinging {setup.node} through {setup.moc} at {setup.uplink}, "
-        f"answers at {setup.downlink}"
+        f"Listening for beacons at {setup.beacon.recv}, which "
+        f"{setup.beacon.send} sends from; pinging {setup.node} through "
+        f"{setup.moc} at {setup.uplink}, answers at {setup.downlink}"
     )
 
     # The vehicle, once this end is listening: a beacon sent before the ground
@@ -490,7 +526,9 @@ def main(argv):
     if not options.no_vehicle:
         try:
             vehicle = Vehicle.for_configuration(
-                options.configuration, options.tcspecial, verbose=options.verbose
+                options.configuration,
+                options.tcspecial,
+                verbose=options.verbose,
             )
             vehicle.start()
         except (OSError, ValueError) as why:

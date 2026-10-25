@@ -17,9 +17,9 @@ use crate::{ConfigFormat, TcsError};
 /// each child's variable on that child's own command.
 ///
 /// They live here, in the library every one of them reads its configuration
-/// through, rather than in the programs: the name tcsmoc sets for a child is then the same constant the
-/// child reads, checked by the compiler rather than by two string literals
-/// being kept equal by hand.
+/// through, rather than in the programs: the name tcsmoc sets for a child is
+/// then the same constant the child reads, checked by the compiler rather than
+/// by two string literals being kept equal by hand.
 pub const PAYLOAD_CONFIG_PATH_VAR: &str = "PAYLOAD_CONFIG_PATH";
 
 /// Which environment variable names tcssim's payload configuration.
@@ -78,7 +78,8 @@ pub fn payload_path_from_args<I: Iterator<Item = String>>(
     let from_args = args.next();
     if let Some(extra) = args.next() {
         return Err(format!(
-            "unexpected argument \"{}\"\nusage: {} [tcspecial configuration file]",
+            "unexpected argument \"{}\"\nusage: {} [tcspecial configuration \
+             file]",
             extra, program
         ));
     }
@@ -137,23 +138,30 @@ struct Sections {
 /// no version, as a configuration now does not, so nothing else tells them
 /// apart from a graph, and one is better told what became of its sections
 /// than that it names fields a graph does not have.
-pub fn names_what_is_gone(text: &str, format: ConfigFormat) -> Option<TcsError> {
+pub fn names_what_is_gone(
+    text: &str,
+    format: ConfigFormat,
+) -> Option<TcsError> {
     what_is_gone(&format.parse(text).ok()?)
 }
 
 fn what_is_gone(sections: &Sections) -> Option<TcsError> {
-    if !sections.data_handlers.is_empty() || !sections.data_handler_groups.is_empty() {
+    if !sections.data_handlers.is_empty()
+        || !sections.data_handler_groups.is_empty()
+    {
         // The old spelling, named rather than ignored. A file keeping it would
         // otherwise be read as naming no section at all, and the honest
         // report of that -- it describes no payloads -- would say nothing
         // about the one word that has to change.
         Some(TcsError::Config(
             "names data_handlers, which is what the payload section was called \
-             before: payloads is the section now, and payload_groups a group of \
-             them"
+             before: payloads is the section now, and payload_groups a group \
+             of them"
                 .to_string(),
         ))
-    } else if !sections.endpoints.is_empty() || !sections.endpoint_groups.is_empty() {
+    } else if !sections.endpoints.is_empty()
+        || !sections.endpoint_groups.is_empty()
+    {
         // The language that is gone, named for the same reason. Its files
         // described the same payloads in other words, and a payload states
         // what an endpoint and its group stated between them.
@@ -203,7 +211,11 @@ mod tests {
         std::env::set_var(var, "from_the_environment.yaml");
 
         assert_eq!(
-            payload_path_from_args(args(&["from_the_argument.yaml"]), Some(var)).unwrap(),
+            payload_path_from_args(
+                args(&["from_the_argument.yaml"]),
+                Some(var)
+            )
+            .unwrap(),
             "from_the_argument.yaml"
         );
         // And with no argument the variable is what is left.
@@ -217,8 +229,9 @@ mod tests {
 
     #[test]
     fn a_second_payload_file_is_refused_rather_than_ignored() {
-        let message = payload_path_from_args(args(&["one.yaml", "two.yaml"]), None)
-            .expect_err("two paths must be refused");
+        let message =
+            payload_path_from_args(args(&["one.yaml", "two.yaml"]), None)
+                .expect_err("two paths must be refused");
         assert!(
             message.contains("two.yaml"),
             "the error should name the extra argument, but said: {message}"
@@ -233,8 +246,11 @@ mod tests {
     /// true and would not say what to do about it.
     #[test]
     fn a_file_naming_endpoints_is_told_the_language_is_gone() {
-        let endpoints = "endpoint_groups:\n  - name: g\n    type: network\n    protocol: udp\n\
-                         endpoints:\n  - name: e\n    group: g\n    address: localhost\n    \
+        let endpoints =
+            "endpoint_groups:\n  - name: g\n    type: network\n    \
+                         protocol: udp\n\
+                         endpoints:\n  - name: e\n    group: g\n    address: \
+                         localhost\n    \
                          port: 5000\n";
         let message = names_what_is_gone(endpoints, ConfigFormat::Yaml)
             .expect("the language is gone")

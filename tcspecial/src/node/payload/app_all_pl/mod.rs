@@ -46,14 +46,14 @@ impl AppAllPl {
     /// Start the program this node names.
     ///
     /// Started when the configuration is loaded rather than at the first datum,
-    /// which is the rule a computation's `process` is held to as well: a program
-    /// that cannot be executed is then a fault found on the ground rather than
-    /// three days into a mission.
+    /// which is the rule a computation's `process` is held to as well: a
+    /// program that cannot be executed is then a fault found on the ground
+    /// rather than three days into a mission.
     ///
     /// `params.restart` is not acted on yet. Nothing here restarts anything,
     /// because nothing here is driving it: the policy is read and checked so
-    /// that a configuration can state it, and what acts on it is the fabric work
-    /// this node is waiting for.
+    /// that a configuration can state it, and what acts on it is the fabric
+    /// work this node is waiting for.
     pub fn of(params: &AppParams) -> Result<AppAllPl, String> {
         if params.kind != Kind::AllPl {
             return Err(format!(
@@ -85,7 +85,10 @@ impl AppAllPl {
     }
 
     /// The same, into the fabric's buffer, allocating nothing.
-    pub fn take_payload_data_now_into(&mut self, out: &mut [u8]) -> Result<ReadInto, String> {
+    pub fn take_payload_data_now_into(
+        &mut self,
+        out: &mut [u8],
+    ) -> Result<ReadInto, String> {
         self.running.read_payload_now_into(out)
     }
 
@@ -162,7 +165,8 @@ mod tests {
     fn asked_for_a_reading_it_answers() {
         let where_ = tempfile::tempdir().expect("a directory");
         let program = stands_in(where_.path());
-        let mut node = crate::when_not_busy(|| AppAllPl::of(&says(&program))).expect("it starts");
+        let mut node = crate::when_not_busy(|| AppAllPl::of(&says(&program)))
+            .expect("it starts");
 
         node.give_moc_data(b"READ").expect("it takes a packet");
         assert_eq!(

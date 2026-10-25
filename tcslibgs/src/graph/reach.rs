@@ -25,12 +25,14 @@
 //! nothing in the telemetry would ever say so.
 
 use crate::endpoint_config::{
-    a_link_term, endpoint_of, parse_u32, EndpointLocation, LinkTerms, Scalar, StreamParams,
-    StreamTerms,
+    a_link_term, endpoint_of, parse_u32, EndpointLocation, LinkTerms, Scalar,
+    StreamParams, StreamTerms,
 };
 use crate::gateway::{is_gateway, GatewayKind};
 use crate::graph::Node;
-use crate::types::{host_port_of, DeviceConfig, EndpointConfig, HostPort, NetworkConfig};
+use crate::types::{
+    host_port_of, DeviceConfig, EndpointConfig, HostPort, NetworkConfig,
+};
 use crate::{DHType, NetworkProtocol};
 
 /// Everything a node's attributes say about reaching it.
@@ -123,11 +125,13 @@ impl Reach {
     /// Simulated" in docs/design.rst.
     pub fn opened(&self, mode: crate::simulate::Mode) -> EndpointConfig {
         match self.stand_in {
-            Some(at) if !mode.is_flight() => EndpointConfig::Network(NetworkConfig {
-                protocol: NetworkProtocol::Udp,
-                address: at.ip().to_string(),
-                port: at.port(),
-            }),
+            Some(at) if !mode.is_flight() => {
+                EndpointConfig::Network(NetworkConfig {
+                    protocol: NetworkProtocol::Udp,
+                    address: at.ip().to_string(),
+                    port: at.port(),
+                })
+            }
             _ => self.endpoint.clone(),
         }
     }
@@ -148,19 +152,25 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
             // `retired_term`.
             let known = |name: &str| {
                 retired_term(name).is_none()
-                    && take(&mut Said::default(), node, kind, name, &Scalar::of("")) != Ok(false)
+                    && take(
+                        &mut Said::default(),
+                        node,
+                        kind,
+                        name,
+                        &Scalar::of(""),
+                    ) != Ok(false)
             };
             return Err(match crate::graph::spelled(attribute, known) {
                 Some(hint) => format!(
-                    "\"{what}\": there is nothing called \"{attribute}\" on {} {} \
-                     node: {hint}",
+                    "\"{what}\": there is nothing called \"{attribute}\" on {} \
+                     {} node: {hint}",
                     kind.article(),
                     node.node_type
                 ),
                 None => format!(
                     "\"{what}\": there is nothing called \"{attribute}\" on {} \
-                     {} node. An attribute nothing reads is worse than one that \
-                     is refused: it looks like something that was set",
+                     {} node. An attribute nothing reads is worse than one \
+                     that is refused: it looks like something that was set",
                     kind.article(),
                     node.node_type
                 ),
@@ -189,8 +199,8 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
     if matches!(kind, DHType::Network | DHType::Device) {
         if let Some(term) = a_link_term(&terms, &[]) {
             return Err(format!(
-                "\"{what}\" is {} {} node, which is not on a link, so {term} does \
-                 not apply to it",
+                "\"{what}\" is {} {} node, which is not on a link, so {term} \
+                 does not apply to it",
                 kind.article(),
                 node.node_type
             ));
@@ -199,9 +209,10 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
         // whether it is a stream.
         if stream_stated && kind == DHType::Device {
             return Err(format!(
-                "\"{what}\" is {} {} node, and where a read ends is a property of a \
-                 stream -- a line, or a tcp or unix_stream socket: max_length, \
-                 read_timeout, terminators and length_prefix do not apply to it",
+                "\"{what}\" is {} {} node, and where a read ends is a property \
+                 of a stream -- a line, or a tcp or unix_stream socket: \
+                 max_length, read_timeout, terminators and length_prefix do \
+                 not apply to it",
                 kind.article(),
                 node.node_type
             ));
@@ -221,20 +232,20 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
                 Some(stated) if stated.as_str() == crate::types::RAW => {
                     NetworkProtocol::Raw(ip_protocol_of(what, node)?)
                 }
-                Some(stated) => {
-                    NetworkProtocol::from_spelling(stated.as_str()).ok_or_else(|| {
+                Some(stated) => NetworkProtocol::from_spelling(stated.as_str())
+                    .ok_or_else(|| {
                         format!(
-                            "\"{what}\": \"{}\" is not a protocol: there are {}",
+                            "\"{what}\": \"{}\" is not a protocol: there are \
+                             {}",
                             stated.as_str(),
                             NetworkProtocol::spellings()
                         )
-                    })?
-                }
+                    })?,
                 None if is_gateway(&node.node_type) => NetworkProtocol::Udp,
                 None => {
                     return Err(format!(
-                        "\"{what}\" is a network node, so it needs the protocol spoken \
-                         to it: one of {}",
+                        "\"{what}\" is a network node, so it needs the \
+                         protocol spoken to it: one of {}",
                         NetworkProtocol::spellings()
                     ))
                 }
@@ -257,18 +268,20 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
                 }
                 (true, None) => {
                     return Err(format!(
-                        "\"{what}\" is reached over {}, which is a stream of bytes, so \
-                         it must say where one packet of it ends: give max_length, and \
-                         read_timeout, terminators or length_prefix",
+                        "\"{what}\" is reached over {}, which is a stream of \
+                         bytes, so it must say where one packet of it ends: \
+                         give max_length, and read_timeout, terminators or \
+                         length_prefix",
                         protocol.spelling()
                     ))
                 }
                 (false, Some(_)) => {
                     return Err(format!(
-                        "\"{what}\" is reached over {}, whose datagrams are packets \
-                         already: max_length, read_timeout, terminators and \
-                         length_prefix say where a packet of a stream ends, and apply \
-                         only to a line or a tcp or unix_stream socket",
+                        "\"{what}\" is reached over {}, whose datagrams are \
+                         packets already: max_length, read_timeout, \
+                         terminators and length_prefix say where a packet of a \
+                         stream ends, and apply only to a line or a tcp or \
+                         unix_stream socket",
                         protocol.spelling()
                     ))
                 }
@@ -306,9 +319,10 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
                         // number and the host.
                         NetworkProtocol::Raw(_) if has("port") => {
                             return Err(format!(
-                                "\"{what}\" is reached on a raw socket, which has no \
-                                 port: take port out, the ip_protocol and the \
-                                 address being what say which datagrams are its"
+                                "\"{what}\" is reached on a raw socket, which \
+                                 has no port: take port out, the ip_protocol \
+                                 and the address being what say which \
+                                 datagrams are its"
                             ))
                         }
                         NetworkProtocol::Raw(_) => 0,
@@ -317,8 +331,8 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
                 })
             }
         }
-        // A file, opened: see node::payload::device_file for why that is a type of its
-        // own and not every other type as well.
+        // A file, opened: see node::payload::device_file for why that is a type
+        // of its own and not every other type as well.
         DHType::Device => EndpointConfig::Device(DeviceConfig {
             path: required(
                 what,
@@ -346,8 +360,9 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
     if let Some(rule) = &framing {
         if rule.max_length as usize > crate::types::DATUM_BYTES {
             return Err(format!(
-                "\"{what}\": max_length {} is more than one datum carries: a read \
-                 is delivered whole, and the most a datum holds is {} bytes",
+                "\"{what}\": max_length {} is more than one datum carries: a \
+                 read is delivered whole, and the most a datum holds is {} \
+                 bytes",
                 rule.max_length,
                 crate::types::DATUM_BYTES
             ));
@@ -372,7 +387,9 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
 
     let ground = ground_of(what, node)?;
     let sends_from = match sends_from {
-        Some(written) => Some(sends_from_of(what, written.as_str(), &endpoint)?),
+        Some(written) => {
+            Some(sends_from_of(what, written.as_str(), &endpoint)?)
+        }
         None => None,
     };
 
@@ -409,32 +426,35 @@ fn sends_from_of(
         EndpointConfig::Network(net) => net,
         _ => {
             return Err(format!(
-                "\"{what}\" states sends_from, which says where a datagram payload \
-                 sends from: only a network node over udp or unix_dgram has one"
+                "\"{what}\" states sends_from, which says where a datagram \
+                 payload sends from: only a network node over udp or \
+                 unix_dgram has one"
             ))
         }
     };
     match net.protocol {
         NetworkProtocol::Udp => {
-            let at: std::net::SocketAddr = written.trim().parse().map_err(|_| {
-                format!(
-                    "\"{what}\": sends_from {written:?} is not a host and a port: \
-                     write the payload's IP address and the port it sends from, \
-                     as 10.0.0.7:7001"
+            let at: std::net::SocketAddr =
+                written.trim().parse().map_err(|_| {
+                    format!(
+                    "\"{what}\": sends_from {written:?} is not a host and a \
+                     port: write the payload's IP address and the port it \
+                     sends from, as 10.0.0.7:7001"
                 )
-            })?;
+                })?;
             if at.port() == 0 {
                 return Err(format!(
-                    "\"{what}\": sends_from {written:?} names port 0, which is any \
-                     port at all: write the port the payload sends from"
+                    "\"{what}\": sends_from {written:?} names port 0, which is \
+                     any port at all: write the port the payload sends from"
                 ));
             }
-            let own = format!("{}:{}", net.address, net.port).parse::<std::net::SocketAddr>();
+            let own = format!("{}:{}", net.address, net.port)
+                .parse::<std::net::SocketAddr>();
             if own.is_ok_and(|own| own == at) {
                 return Err(format!(
-                    "\"{what}\": sends_from {written:?} is the node's own address and \
-                     port, which is where the vehicle waits for it: write where the \
-                     payload sends from"
+                    "\"{what}\": sends_from {written:?} is the node's own \
+                     address and port, which is where the vehicle waits for \
+                     it: write where the payload sends from"
                 ));
             }
             Ok(crate::SendsFrom::Socket(at))
@@ -443,23 +463,24 @@ fn sends_from_of(
             let path = written.trim();
             if path.is_empty() {
                 return Err(format!(
-                    "\"{what}\": sends_from is empty: write the path the payload's \
-                     socket is bound to"
+                    "\"{what}\": sends_from is empty: write the path the \
+                     payload's socket is bound to"
                 ));
             }
             if path == net.address {
                 return Err(format!(
-                    "\"{what}\": sends_from {written:?} is the node's own address, \
-                     which is where the vehicle waits for it: write the path the \
-                     payload's socket is bound to"
+                    "\"{what}\": sends_from {written:?} is the node's own \
+                     address, which is where the vehicle waits for it: write \
+                     the path the payload's socket is bound to"
                 ));
             }
             Ok(crate::SendsFrom::Path(path.to_string()))
         }
         other => Err(format!(
-            "\"{what}\" is reached over {}, and sends_from says where a datagram \
-             payload sends from: a stream is connected, and so is a raw socket, so \
-             the other end is known already. Take sends_from out",
+            "\"{what}\" is reached over {}, and sends_from says where a \
+             datagram payload sends from: a stream is connected, and so is a \
+             raw socket, so the other end is known already. Take sends_from \
+             out",
             other.spelling()
         )),
     }
@@ -552,13 +573,15 @@ fn take(
         // Where a gateway node's data goes, which only a gateway node has,
         // each kind saying it by the name of what is at its far end: read
         // below.
-        other if GatewayKind::ALL.iter().any(|k| k.base_attribute() == other) => {
+        other
+            if GatewayKind::ALL.iter().any(|k| k.base_attribute() == other) =>
+        {
             match GatewayKind::of_node_type(&node.node_type) {
                 Some(of) if of.base_attribute() == other => {}
                 Some(of) => {
                     return Err(format!(
-                        "\"{what}\" is a {} node, whose data goes to {}: say {} \
-                         rather than {other}",
+                        "\"{what}\" is a {} node, whose data goes to {}: say \
+                         {} rather than {other}",
                         node.node_type,
                         of.far_end(),
                         of.base_attribute()
@@ -566,8 +589,8 @@ fn take(
                 }
                 None => {
                     return Err(format!(
-                        "\"{what}\" is {} {} node, and {other} says where a ground \
-                         link's data goes: only a gateway node has one",
+                        "\"{what}\" is {} {} node, and {other} says where a \
+                         ground link's data goes: only a gateway node has one",
                         kind.article(),
                         node.node_type
                     ))
@@ -577,12 +600,13 @@ fn take(
         // Where the F´ IDs of what goes to an F´ bridge begin, which the
         // bridge's model is made from and nothing aboard reads: read below.
         "fprime_id_base"
-            if GatewayKind::of_node_type(&node.node_type) == Some(GatewayKind::Fprime) => {}
+            if GatewayKind::of_node_type(&node.node_type)
+                == Some(GatewayKind::Fprime) => {}
         "fprime_id_base" => {
             return Err(format!(
-                "\"{what}\" is {} {} node, and fprime_id_base says where the F´ \
-                 IDs of what goes to an F´ bridge begin: only a gateway_fprime \
-                 node has one",
+                "\"{what}\" is {} {} node, and fprime_id_base says where the \
+                 F´ IDs of what goes to an F´ bridge begin: only a \
+                 gateway_fprime node has one",
                 kind.article(),
                 node.node_type
             ))
@@ -591,9 +615,9 @@ fn take(
             let size = number(what, "read_size", value)?;
             if size == 0 {
                 return Err(format!(
-                    "\"{what}\": read_size must be more than nought -- a read of no \
-                     bytes is not a read, and a node that is not read says nothing \
-                     about it"
+                    "\"{what}\": read_size must be more than nought -- a read \
+                     of no bytes is not a read, and a node that is not read \
+                     says nothing about it"
                 ));
             }
             said.read_size = Some(size);
@@ -608,9 +632,9 @@ fn take(
         // way a trigger is: only once, as the node opens.
         "init" if is_gateway(&node.node_type) => {
             return Err(format!(
-                "\"{what}\" is a link to the ground, and init is what a payload \
-                 is set to as the vehicle opens it: a ground link has no state \
-                 to start in"
+                "\"{what}\" is a link to the ground, and init is what a \
+                 payload is set to as the vehicle opens it: a ground link has \
+                 no state to start in"
             ))
         }
         "init" => {
@@ -637,9 +661,9 @@ fn take(
             })?;
             if !at.ip().is_loopback() {
                 return Err(format!(
-                    "\"{what}\": stand_in is {at}, which is not on this host: give a \
-                     loopback address, such as 127.0.0.1:{}, so that what answers \
-                     there can only be tcssim",
+                    "\"{what}\": stand_in is {at}, which is not on this host: \
+                     give a loopback address, such as 127.0.0.1:{}, so that \
+                     what answers there can only be tcssim",
                     at.port()
                 ));
             }
@@ -647,10 +671,10 @@ fn take(
         }
         "stand_in" => {
             return Err(format!(
-                "\"{what}\" is {} {} node, which is simulated at its own endpoint, \
-                 so stand_in does not apply to it: only hdlc, spi, rpmsg and iio \
-                 nodes, which the operating system has nothing faithful to stand \
-                 in for, are reached over UDP when simulated",
+                "\"{what}\" is {} {} node, which is simulated at its own \
+                 endpoint, so stand_in does not apply to it: only hdlc, spi, \
+                 rpmsg and iio nodes, which the operating system has nothing \
+                 faithful to stand in for, are reached over UDP when simulated",
                 kind.article(),
                 node.node_type
             ))
@@ -705,14 +729,14 @@ fn take(
 fn cannot_be_asked(endpoint: &EndpointConfig) -> Option<&'static str> {
     match endpoint {
         EndpointConfig::Gpio(_) => Some(
-            "a set of discrete lines is read or driven and not both: writing to \
-             lines that are watched would be commanding a device rather than \
-             reading it",
+            "a set of discrete lines is read or driven and not both: writing \
+             to lines that are watched would be commanding a device rather \
+             than reading it",
         ),
         EndpointConfig::Iio(_) => Some(
-            "a sensor's sample buffer is read and not written: what an IIO device \
-             is configured with is in sysfs, written by whoever brought the sensor \
-             up",
+            "a sensor's sample buffer is read and not written: what an IIO \
+             device is configured with is in sysfs, written by whoever brought \
+             the sensor up",
         ),
         _ => None,
     }
@@ -732,8 +756,9 @@ fn cannot_be_written(endpoint: &EndpointConfig) -> Option<&'static str> {
              direction: output if they are driven",
         ),
         EndpointConfig::Iio(_) => Some(
-            "a sensor's sample buffer is read and not written: what an IIO device \
-             starts with is in sysfs, written by whoever brought the sensor up",
+            "a sensor's sample buffer is read and not written: what an IIO \
+             device starts with is in sysfs, written by whoever brought the \
+             sensor up",
         ),
         _ => None,
     }
@@ -758,7 +783,11 @@ fn cannot_be_written(endpoint: &EndpointConfig) -> Option<&'static str> {
 ///
 /// Every other interface is a stream or a register and has nothing to say
 /// here: where one read ends is the `stream` rule's business.
-fn fits_one_read(what: &str, size: u32, endpoint: &EndpointConfig) -> Result<(), String> {
+fn fits_one_read(
+    what: &str,
+    size: u32,
+    endpoint: &EndpointConfig,
+) -> Result<(), String> {
     if let EndpointConfig::Gpio(_) = endpoint {
         let record = crate::node::payload::gpio::EVENT_BYTES as u32;
         if size.is_multiple_of(record) {
@@ -767,16 +796,17 @@ fn fits_one_read(what: &str, size: u32, endpoint: &EndpointConfig) -> Result<(),
         let whole = (size / record).max(1) * record;
         return Err(if size < record {
             format!(
-                "\"{what}\": read_size is {size}, and a set of lines is read in \
-                 records of {record} bytes, whole ones only: a read of {size} could \
-                 never hold one, so the node would never deliver anything. Say \
-                 {record}, or a multiple of it"
+                "\"{what}\": read_size is {size}, and a set of lines is read \
+                 in records of {record} bytes, whole ones only: a read of \
+                 {size} could never hold one, so the node would never deliver \
+                 anything. Say {record}, or a multiple of it"
             )
         } else {
             format!(
-                "\"{what}\": read_size is {size}, and a set of lines is read in \
-                 records of {record} bytes, whole ones only: {} of every read would \
-                 never be filled. Say {whole}, or another multiple of {record}",
+                "\"{what}\": read_size is {size}, and a set of lines is read \
+                 in records of {record} bytes, whole ones only: {} of every \
+                 read would never be filled. Say {whole}, or another multiple \
+                 of {record}",
                 size % record
             )
         });
@@ -795,9 +825,9 @@ fn fits_one_read(what: &str, size: u32, endpoint: &EndpointConfig) -> Result<(),
 
     if size > room {
         return Err(format!(
-            "\"{what}\": read_size is {size} and {carries} carries {room} bytes: \
-             the rest is refused rather than split, so a read of {size} could \
-             never come back whole"
+            "\"{what}\": read_size is {size} and {carries} carries {room} \
+             bytes: the rest is refused rather than split, so a read of {size} \
+             could never come back whole"
         ));
     }
     Ok(())
@@ -848,8 +878,8 @@ fn ground_of(what: &str, node: &Node) -> Result<Option<HostPort>, String> {
             node,
             "fprime_id_base",
             "a link to an F´ bridge",
-            "the first of the F´ IDs the bridge gives what arrives -- each node \
-             linked into it is that ID plus its own device id",
+            "the first of the F´ IDs the bridge gives what arrives -- each \
+             node linked into it is that ID plus its own device id",
         )?;
         number(what, "fprime_id_base", ids)?;
     }
@@ -927,24 +957,28 @@ fn kind_of(node: &Node) -> Result<DHType, String> {
         // reached by address: see `crate::node::app` and `tcsapp`.
         other if crate::node::app::Kind::of(other).is_some() => Err(format!(
             "\"{}\" is an app node: a program tcspecial runs, which is reached \
-             over what tcspecial makes for it when it starts it, so it takes no \
-             address, port or path -- it names its executable, and the \
+             over what tcspecial makes for it when it starts it, so it takes \
+             no address, port or path -- it names its executable, and the \
              arguments its kind is run with",
             node.name
         )),
         other => Err(format!(
-            "\"{}\": there is no node type called \"{other}\". The interfaces are \
-             i2c, spi, serial, hdlc, can, iio, rpmsg, gpio, device-file and \
-             network; a \
-             ground link is moc; and compute, log, null-moc, null-payload, \
-             tee-moc, tee-payload, ping and the app nodes are the rest",
+            "\"{}\": there is no node type called \"{other}\". The interfaces \
+             are i2c, spi, serial, hdlc, can, iio, rpmsg, gpio, device-file \
+             and network; a ground link is moc; and compute, log, null-moc, \
+             null-payload, tee-moc, tee-payload, ping and the app nodes are \
+             the rest",
             node.name
         )),
     }
 }
 
 /// Where this node is, by the rules for its type.
-fn location_of(what: &str, node: &Node, kind: DHType) -> Result<EndpointLocation, String> {
+fn location_of(
+    what: &str,
+    node: &Node,
+    kind: DHType,
+) -> Result<EndpointLocation, String> {
     // A CAN controller is a network interface and not a device file, and a
     // payload on it is told apart from the others by the identifier its
     // frames carry -- as a device on a bus is told apart by its address.
@@ -1017,8 +1051,12 @@ fn location_of(what: &str, node: &Node, kind: DHType) -> Result<EndpointLocation
 
     Ok(EndpointLocation::I2c {
         bus: path,
-        address: crate::node::payload::i2c::parse_i2c_address(what, address.as_str(), ten_bit)
-            .map_err(|e| format!("{e}"))?,
+        address: crate::node::payload::i2c::parse_i2c_address(
+            what,
+            address.as_str(),
+            ten_bit,
+        )
+        .map_err(|e| format!("{e}"))?,
     })
 }
 
@@ -1030,9 +1068,9 @@ fn required<'a>(
     is: &str,
     wants: &str,
 ) -> Result<&'a Scalar, String> {
-    node.attributes
-        .get(attribute)
-        .ok_or_else(|| format!("\"{what}\" is {is}, so it needs {wants}: say {attribute}"))
+    node.attributes.get(attribute).ok_or_else(|| {
+        format!("\"{what}\" is {is}, so it needs {wants}: say {attribute}")
+    })
 }
 
 /// A whole number an attribute states, in decimal or in hexadecimal.
@@ -1043,7 +1081,10 @@ fn number(what: &str, attribute: &str, value: &Scalar) -> Result<u32, String> {
 /// The IP protocol a raw network node's datagrams are, from its
 /// `ip_protocol`: a number from 1 to 254, IANA's list being where the numbers
 /// are given out.
-fn ip_protocol_of(what: &str, node: &Node) -> Result<crate::types::IpProtocol, String> {
+fn ip_protocol_of(
+    what: &str,
+    node: &Node,
+) -> Result<crate::types::IpProtocol, String> {
     let stated = required(
         what,
         node,
@@ -1057,20 +1098,28 @@ fn ip_protocol_of(what: &str, node: &Node) -> Result<crate::types::IpProtocol, S
         .and_then(crate::types::IpProtocol::of)
         .ok_or_else(|| {
             format!(
-                "\"{what}\": ip_protocol {number} is not one a raw socket can be \
-                 read with -- it is 1 to 254 (253 and 254 are the two set aside for \
-                 experiments): 0 is no protocol, and 255 can only send"
+                "\"{what}\": ip_protocol {number} is not one a raw socket can \
+                 be read with -- it is 1 to 254 (253 and 254 are the two set \
+                 aside for experiments): 0 is no protocol, and 255 can only \
+                 send"
             )
         })
 }
 
 /// An attribute a node of this protocol does not take, said in its terms:
 /// `ip_protocol` names a raw socket's datagrams and nothing else's.
-fn ip_protocol_misplaced(what: &str, node: &Node, protocol: NetworkProtocol) -> Result<(), String> {
-    if node.attributes.contains_key("ip_protocol") && !matches!(protocol, NetworkProtocol::Raw(_)) {
+fn ip_protocol_misplaced(
+    what: &str,
+    node: &Node,
+    protocol: NetworkProtocol,
+) -> Result<(), String> {
+    if node.attributes.contains_key("ip_protocol")
+        && !matches!(protocol, NetworkProtocol::Raw(_))
+    {
         return Err(format!(
-            "\"{what}\" is reached over {}, so ip_protocol does not apply to it: it \
-             is for protocol: raw, where it says which IP datagrams are the node's",
+            "\"{what}\" is reached over {}, so ip_protocol does not apply to \
+             it: it is for protocol: raw, where it says which IP datagrams are \
+             the node's",
             protocol.spelling()
         ));
     }
@@ -1099,8 +1148,9 @@ fn port_named(
     // told where to find.
     if port == 0 || port > u16::MAX as u32 {
         return Err(format!(
-            "\"{what}\": {attribute} {port} is not a port -- a port is 1 to 65535, and 0 \
-             is \"whichever one is free\", which a configuration cannot mean"
+            "\"{what}\": {attribute} {port} is not a port -- a port is 1 to \
+             65535, and 0 is \"whichever one is free\", which a configuration \
+             cannot mean"
         ));
     }
 
@@ -1125,13 +1175,17 @@ fn port_named(
 /// nobody's now.
 pub fn retired_term(attribute: &str) -> Option<&'static str> {
     match attribute {
-        "debounce_us" => Some("say debounce, as a length of time: 50 us rather than 50"),
-        "rs485_delay_before_send_ms" => {
-            Some("say rs485_delay_before_send, as a length of time: 2 ms rather than 2")
-        }
-        "rs485_delay_after_send_ms" => {
-            Some("say rs485_delay_after_send, as a length of time: 2 ms rather than 2")
-        }
+        "debounce_us" => Some(
+            "say debounce, as a length of time: 50 us rather than 50",
+        ),
+        "rs485_delay_before_send_ms" => Some(
+            "say rs485_delay_before_send, as a length of time: 2 ms rather \
+             than 2",
+        ),
+        "rs485_delay_after_send_ms" => Some(
+            "say rs485_delay_after_send, as a length of time: 2 ms rather than \
+             2",
+        ),
         _ => None,
     }
 }
@@ -1198,7 +1252,8 @@ mod tests {
     /// The shipped example, which is what this has to be able to open.
     fn thermostat() -> Graph {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        Graph::load(root.join("tests/manual/thermostat.yaml")).expect("the example reads")
+        Graph::load(root.join("tests/manual/thermostat.yaml"))
+            .expect("the example reads")
     }
 
     /// A node built here rather than read, so a test can make one wrong.
@@ -1356,15 +1411,17 @@ mod tests {
         let said = reach_of(graph.node("thermostat").expect("the thermostat"))
             .expect_err("a computation opened");
         assert!(
-            said.contains("thermostat") && said.contains("not something that is opened"),
+            said.contains("thermostat")
+                && said.contains("not something that is opened"),
             "{said}"
         );
 
-        let said =
-            reach_of(graph.node("housekeeping").expect("the log")).expect_err("a log opened");
+        let said = reach_of(graph.node("housekeeping").expect("the log"))
+            .expect_err("a log opened");
         assert!(said.contains("directory"), "{said}");
 
-        let said = reach_of(&node("mystery", "quantum", &[])).expect_err("a type that is not one");
+        let said = reach_of(&node("mystery", "quantum", &[]))
+            .expect_err("a type that is not one");
         assert!(
             said.contains("quantum") && said.contains("device-file"),
             "the complaint should list the types there are: {said}"
@@ -1387,7 +1444,8 @@ mod tests {
         ))
         .expect_err("a misspelled term");
         assert!(
-            said.contains("max_speeed") && said.contains("looks like something that was set"),
+            said.contains("max_speeed")
+                && said.contains("looks like something that was set"),
             "{said}"
         );
     }
@@ -1673,13 +1731,15 @@ mod tests {
             reach_of(&node("big_frame", "can", &all))
         };
 
-        let said = frame(&[("read_size", "12")]).expect_err("twelve bytes in eight");
+        let said =
+            frame(&[("read_size", "12")]).expect_err("twelve bytes in eight");
         assert!(said.contains("12") && said.contains('8'), "{said}");
 
         // Eight fits, and sixty-four fits an FD frame -- which is what the
         // flag is for.
         frame(&[("read_size", "8")]).expect("eight bytes of frame");
-        frame(&[("read_size", "12"), ("can_fd", "true")]).expect("an FD frame has room");
+        frame(&[("read_size", "12"), ("can_fd", "true")])
+            .expect("an FD frame has room");
         let said = frame(&[("read_size", "65"), ("can_fd", "true")])
             .expect_err("sixty-five bytes in sixty-four");
         assert!(said.contains("65") && said.contains("64"), "{said}");
@@ -1690,14 +1750,16 @@ mod tests {
             reach_of(&node("big_message", "rpmsg", &all))
         };
 
-        let said = message(&[("read_size", "600")]).expect_err("600 bytes in 496");
+        let said =
+            message(&[("read_size", "600")]).expect_err("600 bytes in 496");
         assert!(said.contains("600") && said.contains("496"), "{said}");
 
         // And a platform with larger buffers says so, which makes it fit.
         message(&[("read_size", "600"), ("max_message_bytes", "2048")])
             .expect("a platform with room for it");
-        let said = message(&[("read_size", "2049"), ("max_message_bytes", "2048")])
-            .expect_err("one byte over what it said");
+        let said =
+            message(&[("read_size", "2049"), ("max_message_bytes", "2048")])
+                .expect_err("one byte over what it said");
         assert!(said.contains("2049") && said.contains("2048"), "{said}");
     }
 
@@ -1716,7 +1778,9 @@ mod tests {
             EndpointConfig::Network(net) => {
                 assert_eq!(
                     net.protocol,
-                    NetworkProtocol::Raw(crate::IpProtocol::of(253).expect("a protocol"))
+                    NetworkProtocol::Raw(
+                        crate::IpProtocol::of(253).expect("a protocol")
+                    )
                 );
                 assert_eq!(net.address, "10.0.0.7");
             }
@@ -1727,9 +1791,13 @@ mod tests {
         assert!(said.contains("ip_protocol"), "{said}");
         for number in ["0", "255", "300"] {
             let said = raw(&[("ip_protocol", number)]).expect_err(number);
-            assert!(said.contains(number) && said.contains("1 to 254"), "{said}");
+            assert!(
+                said.contains(number) && said.contains("1 to 254"),
+                "{said}"
+            );
         }
-        let said = raw(&[("ip_protocol", "253"), ("port", "5000")]).expect_err("a port");
+        let said = raw(&[("ip_protocol", "253"), ("port", "5000")])
+            .expect_err("a port");
         assert!(said.contains("no port"), "{said}");
 
         let said = reach_of(&node(
@@ -1810,7 +1878,9 @@ mod tests {
         ))
         .expect("a TCP payload");
         match reach.endpoint {
-            EndpointConfig::Network(net) => assert_eq!(net.protocol, NetworkProtocol::Tcp),
+            EndpointConfig::Network(net) => {
+                assert_eq!(net.protocol, NetworkProtocol::Tcp)
+            }
             other => panic!("{other:?}"),
         }
 
@@ -1851,16 +1921,22 @@ mod tests {
             assert_eq!(rule.max_length, 128);
             assert_eq!(rule.terminators, vec![b"\r\n".to_vec()]);
 
-            let said = socket(protocol, &[]).expect_err("a stream with no rule");
+            let said =
+                socket(protocol, &[]).expect_err("a stream with no rule");
             assert!(
-                said.contains(protocol) && said.contains("stream") && said.contains("max_length"),
+                said.contains(protocol)
+                    && said.contains("stream")
+                    && said.contains("max_length"),
                 "{protocol}: {said}"
             );
         }
         for protocol in ["udp", "unix_dgram"] {
             assert_eq!(socket(protocol, &[]).expect("a datagram").stream, None);
-            let said = socket(protocol, &[("max_length", "128"), ("read_timeout", "none")])
-                .expect_err("a datagram is a packet already");
+            let said = socket(
+                protocol,
+                &[("max_length", "128"), ("read_timeout", "none")],
+            )
+            .expect_err("a datagram is a packet already");
             assert!(said.contains("packets already"), "{protocol}: {said}");
         }
     }
@@ -2003,12 +2079,18 @@ mod tests {
     // the rule's own tests would notice.
 
     /// What a node of this type and these attributes reaches.
-    fn reached(node_type: &str, attributes: &[(&str, &str)]) -> Result<Reach, String> {
+    fn reached(
+        node_type: &str,
+        attributes: &[(&str, &str)],
+    ) -> Result<Reach, String> {
         reach_of(&node("p", node_type, attributes))
     }
 
     /// The endpoint a node of this type and these attributes opens.
-    fn endpoint(node_type: &str, attributes: &[(&str, &str)]) -> Result<EndpointConfig, String> {
+    fn endpoint(
+        node_type: &str,
+        attributes: &[(&str, &str)],
+    ) -> Result<EndpointConfig, String> {
         reached(node_type, attributes).map(|reach| reach.endpoint)
     }
 
@@ -2079,7 +2161,10 @@ mod tests {
         match endpoint("serial", &bus).expect("it opens") {
             EndpointConfig::Serial(serial) => {
                 let rs485 = serial.rs485.expect("the bus reached the endpoint");
-                assert!(!rs485.rts_on_send, "RTS is low while sending on this board");
+                assert!(
+                    !rs485.rts_on_send,
+                    "RTS is low while sending on this board"
+                );
                 assert_eq!(
                     rs485.delay_before_send,
                     Duration::ZERO,
@@ -2091,7 +2176,8 @@ mod tests {
         }
 
         // And a line that says nothing is not a bus.
-        let plain = line_with(&[("max_length", "64"), ("read_timeout", "none")]);
+        let plain =
+            line_with(&[("max_length", "64"), ("read_timeout", "none")]);
         match endpoint("serial", &plain).expect("it opens") {
             EndpointConfig::Serial(serial) => assert_eq!(serial.rs485, None),
             other => panic!("expected a serial endpoint, got {other:?}"),
@@ -2182,7 +2268,8 @@ mod tests {
 
     /// Only on this host, and only on the types that need one.
     #[test]
-    fn a_stand_in_is_refused_off_the_host_and_on_a_type_with_a_stand_in_of_its_own() {
+    fn a_stand_in_is_refused_off_the_host_and_on_a_type_with_a_stand_in_of_its_own(
+    ) {
         let off = node(
             "line",
             "hdlc",
@@ -2217,7 +2304,10 @@ mod tests {
             EndpointConfig::Rpmsg(rpmsg) => {
                 assert_eq!(rpmsg.path, "/dev/rpmsg0");
                 assert_eq!(rpmsg.service, "payload-telemetry");
-                assert_eq!(rpmsg.max_message_bytes, None, "the usual transport");
+                assert_eq!(
+                    rpmsg.max_message_bytes, None,
+                    "the usual transport"
+                );
             }
             other => panic!("expected an rpmsg endpoint, got {other:?}"),
         }
@@ -2225,8 +2315,8 @@ mod tests {
 
         // The service is what identifies a channel, so a node without one is
         // refused: a channel's number is assigned as channels appear.
-        let said =
-            endpoint("rpmsg", &[("path", "/dev/rpmsg0")]).expect_err("a channel with no service");
+        let said = endpoint("rpmsg", &[("path", "/dev/rpmsg0")])
+            .expect_err("a channel with no service");
         assert!(
             said.contains("service"),
             "the error should name what is missing: {said}"
@@ -2327,7 +2417,10 @@ mod tests {
                 // a_stream_socket_says_where_a_packet_ends.
                 .chain(
                     (protocol == "tcp")
-                        .then_some([("max_length", "64"), ("read_timeout", "none")])
+                        .then_some([
+                            ("max_length", "64"),
+                            ("read_timeout", "none"),
+                        ])
                         .into_iter()
                         .flatten(),
                 )
@@ -2365,7 +2458,8 @@ mod tests {
     #[test]
     fn a_can_node_is_an_interface_and_an_identifier() {
         let opened =
-            endpoint("can", &[("interface", "vcan0"), ("can_id", "0x123")]).expect("it opens");
+            endpoint("can", &[("interface", "vcan0"), ("can_id", "0x123")])
+                .expect("it opens");
         match &opened {
             EndpointConfig::Can(can) => {
                 assert_eq!(can.interface, "vcan0");
@@ -2388,7 +2482,8 @@ mod tests {
             ("interface", ("can_id", "1")),
             ("can_id", ("interface", "vcan0")),
         ] {
-            let said = endpoint("can", &[stated]).expect_err("half of where it is");
+            let said =
+                endpoint("can", &[stated]).expect_err("half of where it is");
             assert!(
                 said.contains(missing),
                 "the error should name what is missing: {said}"
@@ -2417,7 +2512,9 @@ mod tests {
         assert_eq!(rule.max_length, 80);
         assert_eq!(rule.terminators, vec![vec![0x0A]]);
 
-        let bus = reached("i2c", &[("path", "/dev/i2c-1"), ("address", "0x48")]).expect("a bus");
+        let bus =
+            reached("i2c", &[("path", "/dev/i2c-1"), ("address", "0x48")])
+                .expect("a bus");
         assert_eq!(bus.stream, None, "a bus transfer is already a frame");
     }
 
@@ -2428,9 +2525,11 @@ mod tests {
     fn a_read_longer_than_a_datum_is_refused() {
         let most = crate::types::DATUM_BYTES.to_string();
         let one_more = (crate::types::DATUM_BYTES + 1).to_string();
-        let fits = line_with(&[("max_length", &most), ("read_timeout", "none")]);
+        let fits =
+            line_with(&[("max_length", &most), ("read_timeout", "none")]);
         reached("serial", &fits).expect("a datum's worth fits");
-        let over = line_with(&[("max_length", &one_more), ("read_timeout", "none")]);
+        let over =
+            line_with(&[("max_length", &one_more), ("read_timeout", "none")]);
         let said = reached("serial", &over).expect_err("more than a datum");
         assert!(
             said.contains("max_length") && said.contains(&most),
@@ -2440,14 +2539,16 @@ mod tests {
 
     #[test]
     fn a_stream_rule_must_say_how_long_a_read_may_be() {
-        let said = line_stream(&[("read_timeout", "1 s")]).expect_err("max_length is required");
+        let said = line_stream(&[("read_timeout", "1 s")])
+            .expect_err("max_length is required");
         assert!(said.contains("max_length"), "{said}");
     }
 
     #[test]
     fn a_timeout_alone_ends_a_read() {
         let stream =
-            line_stream(&[("max_length", "64"), ("read_timeout", "250 ms")]).expect("accepted");
+            line_stream(&[("max_length", "64"), ("read_timeout", "250 ms")])
+                .expect("accepted");
         assert_eq!(stream.timeout, Some(Duration::from_millis(250)));
         assert!(stream.terminators.is_empty());
         assert!(!stream.is_fixed_length());
@@ -2456,7 +2557,8 @@ mod tests {
     #[test]
     fn terminators_alone_end_a_read() {
         let stream =
-            line_stream(&[("max_length", "64"), ("terminators", "[0A]")]).expect("accepted");
+            line_stream(&[("max_length", "64"), ("terminators", "[0A]")])
+                .expect("accepted");
         assert_eq!(stream.timeout, None);
         assert_eq!(stream.terminators, vec![vec![10]]);
         assert!(!stream.is_fixed_length());
@@ -2476,7 +2578,8 @@ mod tests {
 
     #[test]
     fn a_stream_rule_that_ends_no_read_is_refused() {
-        let said = line_stream(&[("max_length", "64")]).expect_err("nothing ends the read");
+        let said = line_stream(&[("max_length", "64")])
+            .expect_err("nothing ends the read");
         assert!(
             said.contains("timeout") && said.contains("terminator"),
             "{said}"
@@ -2487,7 +2590,8 @@ mod tests {
     fn timeout_none_is_how_a_fixed_length_read_is_asked_for() {
         // The documented way to say "hand me max_length bytes at a time".
         let stream =
-            line_stream(&[("max_length", "12"), ("read_timeout", "none")]).expect("accepted");
+            line_stream(&[("max_length", "12"), ("read_timeout", "none")])
+                .expect("accepted");
         assert_eq!(stream.max_length, 12);
         assert_eq!(stream.timeout, None);
         assert!(stream.terminators.is_empty());
@@ -2527,8 +2631,9 @@ mod tests {
     /// file says it means that.
     #[test]
     fn a_length_prefix_must_say_its_timeout() {
-        let said = line_stream(&[("max_length", "64"), ("length_prefix", "u8")])
-            .expect_err("no timeout stated");
+        let said =
+            line_stream(&[("max_length", "64"), ("length_prefix", "u8")])
+                .expect_err("no timeout stated");
         assert!(
             said.contains("length_prefix") && said.contains("read_timeout"),
             "{said}"
@@ -2593,7 +2698,8 @@ mod tests {
             ("stop-bits", "stop_bits"),
             ("ip-protocol", "ip_protocol"),
         ] {
-            let said = reached("serial", &line_with(&[(written, "1")])).expect_err("one spelling");
+            let said = reached("serial", &line_with(&[(written, "1")]))
+                .expect_err("one spelling");
             assert!(
                 said.contains(&format!("\"{written}\""))
                     && said.contains(&format!("it is spelled {spelled}")),
@@ -2606,11 +2712,13 @@ mod tests {
     /// no spelling to offer -- and so is one whose other spelling is retired.
     #[test]
     fn a_word_with_no_other_spelling_gets_no_hint() {
-        let said = reached("serial", &line_with(&[("max-lenght", "1")])).expect_err("nothing");
+        let said = reached("serial", &line_with(&[("max-lenght", "1")]))
+            .expect_err("nothing");
         assert!(!said.contains("spelled"), "{said}");
         assert!(said.contains("looks like something that was set"), "{said}");
 
-        let said = reached("serial", &line_with(&[("debounce-us", "1")])).expect_err("nothing");
+        let said = reached("serial", &line_with(&[("debounce-us", "1")]))
+            .expect_err("nothing");
         assert!(!said.contains("spelled"), "{said}");
     }
 
@@ -2628,8 +2736,9 @@ mod tests {
             ("250 ms", Duration::from_millis(250)),
             ("3 s", Duration::from_secs(3)),
         ] {
-            let stream = line_stream(&[("max_length", "8"), ("read_timeout", text)])
-                .unwrap_or_else(|e| panic!("{text}: {e}"));
+            let stream =
+                line_stream(&[("max_length", "8"), ("read_timeout", text)])
+                    .unwrap_or_else(|e| panic!("{text}: {e}"));
             assert_eq!(stream.timeout, Some(want), "for {text}");
         }
     }
@@ -2643,19 +2752,21 @@ mod tests {
     /// value is not a length of time.
     #[test]
     fn a_timeout_without_a_unit_is_refused() {
-        let said =
-            line_stream(&[("max_length", "8"), ("read_timeout", "250")]).expect_err("250 of what");
+        let said = line_stream(&[("max_length", "8"), ("read_timeout", "250")])
+            .expect_err("250 of what");
         assert!(said.contains("a number, a space, and a unit"), "{said}");
 
-        let said = line_stream(&[("max_length", "8"), ("read_timeout", "250ms")])
-            .expect_err("written together");
+        let said =
+            line_stream(&[("max_length", "8"), ("read_timeout", "250ms")])
+                .expect_err("written together");
         assert!(said.contains("\"250 ms\""), "{said}");
     }
 
     #[test]
     fn a_zero_timeout_is_refused_in_favour_of_none() {
-        let said = line_stream(&[("max_length", "8"), ("read_timeout", "0 ms")])
-            .expect_err("a read that times out at once reads nothing");
+        let said =
+            line_stream(&[("max_length", "8"), ("read_timeout", "0 ms")])
+                .expect_err("a read that times out at once reads nothing");
         assert!(
             said.contains("no interval at all") && said.contains("none"),
             "{said}"
@@ -2674,16 +2785,18 @@ mod tests {
             ("1 h", Duration::from_secs(3_600)),
             ("2_000 ms", Duration::from_secs(2)),
         ] {
-            let stream = line_stream(&[("max_length", "8"), ("read_timeout", text)])
-                .unwrap_or_else(|e| panic!("{text}: {e}"));
+            let stream =
+                line_stream(&[("max_length", "8"), ("read_timeout", text)])
+                    .unwrap_or_else(|e| panic!("{text}: {e}"));
             assert_eq!(stream.timeout, Some(want), "for {text}");
         }
 
         // And what neither takes: an ambiguous unit, by the name the one
         // grammar refuses it with.
         for text in ["5m", "1y", "6mon", "0x8ms"] {
-            let said = line_stream(&[("max_length", "8"), ("read_timeout", text)])
-                .expect_err("not a length of time");
+            let said =
+                line_stream(&[("max_length", "8"), ("read_timeout", text)])
+                    .expect_err("not a length of time");
             assert!(said.contains("timeout"), "{text}: {said}");
         }
     }
@@ -2708,7 +2821,8 @@ mod tests {
     /// 0x -- is refused with the brackets each one wants.
     #[test]
     fn a_terminator_written_bare_is_told_its_brackets() {
-        let said = line_stream(&[("max_length", "8"), ("terminators", "13")]).expect_err("bare");
+        let said = line_stream(&[("max_length", "8"), ("terminators", "13")])
+            .expect_err("bare");
         assert!(
             said.contains("terminators") && said.contains("[0D]"),
             "{said}"
@@ -2719,7 +2833,8 @@ mod tests {
     #[test]
     fn a_terminator_longer_than_max_length_is_refused() {
         let said =
-            line_stream(&[("max_length", "2"), ("terminators", "\"END\"")]).expect_err("too long");
+            line_stream(&[("max_length", "2"), ("terminators", "\"END\"")])
+                .expect_err("too long");
         assert!(
             said.contains("max_length 2") && said.contains("\"END\""),
             "{said}"
@@ -2728,8 +2843,9 @@ mod tests {
 
     #[test]
     fn a_terminator_wider_than_a_byte_is_refused() {
-        let said = line_stream(&[("max_length", "8"), ("terminators", "[100]")])
-            .expect_err("a line carries bytes");
+        let said =
+            line_stream(&[("max_length", "8"), ("terminators", "[100]")])
+                .expect_err("a line carries bytes");
         assert!(said.contains("more than one byte"), "{said}");
     }
 
@@ -2737,7 +2853,9 @@ mod tests {
 
     /// What the rules settle for a line with these terms, beside a path, a
     /// rate, a byte length and a fixed-length read.
-    fn line_terms(extra: &[(&str, &str)]) -> Result<crate::endpoint_config::GroupKind, String> {
+    fn line_terms(
+        extra: &[(&str, &str)],
+    ) -> Result<crate::endpoint_config::GroupKind, String> {
         let mut line: Vec<(&str, &str)> = vec![
             ("path", "/dev/ttyS0"),
             ("datarate", "9600"),
@@ -2807,7 +2925,9 @@ mod tests {
             ("1.5", crate::StopBits::OnePointFive),
             ("2", crate::StopBits::Two),
         ] {
-            match line_terms(&[("stop_bits", text)]).unwrap_or_else(|e| panic!("{text}: {e}")) {
+            match line_terms(&[("stop_bits", text)])
+                .unwrap_or_else(|e| panic!("{text}: {e}"))
+            {
                 crate::endpoint_config::GroupKind::Serial(serial) => {
                     assert_eq!(serial.stop_bits, want, "for {text}")
                 }
@@ -2836,7 +2956,9 @@ mod tests {
     // -- a bus and what sits on it --------------------------------------------
 
     /// One device on a bus, with these terms beside its bus and address.
-    fn bus(extra: &[(&str, &str)]) -> Result<crate::node::payload::i2c::I2cParams, String> {
+    fn bus(
+        extra: &[(&str, &str)],
+    ) -> Result<crate::node::payload::i2c::I2cParams, String> {
         let mut device: Vec<(&str, &str)> = vec![("path", "/dev/i2c-1")];
         device.extend_from_slice(extra);
         match settled("i2c", &device)? {
@@ -2874,7 +2996,8 @@ mod tests {
 
     #[test]
     fn a_bus_timeout_is_rounded_up_to_the_drivers_resolution() {
-        let i2c = bus(&[("timeout", "25 ms"), ("address", "8")]).expect("a timeout");
+        let i2c =
+            bus(&[("timeout", "25 ms"), ("address", "8")]).expect("a timeout");
         assert_eq!(i2c.timeout, Some(Duration::from_millis(25)));
         assert_eq!(i2c.effective_timeout(), Some(Duration::from_millis(30)));
     }
@@ -2882,7 +3005,8 @@ mod tests {
     #[test]
     fn a_device_on_a_bus_carries_the_bus_and_its_place_on_it() {
         let place =
-            endpoint("i2c", &[("path", "/dev/i2c-2"), ("address", "0x49")]).expect("a place");
+            endpoint("i2c", &[("path", "/dev/i2c-2"), ("address", "0x49")])
+                .expect("a place");
         assert_eq!(
             place,
             EndpointConfig::I2c(crate::types::I2cConfig {
@@ -2896,8 +3020,9 @@ mod tests {
 
     #[test]
     fn an_address_too_wide_for_the_addressing_is_refused() {
-        let said = endpoint("i2c", &[("path", "/dev/i2c-2"), ("address", "0x90")])
-            .expect_err("0x90 needs eight bits");
+        let said =
+            endpoint("i2c", &[("path", "/dev/i2c-2"), ("address", "0x90")])
+                .expect_err("0x90 needs eight bits");
         assert!(said.contains("does not fit in 7 bits"), "{said}");
 
         // ...and the same address is fine once the node says so.
@@ -2924,8 +3049,11 @@ mod tests {
         // In range, but the specification keeps these, so no device can
         // answer to one.
         for address in ["0x00", "0x01", "0x07", "0x78", "0x7B", "0x7F"] {
-            let said = endpoint("i2c", &[("path", "/dev/i2c-1"), ("address", address)])
-                .expect_err(address);
+            let said = endpoint(
+                "i2c",
+                &[("path", "/dev/i2c-1"), ("address", address)],
+            )
+            .expect_err(address);
             assert!(
                 said.contains("reserved by the I2C specification"),
                 "for {address}: {said}"
@@ -2936,10 +3064,15 @@ mod tests {
     #[test]
     fn the_addresses_either_side_of_the_reserved_blocks_are_accepted() {
         for (address, want) in [("0x08", 0x08), ("0x77", 0x77)] {
-            match endpoint("i2c", &[("path", "/dev/i2c-1"), ("address", address)])
-                .unwrap_or_else(|e| panic!("{address} should be usable: {e}"))
+            match endpoint(
+                "i2c",
+                &[("path", "/dev/i2c-1"), ("address", address)],
+            )
+            .unwrap_or_else(|e| panic!("{address} should be usable: {e}"))
             {
-                EndpointConfig::I2c(i2c) => assert_eq!(i2c.address, want, "for {address}"),
+                EndpointConfig::I2c(i2c) => {
+                    assert_eq!(i2c.address, want, "for {address}")
+                }
                 other => panic!("{other:?}"),
             }
         }
@@ -2958,25 +3091,31 @@ mod tests {
                     ("address", address),
                 ],
             )
-            .unwrap_or_else(|e| panic!("{address} should be usable with ten_bit: {e}"));
+            .unwrap_or_else(|e| {
+                panic!("{address} should be usable with ten_bit: {e}")
+            });
         }
     }
 
     #[test]
     fn a_device_on_a_bus_says_where_on_it_it_is() {
-        let said = endpoint("i2c", &[("path", "/dev/i2c-1")]).expect_err("which device on the bus");
+        let said = endpoint("i2c", &[("path", "/dev/i2c-1")])
+            .expect_err("which device on the bus");
         assert!(said.contains("address"), "{said}");
 
         // And which bus, the two together being what tells one device on a
         // bus from another.
-        let said = endpoint("i2c", &[("address", "0x48")]).expect_err("which bus");
+        let said =
+            endpoint("i2c", &[("address", "0x48")]).expect_err("which bus");
         assert!(said.contains("path"), "{said}");
     }
 
     // -- a peripheral ---------------------------------------------------------
 
     /// One peripheral with these terms beside its device file.
-    fn peripheral(extra: &[(&str, &str)]) -> Result<crate::node::payload::spi::SpiParams, String> {
+    fn peripheral(
+        extra: &[(&str, &str)],
+    ) -> Result<crate::node::payload::spi::SpiParams, String> {
         let mut device: Vec<(&str, &str)> = vec![("path", "/dev/spidev0.0")];
         device.extend_from_slice(extra);
         match settled("spi", &device)? {
@@ -3004,7 +3143,8 @@ mod tests {
 
     #[test]
     fn a_peripherals_defaults_are_eight_bit_msb_first_and_active_low() {
-        let spi = peripheral(&[("max_speed", "1000000"), ("spi_mode", "0")]).expect("the usual");
+        let spi = peripheral(&[("max_speed", "1000000"), ("spi_mode", "0")])
+            .expect("the usual");
         assert_eq!(spi.bits_per_word.bits(), 8);
         assert_eq!(spi.bit_order, crate::BitOrder::MsbFirst);
         assert_eq!(spi.cs_active, crate::CsActive::Low);
@@ -3012,7 +3152,8 @@ mod tests {
 
     #[test]
     fn a_peripheral_says_which_mode_it_is_clocked_in() {
-        let said = peripheral(&[("max_speed", "1000000")]).expect_err("a mode is required");
+        let said = peripheral(&[("max_speed", "1000000")])
+            .expect_err("a mode is required");
         assert!(said.contains("mode"), "{said}");
 
         let said = peripheral(&[("max_speed", "1000000"), ("spi_mode", "4")])
@@ -3036,7 +3177,10 @@ mod tests {
             ),
         ] {
             let mut stated = rest.clone();
-            stated.extend_from_slice(&[("max_length", "8"), ("read_timeout", "none")]);
+            stated.extend_from_slice(&[
+                ("max_length", "8"),
+                ("read_timeout", "none"),
+            ]);
             let said = endpoint(kind, &stated).expect_err(kind);
             assert!(said.contains("does not apply"), "{kind}: {said}");
         }

@@ -90,7 +90,10 @@ pub fn state_dir() -> Option<PathBuf> {
     // would be pointing it there for every other test in the process.
     #[cfg(test)]
     {
-        Some(std::env::temp_dir().join(format!("tcsgui-tests-{}", std::process::id())))
+        Some(
+            std::env::temp_dir()
+                .join(format!("tcsgui-tests-{}", std::process::id())),
+        )
     }
 
     #[cfg(not(test))]
@@ -106,7 +109,10 @@ pub fn state_dir() -> Option<PathBuf> {
 ///
 /// An `XDG_STATE_HOME` that is not absolute is ignored rather than resolved,
 /// which is what the specification says to do with a relative one.
-fn said_by(xdg: Option<std::ffi::OsString>, home: Option<std::ffi::OsString>) -> Option<PathBuf> {
+fn said_by(
+    xdg: Option<std::ffi::OsString>,
+    home: Option<std::ffi::OsString>,
+) -> Option<PathBuf> {
     if let Some(said) = xdg {
         let said = PathBuf::from(said);
         if said.is_absolute() {
@@ -220,7 +226,8 @@ pub fn read(configuration: &Path) -> Option<Journal> {
 
 /// The same, in a directory given rather than found.
 pub fn read_in(directory: &Path, configuration: &Path) -> Option<Journal> {
-    let text = std::fs::read_to_string(journal_in(directory, configuration)).ok()?;
+    let text =
+        std::fs::read_to_string(journal_in(directory, configuration)).ok()?;
     let kept: Kept = serde_norway::from_str(&text).ok()?;
     (kept.configuration == absolute(configuration)).then_some(kept.journal)
 }
@@ -241,7 +248,11 @@ pub fn write(configuration: &Path, journal: &Journal) -> Result<(), String> {
 }
 
 /// The same, in a directory given rather than found.
-pub fn write_in(directory: &Path, configuration: &Path, journal: &Journal) -> Result<(), String> {
+pub fn write_in(
+    directory: &Path,
+    configuration: &Path,
+    journal: &Journal,
+) -> Result<(), String> {
     let path = journal_in(directory, configuration);
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
@@ -253,7 +264,8 @@ pub fn write_in(directory: &Path, configuration: &Path, journal: &Journal) -> Re
         journal: journal.clone(),
     };
     let text = serde_norway::to_string(&kept).map_err(|why| why.to_string())?;
-    crate::save::write_atomically(&path, text.as_bytes()).map_err(|why| why.to_string())
+    crate::save::write_atomically(&path, text.as_bytes())
+        .map_err(|why| why.to_string())
 }
 
 /// Throw this configuration's history away.
@@ -382,7 +394,8 @@ mod tests {
             node_type: "i2c".to_string(),
             home: None,
         });
-        std::fs::create_dir_all(one.parent().unwrap()).expect("the vehicle's own");
+        std::fs::create_dir_all(one.parent().unwrap())
+            .expect("the vehicle's own");
         std::fs::write(&one, "").expect("a configuration");
         write_in(&state, &one, &journal).expect("the history is written");
         assert!(named.exists(), "{named:?}");
@@ -419,7 +432,8 @@ mod tests {
         // anybody is waiting for.
         std::fs::write(&one, "").expect("a configuration again");
         write_in(&state, &one, &journal).expect("written again");
-        let fortnight = SystemTime::now() + Duration::from_secs(14 * 24 * 60 * 60);
+        let fortnight =
+            SystemTime::now() + Duration::from_secs(14 * 24 * 60 * 60);
         assert_eq!(prune_in(&state, fortnight), 1);
         assert!(!named.exists());
 

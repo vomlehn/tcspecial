@@ -81,14 +81,20 @@ export component PingPanel inherits TitledBox {
                     Heading { text: "Sent"; }
                 }
                 Row {
-                    Value { text: root.sent; min-width: widest.preferred-width; }
+                    Value {
+                        text: root.sent;
+                        min-width: widest.preferred-width;
+                    }
                     Value { text: root.sent-time; }
                 }
                 Row {
                     Heading { text: "Received"; }
                 }
                 Row {
-                    Value { text: root.received; min-width: widest.preferred-width; }
+                    Value {
+                        text: root.received;
+                        min-width: widest.preferred-width;
+                    }
                     Value { text: root.received-time; }
                 }
                 Row {
@@ -131,7 +137,8 @@ export component PingPanel inherits TitledBox {
             HorizontalLayout {
                 spacing: 12px;
                 Text {
-                    text: "Times are UTC. Each one-way time spans two clocks; the two add up to the round trip.";
+                    text: "Times are UTC. Each one-way time spans two clocks; "
+                        + "the two add up to the round trip.";
                     color: #4b5563;
                     vertical-alignment: center;
                     horizontal-stretch: 1;

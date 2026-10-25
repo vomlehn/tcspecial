@@ -122,14 +122,18 @@ impl SegSend {
     ///
     /// For startup: it allocates.
     pub fn start(program: &Path) -> Result<SegSend, String> {
-        let program_c = CString::new(program.as_os_str().as_bytes())
-            .map_err(|_| format!("{} has a nul in its name", program.display()))?;
+        let program_c =
+            CString::new(program.as_os_str().as_bytes()).map_err(|_| {
+                format!("{} has a nul in its name", program.display())
+            })?;
         let (queue, waiting) = sync_channel::<Name>(WAITING);
         let shown = program.display().to_string();
         thread::Builder::new()
             .name(SEGSEND.to_string())
             .spawn(move || send_each(&program_c, &shown, waiting))
-            .map_err(|e| format!("the thread that runs {SEGSEND} cannot be started: {e}"))?;
+            .map_err(|e| {
+                format!("the thread that runs {SEGSEND} cannot be started: {e}")
+            })?;
         Ok(SegSend {
             queue: Some(queue),
             swept: Arc::new(Mutex::new(Vec::new())),
@@ -157,13 +161,15 @@ impl SegSend {
     pub fn handoff(&self, dir: &Path) -> Result<Handoff, String> {
         if let Some(queue) = &self.queue {
             let key = dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf());
-            let mut swept = self.swept.lock().expect("nothing panics holding it");
+            let mut swept =
+                self.swept.lock().expect("nothing panics holding it");
             if !swept.contains(&key) {
                 swept.push(key);
                 for pending in left_pending(dir)? {
                     let Some(name) = Name::of(&pending, "") else {
                         error!(
-                            "{}: too long a name to hand to {SEGSEND}; left where it is",
+                            "{}: too long a name to hand to {SEGSEND}; left \
+                             where it is",
                             pending.display()
                         );
                         continue;
@@ -171,7 +177,9 @@ impl SegSend {
                     // Waited on where the queue is full, there being no loop
                     // yet to hold up.
                     if queue.send(name).is_err() {
-                        return Err(format!("the thread that runs {SEGSEND} has stopped"));
+                        return Err(format!(
+                            "the thread that runs {SEGSEND} has stopped"
+                        ));
                     }
                 }
             }
@@ -204,14 +212,19 @@ impl tcslog::WriteCallbacks for Handoff {
             // Nothing to hand it to: see `SegSend::none`.
             return Ok(());
         };
-        let (Some(from), Some(to)) = (Name::of(path, ""), Name::of(path, PENDING_SUFFIX)) else {
+        let (Some(from), Some(to)) =
+            (Name::of(path, ""), Name::of(path, PENDING_SUFFIX))
+        else {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 "a segment's name is too long to rename",
             ));
         };
         // SAFETY: both are nul-terminated buffers that outlive the call.
-        if unsafe { libc::rename(from.as_c_str().as_ptr(), to.as_c_str().as_ptr()) } != 0 {
+        if unsafe {
+            libc::rename(from.as_c_str().as_ptr(), to.as_c_str().as_ptr())
+        } != 0
+        {
             return Err(std::io::Error::last_os_error());
         }
 
@@ -225,9 +238,10 @@ impl tcslog::WriteCallbacks for Handoff {
             Err(TrySendError::Full(to)) => {
                 if !self.overflowing {
                     error!(
-                        "{} is waiting for {SEGSEND}, which has {WAITING} segments \
-                         still to deal with; it and any others like it are left in \
-                         the log directory and handed over at the next start",
+                        "{} is waiting for {SEGSEND}, which has {WAITING} \
+                         segments still to deal with; it and any others like \
+                         it are left in the log directory and handed over at \
+                         the next start",
                         to.shown()
                     );
                 }
@@ -250,14 +264,16 @@ impl tcslog::WriteCallbacks for Handoff {
 /// Oldest by name, which is how tcslog names segments: by the time each was
 /// begun.
 fn left_pending(dir: &Path) -> Result<Vec<PathBuf>, String> {
-    let entries = std::fs::read_dir(dir)
-        .map_err(|e| format!("the telemetry log directory, {}: {e}", dir.display()))?;
+    let entries = std::fs::read_dir(dir).map_err(|e| {
+        format!("the telemetry log directory, {}: {e}", dir.display())
+    })?;
     let mut pending: Vec<PathBuf> = entries
         .filter_map(|entry| entry.ok())
         .map(|entry| entry.path())
         .filter(|path| {
-            path.file_name()
-                .is_some_and(|name| name.as_bytes().ends_with(PENDING_SUFFIX.as_bytes()))
+            path.file_name().is_some_and(|name| {
+                name.as_bytes().ends_with(PENDING_SUFFIX.as_bytes())
+            })
         })
         .collect();
     pending.sort();
@@ -341,8 +357,9 @@ fn run(program: &CStr, name: &Name) -> std::io::Result<i32> {
 /// vehicle that discovered at its first full segment that it had nothing to
 /// hand it to would fill its log directory without a word.
 pub fn beside_this_program() -> Result<PathBuf, String> {
-    let here = std::env::current_exe()
-        .map_err(|e| format!("where tcspecial is cannot be found, to find {SEGSEND}: {e}"))?;
+    let here = std::env::current_exe().map_err(|e| {
+        format!("where tcspecial is cannot be found, to find {SEGSEND}: {e}")
+    })?;
     let program = here.with_file_name(SEGSEND);
     usable(&program)?;
     Ok(program)
@@ -353,15 +370,23 @@ pub fn beside_this_program() -> Result<PathBuf, String> {
 fn usable(program: &Path) -> Result<(), String> {
     let fix = format!(
         "put the program that takes filled telemetry log segments there, named \
-         {SEGSEND} (`cargo build --workspace` builds the one that deletes them), or \
-         take log.directory out of the configuration's tcspecial section"
+         {SEGSEND} (`cargo build --workspace` builds the one that deletes \
+         them), or take log.directory out of the configuration's tcspecial \
+         section"
     );
     let name = CString::new(program.as_os_str().as_bytes())
         .map_err(|_| format!("{} has a nul in its name", program.display()))?;
     match std::fs::metadata(program) {
         Ok(found) if found.is_file() => {}
-        Ok(_) => return Err(format!("{} is not a program: {fix}", program.display())),
-        Err(_) => return Err(format!("{} is not there: {fix}", program.display())),
+        Ok(_) => {
+            return Err(format!(
+                "{} is not a program: {fix}",
+                program.display()
+            ))
+        }
+        Err(_) => {
+            return Err(format!("{} is not there: {fix}", program.display()))
+        }
     }
     // SAFETY: a nul-terminated name that outlives the call.
     if unsafe { libc::access(name.as_ptr(), libc::X_OK) } != 0 {
@@ -392,13 +417,17 @@ mod tests {
         std::fs::write(
             &program,
             format!(
-                "#!/bin/sh\n[ -n \"$1\" ] || exit 0\necho \"$1\" >> '{}'\nrm -f \"$1\"\n",
+                "#!/bin/sh\n[ -n \"$1\" ] || exit 0\necho \"$1\" >> '{}'\nrm \
+                 -f \"$1\"\n",
                 record.display()
             ),
         )
         .expect("written");
-        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755))
-            .expect("made executable");
+        std::fs::set_permissions(
+            &program,
+            std::fs::Permissions::from_mode(0o755),
+        )
+        .expect("made executable");
         crate::when_not_busy(|| {
             std::process::Command::new(&program)
                 .status()
@@ -466,7 +495,8 @@ mod tests {
         let newer = logs.path().join(format!("telem-2.tcslog{PENDING_SUFFIX}"));
         std::fs::write(&newer, b"").expect("written");
         std::fs::write(&older, b"").expect("written");
-        std::fs::write(logs.path().join("telem-3.tcslog"), b"").expect("written");
+        std::fs::write(logs.path().join("telem-3.tcslog"), b"")
+            .expect("written");
 
         let segsend = SegSend::start(&program).expect("started");
         let _handoff = segsend.handoff(logs.path()).expect("swept");
@@ -490,8 +520,11 @@ mod tests {
         assert!(said.contains("log.directory"), "{said}");
 
         std::fs::write(&missing, b"#!/bin/sh\n").expect("written");
-        std::fs::set_permissions(&missing, std::fs::Permissions::from_mode(0o644))
-            .expect("made unexecutable");
+        std::fs::set_permissions(
+            &missing,
+            std::fs::Permissions::from_mode(0o644),
+        )
+        .expect("made unexecutable");
         let said = usable(&missing).expect_err("it cannot be run");
         assert!(said.contains("executable"), "{said}");
     }

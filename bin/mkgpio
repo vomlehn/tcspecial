@@ -40,7 +40,8 @@ configfs="/sys/kernel/config"
 gpio_sim="$configfs/gpio-sim"
 
 if [ "$(id -u)" -ne 0 ]; then
-	echo "mkgpio: re-running under sudo, which is what loading a module needs"
+	echo "mkgpio: re-running under sudo, which is what loading a module" \
+		"needs"
 	exec sudo -- "$0" "$@"
 fi
 
@@ -82,7 +83,8 @@ chip="$(cat "$bank/chip_name")"
 # The file a simulated payload writes. If this is missing the chip is live but
 # not usable, and saying so here beats a payload failing on it later.
 if [ ! -w "$bank/sim_gpio0/pull" ]; then
-	echo "mkgpio: $chip has no line files under $bank, which should not happen" >&2
+	echo "mkgpio: $chip has no line files under $bank, which should not" \
+		"happen" >&2
 	exit 1
 fi
 

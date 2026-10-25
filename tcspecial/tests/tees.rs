@@ -58,7 +58,12 @@ fn moved(text: &str, was: &str, now: &str) -> String {
 
 /// Send `datum` to `to` until something arrives at `at`, which is how long
 /// tcspecial takes to start; what arrived, and nothing but it, is returned.
-fn until_heard(from: &UdpSocket, to: SocketAddr, datum: &[u8], at: &UdpSocket) -> Vec<u8> {
+fn until_heard(
+    from: &UdpSocket,
+    to: SocketAddr,
+    datum: &[u8],
+    at: &UdpSocket,
+) -> Vec<u8> {
     let deadline = Instant::now() + Duration::from_secs(20);
     let mut buffer = [0u8; 256];
     while Instant::now() < deadline {
@@ -84,13 +89,15 @@ fn heard(at: &UdpSocket) -> Option<Vec<u8>> {
 
 #[test]
 fn a_tee_sends_each_datum_both_ways() {
-    let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/tees/tees.yaml");
+    let example = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../examples/tees/tees.yaml");
     let text = std::fs::read_to_string(&example).expect("the example reads");
 
     // Where the example's own ground hears each tee, which its diagram and
     // the manual say: ground_base, 8700, plus each tee's device id.
-    let shipped = telemetry::of(&Graph::load(&example).expect("the example reads"))
-        .expect("its links to the ground work out");
+    let shipped =
+        telemetry::of(&Graph::load(&example).expect("the example reads"))
+            .expect("its links to the ground work out");
     for (source, at) in [("echo", 8704), ("readings", 8705)] {
         let link = shipped
             .iter()
@@ -101,7 +108,8 @@ fn a_tee_sends_each_datum_both_ways() {
     let dir = tempfile::tempdir().expect("a directory");
     // tcspecial writes its log into a directory that is there, and does not
     // make one.
-    std::fs::create_dir(dir.path().join("telemetry")).expect("the log's directory");
+    std::fs::create_dir(dir.path().join("telemetry"))
+        .expect("the log's directory");
 
     // The heater is driven and never heard from, so tcspecial sends to it:
     // the test is the heater, bound where the configuration says it is.
@@ -135,14 +143,18 @@ fn a_tee_sends_each_datum_both_ways() {
     // Where the ground hears each tee, as the vehicle works it out: the moc
     // node's ground_base plus the tee's device id.
     let graph = Graph::load(&configuration).expect("it reads");
-    let links = telemetry::of(&graph).expect("its links to the ground work out");
+    let links =
+        telemetry::of(&graph).expect("its links to the ground work out");
     let ground_of = |source: &str| {
         let link = links
             .iter()
             .find(|link| link.source == source)
             .unwrap_or_else(|| panic!("{source} sends to the ground"));
-        let socket = UdpSocket::bind(format!("{}:{}", link.ground.address, link.ground.port))
-            .expect("the ground's port");
+        let socket = UdpSocket::bind(format!(
+            "{}:{}",
+            link.ground.address, link.ground.port
+        ))
+        .expect("the ground's port");
         socket
             .set_read_timeout(Some(Duration::from_millis(100)))
             .expect("a timeout");
@@ -165,7 +177,8 @@ fn a_tee_sends_each_datum_both_ways() {
 
     // A command: to the heater, as it was going, and back to the ground.
     let ground = bound();
-    let up: SocketAddr = format!("127.0.0.1:{uplink}").parse().expect("an address");
+    let up: SocketAddr =
+        format!("127.0.0.1:{uplink}").parse().expect("an address");
     assert_eq!(until_heard(&ground, up, b"on", &heater), b"on");
     assert_eq!(
         heard(&echoed).as_deref(),
@@ -176,6 +189,7 @@ fn a_tee_sends_each_datum_both_ways() {
     // A reading: to the ground, as it was going. Its copy vehicleward goes
     // to a node that drops it, which is nothing anybody can hear.
     let thermometer = bound();
-    let to: SocketAddr = format!("127.0.0.1:{sensor}").parse().expect("an address");
+    let to: SocketAddr =
+        format!("127.0.0.1:{sensor}").parse().expect("an address");
     assert_eq!(until_heard(&thermometer, to, b"293.15", &read), b"293.15");
 }

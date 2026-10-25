@@ -1,6 +1,7 @@
 # yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial.schema.json
 
-description: "Answering to an F´ flight computer: a reading to its bridge component, and a command from it to a heater"
+description: "Answering to an F´ flight computer: a reading to its bridge
+  component, and a command from it to a heater"
 
 tcspecial:
   # Every port is in the nine thousands, which no other example uses, so this

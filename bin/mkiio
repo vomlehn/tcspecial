@@ -44,7 +44,8 @@ iio_devices="$configfs/iio/devices/dummy"
 iio_triggers="$configfs/iio/triggers/hrtimer"
 
 if [ "$(id -u)" -ne 0 ]; then
-	echo "mkiio: re-running under sudo, which is what loading a module needs"
+	echo "mkiio: re-running under sudo, which is what loading a module" \
+		"needs"
 	exec sudo -- "$0" "$@"
 fi
 
@@ -93,7 +94,8 @@ for dir in /sys/bus/iio/devices/trigger*; do
 	fi
 done
 if [ -z "$trigger" ]; then
-	echo "mkiio: the trigger was made but is not listed, which should not" >&2
+	echo "mkiio: the trigger was made but is not listed, which should" \
+		"not" >&2
 	echo "mkiio: happen -- look in /sys/bus/iio/devices" >&2
 	exit 1
 fi
@@ -115,7 +117,8 @@ for dir in /sys/bus/iio/devices/iio:device*; do
 	fi
 done
 if [ -z "$device" ]; then
-	echo "mkiio: the dummy sensor was made but is not listed, which should" >&2
+	echo "mkiio: the dummy sensor was made but is not listed, which" \
+		"should" >&2
 	echo "mkiio: not happen -- look in /sys/bus/iio/devices" >&2
 	exit 1
 fi
@@ -127,15 +130,18 @@ fi
 # is now one directory per buffer with both in it. Prefer the newer, because
 # the older pair are kept only for the first buffer and only for
 # compatibility.
-if [ -d "$device/buffer0" ] && compgen -G "$device/buffer0/*_en" > /dev/null; then
+if [ -d "$device/buffer0" ] &&
+	compgen -G "$device/buffer0/*_en" > /dev/null; then
 	scan="$device/buffer0"
 	buffer="$device/buffer0"
 elif [ -d "$device/scan_elements" ]; then
 	scan="$device/scan_elements"
 	buffer="$device/buffer"
 else
-	echo "mkiio: $device has no buffer to enable, so the dummy was built" >&2
-	echo "mkiio: without one: a kernel needs CONFIG_IIO_SIMPLE_DUMMY_BUFFER" >&2
+	echo "mkiio: $device has no buffer to enable, so the dummy was" \
+		"built" >&2
+	echo "mkiio: without one: a kernel needs" \
+		"CONFIG_IIO_SIMPLE_DUMMY_BUFFER" >&2
 	exit 1
 fi
 
@@ -157,7 +163,8 @@ for en in "$scan"/*_en; do
 	channels=$((channels + 1))
 done
 if [ "$channels" -eq 0 ]; then
-	echo "mkiio: $device offers no channels to enable, which should not happen" >&2
+	echo "mkiio: $device offers no channels to enable, which should not" \
+		"happen" >&2
 	exit 1
 fi
 
@@ -176,7 +183,8 @@ if [ "$(cat "$buffer/enable")" != "1" ]; then
 	exit 1
 fi
 if [ ! -r "/dev/$node" ]; then
-	echo "mkiio: $node has no /dev/$node to read, so the buffer is there and" >&2
+	echo "mkiio: $node has no /dev/$node to read, so the buffer is there" \
+		"and" >&2
 	echo "mkiio: the character device is not" >&2
 	exit 1
 fi
@@ -188,4 +196,5 @@ echo "                    channels: $channels"
 echo "                    sample_rate: $iio_rate"
 echo
 echo "The device number is assigned as devices appear, so it can differ from"
-echo "one run of this to the next; a payload set that names it has to name this."
+echo "one run of this to the next; a payload set that names it has to name" \
+	"this."

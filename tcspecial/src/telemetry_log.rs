@@ -34,7 +34,8 @@ pub struct TelemetryLog(Option<Arc<Mutex<LogWrite<Handoff>>>>);
 /// would be a log kept somewhere nobody looks, and a vehicle refused at the
 /// start is the one told so while somebody is watching.
 fn unusable(dir: &str) -> Option<String> {
-    let fix = "create it, or change log.directory in the configuration's tcspecial \
+    let fix =
+        "create it, or change log.directory in the configuration's tcspecial \
                section to a directory that is there";
     match std::fs::metadata(dir) {
         Ok(found) if found.is_dir() => None,
@@ -45,7 +46,8 @@ fn unusable(dir: &str) -> Option<String> {
             "the telemetry log directory, {dir}, does not exist: {fix}"
         )),
         Err(e) => Some(format!(
-            "the telemetry log directory, {dir}, cannot be looked at ({e}): {fix}"
+            "the telemetry log directory, {dir}, cannot be looked at ({e}): \
+             {fix}"
         )),
     }
 }
@@ -84,7 +86,9 @@ impl TelemetryLog {
             // directory from filling over a long flight.
             handoff,
         )
-        .map_err(|e| TcsError::Log(format!("opening telemetry log in {dir}: {e}")))?;
+        .map_err(|e| {
+            TcsError::Log(format!("opening telemetry log in {dir}: {e}"))
+        })?;
 
         Ok(TelemetryLog(Some(Arc::new(Mutex::new(log)))))
     }

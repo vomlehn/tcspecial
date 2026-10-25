@@ -10,16 +10,18 @@
 //! file of its own:
 //!
 //! * [`crate::node::payload::network::tcp`] -- a stream the handler connects to
-//! * [`crate::node::payload::network::udp`] -- datagrams sent to where the handler waits
-//! * [`crate::node::payload::device_file`] -- a device, which produces rather than sends
-//! * [`crate::node::payload::serial`] -- a line, which is a pty the configured path
-//!   leads to
+//! * [`crate::node::payload::network::udp`] -- datagrams sent to where the
+//!   handler waits
+//! * [`crate::node::payload::device_file`] -- a device, which produces rather
+//!   than sends
+//! * [`crate::node::payload::serial`] -- a line, which is a pty the configured
+//!   path leads to
 //! * [`crate::node::payload::i2c`] -- a device on a bus, which is a chip of the
 //!   kernel's `i2c-stub`
-//! * [`crate::node::payload::spi`] -- a peripheral, which is a pty again: the bytes
-//!   of one, and none of its clocking
-//! * [`crate::node::payload::network::unix`] -- a Unix-domain socket of either flavour, which
-//!   the simulator simply is
+//! * [`crate::node::payload::spi`] -- a peripheral, which is a pty again: the
+//!   bytes of one, and none of its clocking
+//! * [`crate::node::payload::network::unix`] -- a Unix-domain socket of either
+//!   flavour, which the simulator simply is
 
 use std::os::unix::fs::{symlink, FileTypeExt};
 use std::path::Path;
@@ -131,30 +133,52 @@ fn run_kind(
 ) {
     match config.protocol {
         PayloadProtocol::Tcp => {
-            crate::node::payload::network::tcp::run_tcp_node(config, running, stats)
+            crate::node::payload::network::tcp::run_tcp_node(
+                config, running, stats,
+            )
         }
         PayloadProtocol::Udp => {
-            crate::node::payload::network::udp::run_udp_node(config, running, stats)
+            crate::node::payload::network::udp::run_udp_node(
+                config, running, stats,
+            )
         }
         PayloadProtocol::Device => {
-            crate::node::payload::device_file::run_device_file_node(config, running, stats)
+            crate::node::payload::device_file::run_device_file_node(
+                config, running, stats,
+            )
         }
         PayloadProtocol::Serial => {
-            crate::node::payload::serial::run_serial_node(config, running, stats)
+            crate::node::payload::serial::run_serial_node(
+                config, running, stats,
+            )
         }
-        PayloadProtocol::I2c => crate::node::payload::i2c::run_i2c_node(config, running, stats),
-        PayloadProtocol::Spi => crate::node::payload::spi::run_spi_node(config, running, stats),
-        PayloadProtocol::Can => crate::node::payload::can::run_can_node(config, running, stats),
-        PayloadProtocol::Iio => crate::node::payload::iio::run_iio_node(config, running, stats),
+        PayloadProtocol::I2c => {
+            crate::node::payload::i2c::run_i2c_node(config, running, stats)
+        }
+        PayloadProtocol::Spi => {
+            crate::node::payload::spi::run_spi_node(config, running, stats)
+        }
+        PayloadProtocol::Can => {
+            crate::node::payload::can::run_can_node(config, running, stats)
+        }
+        PayloadProtocol::Iio => {
+            crate::node::payload::iio::run_iio_node(config, running, stats)
+        }
         PayloadProtocol::Rpmsg => {
             crate::node::payload::rpmsg::run_rpmsg_node(config, running, stats)
         }
-        PayloadProtocol::Gpio => crate::node::payload::gpio::run_gpio_node(config, running, stats),
+        PayloadProtocol::Gpio => {
+            crate::node::payload::gpio::run_gpio_node(config, running, stats)
+        }
         PayloadProtocol::UnixStream => {
-            crate::node::payload::network::unix::run_unix_stream_node(config, running, stats)
+            crate::node::payload::network::unix::run_unix_stream_node(
+                config, running, stats,
+            )
         }
         PayloadProtocol::UnixDgram => {
-            crate::node::payload::network::unix::run_unix_dgram_node(config, running, stats)
+            crate::node::payload::network::unix::run_unix_dgram_node(
+                config, running, stats,
+            )
         }
     }
 }
@@ -377,20 +401,25 @@ impl Drop for SimulatedPayload {
 /// exists. Anything else at that path is somebody else's: a real port, a file,
 /// a directory. The refusal says which, because "permission denied" on
 /// `/dev/ttyS0` and "there is a real device there" call for different answers.
-pub(crate) fn make_the_path_lead_to(path: &Path, leads_to: &str) -> Result<(), String> {
+pub(crate) fn make_the_path_lead_to(
+    path: &Path,
+    leads_to: &str,
+) -> Result<(), String> {
     match std::fs::symlink_metadata(path) {
         Ok(found) if found.file_type().is_symlink() => {
             std::fs::remove_file(path).map_err(|e| {
                 format!(
-                    "{} is a link left by an earlier run and cannot be replaced: {e}",
+                    "{} is a link left by an earlier run and cannot be \
+                     replaced: {e}",
                     path.display()
                 )
             })?;
         }
         Ok(found) if found.file_type().is_char_device() => {
             return Err(format!(
-                "{} is a real serial device, so the simulator will not stand in for it: \
-                 point the tcspecial configuration at a path it may create, such as /tmp/{}",
+                "{} is a real serial device, so the simulator will not stand \
+                 in for it: point the tcspecial configuration at a path it may \
+                 create, such as /tmp/{}",
                 path.display(),
                 path.file_name()
                     .map(|n| n.to_string_lossy().into_owned())
@@ -399,8 +428,8 @@ pub(crate) fn make_the_path_lead_to(path: &Path, leads_to: &str) -> Result<(), S
         }
         Ok(_) => {
             return Err(format!(
-                "{} already exists and is not a link the simulator made, so it is left \
-                 alone",
+                "{} already exists and is not a link the simulator made, so it \
+                 is left alone",
                 path.display()
             ))
         }
@@ -427,7 +456,10 @@ const WAIT_SLICE: Duration = Duration::from_millis(50);
 ///
 /// Returns whether it is still running, so a caller can abandon the rest of
 /// what it was doing.
-pub(crate) fn wait_while_running(how_long: Duration, running: &AtomicBool) -> bool {
+pub(crate) fn wait_while_running(
+    how_long: Duration,
+    running: &AtomicBool,
+) -> bool {
     let until = Instant::now() + how_long;
 
     loop {
@@ -624,7 +656,10 @@ pub(crate) fn lateness(config: &PayloadConfig, rng: &mut impl Rng) -> Duration {
 ///
 /// What exercises a handler's own waiting: a trigger sent and nothing returned
 /// is the case a response timeout exists for.
-pub(crate) fn ignore_this_request(config: &PayloadConfig, rng: &mut impl Rng) -> bool {
+pub(crate) fn ignore_this_request(
+    config: &PayloadConfig,
+    rng: &mut impl Rng,
+) -> bool {
     happens(config.faults.ignore_trigger_percent, rng)
 }
 
@@ -674,7 +709,11 @@ impl Pacing {
     ///
     /// Never for a payload whose panel has it silent: its stand-in is there,
     /// and nothing goes over it.
-    pub(crate) fn a_packet_is_due(&self, triggered: bool, asked: usize) -> bool {
+    pub(crate) fn a_packet_is_due(
+        &self,
+        triggered: bool,
+        asked: usize,
+    ) -> bool {
         if !self.sending {
             false
         } else if triggered {
@@ -693,7 +732,11 @@ impl Pacing {
 /// makes packets late instead of overlapping the next one, which is the
 /// lesser of two wrong answers: the alternative is a payload that quietly
 /// sends more than it was asked to.
-pub(crate) fn wait_out_packet(pacing: &Pacing, since: Instant, running: &AtomicBool) {
+pub(crate) fn wait_out_packet(
+    pacing: &Pacing,
+    since: Instant,
+    running: &AtomicBool,
+) {
     let left = pacing
         .packet_interval
         .saturating_sub(since.elapsed())
@@ -755,7 +798,9 @@ mod tests {
         for sent in 0..20 {
             match a_packet(&config, &pacing, sent, &mut rng) {
                 Produce::Send(packet) => assert_eq!(packet.len(), 12),
-                Produce::Nothing => panic!("a payload that works dropped a packet"),
+                Produce::Nothing => {
+                    panic!("a payload that works dropped a packet")
+                }
             }
         }
     }
@@ -777,7 +822,12 @@ mod tests {
         for sent in 0..10 {
             assert!(
                 matches!(
-                    a_packet(&all_dropped, &pacing_of(&all_dropped), sent, &mut rng),
+                    a_packet(
+                        &all_dropped,
+                        &pacing_of(&all_dropped),
+                        sent,
+                        &mut rng
+                    ),
                     Produce::Nothing
                 ),
                 "a payload dropping everything sent something"
@@ -789,7 +839,12 @@ mod tests {
             ..Faults::default()
         });
         for sent in 0..20 {
-            match a_packet(&all_truncated, &pacing_of(&all_truncated), sent, &mut rng) {
+            match a_packet(
+                &all_truncated,
+                &pacing_of(&all_truncated),
+                sent,
+                &mut rng,
+            ) {
                 Produce::Send(packet) => {
                     // Shorter than the twelve asked for, and not empty.
                     // Twelve would be a packet that was not truncated, which
@@ -797,7 +852,8 @@ mod tests {
                     // did not ask for; empty would be the dropping fault.
                     assert!(
                         (1..12).contains(&packet.len()),
-                        "a truncated packet of twelve bytes came back {} bytes long",
+                        "a truncated packet of twelve bytes came back {} bytes \
+                         long",
                         packet.len()
                     );
                 }
@@ -810,13 +866,21 @@ mod tests {
         // than not at all, because not at all is the other fault.
         all_truncated.packet_size.store(1, Ordering::SeqCst);
         for sent in 0..20 {
-            match a_packet(&all_truncated, &pacing_of(&all_truncated), sent, &mut rng) {
+            match a_packet(
+                &all_truncated,
+                &pacing_of(&all_truncated),
+                sent,
+                &mut rng,
+            ) {
                 Produce::Send(packet) => assert_eq!(
                     packet.len(),
                     1,
-                    "a one-byte packet cannot be shortened and must still be sent"
+                    "a one-byte packet cannot be shortened and must still be \
+                     sent"
                 ),
-                Produce::Nothing => panic!("a packet too short to truncate was dropped"),
+                Produce::Nothing => {
+                    panic!("a packet too short to truncate was dropped")
+                }
             }
         }
 
@@ -829,7 +893,12 @@ mod tests {
             ..Faults::default()
         });
         for sent in 0..20 {
-            match a_packet(&all_corrupted, &pacing_of(&all_corrupted), sent, &mut rng) {
+            match a_packet(
+                &all_corrupted,
+                &pacing_of(&all_corrupted),
+                sent,
+                &mut rng,
+            ) {
                 Produce::Send(packet) => assert_eq!(packet.len(), 12),
                 Produce::Nothing => panic!("corrupting is not dropping"),
             }
@@ -847,7 +916,11 @@ mod tests {
         let mut rng = rand::thread_rng();
         for byte in 0..=255u8 {
             for _ in 0..20 {
-                assert_ne!(corrupt(byte, &mut rng), byte, "{byte} came back itself");
+                assert_ne!(
+                    corrupt(byte, &mut rng),
+                    byte,
+                    "{byte} came back itself"
+                );
             }
         }
     }
@@ -865,13 +938,19 @@ mod tests {
 
         for sent in 0..3 {
             assert!(
-                matches!(a_packet(&config, &pacing, sent, &mut rng), Produce::Send(_)),
+                matches!(
+                    a_packet(&config, &pacing, sent, &mut rng),
+                    Produce::Send(_)
+                ),
                 "it went quiet after {sent} packets rather than 3"
             );
         }
         for sent in 3..30 {
             assert!(
-                matches!(a_packet(&config, &pacing, sent, &mut rng), Produce::Nothing),
+                matches!(
+                    a_packet(&config, &pacing, sent, &mut rng),
+                    Produce::Nothing
+                ),
                 "it spoke again after going quiet, at {sent}"
             );
         }
@@ -938,11 +1017,16 @@ mod tests {
         let running = AtomicBool::new(true);
 
         let mut went: Vec<Vec<u8>> = Vec::new();
-        let (bytes, whole) =
-            send_in_segments(&packet, 5, Duration::ZERO, &running, &mut |segment| {
+        let (bytes, whole) = send_in_segments(
+            &packet,
+            5,
+            Duration::ZERO,
+            &running,
+            &mut |segment| {
                 went.push(segment.to_vec());
                 Ok(segment.len())
-            });
+            },
+        );
 
         assert!(whole, "the whole packet went");
         assert_eq!(bytes, 12);
@@ -954,7 +1038,8 @@ mod tests {
         assert_eq!(
             went.concat(),
             packet,
-            "the segments are the one packet, in order, rather than packets of their own"
+            "the segments are the one packet, in order, rather than packets of \
+             their own"
         );
     }
 
@@ -1000,16 +1085,20 @@ mod tests {
         let running = AtomicBool::new(true);
 
         let started = Instant::now();
-        let (_, whole) =
-            send_in_segments(&packet, 1, Duration::from_millis(40), &running, &mut |s| {
-                Ok(s.len())
-            });
+        let (_, whole) = send_in_segments(
+            &packet,
+            1,
+            Duration::from_millis(40),
+            &running,
+            &mut |s| Ok(s.len()),
+        );
         let took = started.elapsed();
 
         assert!(whole);
         assert!(
             took >= Duration::from_millis(80),
-            "three segments 40 ms apart took {took:?}, so they were not waited between"
+            "three segments 40 ms apart took {took:?}, so they were not waited \
+             between"
         );
         assert!(
             took < Duration::from_millis(110),
@@ -1067,7 +1156,8 @@ mod tests {
         );
         let waited = at.elapsed();
         assert!(
-            waited >= Duration::from_millis(20) && waited < Duration::from_millis(60),
+            waited >= Duration::from_millis(20)
+                && waited < Duration::from_millis(60),
             "waited {waited:?} of the 20 ms left of the interval"
         );
 

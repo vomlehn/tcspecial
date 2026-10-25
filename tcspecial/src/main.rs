@@ -71,8 +71,8 @@ fn main() {
     if visual && simulate.is_flight() {
         eprintln!(
             "tcspecial: --visual is for a run with stand-ins, and this one is \
-             --simulate={simulate}, the flight setting: give --simulate=some or \
-             --simulate=all with it"
+             --simulate={simulate}, the flight setting: give --simulate=some \
+             or --simulate=all with it"
         );
         process::exit(1);
     }
@@ -82,8 +82,8 @@ fn main() {
     #[cfg(not(feature = "visual"))]
     if visual {
         eprintln!(
-            "tcspecial: --visual is only in a tcspecial built with the visual feature, \
-             which this one was not: build it with --features visual"
+            "tcspecial: --visual is only in a tcspecial built with the visual \
+             feature, which this one was not: build it with --features visual"
         );
         process::exit(1);
     }
@@ -97,7 +97,10 @@ fn main() {
     // overrides either; RUST_LOG=trace adds the per-datagram tracing in the
     // main loop.
     let level = if quiet { "warn" } else { "info" };
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(level)).init();
+    env_logger::Builder::from_env(
+        env_logger::Env::default().default_filter_or(level),
+    )
+    .init();
 
     trace!("main: entered");
 
@@ -125,8 +128,10 @@ fn main() {
     // It is the one thing the command line
     // says: where commands are taken and where beacons go are both the
     // configuration file's, so each address is written in one place.
-    let payload_path = match payload_path_from_args(args.into_iter(), Some(PAYLOAD_CONFIG_PATH_VAR))
-    {
+    let payload_path = match payload_path_from_args(
+        args.into_iter(),
+        Some(PAYLOAD_CONFIG_PATH_VAR),
+    ) {
         Ok(payload_path) => payload_path,
         Err(e) => {
             error!("{}", e);

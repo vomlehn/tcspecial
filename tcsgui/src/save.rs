@@ -235,7 +235,9 @@ fn temporary_beside(path: &Path) -> PathBuf {
     let mut temporary = Vec::with_capacity(name.len() + 24);
     temporary.extend_from_slice(b".");
     temporary.extend_from_slice(&name);
-    temporary.extend_from_slice(format!(".tcsgui-{}", std::process::id()).as_bytes());
+    temporary.extend_from_slice(
+        format!(".tcsgui-{}", std::process::id()).as_bytes(),
+    );
 
     let mut full = path.to_path_buf();
     full.set_file_name(std::ffi::OsStr::from_bytes(&temporary));
@@ -293,7 +295,8 @@ mod tests {
         fs::write(&blocked, b"a file").expect("a file");
 
         let path = blocked.join("graph.yaml");
-        let why = write_atomically(&path, b"nodes: []\n").expect_err("a file is not a directory");
+        let why = write_atomically(&path, b"nodes: []\n")
+            .expect_err("a file is not a directory");
         let said = format!("{why}");
         assert!(
             said.contains("graph.yaml"),
@@ -317,7 +320,8 @@ mod tests {
         let path = where_.path().join("graph.yaml");
 
         for n in 0..5 {
-            write_atomically(&path, format!("nodes: [{n}]\n").as_bytes()).expect("a write");
+            write_atomically(&path, format!("nodes: [{n}]\n").as_bytes())
+                .expect("a write");
         }
 
         let left: Vec<_> = fs::read_dir(where_.path())
@@ -339,7 +343,8 @@ mod tests {
     fn a_failed_write_leaves_the_old_file_alone() {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("graph.yaml");
-        write_atomically(&path, b"the good contents\n").expect("the good write");
+        write_atomically(&path, b"the good contents\n")
+            .expect("the good write");
 
         // A read-only directory: the temporary cannot be created in it.
         let locked = where_.path().join("locked");

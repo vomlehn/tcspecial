@@ -91,7 +91,8 @@ impl Mirror {
             // payload-in" is the useful complaint, not "nothing arrives
             // there".
             if let Some(said) = graph.node(node) {
-                if let Err(why) = terminal_at(&said.node_type, Some(sink), true) {
+                if let Err(why) = terminal_at(&said.node_type, Some(sink), true)
+                {
                     return Err(TcsError::Config(format!(
                         "{at}: \"{node}\" says {sink}: {why}"
                     )));
@@ -132,14 +133,15 @@ impl Mirror {
 /// Derived from the links, which are the configuration. The sink a link
 /// arrives at is the one the destination named, where it named one of the
 /// four; otherwise it is the one at the other end of the stream it leaves by
-/// -- a `payload-out` arrives at a `payload-in` and nowhere else, so a file that
-/// did not say it still said it.
+/// -- a `payload-out` arrives at a `payload-in` and nowhere else, so a file
+/// that did not say it still said it.
 ///
 /// The names are here for the complaint rather than for the comparison: what
 /// a flag is checked against is whether this is empty, and what a person needs
 /// told is which node they forgot.
 fn arrivals(graph: &Graph) -> BTreeMap<(String, String), BTreeSet<String>> {
-    let mut arriving: BTreeMap<(String, String), BTreeSet<String>> = BTreeMap::new();
+    let mut arriving: BTreeMap<(String, String), BTreeSet<String>> =
+        BTreeMap::new();
     for link in &graph.links {
         let origin = link.origin();
         // The source terminal, which every link has: a link is
@@ -175,10 +177,10 @@ mod tests {
     /// A configuration of one payload and the ground, with whatever the two
     /// entries are given to say about their own data sinks.
     ///
-    /// The groundward link is the payload's `payload-out: moc` and the vehicleward
-    /// one is the ground's `moc-out: payload`, so the flags that agree with
-    /// them are `payload-in: true` on the ground and `moc-in: true` on the
-    /// payload.
+    /// The groundward link is the payload's `payload-out: moc` and the
+    /// vehicleward one is the ground's `moc-out: payload`, so the flags that
+    /// agree with them are `payload-in: true` on the ground and `moc-in: true`
+    /// on the payload.
     fn pair(moc_says: &str, payload_says: &str) -> TcsResult<Graph> {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("vehicle.yaml");
@@ -266,7 +268,8 @@ payloads:
             "{}",
             pair(
                 "    payload-in: true",
-                "    moc-in: true\nvehicle:\n  - name: through\n    type: null-moc\n    \
+                "    moc-in: true\nvehicle:\n  - name: through\n    type: \
+                 null-moc\n    \
                  moc-in: true",
             )
             .expect_err("nothing sends the null-moc node anything")
@@ -294,7 +297,8 @@ payloads:
     fn a_sink_that_denies_a_line_nobody_sends_is_read() {
         pair("    payload-in: true", "    moc-in: false")
             .expect_err("the ground sends the payload what it asks with");
-        pair("    payload-in: true", "    moc-in: true").expect("and says so when it says so");
+        pair("    payload-in: true", "    moc-in: true")
+            .expect("and says so when it says so");
     }
 
     /// A word that is neither true nor false is refused, saying what the
@@ -307,7 +311,8 @@ payloads:
     fn a_sink_given_a_name_instead_of_a_flag_is_refused() {
         let said = format!(
             "{}",
-            pair("    payload-in: payload", "    moc-in: true").expect_err("a name is not a flag")
+            pair("    payload-in: payload", "    moc-in: true")
+                .expect_err("a name is not a flag")
         );
         assert!(said.contains("is not true or false"), "{said}");
         assert!(said.contains("written on that node"), "{said}");

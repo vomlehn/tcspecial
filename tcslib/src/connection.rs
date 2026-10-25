@@ -43,9 +43,9 @@ impl UdpConnection {
     /// Create a new UDP connection
     pub fn new(local_addr: &str, remote_addr: &str) -> TcsResult<Self> {
         let socket = UdpSocket::bind(local_addr)?;
-        let remote: SocketAddr = remote_addr
-            .parse()
-            .map_err(|e| TcsError::Config(format!("Invalid remote address: {}", e)))?;
+        let remote: SocketAddr = remote_addr.parse().map_err(|e| {
+            TcsError::Config(format!("Invalid remote address: {}", e))
+        })?;
 
         socket.set_nonblocking(false)?;
 
@@ -74,7 +74,10 @@ impl UdpConnection {
     }
 
     /// Set the write timeout
-    pub fn set_write_timeout(&self, timeout: Option<Duration>) -> TcsResult<()> {
+    pub fn set_write_timeout(
+        &self,
+        timeout: Option<Duration>,
+    ) -> TcsResult<()> {
         self.socket.set_write_timeout(timeout)?;
         Ok(())
     }
@@ -101,20 +104,22 @@ impl UdpConnection {
         loop {
             let (size, from) = self.socket.recv_from(&mut self.recv_buffer)?;
             if came_from(&self.expected, &from) {
-                let telemetry: Telemetry = serde_json::from_slice(&self.recv_buffer[..size])?;
+                let telemetry: Telemetry =
+                    serde_json::from_slice(&self.recv_buffer[..size])?;
                 return Ok(telemetry);
             }
 
             eprintln!(
-                "a datagram came from {from} and not from {}, where the command \
-                 went -- ignored",
+                "a datagram came from {from} and not from {}, where the \
+                 command went -- ignored",
                 self.remote_addr
             );
 
             match deadline {
                 None => continue,
                 Some(deadline) => {
-                    let left = deadline.saturating_duration_since(Instant::now());
+                    let left =
+                        deadline.saturating_duration_since(Instant::now());
                     if left.is_zero() {
                         return Err(TcsError::Io(io::Error::new(
                             io::ErrorKind::TimedOut,
@@ -171,7 +176,8 @@ mod tests {
 
     #[test]
     fn test_udp_connection_creation() {
-        // This test requires network access, so we just verify the types compile
+        // This test requires network access, so we just verify the types
+        // compile
         let _: fn() -> TcsResult<UdpConnection> =
             || UdpConnection::new("127.0.0.1:0", "127.0.0.1:4000");
     }
@@ -188,7 +194,8 @@ mod tests {
 
         let spacecraft = UdpSocket::bind("127.0.0.1:0").expect("the far end");
         let at = spacecraft.local_addr().expect("where it is");
-        let mut link = UdpConnection::new("127.0.0.1:0", &at.to_string()).expect("a connection");
+        let mut link = UdpConnection::new("127.0.0.1:0", &at.to_string())
+            .expect("a connection");
         let mine = link.socket.local_addr().expect("where this end is");
 
         let answer = |sequence: u32| {

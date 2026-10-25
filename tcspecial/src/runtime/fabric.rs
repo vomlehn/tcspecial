@@ -52,7 +52,9 @@
 //! every one is counted and named.
 
 use std::collections::BTreeMap;
-use std::sync::{Arc, Condvar, Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::{
+    Arc, Condvar, Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard,
+};
 use std::thread::JoinHandle;
 
 use tcslibgs::graph::terminals::Stream;
@@ -291,7 +293,11 @@ pub trait Port: Send {
     }
 
     /// Hand this node something, saying where it arrived.
-    fn give(&mut self, arriving: Arriving<'_>, data: &[u8]) -> Result<(), String>;
+    fn give(
+        &mut self,
+        arriving: Arriving<'_>,
+        data: &[u8],
+    ) -> Result<(), String>;
 
     /// Whether anything may be handed to this node.
     fn accepts(&self) -> bool {
@@ -325,8 +331,8 @@ pub trait Port: Send {
     /// which, as a command binding.
     fn set(&mut self, attribute: &str, _value: &[u8]) -> Result<(), String> {
         Err(format!(
-            "there is nothing called \"{attribute}\" on this node that the ground \
-             may set"
+            "there is nothing called \"{attribute}\" on this node that the \
+             ground may set"
         ))
     }
 
@@ -750,11 +756,14 @@ impl Fabric {
             }
             Err(e) => {
                 log::error!(
-                    "\"{name}\": no thread can be started for it ({e}), so its reads \
-                     and deliveries are made in turn with the conductor's own"
+                    "\"{name}\": no thread can be started for it ({e}), so its \
+                     reads and deliveries are made in turn with the \
+                     conductor's own"
                 );
                 worker = Arc::try_unwrap(handed).unwrap_or_else(|_| {
-                    unreachable!("the thread that would have held a copy never started")
+                    unreachable!(
+                        "the thread that would have held a copy never started"
+                    )
                 });
                 worker.threaded = false;
                 Arc::new(worker)
@@ -778,7 +787,11 @@ impl Fabric {
     /// `None` is a node this fabric does not hold, which a checked
     /// configuration has no link to and which a node the ground released is
     /// until it is enabled again.
-    fn with_port<R>(&self, name: &str, f: impl FnOnce(&mut dyn Port) -> R) -> Option<R> {
+    fn with_port<R>(
+        &self,
+        name: &str,
+        f: impl FnOnce(&mut dyn Port) -> R,
+    ) -> Option<R> {
         let worker = self.worker(name)?;
         let mut port = locked(&worker.port);
         port.as_mut().map(|port| f(port.as_mut()))
@@ -876,7 +889,12 @@ impl Fabric {
     /// `None` is a node that does not keep them apart, and then every link out
     /// of it is followed, which is what the fabric did before and what every
     /// device and computation still wants.
-    pub fn deliver_on(&mut self, from: &str, data: &[u8], stream: Option<Stream>) -> Moved {
+    pub fn deliver_on(
+        &mut self,
+        from: &str,
+        data: &[u8],
+        stream: Option<Stream>,
+    ) -> Moved {
         self.deliver_as(from, data, stream, false)
     }
 
@@ -946,8 +964,11 @@ impl Fabric {
                 let workers = read(&shared.workers);
                 for passing in &self.wave {
                     // Borrowed, not copied: the routes are only read here.
-                    for (at, delivery) in
-                        shared.routes.from(&names[passing.from]).iter().enumerate()
+                    for (at, delivery) in shared
+                        .routes
+                        .from(&names[passing.from])
+                        .iter()
+                        .enumerate()
                     {
                         // A datum on one stream does not go down the other's
                         // links. Nothing is said about it: a node with two
@@ -972,14 +993,17 @@ impl Fabric {
                         let Some(to) = self
                             .index
                             .get(delivery.to.as_str())
-                            .and_then(|&to| workers[to].as_ref().map(|worker| (to, worker)))
+                            .and_then(|&to| {
+                                workers[to].as_ref().map(|worker| (to, worker))
+                            })
                         else {
                             // A checked configuration has no such link.
                             // Counted rather than ignored, because the
                             // alternative is telemetry going quietly nowhere.
                             moved.refused.push((
                                 delivery.to.clone(),
-                                "there is no such node in this fabric".to_string(),
+                                "there is no such node in this fabric"
+                                    .to_string(),
                             ));
                             continue;
                         };
@@ -1001,7 +1025,8 @@ impl Fabric {
                 }
                 for &to in &self.busy {
                     if let Some(worker) = &workers[to] {
-                        locked(&worker.mail).job = Some(Job::Deliver { bank, most });
+                        locked(&worker.mail).job =
+                            Some(Job::Deliver { bank, most });
                     }
                 }
             }
@@ -1050,7 +1075,9 @@ impl Fabric {
         let threaded = self
             .busy
             .iter()
-            .filter(|&&at| workers[at].as_ref().is_some_and(|worker| worker.threaded))
+            .filter(|&&at| {
+                workers[at].as_ref().is_some_and(|worker| worker.threaded)
+            })
             .count();
 
         *locked(&shared.remaining) = threaded;
@@ -1095,7 +1122,12 @@ impl Fabric {
     ///
     /// One answer rather than a [`Moved`]: a command is one thing, and the
     /// ground is told whether it took effect.
-    pub fn set(&mut self, node: &str, attribute: &str, value: &[u8]) -> Result<(), String> {
+    pub fn set(
+        &mut self,
+        node: &str,
+        attribute: &str,
+        value: &[u8],
+    ) -> Result<(), String> {
         if !self.shared.routes.is_commanded(node, attribute) {
             // An attribute written with hyphens for underscores, or the other
             // way round, is told the spelling a binding does give it: an
@@ -1103,23 +1135,27 @@ impl Fabric {
             // told so than told nothing may be set. Made only on the way to
             // refusing a command, which allocates its answer already.
             let routes = &self.shared.routes;
-            if let Some(hint) =
-                tcslibgs::graph::spelled(attribute, |other| routes.is_commanded(node, other))
-            {
+            if let Some(hint) = tcslibgs::graph::spelled(attribute, |other| {
+                routes.is_commanded(node, other)
+            }) {
                 return Err(format!(
-                    "no command binding says the ground may set \"{node}.{attribute}\": \
-                     {hint}"
+                    "no command binding says the ground may set \
+                     \"{node}.{attribute}\": {hint}"
                 ));
             }
             return Err(format!(
-                "no command binding says the ground may set \"{node}.{attribute}\": \
-                 what a command may change is in the configuration, so that it is \
-                 checkable before it flies"
+                "no command binding says the ground may set \
+                 \"{node}.{attribute}\": what a command may change is in the \
+                 configuration, so that it is checkable before it flies"
             ));
         }
 
         self.with_port(node, |port| port.set(attribute, value))
-            .unwrap_or_else(|| Err(format!("there is no node called \"{node}\" in this fabric")))
+            .unwrap_or_else(|| {
+                Err(format!(
+                    "there is no node called \"{node}\" in this fabric"
+                ))
+            })
     }
 
     /// Read one node and deliver whatever it had.
@@ -1168,7 +1204,9 @@ impl Fabric {
     /// every reading is taken before any is delivered, so that what is
     /// computed from them is computed from the set.
     pub fn pump_group(&mut self, members: &[String]) -> Moved {
-        self.read_stage(members.iter().map(|member| (member.as_str(), Read::Take)))
+        self.read_stage(
+            members.iter().map(|member| (member.as_str(), Read::Take)),
+        )
     }
 
     /// Read every node named, each as it says, all at once, and then deliver
@@ -1178,7 +1216,10 @@ impl Fabric {
     /// it: a read that was not attempted is not a datum that was dropped, and
     /// the pass has nothing to say about a node that is off. A node named
     /// twice is read once.
-    pub fn read_stage<'a>(&mut self, reads: impl IntoIterator<Item = (&'a str, Read)>) -> Moved {
+    pub fn read_stage<'a>(
+        &mut self,
+        reads: impl IntoIterator<Item = (&'a str, Read)>,
+    ) -> Moved {
         let mut moved = Moved::default();
         let shared = self.shared.clone();
         let watch = read(&shared.watch).clone();
@@ -1190,11 +1231,9 @@ impl Fabric {
                 if !watch.is_enabled(name) {
                     continue;
                 }
-                let Some(worker) = self
-                    .index
-                    .get(name)
-                    .and_then(|&at| workers[at].as_ref().map(|worker| (at, worker)))
-                else {
+                let Some(worker) = self.index.get(name).and_then(|&at| {
+                    workers[at].as_ref().map(|worker| (at, worker))
+                }) else {
                     moved.refused.push((
                         name.to_string(),
                         "there is no such node in this fabric".to_string(),
@@ -1290,23 +1329,34 @@ fn serve(worker: &Worker, shared: &Shared) {
 /// it: a thread that died without saying it had finished would leave the
 /// conductor waiting for it for the rest of the flight.
 fn perform(worker: &Worker, shared: &Shared, mail: &mut Mail, job: Job) {
-    let done = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| match job {
-        Job::Read { how, bank } => read_node(worker, shared, mail, how, bank),
-        Job::Deliver { bank, most } => deliver_to(worker, shared, mail, bank, most),
-    }));
+    let done =
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| match job {
+            Job::Read { how, bank } => {
+                read_node(worker, shared, mail, how, bank)
+            }
+            Job::Deliver { bank, most } => {
+                deliver_to(worker, shared, mail, bank, most)
+            }
+        }));
     if done.is_err() {
         mail.produced.clear();
         mail.moved.refused.push((
             worker.name.clone(),
-            "the node panicked part way through an operation, which is a fault in \
-             it to find in the log; the pass carried on without it"
+            "the node panicked part way through an operation, which is a fault \
+             in it to find in the log; the pass carried on without it"
                 .to_string(),
         ));
     }
 }
 
 /// Read a node, into item 0 of `bank`.
-fn read_node(worker: &Worker, shared: &Shared, mail: &mut Mail, how: Read, bank: usize) {
+fn read_node(
+    worker: &Worker,
+    shared: &Shared,
+    mail: &mut Mail,
+    how: Read,
+    bank: usize,
+) {
     let watch = read(&shared.watch).clone();
     let name = worker.name.as_str();
     let mut port = locked(&worker.port);
@@ -1322,7 +1372,9 @@ fn read_node(worker: &Worker, shared: &Shared, mail: &mut Mail, how: Read, bank:
         let mut out = write(&worker.banks[bank]);
         let taken = match how {
             Read::Take => node.take(&mut out[0]),
-            Read::Unasked | Read::UnaskedThenAsk => node.take_unasked(&mut out[0]),
+            Read::Unasked | Read::UnaskedThenAsk => {
+                node.take_unasked(&mut out[0])
+            }
         };
         match taken {
             // Nought bytes is "nothing to say", which is the ordinary answer
@@ -1367,7 +1419,13 @@ fn read_node(worker: &Worker, shared: &Shared, mail: &mut Mail, how: Read, bank:
 
 /// Give a node everything in its inbox, in the order it arrived, and take a
 /// result after each arrival it has one for, into `bank`.
-fn deliver_to(worker: &Worker, shared: &Shared, mail: &mut Mail, bank: usize, most: usize) {
+fn deliver_to(
+    worker: &Worker,
+    shared: &Shared,
+    mail: &mut Mail,
+    bank: usize,
+    most: usize,
+) {
     let watch = read(&shared.watch).clone();
     let names = read(&shared.names);
     let workers = read(&shared.workers);
@@ -1406,7 +1464,8 @@ fn deliver_to(worker: &Worker, shared: &Shared, mail: &mut Mail, bank: usize, mo
             continue;
         }
 
-        let delivery = &shared.routes.from(&names[passing.from])[arrival.delivery];
+        let delivery =
+            &shared.routes.from(&names[passing.from])[arrival.delivery];
         let arriving = Arriving {
             input: delivery.input.as_deref(),
             stream: delivery.stream,
@@ -1417,7 +1476,14 @@ fn deliver_to(worker: &Worker, shared: &Shared, mail: &mut Mail, bank: usize, mo
         let given = match passing.bytes {
             Bytes::Origin => {
                 let origin = read(&shared.origin);
-                give(node, arriving, &origin[..passing.len], name, &*watch, moved)
+                give(
+                    node,
+                    arriving,
+                    &origin[..passing.len],
+                    name,
+                    &*watch,
+                    moved,
+                )
             }
             Bytes::Result {
                 node: from,
@@ -1446,8 +1512,9 @@ fn deliver_to(worker: &Worker, shared: &Shared, mail: &mut Mail, bank: usize, mo
             moved.refused.push((
                 name.to_string(),
                 format!(
-                    "a result is still being passed on after {most} nodes, which is \
-                     more than there are: the links must have a cycle in them"
+                    "a result is still being passed on after {most} nodes, \
+                     which is more than there are: the links must have a cycle \
+                     in them"
                 ),
             ));
             continue;
@@ -1551,7 +1618,11 @@ mod tests {
             })
         }
 
-        fn give(&mut self, arriving: Arriving<'_>, data: &[u8]) -> Result<(), String> {
+        fn give(
+            &mut self,
+            arriving: Arriving<'_>,
+            data: &[u8],
+        ) -> Result<(), String> {
             let mut record = self.0.lock().expect("the record");
             if let Some(why) = record.refuse.clone() {
                 return Err(why);
@@ -1607,7 +1678,8 @@ mod tests {
     /// so the decisions these tests look for are written as `b"1"` and
     /// `b"0"`.
     fn kelvin(number: f64) -> Vec<u8> {
-        crate::node::vehicle::compute::as_value(number).expect("a temperature a value carries")
+        crate::node::vehicle::compute::as_value(number)
+            .expect("a temperature a value carries")
     }
 
     /// The example's links, and only its links.
@@ -1626,7 +1698,8 @@ mod tests {
     /// is delivered to it, as drawn.
     fn drawn() -> Graph {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let mut graph = Graph::load(root.join("tests/manual/thermostat.yaml")).expect("it reads");
+        let mut graph = Graph::load(root.join("tests/manual/thermostat.yaml"))
+            .expect("it reads");
         graph.tcspecial = None;
         for node in graph.nodes.iter_mut().filter(|n| n.node_type == "moc") {
             node.attributes.remove("ground_base");
@@ -1830,8 +1903,8 @@ vehicle:
         // What the ground saw: three temperatures, the one voted out of them,
         // and the decision.
         //
-        // A temperature is four bytes of micro-kelvin and a decision is text, so
-        // they are read back differently -- which is what the two are: a
+        // A temperature is four bytes of micro-kelvin and a decision is text,
+        // so they are read back differently -- which is what the two are: a
         // reading, and the thing a set of discrete lines is driven to.
         let given: Vec<Vec<u8>> = moc
             .lock()
@@ -1844,10 +1917,13 @@ vehicle:
             .iter()
             .take(4)
             .map(|datum| {
-                crate::node::vehicle::compute::from_value(datum, "the ground").expect("a value")
+                crate::node::vehicle::compute::from_value(datum, "the ground")
+                    .expect("a value")
             })
             .collect();
-        for (shown, wanted) in temperatures.iter().zip([289.15, 289.15, 287.3188, 289.15]) {
+        for (shown, wanted) in
+            temperatures.iter().zip([289.15, 289.15, 287.3188, 289.15])
+        {
             assert!(
                 (shown - wanted).abs() < 1e-9,
                 // 289.15 and not the mean's 288.5396: the low reading is the
@@ -1909,7 +1985,8 @@ vehicle:
             fabric.hold(
                 name,
                 Box::new(
-                    ComputePort::make(node, &inputs, &Abandon::nothing()).expect("the computation"),
+                    ComputePort::make(node, &inputs, &Abandon::nothing())
+                        .expect("the computation"),
                 ),
             );
         }
@@ -1954,8 +2031,12 @@ vehicle:
         fabric.hold(
             "k_1",
             Box::new(
-                ComputePort::make(node, &routes.inputs_of("k_1"), &Abandon::nothing())
-                    .expect("it builds"),
+                ComputePort::make(
+                    node,
+                    &routes.inputs_of("k_1"),
+                    &Abandon::nothing(),
+                )
+                .expect("it builds"),
             ),
         );
         let (moc, moc_port) = recorder();
@@ -1995,7 +2076,10 @@ vehicle:
         let thermostat = graph.node("thermostat").expect("the thermostat");
         fabric.hold(
             "thermostat",
-            Box::new(ComputePort::make(thermostat, &[], &Abandon::nothing()).expect("it builds")),
+            Box::new(
+                ComputePort::make(thermostat, &[], &Abandon::nothing())
+                    .expect("it builds"),
+            ),
         );
         let (heaters, heater_port) = recorder();
         let (_, second_port) = recorder();
@@ -2058,7 +2142,10 @@ vehicle:
         let thermostat = graph.node("thermostat").expect("the thermostat");
         fabric.hold(
             "thermostat",
-            Box::new(ComputePort::make(thermostat, &[], &Abandon::nothing()).expect("it builds")),
+            Box::new(
+                ComputePort::make(thermostat, &[], &Abandon::nothing())
+                    .expect("it builds"),
+            ),
         );
         let (heaters, heater_port) = device();
         let (second, second_port) = device();
@@ -2143,7 +2230,10 @@ vehicle:
         let thermostat = graph.node("thermostat").expect("the thermostat");
         fabric.hold(
             "thermostat",
-            Box::new(ComputePort::make(thermostat, &[], &Abandon::nothing()).expect("it builds")),
+            Box::new(
+                ComputePort::make(thermostat, &[], &Abandon::nothing())
+                    .expect("it builds"),
+            ),
         );
 
         // The band either side of the setpoint is in the file and no binding
@@ -2167,7 +2257,10 @@ vehicle:
         let mut fabric_bound = Fabric::new(Routes::of(&bound), 64);
         fabric_bound.hold(
             "thermostat",
-            Box::new(ComputePort::make(thermostat, &[], &Abandon::nothing()).expect("it builds")),
+            Box::new(
+                ComputePort::make(thermostat, &[], &Abandon::nothing())
+                    .expect("it builds"),
+            ),
         );
         let said = fabric_bound
             .set("thermostat", "half-band", b"1.0")
@@ -2222,7 +2315,11 @@ vehicle:
                 Ok(Taken::of(1))
             }
 
-            fn give(&mut self, _arriving: Arriving<'_>, _data: &[u8]) -> Result<(), String> {
+            fn give(
+                &mut self,
+                _arriving: Arriving<'_>,
+                _data: &[u8],
+            ) -> Result<(), String> {
                 Ok(())
             }
 
@@ -2284,18 +2381,25 @@ vehicle:
         let (moc, moc_port) = recorder();
         let (mean, mean_port) = recorder();
         let (log, log_port) = recorder();
-        log.lock().expect("the record").refuse = Some("the device is full".to_string());
+        log.lock().expect("the record").refuse =
+            Some("the device is full".to_string());
         fabric.hold("moc", moc_port);
         fabric.hold("cabin_temp", mean_port);
         fabric.hold("housekeeping", log_port);
 
         let moved = fabric.deliver("k_1", &[9]);
 
-        assert_eq!(moved.delivered, 2, "the other two should still have got it");
+        assert_eq!(
+            moved.delivered, 2,
+            "the other two should still have got it"
+        );
         assert!(!moved.all_delivered());
         assert_eq!(
             moved.refused,
-            vec![("housekeeping".to_string(), "the device is full".to_string())],
+            vec![(
+                "housekeeping".to_string(),
+                "the device is full".to_string()
+            )],
             "the refusal should name the node and say why"
         );
         assert_eq!(moc.lock().expect("the record").given.len(), 1);
@@ -2373,9 +2477,12 @@ vehicle:
         let mut fabric = Fabric::new(thermostat(), 64);
 
         let mut sensors = Vec::new();
-        for (sensor, converter) in [("temp_1", "k_1"), ("temp_2", "k_2"), ("temp_3", "k_3")] {
+        for (sensor, converter) in
+            [("temp_1", "k_1"), ("temp_2", "k_2"), ("temp_3", "k_3")]
+        {
             let (record, port) = recorder();
-            record.lock().expect("the record").to_say = vec![vec![sensors.len() as u8]];
+            record.lock().expect("the record").to_say =
+                vec![vec![sensors.len() as u8]];
             fabric.hold(sensor, port);
             let (got, got_port) = recorder();
             fabric.hold(converter, got_port);
@@ -2453,7 +2560,11 @@ vehicle:
             Ok(Taken::of(1))
         }
 
-        fn give(&mut self, _arriving: Arriving<'_>, _data: &[u8]) -> Result<(), String> {
+        fn give(
+            &mut self,
+            _arriving: Arriving<'_>,
+            _data: &[u8],
+        ) -> Result<(), String> {
             self.events
                 .lock()
                 .unwrap()
@@ -2501,7 +2612,11 @@ vehicle:
         );
 
         let started = std::time::Instant::now();
-        let moved = fabric.pump_group(&["s1".to_string(), "s2".to_string(), "s3".to_string()]);
+        let moved = fabric.pump_group(&[
+            "s1".to_string(),
+            "s2".to_string(),
+            "s3".to_string(),
+        ]);
         let took = started.elapsed();
 
         assert!(moved.all_delivered(), "{:?}", moved.refused);
@@ -2515,7 +2630,8 @@ vehicle:
         assert!(
             happened[..3].iter().all(|event| event.starts_with("read"))
                 && happened[3..].iter().all(|event| event == "given sink"),
-            "every reading should be taken before any is delivered: {happened:?}"
+            "every reading should be taken before any is delivered: \
+             {happened:?}"
         );
     }
 
@@ -2542,7 +2658,8 @@ vehicle:
         assert_eq!(moved.delivered, 3, "{moved:?}");
         assert!(
             took < std::time::Duration::from_millis(450),
-            "three 200 ms deliveries took {took:?}: they were made one after another"
+            "three 200 ms deliveries took {took:?}: they were made one after \
+             another"
         );
     }
 
@@ -2558,7 +2675,11 @@ vehicle:
                 Ok(Taken::NOTHING)
             }
 
-            fn give(&mut self, _arriving: Arriving<'_>, _data: &[u8]) -> Result<(), String> {
+            fn give(
+                &mut self,
+                _arriving: Arriving<'_>,
+                _data: &[u8],
+            ) -> Result<(), String> {
                 panic!("a fault in this port");
             }
         }

@@ -100,7 +100,9 @@ impl CiLink {
     /// there, so nothing here has to remember at each press. A link that is
     /// down has nothing to say -- the times belonged to a client that is
     /// closed, and the next Connect starts a fresh one.
-    pub fn command_times(&self) -> Option<(Option<Timestamp>, Option<Timestamp>)> {
+    pub fn command_times(
+        &self,
+    ) -> Option<(Option<Timestamp>, Option<Timestamp>)> {
         self.client
             .as_ref()
             .map(|client| (client.last_sent(), client.last_received()))
@@ -127,7 +129,8 @@ impl CiLink {
         let connection = UdpConnection::new(&self.from, address)?;
         let Commanded { from, to } = &self.commanded;
         let nodes = UdpConnection::new(&from.to_string(), &to.to_string())?;
-        self.client = Some(TcsClient::of_a_graph(Box::new(connection), Box::new(nodes)));
+        self.client =
+            Some(TcsClient::of_a_graph(Box::new(connection), Box::new(nodes)));
         Ok(())
     }
 
@@ -166,9 +169,10 @@ mod tests {
         let at = spacecraft.local_addr().expect("where it is").to_string();
         let answering = std::thread::spawn(move || {
             let mut buffer = [0u8; 65535];
-            let (size, from) = spacecraft.recv_from(&mut buffer).expect("a command");
-            let command: Command =
-                serde_json::from_slice(&buffer[..size]).expect("a valid command");
+            let (size, from) =
+                spacecraft.recv_from(&mut buffer).expect("a command");
+            let command: Command = serde_json::from_slice(&buffer[..size])
+                .expect("a valid command");
             let answer = Telemetry::Ping(PingTelemetry::new(
                 command.sequence(),
                 tcslibgs::CommandStatus::Success,

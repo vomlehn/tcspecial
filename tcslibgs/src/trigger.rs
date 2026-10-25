@@ -100,7 +100,8 @@ pub const INIT: Named = Named {
 pub const TERMINATOR: Named = Named {
     word: "terminator",
     a: "a terminator",
-    empty: "a terminator is the bytes that end a packet, and nought bytes would \
+    empty:
+        "a terminator is the bytes that end a packet, and nought bytes would \
             end every packet before it began",
     bare_was_decimal: true,
 };
@@ -118,8 +119,9 @@ pub fn bytes_of(named: &Named, written: &str) -> Result<Vec<u8>, String> {
     let written = written.trim();
     if let Some(bracketed) = bare_bytes(named, written) {
         return Err(format!(
-            "the {word} {written:?} is bytes written bare, and bytes are written \
-             in square brackets now: {bracketed}. Text is a C string in quotes"
+            "the {word} {written:?} is bytes written bare, and bytes are \
+             written in square brackets now: {bracketed}. Text is a C string \
+             in quotes"
         ));
     }
 
@@ -134,8 +136,8 @@ pub fn bytes_of(named: &Named, written: &str) -> Result<Vec<u8>, String> {
             '"' => {
                 let (text, after) = c_string_part(rest).ok_or_else(|| {
                     format!(
-                        "the {word} {written:?} opens a quote that does not close: \
-                         text in {a} is a C string, quotes and all"
+                        "the {word} {written:?} opens a quote that does not \
+                         close: text in {a} is a C string, quotes and all"
                     )
                 })?;
                 (c_string_bytes(named, text)?, after)
@@ -143,17 +145,19 @@ pub fn bytes_of(named: &Named, written: &str) -> Result<Vec<u8>, String> {
             '[' => {
                 let close = rest.find(']').ok_or_else(|| {
                     format!(
-                        "the {word} {written:?} opens a bracket that does not close: \
-                         bytes in {a} are written [0D 0A], brackets and all"
+                        "the {word} {written:?} opens a bracket that does not \
+                         close: bytes in {a} are written [0D 0A], brackets and \
+                         all"
                     )
                 })?;
                 (hex_bytes(named, &rest[1..close])?, &rest[close + 1..])
             }
             other => {
                 return Err(format!(
-                    "{other:?} in the {word} {written:?} begins neither text nor bytes: \
-                     {a} is parts one after another, each a C string in quotes, \
-                     \"READ\\r\", or bytes in square brackets, [0D 0A]"
+                    "{other:?} in the {word} {written:?} begins neither text \
+                     nor bytes: {a} is parts one after another, each a C \
+                     string in quotes, \"READ\\r\", or bytes in square \
+                     brackets, [0D 0A]"
                 ))
             }
         };
@@ -178,7 +182,10 @@ pub fn bytes_of(named: &Named, written: &str) -> Result<Vec<u8>, String> {
 /// is in, so only a comma between parts separates sequences; each sequence is
 /// read by [`bytes_of`], and an empty one -- two commas together, or one at
 /// either end -- is refused as no bytes at all.
-pub fn sequences_of(named: &Named, written: &str) -> Result<Vec<Vec<u8>>, String> {
+pub fn sequences_of(
+    named: &Named,
+    written: &str,
+) -> Result<Vec<Vec<u8>>, String> {
     split_sequences(written)
         .into_iter()
         .map(|one| bytes_of(named, one))
@@ -253,21 +260,21 @@ fn hex_bytes(named: &Named, inside: &str) -> Result<Vec<u8>, String> {
     for byte in inside.split_whitespace() {
         if byte.starts_with("0x") || byte.starts_with("0X") {
             return Err(format!(
-                "[{inside}] has {byte:?} in it, and inside brackets a byte is its \
-                 digits alone: [{}]",
+                "[{inside}] has {byte:?} in it, and inside brackets a byte is \
+                 its digits alone: [{}]",
                 &byte[2..]
             ));
         }
         if let Some(bad) = byte.chars().find(|c| !c.is_ascii_hexdigit()) {
             return Err(format!(
-                "{bad:?} in [{inside}] is not a hexadecimal digit: bytes in {a} are \
-                 0-9, a-f or A-F, with a space between one and the next"
+                "{bad:?} in [{inside}] is not a hexadecimal digit: bytes in \
+                 {a} are 0-9, a-f or A-F, with a space between one and the next"
             ));
         }
         if byte.len() > 2 {
             return Err(format!(
-                "{byte:?} in [{inside}] is {} digits, which is more than one byte: \
-                 write each byte apart, as in [0D 0A]",
+                "{byte:?} in [{inside}] is {} digits, which is more than one \
+                 byte: write each byte apart, as in [0D 0A]",
                 byte.len()
             ));
         }
@@ -322,8 +329,8 @@ fn c_string_bytes(named: &Named, written: &str) -> Result<Vec<u8>, String> {
 
         let escaped = chars.next().ok_or_else(|| {
             format!(
-                "{a} ends in a backslash, which escapes nothing: write \\\\ for a \
-                 backslash"
+                "{a} ends in a backslash, which escapes nothing: write \\\\ \
+                 for a backslash"
             )
         })?;
 
@@ -348,18 +355,24 @@ fn c_string_bytes(named: &Named, written: &str) -> Result<Vec<u8>, String> {
                 let high = chars.next();
                 let low = chars.next();
                 let pair: String = [high, low].iter().flatten().collect();
-                if pair.len() != 2 || !pair.chars().all(|c| c.is_ascii_hexdigit()) {
+                if pair.len() != 2
+                    || !pair.chars().all(|c| c.is_ascii_hexdigit())
+                {
                     return Err(format!(
-                        "\\x{pair} is not two hexadecimal digits: \\xNN is one byte, \
-                         and a run of them is written \\x0D\\x0A"
+                        "\\x{pair} is not two hexadecimal digits: \\xNN is one \
+                         byte, and a run of them is written \\x0D\\x0A"
                     ));
                 }
-                bytes.push(u8::from_str_radix(&pair, 16).expect("two checked digits"));
+                bytes.push(
+                    u8::from_str_radix(&pair, 16).expect("two checked digits"),
+                );
             }
             other => {
                 return Err(format!(
-                    "\\{other} is not an escape: {a} takes C's own -- \\\\ \\\" \
-                     \\' \\n \\r \\t \\0 \\a \\b \\f \\v and \\xNN -- and bytes \
+                    "\\{other} is not an escape: {a} takes C's own -- \\\\ \\\
+                     \" \
+                     \\' \\n \\r \\t \\0 \\a \\b \\f \\v and \\xNN -- and \
+                     bytes \
                      that are not text are written in brackets instead, [0D 0A]"
                 ))
             }
@@ -384,7 +397,8 @@ pub fn trigger_as_written(bytes: &[u8]) -> String {
         .iter()
         .all(|byte| matches!(byte, 0x20..=0x7e | b'\r' | b'\n' | b'\t'));
     if !text {
-        let each: Vec<String> = bytes.iter().map(|byte| format!("{byte:02X}")).collect();
+        let each: Vec<String> =
+            bytes.iter().map(|byte| format!("{byte:02X}")).collect();
         return format!("[{}]", each.join(" "));
     }
 
@@ -414,7 +428,10 @@ mod tests {
         assert_eq!(trigger_bytes("[55]").unwrap(), vec![0x55]);
         assert_eq!(trigger_bytes("[aa]").unwrap(), vec![0xAA]);
         assert_eq!(trigger_bytes("[Aa]").unwrap(), vec![0xAA]);
-        assert_eq!(trigger_bytes("[55 AA 0D]").unwrap(), vec![0x55, 0xAA, 0x0D]);
+        assert_eq!(
+            trigger_bytes("[55 AA 0D]").unwrap(),
+            vec![0x55, 0xAA, 0x0D]
+        );
         assert_eq!(trigger_bytes("  [ 0d\t0a ]  ").unwrap(), vec![0x0D, 0x0A]);
 
         // One digit is the same byte as two: a datasheet writes 5 where it
@@ -472,7 +489,9 @@ mod tests {
 
         // A terminator was decimal unless it said 0x, so its brackets are
         // the byte it meant.
-        for (written, wanted) in [("13", "[0D]"), ("0x0A", "[0A]"), ("10", "[0A]")] {
+        for (written, wanted) in
+            [("13", "[0D]"), ("0x0A", "[0A]"), ("10", "[0A]")]
+        {
             let said = bytes_of(&TERMINATOR, written).expect_err("bare bytes");
             assert!(
                 said.contains("square brackets") && said.contains(wanted),
@@ -486,7 +505,8 @@ mod tests {
     fn a_word_without_quotes_is_refused() {
         let said = trigger_bytes("READ").expect_err("neither text nor bytes");
         assert!(said.contains("begins neither"), "{said}");
-        let said = trigger_bytes("\"AT\" 0D").expect_err("a bare byte after text");
+        let said =
+            trigger_bytes("\"AT\" 0D").expect_err("a bare byte after text");
         assert!(said.contains("begins neither"), "{said}");
     }
 
@@ -526,7 +546,10 @@ mod tests {
     /// between them or none.
     #[test]
     fn parts_one_after_another_are_one_run_of_bytes() {
-        assert_eq!(trigger_bytes("\"AT\" [0D 0A]").unwrap(), b"AT\r\n".to_vec());
+        assert_eq!(
+            trigger_bytes("\"AT\" [0D 0A]").unwrap(),
+            b"AT\r\n".to_vec()
+        );
         assert_eq!(trigger_bytes("\"AT\"[0D]").unwrap(), b"AT\r".to_vec());
         assert_eq!(
             trigger_bytes("[02] \"T=\" [03]").unwrap(),

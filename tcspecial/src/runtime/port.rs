@@ -69,8 +69,8 @@ use crate::runtime::frame::Framer;
 use crate::runtime::node_state::Abandon;
 
 use crate::endpoint::{
-    bind_endpoint_pair, connect_endpoint_pair, hearing_endpoint_pair, reaching_endpoint_pair,
-    EndpointReadable, EndpointWritable, WaitResult,
+    bind_endpoint_pair, connect_endpoint_pair, hearing_endpoint_pair,
+    reaching_endpoint_pair, EndpointReadable, EndpointWritable, WaitResult,
 };
 use crate::runtime::fabric::{Arriving, Port, Taken};
 use crate::runtime::route::Routes;
@@ -111,7 +111,8 @@ impl Use {
         // a `commands` entry and no link out of the MOC node, so a MOC link
         // judged by its links looks like a node that is only written -- and
         // the setpoint would then never arrive.
-        let produces = routes.fan_out(node) > 0 || !routes.commands_on(node).is_empty();
+        let produces =
+            routes.fan_out(node) > 0 || !routes.commands_on(node).is_empty();
         let accepts = !routes.arriving_at(node).is_empty();
 
         match (produces, accepts) {
@@ -120,7 +121,8 @@ impl Use {
             (false, true) => Ok(Use::Driven),
             (false, false) => Err(format!(
                 "no link touches \"{node}\", so there is nothing for it to do: \
-                 a device opened and never read holds its lines and says nothing"
+                 a device opened and never read holds its lines and says \
+                 nothing"
             )),
         }
     }
@@ -189,7 +191,11 @@ impl EndpointPort {
     ///
     /// For a device: this end reaches out to it. See [`EndpointPort::bind`]
     /// for the end something else reaches, which is what a MOC link is.
-    pub fn connect(what: &str, config: &EndpointConfig, uses: Use) -> TcsResult<EndpointPort> {
+    pub fn connect(
+        what: &str,
+        config: &EndpointConfig,
+        uses: Use,
+    ) -> TcsResult<EndpointPort> {
         let (reader, writer) = connect_endpoint_pair(what, config)?;
         Ok(EndpointPort::of(what, reader, writer, uses))
     }
@@ -212,7 +218,11 @@ impl EndpointPort {
     /// For a heater or a valve, and for a payload that is asked: see
     /// [`crate::endpoint::reaching_endpoint_pair`] for why the ends swap roles
     /// when the payload does not speak first.
-    pub fn reaching(what: &str, config: &EndpointConfig, uses: Use) -> TcsResult<EndpointPort> {
+    pub fn reaching(
+        what: &str,
+        config: &EndpointConfig,
+        uses: Use,
+    ) -> TcsResult<EndpointPort> {
         let (reader, writer) = reaching_endpoint_pair(what, config)?;
         Ok(EndpointPort::of(what, reader, writer, uses))
     }
@@ -221,7 +231,11 @@ impl EndpointPort {
     ///
     /// For a link to the MOC, which sends to an address it was told, so this
     /// end binds it.
-    pub fn bind(what: &str, config: &EndpointConfig, uses: Use) -> TcsResult<EndpointPort> {
+    pub fn bind(
+        what: &str,
+        config: &EndpointConfig,
+        uses: Use,
+    ) -> TcsResult<EndpointPort> {
         let (reader, writer) = bind_endpoint_pair(what, config)?;
         Ok(EndpointPort::of(what, reader, writer, uses))
     }
@@ -279,7 +293,11 @@ impl EndpointPort {
     /// follows from which end exists first: the ground sends to an address it
     /// was told, so the vehicle waits at it, where a device is something the
     /// vehicle opens.
-    pub fn open(node: &Node, routes: &Routes, abandon: &Abandon) -> Result<EndpointPort, String> {
+    pub fn open(
+        node: &Node,
+        routes: &Routes,
+        abandon: &Abandon,
+    ) -> Result<EndpointPort, String> {
         let uses = Use::of(routes, &node.name)?;
         let reach = reach_of(node)?;
         // Its endpoint, or where it is reached when simulated: a node of a
@@ -296,7 +314,12 @@ impl EndpointPort {
             // the device is, and this sends there.
             EndpointPort::reaching(&node.name, &endpoint, uses)
         } else {
-            EndpointPort::hearing(&node.name, &endpoint, uses, reach.sends_from.as_ref())
+            EndpointPort::hearing(
+                &node.name,
+                &endpoint,
+                uses,
+                reach.sends_from.as_ref(),
+            )
         };
         let mut port = opened.map_err(|e| format!("{e}"))?;
 
@@ -329,7 +352,10 @@ impl EndpointPort {
         // starting state nobody knows is the thing an init exists to prevent.
         if let Some(init) = reach.init {
             port.write_all(&init, "init").map_err(|why| {
-                format!("{why}; the node is not started without what init says to set it to")
+                format!(
+                    "{why}; the node is not started without what init says \
+                         to set it to"
+                )
             })?;
         }
 
@@ -356,7 +382,10 @@ impl EndpointPort {
     /// twelve bytes -- is the node's to say: see [`crate::runtime::frame`].
     /// Without this, a pass would take whatever bytes happened to be waiting,
     /// which is half a sentence as often as a whole one.
-    pub fn framed_by(mut self, rule: tcslibgs::endpoint_config::StreamParams) -> EndpointPort {
+    pub fn framed_by(
+        mut self,
+        rule: tcslibgs::endpoint_config::StreamParams,
+    ) -> EndpointPort {
         self.framer = Some(Framer::new(rule));
         self
     }
@@ -420,7 +449,11 @@ impl EndpointPort {
     }
 
     /// Wait until there is something to read, a command, or the time is up.
-    pub fn wait_for_event(&self, cmd_fd: RawFd, timeout_ms: i32) -> TcsResult<WaitResult> {
+    pub fn wait_for_event(
+        &self,
+        cmd_fd: RawFd,
+        timeout_ms: i32,
+    ) -> TcsResult<WaitResult> {
         self.reader.wait_for_event(cmd_fd, timeout_ms)
     }
 
@@ -448,7 +481,11 @@ impl EndpointPort {
     /// the line, and no more is asked than would fill the read under way:
     /// see [`crate::runtime::frame`]. Nought bytes is a read still under way,
     /// which a pass treats as a node with nothing to say yet.
-    fn read_one(&mut self, buffer: &mut [u8], want: usize) -> Result<usize, String> {
+    fn read_one(
+        &mut self,
+        buffer: &mut [u8],
+        want: usize,
+    ) -> Result<usize, String> {
         let Some(mut framer) = self.framer.take() else {
             return self.read_what_is_there(&mut buffer[..want]);
         };
@@ -496,29 +533,31 @@ impl EndpointPort {
         let let_go = framer.let_go();
         if let_go.too_long > 0 {
             log::warn!(
-                "{}: a frame's length_prefix gave more than max_length holds, so \
-                 the frame was let go. Raise max_length, or check the prefix the \
-                 payload sends against length_prefix",
+                "{}: a frame's length_prefix gave more than max_length holds, \
+                 so the frame was let go. Raise max_length, or check the \
+                 prefix the payload sends against length_prefix",
                 self.what
             );
         }
         if let_go.cut_short > 0 {
             log::warn!(
-                "{}: a frame was still short of the length its prefix gave when \
-                 read_timeout ran out, so it was let go and the next byte is read as \
-                 a prefix. Check that read_timeout is longer than a frame takes to \
-                 arrive",
+                "{}: a frame was still short of the length its prefix gave \
+                 when read_timeout ran out, so it was let go and the next byte \
+                 is read as a prefix. Check that read_timeout is longer than a \
+                 frame takes to arrive",
                 self.what
             );
         }
     }
 
-    fn read_what_is_there(&mut self, buffer: &mut [u8]) -> Result<usize, String> {
+    fn read_what_is_there(
+        &mut self,
+        buffer: &mut [u8],
+    ) -> Result<usize, String> {
         match self.ready_to_read() {
-            Ok(true) => self
-                .reader
-                .read(buffer)
-                .map_err(|e| format!("{}: the read failed: {}", self.what, self.plainly(e))),
+            Ok(true) => self.reader.read(buffer).map_err(|e| {
+                format!("{}: the read failed: {}", self.what, self.plainly(e))
+            }),
             Ok(false) => Ok(0),
             Err(why) => Err(why),
         }
@@ -535,7 +574,9 @@ impl EndpointPort {
             Ok(_) => Ok(fds[0].revents().is_some_and(|events| {
                 // Readable, and also an end or an error: a descriptor at its
                 // end is read, which is how an end is noticed at all.
-                events.intersects(PollFlags::POLLIN | PollFlags::POLLHUP | PollFlags::POLLERR)
+                events.intersects(
+                    PollFlags::POLLIN | PollFlags::POLLHUP | PollFlags::POLLERR,
+                )
             })),
             Err(e) => Err(format!(
                 "{}: cannot ask whether there is anything to read: {e}",
@@ -559,9 +600,9 @@ impl EndpointPort {
         match self.writer.write(data) {
             Ok(n) if n == data.len() => Ok(()),
             Ok(0) => Err(format!(
-                "{}: the {doing} of {} bytes moved none of them and was dropped: \
-                 commonly a far end that is not reading, or a socket with \
-                 nowhere to send yet",
+                "{}: the {doing} of {} bytes moved none of them and was \
+                 dropped: commonly a far end that is not reading, or a socket \
+                 with nowhere to send yet",
                 self.what,
                 data.len()
             )),
@@ -592,8 +633,8 @@ impl Port for EndpointPort {
     fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
         if !self.uses.produces() {
             return Err(format!(
-                "{}: nothing is read from this node -- the configuration has it \
-                 {}",
+                "{}: nothing is read from this node -- the configuration has \
+                 it {}",
                 self.what,
                 self.uses.said()
             ));
@@ -679,12 +720,16 @@ impl Port for EndpointPort {
         }
     }
 
-    fn give(&mut self, arriving: Arriving<'_>, data: &[u8]) -> Result<(), String> {
+    fn give(
+        &mut self,
+        arriving: Arriving<'_>,
+        data: &[u8],
+    ) -> Result<(), String> {
         let input = arriving.input;
         if !self.uses.accepts() {
             return Err(format!(
-                "{}: nothing is written to this node -- the configuration has it \
-                 {}",
+                "{}: nothing is written to this node -- the configuration has \
+                 it {}",
                 self.what,
                 self.uses.said()
             ));
@@ -697,8 +742,8 @@ impl Port for EndpointPort {
         // accident.
         if let Some(input) = input {
             return Err(format!(
-                "{}: a link arrives at the input \"{input}\", and a device has no \
-                 named inputs: only a computation does",
+                "{}: a link arrives at the input \"{input}\", and a device has \
+                 no named inputs: only a computation does",
                 self.what
             ));
         }
@@ -770,7 +815,11 @@ impl ComputePort {
     /// `inputs` is what the routing found bound to the node, which a
     /// computation over several of them needs: a mean cannot know it is
     /// waiting for three until something tells it how many links arrive.
-    pub fn make(node: &Node, inputs: &[&str], abandon: &Abandon) -> Result<ComputePort, String> {
+    pub fn make(
+        node: &Node,
+        inputs: &[&str],
+        abandon: &Abandon,
+    ) -> Result<ComputePort, String> {
         Ok(ComputePort::of(
             &node.name,
             compute::make(node, inputs, abandon)?,
@@ -801,7 +850,8 @@ impl Port for ComputePort {
             let wanted = result.len();
             self.ready.push_front((result, again));
             return Err(format!(
-                "{}: the result of {} is {wanted} bytes and the buffer holds {}:                  part of a value is not a smaller value",
+                "{}: the result of {} is {wanted} bytes and the buffer holds \
+                 {}:                  part of a value is not a smaller value",
                 self.what,
                 self.function.name(),
                 buffer.len()
@@ -816,7 +866,11 @@ impl Port for ComputePort {
         })
     }
 
-    fn give(&mut self, arriving: Arriving<'_>, data: &[u8]) -> Result<(), String> {
+    fn give(
+        &mut self,
+        arriving: Arriving<'_>,
+        data: &[u8],
+    ) -> Result<(), String> {
         match self.function.give(arriving.input, data) {
             Ok(Some(result)) => {
                 self.ready.push_back((result, false));
@@ -869,7 +923,10 @@ impl LogPort {
     }
 
     /// Open the log this node describes.
-    pub fn open(node: &Node, segsend: &crate::segsend::SegSend) -> Result<LogPort, String> {
+    pub fn open(
+        node: &Node,
+        segsend: &crate::segsend::SegSend,
+    ) -> Result<LogPort, String> {
         Ok(LogPort(LogNode::of(node, segsend)?))
     }
 }
@@ -887,13 +944,18 @@ impl Port for LogPort {
 
     fn take(&mut self, _buffer: &mut [u8]) -> Result<Taken, String> {
         Err(format!(
-            "{}: nothing is read from a log -- it is where data stops, and a link \
-             out of one would be a log read back into the vehicle that wrote it",
+            "{}: nothing is read from a log -- it is where data stops, and a \
+             link out of one would be a log read back into the vehicle that \
+             wrote it",
             self.0.name()
         ))
     }
 
-    fn give(&mut self, _arriving: Arriving<'_>, data: &[u8]) -> Result<(), String> {
+    fn give(
+        &mut self,
+        _arriving: Arriving<'_>,
+        data: &[u8],
+    ) -> Result<(), String> {
         self.0.record(data)
     }
 
@@ -930,7 +992,11 @@ impl Port for NullPort {
         Ok(Taken::NOTHING)
     }
 
-    fn give(&mut self, _arriving: Arriving<'_>, _data: &[u8]) -> Result<(), String> {
+    fn give(
+        &mut self,
+        _arriving: Arriving<'_>,
+        _data: &[u8],
+    ) -> Result<(), String> {
         Ok(())
     }
 
@@ -942,8 +1008,8 @@ impl Port for NullPort {
 /// A `tee-moc` or `tee-payload` node, as a node of the graph.
 ///
 /// The thinnest adapter there is, because the node itself holds what there
-/// is to hold: see [`crate::node::vehicle::tee_moc::Through`], which is where the
-/// queue and the rule about a datum that will not fit live. Here for the
+/// is to hold: see [`crate::node::vehicle::tee_moc::Through`], which is where
+/// the queue and the rule about a datum that will not fit live. Here for the
 /// reason the log's adapter and the computation's are here -- the questions a
 /// port answers are the same whatever is behind it, and answers kept together
 /// stay the same.
@@ -972,7 +1038,11 @@ impl Port for TeePort {
         self.through.take(&self.what, buffer).map(Taken::of)
     }
 
-    fn give(&mut self, _arriving: Arriving<'_>, data: &[u8]) -> Result<(), String> {
+    fn give(
+        &mut self,
+        _arriving: Arriving<'_>,
+        data: &[u8],
+    ) -> Result<(), String> {
         self.through.give(data);
         Ok(())
     }
@@ -1018,7 +1088,11 @@ impl Port for PingPort {
     }
 
     /// A ping, answered as it is handed over: the time is when it arrived.
-    fn give(&mut self, _arriving: Arriving<'_>, data: &[u8]) -> Result<(), String> {
+    fn give(
+        &mut self,
+        _arriving: Arriving<'_>,
+        data: &[u8],
+    ) -> Result<(), String> {
         self.answers.give(&self.what, data)
     }
 
@@ -1081,9 +1155,12 @@ impl AppPort {
     /// be executed is a fault found before the vehicle is doing anything --
     /// the rule a `process` computation is held to as well.
     pub fn open(node: &Node) -> Result<AppPort, String> {
-        let params = app::params_of(&node.name, &node.node_type, &node.attributes)?;
+        let params =
+            app::params_of(&node.name, &node.node_type, &node.attributes)?;
         let program = match params.kind {
-            app::Kind::PayloadVeh => Program::Payload(AppPayloadVeh::of(&params)?),
+            app::Kind::PayloadVeh => {
+                Program::Payload(AppPayloadVeh::of(&params)?)
+            }
             app::Kind::MocVeh => Program::Moc(AppMocVeh::of(&params)?),
             app::Kind::AllVeh => Program::All(AppAllVeh::of(&params)?),
             app::Kind::Pl => Program::Pl(AppPl::of(&params)?),
@@ -1101,18 +1178,34 @@ impl AppPort {
     ///
     /// Read straight into `buffer`, so that a packet reaches the fabric with
     /// nothing allocated on the way: see `tcsapp::parent::ReadInto`.
-    fn asked(&mut self, stream: Stream, buffer: &mut [u8]) -> Result<ReadInto, String> {
+    fn asked(
+        &mut self,
+        stream: Stream,
+        buffer: &mut [u8],
+    ) -> Result<ReadInto, String> {
         match (&mut self.program, stream) {
             // What the app writes as MOC data, which it does on the payload
             // interface: see `tcsapp`.
-            (Program::Payload(app), Stream::Vehicleward) => app.take_moc_data_now_into(buffer),
-            (Program::Moc(app), Stream::Groundward) => app.take_payload_data_now_into(buffer),
-            (Program::All(app), Stream::Vehicleward) => app.take_moc_data_now_into(buffer),
-            (Program::All(app), Stream::Groundward) => app.take_payload_data_now_into(buffer),
+            (Program::Payload(app), Stream::Vehicleward) => {
+                app.take_moc_data_now_into(buffer)
+            }
+            (Program::Moc(app), Stream::Groundward) => {
+                app.take_payload_data_now_into(buffer)
+            }
+            (Program::All(app), Stream::Vehicleward) => {
+                app.take_moc_data_now_into(buffer)
+            }
+            (Program::All(app), Stream::Groundward) => {
+                app.take_payload_data_now_into(buffer)
+            }
             // A payload's readings, which are groundward whether anything
             // asked for them or not.
-            (Program::Pl(app), Stream::Groundward) => app.take_payload_data_now_into(buffer),
-            (Program::AllPl(app), Stream::Groundward) => app.take_payload_data_now_into(buffer),
+            (Program::Pl(app), Stream::Groundward) => {
+                app.take_payload_data_now_into(buffer)
+            }
+            (Program::AllPl(app), Stream::Groundward) => {
+                app.take_payload_data_now_into(buffer)
+            }
             // A stream this kind does not produce on. Nothing, rather than a
             // refusal: it is not a fault to ask, and `take` asks only what the
             // kind has.
@@ -1127,7 +1220,9 @@ impl AppPort {
             (Program::Moc(_), _) => &[Stream::Groundward],
             // A payload produces on the one stream, asked or not, so there is
             // nothing to take turns with.
-            (Program::Pl(_), _) | (Program::AllPl(_), _) => &[Stream::Groundward],
+            (Program::Pl(_), _) | (Program::AllPl(_), _) => {
+                &[Stream::Groundward]
+            }
             // Turn and turn about.
             (Program::All(_), Some(Stream::Groundward)) => {
                 &[Stream::Vehicleward, Stream::Groundward]
@@ -1167,16 +1262,16 @@ impl Port for AppPort {
                 // what it wrote.
                 Ok(ReadInto::TooLong(len)) => {
                     return Err(format!(
-                        "{}: a packet of {len} bytes arrived and the buffer holds \
-                         {}: part of a packet is not a smaller packet",
+                        "{}: a packet of {len} bytes arrived and the buffer \
+                         holds {}: part of a packet is not a smaller packet",
                         self.what,
                         buffer.len()
                     ));
                 }
                 Ok(ReadInto::Ended) => {
                     let why = format!(
-                        "{}: its program has finished with the {} interface, so \
-                         nothing more will come from it",
+                        "{}: its program has finished with the {} interface, \
+                         so nothing more will come from it",
                         self.what,
                         stream.label()
                     );
@@ -1190,7 +1285,11 @@ impl Port for AppPort {
     }
 
     /// Hand it a datum, on the interface its stream belongs to.
-    fn give(&mut self, arriving: Arriving<'_>, data: &[u8]) -> Result<(), String> {
+    fn give(
+        &mut self,
+        arriving: Arriving<'_>,
+        data: &[u8],
+    ) -> Result<(), String> {
         if let Some(why) = &self.ended {
             return Err(why.clone());
         }
@@ -1198,11 +1297,17 @@ impl Port for AppPort {
         let given = match (&mut self.program, arriving.stream) {
             // A kind with one interface takes what arrives on it, and a link
             // into it says the same thing its one sink does.
-            (Program::Payload(app), Some(Stream::Groundward) | None) => app.give_payload_data(data),
-            (Program::Moc(app), Some(Stream::Vehicleward) | None) => app.give_moc_data(data),
+            (Program::Payload(app), Some(Stream::Groundward) | None) => {
+                app.give_payload_data(data)
+            }
+            (Program::Moc(app), Some(Stream::Vehicleward) | None) => {
+                app.give_moc_data(data)
+            }
             // What asks a payload that is a program for a reading, which is
             // the datum itself: see `crate::node::payload::app_all_pl`.
-            (Program::AllPl(app), Some(Stream::Vehicleward) | None) => app.give_moc_data(data),
+            (Program::AllPl(app), Some(Stream::Vehicleward) | None) => {
+                app.give_moc_data(data)
+            }
             // And the kind nothing asks. It has no data sink at all, so
             // `Graph::check` refuses the link that would bring this about --
             // this is the backstop, and it says what the type is rather than
@@ -1214,8 +1319,12 @@ impl Port for AppPort {
                 self.what,
                 app::Kind::Pl.node_type()
             )),
-            (Program::All(app), Some(Stream::Groundward)) => app.give_payload_data(data),
-            (Program::All(app), Some(Stream::Vehicleward)) => app.give_moc_data(data),
+            (Program::All(app), Some(Stream::Groundward)) => {
+                app.give_payload_data(data)
+            }
+            (Program::All(app), Some(Stream::Vehicleward)) => {
+                app.give_moc_data(data)
+            }
             // A node with two ways in, and a link that does not say which.
             // `Graph::check` refuses that as a `BadTerminal`, so this is the
             // backstop: guessing would put the ground's commands on the
@@ -1292,7 +1401,8 @@ mod tests {
         fn of(script: &Arc<Mutex<Script>>) -> Half {
             Half(
                 Arc::clone(script),
-                std::fs::File::open("/dev/null").expect("every machine has one"),
+                std::fs::File::open("/dev/null")
+                    .expect("every machine has one"),
             )
         }
     }
@@ -1302,7 +1412,11 @@ mod tests {
             self.1.as_raw_fd()
         }
 
-        fn wait_for_event(&self, _cmd_fd: RawFd, _timeout_ms: i32) -> TcsResult<WaitResult> {
+        fn wait_for_event(
+            &self,
+            _cmd_fd: RawFd,
+            _timeout_ms: i32,
+        ) -> TcsResult<WaitResult> {
             Ok(WaitResult::IoReady)
         }
     }
@@ -1363,7 +1477,10 @@ mod tests {
     /// The shipped example, as the routing sees it.
     fn thermostat() -> Routes {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        Routes::of(&Graph::load(root.join("tests/manual/thermostat.yaml")).expect("it reads"))
+        Routes::of(
+            &Graph::load(root.join("tests/manual/thermostat.yaml"))
+                .expect("it reads"),
+        )
     }
 
     /// A line's reads end where its stream rule says, not wherever the bytes
@@ -1384,12 +1501,13 @@ mod tests {
                 Ok(b"RMC\n".to_vec()),
             ],
         );
-        let mut port = port.framed_by(tcslibgs::endpoint_config::StreamParams {
-            max_length: 64,
-            timeout: None,
-            terminators: vec![b"\n".to_vec()],
-            length_prefix: None,
-        });
+        let mut port =
+            port.framed_by(tcslibgs::endpoint_config::StreamParams {
+                max_length: 64,
+                timeout: None,
+                terminators: vec![b"\n".to_vec()],
+                length_prefix: None,
+            });
         let mut buffer = [0u8; 64];
         let mut read = || {
             let taken = port.take(&mut buffer).expect("a read").bytes;
@@ -1415,12 +1533,15 @@ mod tests {
                 Ok(b"d".to_vec()),
             ],
         );
-        let mut port = port.framed_by(tcslibgs::endpoint_config::StreamParams {
-            max_length: 64,
-            timeout: None,
-            terminators: Vec::new(),
-            length_prefix: Some(tcslibgs::endpoint_config::LengthPrefix::U8),
-        });
+        let mut port =
+            port.framed_by(tcslibgs::endpoint_config::StreamParams {
+                max_length: 64,
+                timeout: None,
+                terminators: Vec::new(),
+                length_prefix: Some(
+                    tcslibgs::endpoint_config::LengthPrefix::U8,
+                ),
+            });
         let mut buffer = [0u8; 64];
         let mut read = || {
             let taken = port.take(&mut buffer).expect("a read").bytes;
@@ -1444,7 +1565,8 @@ mod tests {
         use std::os::unix::io::FromRawFd;
         use tcslibgs::graph::{Destinations, Link, Node};
 
-        let master_fd = unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY) };
+        let master_fd =
+            unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY) };
         assert!(
             master_fd >= 0,
             "no pty: {}",
@@ -1455,7 +1577,9 @@ mod tests {
         assert_eq!(unsafe { libc::unlockpt(master_fd) }, 0);
         let mut name = [0 as libc::c_char; 128];
         assert_eq!(
-            unsafe { libc::ptsname_r(master_fd, name.as_mut_ptr(), name.len()) },
+            unsafe {
+                libc::ptsname_r(master_fd, name.as_mut_ptr(), name.len())
+            },
             0
         );
         let line = unsafe { std::ffi::CStr::from_ptr(name.as_ptr()) }
@@ -1500,8 +1624,9 @@ mod tests {
             placed: Default::default(),
             set_aside: Default::default(),
         };
-        let mut port = EndpointPort::open(&gps, &Routes::of(&graph), &Abandon::nothing())
-            .expect("the line opens");
+        let mut port =
+            EndpointPort::open(&gps, &Routes::of(&graph), &Abandon::nothing())
+                .expect("the line opens");
 
         // What the next few passes take, for long enough that a byte written
         // to the far end has crossed the line.
@@ -1615,7 +1740,8 @@ mod tests {
     #[test]
     fn a_node_no_link_touches_is_refused() {
         let routes = thermostat();
-        let said = Use::of(&routes, "left_over").expect_err("a node with no links");
+        let said =
+            Use::of(&routes, "left_over").expect_err("a node with no links");
         assert!(
             said.contains("left_over") && said.contains("nothing for it to do"),
             "the complaint should name the node and say why: {said}"
@@ -1626,7 +1752,8 @@ mod tests {
     #[test]
     fn a_reading_is_taken_and_quiet_is_not_a_failure() {
         let (script, mut port) = port("temp_1", Use::Read);
-        script.lock().expect("the script").to_read = vec![Ok(b"293.15".to_vec())];
+        script.lock().expect("the script").to_read =
+            vec![Ok(b"293.15".to_vec())];
 
         let mut buffer = [0u8; 64];
         let got = port
@@ -1647,9 +1774,9 @@ mod tests {
     #[test]
     fn a_read_that_fails_is_reported() {
         let (script, mut port) = port("temp_1", Use::Read);
-        script.lock().expect("the script").to_read = vec![Err(TcsError::Endpoint(
-            "the bus did not answer".to_string(),
-        ))];
+        script.lock().expect("the script").to_read = vec![Err(
+            TcsError::Endpoint("the bus did not answer".to_string()),
+        )];
 
         let said = port
             .take(&mut [0u8; 64])
@@ -1686,7 +1813,8 @@ mod tests {
             .give(Arriving::ANYWHERE, b"293.15")
             .expect_err("three bytes of a six-byte reading");
         assert!(
-            said.contains("moved 3 of 6") && said.contains("not a smaller datum"),
+            said.contains("moved 3 of 6")
+                && said.contains("not a smaller datum"),
             "the complaint should say what was lost: {said}"
         );
     }
@@ -1710,9 +1838,10 @@ mod tests {
     #[test]
     fn a_write_that_fails_carries_the_reason() {
         let (script, mut port) = port("heaters_1", Use::Driven);
-        script.lock().expect("the script").write_answers = vec![Err(TcsError::Endpoint(
-            "cannot drive the lines of /dev/gpiochip0".to_string(),
-        ))];
+        script.lock().expect("the script").write_answers =
+            vec![Err(TcsError::Endpoint(
+                "cannot drive the lines of /dev/gpiochip0".to_string(),
+            ))];
 
         let said = port
             .give(Arriving::ANYWHERE, b"1")
@@ -1776,7 +1905,8 @@ mod tests {
     fn a_read_asks_for_what_the_node_says() {
         let (script, port) = port("temp_1", Use::Read);
         let mut port = port.reading(2);
-        script.lock().expect("the script").to_read = vec![Ok(b"293.15".to_vec())];
+        script.lock().expect("the script").to_read =
+            vec![Ok(b"293.15".to_vec())];
 
         // A sensor that answers in two bytes, read into a buffer with room
         // for sixty-four: two is what is asked for.
@@ -1789,7 +1919,8 @@ mod tests {
 
         // And the buffer is the other bound: a caller with room for one byte
         // gets one, whatever the node says.
-        let (script, port) = port_of_script("temp_1", Use::Read, vec![Ok(b"293.15".to_vec())]);
+        let (script, port) =
+            port_of_script("temp_1", Use::Read, vec![Ok(b"293.15".to_vec())]);
         let mut port = port.reading(2);
         let got = port.take(&mut [0u8; 1]).expect("a reading");
         assert_eq!(got.bytes, 1);
@@ -1846,8 +1977,9 @@ mod tests {
         let path = where_.path().join("heater");
         std::fs::write(&path, b"").expect("the device");
         let node = heater(path.to_str().expect("a path"));
-        let port = EndpointPort::open(&node, &routes(&node), &Abandon::nothing())
-            .expect("the heater opens");
+        let port =
+            EndpointPort::open(&node, &routes(&node), &Abandon::nothing())
+                .expect("the heater opens");
         drop(port);
         assert_eq!(
             std::fs::read(&path).expect("what was written"),
@@ -1856,9 +1988,15 @@ mod tests {
         );
 
         let node = heater("/dev/full");
-        let said = match EndpointPort::open(&node, &routes(&node), &Abandon::nothing()) {
+        let said = match EndpointPort::open(
+            &node,
+            &routes(&node),
+            &Abandon::nothing(),
+        ) {
             Err(why) => why,
-            Ok(_) => panic!("a payload its init could not be written to was opened"),
+            Ok(_) => {
+                panic!("a payload its init could not be written to was opened")
+            }
         };
         assert!(
             said.contains("heater") && said.contains("init"),
@@ -1875,7 +2013,8 @@ mod tests {
         use std::net::UdpSocket;
         use tcslibgs::graph::{Destinations, Link};
 
-        let payload = UdpSocket::bind("127.0.0.1:0").expect("the payload's socket");
+        let payload =
+            UdpSocket::bind("127.0.0.1:0").expect("the payload's socket");
         let sends_from = payload.local_addr().expect("where").to_string();
         // A port for the vehicle to wait at, taken and given back.
         let waits = UdpSocket::bind("127.0.0.1:0")
@@ -2025,7 +2164,8 @@ mod tests {
     #[test]
     fn a_node_is_opened_from_its_configuration() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let graph = Graph::load(root.join("tests/manual/thermostat.yaml")).expect("it reads");
+        let graph = Graph::load(root.join("tests/manual/thermostat.yaml"))
+            .expect("it reads");
         let routes = Routes::of(&graph);
 
         let said = match EndpointPort::open(
@@ -2073,7 +2213,8 @@ mod tests {
 
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("pipe");
-        let name = CString::new(path.to_str().expect("a path")).expect("a name");
+        let name =
+            CString::new(path.to_str().expect("a path")).expect("a name");
         // SAFETY: a path in a directory this test owns, and a mode.
         assert_eq!(
             unsafe { libc::mkfifo(name.as_ptr(), 0o600) },
@@ -2084,7 +2225,8 @@ mod tests {
         let config = EndpointConfig::Device(DeviceConfig {
             path: path.to_string_lossy().to_string(),
         });
-        let mut port = EndpointPort::connect("sensor", &config, Use::Read).expect("the pipe opens");
+        let mut port = EndpointPort::connect("sensor", &config, Use::Read)
+            .expect("the pipe opens");
 
         // Nothing has been written, and this returns: without the readiness
         // question in take, this test would hang rather than fail.
@@ -2096,8 +2238,8 @@ mod tests {
         );
 
         // And when there is something, it is read.
-        let mut writer =
-            EndpointPort::connect("writer", &config, Use::Both).expect("the other end");
+        let mut writer = EndpointPort::connect("writer", &config, Use::Both)
+            .expect("the other end");
         assert_eq!(writer.give(Arriving::ANYWHERE, b"293.15"), Ok(()));
         let got = port
             .take(&mut buffer)
@@ -2122,7 +2264,8 @@ mod tests {
 
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("pipe");
-        let name = CString::new(path.to_str().expect("a path")).expect("a name");
+        let name =
+            CString::new(path.to_str().expect("a path")).expect("a name");
         // SAFETY: a path in a directory this test owns, and a mode.
         assert_eq!(
             unsafe { libc::mkfifo(name.as_ptr(), 0o600) },
@@ -2134,8 +2277,8 @@ mod tests {
         let config = EndpointConfig::Device(DeviceConfig {
             path: path.to_string_lossy().to_string(),
         });
-        let mut port =
-            EndpointPort::connect("loopback", &config, Use::Both).expect("the pipe opens");
+        let mut port = EndpointPort::connect("loopback", &config, Use::Both)
+            .expect("the pipe opens");
 
         // Written and read back through the kernel, which is as much of a
         // device as a pipe can be.
@@ -2210,7 +2353,8 @@ mod tests {
             .take(&mut buffer)
             .map(|taken| taken.bytes)
             .expect("an answer");
-        let pong = tcslibgs::node::vehicle::ping::read_reply(&buffer[..got]).expect("it reads");
+        let pong = tcslibgs::node::vehicle::ping::read_reply(&buffer[..got])
+            .expect("it reads");
         assert_eq!(pong.ping.count, 1);
         assert!(!port.ready());
 
@@ -2356,9 +2500,14 @@ mod tests {
                 attributes: [
                     (
                         "directory".to_string(),
-                        tcslibgs::Scalar::of(where_.path().to_str().expect("a path")),
+                        tcslibgs::Scalar::of(
+                            where_.path().to_str().expect("a path"),
+                        ),
                     ),
-                    ("format".to_string(), tcslibgs::Scalar::of("variable_ts_rc")),
+                    (
+                        "format".to_string(),
+                        tcslibgs::Scalar::of("variable_ts_rc"),
+                    ),
                 ]
                 .into_iter()
                 .collect(),
@@ -2400,7 +2549,9 @@ mod tests {
                 attributes: [
                     (
                         "directory".to_string(),
-                        tcslibgs::Scalar::of(where_.path().to_str().expect("a path")),
+                        tcslibgs::Scalar::of(
+                            where_.path().to_str().expect("a path"),
+                        ),
                     ),
                     ("format".to_string(), tcslibgs::Scalar::of("fixed:4")),
                 ]
@@ -2425,12 +2576,14 @@ mod tests {
     #[test]
     fn an_endpoint_is_never_ready_as_a_consequence_of_a_delivery() {
         let (script, mut port) = port("moc", Use::Both);
-        script.lock().expect("the script").to_read = vec![Ok(b"293.15".to_vec())];
+        script.lock().expect("the script").to_read =
+            vec![Ok(b"293.15".to_vec())];
 
         assert_eq!(port.give(Arriving::ANYWHERE, b"1"), Ok(()));
         assert!(
             !port.ready(),
-            "a reading waiting on a socket is not a result of what was sent to it"
+            "a reading waiting on a socket is not a result of what was sent to \
+             it"
         );
     }
 
@@ -2439,7 +2592,8 @@ mod tests {
     fn a_triggered_device_is_asked_after_it_is_read() {
         let (script, port) = port("temp_3", Use::Read);
         let mut port = port.triggered_by(b"R".to_vec());
-        script.lock().expect("the script").to_read = vec![Ok(b"42".to_vec()), Ok(b"43".to_vec())];
+        script.lock().expect("the script").to_read =
+            vec![Ok(b"42".to_vec()), Ok(b"43".to_vec())];
 
         let mut buffer = [0u8; 64];
 
@@ -2597,9 +2751,9 @@ mod tests {
         let (script, port) = port("temp_3", Use::Read);
         let mut port = port.triggered_by(b"R".to_vec());
         script.lock().expect("the script").to_read = vec![Ok(b"42".to_vec())];
-        script.lock().expect("the script").write_answers = vec![Err(TcsError::Endpoint(
-            "the bus will not take it".to_string(),
-        ))];
+        script.lock().expect("the script").write_answers = vec![Err(
+            TcsError::Endpoint("the bus will not take it".to_string()),
+        )];
 
         let said = port
             .take(&mut [0u8; 64])
@@ -2632,9 +2786,13 @@ mod tests {
         fn stands_in(where_: &Path, redirect: &str) -> std::path::PathBuf {
             let path = where_.join("stands_in");
             let mut file = std::fs::File::create(&path).expect("a program");
-            write!(file, "#!/bin/sh\nexec cat {redirect}\n").expect("a program");
-            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
-                .expect("a program that can be run");
+            write!(file, "#!/bin/sh\nexec cat {redirect}\n")
+                .expect("a program");
+            std::fs::set_permissions(
+                &path,
+                std::fs::Permissions::from_mode(0o755),
+            )
+            .expect("a program that can be run");
             path
         }
 
@@ -2644,9 +2802,14 @@ mod tests {
         /// those being required of a node: asked of `app::Kind` rather than
         /// listed per type here, so a kind that gains an argument gains it in
         /// these tests too.
-        fn node(name: &str, node_type: &str, program: &std::path::Path) -> Node {
+        fn node(
+            name: &str,
+            node_type: &str,
+            program: &std::path::Path,
+        ) -> Node {
             // The whole path, this test module being called `app` itself.
-            let kind = tcslibgs::node::app::Kind::of(node_type).expect("a kind of app");
+            let kind = tcslibgs::node::app::Kind::of(node_type)
+                .expect("a kind of app");
             let mut attributes = std::collections::BTreeMap::new();
             attributes.insert(
                 "executable".to_string(),
@@ -2678,7 +2841,8 @@ mod tests {
         /// process and answers when it answers. The bound is so that a
         /// program which never answers fails the test instead of hanging it.
         fn taken_soon(port: &mut AppPort, buffer: &mut [u8]) -> Taken {
-            let until = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            let until =
+                std::time::Instant::now() + std::time::Duration::from_secs(5);
             loop {
                 let taken = port.take(buffer).expect("a datum");
                 if taken.bytes > 0 {
@@ -2699,9 +2863,10 @@ mod tests {
             // Reads payload data at descriptor 0 and writes what it read back
             // to the same descriptor, which is MOC data there.
             let program = stands_in(where_.path(), ">&0");
-            let mut port =
-                crate::when_not_busy(|| AppPort::open(&node("fore", "app_payload_veh", &program)))
-                    .expect("it starts");
+            let mut port = crate::when_not_busy(|| {
+                AppPort::open(&node("fore", "app_payload_veh", &program))
+            })
+            .expect("it starts");
 
             port.give(Arriving::on(Stream::Groundward), b"293.15")
                 .expect("a reading it takes");
@@ -2724,9 +2889,10 @@ mod tests {
             // payload data at descriptor 1, and the vehicleward side is left
             // alone.
             let program = stands_in(where_.path(), "");
-            let mut port =
-                crate::when_not_busy(|| AppPort::open(&node("through", "app_all_veh", &program)))
-                    .expect("it starts");
+            let mut port = crate::when_not_busy(|| {
+                AppPort::open(&node("through", "app_all_veh", &program))
+            })
+            .expect("it starts");
 
             port.give(Arriving::on(Stream::Groundward), b"293.15")
                 .expect("a reading it takes");
@@ -2746,9 +2912,10 @@ mod tests {
         fn a_datum_on_the_wrong_stream_is_refused() {
             let where_ = tempfile::tempdir().expect("a directory");
             let program = stands_in(where_.path(), ">&0");
-            let mut port =
-                crate::when_not_busy(|| AppPort::open(&node("fore", "app_payload_veh", &program)))
-                    .expect("it starts");
+            let mut port = crate::when_not_busy(|| {
+                AppPort::open(&node("fore", "app_payload_veh", &program))
+            })
+            .expect("it starts");
 
             let said = port
                 .give(Arriving::on(Stream::Vehicleward), b"SET 300")
@@ -2769,9 +2936,10 @@ mod tests {
             // Reads at descriptor 1 and writes back to it, which is payload
             // data there.
             let program = stands_in(where_.path(), "<&1");
-            let mut port =
-                crate::when_not_busy(|| AppPort::open(&node("bay", "app_all_pl", &program)))
-                    .expect("it starts");
+            let mut port = crate::when_not_busy(|| {
+                AppPort::open(&node("bay", "app_all_pl", &program))
+            })
+            .expect("it starts");
 
             port.give(Arriving::on(Stream::Vehicleward), b"READ")
                 .expect("what asks it for a reading");
@@ -2799,16 +2967,24 @@ mod tests {
             // nobody: six bytes after a length of six.
             let path = where_.path().join("reports");
             let mut file = std::fs::File::create(&path).expect("a program");
-            write!(file, "#!/bin/sh\nprintf '\\006\\000\\000\\000293.15' >&1\n")
-                .expect("a program");
+            write!(
+                file,
+                "#!/bin/sh\nprintf '\\006\\000\\000\\000293.15' >&1\n"
+            )
+            .expect("a program");
             // Closed before it is run: a program still open for writing is a
             // program the kernel refuses to execute.
             drop(file);
-            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
-                .expect("a program that can be run");
+            std::fs::set_permissions(
+                &path,
+                std::fs::Permissions::from_mode(0o755),
+            )
+            .expect("a program that can be run");
 
-            let mut port = crate::when_not_busy(|| AppPort::open(&node("bay", "app_pl", &path)))
-                .expect("it starts");
+            let mut port = crate::when_not_busy(|| {
+                AppPort::open(&node("bay", "app_pl", &path))
+            })
+            .expect("it starts");
 
             let mut buffer = [0u8; 64];
             let taken = taken_soon(&mut port, &mut buffer);

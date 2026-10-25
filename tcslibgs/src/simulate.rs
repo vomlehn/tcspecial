@@ -675,8 +675,7 @@ mod tests {
     }
 
     #[test]
-    fn all_refuses_each_payload_that_is_not_a_stand_in_and_says_what_could_not_be_told(
-    ) {
+    fn all_refuses_non_stand_ins_and_says_what_could_not_be_told() {
         let (s, h, u) = (stand_in(), hardware(), unknown());
         let said = refusals(Mode::All, &[("a", &s), ("b", &h), ("c", &u)]);
         assert_eq!(

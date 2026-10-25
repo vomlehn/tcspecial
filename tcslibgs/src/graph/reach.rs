@@ -2268,8 +2268,7 @@ mod tests {
 
     /// Only on this host, and only on the types that need one.
     #[test]
-    fn a_stand_in_is_refused_off_the_host_and_on_a_type_with_a_stand_in_of_its_own(
-    ) {
+    fn a_stand_in_is_refused_off_the_host_and_on_types_with_their_own() {
         let off = node(
             "line",
             "hdlc",

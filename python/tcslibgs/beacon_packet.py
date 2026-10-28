@@ -46,7 +46,7 @@ class Beacon(pk.Packet):
     """
 
     NAME: ClassVar[str] = "/TcsBeacon/Beacon"
-    MAX_BYTES: ClassVar[int] = 57
+    MAX_BYTES: ClassVar[int] = 55
 
     major: int = 0
     """``/TcsBeacon/Major`` (/TcsBeacon/U8Type)"""
@@ -81,8 +81,6 @@ class Beacon(pk.Packet):
         v9 = r.uint_order(1, False, "Restarting") != 0
         v10 = r.uint_order(7, False, "Spare")
         v11 = r.bytes(16, "Interface")
-        p12 = r.pos
-        v12 = r.uint_order(16, False, "Crc")
         if not (v1 == "tcspecial "):
             raise pk.PacketError("Mismatch", "/TcsBeacon/Beacon",
                                  "/TcsBeacon/Name == tcspecial ")
@@ -92,9 +90,6 @@ class Beacon(pk.Packet):
         if not (v10 == 0):
             raise pk.PacketError("Mismatch", "/TcsBeacon/Beacon",
                                  "/TcsBeacon/Spare == 0")
-        if (r.checksum(("crc", 16, 4129, 65535, 0, False, False), (0), (p12),
-                       "Crc") & 0xffff != v12):
-            raise pk.PacketError("BadChecksum", "Crc")
         return (Beacon(major=v2, minor=v3, patch=v4, digest=v6, sequence=v7,
                        generation=v8, restarting=v9, interface=v11), r.used())
 
@@ -117,10 +112,6 @@ class Beacon(pk.Packet):
         w.uint_order(1, False, 1 if self.restarting else 0)
         w.uint_order(7, False, pk.from_signed(0, 7, 'unsigned', "Spare"))
         pk.write_binary(w, self.interface, 16, "Interface")
-        l12 = w.pos
-        w.uint(16, 0)
-        w.patch_checksum(("crc", 16, 4129, 65535, 0, False, False), (0), (l12),
-                         l12, 16, False, "Crc")
 
     def alarms(self) -> list:
         """(field, alarm level) for each field with an alarm; the level is None
@@ -159,7 +150,7 @@ class BeaconLayoutKind(pk.PacketKind):
     """Every concrete packet derived from ``/TcsBeacon/BeaconLayout``."""
 
     NAME: ClassVar[str] = "/TcsBeacon/BeaconLayout"
-    MAX_BYTES: ClassVar[int] = 57
+    MAX_BYTES: ClassVar[int] = 55
     MEMBERS: ClassVar[tuple] = (Beacon,)
 
     @staticmethod
@@ -179,12 +170,7 @@ class BeaconLayoutKind(pk.PacketKind):
         v9 = r.uint_order(1, False, "Restarting") != 0
         v10 = r.uint_order(7, False, "Spare")
         v11 = r.bytes(16, "Interface")
-        p12 = r.pos
-        v12 = r.uint_order(16, False, "Crc")
         if (v1 == "tcspecial ") and (v5 == " ") and (v10 == 0):
-            if (r.checksum(("crc", 16, 4129, 65535, 0, False, False), (0),
-                           (p12), "Crc") & 0xffff != v12):
-                raise pk.PacketError("BadChecksum", "Crc")
             return Beacon(major=v2, minor=v3, patch=v4, digest=v6, sequence=v7,
                           generation=v8, restarting=v9, interface=v11), r.used()
         raise pk.PacketError("NoMatch", "/TcsBeacon/BeaconLayout")

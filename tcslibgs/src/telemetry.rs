@@ -2,16 +2,15 @@
 //!
 //! Telemetry is sent from space to ground.
 //!
-//! These are the answers to commands, and go as JSON. The beacon, which
-//! answers nothing and has a layout of its own, is in [`crate::beacon`].
-
-use serde::{Deserialize, Serialize};
+//! These are the answers to commands, which go on the link as the packets
+//! `xtce/link.xml` states: see [`crate::link`]. The beacon, which answers
+//! nothing and has a layout of its own, is in [`crate::beacon`].
 
 use crate::config_digest::{ConfigDigest, ConfigVersion};
 use crate::types::{CommandStatus, DHSample, NodeCounts, NodeId, Timestamp};
 
 /// Telemetry message header
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TelemetryHeader {
     /// Sequence number matching the command that generated this response
     pub sequence: u32,
@@ -54,7 +53,7 @@ impl TelemetryHeader {
 }
 
 /// Telemetry types
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TelemetryType {
     Ping,
     Connect,
@@ -74,6 +73,9 @@ pub enum TelemetryType {
 }
 
 impl TelemetryType {
+    /// The kind an answer of this type carries. What goes on the link is
+    /// stated in `xtce/link.xml`, and a test in [`crate::link`] holds this to
+    /// it, so the two cannot come to differ.
     pub fn to_u8(&self) -> u8 {
         match self {
             TelemetryType::Ping => 0x81,
@@ -107,7 +109,7 @@ impl TelemetryType {
 }
 
 /// PING telemetry response
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PingTelemetry {
     pub header: TelemetryHeader,
 }
@@ -121,7 +123,7 @@ impl PingTelemetry {
 }
 
 /// RESTART_ARM telemetry response
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RestartArmTelemetry {
     pub header: TelemetryHeader,
 }
@@ -139,7 +141,7 @@ impl RestartArmTelemetry {
 }
 
 /// RESTART telemetry response
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RestartTelemetry {
     pub header: TelemetryHeader,
 }
@@ -157,7 +159,7 @@ impl RestartTelemetry {
 }
 
 /// START_DH telemetry response
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ConnectTelemetry {
     pub header: TelemetryHeader,
     pub version: ConfigVersion,
@@ -201,7 +203,7 @@ impl ConnectTelemetry {
     }
 }
 /// CONFIG telemetry response
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ConfigTelemetry {
     pub header: TelemetryHeader,
 }
@@ -225,7 +227,7 @@ impl ConfigTelemetry {
 /// the id says which node the pair was about. The ground shows the name,
 /// which it has from the configuration it read: the same file the id is
 /// counted from.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NodeTelemetry {
     pub header: TelemetryHeader,
     /// The node the command named, whether or not the configuration has it:
@@ -269,14 +271,12 @@ impl NodeTelemetry {
 /// is `InvalidParameter` for every one of them, and an operator who is told
 /// only that has to go and read a log on the vehicle to find out which word
 /// to change. Empty for a SET_NODE that was done.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SetNodeTelemetry {
     pub header: TelemetryHeader,
     /// The node the command named, as [`NodeTelemetry::node`].
     pub node: NodeId,
-    /// Why it was refused, or nothing. Defaulted where it is read, so that an
-    /// answer from a vehicle that sends none still reads, as no reason.
-    #[serde(default)]
+    /// Why it was refused, or nothing.
     pub reason: Reason,
 }
 
@@ -399,42 +399,6 @@ impl std::fmt::Display for Reason {
     }
 }
 
-impl Serialize for Reason {
-    fn serialize<S: serde::Serializer>(
-        &self,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(self.as_str())
-    }
-}
-
-/// Read as it is written: a reason longer than this end holds is cut, as the
-/// vehicle would have cut it, rather than refused -- a reason is something to
-/// show, and an answer refused for its length would show nothing.
-impl<'de> Deserialize<'de> for Reason {
-    fn deserialize<D: serde::Deserializer<'de>>(
-        deserializer: D,
-    ) -> Result<Self, D::Error> {
-        struct Text;
-        impl serde::de::Visitor<'_> for Text {
-            type Value = Reason;
-            fn expecting(
-                &self,
-                f: &mut std::fmt::Formatter,
-            ) -> std::fmt::Result {
-                write!(f, "a reason, as text")
-            }
-            fn visit_str<E: serde::de::Error>(
-                self,
-                text: &str,
-            ) -> Result<Reason, E> {
-                Ok(Reason::of(text))
-            }
-        }
-        deserializer.deserialize_str(Text)
-    }
-}
-
 /// The answer to a QUERY_NODE: what that node has moved, and whether it is
 /// running
 ///
@@ -446,7 +410,7 @@ impl<'de> Deserialize<'de> for Reason {
 /// A command about a disabled node is answered rather than ignored, so this
 /// is what a disabled node answers: its counters, which survive a disable,
 /// and `false`.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct QueryNodeTelemetry {
     pub header: TelemetryHeader,
     /// The node the command named.
@@ -492,7 +456,7 @@ impl QueryNodeTelemetry {
 /// For an operator who wants to see the bytes rather than a count of them. A
 /// direction that has carried nothing has no time, which is not the same as
 /// one that carried a transfer of no bytes: see [`DHSample`].
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct QueryNodeSampleTelemetry {
     pub header: TelemetryHeader,
     /// The node the command named.
@@ -596,7 +560,7 @@ pub fn answer_to(
 }
 
 /// Union of all telemetry types
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Telemetry {
     Ping(PingTelemetry),
     Connect(ConnectTelemetry),
@@ -719,7 +683,7 @@ mod tests {
     }
 
     /// A SET_NODE's answer carries its reason as text, and one with none
-    /// reads -- an answer from a vehicle that sends no reason included.
+    /// reads as one with none.
     #[test]
     fn a_set_node_answer_carries_its_reason() {
         let refused = Telemetry::SetNode(
@@ -730,17 +694,22 @@ mod tests {
             )
             .because(Reason::of("it is spelled half_band")),
         );
-        let json = serde_json::to_string(&refused).unwrap();
+        let packed = refused.to_bytes();
         assert!(
-            json.contains("\"reason\":\"it is spelled half_band\""),
-            "{json}"
+            packed
+                .windows(b"it is spelled half_band".len())
+                .any(|w| w == b"it is spelled half_band"),
+            "the reason is on the link as its text"
         );
-        assert_eq!(serde_json::from_str::<Telemetry>(&json).unwrap(), refused);
+        assert_eq!(Telemetry::read(&packed), Ok(refused));
 
-        let without =
-            json.replace(",\"reason\":\"it is spelled half_band\"", "");
-        match serde_json::from_str::<Telemetry>(&without).unwrap() {
-            Telemetry::SetNode(tm) => assert!(tm.reason.is_empty()),
+        let without = Telemetry::SetNode(SetNodeTelemetry::new(
+            7,
+            CommandStatus::Success,
+            NodeId::of(2),
+        ));
+        match Telemetry::read(&without.to_bytes()) {
+            Ok(Telemetry::SetNode(tm)) => assert!(tm.reason.is_empty()),
             other => panic!("{other:?}"),
         }
     }
@@ -833,14 +802,5 @@ mod tests {
                 answer.tm_type()
             );
         }
-    }
-
-    #[test]
-    fn test_telemetry_serialization() {
-        let tm =
-            Telemetry::Ping(PingTelemetry::new(42, CommandStatus::Success));
-        let json = serde_json::to_string(&tm).unwrap();
-        let deserialized: Telemetry = serde_json::from_str(&json).unwrap();
-        assert_eq!(tm.sequence(), deserialized.sequence());
     }
 }

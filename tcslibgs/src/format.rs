@@ -15,8 +15,8 @@
 //! misspelled extension was not an error but a file parsed as the wrong
 //! language. Nothing was written in it that was not also written in YAML, so
 //! it is gone, and a file this cannot place by its extension is refused.
-//! (Nothing here is about the command link, which carries JSON between the
-//! ground and the spacecraft and is no part of configuration.)
+//! (Nothing here is about the command link, whose packets are stated in
+//! XTCE and are no part of configuration: see [`crate::link`].)
 
 use std::fs;
 use std::path::Path;

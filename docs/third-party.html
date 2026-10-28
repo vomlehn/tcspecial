@@ -549,10 +549,11 @@ not hand-edited structures at both ends that must be kept in step.</dd>
 <h1><a class="toc-backref" href="#toc-entry-9">What Has to Change</a></h1>
 <div class="section" id="commands-and-telemetry-in-xtce">
 <h2><a class="toc-backref" href="#toc-entry-10">1. Commands and Telemetry in XTCE</a></h2>
-<p>This is the change everything else depends on. tcspecial's commands and the
-answers to them are JSON, and cFS's Software Bus carries CCSDS Space Packets,
-while ground systems expect binary formats from a dictionary. The beacon has
-already moved; the rest should follow.</p>
+<p>This is the change everything else depends on, and it is made: tcspecial's
+commands and the answers to them are CCSDS Space Packets stated in XTCE, in
+<tt class="docutils literal">tcslibgs/xtce/link.xml</tt>, as cFS's Software Bus carries and ground systems
+read from a dictionary, and the beacon carries the interface's digest beside
+the configuration's.</p>
 <ul class="simple">
 <li>Describe every tcspecial command and answer in XTCE, on a base container
 holding the CCSDS primary header. tcs-xtce's container inheritance and

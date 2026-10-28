@@ -119,11 +119,11 @@ nothing in it is its own:
   beacons are, starts the loop on a thread, and puts each pass in the window.
   That is all of it, but for a button.
 
-A beacon is 57 bytes: `tcspecial` and a space, the version's major, minor and
+A beacon is 55 bytes: `tcspecial` and a space, the version's major, minor and
 patch a byte each, a space, the configuration's MD5 digest, the beacon's
 number and the generation number in four bytes each, most significant first,
-a byte whose top bit says a restart has begun, the interface's digest and a
-CRC-16. The layout is described once,
+a byte whose top bit says a restart has begun, and the interface's digest.
+The layout is described once,
 in XTCE, in `tcslibgs/xtce/beacon.xml`; tcspecial packs every beacon and
 `tcslib::beacon` unpacks it with the code tcs-xtce generates from that file,
 `tcslibgs::Beacon`, and this example's test packs the beacon it sends the same

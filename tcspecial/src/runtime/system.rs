@@ -2051,7 +2051,7 @@ vehicle:
         let datagrams: Vec<Vec<u8>> = (0..30)
             .map(|sequence| {
                 let value = if sequence % 2 == 0 { "280.0" } else { "300.0" };
-                serde_json::to_vec(&Command::SetNode(
+                Command::SetNode(
                     SetNodeCommand::new(
                         sequence,
                         NodeId::of(0),
@@ -2059,8 +2059,8 @@ vehicle:
                         value.as_bytes(),
                     )
                     .expect("it fits"),
-                ))
-                .expect("it serializes")
+                )
+                .to_bytes()
             })
             .collect();
 
@@ -2074,9 +2074,7 @@ vehicle:
             // What the command thread does with each: read it, and hand the
             // setting to the pass by the node's shared name.
             let round = |datagram: &[u8]| {
-                let Ok(Command::SetNode(set)) =
-                    serde_json::from_slice::<Command>(datagram)
-                else {
+                let Ok(Command::SetNode(set)) = Command::read(datagram) else {
                     panic!("a SET_NODE");
                 };
                 bench.ask(Work::Set {
@@ -2177,15 +2175,16 @@ vehicle:
     }
 
     /// What every command and every beacon goes through allocates nothing:
-    /// whether a datagram came from where the configuration says, an answer
-    /// written as JSON into a buffer that is reused, and a beacon packed by a
-    /// packer that is. What the command thread and the beacon thread do for
-    /// each, but for the socket.
+    /// whether a datagram came from where the configuration says, the
+    /// command read from it, its answer packed by a packer that is reused,
+    /// and a beacon packed by a packer that is. What the command thread and
+    /// the beacon thread do for each, but for the socket.
     #[test]
     fn answering_and_beaconing_allocate_nothing() {
         use tcslibgs::{
-            came_from, Beacon, BeaconPacker, CommandStatus, ConfigDigest,
-            ConfigVersion, HostPort, PingTelemetry, Telemetry,
+            came_from, AnswerPacker, Beacon, BeaconPacker, Command,
+            CommandStatus, ConfigDigest, ConfigVersion, HostPort, NodeId,
+            PingTelemetry, SetNodeCommand, Telemetry,
         };
 
         let stated = HostPort {
@@ -2204,17 +2203,30 @@ vehicle:
         );
         let answer =
             Telemetry::Ping(PingTelemetry::new(3, CommandStatus::Success));
+        // The longest command there is, as it arrives.
+        let asked = Command::SetNode(
+            SetNodeCommand::new(
+                9,
+                NodeId(3),
+                &"a".repeat(tcslibgs::ATTRIBUTE_BYTES),
+                &[0x5a; tcslibgs::VALUE_BYTES],
+            )
+            .expect("the longest fits"),
+        )
+        .to_bytes();
         // Made once, as each thread makes its own.
-        let mut data: Vec<u8> = Vec::with_capacity(1024);
+        let mut answers = AnswerPacker::new();
         let mut packer = BeaconPacker::new();
 
         let made = counting::allocations_in(|| {
             for _ in 0..10 {
                 assert!(came_from(&stated, &from));
                 assert!(!came_from(&stated, &stranger));
-                data.clear();
-                serde_json::to_writer(&mut data, &answer)
-                    .expect("it is written");
+                assert!(matches!(
+                    Command::read(&asked),
+                    Ok(Command::SetNode(_))
+                ));
+                assert!(!answers.pack(&answer).is_empty());
                 assert!(!packer.pack(&beacon).is_empty());
             }
         });

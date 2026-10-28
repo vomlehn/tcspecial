@@ -5300,10 +5300,18 @@ Requirement
     long afterwards, then have nothing to agree about beyond the epoch.
 
 Requirement
-    On the wire a timestamp is eight bytes, least significant byte first.
-    Little-endian because both ends run on little-endian machines, so network
-    order would be a byte swap at each of them to agree with nothing, and
-    because the records a payload reads are already written that way.
+    On the link a timestamp is eight bytes, most significant byte first, as
+    every number in a command, an answer and the beacon is: that is the CCSDS
+    order, which a ground system reading the packets from their XTCE expects,
+    and one order for the whole link is one thing for the two ends to agree
+    about. In the records a node makes -- a GPIO node's events -- it is least
+    significant byte first, as those records' other fields are.
+
+It was least significant byte first on the link too, while the link was
+JSON and the order was a matter of the records alone. Once commands and
+answers became CCSDS packets the link had an order of its own, and a
+timestamp in it that went the other way would be the one field a reader of
+the packet had to know to turn round.
 
 Requirement
     All ones -- ``FF FF FF FF FF FF FF FF`` -- is the one value that is not a
@@ -5428,7 +5436,7 @@ Configure various TCSpecial values
 +----------------+------------+----------------+-------------------------------+
 
 Requirement
-    The interval is eight bytes of microseconds, least significant byte
+    The interval is eight bytes of microseconds, most significant byte
     first: the unit and the order a timestamp uses, so that a number crossing
     this link means one thing whichever field it is in. There is no reserved
     value in it -- an interval, unlike a clock, cannot fail to be read -- and
@@ -5452,7 +5460,7 @@ Asynchronous Telemetry
 ----------------------
 Beacon
 
-The beacon is not JSON, as the answers to commands are. It is 34 bytes in a
+The beacon answers no command and has a layout of its own. It is 55 bytes in a
 fixed layout, stated once, in XTCE, in ``tcslibgs/xtce/beacon.xml``, and packed
 and unpacked by the code tcs-xtce generates from that file: Rust in
 ``tcslibgs::beacon``, which tcspecial and ``tcslib`` use, and Python in
@@ -5494,16 +5502,13 @@ it is published.
 |                +------------+-----------+------------------------------------+
 |                | interface  | 16 bytes  | The digest of the interface this   |
 |                |            |           | tcspecial speaks                   |
-|                +------------+-----------+------------------------------------+
-|                | crc        | 2 bytes   | The CCSDS CRC-16 of every byte     |
-|                |            |           | before it                          |
 +----------------+------------+-----------+------------------------------------+
 
 Requirement
-    A beacon is exactly 57 bytes, in the layout above, and the ground refuses
+    A beacon is exactly 55 bytes, in the layout above, and the ground refuses
     a datagram of any other length, without the name and the space where
-    they belong, with a spare bit set or whose CRC does not match, showing
-    what arrived rather than a beacon. Something else
+    they belong or with a spare bit set, showing what arrived rather than a
+    beacon. Something else
     sending to the beacon port is then seen for what it is.
 
 Requirement
@@ -5594,7 +5599,7 @@ another section says the same thing, this one is the one it follows.
 
 .. note::
    **What runs today.** The beacon carries the generation number, the
-   restarting bit, the interface digest and a CRC, and is read without
+   restarting bit and the interface digest, and is read without
    allocating. ``state_file``, ``beacon.default_interval`` and
    ``beacon.reset_interval`` are read; every start counts itself in the
    state file before its first beacon; the beacon goes fast from start, and
@@ -5603,11 +5608,13 @@ another section says the same thing, this one is the one it follows.
    Python. ``tcslib``'s ``TcsClient``, and through it the C/C++ library,
    holds a station's commands from a RESTART until a beacon says it is done,
    and the beacon watches in Rust and Python judge a restart by the
-   generation. Commands and answers are still JSON on the link, and carry no
-   CRC or generation; the fallback interface and its link, load sets,
-   uploads, SWITCH, the golden build, the refusal of full-interface commands
-   on an interface mismatch and ``tcsverify --interface`` are designed here
-   and not yet built.
+   generation. Commands and answers are CCSDS packets stated in
+   ``tcslibgs/xtce/link.xml``, packed and unpacked by
+   ``tcslibgs::link`` without allocating; nothing on the link is JSON. Not
+   yet built: the generation in every command, a count of the packets
+   refused (they are logged), the fallback interface and its link, load
+   sets, uploads, SWITCH, the golden build, the refusal of full-interface
+   commands on an interface mismatch, and ``tcsverify --interface``.
 
 Every packet is XTCE
 --------------------
@@ -5627,21 +5634,40 @@ Requirement
     are what let a person reading a capture see what it is.
 
 Requirement
-    Every packet ends with a CRC-16 (polynomial ``0x1021``, initial
-    remainder ``0xFFFF``, the CCSDS one) over every byte before it, stated in
-    its container's ``ErrorDetectCorrect``. A packet whose CRC does not match
-    is dropped and counted, and nothing it says is acted on.
-
-UDP has a checksum of its own, but over IPv4 a sender may leave it out --
-nought in that field means "not computed" -- and a receiver then has nothing
-to check. A packet that carries its own check is valid whatever carried it,
-which is what lets the same definition of *valid* serve a radio, an SBN peer
-and a loopback.
+    A command is the six-byte CCSDS primary header -- version 0, packet type
+    1, no secondary header, APID ``0x100``, unsegmented, the low fourteen
+    bits of the command's sequence as the sequence count, and the CCSDS
+    packet length -- then a byte of opcode, the four-byte sequence, what the
+    command carries. An answer is the same header with packet
+    type 0, then a byte saying which answer it is, the sequence of the
+    command it answers, a byte of status, the eight-byte timestamp, what the
+    answer carries. Every number is most significant byte first.
+    A datagram that holds anything after its packet, or whose header's
+    constants are not these, is refused: an answer's kind is a node
+    command's opcode, and it is the packet type that keeps one from being
+    taken for the other.
 
 Requirement
-    A packet is *valid* when it passes its own check, or, where the transport
-    beneath it guarantees end-to-end integrity and the packet carries no check
-    of its own, when the transport delivered it. A valid packet from the MOC
+    ``tcslibgs::link`` is the one place a command or an answer is turned
+    into a packet and back, and every program goes through it: tcspecial,
+    ``tcslib`` and through it the C/C++ library and tcsmoc, and every test's
+    stand-in.
+
+No packet carries a check of its own: the transport beneath it checks it.
+On this link that is UDP's checksum, and beneath a gateway it is the frame
+check of the radio or the bus as well. A datagram that fails the transport's
+check is dropped before anything reads it, so a second check in the packet
+would only check again what was checked.
+
+Requirement
+    Every transport the link runs over checks what it carries end to end.
+    UDP is sent with its checksum, over IPv4 as over IPv6: nothing in
+    tcspecial or ``tcslib`` turns it off (``SO_NO_CHECK``), and a MOC that
+    sends some other way must not either.
+
+Requirement
+    A packet is *valid* when the transport beneath it delivered it and it is
+    exactly one packet of the layout its port takes. A valid packet from the MOC
     is one that is valid and came from where the configuration says the MOC
     sends from (``tcslibgs::came_from``). Nothing else is.
 
@@ -5968,9 +5994,12 @@ with no way in, and any way an upload could be lost or damaged. Each is
 paired with the requirement above that closes it.
 
 UDP may carry no checksum
-    Over IPv4 a UDP checksum of nought means none was computed, so "the
-    transport checked it" is not true of UDP. Every packet carries its own
-    CRC-16, and only a packet that passes it is valid.
+    Over IPv4 a UDP checksum of nought means none was computed, and a
+    receiver cannot tell from its socket that a datagram arrived unchecked.
+    The requirement that every sender computes it closes this for tcspecial
+    and ``tcslib``, but not for a MOC built elsewhere that turns it off. Run
+    over IPv6, where the checksum is mandatory and Linux drops a datagram
+    without one, the link is closed against that too.
 
 A read-only file can still be deleted
     Deleting is permitted by the directory, not the file, and root is
@@ -6089,8 +6118,8 @@ hexadecimal, a flag is ``true`` or ``false``, a timeout carries its unit; see
 `Value Syntax`_. The YAML of a shipped set is the one to read, because it
 carries the comments.
 
-(The command link carries JSON between the ground and the spacecraft. That is
-not configuration and is no part of this.)
+(The command link carries CCSDS packets stated in XTCE. That is not
+configuration and is no part of this.)
 
 tcspecial
 ---------
@@ -10636,8 +10665,9 @@ These are some things that Claude doesn't seem to figure out by itself.
 
 * The crate libc must be included to Cargo.toml for all crates to get definitions of AF_UNIX and other address families.
 
-* The crate serde_json is in Cargo.toml for the command link, which carries
-  JSON between the ground and the spacecraft. No configuration file is JSON.
+* The crate serde_json is in Cargo.toml for the value tree a configuration's
+  digest is taken over. Nothing on the link and no configuration file is
+  JSON.
 
 * into_raw_fd() must not be used to convert TCPStream and UDPSocket types to RawFDs.
 

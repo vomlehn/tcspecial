@@ -4529,7 +4529,6 @@ version = "0.1.0"
 dependencies = [
  "libc",
  "serde",
- "serde_json",
  "tcslibgs",
  "tempfile",
  "thiserror 1.0.69",
@@ -4539,7 +4538,6 @@ dependencies = [
 name = "tcslib-c"
 version = "0.1.0"
 dependencies = [
- "serde_json",
  "tcslib",
  "tcslibgs",
  "tempfile",
@@ -4576,7 +4574,6 @@ dependencies = [
  "i-slint-backend-testing",
  "libc",
  "serde",
- "serde_json",
  "slint",
  "slint-build",
  "tcslib",
@@ -4596,7 +4593,6 @@ dependencies = [
  "log",
  "nix 0.27.1",
  "serde",
- "serde_json",
  "slint",
  "slint-build",
  "socket2",
@@ -4617,7 +4613,6 @@ dependencies = [
  "libc",
  "rand",
  "serde",
- "serde_json",
  "slint",
  "slint-build",
  "tcslib",

@@ -176,10 +176,11 @@ What Has to Change
 
 1. Commands and Telemetry in XTCE
 ---------------------------------
-This is the change everything else depends on. tcspecial's commands and the
-answers to them are JSON, and cFS's Software Bus carries CCSDS Space Packets,
-while ground systems expect binary formats from a dictionary. The beacon has
-already moved; the rest should follow.
+This is the change everything else depends on, and it is made: tcspecial's
+commands and the answers to them are CCSDS Space Packets stated in XTCE, in
+``tcslibgs/xtce/link.xml``, as cFS's Software Bus carries and ground systems
+read from a dictionary, and the beacon carries the interface's digest beside
+the configuration's.
 
 * Describe every tcspecial command and answer in XTCE, on a base container
   holding the CCSDS primary header. tcs-xtce's container inheritance and

@@ -34,6 +34,11 @@ pub mod interface;
 /// The digest of this build's interface, which `make interface-digest`
 /// generated from `xtce/`: used through [`interface`].
 mod interface_digest;
+/// Commands and answers, as they go on the link.
+pub mod link;
+/// The commands' and answers' packing code, which tcs-xtce generated from
+/// `xtce/link.xml`: used through [`link`].
+mod link_packet;
 pub mod node;
 pub mod parameters;
 pub mod protocol;
@@ -68,6 +73,9 @@ pub use endpoint_config::Scalar;
 pub use error::*;
 pub use format::*;
 pub use interface::InterfaceDigest;
+pub use link::{
+    AnswerPacker, CommandPacker, LinkError, ANSWER_BYTES, COMMAND_BYTES,
+};
 pub use node::payload::can::CanParams;
 pub use node::payload::gpio::{Bias, Edge as LineEdge, GpioParams};
 pub use node::payload::hdlc::{

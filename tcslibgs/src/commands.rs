@@ -2,13 +2,11 @@
 //!
 //! Commands are sent from ground to space and are idempotent.
 
-use serde::{Deserialize, Serialize};
-
 use crate::config_digest::{ConfigDigest, ConfigVersion};
 use crate::types::{ArmKey, BeaconInterval, DHName, NodeId};
 
 /// Command message header
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CommandHeader {
     /// Command sequence number for tracking
     pub sequence: u32,
@@ -17,7 +15,7 @@ pub struct CommandHeader {
 }
 
 /// Command types
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CommandType {
     Ping,
     /// What each end reads, asked of the spacecraft as a link comes up.
@@ -120,6 +118,9 @@ impl CommandType {
         self.link() == link
     }
 
+    /// The opcode a command of this kind carries. What goes on the link is
+    /// stated in `xtce/link.xml`, and a test in [`crate::link`] holds this to
+    /// it, so the two cannot come to differ.
     pub fn to_u8(&self) -> u8 {
         match self {
             CommandType::Ping => 0x01,
@@ -153,7 +154,7 @@ impl CommandType {
 }
 
 /// PING command - verify TCSpecial is able to process commands
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PingCommand {
     pub header: CommandHeader,
 }
@@ -183,7 +184,7 @@ pub const RESTART_ARM_VALID_DEFAULT: std::time::Duration =
     std::time::Duration::from_secs(20 * 60);
 
 /// RESTART_ARM command - enable a restart for the next `restart_arm_valid`
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RestartArmCommand {
     pub header: CommandHeader,
     pub arm_key: ArmKey,
@@ -202,7 +203,7 @@ impl RestartArmCommand {
 }
 
 /// RESTART command - restart TCSpecial if armed
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RestartCommand {
     pub header: CommandHeader,
     pub arm_key: ArmKey,
@@ -228,7 +229,7 @@ impl RestartCommand {
 /// makes the two ends prove they are talking about the same payload set, and
 /// when they were not, the only sign was a command answered `NotFound` for a
 /// payload the operator could see on the screen.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ConnectCommand {
     pub header: CommandHeader,
     pub version: ConfigVersion,
@@ -266,7 +267,7 @@ impl ConnectCommand {
 /// success. A command that arrives twice, or whose answer was lost, is the
 /// ordinary case on a link with latency, and an operator who presses Disable
 /// twice has asked for a state and not for an action.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NodeCommand {
     pub header: CommandHeader,
     /// Which node, by its node id: see [`NodeId`].
@@ -320,10 +321,10 @@ impl NodeCommand {
 /// reads back.
 ///
 /// Both are held in room of a fixed size, [`ATTRIBUTE_BYTES`] and
-/// [`VALUE_BYTES`], so that the vehicle reads one without allocating. The
-/// message on the link is the same JSON whatever holds it: the attribute a
-/// string, the value an array of numbers.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+/// [`VALUE_BYTES`], so that the vehicle reads one without allocating. On the
+/// link the attribute is a byte of length and its text, and the value two
+/// bytes of length and its bytes: see `xtce/link.xml`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SetNodeCommand {
     pub header: CommandHeader,
     /// Which node, by its node id: see [`NodeId`].
@@ -440,45 +441,6 @@ impl std::fmt::Display for Attribute {
     }
 }
 
-impl Serialize for Attribute {
-    fn serialize<S: serde::Serializer>(
-        &self,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(self.as_str())
-    }
-}
-
-impl<'de> Deserialize<'de> for Attribute {
-    fn deserialize<D: serde::Deserializer<'de>>(
-        deserializer: D,
-    ) -> Result<Self, D::Error> {
-        struct Name;
-        impl serde::de::Visitor<'_> for Name {
-            type Value = Attribute;
-            fn expecting(
-                &self,
-                f: &mut std::fmt::Formatter,
-            ) -> std::fmt::Result {
-                write!(
-                    f,
-                    "an attribute name of at most {ATTRIBUTE_BYTES} bytes"
-                )
-            }
-            // Copied out of whatever the reader hands over, which is the
-            // datagram itself where the text has no escapes in it: nothing
-            // is made to hold it.
-            fn visit_str<E: serde::de::Error>(
-                self,
-                name: &str,
-            ) -> Result<Attribute, E> {
-                Attribute::of(name).map_err(E::custom)
-            }
-        }
-        deserializer.deserialize_str(Name)
-    }
-}
-
 /// Bytes, at most [`VALUE_BYTES`] of them, held in place: what a SET_NODE's
 /// value is.
 ///
@@ -525,66 +487,8 @@ impl std::fmt::Debug for Value {
     }
 }
 
-impl Serialize for Value {
-    fn serialize<S: serde::Serializer>(
-        &self,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error> {
-        use serde::ser::SerializeSeq;
-        let mut seq = serializer.serialize_seq(Some(self.as_bytes().len()))?;
-        for byte in self.as_bytes() {
-            seq.serialize_element(byte)?;
-        }
-        seq.end()
-    }
-}
-
-impl<'de> Deserialize<'de> for Value {
-    fn deserialize<D: serde::Deserializer<'de>>(
-        deserializer: D,
-    ) -> Result<Self, D::Error> {
-        struct Bytes;
-        impl<'de> serde::de::Visitor<'de> for Bytes {
-            type Value = Value;
-            fn expecting(
-                &self,
-                f: &mut std::fmt::Formatter,
-            ) -> std::fmt::Result {
-                write!(f, "a value of at most {VALUE_BYTES} bytes")
-            }
-            fn visit_seq<A: serde::de::SeqAccess<'de>>(
-                self,
-                mut seq: A,
-            ) -> Result<Value, A::Error> {
-                let mut value = Value {
-                    bytes: [0; VALUE_BYTES],
-                    len: 0,
-                };
-                while let Some(byte) = seq.next_element::<u8>()? {
-                    let at = usize::from(value.len);
-                    let Some(room) = value.bytes.get_mut(at) else {
-                        return Err(serde::de::Error::custom(format!(
-                            "a value longer than a command carries, which is \
-                             at most {VALUE_BYTES} bytes"
-                        )));
-                    };
-                    *room = byte;
-                    value.len += 1;
-                }
-                Ok(value)
-            }
-            fn visit_bytes<E: serde::de::Error>(
-                self,
-                bytes: &[u8],
-            ) -> Result<Value, E> {
-                Value::of(bytes).map_err(E::custom)
-            }
-        }
-        deserializer.deserialize_seq(Bytes)
-    }
-}
 /// CONFIG command - configure TCSpecial values
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ConfigCommand {
     pub header: CommandHeader,
     pub beacon_interval: BeaconInterval,
@@ -607,7 +511,7 @@ impl ConfigCommand {
 /// SET_NODE boxed to make the rest smaller would be an allocation for each
 /// one read, which is what holding them in place is for.
 #[allow(clippy::large_enum_variant)]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Command {
     Ping(PingCommand),
     Connect(ConnectCommand),
@@ -732,18 +636,18 @@ mod tests {
         );
     }
 
-    /// A SET_NODE reads back as it was written, in the JSON a `String` and a
-    /// `Vec<u8>` would have made, and refuses what will not fit.
+    /// A SET_NODE reads back off the link as it was written, and refuses
+    /// what will not fit.
     #[test]
-    fn a_set_node_is_the_json_it_was_and_refuses_what_will_not_fit() {
+    fn a_set_node_reads_back_and_refuses_what_will_not_fit() {
         let command =
             SetNodeCommand::new(3, NodeId::of(2), "setpoint", b"295.0")
                 .expect("it fits");
-        let json = serde_json::to_value(command).expect("it serializes");
-        assert_eq!(json["attribute"], "setpoint");
-        assert_eq!(json["value"], serde_json::json!([50, 57, 53, 46, 48]));
-        let back: SetNodeCommand =
-            serde_json::from_value(json).expect("it reads");
+        let Ok(Command::SetNode(back)) =
+            Command::read(&Command::SetNode(command).to_bytes())
+        else {
+            panic!("a SET_NODE");
+        };
         assert_eq!(back, command);
         assert_eq!(back.attribute, "setpoint");
         assert_eq!(back.value.as_bytes(), b"295.0");
@@ -767,14 +671,21 @@ mod tests {
         )
         .is_err());
 
-        // And as read off the link: a value too long is refused, not cut short.
-        let too_long = serde_json::json!({
-            "header": { "sequence": 1, "cmd_type": "SetNode" },
-            "node": 0,
-            "attribute": "x",
-            "value": vec![7u8; VALUE_BYTES + 1],
-        });
-        assert!(serde_json::from_value::<SetNodeCommand>(too_long).is_err());
+        // And as read off the link: a value too long is refused, not cut
+        // short. Built by hand, as no packer will build one: the longest,
+        // with its length one more and one more byte.
+        let longest = Command::SetNode(
+            SetNodeCommand::new(1, NodeId::of(0), "x", &[7; VALUE_BYTES])
+                .expect("the longest fits"),
+        )
+        .to_bytes();
+        let length_at = longest.len() - VALUE_BYTES - 2;
+        let mut too_long = longest[..length_at].to_vec();
+        too_long.extend(((VALUE_BYTES + 1) as u16).to_be_bytes());
+        too_long.extend([7; VALUE_BYTES + 1]);
+        let packet_length = (too_long.len() - 7) as u16;
+        too_long[4..6].copy_from_slice(&packet_length.to_be_bytes());
+        assert!(Command::read(&too_long).is_err());
     }
 
     /// Every command belongs to one link, and the two classes between them
@@ -861,13 +772,5 @@ mod tests {
         let cmd = PingCommand::new(1);
         assert_eq!(cmd.header.sequence, 1);
         assert_eq!(cmd.header.cmd_type, CommandType::Ping);
-    }
-
-    #[test]
-    fn test_command_serialization() {
-        let cmd = Command::Ping(PingCommand::new(42));
-        let json = serde_json::to_string(&cmd).unwrap();
-        let deserialized: Command = serde_json::from_str(&json).unwrap();
-        assert_eq!(cmd, deserialized);
     }
 }

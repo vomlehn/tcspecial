@@ -171,13 +171,13 @@ mod tests {
             let mut buffer = [0u8; 65535];
             let (size, from) =
                 spacecraft.recv_from(&mut buffer).expect("a command");
-            let command: Command = serde_json::from_slice(&buffer[..size])
-                .expect("a valid command");
+            let command =
+                Command::read(&buffer[..size]).expect("a valid command");
             let answer = Telemetry::Ping(PingTelemetry::new(
                 command.sequence(),
                 tcslibgs::CommandStatus::Success,
             ));
-            let data = serde_json::to_vec(&answer).expect("it serializes");
+            let data = answer.to_bytes();
             spacecraft.send_to(&data, from).expect("the answer is sent");
         });
 

@@ -17,6 +17,9 @@ help:
 	@echo "  make beacon-packet   - Regenerate the beacon's Rust and" \
 		"Python codecs"
 	@echo "                         from xtce/beacon.xml"
+	@echo "  make link-packet     - Regenerate the commands' and answers'" \
+		"Rust codec"
+	@echo "                         from xtce/link.xml"
 	@echo "  make interface-digest - Regenerate the digest of the" \
 		"interface,"
 	@echo "                         src/interface_digest.rs, from xtce/"
@@ -64,6 +67,23 @@ $(BEACON_PY): $(BEACON_XML)
 	$(TCS_XTCE) ../../../tcslibgs/$(BEACON_XML) \
 		../../../tcslibgs/$(BEACON_PY) \
 		--lang python --source-name tcslibgs/$(BEACON_XML)
+
+# Every command and answer on the link is stated once, in xtce/link.xml, and
+# packed and unpacked by the Rust tcs-xtce generates from it, without dynamic
+# allocation, for the reason the beacon's is: tcspecial decodes each command
+# in its main loop. Formatted after it is generated, as the beacon's is.
+LINK_XML := xtce/link.xml
+LINK_RS := src/link_packet.rs
+
+.PHONY: link-packet
+link-packet: $(LINK_RS)
+
+$(LINK_RS): $(LINK_XML)
+	$(TCS_XTCE) ../../../tcslibgs/$(LINK_XML) \
+		../../../tcslibgs/$(LINK_RS) \
+		--lang rust --dynamic-allocations false \
+		--source-name tcslibgs/$(LINK_XML)
+	rustfmt --edition 2021 $(LINK_RS)
 
 # The digest of the interface: the tcs-xtce digest of every XTCE document in
 # xtce/, which every beacon carries so that the ground can tell whether it

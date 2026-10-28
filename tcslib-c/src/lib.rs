@@ -808,9 +808,10 @@ pub unsafe extern "C" fn tcs_client_open(
     })
 }
 
-// Every command below allocates, in tcslib: the command is written as JSON
-// and the answer read from it, as the link carries them. Not this layer's to
-// change.
+// The commands below allocate nothing of their own in tcslib: each is packed
+// into the connection's own buffer and its answer read into fixed room, as
+// the link's packets are. What allocates is the error message, where there
+// is one.
 
 /// Send CONNECT, and say in `*agrees` whether the vehicle is flying this
 /// configuration.

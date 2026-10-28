@@ -230,9 +230,8 @@ vehicle:
                     let Ok((size, from)) = link.recv_from(&mut buffer) else {
                         continue;
                     };
-                    let command: tcslibgs::Command =
-                        serde_json::from_slice(&buffer[..size])
-                            .expect("a command");
+                    let command = tcslibgs::Command::read(&buffer[..size])
+                        .expect("a command");
                     let seq = command.sequence();
                     answered.push(command.cmd_type());
                     let answer = match &command {
@@ -299,7 +298,7 @@ vehicle:
                             other.cmd_type()
                         ),
                     };
-                    let data = serde_json::to_vec(&answer).expect("telemetry");
+                    let data = answer.to_bytes();
                     link.send_to(&data, from).expect("an answer");
 
                     // The query answered, the node's data follows, as it

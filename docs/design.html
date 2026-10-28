@@ -5339,10 +5339,19 @@ unit, wherever a time is carried -- a response's header, a handler's
 samples and statistics, a beacon. Two ends comparing times, or a log read
 long afterwards, then have nothing to agree about beyond the epoch.</dd>
 <dt>Requirement</dt>
-<dd>On the wire a timestamp is eight bytes, least significant byte first.
-Little-endian because both ends run on little-endian machines, so network
-order would be a byte swap at each of them to agree with nothing, and
-because the records a payload reads are already written that way.</dd>
+<dd>On the link a timestamp is eight bytes, most significant byte first, as
+every number in a command, an answer and the beacon is: that is the CCSDS
+order, which a ground system reading the packets from their XTCE expects,
+and one order for the whole link is one thing for the two ends to agree
+about. In the records a node makes -- a GPIO node's events -- it is least
+significant byte first, as those records' other fields are.</dd>
+</dl>
+<p>It was least significant byte first on the link too, while the link was
+JSON and the order was a matter of the records alone. Once commands and
+answers became CCSDS packets the link had an order of its own, and a
+timestamp in it that went the other way would be the one field a reader of
+the packet had to know to turn round.</p>
+<dl class="docutils">
 <dt>Requirement</dt>
 <dd>All ones -- <tt class="docutils literal">FF FF FF FF FF FF FF FF</tt> -- is the one value that is not a
 time: it says the spacecraft could not tell what time it was. A clock
@@ -5534,7 +5543,7 @@ telemetry is sent</td>
 </table>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd>The interval is eight bytes of microseconds, least significant byte
+<dd>The interval is eight bytes of microseconds, most significant byte
 first: the unit and the order a timestamp uses, so that a number crossing
 this link means one thing whichever field it is in. There is no reserved
 value in it -- an interval, unlike a clock, cannot fail to be read -- and
@@ -5557,7 +5566,7 @@ time.</p>
 <div class="section" id="asynchronous-telemetry">
 <h2><a class="toc-backref" href="#toc-entry-56">Asynchronous Telemetry</a></h2>
 <p>Beacon</p>
-<p>The beacon is not JSON, as the answers to commands are. It is 34 bytes in a
+<p>The beacon answers no command and has a layout of its own. It is 55 bytes in a
 fixed layout, stated once, in XTCE, in <tt class="docutils literal">tcslibgs/xtce/beacon.xml</tt>, and packed
 and unpacked by the code tcs-xtce generates from that file: Rust in
 <tt class="docutils literal"><span class="pre">tcslibgs::beacon</span></tt>, which tcspecial and <tt class="docutils literal">tcslib</tt> use, and Python in
@@ -5576,7 +5585,7 @@ it is published.</p>
 </tr>
 </thead>
 <tbody valign="top">
-<tr><td rowspan="11">BEACON</td>
+<tr><td rowspan="10">BEACON</td>
 <td>Name</td>
 <td>Type</td>
 <td>Description</td>
@@ -5630,19 +5639,14 @@ byte</td>
 <td>The digest of the interface this
 tcspecial speaks</td>
 </tr>
-<tr><td>crc</td>
-<td>2 bytes</td>
-<td>The CCSDS CRC-16 of every byte
-before it</td>
-</tr>
 </tbody>
 </table>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd>A beacon is exactly 57 bytes, in the layout above, and the ground refuses
+<dd>A beacon is exactly 55 bytes, in the layout above, and the ground refuses
 a datagram of any other length, without the name and the space where
-they belong, with a spare bit set or whose CRC does not match, showing
-what arrived rather than a beacon. Something else
+they belong or with a spare bit set, showing what arrived rather than a
+beacon. Something else
 sending to the beacon port is then seen for what it is.</dd>
 <dt>Requirement</dt>
 <dd>The layout is stated once, in <tt class="docutils literal">tcslibgs/xtce/beacon.xml</tt>, and the code
@@ -5726,7 +5730,7 @@ another section says the same thing, this one is the one it follows.</p>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last"><strong>What runs today.</strong> The beacon carries the generation number, the
-restarting bit, the interface digest and a CRC, and is read without
+restarting bit and the interface digest, and is read without
 allocating. <tt class="docutils literal">state_file</tt>, <tt class="docutils literal">beacon.default_interval</tt> and
 <tt class="docutils literal">beacon.reset_interval</tt> are read; every start counts itself in the
 state file before its first beacon; the beacon goes fast from start, and
@@ -5735,11 +5739,13 @@ is taken. <tt class="docutils literal"><span class="pre">tcslibgs::interface</sp
 Python. <tt class="docutils literal">tcslib</tt>'s <tt class="docutils literal">TcsClient</tt>, and through it the C/C++ library,
 holds a station's commands from a RESTART until a beacon says it is done,
 and the beacon watches in Rust and Python judge a restart by the
-generation. Commands and answers are still JSON on the link, and carry no
-CRC or generation; the fallback interface and its link, load sets,
-uploads, SWITCH, the golden build, the refusal of full-interface commands
-on an interface mismatch and <tt class="docutils literal">tcsverify <span class="pre">--interface</span></tt> are designed here
-and not yet built.</p>
+generation. Commands and answers are CCSDS packets stated in
+<tt class="docutils literal">tcslibgs/xtce/link.xml</tt>, packed and unpacked by
+<tt class="docutils literal"><span class="pre">tcslibgs::link</span></tt> without allocating; nothing on the link is JSON. Not
+yet built: the generation in every command, a count of the packets
+refused (they are logged), the fallback interface and its link, load
+sets, uploads, SWITCH, the golden build, the refusal of full-interface
+commands on an interface mismatch, and <tt class="docutils literal">tcsverify <span class="pre">--interface</span></tt>.</p>
 </div>
 <div class="section" id="every-packet-is-xtce">
 <h2><a class="toc-backref" href="#toc-entry-58">Every packet is XTCE</a></h2>
@@ -5757,21 +5763,38 @@ from an XTCE mission database -- Yamcs is one -- reads them with no code
 of its own. The beacon keeps the name and version it starts with, which
 are what let a person reading a capture see what it is.</dd>
 <dt>Requirement</dt>
-<dd>Every packet ends with a CRC-16 (polynomial <tt class="docutils literal">0x1021</tt>, initial
-remainder <tt class="docutils literal">0xFFFF</tt>, the CCSDS one) over every byte before it, stated in
-its container's <tt class="docutils literal">ErrorDetectCorrect</tt>. A packet whose CRC does not match
-is dropped and counted, and nothing it says is acted on.</dd>
+<dd>A command is the six-byte CCSDS primary header -- version 0, packet type
+1, no secondary header, APID <tt class="docutils literal">0x100</tt>, unsegmented, the low fourteen
+bits of the command's sequence as the sequence count, and the CCSDS
+packet length -- then a byte of opcode, the four-byte sequence, what the
+command carries. An answer is the same header with packet
+type 0, then a byte saying which answer it is, the sequence of the
+command it answers, a byte of status, the eight-byte timestamp, what the
+answer carries. Every number is most significant byte first.
+A datagram that holds anything after its packet, or whose header's
+constants are not these, is refused: an answer's kind is a node
+command's opcode, and it is the packet type that keeps one from being
+taken for the other.</dd>
+<dt>Requirement</dt>
+<dd><tt class="docutils literal"><span class="pre">tcslibgs::link</span></tt> is the one place a command or an answer is turned
+into a packet and back, and every program goes through it: tcspecial,
+<tt class="docutils literal">tcslib</tt> and through it the C/C++ library and tcsmoc, and every test's
+stand-in.</dd>
 </dl>
-<p>UDP has a checksum of its own, but over IPv4 a sender may leave it out --
-nought in that field means &quot;not computed&quot; -- and a receiver then has nothing
-to check. A packet that carries its own check is valid whatever carried it,
-which is what lets the same definition of <em>valid</em> serve a radio, an SBN peer
-and a loopback.</p>
+<p>No packet carries a check of its own: the transport beneath it checks it.
+On this link that is UDP's checksum, and beneath a gateway it is the frame
+check of the radio or the bus as well. A datagram that fails the transport's
+check is dropped before anything reads it, so a second check in the packet
+would only check again what was checked.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd>A packet is <em>valid</em> when it passes its own check, or, where the transport
-beneath it guarantees end-to-end integrity and the packet carries no check
-of its own, when the transport delivered it. A valid packet from the MOC
+<dd>Every transport the link runs over checks what it carries end to end.
+UDP is sent with its checksum, over IPv4 as over IPv6: nothing in
+tcspecial or <tt class="docutils literal">tcslib</tt> turns it off (<tt class="docutils literal">SO_NO_CHECK</tt>), and a MOC that
+sends some other way must not either.</dd>
+<dt>Requirement</dt>
+<dd>A packet is <em>valid</em> when the transport beneath it delivered it and it is
+exactly one packet of the layout its port takes. A valid packet from the MOC
 is one that is valid and came from where the configuration says the MOC
 sends from (<tt class="docutils literal"><span class="pre">tcslibgs::came_from</span></tt>). Nothing else is.</dd>
 <dt>Requirement</dt>
@@ -6080,9 +6103,12 @@ with no way in, and any way an upload could be lost or damaged. Each is
 paired with the requirement above that closes it.</p>
 <dl class="docutils">
 <dt>UDP may carry no checksum</dt>
-<dd>Over IPv4 a UDP checksum of nought means none was computed, so &quot;the
-transport checked it&quot; is not true of UDP. Every packet carries its own
-CRC-16, and only a packet that passes it is valid.</dd>
+<dd>Over IPv4 a UDP checksum of nought means none was computed, and a
+receiver cannot tell from its socket that a datagram arrived unchecked.
+The requirement that every sender computes it closes this for tcspecial
+and <tt class="docutils literal">tcslib</tt>, but not for a MOC built elsewhere that turns it off. Run
+over IPv6, where the checksum is mandatory and Linux drops a datagram
+without one, the link is closed against that too.</dd>
 <dt>A read-only file can still be deleted</dt>
 <dd>Deleting is permitted by the directory, not the file, and root is
 permitted everything. The load set's directory is made read-only too, and
@@ -6184,8 +6210,8 @@ from an absent one.</dd>
 hexadecimal, a flag is <tt class="docutils literal">true</tt> or <tt class="docutils literal">false</tt>, a timeout carries its unit; see
 <a class="reference internal" href="#value-syntax">Value Syntax</a>. The YAML of a shipped set is the one to read, because it
 carries the comments.</p>
-<p>(The command link carries JSON between the ground and the spacecraft. That is
-not configuration and is no part of this.)</p>
+<p>(The command link carries CCSDS packets stated in XTCE. That is not
+configuration and is no part of this.)</p>
 </div>
 <div class="section" id="tcspecial-1">
 <h2><a class="toc-backref" href="#toc-entry-70">tcspecial</a></h2>
@@ -10697,8 +10723,9 @@ the entire application, i.e. tcspecial, tcsmod, and tcssim.</p>
 <li>Do not pass an i32 to PollFd::new() as the first argument. Instead, pass the i32
 value as the result of applying BorrowedFd::borrowed_raw() to it.</li>
 <li>The crate libc must be included to Cargo.toml for all crates to get definitions of AF_UNIX and other address families.</li>
-<li>The crate serde_json is in Cargo.toml for the command link, which carries
-JSON between the ground and the spacecraft. No configuration file is JSON.</li>
+<li>The crate serde_json is in Cargo.toml for the value tree a configuration's
+digest is taken over. Nothing on the link and no configuration file is
+JSON.</li>
 <li>into_raw_fd() must not be used to convert TCPStream and UDPSocket types to RawFDs.</li>
 <li>as_raw_fd() must be used to convert TCPStream and UDPSocket types to RawFDs.</li>
 <li>Do not use tokio. Use threads directly.</li>

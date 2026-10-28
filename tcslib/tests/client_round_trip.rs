@@ -47,7 +47,7 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
                 Ok(received) => received,
                 Err(_) => return,
             };
-            let command: Command = serde_json::from_slice(&buffer[..size])
+            let command = Command::read(&buffer[..size])
                 .expect("the client sent a valid command");
             let seq = command.sequence();
 
@@ -126,7 +126,7 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
                 }
             };
 
-            let data = serde_json::to_vec(&answer).expect("serialise");
+            let data = answer.to_bytes();
             socket.send_to(&data, from).expect("answer");
         }
     });

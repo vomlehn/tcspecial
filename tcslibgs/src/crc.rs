@@ -1,10 +1,10 @@
-//! The CRC every packet on the link ends with, for what is not a packet.
+//! The CRC for what has no transport to check it.
 //!
-//! The packets' CRCs are computed by the code tcs-xtce generates, from the
-//! `ErrorDetectCorrect` their XTCE states. What else needs a check of its own
-//! -- the state file tcspecial keeps its generation number in -- uses the same
-//! CRC through this, computed by the same tcs-xtce routine, so that there is
-//! one CRC in the system and one implementation of it.
+//! Packets on the link carry none: the transport under them checks them.
+//! What is kept on storage has nothing under it that does -- the state file
+//! tcspecial keeps its generation number in is one -- so it carries the
+//! CCSDS CRC-16, computed through this by tcs-xtce's routine, so that there
+//! is one CRC in the system and one implementation of it.
 
 use tcs_xtce::packet::{checksum, Checksum};
 
@@ -36,24 +36,5 @@ mod tests {
     #[test]
     fn the_crc_is_the_catalogues() {
         assert_eq!(crc16(b"123456789"), 0x29b1);
-    }
-
-    /// And it is the CRC the beacon ends with, which tcs-xtce computed from
-    /// the beacon's XTCE.
-    #[test]
-    fn it_is_the_crc_the_beacon_carries() {
-        let beacon = crate::Beacon::new(
-            1,
-            crate::ConfigVersion::of_this_build(),
-            crate::ConfigDigest([7; 16]),
-            1,
-        )
-        .to_bytes();
-        let end = beacon.len() - 2;
-        assert_eq!(
-            crc16(&beacon[..end]).to_be_bytes(),
-            beacon[end..],
-            "the beacon's CRC"
-        );
     }
 }

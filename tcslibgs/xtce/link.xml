@@ -1,0 +1,594 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Every command the MOC sends tcspecial and every answer tcspecial sends
+     back, as they go on the link: the whole of each datagram.
+
+     Each is a CCSDS Space Packet, so that a ground system that reads them
+     from an XTCE mission database, Yamcs among them, reads them with no code
+     of its own:
+
+       primary header   6 bytes: version 0, packet type (1 for a command, 0
+                        for an answer), no secondary header, APID 0x100,
+                        sequence flags 3 (unsegmented), sequence count (the
+                        low 14 bits of the sequence below), packet length
+       opcode or kind   1 byte: which command, or which answer
+       sequence         4 bytes: the command's number, which its answer
+                        carries back
+       status           1 byte, an answer only: how the command went
+       timestamp        8 bytes, an answer only: microseconds since the UNIX
+                        epoch when the answer was made, all ones where the
+                        vehicle could not tell the time
+       ...              what that command or answer carries
+
+     Every number is most significant byte first, as CCSDS and the beacon
+     have it. A packet carries no CRC of its own: the transport under it,
+     UDP's checksum on this link, refuses a damaged datagram before it is
+     read. One whose header or length does not match is refused, and nothing
+     in it is acted on.
+
+     The Rust in tcslibgs/src/link_packet.rs is generated from this file by
+     `make link-packet` in tcslibgs/: change this, and regenerate it. See
+     tcslibgs/src/link.rs, and "The Interface, the Fallback and Switching
+     Over" in docs/design.rst. -->
+<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20250214" name="TcsLink">
+  <TelemetryMetaData>
+    <ParameterTypeSet>
+      <IntegerParameterType name="U1Type" signed="false">
+        <IntegerDataEncoding sizeInBits="1" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U2Type" signed="false">
+        <IntegerDataEncoding sizeInBits="2" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U3Type" signed="false">
+        <IntegerDataEncoding sizeInBits="3" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U11Type" signed="false">
+        <IntegerDataEncoding sizeInBits="11" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U14Type" signed="false">
+        <IntegerDataEncoding sizeInBits="14" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U8Type" signed="false">
+        <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U16Type" signed="false">
+        <IntegerDataEncoding sizeInBits="16" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U32Type" signed="false">
+        <IntegerDataEncoding sizeInBits="32" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U64Type" signed="false">
+        <IntegerDataEncoding sizeInBits="64" encoding="unsigned"/>
+      </IntegerParameterType>
+      <BooleanParameterType name="FlagType">
+        <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
+      </BooleanParameterType>
+      <BinaryParameterType name="DigestType">
+        <BinaryDataEncoding>
+          <SizeInBits>
+            <FixedValue>128</FixedValue>
+          </SizeInBits>
+        </BinaryDataEncoding>
+      </BinaryParameterType>
+      <BinaryParameterType name="SampleBytesType">
+        <BinaryDataEncoding>
+          <SizeInBits>
+            <FixedValue>64</FixedValue>
+          </SizeInBits>
+        </BinaryDataEncoding>
+      </BinaryParameterType>
+      <!-- Why a SET_NODE was refused, in the vehicle's words: up to 160
+           bytes of UTF-8, after a byte saying how many. -->
+      <StringParameterType name="ReasonType">
+        <StringDataEncoding encoding="UTF-8">
+          <Variable maxSizeInBits="1288">
+            <LeadingSize sizeInBitsOfSizeTag="8"/>
+          </Variable>
+        </StringDataEncoding>
+      </StringParameterType>
+      <EnumeratedParameterType name="StatusType">
+        <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
+        <EnumerationList>
+          <Enumeration value="0" label="Success"/>
+          <Enumeration value="1" label="Failure"/>
+          <Enumeration value="2" label="InvalidCommand"/>
+          <Enumeration value="3" label="InvalidParameter"/>
+          <Enumeration value="4" label="NotArmed"/>
+          <Enumeration value="5" label="NotFound"/>
+          <Enumeration value="6" label="AlreadyExists"/>
+          <Enumeration value="7" label="Timeout"/>
+        </EnumerationList>
+      </EnumeratedParameterType>
+    </ParameterTypeSet>
+    <ParameterSet>
+      <Parameter name="Version" parameterTypeRef="U3Type"/>
+      <Parameter name="PacketType" parameterTypeRef="U1Type"/>
+      <Parameter name="SecHdrFlag" parameterTypeRef="U1Type"/>
+      <Parameter name="APID" parameterTypeRef="U11Type"/>
+      <Parameter name="SeqFlags" parameterTypeRef="U2Type"/>
+      <Parameter name="SeqCount" parameterTypeRef="U14Type"/>
+      <Parameter name="PacketLength" parameterTypeRef="U16Type">
+        <!-- CCSDS: bytes in the packet data field, minus 1 -->
+        <AncillaryDataSet>
+          <AncillaryData name="tcs-xtce.length">-1</AncillaryData>
+        </AncillaryDataSet>
+      </Parameter>
+      <Parameter name="Kind" parameterTypeRef="U8Type"/>
+      <Parameter name="Sequence" parameterTypeRef="U32Type"/>
+      <Parameter name="Status" parameterTypeRef="StatusType"/>
+      <Parameter name="Timestamp" parameterTypeRef="U64Type"/>
+      <Parameter name="Major" parameterTypeRef="U8Type"/>
+      <Parameter name="Minor" parameterTypeRef="U8Type"/>
+      <Parameter name="Patch" parameterTypeRef="U8Type"/>
+      <Parameter name="Digest" parameterTypeRef="DigestType"/>
+      <Parameter name="Node" parameterTypeRef="U32Type"/>
+      <Parameter name="Reason" parameterTypeRef="ReasonType"/>
+      <Parameter name="Enabled" parameterTypeRef="FlagType"/>
+      <Parameter name="TakenBytes" parameterTypeRef="U64Type"/>
+      <Parameter name="Reads" parameterTypeRef="U64Type"/>
+      <Parameter name="ReadsFailed" parameterTypeRef="U64Type"/>
+      <Parameter name="GivenBytes" parameterTypeRef="U64Type"/>
+      <Parameter name="Writes" parameterTypeRef="U64Type"/>
+      <Parameter name="WritesFailed" parameterTypeRef="U64Type"/>
+      <Parameter name="Dropped" parameterTypeRef="U64Type"/>
+      <Parameter name="Asks" parameterTypeRef="U64Type"/>
+      <Parameter name="AsksFailed" parameterTypeRef="U64Type"/>
+      <Parameter name="Strangers" parameterTypeRef="U64Type"/>
+      <!-- Whether the node has moved anything, and when it last did: the
+           time is nought where it has not, and is read only where the flag
+           says it has. -->
+      <Parameter name="MovedKnown" parameterTypeRef="FlagType"/>
+      <Parameter name="LastMoved" parameterTypeRef="U64Type"/>
+      <!-- The last datum a node moved each way: whether one has, when, how
+           many bytes of it are shown, how many it had, and the first eight
+           of them. -->
+      <Parameter name="TakenKnown" parameterTypeRef="FlagType"/>
+      <Parameter name="TakenTime" parameterTypeRef="U64Type"/>
+      <Parameter name="TakenLength" parameterTypeRef="U8Type"/>
+      <Parameter name="TakenTotal" parameterTypeRef="U32Type"/>
+      <Parameter name="TakenBytesShown" parameterTypeRef="SampleBytesType"/>
+      <Parameter name="GivenKnown" parameterTypeRef="FlagType"/>
+      <Parameter name="GivenTime" parameterTypeRef="U64Type"/>
+      <Parameter name="GivenLength" parameterTypeRef="U8Type"/>
+      <Parameter name="GivenTotal" parameterTypeRef="U32Type"/>
+      <Parameter name="GivenBytesShown" parameterTypeRef="SampleBytesType"/>
+    </ParameterSet>
+    <ContainerSet>
+      <!-- What every answer holds first. -->
+      <SequenceContainer name="AnswerLayout" abstract="true">
+        <EntryList>
+          <ParameterRefEntry parameterRef="Version"/>
+          <ParameterRefEntry parameterRef="PacketType"/>
+          <ParameterRefEntry parameterRef="SecHdrFlag"/>
+          <ParameterRefEntry parameterRef="APID"/>
+          <ParameterRefEntry parameterRef="SeqFlags"/>
+          <ParameterRefEntry parameterRef="SeqCount"/>
+          <ParameterRefEntry parameterRef="PacketLength"/>
+          <ParameterRefEntry parameterRef="Kind"/>
+          <ParameterRefEntry parameterRef="Sequence"/>
+          <ParameterRefEntry parameterRef="Status"/>
+          <ParameterRefEntry parameterRef="Timestamp"/>
+        </EntryList>
+      </SequenceContainer>
+      <!-- An answer from tcspecial: the header's constants fixed. -->
+      <SequenceContainer name="Answer" abstract="true">
+        <EntryList/>
+        <BaseContainer containerRef="AnswerLayout">
+          <RestrictionCriteria>
+            <ComparisonList>
+              <Comparison parameterRef="Version" value="0"/>
+              <Comparison parameterRef="PacketType" value="0"/>
+              <Comparison parameterRef="SecHdrFlag" value="0"/>
+              <Comparison parameterRef="APID" value="256"/>
+              <Comparison parameterRef="SeqFlags" value="3"/>
+            </ComparisonList>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+      <SequenceContainer name="PingAnswer">
+        <EntryList/>
+        <BaseContainer containerRef="Answer">
+          <RestrictionCriteria>
+            <Comparison parameterRef="Kind" value="129"/>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+      <SequenceContainer name="RestartArmAnswer">
+        <EntryList/>
+        <BaseContainer containerRef="Answer">
+          <RestrictionCriteria>
+            <Comparison parameterRef="Kind" value="130"/>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+      <SequenceContainer name="RestartAnswer">
+        <EntryList/>
+        <BaseContainer containerRef="Answer">
+          <RestrictionCriteria>
+            <Comparison parameterRef="Kind" value="131"/>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+      <SequenceContainer name="ConnectAnswer">
+        <EntryList>
+          <ParameterRefEntry parameterRef="Major"/>
+          <ParameterRefEntry parameterRef="Minor"/>
+          <ParameterRefEntry parameterRef="Patch"/>
+          <ParameterRefEntry parameterRef="Digest"/>
+        </EntryList>
+        <BaseContainer containerRef="Answer">
+          <RestrictionCriteria>
+            <Comparison parameterRef="Kind" value="132"/>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+      <SequenceContainer name="ConfigAnswer">
+        <EntryList/>
+        <BaseContainer containerRef="Answer">
+          <RestrictionCriteria>
+            <Comparison parameterRef="Kind" value="160"/>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+      <SequenceContainer name="StartNodeAnswer">
+        <EntryList>
+          <ParameterRefEntry parameterRef="Node"/>
+        </EntryList>
+        <BaseContainer containerRef="Answer">
+          <RestrictionCriteria>
+            <Comparison parameterRef="Kind" value="48"/>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+      <SequenceContainer name="StopNodeAnswer">
+        <EntryList>
+          <ParameterRefEntry parameterRef="Node"/>
+        </EntryList>
+        <BaseContainer containerRef="Answer">
+          <RestrictionCriteria>
+            <Comparison parameterRef="Kind" value="49"/>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+      <SequenceContainer name="SetNodeAnswer">
+        <EntryList>
+          <ParameterRefEntry parameterRef="Node"/>
+          <ParameterRefEntry parameterRef="Reason"/>
+        </EntryList>
+        <BaseContainer containerRef="Answer">
+          <RestrictionCriteria>
+            <Comparison parameterRef="Kind" value="50"/>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+      <SequenceContainer name="QueryNodeAnswer">
+        <EntryList>
+          <ParameterRefEntry parameterRef="Node"/>
+          <ParameterRefEntry parameterRef="Enabled"/>
+          <ParameterRefEntry parameterRef="TakenBytes"/>
+          <ParameterRefEntry parameterRef="Reads"/>
+          <ParameterRefEntry parameterRef="ReadsFailed"/>
+          <ParameterRefEntry parameterRef="GivenBytes"/>
+          <ParameterRefEntry parameterRef="Writes"/>
+          <ParameterRefEntry parameterRef="WritesFailed"/>
+          <ParameterRefEntry parameterRef="Dropped"/>
+          <ParameterRefEntry parameterRef="Asks"/>
+          <ParameterRefEntry parameterRef="AsksFailed"/>
+          <ParameterRefEntry parameterRef="Strangers"/>
+          <ParameterRefEntry parameterRef="MovedKnown"/>
+          <ParameterRefEntry parameterRef="LastMoved"/>
+        </EntryList>
+        <BaseContainer containerRef="Answer">
+          <RestrictionCriteria>
+            <Comparison parameterRef="Kind" value="51"/>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+      <SequenceContainer name="QueryNodeSampleAnswer">
+        <EntryList>
+          <ParameterRefEntry parameterRef="Node"/>
+          <ParameterRefEntry parameterRef="TakenKnown"/>
+          <ParameterRefEntry parameterRef="TakenTime"/>
+          <ParameterRefEntry parameterRef="TakenLength"/>
+          <ParameterRefEntry parameterRef="TakenTotal"/>
+          <ParameterRefEntry parameterRef="TakenBytesShown"/>
+          <ParameterRefEntry parameterRef="GivenKnown"/>
+          <ParameterRefEntry parameterRef="GivenTime"/>
+          <ParameterRefEntry parameterRef="GivenLength"/>
+          <ParameterRefEntry parameterRef="GivenTotal"/>
+          <ParameterRefEntry parameterRef="GivenBytesShown"/>
+        </EntryList>
+        <BaseContainer containerRef="Answer">
+          <RestrictionCriteria>
+            <Comparison parameterRef="Kind" value="52"/>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+    </ContainerSet>
+  </TelemetryMetaData>
+  <CommandMetaData>
+    <ArgumentTypeSet>
+      <IntegerArgumentType name="U1Arg" signed="false">
+        <IntegerDataEncoding sizeInBits="1" encoding="unsigned"/>
+      </IntegerArgumentType>
+      <IntegerArgumentType name="U2Arg" signed="false">
+        <IntegerDataEncoding sizeInBits="2" encoding="unsigned"/>
+      </IntegerArgumentType>
+      <IntegerArgumentType name="U3Arg" signed="false">
+        <IntegerDataEncoding sizeInBits="3" encoding="unsigned"/>
+      </IntegerArgumentType>
+      <IntegerArgumentType name="U8Arg" signed="false">
+        <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
+      </IntegerArgumentType>
+      <IntegerArgumentType name="U11Arg" signed="false">
+        <IntegerDataEncoding sizeInBits="11" encoding="unsigned"/>
+      </IntegerArgumentType>
+      <IntegerArgumentType name="U14Arg" signed="false">
+        <IntegerDataEncoding sizeInBits="14" encoding="unsigned"/>
+      </IntegerArgumentType>
+      <IntegerArgumentType name="U16Arg" signed="false">
+        <IntegerDataEncoding sizeInBits="16" encoding="unsigned"/>
+      </IntegerArgumentType>
+      <IntegerArgumentType name="U32Arg" signed="false">
+        <IntegerDataEncoding sizeInBits="32" encoding="unsigned"/>
+      </IntegerArgumentType>
+      <IntegerArgumentType name="U64Arg" signed="false">
+        <IntegerDataEncoding sizeInBits="64" encoding="unsigned"/>
+      </IntegerArgumentType>
+      <BinaryArgumentType name="DigestArg">
+        <BinaryDataEncoding>
+          <SizeInBits>
+            <FixedValue>128</FixedValue>
+          </SizeInBits>
+        </BinaryDataEncoding>
+      </BinaryArgumentType>
+      <!-- The attribute a SET_NODE sets: up to 64 bytes of UTF-8, after a
+           byte saying how many. -->
+      <StringArgumentType name="AttributeArg">
+        <StringDataEncoding encoding="UTF-8">
+          <Variable maxSizeInBits="520">
+            <LeadingSize sizeInBitsOfSizeTag="8"/>
+          </Variable>
+        </StringDataEncoding>
+      </StringArgumentType>
+      <!-- How many bytes the value is: up to 256. -->
+      <IntegerArgumentType name="ValueLengthArg" signed="false">
+        <IntegerDataEncoding sizeInBits="16" encoding="unsigned"/>
+        <ValidRangeSet>
+          <ValidRange minInclusive="0" maxInclusive="256"/>
+        </ValidRangeSet>
+      </IntegerArgumentType>
+      <!-- And the value, which is bytes and not text. -->
+      <BinaryArgumentType name="ValueArg">
+        <BinaryDataEncoding>
+          <SizeInBits>
+            <DynamicValue>
+              <ArgumentInstanceRef argumentRef="ValueLength"/>
+              <LinearAdjustment slope="8"/>
+            </DynamicValue>
+          </SizeInBits>
+        </BinaryDataEncoding>
+      </BinaryArgumentType>
+    </ArgumentTypeSet>
+    <MetaCommandSet>
+      <!-- What every command holds first. -->
+      <MetaCommand name="Command" abstract="true">
+        <ArgumentList>
+          <Argument name="Version" argumentTypeRef="U3Arg"/>
+          <Argument name="PacketType" argumentTypeRef="U1Arg"/>
+          <Argument name="SecHdrFlag" argumentTypeRef="U1Arg"/>
+          <Argument name="APID" argumentTypeRef="U11Arg"/>
+          <Argument name="SeqFlags" argumentTypeRef="U2Arg"/>
+          <Argument name="SeqCount" argumentTypeRef="U14Arg"/>
+          <Argument name="PacketLength" argumentTypeRef="U16Arg">
+            <!-- CCSDS: bytes in the packet data field, minus 1 -->
+            <AncillaryDataSet>
+              <AncillaryData name="tcs-xtce.length">-1</AncillaryData>
+            </AncillaryDataSet>
+          </Argument>
+          <Argument name="Opcode" argumentTypeRef="U8Arg"/>
+          <Argument name="Sequence" argumentTypeRef="U32Arg"/>
+        </ArgumentList>
+        <CommandContainer name="CommandContainer">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="Version"/>
+            <ArgumentRefEntry argumentRef="PacketType"/>
+            <ArgumentRefEntry argumentRef="SecHdrFlag"/>
+            <ArgumentRefEntry argumentRef="APID"/>
+            <ArgumentRefEntry argumentRef="SeqFlags"/>
+            <ArgumentRefEntry argumentRef="SeqCount"/>
+            <ArgumentRefEntry argumentRef="PacketLength"/>
+            <ArgumentRefEntry argumentRef="Opcode"/>
+            <ArgumentRefEntry argumentRef="Sequence"/>
+          </EntryList>
+        </CommandContainer>
+      </MetaCommand>
+      <!-- A command to tcspecial: the header's constants fixed, as
+           arguments assigned rather than fixed entries, so that a packet
+           without them, such as an answer, whose packet type is 0, is not
+           taken for a command. -->
+      <MetaCommand name="TcsCommand" abstract="true">
+        <BaseMetaCommand metaCommandRef="Command">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="Version" argumentValue="0"/>
+            <ArgumentAssignment argumentName="PacketType" argumentValue="1"/>
+            <ArgumentAssignment argumentName="SecHdrFlag" argumentValue="0"/>
+            <ArgumentAssignment argumentName="APID" argumentValue="256"/>
+            <ArgumentAssignment argumentName="SeqFlags" argumentValue="3"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <CommandContainer name="TcsCommandContainer">
+          <EntryList/>
+          <BaseContainer containerRef="CommandContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+      <MetaCommand name="Ping">
+        <BaseMetaCommand metaCommandRef="TcsCommand">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="Opcode" argumentValue="1"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <CommandContainer name="PingContainer">
+          <EntryList/>
+          <BaseContainer containerRef="TcsCommandContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+      <MetaCommand name="RestartArm">
+        <BaseMetaCommand metaCommandRef="TcsCommand">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="Opcode" argumentValue="2"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <ArgumentList>
+          <Argument name="ArmKey" argumentTypeRef="U64Arg"/>
+        </ArgumentList>
+        <CommandContainer name="RestartArmContainer">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="ArmKey"/>
+          </EntryList>
+          <BaseContainer containerRef="TcsCommandContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+      <MetaCommand name="Restart">
+        <BaseMetaCommand metaCommandRef="TcsCommand">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="Opcode" argumentValue="3"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <ArgumentList>
+          <Argument name="ArmKey" argumentTypeRef="U64Arg"/>
+        </ArgumentList>
+        <CommandContainer name="RestartContainer">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="ArmKey"/>
+          </EntryList>
+          <BaseContainer containerRef="TcsCommandContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+      <MetaCommand name="Connect">
+        <BaseMetaCommand metaCommandRef="TcsCommand">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="Opcode" argumentValue="4"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <ArgumentList>
+          <Argument name="Major" argumentTypeRef="U8Arg"/>
+          <Argument name="Minor" argumentTypeRef="U8Arg"/>
+          <Argument name="Patch" argumentTypeRef="U8Arg"/>
+          <Argument name="Digest" argumentTypeRef="DigestArg"/>
+        </ArgumentList>
+        <CommandContainer name="ConnectContainer">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="Major"/>
+            <ArgumentRefEntry argumentRef="Minor"/>
+            <ArgumentRefEntry argumentRef="Patch"/>
+            <ArgumentRefEntry argumentRef="Digest"/>
+          </EntryList>
+          <BaseContainer containerRef="TcsCommandContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+      <MetaCommand name="Config">
+        <BaseMetaCommand metaCommandRef="TcsCommand">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="Opcode" argumentValue="32"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <ArgumentList>
+          <!-- How often to beacon, in microseconds. -->
+          <Argument name="BeaconInterval" argumentTypeRef="U64Arg"/>
+        </ArgumentList>
+        <CommandContainer name="ConfigContainer">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="BeaconInterval"/>
+          </EntryList>
+          <BaseContainer containerRef="TcsCommandContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+      <MetaCommand name="StartNode">
+        <BaseMetaCommand metaCommandRef="TcsCommand">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="Opcode" argumentValue="48"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <ArgumentList>
+          <Argument name="Node" argumentTypeRef="U32Arg"/>
+        </ArgumentList>
+        <CommandContainer name="StartNodeContainer">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="Node"/>
+          </EntryList>
+          <BaseContainer containerRef="TcsCommandContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+      <MetaCommand name="StopNode">
+        <BaseMetaCommand metaCommandRef="TcsCommand">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="Opcode" argumentValue="49"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <ArgumentList>
+          <Argument name="Node" argumentTypeRef="U32Arg"/>
+        </ArgumentList>
+        <CommandContainer name="StopNodeContainer">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="Node"/>
+          </EntryList>
+          <BaseContainer containerRef="TcsCommandContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+      <MetaCommand name="SetNode">
+        <BaseMetaCommand metaCommandRef="TcsCommand">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="Opcode" argumentValue="50"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <ArgumentList>
+          <Argument name="Node" argumentTypeRef="U32Arg"/>
+          <Argument name="Attribute" argumentTypeRef="AttributeArg"/>
+          <Argument name="ValueLength" argumentTypeRef="ValueLengthArg"/>
+          <Argument name="Value" argumentTypeRef="ValueArg"/>
+        </ArgumentList>
+        <CommandContainer name="SetNodeContainer">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="Node"/>
+            <ArgumentRefEntry argumentRef="Attribute"/>
+            <ArgumentRefEntry argumentRef="ValueLength"/>
+            <ArgumentRefEntry argumentRef="Value"/>
+          </EntryList>
+          <BaseContainer containerRef="TcsCommandContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+      <MetaCommand name="QueryNode">
+        <BaseMetaCommand metaCommandRef="TcsCommand">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="Opcode" argumentValue="51"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <ArgumentList>
+          <Argument name="Node" argumentTypeRef="U32Arg"/>
+        </ArgumentList>
+        <CommandContainer name="QueryNodeContainer">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="Node"/>
+          </EntryList>
+          <BaseContainer containerRef="TcsCommandContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+      <MetaCommand name="QueryNodeSample">
+        <BaseMetaCommand metaCommandRef="TcsCommand">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="Opcode" argumentValue="52"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <ArgumentList>
+          <Argument name="Node" argumentTypeRef="U32Arg"/>
+        </ArgumentList>
+        <CommandContainer name="QueryNodeSampleContainer">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="Node"/>
+          </EntryList>
+          <BaseContainer containerRef="TcsCommandContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+    </MetaCommandSet>
+  </CommandMetaData>
+</SpaceSystem>

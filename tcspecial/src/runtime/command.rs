@@ -59,7 +59,7 @@ use std::os::fd::BorrowedFd;
 
 use tcslibgs::config_digest::{ConfigDigest, ConfigVersion};
 use tcslibgs::{
-    answer_to, came_from, ArmKey, CIConfig, Command, CommandLink,
+    answer_to, came_from, AnswerPacker, ArmKey, CIConfig, Command, CommandLink,
     CommandStatus, ConfigTelemetry, ConnectTelemetry, HostPort, NodeTelemetry,
     PingTelemetry, QueryNodeSampleTelemetry, QueryNodeTelemetry, Reason,
     SetNodeTelemetry, TcsError, TcsResult, Telemetry,
@@ -72,9 +72,9 @@ use crate::telemetry_log::TelemetryLog;
 
 /// The most a command datagram may be.
 ///
-/// A whole datagram, because a command that arrived truncated would be read as
-/// a different command or as none: the buffer is the largest a UDP payload can
-/// be.
+/// A whole datagram, and not the longest command, `tcslibgs::COMMAND_BYTES`:
+/// a datagram longer than any command is then read whole and refused for
+/// what it is, rather than cut to a command's length and read as one.
 const COMMAND_BYTES: usize = 65535;
 
 /// What this vehicle calls each of the two links.
@@ -189,7 +189,7 @@ impl Commands {
             log,
             stopping: stopping.clone(),
             wakeup: wakeup.clone(),
-            answer: Vec::with_capacity(ANSWER_BYTES),
+            answer: AnswerPacker::new(),
             armed: None,
             arm_valid: ci.restart_arm_valid,
             restart,
@@ -264,9 +264,9 @@ struct Serving {
     log: TelemetryLog,
     stopping: Arc<AtomicBool>,
     wakeup: Arc<Wakeup>,
-    /// What an answer is written into before it is sent: made with the
+    /// What an answer is packed into before it is sent: made with the
     /// thread and reused, so that answering allocates nothing of its own.
-    answer: Vec<u8>,
+    answer: AnswerPacker,
     /// The key of the last RESTART_ARM and when it was taken, until a RESTART
     /// uses it.
     armed: Option<(ArmKey, Instant)>,
@@ -280,11 +280,6 @@ struct Serving {
     /// restart is asked for once its answer has gone.
     restarting: bool,
 }
-
-/// Room for an answer as JSON, which the longest -- a node's two samples --
-/// comes well inside. A longer one is still written, the buffer growing once
-/// to hold it and keeping the room after.
-const ANSWER_BYTES: usize = 1024;
 
 impl Serving {
     /// Wait for a command on either link, answer it, and wait again.
@@ -369,8 +364,10 @@ impl Serving {
         }
 
         // Read without allocating, a SET_NODE's attribute and value
-        // included: they are read into room the command holds.
-        let command = match serde_json::from_slice::<Command>(&buffer[..size]) {
+        // included: they are read into room the command holds. A packet that
+        // is not one of the link's is refused here, so nothing it says is
+        // acted on and it does not count as the MOC being heard.
+        let command = match Command::read(&buffer[..size]) {
             Ok(command) => command,
             // Not a command. Nothing to answer and nobody to answer it to: the
             // sender is whatever sent this.
@@ -393,21 +390,15 @@ impl Serving {
         trace!("{}: {command:?}", spelling(link.which));
         let answer = self.answer(link.which, &command);
 
-        // Into the thread's own buffer, taken out while it is written and
-        // put back after.
-        let mut data = std::mem::take(&mut self.answer);
-        data.clear();
-        if serde_json::to_writer(&mut data, &answer).is_ok() {
-            // Recorded before it is sent, as a beacon is, so that an answer
-            // the send fails on is still known to have been produced.
-            self.log.record(&data);
-            // Back to the address it came from, because a datagram's sender
-            // is the only statement of where the ground is, and a
-            // configuration that stated it as well would be a second answer
-            // that can disagree.
-            let _ = link.socket.send_to(&data, from);
-        }
-        self.answer = data;
+        // Into the thread's own packer, which keeps its buffer.
+        let data = self.answer.pack(&answer);
+        // Recorded before it is sent, as a beacon is, so that an answer the
+        // send fails on is still known to have been produced.
+        self.log.record(data);
+        // Back to the address it came from, because a datagram's sender is
+        // the only statement of where the ground is, and a configuration
+        // that stated it as well would be a second answer that can disagree.
+        let _ = link.socket.send_to(data, from);
 
         // After the answer has gone, so that the ground hears the RESTART was
         // taken before the links close under it.
@@ -793,15 +784,14 @@ mod tests {
         at: SocketAddr,
         command: &Command,
     ) -> Option<Telemetry> {
-        let asked = serde_json::to_vec(command).expect("a command");
+        let asked = command.to_bytes();
         ground.send_to(&asked, at).expect("it is sent");
         let mut buffer = [0u8; COMMAND_BYTES];
         loop {
             match ground.recv_from(&mut buffer) {
                 Ok((size, _)) => {
                     return Some(
-                        serde_json::from_slice::<Telemetry>(&buffer[..size])
-                            .expect("telemetry"),
+                        Telemetry::read(&buffer[..size]).expect("telemetry"),
                     )
                 }
                 // A child of this test binary exiting interrupts a blocking
@@ -1291,11 +1281,8 @@ mod tests {
             .set_read_timeout(Some(Duration::from_millis(300)))
             .expect("a timeout");
 
-        let asked = serde_json::to_vec(&Command::StopNode(NodeCommand::stop(
-            9,
-            NodeId::of(0),
-        )))
-        .expect("a command");
+        let asked =
+            Command::StopNode(NodeCommand::stop(9, NodeId::of(0))).to_bytes();
         stranger
             .send_to(&asked, commands.node_address())
             .expect("it is sent");
@@ -1412,7 +1399,7 @@ mod tests {
                 log: TelemetryLog::disabled(),
                 stopping: Arc::new(AtomicBool::new(false)),
                 wakeup: Arc::new(Wakeup::new().expect("a wakeup")),
-                answer: Vec::new(),
+                answer: AnswerPacker::new(),
                 armed: None,
                 arm_valid: valid,
                 restart: || {},

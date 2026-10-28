@@ -19,7 +19,6 @@ tcsapp = { path = "../tcsapp" }
 # opened, so that what this refuses to start on is what tcsverify reports.
 tcsverify = { path = "../tcsverify" }
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
 libc = "0.2"
 thiserror = "1.0"
 log = "0.4"

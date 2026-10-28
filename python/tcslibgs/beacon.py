@@ -6,10 +6,11 @@ code tcs-xtce generates from it, ``beacon_packet.py``, as the Rust packs and
 unpacks it with the Rust tcs-xtce generates from the same file::
 
     "tcspecial " major minor patch " " digest[16] sequence[4] generation[4]
-    restarting:1 spare:7 interface[16] crc[2]
+    restarting:1 spare:7 interface[16]
 
-Fifty-seven bytes, every one of them: the numbers most significant byte
-first, and the CRC the CCSDS CRC-16 over every byte before it.
+Fifty-five bytes, every one of them, the numbers most significant byte
+first. A beacon carries no CRC of its own: the transport under it checks it,
+as UDP's checksum does here.
 """
 
 import sys
@@ -74,12 +75,6 @@ class Beacon:
         try:
             packet = _packet.Beacon.decode(datagram)
         except _pk.PacketError as why:
-            if why.kind == "BadChecksum":
-                raise BeaconError(
-                    "a beacon whose CRC does not match what it carries: it "
-                    "was damaged on the way, and nothing in it can be "
-                    "believed"
-                ) from why
             raise BeaconError(
                 f"not a beacon ({why}): something other than tcspecial is "
                 "sending to the beacon port"

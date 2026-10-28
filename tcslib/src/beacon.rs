@@ -1404,15 +1404,12 @@ mod tests {
 
         // Telemetry that is not a beacon is shown as what arrived. Nothing
         // sends a response to this address, so this is a misconfiguration,
-        // and the start of the JSON is enough to name it.
+        // and it is said to be one rather than read as a beacon.
         let other =
             Telemetry::Ping(PingTelemetry::new(1, CommandStatus::Success));
-        let datagram = serde_json::to_vec(&other).expect("it serializes");
+        let datagram = other.to_bytes();
         let shown = message_of(&datagram);
-        assert!(
-            shown.contains("unreadable") && shown.contains("Ping"),
-            "{shown}"
-        );
+        assert!(shown.contains("unreadable"), "{shown}");
         assert_eq!(hear(&datagram, None).sequence, None);
     }
 

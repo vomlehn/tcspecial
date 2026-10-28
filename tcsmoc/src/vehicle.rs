@@ -2163,8 +2163,8 @@ payloads:
                     Ok(got) => got,
                     Err(_) => return seen,
                 };
-                let command: Command =
-                    serde_json::from_slice(&buffer[..size]).expect("a command");
+                let command =
+                    Command::read(&buffer[..size]).expect("a command");
                 let seq = command.sequence();
                 seen.push(command.cmd_type());
                 let answer = match &command {
@@ -2220,7 +2220,7 @@ payloads:
                     }
                     other => panic!("the window sent {:?}", other.cmd_type()),
                 };
-                let data = serde_json::to_vec(&answer).expect("telemetry");
+                let data = answer.to_bytes();
                 vehicle.send_to(&data, from).expect("an answer");
             }
             seen

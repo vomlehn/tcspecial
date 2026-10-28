@@ -310,8 +310,9 @@ no extension or an unfamiliar one was assumed to be, which made a misspelled
 extension not an error but a file parsed as the wrong language. Nothing was
 written in it that was not also written in YAML.
 
-(The command link carries JSON between the ground and the spacecraft. That is
-not a configuration file and is unaffected.)
+(The command link carries CCSDS packets stated in XTCE, in
+``tcslibgs/xtce/link.xml``. That is not a configuration file and is
+unaffected.)
 
 Which Files There Are
 =====================
@@ -2075,12 +2076,11 @@ none of it is the program's own:
   find where the beacons are, starts the loop on a thread of its own, and puts
   each pass in the window.
 
-A beacon is 57 bytes in a fixed layout: ``tcspecial`` and a space, the
+A beacon is 55 bytes in a fixed layout: ``tcspecial`` and a space, the
 version's major, minor and patch a byte each, a space, the sixteen bytes of
 the configuration's MD5 digest, the beacon's number and the generation number
 in four bytes each, most significant first, a byte whose top bit says a
-restart has been initiated, the sixteen bytes of the interface's digest, and a
-CRC-16 of everything before it. The layout is described in XTCE, in
+restart has been initiated, and the sixteen bytes of the interface's digest. The layout is described in XTCE, in
 ``tcslibgs/xtce/beacon.xml``, and tcspecial packs each beacon, and
 ``tcslib::beacon`` unpacks it, with the code tcs-xtce generates from that file:
 ``tcslibgs::Beacon``. The example's test packs the beacon it sends the same
@@ -3939,8 +3939,8 @@ that satisfies both.
    * - `serde_json <https://crates.io/crates/serde_json>`__
      - 1.0
      - `1.0.151 <https://docs.rs/serde_json/1.0.151>`__
-     - tcsgui, tcslib, tcslib-c (tests only), tcslibgs, tcsmoc, tcspecial, tcssim, tcsverify, examples/beacon, examples/ping
-     - The JSON the command link carries between the ground and the vehicle.
+     - tcsgui (tests only), tcslibgs, tcsverify
+     - The value tree a configuration's digest is taken over and its two spellings are compared as, and the schema tests. Nothing on the link is JSON.
      - `repository <https://github.com/serde-rs/json>`__
    * - `serde_norway <https://crates.io/crates/serde_norway>`__
      - 0.9.42

@@ -3,7 +3,9 @@
 use std::io;
 use std::net::{SocketAddr, UdpSocket};
 use std::time::{Duration, Instant};
-use tcslibgs::{came_from, Command, HostPort, TcsError, TcsResult, Telemetry};
+use tcslibgs::{
+    came_from, Command, CommandPacker, HostPort, TcsError, TcsResult, Telemetry,
+};
 
 /// Connection to the spacecraft
 pub trait Connection: Send {
@@ -30,14 +32,9 @@ pub struct UdpConnection {
     /// `remote_addr` as [`came_from`] reads it, worked out once.
     expected: HostPort,
     recv_buffer: Vec<u8>,
-    /// What a command is written into to be sent, kept from one to the next
-    /// so that it grows to the longest once.
-    send_buffer: Vec<u8>,
+    /// What a command is packed into to be sent, kept from one to the next.
+    packer: CommandPacker,
 }
-
-/// The room a connection starts with for a command, which is more than most
-/// need: a SET_NODE's value may be longer, and the buffer grows to it once.
-const COMMAND_BYTES: usize = 1024;
 
 impl UdpConnection {
     /// Create a new UDP connection
@@ -57,7 +54,7 @@ impl UdpConnection {
                 port: remote.port(),
             },
             recv_buffer: vec![0u8; 65535],
-            send_buffer: Vec::with_capacity(COMMAND_BYTES),
+            packer: CommandPacker::new(),
         })
     }
 
@@ -96,17 +93,14 @@ impl UdpConnection {
     /// asked for, or a command would hang on traffic that has nothing to do
     /// with it.
     ///
-    /// Allocates what the answer holds -- a telemetry's strings and lists are
-    /// its own -- once for each command answered. A ground station's commands
-    /// are an operator's, not its loop's, and the answer is handed back to be
-    /// kept.
+    /// An answer that is not one of this link's packets is an error saying
+    /// so: it came from where the command went, so it is the answer, and
+    /// it cannot be read.
     fn answer(&mut self, deadline: Option<Instant>) -> TcsResult<Telemetry> {
         loop {
             let (size, from) = self.socket.recv_from(&mut self.recv_buffer)?;
             if came_from(&self.expected, &from) {
-                let telemetry: Telemetry =
-                    serde_json::from_slice(&self.recv_buffer[..size])?;
-                return Ok(telemetry);
+                return Ok(Telemetry::read(&self.recv_buffer[..size])?);
             }
 
             eprintln!(
@@ -135,9 +129,8 @@ impl UdpConnection {
 
 impl Connection for UdpConnection {
     fn send(&mut self, command: &Command) -> TcsResult<()> {
-        self.send_buffer.clear();
-        serde_json::to_writer(&mut self.send_buffer, command)?;
-        self.socket.send_to(&self.send_buffer, self.remote_addr)?;
+        let packed = self.packer.pack(command);
+        self.socket.send_to(packed, self.remote_addr)?;
         Ok(())
     }
 
@@ -199,11 +192,11 @@ mod tests {
         let mine = link.socket.local_addr().expect("where this end is");
 
         let answer = |sequence: u32| {
-            serde_json::to_vec(&Telemetry::Ping(PingTelemetry::new(
+            Telemetry::Ping(PingTelemetry::new(
                 sequence,
                 CommandStatus::Success,
-            )))
-            .expect("it serializes")
+            ))
+            .to_bytes()
         };
 
         // A stranger answers first, then the spacecraft.

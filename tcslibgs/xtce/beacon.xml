@@ -2,7 +2,7 @@
 <!-- The beacon, as it goes on the link: what tcspecial sends every
      beacon.default_interval to beacon.recv, and the whole of the datagram.
 
-     57 bytes, in this order:
+     55 bytes, in this order:
 
        "tcspecial "    10 bytes of text, the space included
        major           1 byte, unsigned
@@ -15,7 +15,6 @@
        restarting      1 bit, the most significant of its byte
        spare           7 bits, nought
        interface       16 bytes, the digest of the interface tcspecial speaks
-       crc             2 bytes, CRC-16 over every byte before it
 
      The name and the space are constants: tcs-xtce writes them when a beacon
      is packed and refuses a datagram without them when one is unpacked, so
@@ -25,9 +24,9 @@
      beacon it missed from a vehicle that restarted. The generation counts the
      times tcspecial has started, kept in its state file, and the restarting
      bit says a restart has been initiated and the process is about to end:
-     see "The generation number and the state file" in docs/design.rst. The
-     CRC is the CCSDS one, polynomial 0x1021 and initial remainder 0xFFFF,
-     and a beacon that fails it is refused.
+     see "The generation number and the state file" in docs/design.rst. A
+     beacon carries no CRC of its own: the transport under it, UDP's
+     checksum on this link, refuses a damaged datagram before it is read.
 
      The Rust in tcslibgs/src/beacon_packet.rs and the Python in
      python/tcslibgs/beacon_packet.py are generated from this file by
@@ -59,9 +58,6 @@
       <IntegerParameterType name="U32Type" signed="false">
         <IntegerDataEncoding sizeInBits="32" encoding="unsigned"/>
       </IntegerParameterType>
-      <IntegerParameterType name="U16Type" signed="false">
-        <IntegerDataEncoding sizeInBits="16" encoding="unsigned"/>
-      </IntegerParameterType>
       <IntegerParameterType name="SpareType" signed="false">
         <IntegerDataEncoding sizeInBits="7" encoding="unsigned"/>
       </IntegerParameterType>
@@ -88,21 +84,12 @@
       <Parameter name="Restarting" parameterTypeRef="FlagType"/>
       <Parameter name="Spare" parameterTypeRef="SpareType"/>
       <Parameter name="Interface" parameterTypeRef="DigestType"/>
-      <Parameter name="Crc" parameterTypeRef="U16Type"/>
     </ParameterSet>
     <ContainerSet>
       <!-- Everything a beacon holds, constants and all. Abstract: what is
            packed and unpacked is the Beacon below, which is this with the
            constants fixed. -->
       <SequenceContainer name="BeaconLayout" abstract="true">
-        <BinaryEncoding>
-          <ErrorDetectCorrect>
-            <CRC width="16" parameterRef="Crc">
-              <Polynomial>1021</Polynomial>
-              <InitRemainder>FFFF</InitRemainder>
-            </CRC>
-          </ErrorDetectCorrect>
-        </BinaryEncoding>
         <EntryList>
           <ParameterRefEntry parameterRef="Name"/>
           <ParameterRefEntry parameterRef="Major"/>
@@ -115,7 +102,6 @@
           <ParameterRefEntry parameterRef="Restarting"/>
           <ParameterRefEntry parameterRef="Spare"/>
           <ParameterRefEntry parameterRef="Interface"/>
-          <ParameterRefEntry parameterRef="Crc"/>
         </EntryList>
       </SequenceContainer>
       <SequenceContainer name="Beacon">

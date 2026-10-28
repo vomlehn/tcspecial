@@ -16,11 +16,11 @@
 //!
 //! ```text
 //! "tcspecial " major minor patch " " digest[16] sequence[4] generation[4]
-//! restarting:1 spare:7 interface[16] crc[2]
+//! restarting:1 spare:7 interface[16]
 //! ```
 //!
-//! The numbers are most significant byte first, and the CRC is the CCSDS
-//! CRC-16 over every byte before it.
+//! The numbers are most significant byte first. A beacon carries no CRC of
+//! its own: the transport under it checks it, as UDP's checksum does here.
 
 use std::fmt;
 
@@ -197,11 +197,6 @@ impl fmt::Display for BeaconError {
                  other than tcspecial, or a tcspecial of another layout, is \
                  sending to the beacon port"
             ),
-            BeaconError::Packet(PacketError::BadChecksum { .. }) => write!(
-                f,
-                "a beacon whose CRC does not match what it carries: it was \
-                 damaged on the way, and nothing in it can be believed"
-            ),
             BeaconError::Packet(why) => write!(
                 f,
                 "not a beacon ({why}): something other than tcspecial is \
@@ -228,41 +223,8 @@ mod tests {
         ])
     }
 
-    /// The CCSDS CRC-16, written out here rather than taken from tcs-xtce,
-    /// so that the test says what the layout is independently of the code
-    /// that packs it.
-    fn crc16(bytes: &[u8]) -> u16 {
-        let mut crc: u16 = 0xffff;
-        for &byte in bytes {
-            crc ^= u16::from(byte) << 8;
-            for _ in 0..8 {
-                crc = if crc & 0x8000 != 0 {
-                    (crc << 1) ^ 0x1021
-                } else {
-                    crc << 1
-                };
-            }
-        }
-        crc
-    }
-
-    /// `packed` with its CRC made right again, for a test that changes a
-    /// byte to see what else refuses it.
-    fn sealed(packed: &mut [u8]) {
-        let end = packed.len() - 2;
-        let crc = crc16(&packed[..end]).to_be_bytes();
-        packed[end..].copy_from_slice(&crc);
-    }
-
     #[test]
-    fn the_crc_is_the_ccsds_one() {
-        // The CRC catalogue's check value for CRC-16/IBM-3740, which is the
-        // CCSDS polynomial and initial remainder.
-        assert_eq!(crc16(b"123456789"), 0x29b1);
-    }
-
-    #[test]
-    fn a_beacon_is_its_fields_in_order_and_a_crc() {
+    fn a_beacon_is_its_fields_in_order() {
         let beacon = Beacon::new(0x01020304, version(), digest(), 0x0a0b0c0d)
             .restarting(true);
         let packed = beacon.to_bytes();
@@ -274,10 +236,9 @@ mod tests {
         want.extend([0x0a, 0x0b, 0x0c, 0x0d]);
         want.push(0x80);
         want.extend(InterfaceDigest::of_this_build().0);
-        want.extend(crc16(&want).to_be_bytes());
         assert_eq!(packed, want);
         assert_eq!(packed.len(), BEACON_BYTES);
-        assert_eq!(BEACON_BYTES, 57);
+        assert_eq!(BEACON_BYTES, 55);
     }
 
     #[test]
@@ -305,26 +266,12 @@ mod tests {
         assert_eq!(Beacon::read(second), Ok(other));
     }
 
-    /// A beacon damaged on the way is refused, and says that is what it is.
-    #[test]
-    fn a_beacon_whose_crc_fails_is_refused() {
-        let mut packed = Beacon::new(1, version(), digest(), 1).to_bytes();
-        packed[30] ^= 0x01;
-        let why = Beacon::read(&packed).expect_err("it was damaged");
-        assert!(
-            matches!(why, BeaconError::Packet(PacketError::BadChecksum { .. })),
-            "{why:?}"
-        );
-        assert!(why.to_string().contains("CRC"), "{why}");
-    }
-
     /// The spare bits are nought, and a beacon with any of them set is not
     /// one this ground reads: a layout that used them would be another.
     #[test]
     fn a_beacon_with_a_spare_bit_set_is_refused() {
         let mut packed = Beacon::new(1, version(), digest(), 1).to_bytes();
         packed[38] |= 0x01;
-        sealed(&mut packed);
         assert!(matches!(
             Beacon::read(&packed),
             Err(BeaconError::Packet(PacketError::Mismatch { .. }))
@@ -347,14 +294,12 @@ mod tests {
         let good = Beacon::new(1, version(), digest(), 1).to_bytes();
         let mut renamed = good.clone();
         renamed[0] = b'T';
-        sealed(&mut renamed);
         assert!(matches!(
             Beacon::read(&renamed),
             Err(BeaconError::Packet(PacketError::Mismatch { .. }))
         ));
         let mut unspaced = good;
         unspaced[13] = b'-';
-        sealed(&mut unspaced);
         assert!(matches!(
             Beacon::read(&unspaced),
             Err(BeaconError::Packet(PacketError::Mismatch { .. }))

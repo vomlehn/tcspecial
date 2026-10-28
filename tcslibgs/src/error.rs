@@ -8,8 +8,9 @@ pub enum TcsError {
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
-    /// The command link, which carries JSON between the ground and the
-    /// spacecraft. No configuration file is JSON: see [`crate::format`].
+    /// A configuration's canonical form, which its digest is taken over, is
+    /// built as a JSON value tree. Nothing on the link and no configuration
+    /// file is JSON: see [`crate::link`] and [`crate::format`].
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
 
@@ -32,6 +33,11 @@ pub enum TcsError {
 
     #[error("Protocol error: {0}")]
     Protocol(String),
+
+    /// A datagram on a command link that is not a packet of the link's
+    /// layout, or whose CRC does not match.
+    #[error("{0}")]
+    Link(#[from] crate::link::LinkError),
 
     #[error("Command error: {0}")]
     Command(String),

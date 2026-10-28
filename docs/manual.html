@@ -726,8 +726,9 @@ configuration file is called. JSON was read as well, and was what a file with
 no extension or an unfamiliar one was assumed to be, which made a misspelled
 extension not an error but a file parsed as the wrong language. Nothing was
 written in it that was not also written in YAML.</p>
-<p>(The command link carries JSON between the ground and the spacecraft. That is
-not a configuration file and is unaffected.)</p>
+<p>(The command link carries CCSDS packets stated in XTCE, in
+<tt class="docutils literal">tcslibgs/xtce/link.xml</tt>. That is not a configuration file and is
+unaffected.)</p>
 </div>
 <div class="section" id="which-files-there-are">
 <h1><a class="toc-backref" href="#toc-entry-5">Which Files There Are</a></h1>
@@ -2396,12 +2397,11 @@ it.</li>
 find where the beacons are, starts the loop on a thread of its own, and puts
 each pass in the window.</li>
 </ul>
-<p>A beacon is 57 bytes in a fixed layout: <tt class="docutils literal">tcspecial</tt> and a space, the
+<p>A beacon is 55 bytes in a fixed layout: <tt class="docutils literal">tcspecial</tt> and a space, the
 version's major, minor and patch a byte each, a space, the sixteen bytes of
 the configuration's MD5 digest, the beacon's number and the generation number
 in four bytes each, most significant first, a byte whose top bit says a
-restart has been initiated, the sixteen bytes of the interface's digest, and a
-CRC-16 of everything before it. The layout is described in XTCE, in
+restart has been initiated, and the sixteen bytes of the interface's digest. The layout is described in XTCE, in
 <tt class="docutils literal">tcslibgs/xtce/beacon.xml</tt>, and tcspecial packs each beacon, and
 <tt class="docutils literal"><span class="pre">tcslib::beacon</span></tt> unpacks it, with the code tcs-xtce generates from that file:
 <tt class="docutils literal"><span class="pre">tcslibgs::Beacon</span></tt>. The example's test packs the beacon it sends the same
@@ -4069,8 +4069,8 @@ that satisfies both.</p>
 <tr><td><a class="reference external" href="https://crates.io/crates/serde_json">serde_json</a></td>
 <td>1.0</td>
 <td><a class="reference external" href="https://docs.rs/serde_json/1.0.151">1.0.151</a></td>
-<td>tcsgui, tcslib, tcslib-c (tests only), tcslibgs, tcsmoc, tcspecial, tcssim, tcsverify, examples/beacon, examples/ping</td>
-<td>The JSON the command link carries between the ground and the vehicle.</td>
+<td>tcsgui (tests only), tcslibgs, tcsverify</td>
+<td>The value tree a configuration's digest is taken over and its two spellings are compared as, and the schema tests. Nothing on the link is JSON.</td>
 <td><a class="reference external" href="https://github.com/serde-rs/json">repository</a></td>
 </tr>
 <tr><td><a class="reference external" href="https://crates.io/crates/serde_norway">serde_norway</a></td>

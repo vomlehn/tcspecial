@@ -73,7 +73,7 @@ fn ask(
     at: u16,
     command: &tcslibgs::Command,
 ) -> CommandStatus {
-    let asked = serde_json::to_vec(command).expect("a command");
+    let asked = command.to_bytes();
     ground
         .send_to(&asked, ("127.0.0.1", at))
         .expect("it is sent");
@@ -81,7 +81,7 @@ fn ask(
     loop {
         match ground.recv_from(&mut buffer) {
             Ok((size, _)) => {
-                return serde_json::from_slice::<Telemetry>(&buffer[..size])
+                return Telemetry::read(&buffer[..size])
                     .expect("telemetry")
                     .status()
             }

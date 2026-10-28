@@ -7,7 +7,6 @@ with the same figures. The beacons are built here byte by byte, in the layout
 a change to the layout is caught at both ends.
 """
 
-import json
 import struct
 import sys
 import unittest
@@ -33,33 +32,16 @@ SECOND = 1_000_000_000
 AT = 1_000_000 * SECOND
 
 
-def crc16(data):
-    """The CCSDS CRC-16, written out here rather than taken from the code
-    under test."""
-    crc = 0xFFFF
-    for byte in data:
-        crc ^= byte << 8
-        for _ in range(8):
-            crc = ((crc << 1) ^ 0x1021) if crc & 0x8000 else crc << 1
-            crc &= 0xFFFF
-    return crc
-
-
-def sealed(body):
-    """``body`` with the CRC of it after it, as every beacon ends."""
-    return body + struct.pack(">H", crc16(body))
-
-
 def a_beacon(sequence=2, digest=None, version=(0, 1, 0), generation=1,
              restarting=False, interface_digest=None):
     """A beacon, as tcspecial sends one: the name, the version a byte a part,
     a space, the digest, the number and the generation, four bytes
     big-endian each, the restarting bit and seven spare, the interface's
-    digest and the CRC."""
+    digest."""
     digest = digest or [36, 195, 155, 114, 7, 4, 241, 185,
                         121, 87, 153, 67, 108, 53, 167, 176]
     interface_digest = interface_digest or interface.of_this_tree()
-    return sealed(b"tcspecial " + bytes(version) + b" " + bytes(digest)
+    return (b"tcspecial " + bytes(version) + b" " + bytes(digest)
                   + struct.pack(">II", sequence, generation)
                   + bytes([0x80 if restarting else 0])
                   + bytes(interface_digest))
@@ -202,16 +184,7 @@ class LayoutTest(unittest.TestCase):
                                           generation=0x0A0B0C0D,
                                           restarting=True))
         self.assertEqual(len(packed), BEACON_BYTES)
-        self.assertEqual(BEACON_BYTES, 57)
-
-    def test_the_crc_is_the_ccsds_one(self):
-        self.assertEqual(crc16(b"123456789"), 0x29B1)
-
-    def test_a_beacon_whose_crc_fails_is_refused(self):
-        damaged = bytearray(a_beacon())
-        damaged[30] ^= 1
-        with self.assertRaisesRegex(BeaconError, "CRC"):
-            Beacon.read(bytes(damaged))
+        self.assertEqual(BEACON_BYTES, 55)
 
     def test_this_trees_interface_is_the_one_the_rust_was_built_with(self):
         # The constant `make interface-digest` wrote for the Rust, read from
@@ -269,10 +242,10 @@ class HearingTest(unittest.TestCase):
         self.assertTrue(shown.endswith("..."), shown)
         self.assertLess(len(shown), 60)
 
-        # Telemetry that is not a beacon is shown as what arrived, and the
-        # start of the JSON is enough to name it.
-        ping = json.dumps({"Ping": {"header": {"sequence": 1}}}).encode()
-        shown = beacon.message_of(ping)
+        # Something that is not a beacon is shown as what arrived, and the
+        # start of it is enough to name it.
+        stray = b"Ping from somewhere that is not tcspecial"
+        shown = beacon.message_of(stray)
         self.assertIn("unreadable", shown)
         self.assertIn("Ping", shown)
 
@@ -282,9 +255,9 @@ class HearingTest(unittest.TestCase):
         self.assertIsNone(beacon.hear(good + b"\0", None).sequence)
         self.assertIsNone(beacon.hear(good[:-1], None).sequence)
         self.assertIsNone(
-            beacon.hear(sealed(b"T" + good[1:-2]), None).sequence)
+            beacon.hear(b"T" + good[1:], None).sequence)
         self.assertIsNone(
-            beacon.hear(sealed(good[:13] + b"-" + good[14:-2]),
+            beacon.hear(good[:13] + b"-" + good[14:],
                         None).sequence)
 
     def test_a_beacons_number_says_what_happened_before_it(self):

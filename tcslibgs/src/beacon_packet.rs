@@ -93,7 +93,7 @@ impl Beacon {
 
 impl Packet for Beacon {
     const NAME: &'static str = "/TcsBeacon/Beacon";
-    const MAX_BYTES: usize = 57;
+    const MAX_BYTES: usize = 55;
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
@@ -128,8 +128,6 @@ impl Packet for Beacon {
         let v9 = r.uint_order(1, false, "Restarting")? != 0;
         let v10 = r.uint_order(7, false, "Spare")? as u8;
         let v11 = r.fixed_bytes::<16>(16, "Interface")?;
-        let p12 = r.position();
-        let v12 = r.uint_order(16, false, "Crc")? as u16;
         if !(v1 == "tcspecial ") {
             return Err(PacketError::Mismatch {
                 container: "/TcsBeacon/Beacon",
@@ -147,23 +145,6 @@ impl Packet for Beacon {
                 container: "/TcsBeacon/Beacon",
                 criterion: "/TcsBeacon/Spare == 0",
             });
-        }
-        if r.checksum(
-            &pk::Checksum::Crc {
-                width: 16,
-                poly: 0x1021,
-                init: 0xffff,
-                final_xor: 0x0,
-                reflect_data: false,
-                reflect_remainder: false,
-            },
-            (0),
-            (p12),
-            "Crc",
-        )? & 0xffff
-            != v12 as u64
-        {
-            return Err(PacketError::BadChecksum { field: "Crc" });
         }
         Ok((
             Beacon {
@@ -234,24 +215,6 @@ impl Packet for Beacon {
         w.uint_order(1, false, self.restarting as u64);
         w.uint_order(7, false, pk::from_unsigned(0 as u64, 7, "Spare")?);
         pk::write_binary(w, &self.interface, 16, "Interface")?;
-        let l12 = w.position();
-        w.uint(16, 0);
-        w.patch_checksum(
-            &pk::Checksum::Crc {
-                width: 16,
-                poly: 0x1021,
-                init: 0xffff,
-                final_xor: 0x0,
-                reflect_data: false,
-                reflect_remainder: false,
-            },
-            (0),
-            (l12),
-            l12,
-            16,
-            false,
-            "Crc",
-        )?;
         Ok(())
     }
 }
@@ -287,7 +250,7 @@ pub enum BeaconLayoutKind {
 
 impl Packet for BeaconLayoutKind {
     const NAME: &'static str = "/TcsBeacon/BeaconLayout";
-    const MAX_BYTES: usize = 57;
+    const MAX_BYTES: usize = 55;
 
     /// Decodes the root's entries, then picks the first child (in
     /// document order) whose criteria match, recursively.
@@ -324,26 +287,7 @@ impl Packet for BeaconLayoutKind {
         let v9 = r.uint_order(1, false, "Restarting")? != 0;
         let v10 = r.uint_order(7, false, "Spare")? as u8;
         let v11 = r.fixed_bytes::<16>(16, "Interface")?;
-        let p12 = r.position();
-        let v12 = r.uint_order(16, false, "Crc")? as u16;
         if (v1 == "tcspecial ") && (v5 == " ") && ((v10 as i128) == 0) {
-            if r.checksum(
-                &pk::Checksum::Crc {
-                    width: 16,
-                    poly: 0x1021,
-                    init: 0xffff,
-                    final_xor: 0x0,
-                    reflect_data: false,
-                    reflect_remainder: false,
-                },
-                (0),
-                (p12),
-                "Crc",
-            )? & 0xffff
-                != v12 as u64
-            {
-                return Err(PacketError::BadChecksum { field: "Crc" });
-            }
             return Ok((
                 Self::Beacon(Beacon {
                     major: v2,

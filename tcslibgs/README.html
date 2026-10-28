@@ -198,10 +198,14 @@ file with.</p>
 <ul>
 <li><code>commands</code>, <code>telemetry</code>,
 <code>protocol</code>: the command and telemetry protocol.</li>
-<li><code>beacon</code>: the beacon, which is not JSON as the answers to
-commands are but 57 bytes in a fixed layout, described in XTCE in
-<code>xtce/beacon.xml</code>. The code that packs and unpacks it,
-<code>src/beacon_packet.rs</code> and
+<li><code>link</code>: the commands and their answers, each a CCSDS
+Space Packet, described in XTCE in <code>xtce/link.xml</code>. The code
+that packs and unpacks them, <code>src/link_packet.rs</code>, is
+generated from that file: run <code>make link-packet</code> here after
+changing it, and <code>make interface-digest</code>.</li>
+<li><code>beacon</code>: the beacon, 55 bytes in a fixed layout,
+described in XTCE in <code>xtce/beacon.xml</code>. The code that packs
+and unpacks it, <code>src/beacon_packet.rs</code> and
 <code>../python/tcslibgs/beacon_packet.py</code>, is generated from that
 file by tcs-xtce (vendored in <code>../vendor/tcs-xtce</code>): run
 <code>make beacon-packet</code> here after changing it.</li>
@@ -211,8 +215,9 @@ ground station can tell whether it read the documents tcspecial was
 built from. <code>make interface-digest</code> here regenerates
 <code>src/interface_digest.rs</code> after an XTCE document
 changes.</li>
-<li><code>crc</code>: the CRC-16 every packet ends with, for what is not
-a packet, such as tcspecial’s state file.</li>
+<li><code>crc</code>: the CCSDS CRC-16, for what is kept on storage
+rather than carried by a transport that checks it, such as tcspecial’s
+state file.</li>
 <li><code>config_digest</code>: the digest of a configuration, which
 both ends report, so each can tell whether the other read the same
 files.</li>

@@ -352,16 +352,16 @@ two lines beside it.</li>
 find where the beacons are, starts the loop on a thread, and puts each
 pass in the window. That is all of it, but for a button.</li>
 </ul>
-<p>A beacon is 57 bytes: <code>tcspecial</code> and a space, the
+<p>A beacon is 55 bytes: <code>tcspecial</code> and a space, the
 version’s major, minor and patch a byte each, a space, the
 configuration’s MD5 digest, the beacon’s number and the generation
 number in four bytes each, most significant first, a byte whose top bit
-says a restart has begun, the interface’s digest and a CRC-16. The
-layout is described once, in XTCE, in
-<code>tcslibgs/xtce/beacon.xml</code>; tcspecial packs every beacon and
-<code>tcslib::beacon</code> unpacks it with the code tcs-xtce generates
-from that file, <code>tcslibgs::Beacon</code>, and this example’s test
-packs the beacon it sends the same way. tcs-xtce itself is in
+says a restart has begun, and the interface’s digest. The layout is
+described once, in XTCE, in <code>tcslibgs/xtce/beacon.xml</code>;
+tcspecial packs every beacon and <code>tcslib::beacon</code> unpacks it
+with the code tcs-xtce generates from that file,
+<code>tcslibgs::Beacon</code>, and this example’s test packs the beacon
+it sends the same way. tcs-xtce itself is in
 <code>vendor/tcs-xtce</code>.</p>
 <p>After the indicator, on its <code>Status:</code> row, is the stage
 the indicator is at, in a word: <code>Unheard</code> before any beacon

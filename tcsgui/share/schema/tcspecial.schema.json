@@ -100,14 +100,23 @@
         "beacon": {
           "type": "object",
           "properties": {
-            "interval": {
+            "default_interval": {
               "type": [
                 "string",
                 "number",
                 "boolean",
                 "null"
               ],
-              "description": "How often a beacon is sent, as a length of time: 5 s, 500 ms. It was interval_ms, a bare number of milliseconds."
+              "description": "How often a beacon is sent once the MOC has been heard from, as a length of time: 5 s, 500 ms. It was interval, and before that interval_ms, a bare number of milliseconds."
+            },
+            "reset_interval": {
+              "type": [
+                "string",
+                "number",
+                "boolean",
+                "null"
+              ],
+              "description": "How often a beacon is sent across a restart, as a length of time: from a restart's being initiated, and from every start until the MOC is heard from. Not nought, and no longer than interval."
             },
             "send": {
               "description": "The socket tcspecial sends beacons from.",
@@ -138,6 +147,10 @@
             }
           },
           "additionalProperties": false
+        },
+        "state_file": {
+          "description": "The file tcspecial counts its starts in, the generation number every beacon carries. On storage that survives a power cycle.",
+          "type": "string"
         },
         "restart_arm_valid": {
           "description": "How long a RESTART_ARM licenses a RESTART for, as a length of time: 20 min, 90 s. Twenty minutes where it is not stated; nought is refused.",

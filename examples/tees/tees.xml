@@ -8,8 +8,9 @@
              uses, so this one can be left running while another is looked
              at. -->
         <beacon>
-            <interval>5 s</interval>
+            <default_interval>5 s</default_interval>
             <recv>127.0.0.1:8510</recv>
+            <reset_interval>1 s</reset_interval>
             <send>0.0.0.0:8500</send>
         </beacon>
         <gateway>radio</gateway>
@@ -25,6 +26,9 @@
             <dest_base>127.0.0.1:8410</dest_base>
             <source_base>0.0.0.0:8400</source_base>
         </payload_telemetry>
+        <!-- tcspecial counts its starts in this file, which must be on
+             storage that survives a power cycle on a vehicle. -->
+        <state_file>/tmp/tcspecial-tees.state</state_file>
         <tcs_cmd>
             <recv>0.0.0.0:8200</recv>
             <send>127.0.0.1:8210</send>

@@ -1943,9 +1943,11 @@ tcspecial:
     source_base: \
              0.0.0.0:6000
     dest_base: 127.0.0.1:6100
+  state_file: /var/lib/tcspecial/state
   beacon:
     \
-             interval: 5 s
+             default_interval: 5 s
+    reset_interval: 1 s
     send: \"0.0.0.0:5550\"
     recv: \"\
              127.0.0.1:5650\"

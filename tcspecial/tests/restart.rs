@@ -50,13 +50,13 @@ fn descriptors(pid: u32) -> Vec<i32> {
     open
 }
 
-/// The next beacon's number.
-fn beacon(ground: &UdpSocket) -> u32 {
+/// The next beacon.
+fn beacon(ground: &UdpSocket) -> Beacon {
     let mut buffer = [0u8; 65535];
     loop {
         match ground.recv_from(&mut buffer) {
             Ok((size, _)) => match Beacon::read(&buffer[..size]) {
-                Ok(beacon) => return beacon.sequence,
+                Ok(beacon) => return beacon,
                 Err(why) => panic!("expected a beacon: {why}"),
             },
             Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => {
@@ -102,15 +102,18 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
     let take_at = free();
 
     let configuration = dir.path().join("vehicle.yaml");
+    let state = dir.path().join("tcspecial.state").display().to_string();
     let at = || format!("127.0.0.1:{}", free());
     std::fs::write(
         &configuration,
         format!(
             "tcspecial:
   gateway: radio
-  beacon: {{ interval: \"100 ms\", recv: \"127.0.0.1:{}\", send: \"{}\" }}
+  beacon: {{ default_interval: \"100 ms\", reset_interval: \"100 ms\", \
+  recv: \"127.0.0.1:{}\", send: \"{}\" }}
   payload_command: {{ dest_base: \"{}\", source_base: \"{}\" }}
   payload_telemetry: {{ dest_base: \"{}\", source_base: \"{}\" }}
+  state_file: \"{state}\"
   tcs_cmd: {{ recv: \"127.0.0.1:{take_at}\", \
   send: \"127.0.0.1:{commands_at}\" }}
 ",
@@ -152,7 +155,10 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
     // Running, and settled: a second beacon is sent after everything opened.
     beacon(&beacons);
     let before = beacon(&beacons);
-    assert!(before >= 2, "beacon #{before}");
+    assert!(before.sequence >= 2, "beacon #{}", before.sequence);
+    assert!(!before.restarting, "nothing has been restarted yet");
+    // The first start this state file has seen.
+    assert_eq!(before.generation, 1);
     let open_before = descriptors(pid);
     assert!(
         open_before.contains(&handed),
@@ -178,14 +184,26 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
         CommandStatus::Success
     );
 
-    // Back, numbering its beacons from one again.
+    // Back, numbering its beacons from one again, in the next generation
+    // and not restarting -- the first beacon of the new start already says
+    // so -- having said it was restarting before it went.
     let by = Instant::now() + Duration::from_secs(10);
-    loop {
+    let mut said_restarting = false;
+    let back = loop {
         assert!(Instant::now() < by, "tcspecial did not come back");
-        if beacon(&beacons) == 1 {
-            break;
+        let heard = beacon(&beacons);
+        if heard.generation == before.generation {
+            said_restarting |= heard.restarting;
+            continue;
         }
-    }
+        break heard;
+    };
+    assert!(said_restarting, "no beacon said the restart was initiated");
+    assert_eq!(back.generation, before.generation + 1);
+    assert_eq!(back.sequence, 1, "the first beacon of the new start");
+    assert!(!back.restarting, "the new start's first beacon is not");
+    let kept = std::fs::read_to_string(&state).expect("the state file");
+    assert!(kept.contains("\ngeneration 2\n"), "{kept}");
     // And settled again, as it was when it was counted the first time.
     beacon(&beacons);
     beacon(&beacons);

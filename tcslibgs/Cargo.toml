@@ -18,7 +18,7 @@ md5 = "0.8"
 # Packs and unpacks the beacon, from the code tcs-xtce generated from
 # xtce/beacon.xml. Vendored until tcs-xtce is published on crates.io, when this
 # becomes a version: see vendor/tcs-xtce/README.md.
-xtce = { path = "../vendor/tcs-xtce/rust" }
+tcs-xtce = { path = "../vendor/tcs-xtce/rust" }
 
 [dev-dependencies]
 tempfile = "3"

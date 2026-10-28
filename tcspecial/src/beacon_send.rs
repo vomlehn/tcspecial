@@ -10,7 +10,7 @@
  */
 
 use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::time::{Duration, SystemTime};
@@ -20,10 +20,38 @@ use tcslibgs::{Beacon, BeaconPacker, ConfigDigest, ConfigVersion, TcsResult};
 
 use crate::telemetry_log::TelemetryLog;
 
+/// How often beacons go: normally, and across a restart.
+///
+/// Both from the configuration's `beacon` section. See "The beacon across a
+/// restart" in `docs/design.rst`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BeaconTiming {
+    /// `beacon.default_interval`: once the MOC has been heard from.
+    pub default_interval: Duration,
+    /// `beacon.reset_interval`: from a restart's being initiated, and
+    /// from every start until the MOC is heard from.
+    pub reset_interval: Duration,
+}
+
 #[derive(Clone)]
 pub struct BeaconSend {
     pair: ArcCondPair<SystemTime>,
+    /// How long until the next beacon: `reset_interval` as the process
+    /// starts and once a restart is initiated, the timing's `interval` once
+    /// the MOC is heard from, and what a CONFIG says after that.
     interval: Arc<Mutex<Duration>>,
+    timing: BeaconTiming,
+    /// Whether the beacons are still going every `reset_interval`
+    /// because nothing valid has come from the MOC since this process
+    /// started. Shared, so that the command interpreter's copy clears it for
+    /// all of them, and asked without a lock, because it is asked of every
+    /// command that arrives.
+    awaiting_moc: Arc<AtomicBool>,
+    /// Whether a restart has been initiated, which every beacon from then
+    /// until the process ends says.
+    restarting: Arc<AtomicBool>,
+    /// This start's generation, from the state file: see [`crate::state`].
+    generation: u32,
     /// Where beacons go: `beacon_recv`, which is what tcsmoc makes its
     /// receiving socket out of.
     dest_addr: tcslibgs::HostPort,
@@ -69,17 +97,24 @@ impl BeaconSend {
     /// on without beacons -- which the ground cannot tell from a dead one.
     ///
     /// An interval of nought sends none, and is `Ok(None)`.
+    ///
+    /// The first beacon goes at once, and the next every
+    /// `reset_interval` until [`BeaconSend::heard_from_moc`] is
+    /// called: every start is a restart as far as the ground can tell, and is
+    /// beaconed as one.
     pub fn new(
-        interval: Duration,
+        timing: BeaconTiming,
         from_addr: tcslibgs::HostPort,
         dest_addr: tcslibgs::HostPort,
         log: TelemetryLog,
         version: ConfigVersion,
         digest: ConfigDigest,
+        generation: u32,
     ) -> TcsResult<Option<BeaconSend>> {
-        if interval == Duration::from_secs(0) {
+        if timing.default_interval == Duration::from_secs(0) {
             return Ok(None);
         }
+        let interval = timing.reset_interval;
 
         // Bound where the configuration says beacons come from, port and all.
         // A port the system chose would work -- the datagram carries its
@@ -121,6 +156,10 @@ impl BeaconSend {
             sent: Arc::new(AtomicU32::new(0)),
             pair,
             interval: Arc::new(Mutex::new(interval)),
+            timing,
+            awaiting_moc: Arc::new(AtomicBool::new(true)),
+            restarting: Arc::new(AtomicBool::new(false)),
+            generation,
             dest_addr,
             from_addr,
             log,
@@ -190,8 +229,10 @@ impl BeaconSend {
         // every beacon used to carry.
         let sequence =
             self.sent.fetch_add(1, Ordering::Relaxed).wrapping_add(1);
-        let data =
-            packer.pack(&Beacon::new(sequence, self.version, self.digest));
+        let beacon =
+            Beacon::new(sequence, self.version, self.digest, self.generation)
+                .restarting(self.restarting.load(Ordering::SeqCst));
+        let data = packer.pack(&beacon);
         trace!("send_beacon: sending to {dest}");
         // Recorded before it is sent, as a command response is, so that a
         // beacon the send fails on is still known to have been produced.
@@ -207,6 +248,46 @@ impl BeaconSend {
             return;
         }
 
+        self.retime(interval);
+    }
+
+    /// A valid packet has arrived from the MOC: the beacons go back to
+    /// `beacon.default_interval`, if they were going every `reset_interval`
+    /// because nothing had.
+    ///
+    /// Called for every packet the command interpreter takes, so the case
+    /// that matters -- every one after the first -- is one atomic swap. Not
+    /// once a restart has been initiated: from then until the process ends,
+    /// the beacons are the ground's news of the restart, and they stay fast.
+    pub fn heard_from_moc(&self) {
+        if self.restarting.load(Ordering::SeqCst) {
+            return;
+        }
+        if self.awaiting_moc.swap(false, Ordering::SeqCst) {
+            // Slower from the next beacon on, and not one sent now: the
+            // ground has just been heard from, and a beacon now would say
+            // nothing it was not told a moment ago.
+            *self.interval.lock().unwrap() = self.timing.default_interval;
+            // The one allocation this makes in the command loop, where the
+            // log formats the line: once a start, on the first packet, and
+            // worth it for the record of when the ground was first heard.
+            info!(
+                "the MOC has been heard from: beacons every {:?} again",
+                self.timing.default_interval
+            );
+        }
+    }
+
+    /// A restart has been initiated: from now until the process ends, every
+    /// beacon says so, one goes at once, and the rest every
+    /// `reset_interval`.
+    pub fn restart_initiated(&self) {
+        self.restarting.store(true, Ordering::SeqCst);
+        self.retime(self.timing.reset_interval);
+    }
+
+    /// Beacon every `interval` from now on, starting with one now.
+    fn retime(&self, interval: Duration) {
         // Update the interval
         *self.interval.lock().unwrap() = interval;
 
@@ -269,6 +350,14 @@ mod tests {
     use super::*;
     use tcslibgs::CIConfig;
 
+    /// Beacons every fifty milliseconds, across a restart or not.
+    fn fifty() -> BeaconTiming {
+        BeaconTiming {
+            default_interval: Duration::from_millis(50),
+            reset_interval: Duration::from_millis(50),
+        }
+    }
+
     /// Every beacon carries the next number, from one.
     ///
     /// Through the thread that really sends them, because the counting is
@@ -315,6 +404,7 @@ mod tests {
                     port: 6100,
                 },
                 beacon_interval: Duration::from_millis(50),
+                reset_interval: Duration::from_millis(50),
                 beacon_send: tcslibgs::HostPort {
                     address: "127.0.0.1".to_string(),
                     port: 0,
@@ -328,13 +418,14 @@ mod tests {
                 log_segment_bytes: 65_536,
                 restart_arm_valid: tcslibgs::RESTART_ARM_VALID_DEFAULT,
                 gateway: tcslibgs::gateway::GatewayKind::Radio,
+                state_file: String::new(),
             },
             &crate::segsend::SegSend::none(),
         )
         .expect("a log that logs nothing");
 
         let _beacon = BeaconSend::new(
-            Duration::from_millis(50),
+            fifty(),
             // From a port of the system's choosing, to where the ground
             // socket above is bound.
             tcslibgs::HostPort {
@@ -348,6 +439,7 @@ mod tests {
             log,
             ConfigVersion::of_this_build(),
             ConfigDigest([0u8; 16]),
+            1,
         )
         .expect("a sender")
         .expect("an interval that sends");
@@ -381,13 +473,95 @@ mod tests {
     /// A `beacon.send` something else holds is refused when the sender is
     /// made, naming the setting, and is not left to a thread that would end
     /// without a word.
+    /// A ground socket, and a sender beaconing to it from a port of its own
+    /// with `timing`, as generation 7.
+    fn sending(timing: BeaconTiming) -> (std::net::UdpSocket, BeaconSend) {
+        let ground =
+            std::net::UdpSocket::bind("127.0.0.1:0").expect("a ground socket");
+        let at = ground.local_addr().expect("where it is");
+        let sender = BeaconSend::new(
+            timing,
+            tcslibgs::HostPort {
+                address: "127.0.0.1".to_string(),
+                port: 0,
+            },
+            tcslibgs::HostPort {
+                address: at.ip().to_string(),
+                port: at.port(),
+            },
+            TelemetryLog::disabled(),
+            ConfigVersion::of_this_build(),
+            ConfigDigest([0u8; 16]),
+            7,
+        )
+        .expect("a sender")
+        .expect("an interval that sends");
+        (ground, sender)
+    }
+
+    /// The next beacon to arrive within `wait`, or `None`.
+    fn next(ground: &std::net::UdpSocket, wait: Duration) -> Option<Beacon> {
+        ground.set_read_timeout(Some(wait)).expect("a timeout");
+        let mut buffer = [0u8; 512];
+        loop {
+            match ground.recv_from(&mut buffer) {
+                Ok((size, _)) => {
+                    return Some(
+                        Beacon::read(&buffer[..size]).expect("a beacon"),
+                    )
+                }
+                Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => {}
+                Err(_) => return None,
+            }
+        }
+    }
+
+    /// Every start beacons fast, with its generation and the restarting bit
+    /// clear, until the MOC is heard from; then at the interval. A restart
+    /// initiated sends one at once with the bit set, fast again, and being
+    /// heard from does not slow them after that.
+    #[test]
+    fn beacons_go_fast_across_a_restart_and_slow_when_the_moc_is_heard() {
+        let fast = Duration::from_millis(20);
+        let (ground, sender) = sending(BeaconTiming {
+            default_interval: Duration::from_secs(60),
+            reset_interval: fast,
+        });
+        let wait = Duration::from_secs(5);
+        for _ in 0..3 {
+            let beacon =
+                next(&ground, wait).expect("fast beacons as it starts");
+            assert_eq!(beacon.generation, 7);
+            assert!(!beacon.restarting, "a process that has just started");
+        }
+
+        sender.heard_from_moc();
+        // One may already have been on its way; after that, none for a
+        // minute, and a quarter of a second is a dozen fast ones.
+        let _ = next(&ground, Duration::from_millis(100));
+        assert_eq!(
+            next(&ground, Duration::from_millis(250)),
+            None,
+            "the beacons slowed when the MOC was heard from"
+        );
+
+        sender.restart_initiated();
+        let beacon = next(&ground, wait).expect("one at once");
+        assert!(beacon.restarting, "it says the restart was initiated");
+        sender.heard_from_moc();
+        for _ in 0..3 {
+            let beacon = next(&ground, wait).expect("fast until it ends");
+            assert!(beacon.restarting);
+        }
+    }
+
     #[test]
     fn a_beacon_address_that_cannot_be_bound_is_refused_at_the_start() {
         let held = std::net::UdpSocket::bind("127.0.0.1:0").expect("a socket");
         let at = held.local_addr().expect("where it is");
 
         let refused = BeaconSend::new(
-            Duration::from_millis(50),
+            fifty(),
             tcslibgs::HostPort {
                 address: at.ip().to_string(),
                 port: at.port(),
@@ -399,6 +573,7 @@ mod tests {
             TelemetryLog::disabled(),
             ConfigVersion::of_this_build(),
             ConfigDigest([0u8; 16]),
+            1,
         );
         let said = match refused {
             Err(e) => e.to_string(),
@@ -412,7 +587,7 @@ mod tests {
     #[test]
     fn a_beacon_destination_that_does_not_resolve_is_refused_at_the_start() {
         let refused = BeaconSend::new(
-            Duration::from_millis(50),
+            fifty(),
             tcslibgs::HostPort {
                 address: "127.0.0.1".to_string(),
                 port: 0,
@@ -424,6 +599,7 @@ mod tests {
             TelemetryLog::disabled(),
             ConfigVersion::of_this_build(),
             ConfigDigest([0u8; 16]),
+            1,
         );
         let said = match refused {
             Err(e) => e.to_string(),

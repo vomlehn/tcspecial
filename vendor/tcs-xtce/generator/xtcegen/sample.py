@@ -16,29 +16,21 @@ from .model import ComplexRef, EnumRef, ScalarRef, TypeRef
 MAX_SAMPLES = 64
 EXPANSIONS_PER_TYPE = 2  # full expansions of a type per sample
 
-PATTERN_VALUES = {
-    "BinaryType": ["0b101"],
-    "HexadecimalType": ["0x1F"],
-    "OctalType": ["0o17"],
-    "ByteOrderArbitraryType": ["0,1", "1,0"],
-    "ByteOrderType": ["mostSignificantByteFirst", "1,0"],
-    "EpochType": ["TAI", "2024-01-02", "1970-01-01T00:00:00Z"],
-    "FixedIntegerValueType": ["42", "0x2A", "0o52", "0b101010"],
-}
+PATTERN_VALUES = {"BinaryType": ["0b101"], "HexadecimalType": ["0x1F"],
+                  "OctalType": ["0o17"],
+                  "ByteOrderArbitraryType": ["0,1", "1,0"],
+                  "ByteOrderType": ["mostSignificantByteFirst", "1,0"],
+                  "EpochType": ["TAI", "2024-01-02", "1970-01-01T00:00:00Z"],
+                  "FixedIntegerValueType": ["42", "0x2A", "0o52", "0b101010"]}
 
-LEXICAL = {
-    "dateTime": ["2024-01-02T03:04:05Z", "2024-06-30T23:59:59.5+01:00"],
-    "date": ["2024-01-02"],
-    "duration": ["PT1.5S", "P1DT2H"],
-    "hexBinary": ["0A1B", "ff00"],
-    "anyURI": ["http://example.com/xtce", "urn:x:y"],
-    "boolean": ["true", "false"],
-    "int": ["7", "-3"],
-    "long": ["42", "-9000000000"],
-    "integer": ["17"],
-    "unsignedShort": ["65535", "8"],
-    "double": ["1.5", "0.25", "42.0", "1e-05", "2.5e+20"],
-}
+LEXICAL = {"dateTime": ["2024-01-02T03:04:05Z", "2024-06-30T23:59:59.5+01:00"],
+           "date": ["2024-01-02"], "duration": ["PT1.5S", "P1DT2H"],
+           "hexBinary": ["0A1B", "ff00"],
+           "anyURI": ["http://example.com/xtce", "urn:x:y"],
+           "boolean": ["true", "false"], "int": ["7", "-3"],
+           "long": ["42", "-9000000000"], "integer": ["17"],
+           "unsignedShort": ["65535", "8"],
+           "double": ["1.5", "0.25", "42.0", "1e-05", "2.5e+20"]}
 
 # Sets whose children are all selected by an xs:key on @name ("Set/*"), so
 # children without a name attribute make an instance invalid.
@@ -76,7 +68,8 @@ class _Gen:
         if sn in PATTERN_VALUES:
             vals = PATTERN_VALUES[sn]
             return vals[(n + self.seed) % len(vals)]
-        if "Name" in sn or name in ("name", "ref", "parameterRef", "argumentRef"):
+        if ("Name" in sn
+                or name in ("name", "ref", "parameterRef", "argumentRef")):
             return f"n{n}"
         if sn and t.builtin in ("int", "long", "integer"):
             return str(n % 1000 + 1)  # restricted (e.g. positive) integers
@@ -87,14 +80,17 @@ class _Gen:
             return vals[(n + self.seed) % len(vals)]
         return STRINGS[(n + self.seed) % len(STRINGS)] + str(n)
 
-    def element(self, tag: str, t: TypeRef, path: tuple[str, ...], minimal: bool, fixed=None) -> None:
+    def element(self, tag: str, t: TypeRef, path: tuple[str, ...],
+                minimal: bool, fixed=None) -> None:
         if isinstance(t, ComplexRef):
             self.record(self.b.records[t.name], tag, path, minimal)
         else:
-            value = fixed if fixed is not None else self.scalar(t, path[-1], tag)
+            value = (fixed if fixed is not None
+                     else self.scalar(t, path[-1], tag))
             self.out.append(f"<{tag}>{escape(value)}</{tag}>")
 
-    def record(self, r: Record, tag: str, path: tuple[str, ...], minimal: bool, root=False) -> None:
+    def record(self, r: Record, tag: str, path: tuple[str, ...], minimal: bool,
+               root=False) -> None:
         if not minimal:
             seen = self.expanded.get(r.name, 0)
             if r.name in path or seen >= EXPANSIONS_PER_TYPE:
@@ -107,10 +103,12 @@ class _Gen:
             attrs.append(f'xmlns="{self.b.schema.namespace}"')
         for a in r.attrs:
             if a.required or not minimal:
-                attrs.append(f"{a.xml}={quoteattr(self.scalar(a.type, r.name, a.xml))}")
+                attrs.append(f"{a.xml}="
+                             f"{quoteattr(self.scalar(a.type, r.name, a.xml))}")
         head = f"<{tag}" + "".join(" " + a for a in attrs)
         if r.text is not None:
-            value = "m/s" if r.name == "UnitType" else self.scalar(r.text.type, r.name, "value")
+            value = ("m/s" if r.name == "UnitType"
+                     else self.scalar(r.text.type, r.name, "value"))
             self.out.append(f"{head}>{escape(value)}</{tag}>")
             return
         start = len(self.out)
@@ -134,13 +132,15 @@ class _Gen:
         else:
             self.out.append(f"</{tag}>")
 
-    def choice(self, f: ChoiceField, path: tuple[str, ...], minimal: bool) -> None:
+    def choice(self, f: ChoiceField, path: tuple[str, ...],
+               minimal: bool) -> None:
         c = f.choice
         if minimal:
             v = c.variants[c.default_variant]
         else:
             # Prefer alternatives no earlier sample has covered yet.
-            fresh = [v for v in c.variants if (c.name, v.xml) not in self.done | self.covered]
+            fresh = [v for v in c.variants
+                     if (c.name, v.xml) not in self.done | self.covered]
             if fresh:
                 v = fresh[0]
             else:
@@ -191,12 +191,14 @@ def generate(b: Binding) -> list[tuple[str, str]]:
         if not new and seed > 0:
             continue
         covered |= g.covered
-        text = '<?xml version="1.0" encoding="UTF-8"?>\n' + "\n".join(g.out) + "\n"
+        text = ('<?xml version="1.0" encoding="UTF-8"?>\n' + "\n".join(g.out)
+                + "\n")
         samples.append((f"sample_{len(samples):02d}.xml", text))
         if covered >= targets:
             break
     missing = sorted(targets - covered)
-    report = [f"samples: {len(samples)}", f"covered: {len(covered)}/{len(targets)}"]
+    report = [f"samples: {len(samples)}",
+              f"covered: {len(covered)}/{len(targets)}"]
     report += [f"uncovered: {t}.{e}" for t, e in missing]
     samples.append(("COVERAGE.txt", "\n".join(report) + "\n"))
     return samples

@@ -189,9 +189,11 @@ pub const ATTRIBUTES: &[(&str, bool)] = &[
     ("payload_command.dest_base", true),
     ("payload_telemetry.source_base", true),
     ("payload_telemetry.dest_base", true),
-    ("beacon.interval", true),
+    ("beacon.default_interval", true),
+    ("beacon.reset_interval", true),
     ("beacon.send", true),
     ("beacon.recv", true),
+    ("state_file", true),
     ("log.directory", false),
     ("log.segment_size", false),
     ("restart_arm_valid", false),
@@ -212,7 +214,10 @@ pub const ATTRIBUTES: &[(&str, bool)] = &[
 /// argued with.
 pub fn default_of(attribute: &str) -> Option<&'static str> {
     match attribute {
-        "beacon.interval" => Some("1 s"),
+        "beacon.default_interval" => Some("1 s"),
+        // The same once a second, for the same reason: it may be no longer
+        // than the interval, and a new configuration's must be allowed.
+        "beacon.reset_interval" => Some("1 s"),
         _ => None,
     }
 }
@@ -225,8 +230,12 @@ pub fn default_of(attribute: &str) -> Option<&'static str> {
 /// it is a file written for the spelling before this one.
 pub fn retired(attribute: &str) -> Option<&'static str> {
     match attribute {
+        "beacon.interval" => Some(
+            "say beacon.default_interval: there are two intervals now, the \
+             other being beacon.reset_interval",
+        ),
         "beacon.interval_ms" => Some(
-            "say beacon.interval, as a length of time: 5 s rather than 5000",
+            "say beacon.default_interval, as a length of time: 5 s rather than 5000",
         ),
         _ => None,
     }
@@ -326,16 +335,26 @@ pub fn ci_config_of(
             // configuration. Read here all the same, so a length of time that
             // is not one is refused where the section is rather than at
             // whatever later moment something asks how often beacons go.
-            interval: {
-                let said = text("beacon.interval")?;
+            default_interval: {
+                let said = text("beacon.default_interval")?;
                 crate::graph::parse_interval(&said)
-                    .map_err(|why| format!("beacon.interval: {why}"))?;
+                    .map_err(|why| format!("beacon.default_interval: {why}"))?;
                 said
             },
             // The name `interval` used to have, which a graph never writes:
             // this section's words are checked against `ATTRIBUTES`, which
             // names the retired one there.
+            interval: None,
             interval_ms: None,
+            // Read here, as the interval is, so that one that is not a length
+            // of time is refused where the section is. Whether it is longer
+            // than the interval is `to_ci_config`'s question, which has both.
+            reset_interval: {
+                let said = text("beacon.reset_interval")?;
+                crate::graph::parse_interval(&said)
+                    .map_err(|why| format!("beacon.reset_interval: {why}"))?;
+                said
+            },
             send: text("beacon.send")?,
             recv: text("beacon.recv")?,
         },
@@ -350,6 +369,7 @@ pub fn ci_config_of(
             }
             _ => None,
         },
+        state_file: text("state_file")?,
         log: LogJson {
             // Absent is "run without a telemetry log", which is a
             // configuration somebody may mean: a vehicle with no writable
@@ -394,7 +414,7 @@ pub fn beacon_of(graph: &Graph) -> Result<Option<crate::BeaconLink>, String> {
     Ok(Some(crate::BeaconLink::of(&ci)))
 }
 
-/// How often tcspecial beacons: the `tcspecial` section's `beacon.interval`,
+/// How often tcspecial beacons: the `tcspecial` section's `beacon.default_interval`,
 /// as a length of time. `None` for a configuration with no section, as
 /// [`beacon_of`] is.
 ///
@@ -427,6 +447,7 @@ pub fn blank() -> BTreeMap<String, Scalar> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
 
     fn said(pairs: &[(&str, &str)]) -> BTreeMap<String, Scalar> {
         pairs
@@ -444,7 +465,9 @@ mod tests {
             ("payload_command.dest_base", "0.0.0.0:4200"),
             ("payload_telemetry.source_base", "0.0.0.0:6000"),
             ("payload_telemetry.dest_base", "127.0.0.1:6100"),
-            ("beacon.interval", "5 s"),
+            ("beacon.default_interval", "5 s"),
+            ("beacon.reset_interval", "1 s"),
+            ("state_file", "/var/lib/tcspecial/state"),
             ("beacon.send", "0.0.0.0:5550"),
             ("beacon.recv", "127.0.0.1:5650"),
             ("log.directory", "/var/log/tcspecial"),
@@ -462,7 +485,7 @@ mod tests {
         assert_eq!(config.tcs_cmd.send, "127.0.0.1:4100");
         assert_eq!(config.payload_command.source_base, "127.0.0.1:4300");
         assert_eq!(config.payload_command.dest_base, "0.0.0.0:4200");
-        assert_eq!(config.beacon.interval, "5 s");
+        assert_eq!(config.beacon.default_interval, "5 s");
         assert_eq!(config.beacon.send, "0.0.0.0:5550");
         assert_eq!(config.log.directory.as_deref(), Some("/var/log/tcspecial"));
         assert_eq!(config.log.segment_size, 65536);
@@ -477,6 +500,51 @@ mod tests {
         // And the bases, which are counted on by a payload's own id.
         assert_eq!(settled.payload_source_base.at(0).unwrap().port, 6000);
         assert_eq!(settled.payload_dest_base.at(3).unwrap().port, 6103);
+    }
+
+    /// How often beacons go across a restart is `beacon.reset_interval`: a
+    /// length of time, not nought and no longer than
+    /// `beacon.default_interval`, each refusal naming the attribute. And
+    /// `state_file` is required, as the beacon's are.
+    #[test]
+    fn the_reset_interval_and_the_state_file_are_required_and_checked() {
+        let settled = |change: &[(&'static str, &'static str)]| {
+            let mut all: Vec<_> = whole()
+                .into_iter()
+                .filter(|(name, _)| !change.iter().any(|(n, _)| n == name))
+                .collect();
+            all.extend(change.iter().filter(|(_, value)| !value.is_empty()));
+            ci_config_of(&said(&all)).and_then(|config| config.to_ci_config())
+        };
+        let config = settled(&[]).expect("the whole section");
+        assert_eq!(config.reset_interval, Duration::from_secs(1));
+        assert_eq!(config.state_file, "/var/lib/tcspecial/state");
+        assert_eq!(
+            settled(&[("beacon.reset_interval", "5 s")])
+                .expect("as long as the interval")
+                .reset_interval,
+            Duration::from_secs(5)
+        );
+        for (change, said) in [
+            (("beacon.reset_interval", ""), "beacon.reset_interval"),
+            (("beacon.reset_interval", "0 s"), "beacon.reset_interval"),
+            (("beacon.reset_interval", "6 s"), "no longer than"),
+            (("beacon.reset_interval", "soon"), "beacon.reset_interval"),
+            (("state_file", ""), "state_file"),
+        ] {
+            let why = settled(&[change]).expect_err(change.1);
+            assert!(why.contains(said), "{change:?}: {why}");
+        }
+    }
+
+    /// A file still writing `beacon.interval`, from before there were two,
+    /// is told the name it has now.
+    #[test]
+    fn the_beacons_old_interval_is_told_its_new_name() {
+        let mut all = whole();
+        all.push(("beacon.interval", "5 s"));
+        let why = ci_config_of(&said(&all)).expect_err("a retired name");
+        assert!(why.contains("beacon.default_interval"), "{why}");
     }
 
     /// How long an arm lasts is the section's `restart_arm_valid`, a length
@@ -606,8 +674,8 @@ mod tests {
         // and a port are parsed where the rest of their rules are -- see
         // CIConfigJson::to_ci_config -- so they are asked below.
         for (name, value) in [
-            ("beacon.interval", "often"),
-            ("beacon.interval", "-1"),
+            ("beacon.default_interval", "often"),
+            ("beacon.default_interval", "-1"),
             ("log.segment_size", "a few"),
         ] {
             let mut wrong = whole();

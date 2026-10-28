@@ -99,6 +99,64 @@ pub struct TcsClient {
     /// says *sent at this time, nothing back since* rather than blanking.
     last_sent: Option<Timestamp>,
     last_received: Option<Timestamp>,
+    /// How many commands have gone out, so that a caller can tell whether
+    /// the one it asked for did.
+    sent: u64,
+    /// The last beacon's generation and restarting bit, as the station
+    /// passed them on: see [`TcsClient::beacon_heard`].
+    beacon: Option<(u32, bool)>,
+    /// What a RESTART that went out is waiting for, until a beacon says it
+    /// came: see [`RestartWait`].
+    restart_wait: Option<RestartWait>,
+}
+
+/// A RESTART went out, and no command may follow it until a beacon says
+/// tcspecial has started again.
+///
+/// Every command until then is refused here, unsent: from the moment the
+/// vehicle takes the RESTART it is ending, and the vehicle that comes back
+/// is another start, possibly with other definitions -- a command sent in
+/// between would be read by whichever of the two it reached. See "What the
+/// ground may send meanwhile" in `docs/design.rst`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RestartWait {
+    /// The generation of the last beacon before the RESTART went out, which
+    /// the beacon that ends the wait must not carry. `None` where no beacon
+    /// had been heard, and then the wait ends at a beacon with the
+    /// restarting bit clear that comes after one with it set.
+    pub before: Option<u32>,
+    /// Whether a beacon with the restarting bit set has been heard since,
+    /// which is what ends a wait with no generation to go by.
+    pub seen_restarting: bool,
+}
+
+impl RestartWait {
+    /// Whether a beacon of `generation`, restarting or not, ends this wait.
+    fn ended_by(&mut self, generation: u32, restarting: bool) -> bool {
+        if restarting {
+            self.seen_restarting = true;
+            return false;
+        }
+        match self.before {
+            Some(before) => generation != before,
+            None => self.seen_restarting,
+        }
+    }
+
+    /// Why a command is refused while this lasts.
+    fn refusal(&self) -> TcsError {
+        TcsError::AwaitingRestart(match self.before {
+            Some(before) => format!(
+                "not sent: a RESTART went out, and nothing may follow it \
+                 until a beacon of a generation other than {before}, not \
+                 restarting, says tcspecial has started again"
+            ),
+            None => "not sent: a RESTART went out, and nothing may follow it \
+                     until a beacon says tcspecial has restarted and started \
+                     again"
+                .to_string(),
+        })
+    }
 }
 
 impl TcsClient {
@@ -125,6 +183,9 @@ impl TcsClient {
             timeout: DEFAULT_TIMEOUT,
             last_sent: None,
             last_received: None,
+            sent: 0,
+            beacon: None,
+            restart_wait: None,
         }
     }
 
@@ -152,7 +213,45 @@ impl TcsClient {
             timeout: DEFAULT_TIMEOUT,
             last_sent: None,
             last_received: None,
+            sent: 0,
+            beacon: None,
+            restart_wait: None,
         }
+    }
+
+    /// A beacon has arrived, of `generation` and saying whether a restart has
+    /// been initiated: what [`crate::beacon::Pass`] says of the last one.
+    ///
+    /// A station that sends RESTART passes on every beacon it hears, because
+    /// a beacon is what ends the wait a RESTART begins. Returns the wait it
+    /// ended, if it ended one, for the station to say so.
+    pub fn beacon_heard(
+        &mut self,
+        generation: u32,
+        restarting: bool,
+    ) -> Option<RestartWait> {
+        self.beacon = Some((generation, restarting));
+        let mut wait = self.restart_wait?;
+        if wait.ended_by(generation, restarting) {
+            self.restart_wait = None;
+            Some(wait)
+        } else {
+            self.restart_wait = Some(wait);
+            None
+        }
+    }
+
+    /// What a RESTART that went out is waiting for, if one is.
+    pub fn restart_wait(&self) -> Option<RestartWait> {
+        self.restart_wait
+    }
+
+    /// End a wait by hand, for an operator who knows the RESTART was never
+    /// taken -- the beacons go on in the old generation, not restarting --
+    /// and returns it so that the station can record which generation it
+    /// was waiting on. Nothing else ends a wait but a beacon or a refusal.
+    pub fn end_restart_wait(&mut self) -> Option<RestartWait> {
+        self.restart_wait.take()
     }
 
     /// When the last command went out, if one has.
@@ -205,6 +304,9 @@ impl TcsClient {
 
     /// Send a command and wait for the response
     fn send_command(&mut self, command: Command) -> TcsResult<Telemetry> {
+        if let Some(wait) = &self.restart_wait {
+            return Err(wait.refusal());
+        }
         let timeout = self.timeout;
         let link = self.link_for(&command)?;
 
@@ -214,6 +316,7 @@ impl TcsClient {
         // spacecraft's own time in the answer cannot say.
         link.send(&command)?;
         self.last_sent = Some(Timestamp::now());
+        self.sent += 1;
 
         let answer = self.link_for(&command)?.receive_timeout(timeout);
         if answer.is_ok() {
@@ -268,6 +371,9 @@ impl TcsClient {
         let command =
             Command::Connect(ConnectCommand::new(seq, version, digest));
         let timeout = self.timeout;
+        if let Some(wait) = &self.restart_wait {
+            return Err(wait.refusal());
+        }
 
         // The spacecraft's own link, and only that one. A CONNECT is about
         // having a connection to the vehicle, which is what this link is; a
@@ -289,13 +395,33 @@ impl TcsClient {
     }
 
     /// Send a RESTART command
+    ///
+    /// From the moment it goes, every command is refused here until a beacon
+    /// passed to [`TcsClient::beacon_heard`] says tcspecial has started
+    /// again: see [`RestartWait`]. A RESTART the vehicle answers as refused
+    /// ends the wait, because nothing was initiated; one whose answer does
+    /// not come does not, because it may have been taken.
     pub fn restart(&mut self, arm_key: ArmKey) -> TcsResult<CommandStatus> {
         let seq = self.next_sequence();
         let cmd = Command::Restart(RestartCommand::new(seq, arm_key));
-        let response = self.send_command(cmd)?;
+        let before = self.sent;
+        let response = self.send_command(cmd);
+        // Begun once it has gone, whatever comes back -- an answer lost is a
+        // RESTART that may have been taken -- and not where it never went.
+        if self.sent != before {
+            self.restart_wait = Some(RestartWait {
+                before: self.beacon.map(|(generation, _)| generation),
+                seen_restarting: false,
+            });
+        }
 
-        match response {
-            Telemetry::Restart(tm) => Ok(tm.header.status),
+        match response? {
+            Telemetry::Restart(tm) => {
+                if !tm.header.status.is_success() {
+                    self.restart_wait = None;
+                }
+                Ok(tm.header.status)
+            }
             _ => {
                 Err(TcsError::Protocol("Unexpected telemetry type".to_string()))
             }
@@ -524,6 +650,35 @@ impl Default for TcsClientBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A wait with a generation to go by ends at a beacon of another one
+    /// that is not restarting, and nothing else; one with none to go by
+    /// ends at a beacon not restarting after one that was.
+    #[test]
+    fn a_restart_wait_ends_at_the_next_start() {
+        let mut wait = RestartWait {
+            before: Some(7),
+            seen_restarting: false,
+        };
+        assert!(!wait.ended_by(7, false));
+        assert!(!wait.ended_by(7, true));
+        assert!(!wait.ended_by(8, true));
+        assert!(wait.ended_by(8, false));
+        // Down as well as up: a damaged state file starts again from one.
+        assert!(RestartWait {
+            before: Some(7),
+            seen_restarting: false,
+        }
+        .ended_by(1, false));
+
+        let mut blind = RestartWait {
+            before: None,
+            seen_restarting: false,
+        };
+        assert!(!blind.ended_by(3, false), "the old process, still going");
+        assert!(!blind.ended_by(3, true));
+        assert!(blind.ended_by(4, false));
+    }
 
     #[test]
     fn test_client_builder() {

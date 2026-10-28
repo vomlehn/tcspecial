@@ -192,10 +192,11 @@ arrive on are worked out from the configuration, the same way tcspecial
 works them out, so the two ends cannot disagree about them.</li>
 <li><strong>Knowing it is there.</strong> <code>beacon</code> listens
 for the beacon tcspecial sends on its own, every
-<code>beacon.interval</code>, whether or not anyone has connected. It
-says which build is running, which configuration it is serving and the
-digest of the files it read. It is the one thing a ground station can
-know about a spacecraft without having asked it anything.</li>
+<code>beacon.default_interval</code>, whether or not anyone has
+connected. It says which build is running, which configuration it is
+serving and the digest of the files it read. It is the one thing a
+ground station can know about a spacecraft without having asked it
+anything.</li>
 <li><strong>Waiting for the simulator.</strong>
 <code>simulator::wait</code> asks tcssim, at the address its simulator
 file gives as <code>tcssim.ready</code>, until it has made its stand-ins

@@ -28,11 +28,18 @@ the editor is the one the vehicle would have refused the file with.
 
 - `commands`, `telemetry`, `protocol`: the command and telemetry protocol.
 - `beacon`: the beacon, which is not JSON as the answers to commands are but
-  34 bytes in a fixed layout, described in XTCE in `xtce/beacon.xml`. The code
+  57 bytes in a fixed layout, described in XTCE in `xtce/beacon.xml`. The code
   that packs and unpacks it, `src/beacon_packet.rs` and
   `../python/tcslibgs/beacon_packet.py`, is generated from that file by
   tcs-xtce (vendored in `../vendor/tcs-xtce`): run `make beacon-packet` here
   after changing it.
+- `interface`: the digest of the XTCE documents every packet on the link is
+  stated in, which every beacon carries so that a ground station can tell
+  whether it read the documents tcspecial was built from. `make
+  interface-digest` here regenerates `src/interface_digest.rs` after an
+  XTCE document changes.
+- `crc`: the CRC-16 every packet ends with, for what is not a packet, such as
+  tcspecial's state file.
 - `config_digest`: the digest of a configuration, which both ends report, so
   each can tell whether the other read the same files.
 - `graph`: the configuration, a graph of nodes, with its checks, and the

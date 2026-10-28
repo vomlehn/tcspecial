@@ -2372,7 +2372,7 @@ the ground station beacon, which shows it on the beacon panel
 </div>
 <p>What a ground station knows about a spacecraft without asking it anything.
 tcspecial sends a beacon from <tt class="docutils literal">beacon.send</tt> to <tt class="docutils literal">beacon.recv</tt> every
-<tt class="docutils literal">beacon.interval</tt> for as long as it runs, over a socket of its own and
+<tt class="docutils literal">beacon.default_interval</tt> for as long as it runs, over a socket of its own and
 whether or not anything has connected to it -- so this example commands
 nothing, and still says whether the vehicle is alive, which build it is, and
 whether the configuration it is serving is the one the ground read.</p>
@@ -2396,10 +2396,12 @@ it.</li>
 find where the beacons are, starts the loop on a thread of its own, and puts
 each pass in the window.</li>
 </ul>
-<p>A beacon is 34 bytes in a fixed layout: <tt class="docutils literal">tcspecial</tt> and a space, the
+<p>A beacon is 57 bytes in a fixed layout: <tt class="docutils literal">tcspecial</tt> and a space, the
 version's major, minor and patch a byte each, a space, the sixteen bytes of
-the configuration's MD5 digest, and the beacon's number in four bytes, most
-significant first. The layout is described in XTCE, in
+the configuration's MD5 digest, the beacon's number and the generation number
+in four bytes each, most significant first, a byte whose top bit says a
+restart has been initiated, the sixteen bytes of the interface's digest, and a
+CRC-16 of everything before it. The layout is described in XTCE, in
 <tt class="docutils literal">tcslibgs/xtce/beacon.xml</tt>, and tcspecial packs each beacon, and
 <tt class="docutils literal"><span class="pre">tcslib::beacon</span></tt> unpacks it, with the code tcs-xtce generates from that file:
 <tt class="docutils literal"><span class="pre">tcslibgs::Beacon</span></tt>. The example's test packs the beacon it sends the same
@@ -3739,17 +3741,35 @@ vehicle is doing and decide, over a link with minutes of latency; short
 enough that an arm left behind does not stand ready for the next restart
 anybody sends.</dd>
 <dt>Restart</dt>
-<dd>Restarts the spacecraft software, which only a restart armed with the same
+<dd><p class="first">Restarts the spacecraft software, which only a restart armed with the same
 key within the time an arm lasts does. The arm is used up by it; a restart
 with the wrong key is refused and leaves the arm standing. tcspecial
 answers, stops as it does when it is told to -- the pass finished, the
 links closed, the log flushed -- and runs itself again in the same process,
 reading its configuration file again: a changed configuration is flown this
 way. It keeps the descriptors it was started with, such as a socket or pipe
-a supervisor handed it, and closes everything it opened itself. Its beacons
-start again at #1. On a system where it cannot do that -- one with neither
-<tt class="docutils literal">/proc/self/fd</tt> nor <tt class="docutils literal">/dev/fd</tt> to say what it was started with -- it says
-so on its error output and exits.</dd>
+a supervisor handed it, and closes everything it opened itself. On a system
+where it cannot do that -- one with neither <tt class="docutils literal">/proc/self/fd</tt> nor
+<tt class="docutils literal">/dev/fd</tt> to say what it was started with -- it says so on its error
+output and exits, so run tcspecial under a supervisor that starts it again
+when it exits.</p>
+<p>The beacons are how the ground learns the restart happened. From the
+moment the restart is taken, every beacon carries a <em>restarting</em> flag --
+the panel's line ends <tt class="docutils literal">, RESTARTING</tt> -- and one goes at once, the rest
+every <tt class="docutils literal">beacon.reset_interval</tt>. The tcspecial that comes back counts
+itself a new <em>generation</em>, one more than the last, which it keeps in the
+file the <tt class="docutils literal">tcspecial</tt> section's <tt class="docutils literal">state_file</tt> names; its beacons start
+again at #1, say the new generation and have the flag clear. They go
+every <tt class="docutils literal">beacon.reset_interval</tt> until the first command from the MOC
+arrives, and every <tt class="docutils literal">beacon.default_interval</tt> after that.</p>
+<p class="last">Once a station has sent a restart it sends nothing more to the vehicle
+until a beacon of the new generation, not restarting, arrives: the
+vehicle that comes back may read packets differently from the one that
+went, and the beacon -- not the answer to the restart, which may never
+arrive -- is what says it is back. A command tried in between is refused
+by the station, unsent, saying which generation it is waiting to see
+change.</p>
+</dd>
 </dl>
 <p>The remaining four -- <tt class="docutils literal">Query</tt>, <tt class="docutils literal">Query DH</tt>, <tt class="docutils literal">Start DH</tt> and <tt class="docutils literal">Stop DH</tt> --
 answer in <tt class="docutils literal">Last Response</tt> and send nothing. Starting and stopping a handler
@@ -3758,7 +3778,8 @@ without anyone asking.</p>
 </div>
 <div class="section" id="beaconing">
 <h3><a class="toc-backref" href="#toc-entry-59">Beaconing</a></h3>
-<p>TCSpecial sends a beacon at the interval its configuration states, from the
+<p>TCSpecial sends a beacon every <tt class="docutils literal">beacon.default_interval</tt>, or every
+<tt class="docutils literal">beacon.reset_interval</tt> across a restart (see Restart, above), from the
 address the payload set's <tt class="docutils literal">tcspecial</tt> section names to the address beside it,
 or <tt class="docutils literal">tcspecial.yaml</tt>'s pair for a set with no section. Tcsmoc binds that same
 receiving address, having read the same files. Tcsmoc displays the
@@ -3786,8 +3807,8 @@ its blink could hardly be seen.</dd>
 each.</p>
 <p>Which colour the indicator shows is decided by how many beacons have gone
 missing since the last one arrived. A beacon is missed once the
-configuration's <tt class="docutils literal">beacon.interval</tt> has passed without it, so the count goes
-up by one each interval, and a new beacon puts it back to nought:</p>
+configuration's <tt class="docutils literal">beacon.default_interval</tt> has passed without it, so the
+count goes up by one each interval, and a new beacon puts it back to nought:</p>
 <table border="1" class="docutils">
 <colgroup>
 <col width="42%" />

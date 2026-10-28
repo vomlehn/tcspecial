@@ -5,8 +5,9 @@
     <description>The ground link alone, ready for payloads to be added</description>
     <tcspecial>
         <beacon>
-            <interval>1 s</interval>
+            <default_interval>1 s</default_interval>
             <recv>127.0.0.1:5650</recv>
+            <reset_interval>1 s</reset_interval>
             <send>0.0.0.0:5550</send>
         </beacon>
         <gateway>radio</gateway>
@@ -18,6 +19,7 @@
             <dest_base>127.0.0.1:6100</dest_base>
             <source_base>0.0.0.0:6000</source_base>
         </payload_telemetry>
+        <state_file>/tmp/tcspecial-example.state</state_file>
         <tcs_cmd>
             <recv>0.0.0.0:4000</recv>
             <send>127.0.0.1:4100</send>

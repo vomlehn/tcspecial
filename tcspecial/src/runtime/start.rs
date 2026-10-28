@@ -315,8 +315,12 @@ fn segsend_for(graph: &Graph) -> Result<SegSend, String> {
 
 /// Start sending beacons where the configuration's `tcspecial` section says.
 ///
-/// From `beacon.send` to `beacon.recv`, every `beacon.interval`, carrying
-/// this build's version and the configuration's digest.
+/// From `beacon.send` to `beacon.recv`, every `beacon.default_interval`, carrying
+/// this build's version, the configuration's digest and this start's
+/// generation -- counted in `state_file` here, before the first beacon goes,
+/// so that the first beacon already says it. Every
+/// `beacon.reset_interval` until the MOC is heard from, as every start
+/// is: see [`BeaconSend::heard_from_moc`].
 /// An interval of nought sends none. Recorded in the telemetry log, which is
 /// the vehicle's own account of what it sent.
 ///
@@ -335,13 +339,28 @@ fn beacons(
         &tcslibgs::graph::parameters::flatten(section),
     )?
     .to_ci_config()?;
+    let started = crate::state::start(std::path::Path::new(&ci.state_file))?;
+    if let Some(why) = &started.damaged {
+        log::warn!(
+            "the state file was not one tcspecial can read ({why}), so the \
+             generation starts again from 1"
+        );
+    }
+    summary(format!(
+        "generation {}: {}",
+        started.generation, ci.state_file
+    ));
     let sending = BeaconSend::new(
-        ci.beacon_interval,
+        crate::beacon_send::BeaconTiming {
+            default_interval: ci.beacon_interval,
+            reset_interval: ci.reset_interval,
+        },
         ci.beacon_send.clone(),
         ci.beacon_recv.clone(),
         telemetry_log,
         ConfigVersion::of_this_build(),
         digest,
+        started.generation,
     )
     .map_err(|e| e.to_string())?;
     if sending.is_some() {

@@ -5,8 +5,9 @@
     <description>A payload that is a program, sending a line of text a word at a time</description>
     <tcspecial>
         <beacon>
-            <interval>5 s</interval>
+            <default_interval>5 s</default_interval>
             <recv>127.0.0.1:5650</recv>
+            <reset_interval>1 s</reset_interval>
             <send>0.0.0.0:5550</send>
         </beacon>
         <gateway>radio</gateway>
@@ -22,6 +23,9 @@
             <dest_base>127.0.0.1:6100</dest_base>
             <source_base>0.0.0.0:6000</source_base>
         </payload_telemetry>
+        <!-- tcspecial counts its starts in this file, which must be on
+             storage that survives a power cycle on a vehicle. -->
+        <state_file>/tmp/tcspecial-simple-app.state</state_file>
         <tcs_cmd>
             <recv>0.0.0.0:4000</recv>
             <send>127.0.0.1:4100</send>

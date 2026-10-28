@@ -383,6 +383,13 @@ impl Serving {
             }
         };
 
+        // A valid packet from the MOC: from where the configuration says, and
+        // a command. The beacons go back to their interval if they were
+        // going fast because nothing had come since this process started.
+        if let Some(beacon) = self.beacon.as_ref() {
+            beacon.heard_from_moc();
+        }
+
         trace!("{}: {command:?}", spelling(link.which));
         let answer = self.answer(link.which, &command);
 
@@ -406,6 +413,11 @@ impl Serving {
         // taken before the links close under it.
         if self.restarting {
             self.restarting = false;
+            // Initiated now: the beacons say so from here until the process
+            // ends, starting with one at once.
+            if let Some(beacon) = self.beacon.as_ref() {
+                beacon.restart_initiated();
+            }
             (self.restart)();
         }
     }
@@ -737,6 +749,7 @@ mod tests {
             payload_source_base: here(0),
             payload_dest_base: here(0),
             beacon_interval: Duration::from_secs(5),
+            reset_interval: Duration::from_secs(1),
             beacon_send: here(0),
             beacon_recv: here(0),
             // Nothing to write: what is being tested is what goes out.
@@ -744,6 +757,9 @@ mod tests {
             log_segment_bytes: 65_536,
             restart_arm_valid: tcslibgs::RESTART_ARM_VALID_DEFAULT,
             gateway: tcslibgs::gateway::GatewayKind::Radio,
+            // Nothing reads it: the state file is counted where beacons
+            // start, which this does not.
+            state_file: String::new(),
         }
     }
 

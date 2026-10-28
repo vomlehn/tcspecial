@@ -38,16 +38,19 @@ fn filled_segments_are_handed_to_segsend_and_leave_the_directory() {
     let logs = dir.path().join("telemetry");
     std::fs::create_dir(&logs).expect("the log directory");
     let configuration = dir.path().join("vehicle.yaml");
+    let state = dir.path().join("tcspecial.state").display().to_string();
     let at = || format!("127.0.0.1:{}", free());
     std::fs::write(
         &configuration,
         format!(
             "tcspecial:
   gateway: radio
-  beacon: {{ interval: \"5 ms\", recv: \"{}\", send: \"{}\" }}
+  beacon: {{ default_interval: \"5 ms\", reset_interval: \"5 ms\", \
+  recv: \"{}\", send: \"{}\" }}
   log: {{ directory: \"{}\", segment_size: \"512\" }}
   payload_command: {{ dest_base: \"{}\", source_base: \"{}\" }}
   payload_telemetry: {{ dest_base: \"{}\", source_base: \"{}\" }}
+  state_file: \"{state}\"
   tcs_cmd: {{ recv: \"{}\", send: \"{}\" }}
 ",
             at(),

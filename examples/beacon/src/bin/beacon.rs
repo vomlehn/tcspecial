@@ -1,9 +1,9 @@
 //! The example's ground end: a window showing the spacecraft's beacon.
 //!
 //! What a ground station can know about a spacecraft without asking it
-//! anything. tcspecial beacons every `beacon.interval` for as long as it
-//! runs, over a socket of its own, whether or not anything has connected to
-//! it -- so this program commands nothing, connects to nothing, and still
+//! anything. tcspecial beacons every `beacon.default_interval` for as long
+//! as it runs, over a socket of its own, whether or not anything has
+//! connected to it -- so this program commands nothing, connects to nothing, and still
 //! says whether the vehicle is alive, which build it is, which version of a
 //! configuration it is serving and whether that is the configuration this end
 //! read.

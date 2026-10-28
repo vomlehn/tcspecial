@@ -6,8 +6,9 @@ tcspecial:
   # tcspecial sends beacons from the interface the send attribute names, and
   # the MOC receives them on the address the recv attribute names.
   beacon:
-    interval: "5 s"
+    default_interval: "5 s"
     recv: "127.0.0.1:5650"
+    reset_interval: "1 s"
     send: "0.0.0.0:5550"
   gateway: "radio"
   log:
@@ -30,6 +31,9 @@ tcspecial:
   payload_telemetry:
     dest_base: "127.0.0.1:6100"
     source_base: "0.0.0.0:6000"
+  # tcspecial counts its starts in this file, which must be on storage
+  # that survives a power cycle on a vehicle.
+  state_file: "/tmp/tcspecial-minimal.state"
   # Commands to tcspecial are sent from the MOC's address, tcs_cmd.send, to
   # tcspecial at tcs_cmd.recv, and tcspecial sends its responses back to
   # tcs_cmd.send.

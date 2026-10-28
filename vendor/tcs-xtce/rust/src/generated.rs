@@ -1,7 +1,9 @@
-// @generated automatically by tcs-xtce (generator/xtcegen) from references/SpaceSystem.xsd.
+// @generated automatically by tcs-xtce (generator/xtcegen) from
+// references/SpaceSystem.xsd.
 // Any changes made to this file will be lost when it is regenerated;
 // change generator/xtcegen instead and run `make generate`.
 // tcs-xtce: https://github.com/vomlehn/tcs-xtce
+// Rust crate: https://crates.io/crates/tcs-xtce
 
 //! Data structures for XTCE 1.3 (`http://www.omg.org/spec/XTCE/20250214`).
 
@@ -17,7 +19,8 @@ pub const SCHEMA_VERSION: &str = "1.3";
 /// Name of the document root element.
 pub const ROOT_ELEMENT: &str = "SpaceSystem";
 
-/// Defines to type of update rates: perSecond and perContainerUpdate. See RateInStreamType.
+/// Defines to type of update rates: perSecond and perContainerUpdate. See
+/// RateInStreamType.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum BasisType {
     /// `perSecond`
@@ -28,7 +31,8 @@ pub enum BasisType {
 }
 
 impl BasisType {
-    pub const ALL: &'static [Self] = &[Self::PerSecond, Self::PerContainerUpdate];
+    pub const ALL: &'static [Self] =
+        &[Self::PerSecond, Self::PerContainerUpdate];
 
     /// The XML lexical value.
     pub fn as_str(self) -> &'static str {
@@ -59,7 +63,8 @@ impl std::fmt::Display for BasisType {
     }
 }
 
-/// Defines two bit-order types: most significant bit first and least significant bit first. See DataEncodingType.
+/// Defines two bit-order types: most significant bit first and least
+/// significant bit first. See DataEncodingType.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum BitOrderType {
     /// `leastSignificantBitFirst`
@@ -104,7 +109,8 @@ impl std::fmt::Display for BitOrderType {
     }
 }
 
-/// Common byte orderings: most significant byte first (also known as big endian) and least significant byte first (also known as little endian).
+/// Common byte orderings: most significant byte first (also known as big
+/// endian) and least significant byte first (also known as little endian).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum ByteOrderCommonType {
     /// `mostSignificantByteFirst`
@@ -134,7 +140,9 @@ impl Value for ByteOrderCommonType {
         Ok(match s.trim() {
             "mostSignificantByteFirst" => Self::MostSignificantByteFirst,
             "leastSignificantByteFirst" => Self::LeastSignificantByteFirst,
-            other => return Err(format!("invalid ByteOrderCommonType {other:?}")),
+            other => {
+                return Err(format!("invalid ByteOrderCommonType {other:?}"))
+            }
         })
     }
 
@@ -149,7 +157,8 @@ impl std::fmt::Display for ByteOrderCommonType {
     }
 }
 
-/// Defines absoluteChange and percentageChange for use in rate of change alarms. Used by ChangeAlarmRangesType.
+/// Defines absoluteChange and percentageChange for use in rate of change
+/// alarms. Used by ChangeAlarmRangesType.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum ChangeBasisType {
     /// `absoluteChange`
@@ -160,7 +169,8 @@ pub enum ChangeBasisType {
 }
 
 impl ChangeBasisType {
-    pub const ALL: &'static [Self] = &[Self::AbsoluteChange, Self::PercentageChange];
+    pub const ALL: &'static [Self] =
+        &[Self::AbsoluteChange, Self::PercentageChange];
 
     /// The XML lexical value.
     pub fn as_str(self) -> &'static str {
@@ -191,7 +201,8 @@ impl std::fmt::Display for ChangeBasisType {
     }
 }
 
-/// Defines a changePerSecond and changePerSample for use in rate of change alarms. Used by ChangeAlarmRangesType.
+/// Defines a changePerSecond and changePerSample for use in rate of change
+/// alarms. Used by ChangeAlarmRangesType.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum ChangeSpanType {
     /// `changePerSecond`
@@ -202,7 +213,8 @@ pub enum ChangeSpanType {
 }
 
 impl ChangeSpanType {
-    pub const ALL: &'static [Self] = &[Self::ChangePerSecond, Self::ChangePerSample];
+    pub const ALL: &'static [Self] =
+        &[Self::ChangePerSecond, Self::ChangePerSample];
 
     /// The XML lexical value.
     pub fn as_str(self) -> &'static str {
@@ -263,7 +275,9 @@ impl Value for CharacterWidthType {
             "8" => Self::V8,
             "16" => Self::V16,
             "32" => Self::V32,
-            other => return Err(format!("invalid CharacterWidthType {other:?}")),
+            other => {
+                return Err(format!("invalid CharacterWidthType {other:?}"))
+            }
         })
     }
 
@@ -432,7 +446,12 @@ impl Value for ComparisonOperatorsType {
             "<=" => Self::Empty4,
             ">" => Self::Empty5,
             ">=" => Self::Empty6,
-            other => return Err(format!("invalid ComparisonOperatorsType {other:?}")),
+            other => {
+                return Err(format!(
+                    "invalid ComparisonOperatorsType \
+                            {other:?}"
+                ))
+            }
         })
     }
 
@@ -447,7 +466,14 @@ impl std::fmt::Display for ComparisonOperatorsType {
     }
 }
 
-/// Defines six levels: Normal, Watch, Warning, Distress, Critical and Severe, in that order of concern from least to most. These level definitions are used throughout the alarm definitions. An implementation should interpret these as best to match their uniqueness and provide documentation on how this standard maps to their implementation. Not all are likely to be provided, with some either ignored, promoted or demoted to others, or warned on input. There exist some reasonable usage recommendations in the user community.
+/// Defines six levels: Normal, Watch, Warning, Distress, Critical and Severe,
+/// in that order of concern from least to most. These level definitions are
+/// used throughout the alarm definitions. An implementation should interpret
+/// these as best to match their uniqueness and provide documentation on how
+/// this standard maps to their implementation. Not all are likely to be
+/// provided, with some either ignored, promoted or demoted to others, or warned
+/// on input. There exist some reasonable usage recommendations in the user
+/// community.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum ConcernLevelsType {
     /// `normal`
@@ -497,7 +523,9 @@ impl Value for ConcernLevelsType {
             "distress" => Self::Distress,
             "critical" => Self::Critical,
             "severe" => Self::Severe,
-            other => return Err(format!("invalid ConcernLevelsType {other:?}")),
+            other => {
+                return Err(format!("invalid ConcernLevelsType {other:?}"))
+            }
         })
     }
 
@@ -512,7 +540,8 @@ impl std::fmt::Display for ConcernLevelsType {
     }
 }
 
-/// Defines the criticality level of a command. Criticality levels follow ISO 14950.
+/// Defines the criticality level of a command. Criticality levels follow ISO
+/// 14950.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum ConsequenceLevelType {
     /// `normal`
@@ -562,7 +591,9 @@ impl Value for ConsequenceLevelType {
             "forbidden" => Self::Forbidden,
             "user1" => Self::User1,
             "user2" => Self::User2,
-            other => return Err(format!("invalid ConsequenceLevelType {other:?}")),
+            other => {
+                return Err(format!("invalid ConsequenceLevelType {other:?}"))
+            }
         })
     }
 
@@ -592,7 +623,8 @@ pub enum EpochTimeEnumsType {
 }
 
 impl EpochTimeEnumsType {
-    pub const ALL: &'static [Self] = &[Self::TAI, Self::J2000, Self::UNIX, Self::GPS];
+    pub const ALL: &'static [Self] =
+        &[Self::TAI, Self::J2000, Self::UNIX, Self::GPS];
 
     /// The XML lexical value.
     pub fn as_str(self) -> &'static str {
@@ -612,7 +644,9 @@ impl Value for EpochTimeEnumsType {
             "J2000" => Self::J2000,
             "UNIX" => Self::UNIX,
             "GPS" => Self::GPS,
-            other => return Err(format!("invalid EpochTimeEnumsType {other:?}")),
+            other => {
+                return Err(format!("invalid EpochTimeEnumsType {other:?}"))
+            }
         })
     }
 
@@ -722,7 +756,12 @@ impl Value for FloatEncodingSizeInBitsType {
             "64" => Self::V64,
             "80" => Self::V80,
             "128" => Self::V128,
-            other => return Err(format!("invalid FloatEncodingSizeInBitsType {other:?}")),
+            other => {
+                return Err(format!(
+                    "invalid FloatEncodingSizeInBitsType \
+                            {other:?}"
+                ))
+            }
         })
     }
 
@@ -786,7 +825,9 @@ impl Value for FloatEncodingType {
             "DEC" => Self::DEC,
             "IBM" => Self::IBM,
             "TI" => Self::TI,
-            other => return Err(format!("invalid FloatEncodingType {other:?}")),
+            other => {
+                return Err(format!("invalid FloatEncodingType {other:?}"))
+            }
         })
     }
 
@@ -831,7 +872,9 @@ impl Value for FloatSizeInBitsType {
             "32" => Self::V32,
             "64" => Self::V64,
             "128" => Self::V128,
-            other => return Err(format!("invalid FloatSizeInBitsType {other:?}")),
+            other => {
+                return Err(format!("invalid FloatSizeInBitsType {other:?}"))
+            }
         })
     }
 
@@ -858,7 +901,8 @@ pub enum FloatingPointNotationType {
 }
 
 impl FloatingPointNotationType {
-    pub const ALL: &'static [Self] = &[Self::Normal, Self::Scientific, Self::Engineering];
+    pub const ALL: &'static [Self] =
+        &[Self::Normal, Self::Scientific, Self::Engineering];
 
     /// The XML lexical value.
     pub fn as_str(self) -> &'static str {
@@ -876,7 +920,12 @@ impl Value for FloatingPointNotationType {
             "normal" => Self::Normal,
             "scientific" => Self::Scientific,
             "engineering" => Self::Engineering,
-            other => return Err(format!("invalid FloatingPointNotationType {other:?}")),
+            other => {
+                return Err(format!(
+                    "invalid FloatingPointNotationType \
+                            {other:?}"
+                ))
+            }
         })
     }
 
@@ -940,7 +989,9 @@ impl Value for IntegerEncodingType {
             "onesComplement" => Self::OnesComplement,
             "BCD" => Self::BCD,
             "packedBCD" => Self::PackedBCD,
-            other => return Err(format!("invalid IntegerEncodingType {other:?}")),
+            other => {
+                return Err(format!("invalid IntegerEncodingType {other:?}"))
+            }
         })
     }
 
@@ -955,7 +1006,10 @@ impl std::fmt::Display for IntegerEncodingType {
     }
 }
 
-/// Mathematical operators used in the math operation. Behavior of each operator on the stack is described using notation (before -- after), where "before" represents the stack before execution of the operator and "after" represent the stack after execution.
+/// Mathematical operators used in the math operation. Behavior of each operator
+/// on the stack is described using notation (before -- after), where "before"
+/// represents the stack before execution of the operator and "after" represent
+/// the stack after execution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum MathOperatorsType {
     /// `+`
@@ -1220,7 +1274,9 @@ impl Value for MathOperatorsType {
             "max" => Self::Max,
             "xor" => Self::Xor,
             "~" => Self::Empty20,
-            other => return Err(format!("invalid MathOperatorsType {other:?}")),
+            other => {
+                return Err(format!("invalid MathOperatorsType {other:?}"))
+            }
         })
     }
 
@@ -1355,7 +1411,8 @@ pub enum RadixType {
 }
 
 impl RadixType {
-    pub const ALL: &'static [Self] = &[Self::Decimal, Self::Hexadecimal, Self::Octal, Self::Binary];
+    pub const ALL: &'static [Self] =
+        &[Self::Decimal, Self::Hexadecimal, Self::Octal, Self::Binary];
 
     /// The XML lexical value.
     pub fn as_str(self) -> &'static str {
@@ -1390,7 +1447,12 @@ impl std::fmt::Display for RadixType {
     }
 }
 
-/// Defines inside and outside enumerated terms, where the term outside means the range is (-inf, minimum) and (maximum, inf) -- that is a range where acceptable values must be less than the minimum and greater than the maximum, and the term inside means the range is (minimum, maximum) -- that is acceptable values are between the minimum and maximum (either the min or max may be inclusive or exclusive).
+/// Defines inside and outside enumerated terms, where the term outside means
+/// the range is (-inf, minimum) and (maximum, inf) -- that is a range where
+/// acceptable values must be less than the minimum and greater than the
+/// maximum, and the term inside means the range is (minimum, maximum) -- that
+/// is acceptable values are between the minimum and maximum (either the min or
+/// max may be inclusive or exclusive).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum RangeFormType {
     /// `outside`
@@ -1432,7 +1494,13 @@ impl std::fmt::Display for RangeFormType {
     }
 }
 
-/// The location may be relative to the start of the container (containerStart), relative to the end of the previous entry (previousEntry), relative to the end of the container (containerEnd), or relative to the entry that follows this one (nextEntry). If going forward (containerStart and previousEntry) then the location refers to the start of the Entry. If going backwards (containerEnd and nextEntry) then, the location refers to the end of the entry.
+/// The location may be relative to the start of the container (containerStart),
+/// relative to the end of the previous entry (previousEntry), relative to the
+/// end of the container (containerEnd), or relative to the entry that follows
+/// this one (nextEntry). If going forward (containerStart and previousEntry)
+/// then the location refers to the start of the Entry. If going backwards
+/// (containerEnd and nextEntry) then, the location refers to the end of the
+/// entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum ReferenceLocationType {
     /// `containerStart`
@@ -1472,7 +1540,9 @@ impl Value for ReferenceLocationType {
             "containerEnd" => Self::ContainerEnd,
             "previousEntry" => Self::PreviousEntry,
             "nextEntry" => Self::NextEntry,
-            other => return Err(format!("invalid ReferenceLocationType {other:?}")),
+            other => {
+                return Err(format!("invalid ReferenceLocationType {other:?}"))
+            }
         })
     }
 
@@ -1513,7 +1583,9 @@ impl Value for ReferencePointType {
         Ok(match s.trim() {
             "start" => Self::Start,
             "end" => Self::End,
-            other => return Err(format!("invalid ReferencePointType {other:?}")),
+            other => {
+                return Err(format!("invalid ReferencePointType {other:?}"))
+            }
         })
     }
 
@@ -1528,7 +1600,10 @@ impl std::fmt::Display for ReferencePointType {
     }
 }
 
-/// Defines string encodings. US-ASCII (7-bit), ISO-8859-1 (8-bit Extended ASCII), Windows-1252 (8-bit Extended ASCII), UTF-8 (Unicode), UTF-16 (Unicode with Byte Order Mark), UTF-16LE (Unicode Little Endian), UTF-16BE (Unicode Big Endian). See StringDataEncodingType.
+/// Defines string encodings. US-ASCII (7-bit), ISO-8859-1 (8-bit Extended
+/// ASCII), Windows-1252 (8-bit Extended ASCII), UTF-8 (Unicode), UTF-16
+/// (Unicode with Byte Order Mark), UTF-16LE (Unicode Little Endian), UTF-16BE
+/// (Unicode Big Endian). See StringDataEncodingType.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum StringEncodingType {
     /// `US-ASCII`
@@ -1598,7 +1673,9 @@ impl Value for StringEncodingType {
             "UTF-32" => Self::UTF_32,
             "UTF-32LE" => Self::UTF_32LE,
             "UTF-32BE" => Self::UTF_32BE,
-            other => return Err(format!("invalid StringEncodingType {other:?}")),
+            other => {
+                return Err(format!("invalid StringEncodingType {other:?}"))
+            }
         })
     }
 
@@ -1613,7 +1690,10 @@ impl std::fmt::Display for StringEncodingType {
     }
 }
 
-/// The type attribute represents what from a space enterprise this SpaceSystem element represents. See the enumerations for specific details. Unknown is the default for backwards compatibility, though it should be avoided in newer documents.
+/// The type attribute represents what from a space enterprise this SpaceSystem
+/// element represents. See the enumerations for specific details. Unknown is
+/// the default for backwards compatibility, though it should be avoided in
+/// newer documents.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum SystemTypeType {
     /// `asset`
@@ -1668,7 +1748,12 @@ impl std::fmt::Display for SystemTypeType {
     }
 }
 
-/// A telemetered Parameter is one that will have values in telemetry. A derived Parameter is one that is calculated, usually by an Algorithm. A constant Parameter is one that is used as a constant in the system (e.g. a vehicle id). A local Parameter is one that is used purely by the software locally (e.g. a ground command counter). A ground Parameter is one that is generated by an asset which is not the spacecraft.
+/// A telemetered Parameter is one that will have values in telemetry. A derived
+/// Parameter is one that is calculated, usually by an Algorithm. A constant
+/// Parameter is one that is used as a constant in the system (e.g. a vehicle
+/// id). A local Parameter is one that is used purely by the software locally
+/// (e.g. a ground command counter). A ground Parameter is one that is generated
+/// by an asset which is not the spacecraft.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum TelemetryDataSourceType {
     /// `telemetered`
@@ -1713,7 +1798,12 @@ impl Value for TelemetryDataSourceType {
             "constant" => Self::Constant,
             "local" => Self::Local,
             "ground" => Self::Ground,
-            other => return Err(format!("invalid TelemetryDataSourceType {other:?}")),
+            other => {
+                return Err(format!(
+                    "invalid TelemetryDataSourceType \
+                            {other:?}"
+                ))
+            }
         })
     }
 
@@ -1798,7 +1888,12 @@ impl Value for TimeAssociationUnitType {
             "days" => Self::Days,
             "months" => Self::Months,
             "years" => Self::Years,
-            other => return Err(format!("invalid TimeAssociationUnitType {other:?}")),
+            other => {
+                return Err(format!(
+                    "invalid TimeAssociationUnitType \
+                            {other:?}"
+                ))
+            }
         })
     }
 
@@ -1813,7 +1908,9 @@ impl std::fmt::Display for TimeAssociationUnitType {
     }
 }
 
-/// Base time unit of measure. It is best practice to avoid days, months, and years due to ambiguity involving leap seconds and leap days. If these are used, the system should document how the leaps are handled.
+/// Base time unit of measure. It is best practice to avoid days, months, and
+/// years due to ambiguity involving leap seconds and leap days. If these are
+/// used, the system should document how the leaps are handled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum TimeUnitsType {
     /// `seconds`
@@ -1908,7 +2005,8 @@ pub enum TimeWindowIsRelativeToType {
 }
 
 impl TimeWindowIsRelativeToType {
-    pub const ALL: &'static [Self] = &[Self::CommandRelease, Self::TimeLastVerifierPassed];
+    pub const ALL: &'static [Self] =
+        &[Self::CommandRelease, Self::TimeLastVerifierPassed];
 
     /// The XML lexical value.
     pub fn as_str(self) -> &'static str {
@@ -1924,7 +2022,12 @@ impl Value for TimeWindowIsRelativeToType {
         Ok(match s.trim() {
             "commandRelease" => Self::CommandRelease,
             "timeLastVerifierPassed" => Self::TimeLastVerifierPassed,
-            other => return Err(format!("invalid TimeWindowIsRelativeToType {other:?}")),
+            other => {
+                return Err(format!(
+                    "invalid TimeWindowIsRelativeToType \
+                            {other:?}"
+                ))
+            }
         })
     }
 
@@ -1939,7 +2042,11 @@ impl std::fmt::Display for TimeWindowIsRelativeToType {
     }
 }
 
-/// Defines enumerated values to categorize a unit associated with a telemetered value. Typically the unit refers to the calibrated (engineering) value. In some cases the unit may be associated with the uncalibrated or raw values. Uncalibrated and raw here are typically synonymous, but there are exceptions.
+/// Defines enumerated values to categorize a unit associated with a telemetered
+/// value. Typically the unit refers to the calibrated (engineering) value. In
+/// some cases the unit may be associated with the uncalibrated or raw values.
+/// Uncalibrated and raw here are typically synonymous, but there are
+/// exceptions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum UnitFormType {
     /// `calibrated`
@@ -1952,7 +2059,8 @@ pub enum UnitFormType {
 }
 
 impl UnitFormType {
-    pub const ALL: &'static [Self] = &[Self::Calibrated, Self::Uncalibrated, Self::Raw];
+    pub const ALL: &'static [Self] =
+        &[Self::Calibrated, Self::Uncalibrated, Self::Raw];
 
     /// The XML lexical value.
     pub fn as_str(self) -> &'static str {
@@ -2039,7 +2147,9 @@ impl Value for ValidationStatusType {
             "Validated" => Self::Validated,
             "Released" => Self::Released,
             "Withdrawn" => Self::Withdrawn,
-            other => return Err(format!("invalid ValidationStatusType {other:?}")),
+            other => {
+                return Err(format!("invalid ValidationStatusType {other:?}"))
+            }
         })
     }
 
@@ -2119,7 +2229,12 @@ impl Value for VerifierEnumerationType {
             "executing" => Self::Executing,
             "complete" => Self::Complete,
             "failed" => Self::Failed,
-            other => return Err(format!("invalid VerifierEnumerationType {other:?}")),
+            other => {
+                return Err(format!(
+                    "invalid VerifierEnumerationType \
+                            {other:?}"
+                ))
+            }
         })
     }
 
@@ -2134,7 +2249,9 @@ impl std::fmt::Display for VerifierEnumerationType {
     }
 }
 
-/// Describe two or more conditions that are logically anded together. Conditions may be a mix of Condition and ORedCondition. See ORedConditionType and BooleanExpressionType.
+/// Describe two or more conditions that are logically anded together.
+/// Conditions may be a mix of Condition and ORedCondition. See
+/// ORedConditionType and BooleanExpressionType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ANDedConditionsType {
     /// One of: `Condition`, `ORedConditions`.
@@ -2175,10 +2292,21 @@ impl XmlElement for ANDedConditionsType {
     }
 }
 
-/// Describe an absolute time argument type relative to a known epoch (such as TAI). The string representation of this time should use the [ISO 8601] extended format CCYY-MM-DDThh:mm:ss where "CC" represents the century, "YY" the year, "MM" the month and "DD" the day, preceded by an optional leading "-" sign to indicate a negative number. If the sign is omitted, "+" is assumed. The letter "T" is the date/time separator and "hh", "mm", "ss" represent hour, minute and second respectively. Additional digits can be used to increase the precision of fractional seconds if desired i.e. the format ss.ss... with any number of digits after the decimal point is supported. See TAIType, IntegerDataEncoding and AbsoluteTimeDataType.
+/// Describe an absolute time argument type relative to a known epoch (such as
+/// TAI). The string representation of this time should use the [ISO 8601]
+/// extended format CCYY-MM-DDThh:mm:ss where "CC" represents the century, "YY"
+/// the year, "MM" the month and "DD" the day, preceded by an optional leading
+/// "-" sign to indicate a negative number. If the sign is omitted, "+" is
+/// assumed. The letter "T" is the date/time separator and "hh", "mm", "ss"
+/// represent hour, minute and second respectively. Additional digits can be
+/// used to increase the precision of fractional seconds if desired i.e. the
+/// format ss.ss... with any number of digits after the decimal point is
+/// supported. See TAIType, IntegerDataEncoding and AbsoluteTimeDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct AbsoluteTimeArgumentType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
@@ -2186,11 +2314,15 @@ pub struct AbsoluteTimeArgumentType {
     pub base_type: Option<String>,
     /// Default/Initial value is always given in calibrated form.
     pub initial_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// Describes how the raw base counts of the time type are encoded/decoded.
     pub encoding: Option<EncodingType>,
@@ -2236,13 +2368,17 @@ impl XmlElement for AbsoluteTimeArgumentType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -2269,10 +2405,22 @@ impl XmlElement for AbsoluteTimeArgumentType {
     }
 }
 
-/// A base schema type for describing an absolute time data type. Contains an absolute (to a known epoch) time. Use the [ISO 8601] extended format CCYY-MM-DDThh:mm:ss where "CC" represents the century, "YY" the year, "MM" the month and "DD" the day, preceded by an optional leading "-" sign to indicate a negative number. If the sign is omitted, "+" is assumed. The letter "T" is the date/time separator and "hh", "mm", "ss" represent hour, minute and second respectively. Additional digits can be used to increase the precision of fractional seconds if desired i.e. the format ss.ss... with any number of digits after the decimal point is supported. See AbsoluteTimeParameterType and AbsoluteTimeArgumentType. See AbsouteTimeParameterType, AbsoluteTimeArgumentType and BaseTimeDataType.
+/// A base schema type for describing an absolute time data type. Contains an
+/// absolute (to a known epoch) time. Use the [ISO 8601] extended format
+/// CCYY-MM-DDThh:mm:ss where "CC" represents the century, "YY" the year, "MM"
+/// the month and "DD" the day, preceded by an optional leading "-" sign to
+/// indicate a negative number. If the sign is omitted, "+" is assumed. The
+/// letter "T" is the date/time separator and "hh", "mm", "ss" represent hour,
+/// minute and second respectively. Additional digits can be used to increase
+/// the precision of fractional seconds if desired i.e. the format ss.ss... with
+/// any number of digits after the decimal point is supported. See
+/// AbsoluteTimeParameterType and AbsoluteTimeArgumentType. See
+/// AbsouteTimeParameterType, AbsoluteTimeArgumentType and BaseTimeDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct AbsoluteTimeDataType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
@@ -2280,11 +2428,15 @@ pub struct AbsoluteTimeDataType {
     pub base_type: Option<String>,
     /// Default/Initial value is always given in calibrated form.
     pub initial_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// Describes how the raw base counts of the time type are encoded/decoded.
     pub encoding: Option<EncodingType>,
@@ -2330,13 +2482,17 @@ impl XmlElement for AbsoluteTimeDataType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -2363,10 +2519,21 @@ impl XmlElement for AbsoluteTimeDataType {
     }
 }
 
-/// Describe an absolute time parameter type relative to a known epoch (such as TAI). The string representation of this time should use the [ISO 8601] extended format CCYY-MM-DDThh:mm:ss where "CC" represents the century, "YY" the year, "MM" the month and "DD" the day, preceded by an optional leading "-" sign to indicate a negative number. If the sign is omitted, "+" is assumed. The letter "T" is the date/time separator and "hh", "mm", "ss" represent hour, minute and second respectively. Additional digits can be used to increase the precision of fractional seconds if desired i.e. the format ss.ss... with any number of digits after the decimal point is supported. See TAIType, IntegerDataEncoding and AbsoluteTimeDataType.
+/// Describe an absolute time parameter type relative to a known epoch (such as
+/// TAI). The string representation of this time should use the [ISO 8601]
+/// extended format CCYY-MM-DDThh:mm:ss where "CC" represents the century, "YY"
+/// the year, "MM" the month and "DD" the day, preceded by an optional leading
+/// "-" sign to indicate a negative number. If the sign is omitted, "+" is
+/// assumed. The letter "T" is the date/time separator and "hh", "mm", "ss"
+/// represent hour, minute and second respectively. Additional digits can be
+/// used to increase the precision of fractional seconds if desired i.e. the
+/// format ss.ss... with any number of digits after the decimal point is
+/// supported. See TAIType, IntegerDataEncoding and AbsoluteTimeDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct AbsoluteTimeParameterType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
@@ -2374,11 +2541,15 @@ pub struct AbsoluteTimeParameterType {
     pub base_type: Option<String>,
     /// Default/Initial value is always given in calibrated form.
     pub initial_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// Describes how the raw base counts of the time type are encoded/decoded.
     pub encoding: Option<EncodingType>,
@@ -2424,13 +2595,17 @@ impl XmlElement for AbsoluteTimeParameterType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -2460,21 +2635,31 @@ impl XmlElement for AbsoluteTimeParameterType {
 /// A verifier that means the destination has accepted the command.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct AcceptedVerifierType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
-    /// Optional name of this defined item. See NameType for restriction information.
+    /// Optional name of this defined item. See NameType for restriction
+    /// information.
     pub name: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// One of: `ComparisonList`, `ContainerRef`, `ParameterValueChange`, `CustomAlgorithm`, `BooleanExpression`, `Comparison`.
+    /// One of: `ComparisonList`, `ContainerRef`, `ParameterValueChange`,
+    /// `CustomAlgorithm`, `BooleanExpression`, `Comparison`.
     pub choice1: AcceptedVerifierChoice1,
     /// One of: `CheckWindow`, `CheckWindowAlgorithms`.
     pub choice2: AcceptedVerifierChoice2,
-    /// Optional list of argument values that manifest this post-transmission validation parameter value check. When not present, this check applies to all instances of the command.
+    /// Optional list of argument values that manifest this post-transmission
+    /// validation parameter value check. When not present, this check applies
+    /// to all instances of the command.
     pub argument_restriction_list: Option<ArgumentAssignmentListType>,
 }
 
@@ -2510,7 +2695,9 @@ impl XmlElement for AcceptedVerifierType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -2534,22 +2721,43 @@ impl XmlElement for AcceptedVerifierType {
     }
 }
 
-/// Describe a complex data type analogous to a C-struct. Each field of the data type is called a Member. Each Member is part of the MemberList which forms the list of items to be placed under this data type's name. The MemberList defines a data block and block's size is defined by the DataEncodings of each Member's type reference. The data members are ordered and contiguous in the MemberList element (packed). Each member may be addressed by the dot syntax similar to C such as P.voltage if P is the referring parameter and voltage is of a member of P's aggregate type. See MemberType, MemberListType, DataEncodingType, NameReferenceType, and AggregateDataType.
+/// Describe a complex data type analogous to a C-struct. Each field of the data
+/// type is called a Member. Each Member is part of the MemberList which forms
+/// the list of items to be placed under this data type's name. The MemberList
+/// defines a data block and block's size is defined by the DataEncodings of
+/// each Member's type reference. The data members are ordered and contiguous in
+/// the MemberList element (packed). Each member may be addressed by the dot
+/// syntax similar to C such as P.voltage if P is the referring parameter and
+/// voltage is of a member of P's aggregate type. See MemberType,
+/// MemberListType, DataEncodingType, NameReferenceType, and AggregateDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct AggregateArgumentType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Initial values for the individual members of the aggregate/structure may be provided here at the type definition using JSON style notation (e.g. '{ "member1": 2, "member2": "foo" }'). When Member elements provide initialValue attributes, they take precedence over these since these are at the type definition level and the Member element acts like a Parameter element. These may also recurse into members that are also aggregates.
+    /// Initial values for the individual members of the aggregate/structure may
+    /// be provided here at the type definition using JSON style notation (e.g.
+    /// '{ "member1": 2, "member2": "foo" }'). When Member elements provide
+    /// initialValue attributes, they take precedence over these since these are
+    /// at the type definition level and the Member element acts like a
+    /// Parameter element. These may also recurse into members that are also
+    /// aggregates.
     pub initial_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// Ordered list of the members of the aggregate/structure. Members are contiguous.
+    /// Ordered list of the members of the aggregate/structure. Members are
+    /// contiguous.
     pub member_list: MemberListType,
 }
 
@@ -2583,12 +2791,16 @@ impl XmlElement for AggregateArgumentType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -2613,22 +2825,44 @@ impl XmlElement for AggregateArgumentType {
     }
 }
 
-/// A base schema type for describing a complex data type analogous to a C-struct. Each field of the data type is called a Member. Each Member is part of the MemberList which forms the list of items to be placed under this data type's name. The MemberList defines a data block and block's size is defined by the DataEncodings of each Member's type reference. The data members are ordered and contiguous in the MemberList element (packed). Each member may be addressed by the dot syntax similar to C such as P.voltage if P is the referring parameter and voltage is of a member of P's aggregate type. See MemberType, MemberListType, DataEncodingType, NameReferenceType, AggregateParameterType and AggregateArgumentType.
+/// A base schema type for describing a complex data type analogous to a
+/// C-struct. Each field of the data type is called a Member. Each Member is
+/// part of the MemberList which forms the list of items to be placed under this
+/// data type's name. The MemberList defines a data block and block's size is
+/// defined by the DataEncodings of each Member's type reference. The data
+/// members are ordered and contiguous in the MemberList element (packed). Each
+/// member may be addressed by the dot syntax similar to C such as P.voltage if
+/// P is the referring parameter and voltage is of a member of P's aggregate
+/// type. See MemberType, MemberListType, DataEncodingType, NameReferenceType,
+/// AggregateParameterType and AggregateArgumentType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct AggregateDataType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Initial values for the individual members of the aggregate/structure may be provided here at the type definition using JSON style notation (e.g. '{ "member1": 2, "member2": "foo" }'). When Member elements provide initialValue attributes, they take precedence over these since these are at the type definition level and the Member element acts like a Parameter element. These may also recurse into members that are also aggregates.
+    /// Initial values for the individual members of the aggregate/structure may
+    /// be provided here at the type definition using JSON style notation (e.g.
+    /// '{ "member1": 2, "member2": "foo" }'). When Member elements provide
+    /// initialValue attributes, they take precedence over these since these are
+    /// at the type definition level and the Member element acts like a
+    /// Parameter element. These may also recurse into members that are also
+    /// aggregates.
     pub initial_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// Ordered list of the members of the aggregate/structure. Members are contiguous.
+    /// Ordered list of the members of the aggregate/structure. Members are
+    /// contiguous.
     pub member_list: MemberListType,
 }
 
@@ -2662,12 +2896,16 @@ impl XmlElement for AggregateDataType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -2692,22 +2930,43 @@ impl XmlElement for AggregateDataType {
     }
 }
 
-/// Describe a complex data type analogous to a C-struct. Each field of the data type is called a Member. Each Member is part of the MemberList which forms the list of items to be placed under this data type's name. The MemberList defines a data block and block's size is defined by the DataEncodings of each Member's type reference. The data members are ordered and contiguous in the MemberList element (packed). Each member may be addressed by the dot syntax similar to C such as P.voltage if P is the referring parameter and voltage is of a member of P's aggregate type. See MemberType, MemberListType, DataEncodingType, NameReferenceType, and AggregateDataType.
+/// Describe a complex data type analogous to a C-struct. Each field of the data
+/// type is called a Member. Each Member is part of the MemberList which forms
+/// the list of items to be placed under this data type's name. The MemberList
+/// defines a data block and block's size is defined by the DataEncodings of
+/// each Member's type reference. The data members are ordered and contiguous in
+/// the MemberList element (packed). Each member may be addressed by the dot
+/// syntax similar to C such as P.voltage if P is the referring parameter and
+/// voltage is of a member of P's aggregate type. See MemberType,
+/// MemberListType, DataEncodingType, NameReferenceType, and AggregateDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct AggregateParameterType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Initial values for the individual members of the aggregate/structure may be provided here at the type definition using JSON style notation (e.g. '{ "member1": 2, "member2": "foo" }'). When Member elements provide initialValue attributes, they take precedence over these since these are at the type definition level and the Member element acts like a Parameter element. These may also recurse into members that are also aggregates.
+    /// Initial values for the individual members of the aggregate/structure may
+    /// be provided here at the type definition using JSON style notation (e.g.
+    /// '{ "member1": 2, "member2": "foo" }'). When Member elements provide
+    /// initialValue attributes, they take precedence over these since these are
+    /// at the type definition level and the Member element acts like a
+    /// Parameter element. These may also recurse into members that are also
+    /// aggregates.
     pub initial_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// Ordered list of the members of the aggregate/structure. Members are contiguous.
+    /// Ordered list of the members of the aggregate/structure. Members are
+    /// contiguous.
     pub member_list: MemberListType,
 }
 
@@ -2741,12 +3000,16 @@ impl XmlElement for AggregateParameterType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -2771,18 +3034,26 @@ impl XmlElement for AggregateParameterType {
     }
 }
 
-/// Describe up to six levels: Normal, Watch, Warning, Distress, Critical, and Severe of conditions the alarm will trigger when true. The types are conditions available are a single comparison, a comparison list, a discrete lookup list, and custom algorithm. See MatchCriteriaType.
+/// Describe up to six levels: Normal, Watch, Warning, Distress, Critical, and
+/// Severe of conditions the alarm will trigger when true. The types are
+/// conditions available are a single comparison, a comparison list, a discrete
+/// lookup list, and custom algorithm. See MatchCriteriaType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct AlarmConditionsType {
-    /// An alarm state of least concern. Considered to be below the most commonly used Warning level.
+    /// An alarm state of least concern. Considered to be below the most
+    /// commonly used Warning level.
     pub watch_alarm: Option<MatchCriteriaType>,
-    /// An alarm state of concern that represents the most commonly used minimum concern level for many software applications.
+    /// An alarm state of concern that represents the most commonly used minimum
+    /// concern level for many software applications.
     pub warning_alarm: Option<MatchCriteriaType>,
-    /// An alarm state of concern in between the most commonly used Warning and Critical levels.
+    /// An alarm state of concern in between the most commonly used Warning and
+    /// Critical levels.
     pub distress_alarm: Option<MatchCriteriaType>,
-    /// An alarm state of concern that represents the most commonly used maximum concern level for many software applications.
+    /// An alarm state of concern that represents the most commonly used maximum
+    /// concern level for many software applications.
     pub critical_alarm: Option<MatchCriteriaType>,
-    /// An alarm state of highest concern. Considered to be above the most commonly used Critical level.
+    /// An alarm state of highest concern. Considered to be above the most
+    /// commonly used Critical level.
     pub severe_alarm: Option<MatchCriteriaType>,
 }
 
@@ -2834,7 +3105,13 @@ impl XmlElement for AlarmConditionsType {
     }
 }
 
-/// Describe any number of alarm ranges, each with its own level (normal, warning, watch, distress, critical, severe) and range form (inside -- (min,max), [min,max), (min, max], [min, max], or outside -- (-inf, min) or (-inf,min] and [max, +inf) or (max,+inf). Ranges may overlap, be disjoint and so forth. Ranges within the value spectrum non-specified are non-normal. The most severe range level of value within the ranges is the level of the alarm. Range values are in calibrated engineering units. See FloatRangeType.
+/// Describe any number of alarm ranges, each with its own level (normal,
+/// warning, watch, distress, critical, severe) and range form (inside --
+/// (min,max), [min,max), (min, max], [min, max], or outside -- (-inf, min) or
+/// (-inf,min] and [max, +inf) or (max,+inf). Ranges may overlap, be disjoint
+/// and so forth. Ranges within the value spectrum non-specified are non-normal.
+/// The most severe range level of value within the ranges is the level of the
+/// alarm. Range values are in calibrated engineering units. See FloatRangeType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct AlarmMultiRangesType {
     /// The alarm definition may be named.
@@ -2843,7 +3120,14 @@ pub struct AlarmMultiRangesType {
     pub short_description: Option<String>,
     /// Element `AncillaryDataSet`.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// Describe any number of alarm ranges, each with its own level (normal, warning, watch, distress, critical, severe) and range form (inside -- (min,max),[min,max), (min, max], [min, max], or outside -- (-inf, min) or (-inf,min] and [max, +inf) or (max,+inf).. Ranges may overlap, be disjoint and so forth. Ranges within the value spectrum non-specified are non-normal. The most severe range level of value within the ranges is the level of the alarm. Range values are in calibrated engineering units. See FloatRangeType.
+    /// Describe any number of alarm ranges, each with its own level (normal,
+    /// warning, watch, distress, critical, severe) and range form (inside --
+    /// (min,max),[min,max), (min, max], [min, max], or outside -- (-inf, min)
+    /// or (-inf,min] and [max, +inf) or (max,+inf).. Ranges may overlap, be
+    /// disjoint and so forth. Ranges within the value spectrum non-specified
+    /// are non-normal. The most severe range level of value within the ranges
+    /// is the level of the alarm. Range values are in calibrated engineering
+    /// units. See FloatRangeType.
     pub range: Vec<MultiRangeType>,
 }
 
@@ -2873,7 +3157,9 @@ impl XmlElement for AlarmMultiRangesType {
             let (k, raw) = a?;
             match k {
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -2892,28 +3178,46 @@ impl XmlElement for AlarmMultiRangesType {
     }
 }
 
-/// Describe up to six ranges where either less severe ranges are a subset of more severe ranges (outside), or more severe ranges are a subset of less severe ranges (inside). In both forms, the undefined least severe range is normal. Range values are in calibrated engineering units. See FloatRangeType.
+/// Describe up to six ranges where either less severe ranges are a subset of
+/// more severe ranges (outside), or more severe ranges are a subset of less
+/// severe ranges (inside). In both forms, the undefined least severe range is
+/// normal. Range values are in calibrated engineering units. See
+/// FloatRangeType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct AlarmRangesType {
     /// The alarm definition may be named.
     pub name: Option<String>,
     /// An optional brief description of this alarm definition.
     pub short_description: Option<String>,
-    /// A value of outside specifies that the most severe range is outside all the other ranges: -severe -critical -distress -warning -watch normal +watch +warning +distress +critical +severe. This means each min, max pair are a range: (-inf, min) or (-inf, min], and [max, inf) or (max, inf). However a value of inside "inverts" these bands: -normal -watch -warning -distress -critical severe +critical +distress +warning +watch, +normal. This means each min, max pair form a range of (min, max) or [min, max) or (min, max] or [min, max]. The most common form used is "outside" and it is the default. The set notation used defines parenthesis as exclusive and square brackets as inclusive.
+    /// A value of outside specifies that the most severe range is outside all
+    /// the other ranges: -severe -critical -distress -warning -watch normal
+    /// +watch +warning +distress +critical +severe. This means each min, max
+    /// pair are a range: (-inf, min) or (-inf, min], and [max, inf) or (max,
+    /// inf). However a value of inside "inverts" these bands: -normal -watch
+    /// -warning -distress -critical severe +critical +distress +warning +watch,
+    /// +normal. This means each min, max pair form a range of (min, max) or
+    /// [min, max) or (min, max] or [min, max]. The most common form used is
+    /// "outside" and it is the default. The set notation used defines
+    /// parenthesis as exclusive and square brackets as inclusive.
     ///
     /// Schema default: `outside`.
     pub range_form: Option<RangeFormType>,
     /// Element `AncillaryDataSet`.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// A range of least concern. Considered to be below the most commonly used Warning level.
+    /// A range of least concern. Considered to be below the most commonly used
+    /// Warning level.
     pub watch_range: Option<FloatRangeType>,
-    /// A range of concern that represents the most commonly used minimum concern level for many software applications.
+    /// A range of concern that represents the most commonly used minimum
+    /// concern level for many software applications.
     pub warning_range: Option<FloatRangeType>,
-    /// A range of concern in between the most commonly used Warning and Critical levels.
+    /// A range of concern in between the most commonly used Warning and
+    /// Critical levels.
     pub distress_range: Option<FloatRangeType>,
-    /// A range of concern that represents the most commonly used maximum concern level for many software applications.
+    /// A range of concern that represents the most commonly used maximum
+    /// concern level for many software applications.
     pub critical_range: Option<FloatRangeType>,
-    /// A range of highest concern. Considered to be above the most commonly used Critical level.
+    /// A range of highest concern. Considered to be above the most commonly
+    /// used Critical level.
     pub severe_range: Option<FloatRangeType>,
 }
 
@@ -2957,7 +3261,9 @@ impl XmlElement for AlarmRangesType {
             let (k, raw) = a?;
             match k {
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "rangeForm" => v.range_form = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -2985,22 +3291,34 @@ impl XmlElement for AlarmRangesType {
     }
 }
 
-/// Defines a base schema type used to build up the other data type specific alarm types. The definition includes a count to go into alarm (minViolations - the counts to go out of alarm is the same), a condition style alarm and a custom alarm. See AlarmConditionType, CustomAlgorithmType, BinaryAlarmConditionType, BooleanAlarmType, BinaryContextAlarmType, EnumerationAlarmType, NumericAlarmType, StringAlarmType, TimeAlarmType, TimeAlarmConditionType.
+/// Defines a base schema type used to build up the other data type specific
+/// alarm types. The definition includes a count to go into alarm (minViolations
+/// - the counts to go out of alarm is the same), a condition style alarm and a
+/// custom alarm. See AlarmConditionType, CustomAlgorithmType,
+/// BinaryAlarmConditionType, BooleanAlarmType, BinaryContextAlarmType,
+/// EnumerationAlarmType, NumericAlarmType, StringAlarmType, TimeAlarmType,
+/// TimeAlarmConditionType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct AlarmType {
     /// The alarm definition may be named.
     pub name: Option<String>,
     /// An optional brief description of this alarm definition.
     pub short_description: Option<String>,
-    /// The number of successive instances that meet the alarm conditions for the alarm to trigger. The default is 1.
+    /// The number of successive instances that meet the alarm conditions for
+    /// the alarm to trigger. The default is 1.
     ///
     /// Schema default: `1`.
     pub min_violations: Option<i64>,
-    /// Optionally specify the number of successive instances that do not meet the alarm conditions to leave the alarm state. If this attribute is not specified, it is treated as being equal to minViolations (symmetric).
+    /// Optionally specify the number of successive instances that do not meet
+    /// the alarm conditions to leave the alarm state. If this attribute is not
+    /// specified, it is treated as being equal to minViolations (symmetric).
     ///
     /// Schema default: `1`.
     pub min_conformance: Option<i64>,
-    /// The initial state of this alarm definition as delivered. When true, this leaves the alarm definition empty for the parameter and also short circuits the remaining context matches and the default so no alarm is active on the parameter.
+    /// The initial state of this alarm definition as delivered. When true, this
+    /// leaves the alarm definition empty for the parameter and also short
+    /// circuits the remaining context matches and the default so no alarm is
+    /// active on the parameter.
     ///
     /// Schema default: `false`.
     pub disabled: Option<bool>,
@@ -3044,9 +3362,15 @@ impl XmlElement for AlarmType {
             let (k, raw) = a?;
             match k {
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
-                "minViolations" => v.min_violations = Some(r.attr_value(tag, raw)?),
-                "minConformance" => v.min_conformance = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
+                "minViolations" => {
+                    v.min_violations = Some(r.attr_value(tag, raw)?)
+                }
+                "minConformance" => {
+                    v.min_conformance = Some(r.attr_value(tag, raw)?)
+                }
                 "disabled" => v.disabled = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -3103,7 +3427,9 @@ impl XmlElement for AlgorithmSetType {
     }
 }
 
-/// This optional element may be used to enter Pseudo or actual code for the algorithm. The language for the algorithm is specified with the language attribute
+/// This optional element may be used to enter Pseudo or actual code for the
+/// algorithm. The language for the algorithm is specified with the language
+/// attribute
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct AlgorithmTextType {
     /// Attribute `language`.
@@ -3139,10 +3465,12 @@ impl XmlElement for AlgorithmTextType {
     }
 }
 
-/// Contains an unordered collection of Alias elements to describe alternate names or IDs for this named item.
+/// Contains an unordered collection of Alias elements to describe alternate
+/// names or IDs for this named item.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct AliasSetType {
-    /// An alternate name, ID number, and sometimes flight software variable name in the code for this item.
+    /// An alternate name, ID number, and sometimes flight software variable
+    /// name in the code for this item.
     pub alias: Vec<AliasType>,
 }
 
@@ -3175,12 +3503,27 @@ impl XmlElement for AliasSetType {
     }
 }
 
-/// Used to contain an alias (alternate) name or ID for the object. For example, a parameter may have a mnemonic, an on-board id, and special IDs used by various ground software applications; all of these are alias's. Some ground system processing equipment has some severe naming restrictions on parameters (e.g., names must less then 12 characters, single case or integral id's only); their alias's provide a means of capturing each name in a "nameSpace". Note: the name is not reference-able (it cannot be used in a name reference substituting for the name of the item of interest). See NameDescriptionType.
+/// Used to contain an alias (alternate) name or ID for the object. For example,
+/// a parameter may have a mnemonic, an on-board id, and special IDs used by
+/// various ground software applications; all of these are alias's. Some ground
+/// system processing equipment has some severe naming restrictions on
+/// parameters (e.g., names must less then 12 characters, single case or
+/// integral id's only); their alias's provide a means of capturing each name in
+/// a "nameSpace". Note: the name is not reference-able (it cannot be used in a
+/// name reference substituting for the name of the item of interest). See
+/// NameDescriptionType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct AliasType {
-    /// Aliases should be grouped together in a "namespace" so that they can be switched in and out of data extractions. The namespace generally identifies the purpose of the alternate name, whether for software variable names, additional operator names, or whatever the purpose.
+    /// Aliases should be grouped together in a "namespace" so that they can be
+    /// switched in and out of data extractions. The namespace generally
+    /// identifies the purpose of the alternate name, whether for software
+    /// variable names, additional operator names, or whatever the purpose.
     pub name_space: String,
-    /// The alternate name or ID to use. The alias does not have the restrictions that apply to name attributes. This is useful for capturing legacy identifiers for systems with unusual naming conventions. It is also useful for capturing variable names in software, amongst other things.
+    /// The alternate name or ID to use. The alias does not have the
+    /// restrictions that apply to name attributes. This is useful for capturing
+    /// legacy identifiers for systems with unusual naming conventions. It is
+    /// also useful for capturing variable names in software, amongst other
+    /// things.
     pub alias: String,
 }
 
@@ -3222,7 +3565,10 @@ impl XmlElement for AliasType {
     }
 }
 
-/// Describe an unordered collection of ancillary data. AncillaryData elements capture platform/program/implementation specific data about the parent element object that is non-standard and would not fit into the schema. See AncillaryDataType.
+/// Describe an unordered collection of ancillary data. AncillaryData elements
+/// capture platform/program/implementation specific data about the parent
+/// element object that is non-standard and would not fit into the schema. See
+/// AncillaryDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct AncillaryDataSetType {
     /// Optional list of AncillaryData elements associated with this item.
@@ -3263,16 +3609,20 @@ impl XmlElement for AncillaryDataSetType {
     }
 }
 
-/// Use for any other data associated with a named item. May be used to include administrative data (e.g., version, CM or tags) or potentially any MIME type. Data may be included or given as an href.
+/// Use for any other data associated with a named item. May be used to include
+/// administrative data (e.g., version, CM or tags) or potentially any MIME
+/// type. Data may be included or given as an href.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct AncillaryDataType {
     /// Identifier for this Ancillary Data characteristic, feature, or data.
     pub name: String,
-    /// Optional text encoding method for the element text content of this element. The default is "text/plain".
+    /// Optional text encoding method for the element text content of this
+    /// element. The default is "text/plain".
     ///
     /// Schema default: `text/plain`.
     pub mime_type: Option<String>,
-    /// Optional Uniform Resource Identifier for this characteristic, feature, or data.
+    /// Optional Uniform Resource Identifier for this characteristic, feature,
+    /// or data.
     pub href: Option<String>,
     /// Text content.
     pub value: String,
@@ -3360,10 +3710,22 @@ impl XmlElement for ArgumentANDedConditionsType {
     }
 }
 
-/// A base schema type for describing an absolute time data type. Contains an absolute (to a known epoch) time. Use the [ISO 8601] extended format CCYY-MM-DDThh:mm:ss where "CC" represents the century, "YY" the year, "MM" the month and "DD" the day, preceded by an optional leading "-" sign to indicate a negative number. If the sign is omitted, "+" is assumed. The letter "T" is the date/time separator and "hh", "mm", "ss" represent hour, minute and second respectively. Additional digits can be used to increase the precision of fractional seconds if desired i.e. the format ss.ss... with any number of digits after the decimal point is supported. See AbsoluteTimeParameterType and AbsoluteTimeArgumentType. See AbsouteTimeParameterType, AbsoluteTimeArgumentType and BaseTimeDataType.
+/// A base schema type for describing an absolute time data type. Contains an
+/// absolute (to a known epoch) time. Use the [ISO 8601] extended format
+/// CCYY-MM-DDThh:mm:ss where "CC" represents the century, "YY" the year, "MM"
+/// the month and "DD" the day, preceded by an optional leading "-" sign to
+/// indicate a negative number. If the sign is omitted, "+" is assumed. The
+/// letter "T" is the date/time separator and "hh", "mm", "ss" represent hour,
+/// minute and second respectively. Additional digits can be used to increase
+/// the precision of fractional seconds if desired i.e. the format ss.ss... with
+/// any number of digits after the decimal point is supported. See
+/// AbsoluteTimeParameterType and AbsoluteTimeArgumentType. See
+/// AbsouteTimeParameterType, AbsoluteTimeArgumentType and BaseTimeDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentAbsoluteTimeDataType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
@@ -3371,11 +3733,15 @@ pub struct ArgumentAbsoluteTimeDataType {
     pub base_type: Option<String>,
     /// Default/Initial value is always given in calibrated form.
     pub initial_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// Describes how the raw base counts of the time type are encoded/decoded.
     pub encoding: Option<EncodingType>,
@@ -3421,13 +3787,17 @@ impl XmlElement for ArgumentAbsoluteTimeDataType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -3461,11 +3831,26 @@ pub struct ArgumentArgumentRefEntryType {
     pub short_description: Option<String>,
     /// Attribute `argumentRef`.
     pub argument_ref: String,
-    /// The start bit 0 position for each container is local to the container, but does include space occupied by inherited containers. When a container is "included", as opposed to inherited, then the interpreting implementation takes into account the start bit position of the referring container when finally assembling the start bits for the post-processed entry content. The default start bit for any entry is 0 bits from the previous entry, making the content contiguous when this element is not used.
-    pub location_in_container_in_bits: Option<ArgumentLocationInContainerInBitsType>,
-    /// May be used when this entry repeats itself in the sequence container. When an entry repeats, it effectively specifies that the same entry is reported more than once in the container and has the same physical meaning. This should not be construed to be equivalent to arrays.
+    /// The start bit 0 position for each container is local to the container,
+    /// but does include space occupied by inherited containers. When a
+    /// container is "included", as opposed to inherited, then the interpreting
+    /// implementation takes into account the start bit position of the
+    /// referring container when finally assembling the start bits for the
+    /// post-processed entry content. The default start bit for any entry is 0
+    /// bits from the previous entry, making the content contiguous when this
+    /// element is not used.
+    pub location_in_container_in_bits:
+        Option<ArgumentLocationInContainerInBitsType>,
+    /// May be used when this entry repeats itself in the sequence container.
+    /// When an entry repeats, it effectively specifies that the same entry is
+    /// reported more than once in the container and has the same physical
+    /// meaning. This should not be construed to be equivalent to arrays.
     pub repeat_entry: Option<ArgumentRepeatType>,
-    /// This entry will only be included in the sequence when this condition is true, otherwise it is always included. When the include condition evaluates to false, it is as if the entry does not exist such that any start bit interpretations cannot take into account the space that would have been occupied if this included condition were true.
+    /// This entry will only be included in the sequence when this condition is
+    /// true, otherwise it is always included. When the include condition
+    /// evaluates to false, it is as if the entry does not exist such that any
+    /// start bit interpretations cannot take into account the space that would
+    /// have been occupied if this included condition were true.
     pub include_condition: Option<ArgumentMatchCriteriaType>,
     /// Ancillary data associated with this entry.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
@@ -3500,7 +3885,9 @@ impl XmlElement for ArgumentArgumentRefEntryType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "argumentRef" => {
                     v.argument_ref = r.attr_value(tag, raw)?;
                     seen_argument_ref = true;
@@ -3528,7 +3915,8 @@ impl XmlElement for ArgumentArgumentRefEntryType {
     }
 }
 
-/// Identical to ArrayParameterRefEntryType but supports argument instance references.
+/// Identical to ArrayParameterRefEntryType but supports argument instance
+/// references.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentArrayArgumentRefEntryType {
     /// Optional short description for this entry element.
@@ -3539,15 +3927,31 @@ pub struct ArgumentArrayArgumentRefEntryType {
     ///
     /// Schema default: `false`.
     pub last_entry_for_this_array_instance: Option<bool>,
-    /// The start bit 0 position for each container is local to the container, but does include space occupied by inherited containers. When a container is "included", as opposed to inherited, then the interpreting implementation takes into account the start bit position of the referring container when finally assembling the start bits for the post-processed entry content. The default start bit for any entry is 0 bits from the previous entry, making the content contiguous when this element is not used.
-    pub location_in_container_in_bits: Option<ArgumentLocationInContainerInBitsType>,
-    /// May be used when this entry repeats itself in the sequence container. When an entry repeats, it effectively specifies that the same entry is reported more than once in the container and has the same physical meaning. This should not be construed to be equivalent to arrays.
+    /// The start bit 0 position for each container is local to the container,
+    /// but does include space occupied by inherited containers. When a
+    /// container is "included", as opposed to inherited, then the interpreting
+    /// implementation takes into account the start bit position of the
+    /// referring container when finally assembling the start bits for the
+    /// post-processed entry content. The default start bit for any entry is 0
+    /// bits from the previous entry, making the content contiguous when this
+    /// element is not used.
+    pub location_in_container_in_bits:
+        Option<ArgumentLocationInContainerInBitsType>,
+    /// May be used when this entry repeats itself in the sequence container.
+    /// When an entry repeats, it effectively specifies that the same entry is
+    /// reported more than once in the container and has the same physical
+    /// meaning. This should not be construed to be equivalent to arrays.
     pub repeat_entry: Option<ArgumentRepeatType>,
-    /// This entry will only be included in the sequence when this condition is true, otherwise it is always included. When the include condition evaluates to false, it is as if the entry does not exist such that any start bit interpretations cannot take into account the space that would have been occupied if this included condition were true.
+    /// This entry will only be included in the sequence when this condition is
+    /// true, otherwise it is always included. When the include condition
+    /// evaluates to false, it is as if the entry does not exist such that any
+    /// start bit interpretations cannot take into account the space that would
+    /// have been occupied if this included condition were true.
     pub include_condition: Option<ArgumentMatchCriteriaType>,
     /// Ancillary data associated with this entry.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// The dimension here if used for subsetting must be less than the ones in the type. It's not a subset if its the same size.
+    /// The dimension here if used for subsetting must be less than the ones in
+    /// the type. It's not a subset if its the same size.
     pub dimension_list: Option<ArgumentDimensionListType>,
 }
 
@@ -3586,13 +3990,16 @@ impl XmlElement for ArgumentArrayArgumentRefEntryType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "argumentRef" => {
                     v.argument_ref = r.attr_value(tag, raw)?;
                     seen_argument_ref = true;
                 }
                 "lastEntryForThisArrayInstance" => {
-                    v.last_entry_for_this_array_instance = Some(r.attr_value(tag, raw)?)
+                    v.last_entry_for_this_array_instance =
+                        Some(r.attr_value(tag, raw)?)
                 }
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -3620,7 +4027,8 @@ impl XmlElement for ArgumentArrayArgumentRefEntryType {
     }
 }
 
-/// Identical to ArrayParameterRefEntryType but supports argument instance references.
+/// Identical to ArrayParameterRefEntryType but supports argument instance
+/// references.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentArrayParameterRefEntryType {
     /// Optional short description for this entry element.
@@ -3631,15 +4039,31 @@ pub struct ArgumentArrayParameterRefEntryType {
     ///
     /// Schema default: `false`.
     pub last_entry_for_this_array_instance: Option<bool>,
-    /// The start bit 0 position for each container is local to the container, but does include space occupied by inherited containers. When a container is "included", as opposed to inherited, then the interpreting implementation takes into account the start bit position of the referring container when finally assembling the start bits for the post-processed entry content. The default start bit for any entry is 0 bits from the previous entry, making the content contiguous when this element is not used.
-    pub location_in_container_in_bits: Option<ArgumentLocationInContainerInBitsType>,
-    /// May be used when this entry repeats itself in the sequence container. When an entry repeats, it effectively specifies that the same entry is reported more than once in the container and has the same physical meaning. This should not be construed to be equivalent to arrays.
+    /// The start bit 0 position for each container is local to the container,
+    /// but does include space occupied by inherited containers. When a
+    /// container is "included", as opposed to inherited, then the interpreting
+    /// implementation takes into account the start bit position of the
+    /// referring container when finally assembling the start bits for the
+    /// post-processed entry content. The default start bit for any entry is 0
+    /// bits from the previous entry, making the content contiguous when this
+    /// element is not used.
+    pub location_in_container_in_bits:
+        Option<ArgumentLocationInContainerInBitsType>,
+    /// May be used when this entry repeats itself in the sequence container.
+    /// When an entry repeats, it effectively specifies that the same entry is
+    /// reported more than once in the container and has the same physical
+    /// meaning. This should not be construed to be equivalent to arrays.
     pub repeat_entry: Option<ArgumentRepeatType>,
-    /// This entry will only be included in the sequence when this condition is true, otherwise it is always included. When the include condition evaluates to false, it is as if the entry does not exist such that any start bit interpretations cannot take into account the space that would have been occupied if this included condition were true.
+    /// This entry will only be included in the sequence when this condition is
+    /// true, otherwise it is always included. When the include condition
+    /// evaluates to false, it is as if the entry does not exist such that any
+    /// start bit interpretations cannot take into account the space that would
+    /// have been occupied if this included condition were true.
     pub include_condition: Option<ArgumentMatchCriteriaType>,
     /// Ancillary data associated with this entry.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// The dimension here if used for subsetting must be less than the ones in the type. It's not a subset if its the same size.
+    /// The dimension here if used for subsetting must be less than the ones in
+    /// the type. It's not a subset if its the same size.
     pub dimension_list: Option<DimensionListType>,
 }
 
@@ -3678,13 +4102,16 @@ impl XmlElement for ArgumentArrayParameterRefEntryType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "parameterRef" => {
                     v.parameter_ref = r.attr_value(tag, raw)?;
                     seen_parameter_ref = true;
                 }
                 "lastEntryForThisArrayInstance" => {
-                    v.last_entry_for_this_array_instance = Some(r.attr_value(tag, raw)?)
+                    v.last_entry_for_this_array_instance =
+                        Some(r.attr_value(tag, raw)?)
                 }
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -3712,10 +4139,18 @@ impl XmlElement for ArgumentArrayParameterRefEntryType {
     }
 }
 
-/// Argument Assignments specialize a MetaCommand or BlockMetaCommand when inheriting from another MetaCommand. General argument values can be restricted to specific values to further specialize the MetaCommand. Use it to "narrow" a MetaCommand from its base MetaCommand by specifying values of arguments for example, a power command may be narrowed to a "power on" command by assigning the value of an argument to "on". See ArgumentAssignmentType and MetaCommandType.
+/// Argument Assignments specialize a MetaCommand or BlockMetaCommand when
+/// inheriting from another MetaCommand. General argument values can be
+/// restricted to specific values to further specialize the MetaCommand. Use it
+/// to "narrow" a MetaCommand from its base MetaCommand by specifying values of
+/// arguments for example, a power command may be narrowed to a "power on"
+/// command by assigning the value of an argument to "on". See
+/// ArgumentAssignmentType and MetaCommandType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentAssignmentListType {
-    /// Specialize this command definition when inheriting from a more general MetaCommand by restricting the specific values of otherwise general arguments.
+    /// Specialize this command definition when inheriting from a more general
+    /// MetaCommand by restricting the specific values of otherwise general
+    /// arguments.
     pub argument_assignment: Vec<ArgumentAssignmentType>,
 }
 
@@ -3753,12 +4188,19 @@ impl XmlElement for ArgumentAssignmentListType {
     }
 }
 
-/// Describe an assignment of an argument with a calibrated/engineering value. See ArgumentAssignmentListType.
+/// Describe an assignment of an argument with a calibrated/engineering value.
+/// See ArgumentAssignmentListType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentAssignmentType {
-    /// The named argument from the base MetaCommand to assign/restrict with a value.
+    /// The named argument from the base MetaCommand to assign/restrict with a
+    /// value.
     pub argument_name: String,
-    /// Specify value as a string compliant with the XML schema (xs) type specified for each XTCE type: integer=xs:integer; float=xs:double; string=xs:string; boolean=xs:boolean; binary=xs:hexBinary; enum=xs:string from EnumerationList; relative time=xs:duration; absolute time=xs:dateTime. Supplied value must be within the ValidRange specified for the type.
+    /// Specify value as a string compliant with the XML schema (xs) type
+    /// specified for each XTCE type: integer=xs:integer; float=xs:double;
+    /// string=xs:string; boolean=xs:boolean; binary=xs:hexBinary;
+    /// enum=xs:string from EnumerationList; relative time=xs:duration; absolute
+    /// time=xs:dateTime. Supplied value must be within the ValidRange specified
+    /// for the type.
     pub argument_value: String,
 }
 
@@ -3803,21 +4245,31 @@ impl XmlElement for ArgumentAssignmentType {
 /// Identical to BaseDataType but supports argument instance references.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentBaseDataType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Used to derive one Data Type from another - will inherit all the attributes from the baseType any of which may be redefined in this type definition.
+    /// Used to derive one Data Type from another - will inherit all the
+    /// attributes from the baseType any of which may be redefined in this type
+    /// definition.
     pub base_type: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// When appropriate, describe the units of measure that are represented by this argument value.
+    /// When appropriate, describe the units of measure that are represented by
+    /// this argument value.
     pub unit_set: Option<UnitSetType>,
-    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`, `StringDataEncoding`.
+    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding`, `StringDataEncoding`.
     pub choice: Option<ArgumentBaseDataChoice>,
 }
 
@@ -3856,7 +4308,9 @@ impl XmlElement for ArgumentBaseDataType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
@@ -3891,17 +4345,23 @@ impl XmlElement for ArgumentBaseDataType {
 /// Identical to BaseTimeDataType but supports argument instance references.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentBaseTimeDataType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
     /// Extend another absolute or relative time type.
     pub base_type: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// Describes how the raw base counts of the time type are encoded/decoded.
     pub encoding: Option<EncodingType>,
@@ -3944,7 +4404,9 @@ impl XmlElement for ArgumentBaseTimeDataType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
@@ -3976,7 +4438,8 @@ impl XmlElement for ArgumentBaseTimeDataType {
     }
 }
 
-/// Identical to BinaryDataEncodingType but supports argument instance references.
+/// Identical to BinaryDataEncodingType but supports argument instance
+/// references.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentBinaryDataEncodingType {
     /// Describes the bit ordering of the encoded value.
@@ -3987,7 +4450,8 @@ pub struct ArgumentBinaryDataEncodingType {
     ///
     /// Schema default: `mostSignificantByteFirst`.
     pub byte_order: Option<String>,
-    /// DEPRECATED: Use the ErrorDetectCorrect element in the container elements instead.
+    /// DEPRECATED: Use the ErrorDetectCorrect element in the container elements
+    /// instead.
     pub error_detect_correct: Option<ErrorDetectCorrectType>,
     /// Number of bits this value occupies on the stream being encoded/decoded.
     pub size_in_bits: ArgumentIntegerValueType,
@@ -4051,23 +4515,34 @@ impl XmlElement for ArgumentBinaryDataEncodingType {
 /// Identical to BinaryDataType but supports argument instance references.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentBinaryDataType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Used to derive one Data Type from another - will inherit all the attributes from the baseType any of which may be redefined in this type definition.
+    /// Used to derive one Data Type from another - will inherit all the
+    /// attributes from the baseType any of which may be redefined in this type
+    /// definition.
     pub base_type: Option<String>,
-    /// Default/Initial value is always given in calibrated form. Extra bits are truncated from the MSB (leftmost).
+    /// Default/Initial value is always given in calibrated form. Extra bits are
+    /// truncated from the MSB (leftmost).
     pub initial_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// When appropriate, describe the units of measure that are represented by this argument value.
+    /// When appropriate, describe the units of measure that are represented by
+    /// this argument value.
     pub unit_set: Option<UnitSetType>,
-    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`, `StringDataEncoding`.
+    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding`, `StringDataEncoding`.
     pub choice: Option<ArgumentBinaryDataChoice>,
 }
 
@@ -4109,13 +4584,17 @@ impl XmlElement for ArgumentBinaryDataType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -4147,31 +4626,43 @@ impl XmlElement for ArgumentBinaryDataType {
 /// Identical to BooleanDataType but supports argument instance references.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentBooleanDataType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Used to derive one Data Type from another - will inherit all the attributes from the baseType any of which may be redefined in this type definition.
+    /// Used to derive one Data Type from another - will inherit all the
+    /// attributes from the baseType any of which may be redefined in this type
+    /// definition.
     pub base_type: Option<String>,
     /// Default/Initial value is always given in calibrated form.
     pub initial_value: Option<String>,
-    /// Enumeration string representing the 1 value, with the default being 'True'.
+    /// Enumeration string representing the 1 value, with the default being
+    /// 'True'.
     ///
     /// Schema default: `True`.
     pub one_string_value: Option<String>,
-    /// Enumeration string representing the 0 value, with the default being 'False'.
+    /// Enumeration string representing the 0 value, with the default being
+    /// 'False'.
     ///
     /// Schema default: `False`.
     pub zero_string_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// When appropriate, describe the units of measure that are represented by this argument value.
+    /// When appropriate, describe the units of measure that are represented by
+    /// this argument value.
     pub unit_set: Option<UnitSetType>,
-    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`, `StringDataEncoding`.
+    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding`, `StringDataEncoding`.
     pub choice: Option<ArgumentBooleanDataChoice>,
 }
 
@@ -4219,15 +4710,23 @@ impl XmlElement for ArgumentBooleanDataType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
-                "oneStringValue" => v.one_string_value = Some(r.attr_value(tag, raw)?),
-                "zeroStringValue" => v.zero_string_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
+                "oneStringValue" => {
+                    v.one_string_value = Some(r.attr_value(tag, raw)?)
+                }
+                "zeroStringValue" => {
+                    v.zero_string_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -4256,7 +4755,8 @@ impl XmlElement for ArgumentBooleanDataType {
     }
 }
 
-/// Identical to BooleanExpressionType but supports argument instance references.
+/// Identical to BooleanExpressionType but supports argument instance
+/// references.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentBooleanExpressionType {
     /// One of: `Condition`, `ANDedConditions`, `ORedConditions`.
@@ -4324,7 +4824,8 @@ impl XmlElement for ArgumentComparisonCheckType {
 /// Identical to ComparisonListType but supports argument instance references.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentComparisonListType {
-    /// List of Comparison elements must all be true for the comparison to evaluate to true.
+    /// List of Comparison elements must all be true for the comparison to
+    /// evaluate to true.
     pub comparison: Vec<ArgumentComparisonType>,
 }
 
@@ -4369,7 +4870,14 @@ pub struct ArgumentComparisonType {
     ///
     /// Schema default: `==`.
     pub comparison_operator: Option<ComparisonOperatorsType>,
-    /// Specify as: integer data type using xs:integer, float data type using xs:double, string data type using xs:string, boolean data type using xs:boolean, binary data type using xs:hexBinary, enum data type using label name, relative time data type using xs:duration, absolute time data type using xs:dateTime. Values must not exceed the characteristics for the data type or this is a validation error. Takes precedence over an initial value given in the data type. Values are calibrated unless there is an option to override it.
+    /// Specify as: integer data type using xs:integer, float data type using
+    /// xs:double, string data type using xs:string, boolean data type using
+    /// xs:boolean, binary data type using xs:hexBinary, enum data type using
+    /// label name, relative time data type using xs:duration, absolute time
+    /// data type using xs:dateTime. Values must not exceed the characteristics
+    /// for the data type or this is a validation error. Takes precedence over
+    /// an initial value given in the data type. Values are calibrated unless
+    /// there is an option to override it.
     pub value: String,
     /// One of: `ParameterInstanceRef`, `ArgumentInstanceRef`.
     pub choice: ArgumentComparisonChoice,
@@ -4393,7 +4901,9 @@ impl XmlElement for ArgumentComparisonType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "comparisonOperator" => v.comparison_operator = Some(r.attr_value(tag, raw)?),
+                "comparisonOperator" => {
+                    v.comparison_operator = Some(r.attr_value(tag, raw)?)
+                }
                 "value" => {
                     v.value = r.attr_value(tag, raw)?;
                     seen_value = true;
@@ -4410,18 +4920,34 @@ impl XmlElement for ArgumentComparisonType {
     }
 }
 
-/// Identical to ContainerRefEntryType but supports argument instance references.
+/// Identical to ContainerRefEntryType but supports argument instance
+/// references.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentContainerRefEntryType {
     /// Optional short description for this entry element.
     pub short_description: Option<String>,
     /// Attribute `containerRef`.
     pub container_ref: String,
-    /// The start bit 0 position for each container is local to the container, but does include space occupied by inherited containers. When a container is "included", as opposed to inherited, then the interpreting implementation takes into account the start bit position of the referring container when finally assembling the start bits for the post-processed entry content. The default start bit for any entry is 0 bits from the previous entry, making the content contiguous when this element is not used.
-    pub location_in_container_in_bits: Option<ArgumentLocationInContainerInBitsType>,
-    /// May be used when this entry repeats itself in the sequence container. When an entry repeats, it effectively specifies that the same entry is reported more than once in the container and has the same physical meaning. This should not be construed to be equivalent to arrays.
+    /// The start bit 0 position for each container is local to the container,
+    /// but does include space occupied by inherited containers. When a
+    /// container is "included", as opposed to inherited, then the interpreting
+    /// implementation takes into account the start bit position of the
+    /// referring container when finally assembling the start bits for the
+    /// post-processed entry content. The default start bit for any entry is 0
+    /// bits from the previous entry, making the content contiguous when this
+    /// element is not used.
+    pub location_in_container_in_bits:
+        Option<ArgumentLocationInContainerInBitsType>,
+    /// May be used when this entry repeats itself in the sequence container.
+    /// When an entry repeats, it effectively specifies that the same entry is
+    /// reported more than once in the container and has the same physical
+    /// meaning. This should not be construed to be equivalent to arrays.
     pub repeat_entry: Option<ArgumentRepeatType>,
-    /// This entry will only be included in the sequence when this condition is true, otherwise it is always included. When the include condition evaluates to false, it is as if the entry does not exist such that any start bit interpretations cannot take into account the space that would have been occupied if this included condition were true.
+    /// This entry will only be included in the sequence when this condition is
+    /// true, otherwise it is always included. When the include condition
+    /// evaluates to false, it is as if the entry does not exist such that any
+    /// start bit interpretations cannot take into account the space that would
+    /// have been occupied if this included condition were true.
     pub include_condition: Option<ArgumentMatchCriteriaType>,
     /// Ancillary data associated with this entry.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
@@ -4456,7 +4982,9 @@ impl XmlElement for ArgumentContainerRefEntryType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "containerRef" => {
                     v.container_ref = r.attr_value(tag, raw)?;
                     seen_container_ref = true;
@@ -4484,7 +5012,8 @@ impl XmlElement for ArgumentContainerRefEntryType {
     }
 }
 
-/// Identical to ContainerSegmentRefEntryType but supports argument instance references.
+/// Identical to ContainerSegmentRefEntryType but supports argument instance
+/// references.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentContainerSegmentRefEntryType {
     /// Optional short description for this entry element.
@@ -4495,11 +5024,26 @@ pub struct ArgumentContainerSegmentRefEntryType {
     pub order: Option<i64>,
     /// Attribute `sizeInBits`.
     pub size_in_bits: i64,
-    /// The start bit 0 position for each container is local to the container, but does include space occupied by inherited containers. When a container is "included", as opposed to inherited, then the interpreting implementation takes into account the start bit position of the referring container when finally assembling the start bits for the post-processed entry content. The default start bit for any entry is 0 bits from the previous entry, making the content contiguous when this element is not used.
-    pub location_in_container_in_bits: Option<ArgumentLocationInContainerInBitsType>,
-    /// May be used when this entry repeats itself in the sequence container. When an entry repeats, it effectively specifies that the same entry is reported more than once in the container and has the same physical meaning. This should not be construed to be equivalent to arrays.
+    /// The start bit 0 position for each container is local to the container,
+    /// but does include space occupied by inherited containers. When a
+    /// container is "included", as opposed to inherited, then the interpreting
+    /// implementation takes into account the start bit position of the
+    /// referring container when finally assembling the start bits for the
+    /// post-processed entry content. The default start bit for any entry is 0
+    /// bits from the previous entry, making the content contiguous when this
+    /// element is not used.
+    pub location_in_container_in_bits:
+        Option<ArgumentLocationInContainerInBitsType>,
+    /// May be used when this entry repeats itself in the sequence container.
+    /// When an entry repeats, it effectively specifies that the same entry is
+    /// reported more than once in the container and has the same physical
+    /// meaning. This should not be construed to be equivalent to arrays.
     pub repeat_entry: Option<ArgumentRepeatType>,
-    /// This entry will only be included in the sequence when this condition is true, otherwise it is always included. When the include condition evaluates to false, it is as if the entry does not exist such that any start bit interpretations cannot take into account the space that would have been occupied if this included condition were true.
+    /// This entry will only be included in the sequence when this condition is
+    /// true, otherwise it is always included. When the include condition
+    /// evaluates to false, it is as if the entry does not exist such that any
+    /// start bit interpretations cannot take into account the space that would
+    /// have been occupied if this included condition were true.
     pub include_condition: Option<ArgumentMatchCriteriaType>,
     /// Ancillary data associated with this entry.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
@@ -4539,7 +5083,9 @@ impl XmlElement for ArgumentContainerSegmentRefEntryType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "containerRef" => {
                     v.container_ref = r.attr_value(tag, raw)?;
                     seen_container_ref = true;
@@ -4653,12 +5199,15 @@ impl XmlElement for ArgumentDimensionType {
     }
 }
 
-/// Identical to DiscreteLookupListType but supports argument instance references.
+/// Identical to DiscreteLookupListType but supports argument instance
+/// references.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentDiscreteLookupListType {
-    /// In the event that no lookup condition evaluates to true, then this value will be used.
+    /// In the event that no lookup condition evaluates to true, then this value
+    /// will be used.
     pub default_value: i64,
-    /// Describe a lookup condition set using discrete values from arguments and/or parameters.
+    /// Describe a lookup condition set using discrete values from arguments
+    /// and/or parameters.
     pub discrete_lookup: Vec<ArgumentDiscreteLookupType>,
 }
 
@@ -4707,12 +5256,14 @@ impl XmlElement for ArgumentDiscreteLookupListType {
     }
 }
 
-/// Identical to ArgumentDiscreteLookupType but supports argument instance references.
+/// Identical to ArgumentDiscreteLookupType but supports argument instance
+/// references.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentDiscreteLookupType {
     /// Value to use when the lookup conditions are true.
     pub value: i64,
-    /// One of: `Comparison`, `ComparisonList`, `BooleanExpression`, `CustomAlgorithm`.
+    /// One of: `Comparison`, `ComparisonList`, `BooleanExpression`,
+    /// `CustomAlgorithm`.
     pub choice: ArgumentDiscreteLookupChoice,
 }
 
@@ -4752,7 +5303,8 @@ impl XmlElement for ArgumentDiscreteLookupType {
 pub struct ArgumentDynamicValueType {
     /// One of: `ArgumentInstanceRef`, `ParameterInstanceRef`.
     pub choice: ArgumentDynamicValueChoice,
-    /// A slope and intercept may be applied to scale or shift the value selected from the argument or parameter.
+    /// A slope and intercept may be applied to scale or shift the value
+    /// selected from the argument or parameter.
     pub linear_adjustment: Option<LinearAdjustmentType>,
 }
 
@@ -4785,23 +5337,34 @@ impl XmlElement for ArgumentDynamicValueType {
 /// Identical to EnumeratedDataType but supports argument instance references.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentEnumeratedDataType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Used to derive one Data Type from another - will inherit all the attributes from the baseType any of which may be redefined in this type definition.
+    /// Used to derive one Data Type from another - will inherit all the
+    /// attributes from the baseType any of which may be redefined in this type
+    /// definition.
     pub base_type: Option<String>,
-    /// Default/Initial value is always given in calibrated form. Use the label, it must be in the enumeration list to be valid.
+    /// Default/Initial value is always given in calibrated form. Use the label,
+    /// it must be in the enumeration list to be valid.
     pub initial_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// When appropriate, describe the units of measure that are represented by this argument value.
+    /// When appropriate, describe the units of measure that are represented by
+    /// this argument value.
     pub unit_set: Option<UnitSetType>,
-    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`, `StringDataEncoding`.
+    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding`, `StringDataEncoding`.
     pub choice: Option<ArgumentEnumeratedDataChoice>,
     /// Unordered list of label/value pairs where values cannot be duplicated.
     pub enumeration_list: EnumerationListType,
@@ -4846,13 +5409,17 @@ impl XmlElement for ArgumentEnumeratedDataType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -4892,15 +5459,35 @@ pub struct ArgumentFixedValueEntryType {
     pub short_description: Option<String>,
     /// An optional name for the fixed/constant field in the sequence.
     pub name: Option<String>,
-    /// The fixed/constant value that should be encoded into the sequence. This value provided should have sufficient bit length to accomodate the size in bits. If the value is larger, the most significant unnecessary bits are dropped. The value provided should be in network byte order for encoding.
+    /// The fixed/constant value that should be encoded into the sequence. This
+    /// value provided should have sufficient bit length to accomodate the size
+    /// in bits. If the value is larger, the most significant unnecessary bits
+    /// are dropped. The value provided should be in network byte order for
+    /// encoding.
     pub binary_value: String,
-    /// The number of bits that this fixed/constant value should occupy in the sequence.
+    /// The number of bits that this fixed/constant value should occupy in the
+    /// sequence.
     pub size_in_bits: i64,
-    /// The start bit 0 position for each container is local to the container, but does include space occupied by inherited containers. When a container is "included", as opposed to inherited, then the interpreting implementation takes into account the start bit position of the referring container when finally assembling the start bits for the post-processed entry content. The default start bit for any entry is 0 bits from the previous entry, making the content contiguous when this element is not used.
-    pub location_in_container_in_bits: Option<ArgumentLocationInContainerInBitsType>,
-    /// May be used when this entry repeats itself in the sequence container. When an entry repeats, it effectively specifies that the same entry is reported more than once in the container and has the same physical meaning. This should not be construed to be equivalent to arrays.
+    /// The start bit 0 position for each container is local to the container,
+    /// but does include space occupied by inherited containers. When a
+    /// container is "included", as opposed to inherited, then the interpreting
+    /// implementation takes into account the start bit position of the
+    /// referring container when finally assembling the start bits for the
+    /// post-processed entry content. The default start bit for any entry is 0
+    /// bits from the previous entry, making the content contiguous when this
+    /// element is not used.
+    pub location_in_container_in_bits:
+        Option<ArgumentLocationInContainerInBitsType>,
+    /// May be used when this entry repeats itself in the sequence container.
+    /// When an entry repeats, it effectively specifies that the same entry is
+    /// reported more than once in the container and has the same physical
+    /// meaning. This should not be construed to be equivalent to arrays.
     pub repeat_entry: Option<ArgumentRepeatType>,
-    /// This entry will only be included in the sequence when this condition is true, otherwise it is always included. When the include condition evaluates to false, it is as if the entry does not exist such that any start bit interpretations cannot take into account the space that would have been occupied if this included condition were true.
+    /// This entry will only be included in the sequence when this condition is
+    /// true, otherwise it is always included. When the include condition
+    /// evaluates to false, it is as if the entry does not exist such that any
+    /// start bit interpretations cannot take into account the space that would
+    /// have been occupied if this included condition were true.
     pub include_condition: Option<ArgumentMatchCriteriaType>,
     /// Ancillary data associated with this entry.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
@@ -4940,7 +5527,9 @@ impl XmlElement for ArgumentFixedValueEntryType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
                 "binaryValue" => {
                     v.binary_value = r.attr_value(tag, raw)?;
@@ -4979,29 +5568,46 @@ impl XmlElement for ArgumentFixedValueEntryType {
 /// Identical to FloatDataType but supports argument instance references.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentFloatDataType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Used to derive one Data Type from another - will inherit all the attributes from the baseType any of which may be redefined in this type definition.
+    /// Used to derive one Data Type from another - will inherit all the
+    /// attributes from the baseType any of which may be redefined in this type
+    /// definition.
     pub base_type: Option<String>,
     /// Default/Initial value is always given in calibrated form.
     pub initial_value: Option<f64>,
-    /// Optional hint to the implementation about the size of the engineering/calibrated data type to use internally. Generally this can be determined by examination of the space required to capture the full range of the encoding, but it is not always clear when calibrators are in use. A tolerant implementation will endeavor to always make sufficient size engineering data types to capture the entire range of possible values.
+    /// Optional hint to the implementation about the size of the
+    /// engineering/calibrated data type to use internally. Generally this can
+    /// be determined by examination of the space required to capture the full
+    /// range of the encoding, but it is not always clear when calibrators are
+    /// in use. A tolerant implementation will endeavor to always make
+    /// sufficient size engineering data types to capture the entire range of
+    /// possible values.
     ///
     /// Schema default: `32`.
     pub size_in_bits: Option<FloatSizeInBitsType>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// When appropriate, describe the units of measure that are represented by this argument value.
+    /// When appropriate, describe the units of measure that are represented by
+    /// this argument value.
     pub unit_set: Option<UnitSetType>,
-    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`, `StringDataEncoding`.
+    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding`, `StringDataEncoding`.
     pub choice: Option<ArgumentFloatDataChoice>,
-    /// This element provides the implementation with assistance rendering the value as a string for users.
+    /// This element provides the implementation with assistance rendering the
+    /// value as a string for users.
     pub to_string: Option<ToStringType>,
 }
 
@@ -5049,13 +5655,17 @@ impl XmlElement for ArgumentFloatDataType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 "sizeInBits" => v.size_in_bits = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -5088,18 +5698,34 @@ impl XmlElement for ArgumentFloatDataType {
     }
 }
 
-/// Identical to IndirectParameterRefEntryType but supports argument instance references.
+/// Identical to IndirectParameterRefEntryType but supports argument instance
+/// references.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentIndirectParameterRefEntryType {
     /// Optional short description for this entry element.
     pub short_description: Option<String>,
     /// Attribute `aliasNameSpace`.
     pub alias_name_space: Option<String>,
-    /// The start bit 0 position for each container is local to the container, but does include space occupied by inherited containers. When a container is "included", as opposed to inherited, then the interpreting implementation takes into account the start bit position of the referring container when finally assembling the start bits for the post-processed entry content. The default start bit for any entry is 0 bits from the previous entry, making the content contiguous when this element is not used.
-    pub location_in_container_in_bits: Option<ArgumentLocationInContainerInBitsType>,
-    /// May be used when this entry repeats itself in the sequence container. When an entry repeats, it effectively specifies that the same entry is reported more than once in the container and has the same physical meaning. This should not be construed to be equivalent to arrays.
+    /// The start bit 0 position for each container is local to the container,
+    /// but does include space occupied by inherited containers. When a
+    /// container is "included", as opposed to inherited, then the interpreting
+    /// implementation takes into account the start bit position of the
+    /// referring container when finally assembling the start bits for the
+    /// post-processed entry content. The default start bit for any entry is 0
+    /// bits from the previous entry, making the content contiguous when this
+    /// element is not used.
+    pub location_in_container_in_bits:
+        Option<ArgumentLocationInContainerInBitsType>,
+    /// May be used when this entry repeats itself in the sequence container.
+    /// When an entry repeats, it effectively specifies that the same entry is
+    /// reported more than once in the container and has the same physical
+    /// meaning. This should not be construed to be equivalent to arrays.
     pub repeat_entry: Option<ArgumentRepeatType>,
-    /// This entry will only be included in the sequence when this condition is true, otherwise it is always included. When the include condition evaluates to false, it is as if the entry does not exist such that any start bit interpretations cannot take into account the space that would have been occupied if this included condition were true.
+    /// This entry will only be included in the sequence when this condition is
+    /// true, otherwise it is always included. When the include condition
+    /// evaluates to false, it is as if the entry does not exist such that any
+    /// start bit interpretations cannot take into account the space that would
+    /// have been occupied if this included condition were true.
     pub include_condition: Option<ArgumentMatchCriteriaType>,
     /// Ancillary data associated with this entry.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
@@ -5138,8 +5764,12 @@ impl XmlElement for ArgumentIndirectParameterRefEntryType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
-                "aliasNameSpace" => v.alias_name_space = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
+                "aliasNameSpace" => {
+                    v.alias_name_space = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -5167,21 +5797,28 @@ impl XmlElement for ArgumentIndirectParameterRefEntryType {
 /// Identical to InputAlgorithmType but supports argument instance references.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentInputAlgorithmType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// Element `AlgorithmText`.
     pub algorithm_text: Option<AlgorithmTextType>,
     /// Element `ExternalAlgorithmSet`.
     pub external_algorithm_set: Option<ExternalAlgorithmSetType>,
-    /// The InputSet describes the list of arguments and/or parameters that should be made available as input arguments to the algorithm.
+    /// The InputSet describes the list of arguments and/or parameters that
+    /// should be made available as input arguments to the algorithm.
     pub input_set: Option<ArgumentInputSetType>,
 }
 
@@ -5220,7 +5857,9 @@ impl XmlElement for ArgumentInputAlgorithmType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
@@ -5257,7 +5896,8 @@ impl XmlElement for ArgumentInputAlgorithmType {
 /// Identical to InputSetType but supports argument instance references.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentInputSetType {
-    /// One of: `InputParameterInstanceRef`, `InputArgumentInstanceRef`, `Constant`.
+    /// One of: `InputParameterInstanceRef`, `InputArgumentInstanceRef`,
+    /// `Constant`.
     pub items: Vec<ArgumentInputSetChoice>,
 }
 
@@ -5289,7 +5929,8 @@ impl XmlElement for ArgumentInputSetType {
         if v.items.len() < 1 {
             let n = v.items.len();
             return Err(r.too_few(
-                "InputParameterInstanceRef|InputArgumentInstanceRef|Constant",
+                "InputParameterInstanceRef|\
+                        InputArgumentInstanceRef|Constant",
                 1,
                 n,
             ));
@@ -5299,12 +5940,15 @@ impl XmlElement for ArgumentInputSetType {
     }
 }
 
-/// An argument instance is the name of an argument as the reference is always resolved locally to the metacommand.
+/// An argument instance is the name of an argument as the reference is always
+/// resolved locally to the metacommand.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentInstanceRefType {
-    /// Give the name of the argument. There is no path, this is a local reference.
+    /// Give the name of the argument. There is no path, this is a local
+    /// reference.
     pub argument_ref: String,
-    /// Typically the calibrated/engineering value is used and that is the default.
+    /// Typically the calibrated/engineering value is used and that is the
+    /// default.
     ///
     /// Schema default: `true`.
     pub use_calibrated_value: Option<bool>,
@@ -5331,7 +5975,9 @@ impl XmlElement for ArgumentInstanceRefType {
                     v.argument_ref = r.attr_value(tag, raw)?;
                     seen_argument_ref = true;
                 }
-                "useCalibratedValue" => v.use_calibrated_value = Some(r.attr_value(tag, raw)?),
+                "useCalibratedValue" => {
+                    v.use_calibrated_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -5346,33 +5992,53 @@ impl XmlElement for ArgumentInstanceRefType {
 /// Identical to IntegerDataType but supports argument instance references.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentIntegerDataType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Used to derive one Data Type from another - will inherit all the attributes from the baseType any of which may be redefined in this type definition.
+    /// Used to derive one Data Type from another - will inherit all the
+    /// attributes from the baseType any of which may be redefined in this type
+    /// definition.
     pub base_type: Option<String>,
-    /// Default/Initial value is always given in calibrated form. Specify the value as a base 10 integer.
+    /// Default/Initial value is always given in calibrated form. Specify the
+    /// value as a base 10 integer.
     pub initial_value: Option<i64>,
-    /// Optional hint to the implementation about the size of the engineering/calibrated data type to use internally. Generally this can be determined by examination of the space required to capture the full range of the encoding, but it is not always clear when calibrators are in use. A tolerant implementation will endeavor to always make sufficient size engineering data types to capture the entire range of possible values.
+    /// Optional hint to the implementation about the size of the
+    /// engineering/calibrated data type to use internally. Generally this can
+    /// be determined by examination of the space required to capture the full
+    /// range of the encoding, but it is not always clear when calibrators are
+    /// in use. A tolerant implementation will endeavor to always make
+    /// sufficient size engineering data types to capture the entire range of
+    /// possible values.
     ///
     /// Schema default: `32`.
     pub size_in_bits: Option<i64>,
-    /// Flag indicating if the engineering/calibrated data type used should support signed representation. This should not be confused with the encoding type for the raw value. The default is true.
+    /// Flag indicating if the engineering/calibrated data type used should
+    /// support signed representation. This should not be confused with the
+    /// encoding type for the raw value. The default is true.
     ///
     /// Schema default: `true`.
     pub signed: Option<bool>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// When appropriate, describe the units of measure that are represented by this argument value.
+    /// When appropriate, describe the units of measure that are represented by
+    /// this argument value.
     pub unit_set: Option<UnitSetType>,
-    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`, `StringDataEncoding`.
+    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding`, `StringDataEncoding`.
     pub choice: Option<ArgumentIntegerDataChoice>,
-    /// This element provides the implementation with assistance rendering the value as a string for users.
+    /// This element provides the implementation with assistance rendering the
+    /// value as a string for users.
     pub to_string: Option<ToStringType>,
 }
 
@@ -5423,13 +6089,17 @@ impl XmlElement for ArgumentIntegerDataType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 "sizeInBits" => v.size_in_bits = Some(r.attr_value(tag, raw)?),
                 "signed" => v.signed = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
@@ -5493,7 +6163,9 @@ impl XmlElement for ArgumentIntegerValueType {
 /// Defines a list of Arguments for a command definition.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentListType {
-    /// Defines an Argument for a command definition. Arguments are local to the MetaCommand, BlockMetaCommand, and those that inherit from the definition.
+    /// Defines an Argument for a command definition. Arguments are local to the
+    /// MetaCommand, BlockMetaCommand, and those that inherit from the
+    /// definition.
     pub argument: Vec<ArgumentType>,
 }
 
@@ -5526,7 +6198,8 @@ impl XmlElement for ArgumentListType {
     }
 }
 
-/// Identical to LocationInContainerInBitsType but supports argument instance references.
+/// Identical to LocationInContainerInBitsType but supports argument instance
+/// references.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentLocationInContainerInBitsType {
     /// Attribute `referenceLocation`.
@@ -5553,7 +6226,9 @@ impl XmlElement for ArgumentLocationInContainerInBitsType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "referenceLocation" => v.reference_location = Some(r.attr_value(tag, raw)?),
+                "referenceLocation" => {
+                    v.reference_location = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -5566,7 +6241,8 @@ impl XmlElement for ArgumentLocationInContainerInBitsType {
 /// Identical to MatchCriteriaType but supports argument instance references.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentMatchCriteriaType {
-    /// One of: `Comparison`, `ComparisonList`, `BooleanExpression`, `CustomAlgorithm`.
+    /// One of: `Comparison`, `ComparisonList`, `BooleanExpression`,
+    /// `CustomAlgorithm`.
     pub choice: ArgumentMatchCriteriaChoice,
 }
 
@@ -5590,10 +6266,12 @@ impl XmlElement for ArgumentMatchCriteriaType {
     }
 }
 
-/// Describe a value to set to a destination Parameter after completion of a commanding lifecycle step.
+/// Describe a value to set to a destination Parameter after completion of a
+/// commanding lifecycle step.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentMathOperationType {
-    /// One of: `ValueOperand`, `ThisParameterOperand`, `Operator`, `ParameterInstanceRefOperand`, `ArgumentInstanceRefOperand`.
+    /// One of: `ValueOperand`, `ThisParameterOperand`, `Operator`,
+    /// `ParameterInstanceRefOperand`, `ArgumentInstanceRefOperand`.
     pub items: Vec<ArgumentMathOperationChoice>,
 }
 
@@ -5627,7 +6305,13 @@ impl XmlElement for ArgumentMathOperationType {
         }
         if v.items.len() < 1 {
             let n = v.items.len();
-            return Err(r.too_few("ValueOperand|ThisParameterOperand|Operator|ParameterInstanceRefOperand|ArgumentInstanceRefOperand", 1, n));
+            return Err(r.too_few(
+                "ValueOperand|ThisParameterOperand|\
+                        Operator|ParameterInstanceRefOperand|\
+ArgumentInstanceRefOperand",
+                1,
+                n,
+            ));
         }
         r.close()?;
         Ok(v)
@@ -5678,18 +6362,34 @@ impl XmlElement for ArgumentORedConditionsType {
     }
 }
 
-/// Identical to ParameterRefEntryType but supports argument instance references.
+/// Identical to ParameterRefEntryType but supports argument instance
+/// references.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentParameterRefEntryType {
     /// Optional short description for this entry element.
     pub short_description: Option<String>,
     /// Attribute `parameterRef`.
     pub parameter_ref: String,
-    /// The start bit 0 position for each container is local to the container, but does include space occupied by inherited containers. When a container is "included", as opposed to inherited, then the interpreting implementation takes into account the start bit position of the referring container when finally assembling the start bits for the post-processed entry content. The default start bit for any entry is 0 bits from the previous entry, making the content contiguous when this element is not used.
-    pub location_in_container_in_bits: Option<ArgumentLocationInContainerInBitsType>,
-    /// May be used when this entry repeats itself in the sequence container. When an entry repeats, it effectively specifies that the same entry is reported more than once in the container and has the same physical meaning. This should not be construed to be equivalent to arrays.
+    /// The start bit 0 position for each container is local to the container,
+    /// but does include space occupied by inherited containers. When a
+    /// container is "included", as opposed to inherited, then the interpreting
+    /// implementation takes into account the start bit position of the
+    /// referring container when finally assembling the start bits for the
+    /// post-processed entry content. The default start bit for any entry is 0
+    /// bits from the previous entry, making the content contiguous when this
+    /// element is not used.
+    pub location_in_container_in_bits:
+        Option<ArgumentLocationInContainerInBitsType>,
+    /// May be used when this entry repeats itself in the sequence container.
+    /// When an entry repeats, it effectively specifies that the same entry is
+    /// reported more than once in the container and has the same physical
+    /// meaning. This should not be construed to be equivalent to arrays.
     pub repeat_entry: Option<ArgumentRepeatType>,
-    /// This entry will only be included in the sequence when this condition is true, otherwise it is always included. When the include condition evaluates to false, it is as if the entry does not exist such that any start bit interpretations cannot take into account the space that would have been occupied if this included condition were true.
+    /// This entry will only be included in the sequence when this condition is
+    /// true, otherwise it is always included. When the include condition
+    /// evaluates to false, it is as if the entry does not exist such that any
+    /// start bit interpretations cannot take into account the space that would
+    /// have been occupied if this included condition were true.
     pub include_condition: Option<ArgumentMatchCriteriaType>,
     /// Ancillary data associated with this entry.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
@@ -5724,7 +6424,9 @@ impl XmlElement for ArgumentParameterRefEntryType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "parameterRef" => {
                     v.parameter_ref = r.attr_value(tag, raw)?;
                     seen_parameter_ref = true;
@@ -5752,7 +6454,8 @@ impl XmlElement for ArgumentParameterRefEntryType {
     }
 }
 
-/// Identical to ParameterSegmentRefEntryType but supports argument instance references.
+/// Identical to ParameterSegmentRefEntryType but supports argument instance
+/// references.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentParameterSegmentRefEntryType {
     /// Optional short description for this entry element.
@@ -5763,11 +6466,26 @@ pub struct ArgumentParameterSegmentRefEntryType {
     pub order: Option<i64>,
     /// Attribute `sizeInBits`.
     pub size_in_bits: i64,
-    /// The start bit 0 position for each container is local to the container, but does include space occupied by inherited containers. When a container is "included", as opposed to inherited, then the interpreting implementation takes into account the start bit position of the referring container when finally assembling the start bits for the post-processed entry content. The default start bit for any entry is 0 bits from the previous entry, making the content contiguous when this element is not used.
-    pub location_in_container_in_bits: Option<ArgumentLocationInContainerInBitsType>,
-    /// May be used when this entry repeats itself in the sequence container. When an entry repeats, it effectively specifies that the same entry is reported more than once in the container and has the same physical meaning. This should not be construed to be equivalent to arrays.
+    /// The start bit 0 position for each container is local to the container,
+    /// but does include space occupied by inherited containers. When a
+    /// container is "included", as opposed to inherited, then the interpreting
+    /// implementation takes into account the start bit position of the
+    /// referring container when finally assembling the start bits for the
+    /// post-processed entry content. The default start bit for any entry is 0
+    /// bits from the previous entry, making the content contiguous when this
+    /// element is not used.
+    pub location_in_container_in_bits:
+        Option<ArgumentLocationInContainerInBitsType>,
+    /// May be used when this entry repeats itself in the sequence container.
+    /// When an entry repeats, it effectively specifies that the same entry is
+    /// reported more than once in the container and has the same physical
+    /// meaning. This should not be construed to be equivalent to arrays.
     pub repeat_entry: Option<ArgumentRepeatType>,
-    /// This entry will only be included in the sequence when this condition is true, otherwise it is always included. When the include condition evaluates to false, it is as if the entry does not exist such that any start bit interpretations cannot take into account the space that would have been occupied if this included condition were true.
+    /// This entry will only be included in the sequence when this condition is
+    /// true, otherwise it is always included. When the include condition
+    /// evaluates to false, it is as if the entry does not exist such that any
+    /// start bit interpretations cannot take into account the space that would
+    /// have been occupied if this included condition were true.
     pub include_condition: Option<ArgumentMatchCriteriaType>,
     /// Ancillary data associated with this entry.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
@@ -5807,7 +6525,9 @@ impl XmlElement for ArgumentParameterSegmentRefEntryType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "parameterRef" => {
                     v.parameter_ref = r.attr_value(tag, raw)?;
                     seen_parameter_ref = true;
@@ -5843,10 +6563,20 @@ impl XmlElement for ArgumentParameterSegmentRefEntryType {
     }
 }
 
-/// Used to contain a relative time value. Used to describe a relative time. Normally used for time offsets. A Relative time is expressed as PnYn MnDTnH nMnS, where nY represents the number of years, nM the number of months, nD the number of days, 'T' is the date/time separator, nH the number of hours, nM the number of minutes and nS the number of seconds. The number of seconds can include decimal digits to arbitrary precision. For example, to indicate a duration of 1 year, 2 months, 3 days, 10 hours, and 30 minutes, one would write: P1Y2M3DT10H30M. One could also indicate a duration of minus 120 days as: -P120D. An extension of Schema duration type.
+/// Used to contain a relative time value. Used to describe a relative time.
+/// Normally used for time offsets. A Relative time is expressed as PnYn MnDTnH
+/// nMnS, where nY represents the number of years, nM the number of months, nD
+/// the number of days, 'T' is the date/time separator, nH the number of hours,
+/// nM the number of minutes and nS the number of seconds. The number of seconds
+/// can include decimal digits to arbitrary precision. For example, to indicate
+/// a duration of 1 year, 2 months, 3 days, 10 hours, and 30 minutes, one would
+/// write: P1Y2M3DT10H30M. One could also indicate a duration of minus 120 days
+/// as: -P120D. An extension of Schema duration type.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentRelativeTimeDataType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
@@ -5854,11 +6584,15 @@ pub struct ArgumentRelativeTimeDataType {
     pub base_type: Option<String>,
     /// Attribute `initialValue`.
     pub initial_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// Describes how the raw base counts of the time type are encoded/decoded.
     pub encoding: Option<EncodingType>,
@@ -5904,13 +6638,17 @@ impl XmlElement for ArgumentRelativeTimeDataType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -5940,7 +6678,8 @@ impl XmlElement for ArgumentRelativeTimeDataType {
 /// Identical to RepeatType but supports argument instance references.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentRepeatType {
-    /// Value (either fixed or dynamic) that contains the count of repeated structures.
+    /// Value (either fixed or dynamic) that contains the count of repeated
+    /// structures.
     pub count: ArgumentIntegerValueType,
     /// Element `Offset`.
     pub offset: Option<ArgumentIntegerValueType>,
@@ -5975,7 +6714,8 @@ impl XmlElement for ArgumentRepeatType {
     }
 }
 
-/// Defines a list of argument values that restrict a constraint from being realized in the commanding lifecycle.
+/// Defines a list of argument values that restrict a constraint from being
+/// realized in the commanding lifecycle.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentRestrictionListType {
     /// Specifies an argument value that causes this constraint to be realized.
@@ -6021,11 +6761,26 @@ impl XmlElement for ArgumentRestrictionListType {
 pub struct ArgumentSequenceEntryType {
     /// Optional short description for this entry element.
     pub short_description: Option<String>,
-    /// The start bit 0 position for each container is local to the container, but does include space occupied by inherited containers. When a container is "included", as opposed to inherited, then the interpreting implementation takes into account the start bit position of the referring container when finally assembling the start bits for the post-processed entry content. The default start bit for any entry is 0 bits from the previous entry, making the content contiguous when this element is not used.
-    pub location_in_container_in_bits: Option<ArgumentLocationInContainerInBitsType>,
-    /// May be used when this entry repeats itself in the sequence container. When an entry repeats, it effectively specifies that the same entry is reported more than once in the container and has the same physical meaning. This should not be construed to be equivalent to arrays.
+    /// The start bit 0 position for each container is local to the container,
+    /// but does include space occupied by inherited containers. When a
+    /// container is "included", as opposed to inherited, then the interpreting
+    /// implementation takes into account the start bit position of the
+    /// referring container when finally assembling the start bits for the
+    /// post-processed entry content. The default start bit for any entry is 0
+    /// bits from the previous entry, making the content contiguous when this
+    /// element is not used.
+    pub location_in_container_in_bits:
+        Option<ArgumentLocationInContainerInBitsType>,
+    /// May be used when this entry repeats itself in the sequence container.
+    /// When an entry repeats, it effectively specifies that the same entry is
+    /// reported more than once in the container and has the same physical
+    /// meaning. This should not be construed to be equivalent to arrays.
     pub repeat_entry: Option<ArgumentRepeatType>,
-    /// This entry will only be included in the sequence when this condition is true, otherwise it is always included. When the include condition evaluates to false, it is as if the entry does not exist such that any start bit interpretations cannot take into account the space that would have been occupied if this included condition were true.
+    /// This entry will only be included in the sequence when this condition is
+    /// true, otherwise it is always included. When the include condition
+    /// evaluates to false, it is as if the entry does not exist such that any
+    /// start bit interpretations cannot take into account the space that would
+    /// have been occupied if this included condition were true.
     pub include_condition: Option<ArgumentMatchCriteriaType>,
     /// Ancillary data associated with this entry.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
@@ -6058,7 +6813,9 @@ impl XmlElement for ArgumentSequenceEntryType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -6090,11 +6847,26 @@ pub struct ArgumentStreamSegmentEntryType {
     pub order: Option<i64>,
     /// Attribute `sizeInBits`.
     pub size_in_bits: i64,
-    /// The start bit 0 position for each container is local to the container, but does include space occupied by inherited containers. When a container is "included", as opposed to inherited, then the interpreting implementation takes into account the start bit position of the referring container when finally assembling the start bits for the post-processed entry content. The default start bit for any entry is 0 bits from the previous entry, making the content contiguous when this element is not used.
-    pub location_in_container_in_bits: Option<ArgumentLocationInContainerInBitsType>,
-    /// May be used when this entry repeats itself in the sequence container. When an entry repeats, it effectively specifies that the same entry is reported more than once in the container and has the same physical meaning. This should not be construed to be equivalent to arrays.
+    /// The start bit 0 position for each container is local to the container,
+    /// but does include space occupied by inherited containers. When a
+    /// container is "included", as opposed to inherited, then the interpreting
+    /// implementation takes into account the start bit position of the
+    /// referring container when finally assembling the start bits for the
+    /// post-processed entry content. The default start bit for any entry is 0
+    /// bits from the previous entry, making the content contiguous when this
+    /// element is not used.
+    pub location_in_container_in_bits:
+        Option<ArgumentLocationInContainerInBitsType>,
+    /// May be used when this entry repeats itself in the sequence container.
+    /// When an entry repeats, it effectively specifies that the same entry is
+    /// reported more than once in the container and has the same physical
+    /// meaning. This should not be construed to be equivalent to arrays.
     pub repeat_entry: Option<ArgumentRepeatType>,
-    /// This entry will only be included in the sequence when this condition is true, otherwise it is always included. When the include condition evaluates to false, it is as if the entry does not exist such that any start bit interpretations cannot take into account the space that would have been occupied if this included condition were true.
+    /// This entry will only be included in the sequence when this condition is
+    /// true, otherwise it is always included. When the include condition
+    /// evaluates to false, it is as if the entry does not exist such that any
+    /// start bit interpretations cannot take into account the space that would
+    /// have been occupied if this included condition were true.
     pub include_condition: Option<ArgumentMatchCriteriaType>,
     /// Ancillary data associated with this entry.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
@@ -6134,7 +6906,9 @@ impl XmlElement for ArgumentStreamSegmentEntryType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "streamRef" => {
                     v.stream_ref = r.attr_value(tag, raw)?;
                     seen_stream_ref = true;
@@ -6170,7 +6944,8 @@ impl XmlElement for ArgumentStreamSegmentEntryType {
     }
 }
 
-/// Identical to StringDataEncodingType but supports argument instance references.
+/// Identical to StringDataEncodingType but supports argument instance
+/// references.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentStringDataEncodingType {
     /// Describes the bit ordering of the encoded value.
@@ -6185,7 +6960,8 @@ pub struct ArgumentStringDataEncodingType {
     ///
     /// Schema default: `UTF-8`.
     pub encoding: Option<StringEncodingType>,
-    /// DEPRECATED: Use the ErrorDetectCorrect element in the container elements instead.
+    /// DEPRECATED: Use the ErrorDetectCorrect element in the container elements
+    /// instead.
     pub error_detect_correct: Option<ErrorDetectCorrectType>,
     /// One of: `SizeInBits`, `Variable`.
     pub choice: ArgumentStringDataEncodingChoice,
@@ -6234,27 +7010,44 @@ impl XmlElement for ArgumentStringDataEncodingType {
 /// Identical to StringDataType but supports argument instance references.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentStringDataType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Used to derive one Data Type from another - will inherit all the attributes from the baseType any of which may be redefined in this type definition.
+    /// Used to derive one Data Type from another - will inherit all the
+    /// attributes from the baseType any of which may be redefined in this type
+    /// definition.
     pub base_type: Option<String>,
-    /// Initial values for string types, may include C language style (\n, \t, \", \\, etc.) escape sequences.
+    /// Initial values for string types, may include C language style (\n, \t,
+    /// \", \\, etc.) escape sequences.
     pub initial_value: Option<String>,
     /// restriction pattern is a regular expression
     pub restriction_pattern: Option<String>,
-    /// Optional hint to the implementation about the size of the engineering/calibrated data type to use internally. Generally this can be determined by examination of the encoding information for the string, but it is not always clear, so this attribute allows the extra hint when needed. A tolerant implementation will endeavor to always make sufficient size engineering data types to capture the entire range of possible characters.
+    /// Optional hint to the implementation about the size of the
+    /// engineering/calibrated data type to use internally. Generally this can
+    /// be determined by examination of the encoding information for the string,
+    /// but it is not always clear, so this attribute allows the extra hint when
+    /// needed. A tolerant implementation will endeavor to always make
+    /// sufficient size engineering data types to capture the entire range of
+    /// possible characters.
     pub character_width: Option<CharacterWidthType>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// When appropriate, describe the units of measure that are represented by this argument value.
+    /// When appropriate, describe the units of measure that are represented by
+    /// this argument value.
     pub unit_set: Option<UnitSetType>,
-    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`, `StringDataEncoding`.
+    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding`, `StringDataEncoding`.
     pub choice: Option<ArgumentStringDataChoice>,
     /// Element `SizeRangeInCharacters`.
     pub size_range_in_characters: Option<IntegerRangeType>,
@@ -6307,15 +7100,23 @@ impl XmlElement for ArgumentStringDataType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
-                "restrictionPattern" => v.restriction_pattern = Some(r.attr_value(tag, raw)?),
-                "characterWidth" => v.character_width = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
+                "restrictionPattern" => {
+                    v.restriction_pattern = Some(r.attr_value(tag, raw)?)
+                }
+                "characterWidth" => {
+                    v.character_width = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -6347,22 +7148,44 @@ impl XmlElement for ArgumentStringDataType {
     }
 }
 
-/// An Argument has a name and can take on values with the underlying value type described by the ArgumentTypeRef. Describe the properties of a command argument referring to a data type (argument type). The bulk of properties associated with a command argument are in its argument type. The initial value specified here, overrides the initial value in the argument type. See BaseDataType, BaseTimeDataType and NameReferenceType.
+/// An Argument has a name and can take on values with the underlying value type
+/// described by the ArgumentTypeRef. Describe the properties of a command
+/// argument referring to a data type (argument type). The bulk of properties
+/// associated with a command argument are in its argument type. The initial
+/// value specified here, overrides the initial value in the argument type. See
+/// BaseDataType, BaseTimeDataType and NameReferenceType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Specify the reference to the argument type from the ArgumentTypeSet area using the path reference rules, either local to this SpaceSystem, relative, or absolute.
+    /// Specify the reference to the argument type from the ArgumentTypeSet area
+    /// using the path reference rules, either local to this SpaceSystem,
+    /// relative, or absolute.
     pub argument_type_ref: String,
-    /// Specify as: integer data type using xs:integer, float data type using xs:double, string data type using xs:string, boolean data type using xs:boolean, binary data type using xs:hexBinary, enum data type using label name, relative time data type using xs:duration, absolute time data type using xs:dateTime, arrays using JSON syntax (e.g. '[1, 3, 4]', and aggregates using JSON syntax '{"member1": 1, "member2": "foo"}' ). Values must not exceed the characteristics for the data type or this is a validation error. Takes precedence over an initial value given in the data type. Values are calibrated unless there is an option to override it.
+    /// Specify as: integer data type using xs:integer, float data type using
+    /// xs:double, string data type using xs:string, boolean data type using
+    /// xs:boolean, binary data type using xs:hexBinary, enum data type using
+    /// label name, relative time data type using xs:duration, absolute time
+    /// data type using xs:dateTime, arrays using JSON syntax (e.g. '[1, 3, 4]',
+    /// and aggregates using JSON syntax '{"member1": 1, "member2": "foo"}' ).
+    /// Values must not exceed the characteristics for the data type or this is
+    /// a validation error. Takes precedence over an initial value given in the
+    /// data type. Values are calibrated unless there is an option to override
+    /// it.
     pub initial_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
 }
 
@@ -6397,7 +7220,9 @@ impl XmlElement for ArgumentType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
@@ -6406,7 +7231,9 @@ impl XmlElement for ArgumentType {
                     v.argument_type_ref = r.attr_value(tag, raw)?;
                     seen_argument_type_ref = true;
                 }
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -6430,10 +7257,16 @@ impl XmlElement for ArgumentType {
     }
 }
 
-/// Describe an unordered collection of argument type definitions. These types named for the engineering/calibrated type of the argument. See BaseDataType and BaseTimeDataType.
+/// Describe an unordered collection of argument type definitions. These types
+/// named for the engineering/calibrated type of the argument. See BaseDataType
+/// and BaseTimeDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentTypeSetType {
-    /// One of: `StringArgumentType`, `EnumeratedArgumentType`, `IntegerArgumentType`, `BinaryArgumentType`, `FloatArgumentType`, `BooleanArgumentType`, `RelativeTimeArgumentType`, `AbsoluteTimeArgumentType`, `ArrayArgumentType`, `AggregateArgumentType`.
+    /// One of: `StringArgumentType`, `EnumeratedArgumentType`,
+    /// `IntegerArgumentType`, `BinaryArgumentType`, `FloatArgumentType`,
+    /// `BooleanArgumentType`, `RelativeTimeArgumentType`,
+    /// `AbsoluteTimeArgumentType`, `ArrayArgumentType`,
+    /// `AggregateArgumentType`.
     pub items: Vec<ArgumentTypeSetChoice>,
 }
 
@@ -6464,7 +7297,17 @@ impl XmlElement for ArgumentTypeSetType {
         }
         if v.items.len() < 1 {
             let n = v.items.len();
-            return Err(r.too_few("StringArgumentType|EnumeratedArgumentType|IntegerArgumentType|BinaryArgumentType|FloatArgumentType|BooleanArgumentType|RelativeTimeArgumentType|AbsoluteTimeArgumentType|ArrayArgumentType|AggregateArgumentType", 1, n));
+            return Err(r.too_few(
+                "StringArgumentType|\
+                        EnumeratedArgumentType|\
+IntegerArgumentType|BinaryArgumentType|\
+FloatArgumentType|BooleanArgumentType|\
+RelativeTimeArgumentType|\
+AbsoluteTimeArgumentType|\
+ArrayArgumentType|AggregateArgumentType",
+                1,
+                n,
+            ));
         }
         r.close()?;
         Ok(v)
@@ -6474,7 +7317,9 @@ impl XmlElement for ArgumentTypeSetType {
 /// Identical to VariableStringType but supports argument instance references.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArgumentVariableStringType {
-    /// The upper bound of the size of this string data type so that the implementation can reserve/allocate enough memory to capture all reported instances of the string.
+    /// The upper bound of the size of this string data type so that the
+    /// implementation can reserve/allocate enough memory to capture all
+    /// reported instances of the string.
     pub max_size_in_bits: i64,
     /// One of: `DynamicValue`, `DiscreteLookupList`.
     pub choice1: Option<ArgumentVariableStringChoice1>,
@@ -6521,22 +7366,36 @@ impl XmlElement for ArgumentVariableStringType {
     }
 }
 
-/// Describe an array argument type. The size and number of dimension are described here. See ArrayParameterRefEntryType, NameReferenceType and ArrayDataType.
+/// Describe an array argument type. The size and number of dimension are
+/// described here. See ArrayParameterRefEntryType, NameReferenceType and
+/// ArrayDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArrayArgumentType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Reference to the data type that represents the type of the elements for this array.
+    /// Reference to the data type that represents the type of the elements for
+    /// this array.
     pub array_type_ref: String,
-    /// Initial values for the individual elements of the array may be provided here at the type definition using JSON style array notation (e.g. [1, 2, 3]). It may be multi-dimension, in which case the sequence matches the sequence of the Dimension elements in the DimensionList. When provided here, the initialValue attributes in the type definition specified in attribute arrayTypeRef are ignored.
+    /// Initial values for the individual elements of the array may be provided
+    /// here at the type definition using JSON style array notation (e.g. [1, 2,
+    /// 3]). It may be multi-dimension, in which case the sequence matches the
+    /// sequence of the Dimension elements in the DimensionList. When provided
+    /// here, the initialValue attributes in the type definition specified in
+    /// attribute arrayTypeRef are ignored.
     pub initial_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// Describe the dimensions of this array.
     pub dimension_list: ArgumentDimensionListType,
@@ -6574,7 +7433,9 @@ impl XmlElement for ArrayArgumentType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
@@ -6583,7 +7444,9 @@ impl XmlElement for ArrayArgumentType {
                     v.array_type_ref = r.attr_value(tag, raw)?;
                     seen_array_type_ref = true;
                 }
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -6611,22 +7474,36 @@ impl XmlElement for ArrayArgumentType {
     }
 }
 
-/// A base schema type for describing an array data type. The number of and size of each dimension is defined in its two child types. See NameReferenceType, ArrayArgumentType and ArrayParameterType.
+/// A base schema type for describing an array data type. The number of and size
+/// of each dimension is defined in its two child types. See NameReferenceType,
+/// ArrayArgumentType and ArrayParameterType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArrayDataTypeType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Reference to the data type that represents the type of the elements for this array.
+    /// Reference to the data type that represents the type of the elements for
+    /// this array.
     pub array_type_ref: String,
-    /// Initial values for the individual elements of the array may be provided here at the type definition using JSON style array notation (e.g. [1, 2, 3]). It may be multi-dimension, in which case the sequence matches the sequence of the Dimension elements in the DimensionList. When provided here, the initialValue attributes in the type definition specified in attribute arrayTypeRef are ignored.
+    /// Initial values for the individual elements of the array may be provided
+    /// here at the type definition using JSON style array notation (e.g. [1, 2,
+    /// 3]). It may be multi-dimension, in which case the sequence matches the
+    /// sequence of the Dimension elements in the DimensionList. When provided
+    /// here, the initialValue attributes in the type definition specified in
+    /// attribute arrayTypeRef are ignored.
     pub initial_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
 }
 
@@ -6661,7 +7538,9 @@ impl XmlElement for ArrayDataTypeType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
@@ -6670,7 +7549,9 @@ impl XmlElement for ArrayDataTypeType {
                     v.array_type_ref = r.attr_value(tag, raw)?;
                     seen_array_type_ref = true;
                 }
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -6694,24 +7575,42 @@ impl XmlElement for ArrayDataTypeType {
     }
 }
 
-/// Describe an entry that is an array parameter. Specify the dimension sizes if you subsetting the array (the number of dimensions shall match the number defined in the parameter's type definition), otherwise the ones in the ParameterType are assumed. See SequenceEntryType.
+/// Describe an entry that is an array parameter. Specify the dimension sizes if
+/// you subsetting the array (the number of dimensions shall match the number
+/// defined in the parameter's type definition), otherwise the ones in the
+/// ParameterType are assumed. See SequenceEntryType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArrayParameterRefEntryType {
     /// Optional short description for this entry element.
     pub short_description: Option<String>,
     /// Attribute `parameterRef`.
     pub parameter_ref: String,
-    /// The start bit 0 position for each container is local to the container, but does include space occupied by inherited containers. When a container is "included", as opposed to inherited, then the interpreting implementation takes into account the start bit position of the referring container when finally assembling the start bits for the post-processed entry content. The default start bit for any entry is 0 bits from the previous entry, making the content contiguous when this element is not used.
+    /// The start bit 0 position for each container is local to the container,
+    /// but does include space occupied by inherited containers. When a
+    /// container is "included", as opposed to inherited, then the interpreting
+    /// implementation takes into account the start bit position of the
+    /// referring container when finally assembling the start bits for the
+    /// post-processed entry content. The default start bit for any entry is 0
+    /// bits from the previous entry, making the content contiguous when this
+    /// element is not used.
     pub location_in_container_in_bits: Option<LocationInContainerInBitsType>,
-    /// May be used when this entry repeats itself in the sequence container. When an entry repeats, it effectively specifies that the same entry is reported more than once in the container and has the same physical meaning. This should not be construed to be equivalent to arrays.
+    /// May be used when this entry repeats itself in the sequence container.
+    /// When an entry repeats, it effectively specifies that the same entry is
+    /// reported more than once in the container and has the same physical
+    /// meaning. This should not be construed to be equivalent to arrays.
     pub repeat_entry: Option<RepeatType>,
-    /// This entry will only be included in the sequence when this condition is true, otherwise it is always included. When the include condition evaluates to false, it is as if the entry does not exist such that any start bit interpretations cannot take into account the space that would have been occupied if this included condition were true.
+    /// This entry will only be included in the sequence when this condition is
+    /// true, otherwise it is always included. When the include condition
+    /// evaluates to false, it is as if the entry does not exist such that any
+    /// start bit interpretations cannot take into account the space that would
+    /// have been occupied if this included condition were true.
     pub include_condition: Option<MatchCriteriaType>,
     /// Optional timing information associated with this entry.
     pub time_association: Option<TimeAssociationType>,
     /// Optional ancillary data associated with this element.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// The dimension here if used for subsetting must be less than the ones in the type. It's not a subset if its the same size.
+    /// The dimension here if used for subsetting must be less than the ones in
+    /// the type. It's not a subset if its the same size.
     pub dimension_list: Option<DimensionListType>,
 }
 
@@ -6750,7 +7649,9 @@ impl XmlElement for ArrayParameterRefEntryType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "parameterRef" => {
                     v.parameter_ref = r.attr_value(tag, raw)?;
                     seen_parameter_ref = true;
@@ -6784,22 +7685,36 @@ impl XmlElement for ArrayParameterRefEntryType {
     }
 }
 
-/// Describe an array parameter type. The size and number of dimensions are described here. See ArrayParameterRefEntryType, NameReferenceType and ArrayDataType.
+/// Describe an array parameter type. The size and number of dimensions are
+/// described here. See ArrayParameterRefEntryType, NameReferenceType and
+/// ArrayDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArrayParameterType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Reference to the data type that represents the type of the elements for this array.
+    /// Reference to the data type that represents the type of the elements for
+    /// this array.
     pub array_type_ref: String,
-    /// Initial values for the individual elements of the array may be provided here at the type definition using JSON style array notation (e.g. [1, 2, 3]). It may be multi-dimension, in which case the sequence matches the sequence of the Dimension elements in the DimensionList. When provided here, the initialValue attributes in the type definition specified in attribute arrayTypeRef are ignored.
+    /// Initial values for the individual elements of the array may be provided
+    /// here at the type definition using JSON style array notation (e.g. [1, 2,
+    /// 3]). It may be multi-dimension, in which case the sequence matches the
+    /// sequence of the Dimension elements in the DimensionList. When provided
+    /// here, the initialValue attributes in the type definition specified in
+    /// attribute arrayTypeRef are ignored.
     pub initial_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// Describe the dimensions of this array.
     pub dimension_list: DimensionListType,
@@ -6837,7 +7752,9 @@ impl XmlElement for ArrayParameterType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
@@ -6846,7 +7763,9 @@ impl XmlElement for ArrayParameterType {
                     v.array_type_ref = r.attr_value(tag, raw)?;
                     seen_array_type_ref = true;
                 }
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -6877,7 +7796,8 @@ impl XmlElement for ArrayParameterType {
 /// Describe an unordered collection of authors. See AuthorType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct AuthorSetType {
-    /// Contains information about an author, maintainer, or data source regarding this document.
+    /// Contains information about an author, maintainer, or data source
+    /// regarding this document.
     pub author: Vec<String>,
 }
 
@@ -6905,7 +7825,9 @@ impl XmlElement for AuthorSetType {
     }
 }
 
-/// After searching for the frame sync marker for some number of bits, it may be desirable to invert the incoming data, and then look for frame sync. In some cases this will require an external algorithm
+/// After searching for the frame sync marker for some number of bits, it may be
+/// desirable to invert the incoming data, and then look for frame sync. In some
+/// cases this will require an external algorithm
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct AutoInvertType {
     /// Attribute `badFramesToAutoInvert`.
@@ -6948,7 +7870,10 @@ impl XmlElement for AutoInvertType {
     }
 }
 
-/// Supplies an optional non-reference-able name and short description for alarms. Also includes an optional ancillary data for any special local flags, note that these may not necessarily transfer to another recipient of an instance document.
+/// Supplies an optional non-reference-able name and short description for
+/// alarms. Also includes an optional ancillary data for any special local
+/// flags, note that these may not necessarily transfer to another recipient of
+/// an instance document.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct BaseAlarmType {
     /// The alarm definition may be named.
@@ -6981,7 +7906,9 @@ impl XmlElement for BaseAlarmType {
             let (k, raw) = a?;
             match k {
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -6993,7 +7920,10 @@ impl XmlElement for BaseAlarmType {
     }
 }
 
-/// Supplies an optional non-reference-able name and short description for calibrators. Also includes an optional ancillary data for any special local flags, note that these may not necessarily transfer to another recipient of an instance document.
+/// Supplies an optional non-reference-able name and short description for
+/// calibrators. Also includes an optional ancillary data for any special local
+/// flags, note that these may not necessarily transfer to another recipient of
+/// an instance document.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct BaseCalibratorType {
     /// Optional name for this calibrator/algorithm
@@ -7026,7 +7956,9 @@ impl XmlElement for BaseCalibratorType {
             let (k, raw) = a?;
             match k {
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -7038,7 +7970,8 @@ impl XmlElement for BaseCalibratorType {
     }
 }
 
-/// A base type for comparison related elements that improves the mapping produced by data binding tools.
+/// A base type for comparison related elements that improves the mapping
+/// produced by data binding tools.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct BaseComparisonType {}
 
@@ -7060,7 +7993,8 @@ impl XmlElement for BaseComparisonType {
     }
 }
 
-/// A base type for boolean expression related elements that improves the mapping produced by data binding tools.
+/// A base type for boolean expression related elements that improves the
+/// mapping produced by data binding tools.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct BaseConditionsType {}
 
@@ -7082,12 +8016,18 @@ impl XmlElement for BaseConditionsType {
     }
 }
 
-/// Describe a child/parent container inheritance relationship. Describe constraints with RestrictionCriteria, conditions that must be true for this container to be an extension of the parent container. A constraint can be used to convey the identifying features of the telemetry format such as the CCSDS application id or minor-frame id. See RestrictionCriteriaType and SequenceContainerType.
+/// Describe a child/parent container inheritance relationship. Describe
+/// constraints with RestrictionCriteria, conditions that must be true for this
+/// container to be an extension of the parent container. A constraint can be
+/// used to convey the identifying features of the telemetry format such as the
+/// CCSDS application id or minor-frame id. See RestrictionCriteriaType and
+/// SequenceContainerType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct BaseContainerType {
     /// Reference to the container that this container extends.
     pub container_ref: String,
-    /// Contains the conditions that must evaluate to true in order for this container to be an extension of the parent container.
+    /// Contains the conditions that must evaluate to true in order for this
+    /// container to be an extension of the parent container.
     pub restriction_criteria: Option<RestrictionCriteriaType>,
 }
 
@@ -7126,24 +8066,40 @@ impl XmlElement for BaseContainerType {
     }
 }
 
-/// An abstract schema type used by within the schema to derive the other simple/primitive engineering form data types: BooleanDataType, BinaryDataType, StringDataType, EnumeratedDataType, FloatDataType and IntegerDataType. The encoding elements are optional because they describe the raw wire encoded form of the data type. Encoding is only necessary when the type is telemetered in some form. Local variables and derived typically do not require encoding.
+/// An abstract schema type used by within the schema to derive the other
+/// simple/primitive engineering form data types: BooleanDataType,
+/// BinaryDataType, StringDataType, EnumeratedDataType, FloatDataType and
+/// IntegerDataType. The encoding elements are optional because they describe
+/// the raw wire encoded form of the data type. Encoding is only necessary when
+/// the type is telemetered in some form. Local variables and derived typically
+/// do not require encoding.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct BaseDataType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Used to derive one Data Type from another - will inherit all the attributes from the baseType any of which may be redefined in this type definition.
+    /// Used to derive one Data Type from another - will inherit all the
+    /// attributes from the baseType any of which may be redefined in this type
+    /// definition.
     pub base_type: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// When appropriate, describe the units of measure that are represented by this parameter value.
+    /// When appropriate, describe the units of measure that are represented by
+    /// this parameter value.
     pub unit_set: Option<UnitSetType>,
-    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`, `StringDataEncoding`.
+    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding`, `StringDataEncoding`.
     pub choice: Option<BaseDataChoice>,
 }
 
@@ -7182,7 +8138,9 @@ impl XmlElement for BaseDataType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
@@ -7214,12 +8172,18 @@ impl XmlElement for BaseDataType {
     }
 }
 
-/// When specified, a BaseMetaCommand element identifies that this MetaCommand inherits (extends) another MetaCommand. It's required ArgumentAssignmentList narrows or this command from the parent. This is typically used when specializing a generic MetaCommand to a specific MetaCommand. See MetaCommandType.
+/// When specified, a BaseMetaCommand element identifies that this MetaCommand
+/// inherits (extends) another MetaCommand. It's required ArgumentAssignmentList
+/// narrows or this command from the parent. This is typically used when
+/// specializing a generic MetaCommand to a specific MetaCommand. See
+/// MetaCommandType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct BaseMetaCommandType {
     /// Reference to the MetaCommand definition that this MetaCommand extends.
     pub meta_command_ref: String,
-    /// Argument Assignments specialize a MetaCommand or BlockMetaCommand when inheriting from another MetaCommand. General argument values can be restricted to specific values to further specialize the MetaCommand.
+    /// Argument Assignments specialize a MetaCommand or BlockMetaCommand when
+    /// inheriting from another MetaCommand. General argument values can be
+    /// restricted to specific values to further specialize the MetaCommand.
     pub argument_assignment_list: Option<ArgumentAssignmentListType>,
 }
 
@@ -7258,20 +8222,32 @@ impl XmlElement for BaseMetaCommandType {
     }
 }
 
-/// An abstract schema type used within the schema to derive other time based data types: RelativeTimeDataType and AbsoluteTimeDataType. An absolute time data type is a telemetered source/destination data type. A data encoding must be set. An optional epoch may be set. Time types are an exception to other primitives because, if the time data type is not telemetered, it still must have a data encoding set. See DataEncodingType, AbsoluteTimeDataType and RelativeTimeDataType.
+/// An abstract schema type used within the schema to derive other time based
+/// data types: RelativeTimeDataType and AbsoluteTimeDataType. An absolute time
+/// data type is a telemetered source/destination data type. A data encoding
+/// must be set. An optional epoch may be set. Time types are an exception to
+/// other primitives because, if the time data type is not telemetered, it still
+/// must have a data encoding set. See DataEncodingType, AbsoluteTimeDataType
+/// and RelativeTimeDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct BaseTimeDataType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
     /// Extend another absolute or relative time type.
     pub base_type: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// Describes how the raw base counts of the time type are encoded/decoded.
     pub encoding: Option<EncodingType>,
@@ -7314,7 +8290,9 @@ impl XmlElement for BaseTimeDataType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
@@ -7346,7 +8324,8 @@ impl XmlElement for BaseTimeDataType {
     }
 }
 
-/// A base type for the various triggers, purely to improve the mappings created by data binding compilers.
+/// A base type for the various triggers, purely to improve the mappings created
+/// by data binding compilers.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct BaseTriggerType {}
 
@@ -7368,22 +8347,29 @@ impl XmlElement for BaseTriggerType {
     }
 }
 
-/// Describe alarm conditions specific to the binary data type, extends the basic AlarmType.
+/// Describe alarm conditions specific to the binary data type, extends the
+/// basic AlarmType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct BinaryAlarmType {
     /// The alarm definition may be named.
     pub name: Option<String>,
     /// An optional brief description of this alarm definition.
     pub short_description: Option<String>,
-    /// The number of successive instances that meet the alarm conditions for the alarm to trigger. The default is 1.
+    /// The number of successive instances that meet the alarm conditions for
+    /// the alarm to trigger. The default is 1.
     ///
     /// Schema default: `1`.
     pub min_violations: Option<i64>,
-    /// Optionally specify the number of successive instances that do not meet the alarm conditions to leave the alarm state. If this attribute is not specified, it is treated as being equal to minViolations (symmetric).
+    /// Optionally specify the number of successive instances that do not meet
+    /// the alarm conditions to leave the alarm state. If this attribute is not
+    /// specified, it is treated as being equal to minViolations (symmetric).
     ///
     /// Schema default: `1`.
     pub min_conformance: Option<i64>,
-    /// The initial state of this alarm definition as delivered. When true, this leaves the alarm definition empty for the parameter and also short circuits the remaining context matches and the default so no alarm is active on the parameter.
+    /// The initial state of this alarm definition as delivered. When true, this
+    /// leaves the alarm definition empty for the parameter and also short
+    /// circuits the remaining context matches and the default so no alarm is
+    /// active on the parameter.
     ///
     /// Schema default: `false`.
     pub disabled: Option<bool>,
@@ -7427,9 +8413,15 @@ impl XmlElement for BinaryAlarmType {
             let (k, raw) = a?;
             match k {
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
-                "minViolations" => v.min_violations = Some(r.attr_value(tag, raw)?),
-                "minConformance" => v.min_conformance = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
+                "minViolations" => {
+                    v.min_violations = Some(r.attr_value(tag, raw)?)
+                }
+                "minConformance" => {
+                    v.min_conformance = Some(r.attr_value(tag, raw)?)
+                }
                 "disabled" => v.disabled = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -7445,26 +8437,41 @@ impl XmlElement for BinaryAlarmType {
     }
 }
 
-/// Defines a binary engineering/calibrated argument type (often called "blob type"). The binary data may be of fixed or variable length, and has an optional encoding and decoding algorithm that may be defined to transform the data between space and ground. See BinaryDataEncodingType, IntegerValueType, InputAlgorithmType, and BinaryDataType.
+/// Defines a binary engineering/calibrated argument type (often called "blob
+/// type"). The binary data may be of fixed or variable length, and has an
+/// optional encoding and decoding algorithm that may be defined to transform
+/// the data between space and ground. See BinaryDataEncodingType,
+/// IntegerValueType, InputAlgorithmType, and BinaryDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct BinaryArgumentType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Used to derive one Data Type from another - will inherit all the attributes from the baseType any of which may be redefined in this type definition.
+    /// Used to derive one Data Type from another - will inherit all the
+    /// attributes from the baseType any of which may be redefined in this type
+    /// definition.
     pub base_type: Option<String>,
-    /// Default/Initial value is always given in calibrated form. Extra bits are truncated from the MSB (leftmost).
+    /// Default/Initial value is always given in calibrated form. Extra bits are
+    /// truncated from the MSB (leftmost).
     pub initial_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// When appropriate, describe the units of measure that are represented by this argument value.
+    /// When appropriate, describe the units of measure that are represented by
+    /// this argument value.
     pub unit_set: Option<UnitSetType>,
-    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`, `StringDataEncoding`.
+    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding`, `StringDataEncoding`.
     pub choice: Option<BinaryArgumentChoice>,
 }
 
@@ -7506,13 +8513,17 @@ impl XmlElement for BinaryArgumentType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -7539,10 +8550,15 @@ impl XmlElement for BinaryArgumentType {
     }
 }
 
-/// Describe an ordered collection of context binary alarms, duplicates are valid. Process the contexts in list order. See BinaryContextAlarmType.
+/// Describe an ordered collection of context binary alarms, duplicates are
+/// valid. Process the contexts in list order. See BinaryContextAlarmType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct BinaryContextAlarmListType {
-    /// A Context contains a new alarm definition and a context match. The match takes precedence over any default alarm when the first in the overall list evaluates to true. It is also possible the alarm definition is empty, in which case the context means no alarm defined when the match is true.
+    /// A Context contains a new alarm definition and a context match. The match
+    /// takes precedence over any default alarm when the first in the overall
+    /// list evaluates to true. It is also possible the alarm definition is
+    /// empty, in which case the context means no alarm defined when the match
+    /// is true.
     pub context_alarm: Vec<BinaryContextAlarmType>,
 }
 
@@ -7586,15 +8602,21 @@ pub struct BinaryContextAlarmType {
     pub name: Option<String>,
     /// An optional brief description of this alarm definition.
     pub short_description: Option<String>,
-    /// The number of successive instances that meet the alarm conditions for the alarm to trigger. The default is 1.
+    /// The number of successive instances that meet the alarm conditions for
+    /// the alarm to trigger. The default is 1.
     ///
     /// Schema default: `1`.
     pub min_violations: Option<i64>,
-    /// Optionally specify the number of successive instances that do not meet the alarm conditions to leave the alarm state. If this attribute is not specified, it is treated as being equal to minViolations (symmetric).
+    /// Optionally specify the number of successive instances that do not meet
+    /// the alarm conditions to leave the alarm state. If this attribute is not
+    /// specified, it is treated as being equal to minViolations (symmetric).
     ///
     /// Schema default: `1`.
     pub min_conformance: Option<i64>,
-    /// The initial state of this alarm definition as delivered. When true, this leaves the alarm definition empty for the parameter and also short circuits the remaining context matches and the default so no alarm is active on the parameter.
+    /// The initial state of this alarm definition as delivered. When true, this
+    /// leaves the alarm definition empty for the parameter and also short
+    /// circuits the remaining context matches and the default so no alarm is
+    /// active on the parameter.
     ///
     /// Schema default: `false`.
     pub disabled: Option<bool>,
@@ -7641,9 +8663,15 @@ impl XmlElement for BinaryContextAlarmType {
             let (k, raw) = a?;
             match k {
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
-                "minViolations" => v.min_violations = Some(r.attr_value(tag, raw)?),
-                "minConformance" => v.min_conformance = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
+                "minViolations" => {
+                    v.min_violations = Some(r.attr_value(tag, raw)?)
+                }
+                "minConformance" => {
+                    v.min_conformance = Some(r.attr_value(tag, raw)?)
+                }
                 "disabled" => v.disabled = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -7665,7 +8693,11 @@ impl XmlElement for BinaryContextAlarmType {
     }
 }
 
-/// Describe binary data that is unmolested in the decoding/encoding or cannot be represented in any of the other data encoding formats. Optionally use the FromBinaryTransformAlgorithm and ToBinaryTransformAlgorithm element to describe the transformation process. See InputAlgorithmType for the transformation structure.
+/// Describe binary data that is unmolested in the decoding/encoding or cannot
+/// be represented in any of the other data encoding formats. Optionally use the
+/// FromBinaryTransformAlgorithm and ToBinaryTransformAlgorithm element to
+/// describe the transformation process. See InputAlgorithmType for the
+/// transformation structure.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct BinaryDataEncodingType {
     /// Describes the bit ordering of the encoded value.
@@ -7676,7 +8708,8 @@ pub struct BinaryDataEncodingType {
     ///
     /// Schema default: `mostSignificantByteFirst`.
     pub byte_order: Option<String>,
-    /// DEPRECATED: Use the ErrorDetectCorrect element in the container elements instead.
+    /// DEPRECATED: Use the ErrorDetectCorrect element in the container elements
+    /// instead.
     pub error_detect_correct: Option<ErrorDetectCorrectType>,
     /// Number of bits this value occupies on the stream being encoded/decoded.
     pub size_in_bits: IntegerValueType,
@@ -7737,26 +8770,41 @@ impl XmlElement for BinaryDataEncodingType {
     }
 }
 
-/// A base schema type for describing a binary data engineering/calibrated type (often called "blob type"). The binary data may be of fixed or variable length, and has an optional encoding and decoding algorithm that may be defined to transform the data between space and ground. See BaseDataType, BinaryParameterType and BinaryArgumentType.
+/// A base schema type for describing a binary data engineering/calibrated type
+/// (often called "blob type"). The binary data may be of fixed or variable
+/// length, and has an optional encoding and decoding algorithm that may be
+/// defined to transform the data between space and ground. See BaseDataType,
+/// BinaryParameterType and BinaryArgumentType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct BinaryDataType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Used to derive one Data Type from another - will inherit all the attributes from the baseType any of which may be redefined in this type definition.
+    /// Used to derive one Data Type from another - will inherit all the
+    /// attributes from the baseType any of which may be redefined in this type
+    /// definition.
     pub base_type: Option<String>,
-    /// Default/Initial value is always given in calibrated form. Extra bits are truncated from the MSB (leftmost).
+    /// Default/Initial value is always given in calibrated form. Extra bits are
+    /// truncated from the MSB (leftmost).
     pub initial_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// When appropriate, describe the units of measure that are represented by this parameter value.
+    /// When appropriate, describe the units of measure that are represented by
+    /// this parameter value.
     pub unit_set: Option<UnitSetType>,
-    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`, `StringDataEncoding`.
+    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding`, `StringDataEncoding`.
     pub choice: Option<BinaryDataChoice>,
 }
 
@@ -7798,13 +8846,17 @@ impl XmlElement for BinaryDataType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -7831,30 +8883,48 @@ impl XmlElement for BinaryDataType {
     }
 }
 
-/// Describe a binary engineering/calibrated parameter type (sometimes called a "blob type"). It may be of fixed or variable length, and has an optional encoding and decoding algorithm that may be defined to transform the data between space and ground. See BinaryDataEncodingType, IntegerValueType, InputAlgorithmType and BinaryDataType.
+/// Describe a binary engineering/calibrated parameter type (sometimes called a
+/// "blob type"). It may be of fixed or variable length, and has an optional
+/// encoding and decoding algorithm that may be defined to transform the data
+/// between space and ground. See BinaryDataEncodingType, IntegerValueType,
+/// InputAlgorithmType and BinaryDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct BinaryParameterType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Used to derive one Data Type from another - will inherit all the attributes from the baseType any of which may be redefined in this type definition.
+    /// Used to derive one Data Type from another - will inherit all the
+    /// attributes from the baseType any of which may be redefined in this type
+    /// definition.
     pub base_type: Option<String>,
-    /// Default/Initial value is always given in calibrated form. Extra bits are truncated from the MSB (leftmost).
+    /// Default/Initial value is always given in calibrated form. Extra bits are
+    /// truncated from the MSB (leftmost).
     pub initial_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// When appropriate, describe the units of measure that are represented by this parameter value.
+    /// When appropriate, describe the units of measure that are represented by
+    /// this parameter value.
     pub unit_set: Option<UnitSetType>,
-    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`, `StringDataEncoding`.
+    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding`, `StringDataEncoding`.
     pub choice: Option<BinaryParameterChoice>,
-    /// Optionally describe an alarm monitoring specification that is effective whenever a contextual alarm definition does not take precedence.
+    /// Optionally describe an alarm monitoring specification that is effective
+    /// whenever a contextual alarm definition does not take precedence.
     pub default_alarm: Option<BinaryAlarmType>,
-    /// Optionally describe one or more alarm monitoring specifications that are effective whenever a contextual match definition evaluates to true. The first match that evaluates to true takes precedence.
+    /// Optionally describe one or more alarm monitoring specifications that are
+    /// effective whenever a contextual match definition evaluates to true. The
+    /// first match that evaluates to true takes precedence.
     pub context_alarm_list: Option<BinaryContextAlarmListType>,
 }
 
@@ -7902,13 +8972,17 @@ impl XmlElement for BinaryParameterType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -7941,18 +9015,26 @@ impl XmlElement for BinaryParameterType {
     }
 }
 
-/// Describe an ordered grouping of MetaCommands into a list, duplicates are valid. The block contains argument values fully specified. See MetaCommandStepListType.
+/// Describe an ordered grouping of MetaCommands into a list, duplicates are
+/// valid. The block contains argument values fully specified. See
+/// MetaCommandStepListType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct BlockMetaCommandType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// List of the MetaCommands to include in this BlockMetaCommand.
     pub meta_command_step_list: MetaCommandStepListType,
@@ -7986,7 +9068,9 @@ impl XmlElement for BlockMetaCommandType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
@@ -8022,15 +9106,21 @@ pub struct BooleanAlarmType {
     pub name: Option<String>,
     /// An optional brief description of this alarm definition.
     pub short_description: Option<String>,
-    /// The number of successive instances that meet the alarm conditions for the alarm to trigger. The default is 1.
+    /// The number of successive instances that meet the alarm conditions for
+    /// the alarm to trigger. The default is 1.
     ///
     /// Schema default: `1`.
     pub min_violations: Option<i64>,
-    /// Optionally specify the number of successive instances that do not meet the alarm conditions to leave the alarm state. If this attribute is not specified, it is treated as being equal to minViolations (symmetric).
+    /// Optionally specify the number of successive instances that do not meet
+    /// the alarm conditions to leave the alarm state. If this attribute is not
+    /// specified, it is treated as being equal to minViolations (symmetric).
     ///
     /// Schema default: `1`.
     pub min_conformance: Option<i64>,
-    /// The initial state of this alarm definition as delivered. When true, this leaves the alarm definition empty for the parameter and also short circuits the remaining context matches and the default so no alarm is active on the parameter.
+    /// The initial state of this alarm definition as delivered. When true, this
+    /// leaves the alarm definition empty for the parameter and also short
+    /// circuits the remaining context matches and the default so no alarm is
+    /// active on the parameter.
     ///
     /// Schema default: `false`.
     pub disabled: Option<bool>,
@@ -8074,9 +9164,15 @@ impl XmlElement for BooleanAlarmType {
             let (k, raw) = a?;
             match k {
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
-                "minViolations" => v.min_violations = Some(r.attr_value(tag, raw)?),
-                "minConformance" => v.min_conformance = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
+                "minViolations" => {
+                    v.min_violations = Some(r.attr_value(tag, raw)?)
+                }
+                "minConformance" => {
+                    v.min_conformance = Some(r.attr_value(tag, raw)?)
+                }
                 "disabled" => v.disabled = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -8092,34 +9188,50 @@ impl XmlElement for BooleanAlarmType {
     }
 }
 
-/// Defines a boolean argument type which has two values only: "True" (1) or "False" (0). The values one and zero may be mapped to a specific string using the attributes oneStringValue and zeroStringValue. This type is a simplified form of the EnumeratedDataType. See IntegerDataEncoding and BooleanDataType.
+/// Defines a boolean argument type which has two values only: "True" (1) or
+/// "False" (0). The values one and zero may be mapped to a specific string
+/// using the attributes oneStringValue and zeroStringValue. This type is a
+/// simplified form of the EnumeratedDataType. See IntegerDataEncoding and
+/// BooleanDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct BooleanArgumentType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Used to derive one Data Type from another - will inherit all the attributes from the baseType any of which may be redefined in this type definition.
+    /// Used to derive one Data Type from another - will inherit all the
+    /// attributes from the baseType any of which may be redefined in this type
+    /// definition.
     pub base_type: Option<String>,
     /// Default/Initial value is always given in calibrated form.
     pub initial_value: Option<String>,
-    /// Enumeration string representing the 1 value, with the default being 'True'.
+    /// Enumeration string representing the 1 value, with the default being
+    /// 'True'.
     ///
     /// Schema default: `True`.
     pub one_string_value: Option<String>,
-    /// Enumeration string representing the 0 value, with the default being 'False'.
+    /// Enumeration string representing the 0 value, with the default being
+    /// 'False'.
     ///
     /// Schema default: `False`.
     pub zero_string_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// When appropriate, describe the units of measure that are represented by this argument value.
+    /// When appropriate, describe the units of measure that are represented by
+    /// this argument value.
     pub unit_set: Option<UnitSetType>,
-    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`, `StringDataEncoding`.
+    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding`, `StringDataEncoding`.
     pub choice: Option<BooleanArgumentChoice>,
 }
 
@@ -8167,15 +9279,23 @@ impl XmlElement for BooleanArgumentType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
-                "oneStringValue" => v.one_string_value = Some(r.attr_value(tag, raw)?),
-                "zeroStringValue" => v.zero_string_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
+                "oneStringValue" => {
+                    v.one_string_value = Some(r.attr_value(tag, raw)?)
+                }
+                "zeroStringValue" => {
+                    v.zero_string_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -8202,10 +9322,15 @@ impl XmlElement for BooleanArgumentType {
     }
 }
 
-/// Describe an ordered collection of context boolean alarms, duplicates are valid. Process the contexts in list order. See BooleanContextAlarmType.
+/// Describe an ordered collection of context boolean alarms, duplicates are
+/// valid. Process the contexts in list order. See BooleanContextAlarmType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct BooleanContextAlarmListType {
-    /// A Context contains a new alarm definition and a context match. The match takes precedence over any default alarm when the first in the overall list evaluates to true. It is also possible the alarm definition is empty, in which case the context means no alarm defined when the match is true.
+    /// A Context contains a new alarm definition and a context match. The match
+    /// takes precedence over any default alarm when the first in the overall
+    /// list evaluates to true. It is also possible the alarm definition is
+    /// empty, in which case the context means no alarm defined when the match
+    /// is true.
     pub context_alarm: Vec<BooleanContextAlarmType>,
 }
 
@@ -8249,15 +9374,21 @@ pub struct BooleanContextAlarmType {
     pub name: Option<String>,
     /// An optional brief description of this alarm definition.
     pub short_description: Option<String>,
-    /// The number of successive instances that meet the alarm conditions for the alarm to trigger. The default is 1.
+    /// The number of successive instances that meet the alarm conditions for
+    /// the alarm to trigger. The default is 1.
     ///
     /// Schema default: `1`.
     pub min_violations: Option<i64>,
-    /// Optionally specify the number of successive instances that do not meet the alarm conditions to leave the alarm state. If this attribute is not specified, it is treated as being equal to minViolations (symmetric).
+    /// Optionally specify the number of successive instances that do not meet
+    /// the alarm conditions to leave the alarm state. If this attribute is not
+    /// specified, it is treated as being equal to minViolations (symmetric).
     ///
     /// Schema default: `1`.
     pub min_conformance: Option<i64>,
-    /// The initial state of this alarm definition as delivered. When true, this leaves the alarm definition empty for the parameter and also short circuits the remaining context matches and the default so no alarm is active on the parameter.
+    /// The initial state of this alarm definition as delivered. When true, this
+    /// leaves the alarm definition empty for the parameter and also short
+    /// circuits the remaining context matches and the default so no alarm is
+    /// active on the parameter.
     ///
     /// Schema default: `false`.
     pub disabled: Option<bool>,
@@ -8304,9 +9435,15 @@ impl XmlElement for BooleanContextAlarmType {
             let (k, raw) = a?;
             match k {
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
-                "minViolations" => v.min_violations = Some(r.attr_value(tag, raw)?),
-                "minConformance" => v.min_conformance = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
+                "minViolations" => {
+                    v.min_violations = Some(r.attr_value(tag, raw)?)
+                }
+                "minConformance" => {
+                    v.min_conformance = Some(r.attr_value(tag, raw)?)
+                }
                 "disabled" => v.disabled = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -8328,34 +9465,50 @@ impl XmlElement for BooleanContextAlarmType {
     }
 }
 
-/// A base schema type for describing a boolean data type which has two values only: "True" (1) or "False" (0). The values one and zero may be mapped to a specific string using the attributes oneStringValue and zeroStringValue. This type is a simplified form of the EnumeratedDataType. See BaseDataType, BooleanParameterType and BooleanArgumentType.
+/// A base schema type for describing a boolean data type which has two values
+/// only: "True" (1) or "False" (0). The values one and zero may be mapped to a
+/// specific string using the attributes oneStringValue and zeroStringValue.
+/// This type is a simplified form of the EnumeratedDataType. See BaseDataType,
+/// BooleanParameterType and BooleanArgumentType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct BooleanDataType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Used to derive one Data Type from another - will inherit all the attributes from the baseType any of which may be redefined in this type definition.
+    /// Used to derive one Data Type from another - will inherit all the
+    /// attributes from the baseType any of which may be redefined in this type
+    /// definition.
     pub base_type: Option<String>,
     /// Default/Initial value is always given in calibrated form.
     pub initial_value: Option<String>,
-    /// Enumeration string representing the 1 value, with the default being 'True'.
+    /// Enumeration string representing the 1 value, with the default being
+    /// 'True'.
     ///
     /// Schema default: `True`.
     pub one_string_value: Option<String>,
-    /// Enumeration string representing the 0 value, with the default being 'False'.
+    /// Enumeration string representing the 0 value, with the default being
+    /// 'False'.
     ///
     /// Schema default: `False`.
     pub zero_string_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// When appropriate, describe the units of measure that are represented by this parameter value.
+    /// When appropriate, describe the units of measure that are represented by
+    /// this parameter value.
     pub unit_set: Option<UnitSetType>,
-    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`, `StringDataEncoding`.
+    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding`, `StringDataEncoding`.
     pub choice: Option<BooleanDataChoice>,
 }
 
@@ -8403,15 +9556,23 @@ impl XmlElement for BooleanDataType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
-                "oneStringValue" => v.one_string_value = Some(r.attr_value(tag, raw)?),
-                "zeroStringValue" => v.zero_string_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
+                "oneStringValue" => {
+                    v.one_string_value = Some(r.attr_value(tag, raw)?)
+                }
+                "zeroStringValue" => {
+                    v.zero_string_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -8465,38 +9626,57 @@ impl XmlElement for BooleanExpressionType {
     }
 }
 
-/// Describe a boolean parameter type which has two values only: "True" (1) or "False" (0). The values one and zero may be mapped to a specific string using the attributes oneStringValue and zeroStringValue. This type is a simplified form of the EnumeratedDataType. See IntegerDataEncoding and BooleanDataType.
+/// Describe a boolean parameter type which has two values only: "True" (1) or
+/// "False" (0). The values one and zero may be mapped to a specific string
+/// using the attributes oneStringValue and zeroStringValue. This type is a
+/// simplified form of the EnumeratedDataType. See IntegerDataEncoding and
+/// BooleanDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct BooleanParameterType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Used to derive one Data Type from another - will inherit all the attributes from the baseType any of which may be redefined in this type definition.
+    /// Used to derive one Data Type from another - will inherit all the
+    /// attributes from the baseType any of which may be redefined in this type
+    /// definition.
     pub base_type: Option<String>,
     /// Default/Initial value is always given in calibrated form.
     pub initial_value: Option<String>,
-    /// Enumeration string representing the 1 value, with the default being 'True'.
+    /// Enumeration string representing the 1 value, with the default being
+    /// 'True'.
     ///
     /// Schema default: `True`.
     pub one_string_value: Option<String>,
-    /// Enumeration string representing the 0 value, with the default being 'False'.
+    /// Enumeration string representing the 0 value, with the default being
+    /// 'False'.
     ///
     /// Schema default: `False`.
     pub zero_string_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// When appropriate, describe the units of measure that are represented by this parameter value.
+    /// When appropriate, describe the units of measure that are represented by
+    /// this parameter value.
     pub unit_set: Option<UnitSetType>,
-    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`, `StringDataEncoding`.
+    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding`, `StringDataEncoding`.
     pub choice: Option<BooleanParameterChoice>,
-    /// Optionally describe an alarm monitoring specification that is effective whenever a contextual alarm definition does not take precedence.
+    /// Optionally describe an alarm monitoring specification that is effective
+    /// whenever a contextual alarm definition does not take precedence.
     pub default_alarm: Option<BooleanAlarmType>,
-    /// Optionally describe one or more alarm monitoring specifications that are effective whenever a contextual match definition evaluates to true. The first match that evaluates to true takes precedence.
+    /// Optionally describe one or more alarm monitoring specifications that are
+    /// effective whenever a contextual match definition evaluates to true. The
+    /// first match that evaluates to true takes precedence.
     pub context_alarm_list: Option<BooleanContextAlarmListType>,
 }
 
@@ -8550,15 +9730,23 @@ impl XmlElement for BooleanParameterType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
-                "oneStringValue" => v.one_string_value = Some(r.attr_value(tag, raw)?),
-                "zeroStringValue" => v.zero_string_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
+                "oneStringValue" => {
+                    v.one_string_value = Some(r.attr_value(tag, raw)?)
+                }
+                "zeroStringValue" => {
+                    v.zero_string_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -8626,10 +9814,20 @@ impl XmlElement for ByteType {
     }
 }
 
-/// Cyclic Redundancy Check (CRC) definition. The polynomial coefficients for the CRC are defined as a truncated hex value. The coefficient for the nth bit of an n-bit CRC will always be 1 and is not represented in the truncated hex value. For example, the truncated hex value of CRC-32 (width=32 bits) used in the Ethernet specification is 0x04C11DB7, where each non-zero bit of the truncated hex represents a coefficient of 1 in the polynomial and the bit position represents the exponent. There may also be an initial remainder "InitRemainder" and a final XOR "FinalXOR" to fully specify the CRC. reflectData and reflectRemainder may also be specified to reverse the bit order in the incoming data and/or the result.
+/// Cyclic Redundancy Check (CRC) definition. The polynomial coefficients for
+/// the CRC are defined as a truncated hex value. The coefficient for the nth
+/// bit of an n-bit CRC will always be 1 and is not represented in the truncated
+/// hex value. For example, the truncated hex value of CRC-32 (width=32 bits)
+/// used in the Ethernet specification is 0x04C11DB7, where each non-zero bit of
+/// the truncated hex represents a coefficient of 1 in the polynomial and the
+/// bit position represents the exponent. There may also be an initial remainder
+/// "InitRemainder" and a final XOR "FinalXOR" to fully specify the CRC.
+/// reflectData and reflectRemainder may also be specified to reverse the bit
+/// order in the incoming data and/or the result.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct CRCType {
-    /// The width is the number of bits in the shift register, which is not necessarily the number of bits of the parameter holding the value.
+    /// The width is the number of bits in the shift register, which is not
+    /// necessarily the number of bits of the parameter holding the value.
     pub width: i64,
     /// Endianness of the input data, true=little, false=big.
     ///
@@ -8643,21 +9841,29 @@ pub struct CRCType {
     ///
     /// Schema default: `mostSignificantBitFirst`.
     pub direction: Option<BitOrderType>,
-    /// An offset of non-zero may be specified to skip some bits against the reference position in the reference attribute.
+    /// An offset of non-zero may be specified to skip some bits against the
+    /// reference position in the reference attribute.
     ///
     /// Schema default: `0`.
     pub bits_from_reference: Option<i64>,
-    /// The bits involved in the calculation may start at the beginning or the end of the container.
+    /// The bits involved in the calculation may start at the beginning or the
+    /// end of the container.
     ///
     /// Schema default: `start`.
     pub reference: Option<ReferencePointType>,
-    /// Reference to the parameter that contains the value of the CRC based on this container. This attribute is optional because not all implementations verify (telemetry) or create (telecommand) error control fields using the XTCE definition.
+    /// Reference to the parameter that contains the value of the CRC based on
+    /// this container. This attribute is optional because not all
+    /// implementations verify (telemetry) or create (telecommand) error control
+    /// fields using the XTCE definition.
     pub parameter_ref: Option<String>,
-    /// The polynomial that represents the calculation in hexadecimal form (described at CRCType annotation).
+    /// The polynomial that represents the calculation in hexadecimal form
+    /// (described at CRCType annotation).
     pub polynomial: String,
-    /// A hexadecimal digit string specifying the initial value to set in the shift register before computing the CRC.
+    /// A hexadecimal digit string specifying the initial value to set in the
+    /// shift register before computing the CRC.
     pub init_remainder: Option<String>,
-    /// A hexadecimal digit string specifying the value to be added to the final shift register value before output.
+    /// A hexadecimal digit string specifying the value to be added to the final
+    /// shift register value before output.
     pub final_xor: Option<String>,
 }
 
@@ -8705,11 +9911,17 @@ impl XmlElement for CRCType {
                     seen_width = true;
                 }
                 "reflectData" => v.reflect_data = Some(r.attr_value(tag, raw)?),
-                "reflectRemainder" => v.reflect_remainder = Some(r.attr_value(tag, raw)?),
+                "reflectRemainder" => {
+                    v.reflect_remainder = Some(r.attr_value(tag, raw)?)
+                }
                 "direction" => v.direction = Some(r.attr_value(tag, raw)?),
-                "bitsFromReference" => v.bits_from_reference = Some(r.attr_value(tag, raw)?),
+                "bitsFromReference" => {
+                    v.bits_from_reference = Some(r.attr_value(tag, raw)?)
+                }
                 "reference" => v.reference = Some(r.attr_value(tag, raw)?),
-                "parameterRef" => v.parameter_ref = Some(r.attr_value(tag, raw)?),
+                "parameterRef" => {
+                    v.parameter_ref = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -8731,7 +9943,9 @@ impl XmlElement for CRCType {
     }
 }
 
-/// Describe a calibrator to transform a source data type raw/uncalibrated value (e.g. an integer count from a spacecraft) to an engineering unit/calibrated value for users (e.g. a float).
+/// Describe a calibrator to transform a source data type raw/uncalibrated value
+/// (e.g. an integer count from a spacecraft) to an engineering unit/calibrated
+/// value for users (e.g. a float).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct CalibratorType {
     /// Optional name for this calibrator/algorithm
@@ -8740,7 +9954,8 @@ pub struct CalibratorType {
     pub short_description: Option<String>,
     /// Optional additional ancillary information for this calibrator/algorithm
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// One of: `SplineCalibrator`, `PolynomialCalibrator`, `MathOperationCalibrator`.
+    /// One of: `SplineCalibrator`, `PolynomialCalibrator`,
+    /// `MathOperationCalibrator`.
     pub choice: CalibratorChoice,
 }
 
@@ -8767,7 +9982,9 @@ impl XmlElement for CalibratorType {
             let (k, raw) = a?;
             match k {
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -8780,14 +9997,43 @@ impl XmlElement for CalibratorType {
     }
 }
 
-/// Describe an alarm when the parameter value's rate-of-change is either too fast or too slow. The change may be with respect to time (the default) or with respect to samples (delta alarms). Use the changeType attribute to select the type: changePerSecond (time) or changePerSample (delta). The change may also be ether relative (as a percentage change) or absolute as set by the changeBasis attribute. (Delta alarms are typically absolute but percentage is conceivable). The alarm also requires the spanOfInterest in both samples and seconds to have passed before it is to trigger. For time based rate of change alarms, the time specified in spanOfInterestInSeconds is used to calculate the change. For sample based rate of change alarms, the change is calculated over the number of samples specified in spanOfInterestInSamples. A typical delta alarm would set: changeType=changePerSample, changeBasis=absoluteChange, spanOfInterestInSamples=1. A typical time based version would set: changeType=changePerSecond, changeBasis=percentageChange, and spaceOfInterestInSeconds=1. To set the ranges use maxInclusive, the following definition applies: | Normal.maxInclusive | <= | Watch.maxInclusive | <= | Warning.maxInclusive | <= | Distress.maxInclusive | <= | Critical.maxInclusive | <= | Severe.maxInclusive |. And it is further assumed the absolute value of each range and sampled value it taken to evaluate the alarm. See NumericAlarmType.
+/// Describe an alarm when the parameter value's rate-of-change is either too
+/// fast or too slow. The change may be with respect to time (the default) or
+/// with respect to samples (delta alarms). Use the changeType attribute to
+/// select the type: changePerSecond (time) or changePerSample (delta). The
+/// change may also be ether relative (as a percentage change) or absolute as
+/// set by the changeBasis attribute. (Delta alarms are typically absolute but
+/// percentage is conceivable). The alarm also requires the spanOfInterest in
+/// both samples and seconds to have passed before it is to trigger. For time
+/// based rate of change alarms, the time specified in spanOfInterestInSeconds
+/// is used to calculate the change. For sample based rate of change alarms, the
+/// change is calculated over the number of samples specified in
+/// spanOfInterestInSamples. A typical delta alarm would set:
+/// changeType=changePerSample, changeBasis=absoluteChange,
+/// spanOfInterestInSamples=1. A typical time based version would set:
+/// changeType=changePerSecond, changeBasis=percentageChange, and
+/// spaceOfInterestInSeconds=1. To set the ranges use maxInclusive, the
+/// following definition applies: | Normal.maxInclusive | <= |
+/// Watch.maxInclusive | <= | Warning.maxInclusive | <= | Distress.maxInclusive
+/// | <= | Critical.maxInclusive | <= | Severe.maxInclusive |. And it is further
+/// assumed the absolute value of each range and sampled value it taken to
+/// evaluate the alarm. See NumericAlarmType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ChangeAlarmRangesType {
     /// The alarm definition may be named.
     pub name: Option<String>,
     /// An optional brief description of this alarm definition.
     pub short_description: Option<String>,
-    /// A value of outside specifies that the most severe range is outside all the other ranges: -severe -critical -distress -warning -watch normal +watch +warning +distress +critical +severe. This means each min, max pair are a range: (-inf, min) or (-inf, min], and [max, inf) or (max, inf). However a value of inside "inverts" these bands: -normal -watch -warning -distress -critical severe +critical +distress +warning +watch, +normal. This means each min, max pair form a range of (min, max) or [min, max) or (min, max] or [min, max]. The most common form used is "outside" and it is the default. The set notation used defines parenthesis as exclusive and square brackets as inclusive.
+    /// A value of outside specifies that the most severe range is outside all
+    /// the other ranges: -severe -critical -distress -warning -watch normal
+    /// +watch +warning +distress +critical +severe. This means each min, max
+    /// pair are a range: (-inf, min) or (-inf, min], and [max, inf) or (max,
+    /// inf). However a value of inside "inverts" these bands: -normal -watch
+    /// -warning -distress -critical severe +critical +distress +warning +watch,
+    /// +normal. This means each min, max pair form a range of (min, max) or
+    /// [min, max) or (min, max] or [min, max]. The most common form used is
+    /// "outside" and it is the default. The set notation used defines
+    /// parenthesis as exclusive and square brackets as inclusive.
     ///
     /// Schema default: `outside`.
     pub range_form: Option<RangeFormType>,
@@ -8809,15 +10055,20 @@ pub struct ChangeAlarmRangesType {
     pub span_of_interest_in_seconds: Option<f64>,
     /// Element `AncillaryDataSet`.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// A range of least concern. Considered to be below the most commonly used Warning level.
+    /// A range of least concern. Considered to be below the most commonly used
+    /// Warning level.
     pub watch_range: Option<FloatRangeType>,
-    /// A range of concern that represents the most commonly used minimum concern level for many software applications.
+    /// A range of concern that represents the most commonly used minimum
+    /// concern level for many software applications.
     pub warning_range: Option<FloatRangeType>,
-    /// A range of concern in between the most commonly used Warning and Critical levels.
+    /// A range of concern in between the most commonly used Warning and
+    /// Critical levels.
     pub distress_range: Option<FloatRangeType>,
-    /// A range of concern that represents the most commonly used maximum concern level for many software applications.
+    /// A range of concern that represents the most commonly used maximum
+    /// concern level for many software applications.
     pub critical_range: Option<FloatRangeType>,
-    /// A range of highest concern. Considered to be above the most commonly used Critical level.
+    /// A range of highest concern. Considered to be above the most commonly
+    /// used Critical level.
     pub severe_range: Option<FloatRangeType>,
 }
 
@@ -8873,15 +10124,19 @@ impl XmlElement for ChangeAlarmRangesType {
             let (k, raw) = a?;
             match k {
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "rangeForm" => v.range_form = Some(r.attr_value(tag, raw)?),
                 "changeType" => v.change_type = Some(r.attr_value(tag, raw)?),
                 "changeBasis" => v.change_basis = Some(r.attr_value(tag, raw)?),
                 "spanOfInterestInSamples" => {
-                    v.span_of_interest_in_samples = Some(r.attr_value(tag, raw)?)
+                    v.span_of_interest_in_samples =
+                        Some(r.attr_value(tag, raw)?)
                 }
                 "spanOfInterestInSeconds" => {
-                    v.span_of_interest_in_seconds = Some(r.attr_value(tag, raw)?)
+                    v.span_of_interest_in_seconds =
+                        Some(r.attr_value(tag, raw)?)
                 }
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -8909,7 +10164,8 @@ impl XmlElement for ChangeAlarmRangesType {
     }
 }
 
-/// Describe a change value used to test verification status. See CommandVerifierType.
+/// Describe a change value used to test verification status. See
+/// CommandVerifierType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ChangeValueType {
     /// Value as a floating point number.
@@ -8945,7 +10201,8 @@ impl XmlElement for ChangeValueType {
     }
 }
 
-/// Used by CommandVerifiers to limit the time allocated to check for the verification. See CommandVerifierType.
+/// Used by CommandVerifiers to limit the time allocated to check for the
+/// verification. See CommandVerifierType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct CheckWindowAlgorithmsType {
     /// Element `StartCheck`.
@@ -8982,7 +10239,8 @@ impl XmlElement for CheckWindowAlgorithmsType {
     }
 }
 
-/// Used by CommandVerifiers to limit the time allocated to check for the verification. See CheckWindowAlgorithmsType.
+/// Used by CommandVerifiers to limit the time allocated to check for the
+/// verification. See CheckWindowAlgorithmsType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct CheckWindowType {
     /// Attribute `timeToStartChecking`.
@@ -9015,7 +10273,9 @@ impl XmlElement for CheckWindowType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "timeToStartChecking" => v.time_to_start_checking = Some(r.attr_value(tag, raw)?),
+                "timeToStartChecking" => {
+                    v.time_to_start_checking = Some(r.attr_value(tag, raw)?)
+                }
                 "timeToStopChecking" => {
                     v.time_to_stop_checking = r.attr_value(tag, raw)?;
                     seen_time_to_stop_checking = true;
@@ -9037,21 +10297,29 @@ impl XmlElement for CheckWindowType {
 /// Describe checksum or hash function definiton. See ErrorDetectCorrectType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ChecksumType {
-    /// An offset of non-zero may be specified to skip some bits against the reference position in the reference attribute.
+    /// An offset of non-zero may be specified to skip some bits against the
+    /// reference position in the reference attribute.
     ///
     /// Schema default: `0`.
     pub bits_from_reference: Option<i64>,
-    /// The bits involved in the calculation may start at the beginning or the end of the container.
+    /// The bits involved in the calculation may start at the beginning or the
+    /// end of the container.
     ///
     /// Schema default: `start`.
     pub reference: Option<ReferencePointType>,
-    /// Qualified list of named common checksum algorithms. If custom is chosen, InputAlgorithm must be set.
+    /// Qualified list of named common checksum algorithms. If custom is chosen,
+    /// InputAlgorithm must be set.
     pub name: ChecksumnameType,
-    /// The hashing algorithm may use a larger internal bucket size than the emitted value size in bits captured by the parameterRef attribute.
+    /// The hashing algorithm may use a larger internal bucket size than the
+    /// emitted value size in bits captured by the parameterRef attribute.
     pub hash_size_in_bits: Option<i64>,
-    /// Reference to the parameter that contains the value of this computed checksum or hash based on this container. This attribute is optional because not all implementations verify (telemetry) or create (telecommand) error control fields using the XTCE definition.
+    /// Reference to the parameter that contains the value of this computed
+    /// checksum or hash based on this container. This attribute is optional
+    /// because not all implementations verify (telemetry) or create
+    /// (telecommand) error control fields using the XTCE definition.
     pub parameter_ref: Option<String>,
-    /// Provided to account for an algorithm not otherwise listed by enumeration. Assumed to return the computed checksum.
+    /// Provided to account for an algorithm not otherwise listed by
+    /// enumeration. Assumed to return the computed checksum.
     pub input_algorithm: Option<InputAlgorithmType>,
 }
 
@@ -9084,14 +10352,20 @@ impl XmlElement for ChecksumType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "bitsFromReference" => v.bits_from_reference = Some(r.attr_value(tag, raw)?),
+                "bitsFromReference" => {
+                    v.bits_from_reference = Some(r.attr_value(tag, raw)?)
+                }
                 "reference" => v.reference = Some(r.attr_value(tag, raw)?),
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
-                "hashSizeInBits" => v.hash_size_in_bits = Some(r.attr_value(tag, raw)?),
-                "parameterRef" => v.parameter_ref = Some(r.attr_value(tag, raw)?),
+                "hashSizeInBits" => {
+                    v.hash_size_in_bits = Some(r.attr_value(tag, raw)?)
+                }
+                "parameterRef" => {
+                    v.parameter_ref = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -9106,10 +10380,18 @@ impl XmlElement for ChecksumType {
     }
 }
 
-/// Describe an entry list for a CommandContainer which is associated with a MetaCommand. The entry list for a MetaCommand CommandContainer element operates in a similar fashion as the entry list element for a SequenceContainer element. It adds fixed value and argument entries to the entry list not present in sequence containers. See MetaCommandType, CommandContainerType and EntryListType.
+/// Describe an entry list for a CommandContainer which is associated with a
+/// MetaCommand. The entry list for a MetaCommand CommandContainer element
+/// operates in a similar fashion as the entry list element for a
+/// SequenceContainer element. It adds fixed value and argument entries to the
+/// entry list not present in sequence containers. See MetaCommandType,
+/// CommandContainerType and EntryListType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct CommandContainerEntryListType {
-    /// One of: `ParameterRefEntry`, `ParameterSegmentRefEntry`, `ContainerRefEntry`, `ContainerSegmentRefEntry`, `StreamSegmentEntry`, `IndirectParameterRefEntry`, `ArrayParameterRefEntry`, `ArgumentRefEntry`, `ArrayArgumentRefEntry`, `FixedValueEntry`.
+    /// One of: `ParameterRefEntry`, `ParameterSegmentRefEntry`,
+    /// `ContainerRefEntry`, `ContainerSegmentRefEntry`, `StreamSegmentEntry`,
+    /// `IndirectParameterRefEntry`, `ArrayParameterRefEntry`,
+    /// `ArgumentRefEntry`, `ArrayArgumentRefEntry`, `FixedValueEntry`.
     pub items: Vec<CommandContainerEntryListChoice>,
 }
 
@@ -9181,28 +10463,41 @@ impl XmlElement for CommandContainerSetType {
     }
 }
 
-/// Describe a MetaCommand command container. The command container may contain arguments, parameters, other basic containers, and fixed values. Arguments are supplied by the user of a commanding application; parameters are supplied by the controlling system. Parameters and arguments map source data types to encodings. See MetaCommandType.
+/// Describe a MetaCommand command container. The command container may contain
+/// arguments, parameters, other basic containers, and fixed values. Arguments
+/// are supplied by the user of a commanding application; parameters are
+/// supplied by the controlling system. Parameters and arguments map source data
+/// types to encodings. See MetaCommandType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct CommandContainerType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// Element `DefaultRateInStream`.
     pub default_rate_in_stream: Option<RateInStreamType>,
     /// Element `RateInStreamSet`.
     pub rate_in_stream_set: Option<RateInStreamSetType>,
-    /// May be used to indicate error detection and correction, change byte order, provide the size (when it can't be derived), or perform some custom processing.
+    /// May be used to indicate error detection and correction, change byte
+    /// order, provide the size (when it can't be derived), or perform some
+    /// custom processing.
     pub binary_encoding: Option<ContainerBinaryDataEncodingType>,
     /// List of item entries to pack/encode into this container definition.
     pub entry_list: CommandContainerEntryListType,
-    /// When a MetaCommand inherits/extends another MetaCommand, this references the CommandContainer from the BaseMetaCommand.
+    /// When a MetaCommand inherits/extends another MetaCommand, this references
+    /// the CommandContainer from the BaseMetaCommand.
     pub base_container: Option<BaseContainerType>,
 }
 
@@ -9245,7 +10540,9 @@ impl XmlElement for CommandContainerType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
@@ -9286,18 +10583,29 @@ impl XmlElement for CommandContainerType {
     }
 }
 
-/// Describe command related metadata. Items defined in this area may refer to items defined in TelemetryMetaData. See TelemetryMetaDataType.
+/// Describe command related metadata. Items defined in this area may refer to
+/// items defined in TelemetryMetaData. See TelemetryMetaDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct CommandMetaDataType {
     /// A list of parameter types.
     pub parameter_type_set: Option<ParameterTypeSetType>,
-    /// Parameters referenced by MetaCommands. This Parameter Set is located here so that MetaCommand data can be built independently of TelemetryMetaData.
+    /// Parameters referenced by MetaCommands. This Parameter Set is located
+    /// here so that MetaCommand data can be built independently of
+    /// TelemetryMetaData.
     pub parameter_set: Option<ParameterSetType>,
-    /// A list of argument types. MetaCommand definitions can contain arguments and parameters. Arguments are user provided to the specific command definition. Parameters are provided/calculated/determined by the software creating the command instance. As a result, arguments contain separate type information. In some cases, arguments have different descriptive characteristics.
+    /// A list of argument types. MetaCommand definitions can contain arguments
+    /// and parameters. Arguments are user provided to the specific command
+    /// definition. Parameters are provided/calculated/determined by the
+    /// software creating the command instance. As a result, arguments contain
+    /// separate type information. In some cases, arguments have different
+    /// descriptive characteristics.
     pub argument_type_set: Option<ArgumentTypeSetType>,
-    /// A list of command definitions with their arguments, parameters, and container encoding descriptions.
+    /// A list of command definitions with their arguments, parameters, and
+    /// container encoding descriptions.
     pub meta_command_set: Option<MetaCommandSetType>,
-    /// Similar to the ContainerSet for telemetry, the CommandContainerSet contains containers that can be referenced/shared by MetaCommand definitions.
+    /// Similar to the ContainerSet for telemetry, the CommandContainerSet
+    /// contains containers that can be referenced/shared by MetaCommand
+    /// definitions.
     pub command_container_set: Option<CommandContainerSetType>,
     /// Contains an unordered set of Streams.
     pub stream_set: Option<StreamSetType>,
@@ -9365,24 +10673,38 @@ impl XmlElement for CommandMetaDataType {
     }
 }
 
-/// A command verifier is used to check that the command has been successfully executed. Command Verifiers may be either a Custom Algorithm or a Boolean Check or the presence of a Container for a relative change in the value of a Parameter. The CheckWindow is a time period where the verification must test true to pass.
+/// A command verifier is used to check that the command has been successfully
+/// executed. Command Verifiers may be either a Custom Algorithm or a Boolean
+/// Check or the presence of a Container for a relative change in the value of a
+/// Parameter. The CheckWindow is a time period where the verification must test
+/// true to pass.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct CommandVerifierType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
-    /// Optional name of this defined item. See NameType for restriction information.
+    /// Optional name of this defined item. See NameType for restriction
+    /// information.
     pub name: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// One of: `ComparisonList`, `ContainerRef`, `ParameterValueChange`, `CustomAlgorithm`, `BooleanExpression`, `Comparison`.
+    /// One of: `ComparisonList`, `ContainerRef`, `ParameterValueChange`,
+    /// `CustomAlgorithm`, `BooleanExpression`, `Comparison`.
     pub choice1: CommandVerifierChoice1,
     /// One of: `CheckWindow`, `CheckWindowAlgorithms`.
     pub choice2: CommandVerifierChoice2,
-    /// Optional list of argument values that manifest this post-transmission validation parameter value check. When not present, this check applies to all instances of the command.
+    /// Optional list of argument values that manifest this post-transmission
+    /// validation parameter value check. When not present, this check applies
+    /// to all instances of the command.
     pub argument_restriction_list: Option<ArgumentAssignmentListType>,
 }
 
@@ -9418,7 +10740,9 @@ impl XmlElement for CommandVerifierType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -9442,7 +10766,8 @@ impl XmlElement for CommandVerifierType {
     }
 }
 
-/// Describe the comparison between the instance (value) of a parameter against either a specified value or another parameter instance.
+/// Describe the comparison between the instance (value) of a parameter against
+/// either a specified value or another parameter instance.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ComparisonCheckType {
     /// Left hand side parameter instance.
@@ -9487,7 +10812,8 @@ impl XmlElement for ComparisonCheckType {
 /// All comparisons must be true
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ComparisonListType {
-    /// List of Comparison elements must all be true for the comparison to evaluate to true.
+    /// List of Comparison elements must all be true for the comparison to
+    /// evaluate to true.
     pub comparison: Vec<ComparisonType>,
 }
 
@@ -9525,7 +10851,12 @@ impl XmlElement for ComparisonListType {
     }
 }
 
-/// A simple ParameterInstanceRef to value comparison. The string supplied in the value attribute needs to be converted to a type matching the Parameter being compared to. For integer types it is base 10 form. Floating point types may be specified in normal (100.0) or scientific (1.0e2) form. The value is truncated to use the least significant bits that match the bit size of the Parameter being compared to.
+/// A simple ParameterInstanceRef to value comparison. The string supplied in
+/// the value attribute needs to be converted to a type matching the Parameter
+/// being compared to. For integer types it is base 10 form. Floating point
+/// types may be specified in normal (100.0) or scientific (1.0e2) form. The
+/// value is truncated to use the least significant bits that match the bit size
+/// of the Parameter being compared to.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ComparisonType {
     /// Attribute `parameterRef`.
@@ -9538,11 +10869,17 @@ pub struct ComparisonType {
     ///
     /// Schema default: `true`.
     pub use_calibrated_value: Option<bool>,
-    /// Operator to use for the comparison with the common equality operator as the default.
+    /// Operator to use for the comparison with the common equality operator as
+    /// the default.
     ///
     /// Schema default: `==`.
     pub comparison_operator: Option<ComparisonOperatorsType>,
-    /// Specify value as a string compliant with the XML schema (xs) type specified for each XTCE type: integer=xs:integer; float=xs:double; string=xs:string; boolean=xs:boolean; binary=xs:hexBinary; enum=xs:string from EnumerationList; relative time= xs:duration; absolute time=xs:dateTime. Supplied value must be within the ValidRange specified for the type.
+    /// Specify value as a string compliant with the XML schema (xs) type
+    /// specified for each XTCE type: integer=xs:integer; float=xs:double;
+    /// string=xs:string; boolean=xs:boolean; binary=xs:hexBinary;
+    /// enum=xs:string from EnumerationList; relative time= xs:duration;
+    /// absolute time=xs:dateTime. Supplied value must be within the ValidRange
+    /// specified for the type.
     pub value: String,
 }
 
@@ -9576,8 +10913,12 @@ impl XmlElement for ComparisonType {
                     seen_parameter_ref = true;
                 }
                 "instance" => v.instance = Some(r.attr_value(tag, raw)?),
-                "useCalibratedValue" => v.use_calibrated_value = Some(r.attr_value(tag, raw)?),
-                "comparisonOperator" => v.comparison_operator = Some(r.attr_value(tag, raw)?),
+                "useCalibratedValue" => {
+                    v.use_calibrated_value = Some(r.attr_value(tag, raw)?)
+                }
+                "comparisonOperator" => {
+                    v.comparison_operator = Some(r.attr_value(tag, raw)?)
+                }
                 "value" => {
                     v.value = r.attr_value(tag, raw)?;
                     seen_value = true;
@@ -9596,24 +10937,36 @@ impl XmlElement for ComparisonType {
     }
 }
 
-/// A possible set of verifiers that all must be true for the command be considered completed. Consider that some may not participate due to argument value restriction, if that element is used.
+/// A possible set of verifiers that all must be true for the command be
+/// considered completed. Consider that some may not participate due to argument
+/// value restriction, if that element is used.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct CompleteVerifierType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
-    /// Optional name of this defined item. See NameType for restriction information.
+    /// Optional name of this defined item. See NameType for restriction
+    /// information.
     pub name: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// One of: `ComparisonList`, `ContainerRef`, `ParameterValueChange`, `CustomAlgorithm`, `BooleanExpression`, `Comparison`.
+    /// One of: `ComparisonList`, `ContainerRef`, `ParameterValueChange`,
+    /// `CustomAlgorithm`, `BooleanExpression`, `Comparison`.
     pub choice1: CompleteVerifierChoice1,
     /// One of: `CheckWindow`, `CheckWindowAlgorithms`.
     pub choice2: CompleteVerifierChoice2,
-    /// Optional list of argument values that manifest this post-transmission validation parameter value check. When not present, this check applies to all instances of the command.
+    /// Optional list of argument values that manifest this post-transmission
+    /// validation parameter value check. When not present, this check applies
+    /// to all instances of the command.
     pub argument_restriction_list: Option<ArgumentAssignmentListType>,
     /// Element `ReturnParmRef`.
     pub return_parm_ref: Option<ParameterRefType>,
@@ -9654,7 +11007,9 @@ impl XmlElement for CompleteVerifierType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -9681,12 +11036,17 @@ impl XmlElement for CompleteVerifierType {
     }
 }
 
-/// Names and provides a value for a constant input to the algorithm. There are two attributes to Constant, constantName and value. constantName is a variable name in the algorithm to be executed. value is the value of the constant to be used.
+/// Names and provides a value for a constant input to the algorithm. There are
+/// two attributes to Constant, constantName and value. constantName is a
+/// variable name in the algorithm to be executed. value is the value of the
+/// constant to be used.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ConstantType {
-    /// Supply a name for the constant to be used to access this value from within the algorithm.
+    /// Supply a name for the constant to be used to access this value from
+    /// within the algorithm.
     pub constant_name: String,
-    /// Supply the constant value in the form of the data type needed in the algorithm.
+    /// Supply the constant value in the form of the data type needed in the
+    /// algorithm.
     pub value: String,
 }
 
@@ -9728,16 +11088,25 @@ impl XmlElement for ConstantType {
     }
 }
 
-/// Describe container binary data that is unmolested in the decoding/encoding or cannot be represented in any of the other data encoding formats. Optionally use the FromBinaryTransformAlgorithm and ToBinaryTransformAlgorithm element to describe the transformation process. See InputAlgorithmType for the transformation structure.
+/// Describe container binary data that is unmolested in the decoding/encoding
+/// or cannot be represented in any of the other data encoding formats.
+/// Optionally use the FromBinaryTransformAlgorithm and
+/// ToBinaryTransformAlgorithm element to describe the transformation process.
+/// See InputAlgorithmType for the transformation structure.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ContainerBinaryDataEncodingType {
-    /// Describes the optional inclusion of an error detection and/or correction algorithm used with this container.
+    /// Describes the optional inclusion of an error detection and/or correction
+    /// algorithm used with this container.
     pub error_detect_correct: Option<ErrorDetectCorrectType>,
-    /// Number of bits this container occupies on the stream being encoded/decoded. This is only needed to "force" the bit length of the container to be a fixed value. In most cases, the entry list would define the size of the container.
+    /// Number of bits this container occupies on the stream being
+    /// encoded/decoded. This is only needed to "force" the bit length of the
+    /// container to be a fixed value. In most cases, the entry list would
+    /// define the size of the container.
     pub size_in_bits: Option<IntegerValueType>,
     /// Used to convert binary data to an application data type.
     pub from_binary_transform_algorithm: Option<InputAlgorithmType>,
-    /// Used to convert binary data from an application data type to binary data.
+    /// Used to convert binary data from an application data type to binary
+    /// data.
     pub to_binary_transform_algorithm: Option<InputAlgorithmType>,
 }
 
@@ -9790,11 +11159,25 @@ pub struct ContainerRefEntryType {
     pub short_description: Option<String>,
     /// Attribute `containerRef`.
     pub container_ref: String,
-    /// The start bit 0 position for each container is local to the container, but does include space occupied by inherited containers. When a container is "included", as opposed to inherited, then the interpreting implementation takes into account the start bit position of the referring container when finally assembling the start bits for the post-processed entry content. The default start bit for any entry is 0 bits from the previous entry, making the content contiguous when this element is not used.
+    /// The start bit 0 position for each container is local to the container,
+    /// but does include space occupied by inherited containers. When a
+    /// container is "included", as opposed to inherited, then the interpreting
+    /// implementation takes into account the start bit position of the
+    /// referring container when finally assembling the start bits for the
+    /// post-processed entry content. The default start bit for any entry is 0
+    /// bits from the previous entry, making the content contiguous when this
+    /// element is not used.
     pub location_in_container_in_bits: Option<LocationInContainerInBitsType>,
-    /// May be used when this entry repeats itself in the sequence container. When an entry repeats, it effectively specifies that the same entry is reported more than once in the container and has the same physical meaning. This should not be construed to be equivalent to arrays.
+    /// May be used when this entry repeats itself in the sequence container.
+    /// When an entry repeats, it effectively specifies that the same entry is
+    /// reported more than once in the container and has the same physical
+    /// meaning. This should not be construed to be equivalent to arrays.
     pub repeat_entry: Option<RepeatType>,
-    /// This entry will only be included in the sequence when this condition is true, otherwise it is always included. When the include condition evaluates to false, it is as if the entry does not exist such that any start bit interpretations cannot take into account the space that would have been occupied if this included condition were true.
+    /// This entry will only be included in the sequence when this condition is
+    /// true, otherwise it is always included. When the include condition
+    /// evaluates to false, it is as if the entry does not exist such that any
+    /// start bit interpretations cannot take into account the space that would
+    /// have been occupied if this included condition were true.
     pub include_condition: Option<MatchCriteriaType>,
     /// Optional timing information associated with this entry.
     pub time_association: Option<TimeAssociationType>,
@@ -9834,7 +11217,9 @@ impl XmlElement for ContainerRefEntryType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "containerRef" => {
                     v.container_ref = r.attr_value(tag, raw)?;
                     seen_container_ref = true;
@@ -9941,7 +11326,13 @@ impl XmlElement for ContainerRefType {
     }
 }
 
-/// An entry that is only a portion of a container indicating that the entire container must be assembled from other container segments. It is assumed that container segments happen sequentially in time, that is the first part of a container is first, however (and there's always a however), if this is not the case the order of this container segment may be supplied with the order attribute where the first segment order="0". Each instance of a container cannot overlap in the overall sequence with another instance
+/// An entry that is only a portion of a container indicating that the entire
+/// container must be assembled from other container segments. It is assumed
+/// that container segments happen sequentially in time, that is the first part
+/// of a container is first, however (and there's always a however), if this is
+/// not the case the order of this container segment may be supplied with the
+/// order attribute where the first segment order="0". Each instance of a
+/// container cannot overlap in the overall sequence with another instance
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ContainerSegmentRefEntryType {
     /// Optional short description for this entry element.
@@ -9952,11 +11343,25 @@ pub struct ContainerSegmentRefEntryType {
     pub order: Option<i64>,
     /// Attribute `sizeInBits`.
     pub size_in_bits: i64,
-    /// The start bit 0 position for each container is local to the container, but does include space occupied by inherited containers. When a container is "included", as opposed to inherited, then the interpreting implementation takes into account the start bit position of the referring container when finally assembling the start bits for the post-processed entry content. The default start bit for any entry is 0 bits from the previous entry, making the content contiguous when this element is not used.
+    /// The start bit 0 position for each container is local to the container,
+    /// but does include space occupied by inherited containers. When a
+    /// container is "included", as opposed to inherited, then the interpreting
+    /// implementation takes into account the start bit position of the
+    /// referring container when finally assembling the start bits for the
+    /// post-processed entry content. The default start bit for any entry is 0
+    /// bits from the previous entry, making the content contiguous when this
+    /// element is not used.
     pub location_in_container_in_bits: Option<LocationInContainerInBitsType>,
-    /// May be used when this entry repeats itself in the sequence container. When an entry repeats, it effectively specifies that the same entry is reported more than once in the container and has the same physical meaning. This should not be construed to be equivalent to arrays.
+    /// May be used when this entry repeats itself in the sequence container.
+    /// When an entry repeats, it effectively specifies that the same entry is
+    /// reported more than once in the container and has the same physical
+    /// meaning. This should not be construed to be equivalent to arrays.
     pub repeat_entry: Option<RepeatType>,
-    /// This entry will only be included in the sequence when this condition is true, otherwise it is always included. When the include condition evaluates to false, it is as if the entry does not exist such that any start bit interpretations cannot take into account the space that would have been occupied if this included condition were true.
+    /// This entry will only be included in the sequence when this condition is
+    /// true, otherwise it is always included. When the include condition
+    /// evaluates to false, it is as if the entry does not exist such that any
+    /// start bit interpretations cannot take into account the space that would
+    /// have been occupied if this included condition were true.
     pub include_condition: Option<MatchCriteriaType>,
     /// Optional timing information associated with this entry.
     pub time_association: Option<TimeAssociationType>,
@@ -10001,7 +11406,9 @@ impl XmlElement for ContainerSegmentRefEntryType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "containerRef" => {
                     v.container_ref = r.attr_value(tag, raw)?;
                     seen_container_ref = true;
@@ -10081,24 +11488,33 @@ impl XmlElement for ContainerSetType {
     }
 }
 
-/// An abstract block of data; used as the base type for more specific container types
+/// An abstract block of data; used as the base type for more specific container
+/// types
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ContainerType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// Element `DefaultRateInStream`.
     pub default_rate_in_stream: Option<RateInStreamType>,
     /// Element `RateInStreamSet`.
     pub rate_in_stream_set: Option<RateInStreamSetType>,
-    /// May be used to indicate error detection and correction, change byte order, provide the size (when it can't be derived), or perform some custom processing.
+    /// May be used to indicate error detection and correction, change byte
+    /// order, provide the size (when it can't be derived), or perform some
+    /// custom processing.
     pub binary_encoding: Option<ContainerBinaryDataEncodingType>,
 }
 
@@ -10137,7 +11553,9 @@ impl XmlElement for ContainerType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
@@ -10171,10 +11589,15 @@ impl XmlElement for ContainerType {
     }
 }
 
-/// Describe an ordered list of calibrators with a context match. Useful when different calibrations must be used depending on a matching value. The first context that matches determines which calibrator to use. See IntegerDataEncodingType and FloatDataEncodingType.
+/// Describe an ordered list of calibrators with a context match. Useful when
+/// different calibrations must be used depending on a matching value. The first
+/// context that matches determines which calibrator to use. See
+/// IntegerDataEncodingType and FloatDataEncodingType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ContextCalibratorListType {
-    /// Describe a calibrator that depends on a matching value using a ContextMatch. When the context matches for the calibrator, the default calibrator is overridden, if it exists.
+    /// Describe a calibrator that depends on a matching value using a
+    /// ContextMatch. When the context matches for the calibrator, the default
+    /// calibrator is overridden, if it exists.
     pub context_calibrator: Vec<ContextCalibratorType>,
 }
 
@@ -10212,7 +11635,8 @@ impl XmlElement for ContextCalibratorListType {
     }
 }
 
-/// Context calibrations are applied when the ContextMatch is true. Context calibrators overide Default calibrators
+/// Context calibrations are applied when the ContextMatch is true. Context
+/// calibrators overide Default calibrators
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ContextCalibratorType {
     /// Element `ContextMatch`.
@@ -10249,10 +11673,14 @@ impl XmlElement for ContextCalibratorType {
     }
 }
 
-/// A MatchCriteriaType used for Context selection. It is possible that no match evaluates to true, which results in the default element being used. It is also possible that a match can have an empty context change, in which case the default is replaced with nothing.
+/// A MatchCriteriaType used for Context selection. It is possible that no match
+/// evaluates to true, which results in the default element being used. It is
+/// also possible that a match can have an empty context change, in which case
+/// the default is replaced with nothing.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ContextMatchType {
-    /// One of: `Comparison`, `ComparisonList`, `BooleanExpression`, `CustomAlgorithm`.
+    /// One of: `Comparison`, `ComparisonList`, `BooleanExpression`,
+    /// `CustomAlgorithm`.
     pub choice: ContextMatchChoice,
 }
 
@@ -10276,10 +11704,16 @@ impl XmlElement for ContextMatchType {
     }
 }
 
-/// Describe an ordered list of ContextSignificance elements where the significance on the first context match to test true is used as the significance of the MetaCommand. If there is a DefaultSignificance, it is overrideen by the matching context. See ContextSignificantType and MetaCommandType.
+/// Describe an ordered list of ContextSignificance elements where the
+/// significance on the first context match to test true is used as the
+/// significance of the MetaCommand. If there is a DefaultSignificance, it is
+/// overrideen by the matching context. See ContextSignificantType and
+/// MetaCommandType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ContextSignificanceListType {
-    /// A Context contains a different significance definition and a context match. The match takes precedence over any default significance when the first in the overall list evaluates to true.
+    /// A Context contains a different significance definition and a context
+    /// match. The match takes precedence over any default significance when the
+    /// first in the overall list evaluates to true.
     pub context_significance: Vec<ContextSignificanceType>,
 }
 
@@ -10317,12 +11751,16 @@ impl XmlElement for ContextSignificanceListType {
     }
 }
 
-/// Describe a significance level for a MetaCommand definition where the significance level depends on matching a context value. See ContextMatchType and SignificanceType.
+/// Describe a significance level for a MetaCommand definition where the
+/// significance level depends on matching a context value. See ContextMatchType
+/// and SignificanceType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ContextSignificanceType {
-    /// Describe the context matching value and source that will enable the Significance listed in the Significance element.
+    /// Describe the context matching value and source that will enable the
+    /// Significance listed in the Significance element.
     pub context_match: ContextMatchType,
-    /// Describe the signficance of this MetaCommand definition. See SignificanceType.
+    /// Describe the signficance of this MetaCommand definition. See
+    /// SignificanceType.
     pub significance: SignificanceType,
 }
 
@@ -10354,7 +11792,8 @@ impl XmlElement for ContextSignificanceType {
     }
 }
 
-/// Describe a custom, algorithmic alarm condition. The algorithm is assumed to return a boolean value: true or false. See AlarmType.
+/// Describe a custom, algorithmic alarm condition. The algorithm is assumed to
+/// return a boolean value: true or false. See AlarmType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct CustomAlarmType {
     /// The alarm definition may be named.
@@ -10390,7 +11829,9 @@ impl XmlElement for CustomAlarmType {
             let (k, raw) = a?;
             match k {
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -10406,10 +11847,14 @@ impl XmlElement for CustomAlarmType {
     }
 }
 
-/// A stream type where some level of custom processing (e.g. convolutional, encryption, compression) is performed. Has a reference to external algorithms for encoding and decoding algorithms.
+/// A stream type where some level of custom processing (e.g. convolutional,
+/// encryption, compression) is performed. Has a reference to external
+/// algorithms for encoding and decoding algorithms.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct CustomStreamType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
@@ -10427,11 +11872,15 @@ pub struct CustomStreamType {
     pub encoded_stream_ref: String,
     /// Attribute `decodedStreamRef`.
     pub decoded_stream_ref: String,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// Element `EncodingAlgorithm`.
     pub encoding_algorithm: InputAlgorithmType,
@@ -10480,12 +11929,16 @@ impl XmlElement for CustomStreamType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
-                "bitRateInBPS" => v.bit_rate_in_bps = Some(r.attr_value(tag, raw)?),
+                "bitRateInBPS" => {
+                    v.bit_rate_in_bps = Some(r.attr_value(tag, raw)?)
+                }
                 "pcmType" => v.pcm_type = Some(r.attr_value(tag, raw)?),
                 "inverted" => v.inverted = Some(r.attr_value(tag, raw)?),
                 "encodedStreamRef" => {
@@ -10530,7 +11983,8 @@ impl XmlElement for CustomStreamType {
     }
 }
 
-/// Describes how a particular piece of data is sent or received from some non-native, off-platform device. (e.g. a spacecraft)
+/// Describes how a particular piece of data is sent or received from some
+/// non-native, off-platform device. (e.g. a spacecraft)
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct DataEncodingType {
     /// Describes the bit ordering of the encoded value.
@@ -10541,7 +11995,8 @@ pub struct DataEncodingType {
     ///
     /// Schema default: `mostSignificantByteFirst`.
     pub byte_order: Option<String>,
-    /// DEPRECATED: Use the ErrorDetectCorrect element in the container elements instead.
+    /// DEPRECATED: Use the ErrorDetectCorrect element in the container elements
+    /// instead.
     pub error_detect_correct: Option<ErrorDetectCorrectType>,
 }
 
@@ -10579,16 +12034,25 @@ impl XmlElement for DataEncodingType {
     }
 }
 
-/// Defines an abstract schema type used as basis for NameDescriptionType and OptionalNameDescriptionType, includes an attribute for a short description and an element for a longer unbounded description. This type also provides alias set and ancillary data set See AliasSetType and AncillaryDataSetType.
+/// Defines an abstract schema type used as basis for NameDescriptionType and
+/// OptionalNameDescriptionType, includes an attribute for a short description
+/// and an element for a longer unbounded description. This type also provides
+/// alias set and ancillary data set See AliasSetType and AncillaryDataSetType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct DescriptionType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
 }
 
@@ -10616,7 +12080,9 @@ impl XmlElement for DescriptionType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -10634,7 +12100,11 @@ impl XmlElement for DescriptionType {
     }
 }
 
-/// Where the Dimension list is in this form: Array[1stDim][2ndDim][lastDim]. The last dimension is assumed to be the least significant - that is this dimension will cycle through its combination before the next to last dimension changes. The order MUST ascend or the array will need to be broken out entry by entry.
+/// Where the Dimension list is in this form: Array[1stDim][2ndDim][lastDim].
+/// The last dimension is assumed to be the least significant - that is this
+/// dimension will cycle through its combination before the next to last
+/// dimension changes. The order MUST ascend or the array will need to be broken
+/// out entry by entry.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct DimensionListType {
     /// Element `Dimension`.
@@ -10644,7 +12114,12 @@ pub struct DimensionListType {
 impl XmlElement for DimensionListType {
     fn write_xml(&self, w: &mut Writer<'_>, tag: &str) -> Result<()> {
         w.start(tag);
-        check_count(self.dimension.len(), 1, None, "DimensionListType.Dimension")?;
+        check_count(
+            self.dimension.len(),
+            1,
+            None,
+            "DimensionListType.Dimension",
+        )?;
         for v in &self.dimension {
             v.write_xml(w, "Dimension")?;
         }
@@ -10670,7 +12145,8 @@ impl XmlElement for DimensionListType {
     }
 }
 
-/// For partial entries of an array, the starting and ending index for each dimension, OR the Size must be specified. Indexes are zero based.
+/// For partial entries of an array, the starting and ending index for each
+/// dimension, OR the Size must be specified. Indexes are zero based.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct DimensionType {
     /// zero based index
@@ -10707,10 +12183,14 @@ impl XmlElement for DimensionType {
     }
 }
 
-/// Describe an ordered table of integer values and associated conditions, forming a lookup table. The list may have duplicates. The table is evaluated from first to last, the first condition to be true returns the value associated with it. See DiscreteLookupType.
+/// Describe an ordered table of integer values and associated conditions,
+/// forming a lookup table. The list may have duplicates. The table is evaluated
+/// from first to last, the first condition to be true returns the value
+/// associated with it. See DiscreteLookupType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct DiscreteLookupListType {
-    /// In the event that no lookup condition evaluates to true, then this value will be used.
+    /// In the event that no lookup condition evaluates to true, then this value
+    /// will be used.
     pub default_value: i64,
     /// Describe a lookup condition set using discrete values from parameters.
     pub discrete_lookup: Vec<DiscreteLookupType>,
@@ -10761,12 +12241,14 @@ impl XmlElement for DiscreteLookupListType {
     }
 }
 
-/// Describe a discrete value lookup and the value associated when the lookup evaluates to true.
+/// Describe a discrete value lookup and the value associated when the lookup
+/// evaluates to true.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct DiscreteLookupType {
     /// Value to use when the lookup conditions are true.
     pub value: i64,
-    /// One of: `Comparison`, `ComparisonList`, `BooleanExpression`, `CustomAlgorithm`.
+    /// One of: `Comparison`, `ComparisonList`, `BooleanExpression`,
+    /// `CustomAlgorithm`.
     pub choice: DiscreteLookupChoice,
 }
 
@@ -10801,12 +12283,16 @@ impl XmlElement for DiscreteLookupType {
     }
 }
 
-/// Uses a parameter instance to obtain the value. The parameter value may be optionally adjusted by a Linear function or use a series of boolean expressions to lookup the value. Anything more complex and a DynamicValue with a CustomAlgorithm may be used
+/// Uses a parameter instance to obtain the value. The parameter value may be
+/// optionally adjusted by a Linear function or use a series of boolean
+/// expressions to lookup the value. Anything more complex and a DynamicValue
+/// with a CustomAlgorithm may be used
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct DynamicValueType {
     /// Retrieve the value by referencing the value of a Parameter.
     pub parameter_instance_ref: ParameterInstanceRefType,
-    /// A slope and intercept may be applied to scale or shift the value selected from the argument or parameter.
+    /// A slope and intercept may be applied to scale or shift the value
+    /// selected from the argument or parameter.
     pub linear_adjustment: Option<LinearAdjustmentType>,
 }
 
@@ -10840,22 +12326,31 @@ impl XmlElement for DynamicValueType {
     }
 }
 
-/// Describe the data encoding for a time data type. It includes the units and other attributes scale and offset. Use scale and offset to describe a y=mx+b relationship (where m is the slope/scale and b is the intercept/offset) to make adjustments to the encoded time value so that it matches the time units. For binary encoded time use transform algorithms to convert time data formats that are too difficult to describe in XTCE. See AbsoluteTimeDataType and RelativeTimeDataType.
+/// Describe the data encoding for a time data type. It includes the units and
+/// other attributes scale and offset. Use scale and offset to describe a y=mx+b
+/// relationship (where m is the slope/scale and b is the intercept/offset) to
+/// make adjustments to the encoded time value so that it matches the time
+/// units. For binary encoded time use transform algorithms to convert time data
+/// formats that are too difficult to describe in XTCE. See AbsoluteTimeDataType
+/// and RelativeTimeDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct EncodingType {
     /// Time units, with the default being in seconds.
     ///
     /// Schema default: `seconds`.
     pub units: Option<TimeUnitsType>,
-    /// Linear slope used as a shorter form of specifying a calibrator to convert between the raw value and the engineering units.
+    /// Linear slope used as a shorter form of specifying a calibrator to
+    /// convert between the raw value and the engineering units.
     ///
     /// Schema default: `1`.
     pub scale: Option<f64>,
-    /// Linear intercept used as a shorter form of specifying a calibrator to convert between the raw value and the engineering units.
+    /// Linear intercept used as a shorter form of specifying a calibrator to
+    /// convert between the raw value and the engineering units.
     ///
     /// Schema default: `0`.
     pub offset: Option<f64>,
-    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`, `StringDataEncoding`.
+    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding`, `StringDataEncoding`.
     pub choice: EncodingChoice,
 }
 
@@ -10896,7 +12391,9 @@ impl XmlElement for EncodingType {
 /// Contains an ordered list of Entries. Used in Sequence Container
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct EntryListType {
-    /// One of: `ParameterRefEntry`, `ParameterSegmentRefEntry`, `ContainerRefEntry`, `ContainerSegmentRefEntry`, `StreamSegmentEntry`, `IndirectParameterRefEntry`, `ArrayParameterRefEntry`.
+    /// One of: `ParameterRefEntry`, `ParameterSegmentRefEntry`,
+    /// `ContainerRefEntry`, `ContainerSegmentRefEntry`, `StreamSegmentEntry`,
+    /// `IndirectParameterRefEntry`, `ArrayParameterRefEntry`.
     pub items: Vec<EntryListChoice>,
 }
 
@@ -10924,26 +12421,39 @@ impl XmlElement for EntryListType {
     }
 }
 
-/// Describes an enumerated argument type. The enumeration list consists of label/value pairs. See EnumerationListType, IntegerDataEncodingType and EnumeratedDataType.
+/// Describes an enumerated argument type. The enumeration list consists of
+/// label/value pairs. See EnumerationListType, IntegerDataEncodingType and
+/// EnumeratedDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct EnumeratedArgumentType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Used to derive one Data Type from another - will inherit all the attributes from the baseType any of which may be redefined in this type definition.
+    /// Used to derive one Data Type from another - will inherit all the
+    /// attributes from the baseType any of which may be redefined in this type
+    /// definition.
     pub base_type: Option<String>,
-    /// Default/Initial value is always given in calibrated form. Use the label, it must be in the enumeration list to be valid.
+    /// Default/Initial value is always given in calibrated form. Use the label,
+    /// it must be in the enumeration list to be valid.
     pub initial_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// When appropriate, describe the units of measure that are represented by this argument value.
+    /// When appropriate, describe the units of measure that are represented by
+    /// this argument value.
     pub unit_set: Option<UnitSetType>,
-    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`, `StringDataEncoding`.
+    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding`, `StringDataEncoding`.
     pub choice: Option<EnumeratedArgumentChoice>,
     /// Unordered list of label/value pairs where values cannot be duplicated.
     pub enumeration_list: EnumerationListType,
@@ -10988,13 +12498,17 @@ impl XmlElement for EnumeratedArgumentType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -11027,26 +12541,39 @@ impl XmlElement for EnumeratedArgumentType {
     }
 }
 
-/// Describes an enumerated parameter type. The enumeration list consists of label/value pairs. See EnumerationListType, EnumeratedParameterType and EnumeratedArgumentType.
+/// Describes an enumerated parameter type. The enumeration list consists of
+/// label/value pairs. See EnumerationListType, EnumeratedParameterType and
+/// EnumeratedArgumentType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct EnumeratedDataType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Used to derive one Data Type from another - will inherit all the attributes from the baseType any of which may be redefined in this type definition.
+    /// Used to derive one Data Type from another - will inherit all the
+    /// attributes from the baseType any of which may be redefined in this type
+    /// definition.
     pub base_type: Option<String>,
-    /// Default/Initial value is always given in calibrated form. Use the label, it must be in the enumeration list to be valid.
+    /// Default/Initial value is always given in calibrated form. Use the label,
+    /// it must be in the enumeration list to be valid.
     pub initial_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// When appropriate, describe the units of measure that are represented by this parameter value.
+    /// When appropriate, describe the units of measure that are represented by
+    /// this parameter value.
     pub unit_set: Option<UnitSetType>,
-    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`, `StringDataEncoding`.
+    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding`, `StringDataEncoding`.
     pub choice: Option<EnumeratedDataChoice>,
     /// Unordered list of label/value pairs where values cannot be duplicated.
     pub enumeration_list: EnumerationListType,
@@ -11091,13 +12618,17 @@ impl XmlElement for EnumeratedDataType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -11128,32 +12659,50 @@ impl XmlElement for EnumeratedDataType {
     }
 }
 
-/// Describe an enumerated parameter type. The enumeration list consists of label/value pairs. See EnumerationListType, IntegerDataEncodingType and EnumeratedDataType.
+/// Describe an enumerated parameter type. The enumeration list consists of
+/// label/value pairs. See EnumerationListType, IntegerDataEncodingType and
+/// EnumeratedDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct EnumeratedParameterType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Used to derive one Data Type from another - will inherit all the attributes from the baseType any of which may be redefined in this type definition.
+    /// Used to derive one Data Type from another - will inherit all the
+    /// attributes from the baseType any of which may be redefined in this type
+    /// definition.
     pub base_type: Option<String>,
-    /// Default/Initial value is always given in calibrated form. Use the label, it must be in the enumeration list to be valid.
+    /// Default/Initial value is always given in calibrated form. Use the label,
+    /// it must be in the enumeration list to be valid.
     pub initial_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// When appropriate, describe the units of measure that are represented by this parameter value.
+    /// When appropriate, describe the units of measure that are represented by
+    /// this parameter value.
     pub unit_set: Option<UnitSetType>,
-    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`, `StringDataEncoding`.
+    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding`, `StringDataEncoding`.
     pub choice: Option<EnumeratedParameterChoice>,
     /// Unordered list of label/value pairs where values cannot be duplicated.
     pub enumeration_list: EnumerationListType,
-    /// Describe labels for this parameter that should be in an alarm state. The default definition applies when there are no context alarm definitions or all the context alarm definitions evaluate to false in their matching criteria.
+    /// Describe labels for this parameter that should be in an alarm state. The
+    /// default definition applies when there are no context alarm definitions
+    /// or all the context alarm definitions evaluate to false in their matching
+    /// criteria.
     pub default_alarm: Option<EnumerationAlarmType>,
-    /// Describe labels for this parameter that should be in an alarm state when another parameter and value combination evaluates to true using the described matching criteria.
+    /// Describe labels for this parameter that should be in an alarm state when
+    /// another parameter and value combination evaluates to true using the
+    /// described matching criteria.
     pub context_alarm_list: Option<EnumerationContextAlarmListType>,
 }
 
@@ -11202,13 +12751,17 @@ impl XmlElement for EnumeratedParameterType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -11247,12 +12800,18 @@ impl XmlElement for EnumeratedParameterType {
     }
 }
 
-/// Describe an alarm level and its enumeration label to trigger from. See EnumeratedAlarmType and EnumeratedParameterType.
+/// Describe an alarm level and its enumeration label to trigger from. See
+/// EnumeratedAlarmType and EnumeratedParameterType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct EnumerationAlarmLevelType {
-    /// Defines six levels: Normal, Watch, Warning, Distress, Critical and Severe. Typical implementations color the "normal" level as green, "warning" level as yellow, and "critical" level as red. In the case of enumeration alarms, the "normal" is assumed by implementations to be any label not otherwise in an alarm state.
+    /// Defines six levels: Normal, Watch, Warning, Distress, Critical and
+    /// Severe. Typical implementations color the "normal" level as green,
+    /// "warning" level as yellow, and "critical" level as red. In the case of
+    /// enumeration alarms, the "normal" is assumed by implementations to be any
+    /// label not otherwise in an alarm state.
     pub alarm_level: ConcernLevelsType,
-    /// The enumeration label is the engineering/calibrated value for enumerated types.
+    /// The enumeration label is the engineering/calibrated value for enumerated
+    /// types.
     pub enumeration_label: String,
 }
 
@@ -11296,7 +12855,9 @@ impl XmlElement for EnumerationAlarmLevelType {
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct EnumerationAlarmListType {
-    /// Describe an alarm state for an enumeration label where the label is engineer/calibrated value. Note that labels may represent multiple raw/uncalbrated values.
+    /// Describe an alarm state for an enumeration label where the label is
+    /// engineer/calibrated value. Note that labels may represent multiple
+    /// raw/uncalbrated values.
     pub enumeration_alarm: Vec<EnumerationAlarmLevelType>,
 }
 
@@ -11334,26 +12895,43 @@ impl XmlElement for EnumerationAlarmListType {
     }
 }
 
-/// Describe alarm conditions specific to the enumeration data type, extends the basic AlarmType with an EnumerationAlarmList. The alarms are described using the label (engineering/calibrated value) of the enumerated parameter. Enumeration labels may represent several raw/uncalibrated values, so as a result, a single alarm definition here may represent multiple raw values in the enumerated parameter. It is not necessary to define an alarm for raw/uncalibrated values that do not map to an enumeration. Implementations should implicitly define this as an alarm case, of which the manifestation of that is program/implementation specific. See EnumeratedParameterType.
+/// Describe alarm conditions specific to the enumeration data type, extends the
+/// basic AlarmType with an EnumerationAlarmList. The alarms are described using
+/// the label (engineering/calibrated value) of the enumerated parameter.
+/// Enumeration labels may represent several raw/uncalibrated values, so as a
+/// result, a single alarm definition here may represent multiple raw values in
+/// the enumerated parameter. It is not necessary to define an alarm for
+/// raw/uncalibrated values that do not map to an enumeration. Implementations
+/// should implicitly define this as an alarm case, of which the manifestation
+/// of that is program/implementation specific. See EnumeratedParameterType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct EnumerationAlarmType {
     /// The alarm definition may be named.
     pub name: Option<String>,
     /// An optional brief description of this alarm definition.
     pub short_description: Option<String>,
-    /// The number of successive instances that meet the alarm conditions for the alarm to trigger. The default is 1.
+    /// The number of successive instances that meet the alarm conditions for
+    /// the alarm to trigger. The default is 1.
     ///
     /// Schema default: `1`.
     pub min_violations: Option<i64>,
-    /// Optionally specify the number of successive instances that do not meet the alarm conditions to leave the alarm state. If this attribute is not specified, it is treated as being equal to minViolations (symmetric).
+    /// Optionally specify the number of successive instances that do not meet
+    /// the alarm conditions to leave the alarm state. If this attribute is not
+    /// specified, it is treated as being equal to minViolations (symmetric).
     ///
     /// Schema default: `1`.
     pub min_conformance: Option<i64>,
-    /// The initial state of this alarm definition as delivered. When true, this leaves the alarm definition empty for the parameter and also short circuits the remaining context matches and the default so no alarm is active on the parameter.
+    /// The initial state of this alarm definition as delivered. When true, this
+    /// leaves the alarm definition empty for the parameter and also short
+    /// circuits the remaining context matches and the default so no alarm is
+    /// active on the parameter.
     ///
     /// Schema default: `false`.
     pub disabled: Option<bool>,
-    /// Alarm state name for when no enumeration alarms evaluate to true. This defaults to "normal", which is almost always the case. Setting it to another alarm state permits a form of "inverted logic" where the alarm list can specify the normal states instead of the alarm states.
+    /// Alarm state name for when no enumeration alarms evaluate to true. This
+    /// defaults to "normal", which is almost always the case. Setting it to
+    /// another alarm state permits a form of "inverted logic" where the alarm
+    /// list can specify the normal states instead of the alarm states.
     ///
     /// Schema default: `normal`.
     pub default_alarm_level: Option<ConcernLevelsType>,
@@ -11405,11 +12983,19 @@ impl XmlElement for EnumerationAlarmType {
             let (k, raw) = a?;
             match k {
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
-                "minViolations" => v.min_violations = Some(r.attr_value(tag, raw)?),
-                "minConformance" => v.min_conformance = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
+                "minViolations" => {
+                    v.min_violations = Some(r.attr_value(tag, raw)?)
+                }
+                "minConformance" => {
+                    v.min_conformance = Some(r.attr_value(tag, raw)?)
+                }
                 "disabled" => v.disabled = Some(r.attr_value(tag, raw)?),
-                "defaultAlarmLevel" => v.default_alarm_level = Some(r.attr_value(tag, raw)?),
+                "defaultAlarmLevel" => {
+                    v.default_alarm_level = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -11427,10 +13013,15 @@ impl XmlElement for EnumerationAlarmType {
     }
 }
 
-/// Describe an ordered collection of context enumeration alarms, duplicates are valid. Process the contexts in list order. See EnumerationContextAlarmType.
+/// Describe an ordered collection of context enumeration alarms, duplicates are
+/// valid. Process the contexts in list order. See EnumerationContextAlarmType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct EnumerationContextAlarmListType {
-    /// A Context contains a new alarm definition and a context match. The match takes precedence over any default alarm when the first in the overall list evaluates to true. It is also possible the alarm definition is empty, in which case the context means no alarm defined when the match is true.
+    /// A Context contains a new alarm definition and a context match. The match
+    /// takes precedence over any default alarm when the first in the overall
+    /// list evaluates to true. It is also possible the alarm definition is
+    /// empty, in which case the context means no alarm defined when the match
+    /// is true.
     pub context_alarm: Vec<EnumerationContextAlarmType>,
 }
 
@@ -11468,26 +13059,36 @@ impl XmlElement for EnumerationContextAlarmListType {
     }
 }
 
-/// Describe a context that when true the alarm condition may be evaluated. See ContextMatchType and EnumerationAlarmType.
+/// Describe a context that when true the alarm condition may be evaluated. See
+/// ContextMatchType and EnumerationAlarmType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct EnumerationContextAlarmType {
     /// The alarm definition may be named.
     pub name: Option<String>,
     /// An optional brief description of this alarm definition.
     pub short_description: Option<String>,
-    /// The number of successive instances that meet the alarm conditions for the alarm to trigger. The default is 1.
+    /// The number of successive instances that meet the alarm conditions for
+    /// the alarm to trigger. The default is 1.
     ///
     /// Schema default: `1`.
     pub min_violations: Option<i64>,
-    /// Optionally specify the number of successive instances that do not meet the alarm conditions to leave the alarm state. If this attribute is not specified, it is treated as being equal to minViolations (symmetric).
+    /// Optionally specify the number of successive instances that do not meet
+    /// the alarm conditions to leave the alarm state. If this attribute is not
+    /// specified, it is treated as being equal to minViolations (symmetric).
     ///
     /// Schema default: `1`.
     pub min_conformance: Option<i64>,
-    /// The initial state of this alarm definition as delivered. When true, this leaves the alarm definition empty for the parameter and also short circuits the remaining context matches and the default so no alarm is active on the parameter.
+    /// The initial state of this alarm definition as delivered. When true, this
+    /// leaves the alarm definition empty for the parameter and also short
+    /// circuits the remaining context matches and the default so no alarm is
+    /// active on the parameter.
     ///
     /// Schema default: `false`.
     pub disabled: Option<bool>,
-    /// Alarm state name for when no enumeration alarms evaluate to true. This defaults to "normal", which is almost always the case. Setting it to another alarm state permits a form of "inverted logic" where the alarm list can specify the normal states instead of the alarm states.
+    /// Alarm state name for when no enumeration alarms evaluate to true. This
+    /// defaults to "normal", which is almost always the case. Setting it to
+    /// another alarm state permits a form of "inverted logic" where the alarm
+    /// list can specify the normal states instead of the alarm states.
     ///
     /// Schema default: `normal`.
     pub default_alarm_level: Option<ConcernLevelsType>,
@@ -11497,7 +13098,8 @@ pub struct EnumerationContextAlarmType {
     pub choice: Option<EnumerationContextAlarmChoice>,
     /// List of alarm state definitions for this enumerated type.
     pub enumeration_alarm_list: Option<EnumerationAlarmListType>,
-    /// Describe a context in terms of a parameter and value that when true enables the context alarm definition.
+    /// Describe a context in terms of a parameter and value that when true
+    /// enables the context alarm definition.
     pub context_match: ContextMatchType,
 }
 
@@ -11542,11 +13144,19 @@ impl XmlElement for EnumerationContextAlarmType {
             let (k, raw) = a?;
             match k {
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
-                "minViolations" => v.min_violations = Some(r.attr_value(tag, raw)?),
-                "minConformance" => v.min_conformance = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
+                "minViolations" => {
+                    v.min_violations = Some(r.attr_value(tag, raw)?)
+                }
+                "minConformance" => {
+                    v.min_conformance = Some(r.attr_value(tag, raw)?)
+                }
                 "disabled" => v.disabled = Some(r.attr_value(tag, raw)?),
-                "defaultAlarmLevel" => v.default_alarm_level = Some(r.attr_value(tag, raw)?),
+                "defaultAlarmLevel" => {
+                    v.default_alarm_level = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -11610,7 +13220,8 @@ impl XmlElement for EnumerationListType {
     }
 }
 
-/// Describe CRC, Checksum, Parity, or XOR for error detection and correction algorithm calculation. See CRCType, ChecksumType, ParityType, and XORType.
+/// Describe CRC, Checksum, Parity, or XOR for error detection and correction
+/// algorithm calculation. See CRCType, ChecksumType, ParityType, and XORType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ErrorDetectCorrectType {
     /// One of: `Checksum`, `CRC`, `XOR`, `Parity`.
@@ -11654,24 +13265,36 @@ impl XmlElement for ErrorDetectCorrectType {
     }
 }
 
-/// A verifier that indicates that the command is being executed. An optional Element indicates how far along the command has progressed either as a fixed value or an (possibly scaled) ParameterInstance value.
+/// A verifier that indicates that the command is being executed. An optional
+/// Element indicates how far along the command has progressed either as a fixed
+/// value or an (possibly scaled) ParameterInstance value.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ExecutionVerifierType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
-    /// Optional name of this defined item. See NameType for restriction information.
+    /// Optional name of this defined item. See NameType for restriction
+    /// information.
     pub name: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// One of: `ComparisonList`, `ContainerRef`, `ParameterValueChange`, `CustomAlgorithm`, `BooleanExpression`, `Comparison`.
+    /// One of: `ComparisonList`, `ContainerRef`, `ParameterValueChange`,
+    /// `CustomAlgorithm`, `BooleanExpression`, `Comparison`.
     pub choice1: ExecutionVerifierChoice1,
     /// One of: `CheckWindow`, `CheckWindowAlgorithms`.
     pub choice2: ExecutionVerifierChoice2,
-    /// Optional list of argument values that manifest this post-transmission validation parameter value check. When not present, this check applies to all instances of the command.
+    /// Optional list of argument values that manifest this post-transmission
+    /// validation parameter value check. When not present, this check applies
+    /// to all instances of the command.
     pub argument_restriction_list: Option<ArgumentAssignmentListType>,
     /// Element `PercentComplete`.
     pub percent_complete: Option<PercentCompleteType>,
@@ -11712,7 +13335,9 @@ impl XmlElement for ExecutionVerifierType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -11779,7 +13404,8 @@ impl XmlElement for ExternalAlgorithmSetType {
     }
 }
 
-/// This is the external algorithm. Multiple entries are provided so that the same database may be used for multiple implementation s
+/// This is the external algorithm. Multiple entries are provided so that the
+/// same database may be used for multiple implementation s
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ExternalAlgorithmType {
     /// Attribute `implementationName`.
@@ -11826,24 +13452,35 @@ impl XmlElement for ExternalAlgorithmType {
     }
 }
 
-/// When true, indicates that the command failed. timeToWait is how long to wait for the FailedVerifier to test true.
+/// When true, indicates that the command failed. timeToWait is how long to wait
+/// for the FailedVerifier to test true.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FailedVerifierType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
-    /// Optional name of this defined item. See NameType for restriction information.
+    /// Optional name of this defined item. See NameType for restriction
+    /// information.
     pub name: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// One of: `ComparisonList`, `ContainerRef`, `ParameterValueChange`, `CustomAlgorithm`, `BooleanExpression`, `Comparison`.
+    /// One of: `ComparisonList`, `ContainerRef`, `ParameterValueChange`,
+    /// `CustomAlgorithm`, `BooleanExpression`, `Comparison`.
     pub choice1: FailedVerifierChoice1,
     /// One of: `CheckWindow`, `CheckWindowAlgorithms`.
     pub choice2: FailedVerifierChoice2,
-    /// Optional list of argument values that manifest this post-transmission validation parameter value check. When not present, this check applies to all instances of the command.
+    /// Optional list of argument values that manifest this post-transmission
+    /// validation parameter value check. When not present, this check applies
+    /// to all instances of the command.
     pub argument_restriction_list: Option<ArgumentAssignmentListType>,
     /// Element `ReturnParmRef`.
     pub return_parm_ref: Option<ParameterRefType>,
@@ -11884,7 +13521,9 @@ impl XmlElement for FailedVerifierType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -11911,10 +13550,15 @@ impl XmlElement for FailedVerifierType {
     }
 }
 
-/// For streams that contain a series of frames with a fixed frame length where the frames are found by looking for a marker in the data. This marker is sometimes called the frame sync pattern and sometimes the Asynchronous Sync Marker (ASM). This marker need not be contiguous although it usually is.
+/// For streams that contain a series of frames with a fixed frame length where
+/// the frames are found by looking for a marker in the data. This marker is
+/// sometimes called the frame sync pattern and sometimes the Asynchronous Sync
+/// Marker (ASM). This marker need not be contiguous although it usually is.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FixedFrameStreamType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
@@ -11934,11 +13578,15 @@ pub struct FixedFrameStreamType {
     pub sync_aperture_in_bits: Option<i64>,
     /// Attribute `frameLengthInBits`.
     pub frame_length_in_bits: i64,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// One of: `ContainerRef`, `ServiceRef`.
     pub choice: FixedFrameStreamChoice,
@@ -11993,15 +13641,21 @@ impl XmlElement for FixedFrameStreamType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
-                "bitRateInBPS" => v.bit_rate_in_bps = Some(r.attr_value(tag, raw)?),
+                "bitRateInBPS" => {
+                    v.bit_rate_in_bps = Some(r.attr_value(tag, raw)?)
+                }
                 "pcmType" => v.pcm_type = Some(r.attr_value(tag, raw)?),
                 "inverted" => v.inverted = Some(r.attr_value(tag, raw)?),
-                "syncApertureInBits" => v.sync_aperture_in_bits = Some(r.attr_value(tag, raw)?),
+                "syncApertureInBits" => {
+                    v.sync_aperture_in_bits = Some(r.attr_value(tag, raw)?)
+                }
                 "frameLengthInBits" => {
                     v.frame_length_in_bits = r.attr_value(tag, raw)?;
                     seen_frame_length_in_bits = true;
@@ -12037,7 +13691,9 @@ impl XmlElement for FixedFrameStreamType {
     }
 }
 
-/// Describe a sync pattern and an optional reference to an algorithm used to invert the stream if the frame sync pattern is not found. See FixedFrameStreamType.
+/// Describe a sync pattern and an optional reference to an algorithm used to
+/// invert the stream if the frame sync pattern is not found. See
+/// FixedFrameStreamType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FixedFrameSyncStrategyType {
     /// Attribute `verifyToLockGoodFrames`.
@@ -12054,7 +13710,8 @@ pub struct FixedFrameSyncStrategyType {
     pub max_bit_errors_in_sync_pattern: Option<i64>,
     /// Element `AutoInvert`.
     pub auto_invert: Option<AutoInvertType>,
-    /// The pattern of bits used to look for frame synchronization. See SyncPatternType.
+    /// The pattern of bits used to look for frame synchronization. See
+    /// SyncPatternType.
     pub sync_pattern: SyncPatternType,
 }
 
@@ -12090,7 +13747,8 @@ impl XmlElement for FixedFrameSyncStrategyType {
                     v.check_to_lock_good_frames = Some(r.attr_value(tag, raw)?)
                 }
                 "maxBitErrorsInSyncPattern" => {
-                    v.max_bit_errors_in_sync_pattern = Some(r.attr_value(tag, raw)?)
+                    v.max_bit_errors_in_sync_pattern =
+                        Some(r.attr_value(tag, raw)?)
                 }
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -12138,8 +13796,12 @@ impl XmlElement for FlagType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "flagSizeInBits" => v.flag_size_in_bits = Some(r.attr_value(tag, raw)?),
-                "flagBitType" => v.flag_bit_type = Some(r.attr_value(tag, raw)?),
+                "flagSizeInBits" => {
+                    v.flag_size_in_bits = Some(r.attr_value(tag, raw)?)
+                }
+                "flagBitType" => {
+                    v.flag_bit_type = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -12148,32 +13810,53 @@ impl XmlElement for FlagType {
     }
 }
 
-/// Describe a floating point argument type. Several encodings are supported. Calibrated integer to float relationships should be described with this data type. Use the data encoding to define calibrators. Joins integer as one of the numerics. See FloatDataEncodingType, IntegerDataEncodingType and FloatDataType.
+/// Describe a floating point argument type. Several encodings are supported.
+/// Calibrated integer to float relationships should be described with this data
+/// type. Use the data encoding to define calibrators. Joins integer as one of
+/// the numerics. See FloatDataEncodingType, IntegerDataEncodingType and
+/// FloatDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FloatArgumentType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Used to derive one Data Type from another - will inherit all the attributes from the baseType any of which may be redefined in this type definition.
+    /// Used to derive one Data Type from another - will inherit all the
+    /// attributes from the baseType any of which may be redefined in this type
+    /// definition.
     pub base_type: Option<String>,
     /// Default/Initial value is always given in calibrated form.
     pub initial_value: Option<f64>,
-    /// Optional hint to the implementation about the size of the engineering/calibrated data type to use internally. Generally this can be determined by examination of the space required to capture the full range of the encoding, but it is not always clear when calibrators are in use. A tolerant implementation will endeavor to always make sufficient size engineering data types to capture the entire range of possible values.
+    /// Optional hint to the implementation about the size of the
+    /// engineering/calibrated data type to use internally. Generally this can
+    /// be determined by examination of the space required to capture the full
+    /// range of the encoding, but it is not always clear when calibrators are
+    /// in use. A tolerant implementation will endeavor to always make
+    /// sufficient size engineering data types to capture the entire range of
+    /// possible values.
     ///
     /// Schema default: `32`.
     pub size_in_bits: Option<FloatSizeInBitsType>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// When appropriate, describe the units of measure that are represented by this argument value.
+    /// When appropriate, describe the units of measure that are represented by
+    /// this argument value.
     pub unit_set: Option<UnitSetType>,
-    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`, `StringDataEncoding`.
+    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding`, `StringDataEncoding`.
     pub choice: Option<FloatArgumentChoice>,
-    /// This element provides the implementation with assistance rendering the value as a string for users.
+    /// This element provides the implementation with assistance rendering the
+    /// value as a string for users.
     pub to_string: Option<ToStringType>,
     /// Provides additional platform/program specific ranging information.
     pub valid_range_set: Option<ValidFloatRangeSetType>,
@@ -12226,13 +13909,17 @@ impl XmlElement for FloatArgumentType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 "sizeInBits" => v.size_in_bits = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -12277,21 +13964,31 @@ pub struct FloatDataEncodingType {
     ///
     /// Schema default: `mostSignificantByteFirst`.
     pub byte_order: Option<String>,
-    /// Specifies real/decimal numeric value to raw encoding method, with the default being "IEEE754_1985".
+    /// Specifies real/decimal numeric value to raw encoding method, with the
+    /// default being "IEEE754_1985".
     ///
     /// Schema default: `IEEE754_1985`.
     pub encoding: Option<FloatEncodingType>,
-    /// Number of bits to use for the float raw encoding method, with 32 being the default. Not every number of bits is valid for each encoding method.
+    /// Number of bits to use for the float raw encoding method, with 32 being
+    /// the default. Not every number of bits is valid for each encoding method.
     ///
     /// Schema default: `32`.
     pub size_in_bits: Option<FloatEncodingSizeInBitsType>,
-    /// A changeThreshold may optionally be specified to inform systems of the minimum change in value that is significant. This is used by some systems to limit the telemetry processing and/or recording requirements. If the value is unspecified or zero, any change is significant.
+    /// A changeThreshold may optionally be specified to inform systems of the
+    /// minimum change in value that is significant. This is used by some
+    /// systems to limit the telemetry processing and/or recording requirements.
+    /// If the value is unspecified or zero, any change is significant.
     pub change_threshold: Option<f64>,
-    /// DEPRECATED: Use the ErrorDetectCorrect element in the container elements instead.
+    /// DEPRECATED: Use the ErrorDetectCorrect element in the container elements
+    /// instead.
     pub error_detect_correct: Option<ErrorDetectCorrectType>,
-    /// Calibrator to be applied to the raw uncalibrated value to arrive at the engineering/calibrated value when no Context Calibrators are provided or evaluate to true, based on their MatchCriteria.
+    /// Calibrator to be applied to the raw uncalibrated value to arrive at the
+    /// engineering/calibrated value when no Context Calibrators are provided or
+    /// evaluate to true, based on their MatchCriteria.
     pub default_calibrator: Option<CalibratorType>,
-    /// Calibrator to be applied to the raw uncalibrated value to arrive at the engineering/calibrated value when a MatchCriteria evaluates to true. The first in the list to match takes precedence.
+    /// Calibrator to be applied to the raw uncalibrated value to arrive at the
+    /// engineering/calibrated value when a MatchCriteria evaluates to true. The
+    /// first in the list to match takes precedence.
     pub context_calibrator_list: Option<ContextCalibratorListType>,
 }
 
@@ -12335,7 +14032,9 @@ impl XmlElement for FloatDataEncodingType {
                 "byteOrder" => v.byte_order = Some(r.attr_value(tag, raw)?),
                 "encoding" => v.encoding = Some(r.attr_value(tag, raw)?),
                 "sizeInBits" => v.size_in_bits = Some(r.attr_value(tag, raw)?),
-                "changeThreshold" => v.change_threshold = Some(r.attr_value(tag, raw)?),
+                "changeThreshold" => {
+                    v.change_threshold = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -12353,34 +14052,66 @@ impl XmlElement for FloatDataEncodingType {
     }
 }
 
-/// A base schema type for describing a floating point engineering/calibrated data type. Several encodings are supported. Calibrated integer to float relationships should be described with this data type. Use the data encoding to define calibrators. Joins integer as one of the numerics. See BaseDataType, FloatParameterType and FloatArgumentType.
+/// A base schema type for describing a floating point engineering/calibrated
+/// data type. Several encodings are supported. Calibrated integer to float
+/// relationships should be described with this data type. Use the data encoding
+/// to define calibrators. Joins integer as one of the numerics. See
+/// BaseDataType, FloatParameterType and FloatArgumentType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FloatDataType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Used to derive one Data Type from another - will inherit all the attributes from the baseType any of which may be redefined in this type definition.
+    /// Used to derive one Data Type from another - will inherit all the
+    /// attributes from the baseType any of which may be redefined in this type
+    /// definition.
     pub base_type: Option<String>,
     /// Initial value is always given in calibrated form
     pub initial_value: Option<f64>,
-    /// Optional hint to the implementation about the size of the engineering/calibrated data type to use internally. Generally this can be determined by examination of the space required to capture the full range of the encoding, but it is not always clear when calibrators are in use. A tolerant implementation will endeavor to always make sufficient size engineering data types to capture the entire range of possible values.
+    /// Optional hint to the implementation about the size of the
+    /// engineering/calibrated data type to use internally. Generally this can
+    /// be determined by examination of the space required to capture the full
+    /// range of the encoding, but it is not always clear when calibrators are
+    /// in use. A tolerant implementation will endeavor to always make
+    /// sufficient size engineering data types to capture the entire range of
+    /// possible values.
     ///
     /// Schema default: `32`.
     pub size_in_bits: Option<FloatSizeInBitsType>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// When appropriate, describe the units of measure that are represented by this parameter value.
+    /// When appropriate, describe the units of measure that are represented by
+    /// this parameter value.
     pub unit_set: Option<UnitSetType>,
-    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`, `StringDataEncoding`.
+    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding`, `StringDataEncoding`.
     pub choice: Option<FloatDataChoice>,
-    /// This element provides the implementation with assistance rendering the value as a string for users.
+    /// This element provides the implementation with assistance rendering the
+    /// value as a string for users.
     pub to_string: Option<ToStringType>,
-    /// The ValidRange defines the span of valid values for this data type. This is a subset within the data type itself. For example, an IEEE754 encoded float has almost a universal of possible values. However, the known possible valid range may only span -180.0 to +180.0, due to the physics of the measurement. So, the valid range provides additional boundary/constraint information beyond that of the data encoding in the range of possible values that are meaningful to this parameter. The valid range is not to be construed as an alarm definition and is not affected by any alarm definitions, instead violations of the valid range make a parameter value "unreasonable", as opposed to reasonable to be reported. The exact effect of this state which should be of concern is implementation dependent.
+    /// The ValidRange defines the span of valid values for this data type. This
+    /// is a subset within the data type itself. For example, an IEEE754 encoded
+    /// float has almost a universal of possible values. However, the known
+    /// possible valid range may only span -180.0 to +180.0, due to the physics
+    /// of the measurement. So, the valid range provides additional
+    /// boundary/constraint information beyond that of the data encoding in the
+    /// range of possible values that are meaningful to this parameter. The
+    /// valid range is not to be construed as an alarm definition and is not
+    /// affected by any alarm definitions, instead violations of the valid range
+    /// make a parameter value "unreasonable", as opposed to reasonable to be
+    /// reported. The exact effect of this state which should be of concern is
+    /// implementation dependent.
     pub valid_range: Option<FloatDataValidRangeType>,
 }
 
@@ -12431,13 +14162,17 @@ impl XmlElement for FloatDataType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 "sizeInBits" => v.size_in_bits = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -12481,7 +14216,8 @@ pub struct FloatDataValidRangeType {
     pub max_inclusive: Option<f64>,
     /// Maximum decimal/real number value excluding itself.
     pub max_exclusive: Option<f64>,
-    /// By default and general recommendation, the valid range is specified in engineering/calibrated values, although this can be adjusted.
+    /// By default and general recommendation, the valid range is specified in
+    /// engineering/calibrated values, although this can be adjusted.
     ///
     /// Schema default: `true`.
     pub valid_range_applies_to_calibrated: Option<bool>,
@@ -12514,12 +14250,21 @@ impl XmlElement for FloatDataValidRangeType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "minInclusive" => v.min_inclusive = Some(r.attr_value(tag, raw)?),
-                "minExclusive" => v.min_exclusive = Some(r.attr_value(tag, raw)?),
-                "maxInclusive" => v.max_inclusive = Some(r.attr_value(tag, raw)?),
-                "maxExclusive" => v.max_exclusive = Some(r.attr_value(tag, raw)?),
+                "minInclusive" => {
+                    v.min_inclusive = Some(r.attr_value(tag, raw)?)
+                }
+                "minExclusive" => {
+                    v.min_exclusive = Some(r.attr_value(tag, raw)?)
+                }
+                "maxInclusive" => {
+                    v.max_inclusive = Some(r.attr_value(tag, raw)?)
+                }
+                "maxExclusive" => {
+                    v.max_exclusive = Some(r.attr_value(tag, raw)?)
+                }
                 "validRangeAppliesToCalibrated" => {
-                    v.valid_range_applies_to_calibrated = Some(r.attr_value(tag, raw)?)
+                    v.valid_range_applies_to_calibrated =
+                        Some(r.attr_value(tag, raw)?)
                 }
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -12529,38 +14274,84 @@ impl XmlElement for FloatDataValidRangeType {
     }
 }
 
-/// Describe a floating point parameter type. Several encodings are supported. Calibrated integer to float relationships should be described with this data type. Use the data encoding to define calibrators. Joins integer as one of the numerics. See FloatDataEncodingType, IntegerDataEncodingType and FloatDataType.
+/// Describe a floating point parameter type. Several encodings are supported.
+/// Calibrated integer to float relationships should be described with this data
+/// type. Use the data encoding to define calibrators. Joins integer as one of
+/// the numerics. See FloatDataEncodingType, IntegerDataEncodingType and
+/// FloatDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FloatParameterType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Used to derive one Data Type from another - will inherit all the attributes from the baseType any of which may be redefined in this type definition.
+    /// Used to derive one Data Type from another - will inherit all the
+    /// attributes from the baseType any of which may be redefined in this type
+    /// definition.
     pub base_type: Option<String>,
     /// Initial value is always given in calibrated form
     pub initial_value: Option<f64>,
-    /// Optional hint to the implementation about the size of the engineering/calibrated data type to use internally. Generally this can be determined by examination of the space required to capture the full range of the encoding, but it is not always clear when calibrators are in use. A tolerant implementation will endeavor to always make sufficient size engineering data types to capture the entire range of possible values.
+    /// Optional hint to the implementation about the size of the
+    /// engineering/calibrated data type to use internally. Generally this can
+    /// be determined by examination of the space required to capture the full
+    /// range of the encoding, but it is not always clear when calibrators are
+    /// in use. A tolerant implementation will endeavor to always make
+    /// sufficient size engineering data types to capture the entire range of
+    /// possible values.
     ///
     /// Schema default: `32`.
     pub size_in_bits: Option<FloatSizeInBitsType>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// When appropriate, describe the units of measure that are represented by this parameter value.
+    /// When appropriate, describe the units of measure that are represented by
+    /// this parameter value.
     pub unit_set: Option<UnitSetType>,
-    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`, `StringDataEncoding`.
+    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding`, `StringDataEncoding`.
     pub choice: Option<FloatParameterChoice>,
-    /// This element provides the implementation with assistance rendering the value as a string for users.
+    /// This element provides the implementation with assistance rendering the
+    /// value as a string for users.
     pub to_string: Option<ToStringType>,
-    /// The ValidRange defines the span of valid values for this data type. This is a subset within the data type itself. For example, an IEEE754 encoded float has almost a universal of possible values. However, the known possible valid range may only span -180.0 to +180.0, due to the physics of the measurement. So, the valid range provides additional boundary/constraint information beyond that of the data encoding in the range of possible values that are meaningful to this parameter. The valid range is not to be construed as an alarm definition and is not affected by any alarm definitions, instead violations of the valid range make a parameter value "unreasonable", as opposed to reasonable to be reported. The exact effect of this state which should be of concern is implementation dependent.
+    /// The ValidRange defines the span of valid values for this data type. This
+    /// is a subset within the data type itself. For example, an IEEE754 encoded
+    /// float has almost a universal of possible values. However, the known
+    /// possible valid range may only span -180.0 to +180.0, due to the physics
+    /// of the measurement. So, the valid range provides additional
+    /// boundary/constraint information beyond that of the data encoding in the
+    /// range of possible values that are meaningful to this parameter. The
+    /// valid range is not to be construed as an alarm definition and is not
+    /// affected by any alarm definitions, instead violations of the valid range
+    /// make a parameter value "unreasonable", as opposed to reasonable to be
+    /// reported. The exact effect of this state which should be of concern is
+    /// implementation dependent.
     pub valid_range: Option<FloatDataValidRangeType>,
-    /// Default alarm definitions are those which do not adjust definition logic based on the value of other parameters. Other parameters may participate in the determination of an alarm condition for this parameter, but the definition logic of the alarm on this parameter is constant. If the alarming logic on this parameter changes based on the value of other parameters, then it is a ContextAlarm and belongs in the ContextAlarmList element.
+    /// Default alarm definitions are those which do not adjust definition logic
+    /// based on the value of other parameters. Other parameters may participate
+    /// in the determination of an alarm condition for this parameter, but the
+    /// definition logic of the alarm on this parameter is constant. If the
+    /// alarming logic on this parameter changes based on the value of other
+    /// parameters, then it is a ContextAlarm and belongs in the
+    /// ContextAlarmList element.
     pub default_alarm: Option<NumericAlarmType>,
-    /// Context alarm definitions are those which adjust the definition logic for this parameter based on the value of other parameters. A context which evaluates to being in effect, based on the testing of another parameter, takes precedence over the default alarms in the DefaultAlarm element. If the no context alarm evaluates to being in effect, based on the testing of another parameter, then the default alarm definitions from the DefaultAlarm element will remain in effect. If multiple contexts evaluate to being in effect, then the first one that appears will take precedence.
+    /// Context alarm definitions are those which adjust the definition logic
+    /// for this parameter based on the value of other parameters. A context
+    /// which evaluates to being in effect, based on the testing of another
+    /// parameter, takes precedence over the default alarms in the DefaultAlarm
+    /// element. If the no context alarm evaluates to being in effect, based on
+    /// the testing of another parameter, then the default alarm definitions
+    /// from the DefaultAlarm element will remain in effect. If multiple
+    /// contexts evaluate to being in effect, then the first one that appears
+    /// will take precedence.
     pub context_alarm_list: Option<NumericContextAlarmListType>,
 }
 
@@ -12617,13 +14408,17 @@ impl XmlElement for FloatParameterType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 "sizeInBits" => v.size_in_bits = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -12663,7 +14458,10 @@ impl XmlElement for FloatParameterType {
     }
 }
 
-/// Describe a floating point based range, several types of ranges are supported -- one sided and two sided, inclusive or exclusive. It would not make sense to set two mins or maxes. Used in a number of locations related to ranges: ValidFloatRangeSetType or AlarmRangeType for example.
+/// Describe a floating point based range, several types of ranges are supported
+/// -- one sided and two sided, inclusive or exclusive. It would not make sense
+/// to set two mins or maxes. Used in a number of locations related to ranges:
+/// ValidFloatRangeSetType or AlarmRangeType for example.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FloatRangeType {
     /// Minimum decimal/real number value including itself.
@@ -12700,10 +14498,18 @@ impl XmlElement for FloatRangeType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "minInclusive" => v.min_inclusive = Some(r.attr_value(tag, raw)?),
-                "minExclusive" => v.min_exclusive = Some(r.attr_value(tag, raw)?),
-                "maxInclusive" => v.max_inclusive = Some(r.attr_value(tag, raw)?),
-                "maxExclusive" => v.max_exclusive = Some(r.attr_value(tag, raw)?),
+                "minInclusive" => {
+                    v.min_inclusive = Some(r.attr_value(tag, raw)?)
+                }
+                "minExclusive" => {
+                    v.min_exclusive = Some(r.attr_value(tag, raw)?)
+                }
+                "maxInclusive" => {
+                    v.max_inclusive = Some(r.attr_value(tag, raw)?)
+                }
+                "maxExclusive" => {
+                    v.max_exclusive = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -12715,7 +14521,9 @@ impl XmlElement for FloatRangeType {
 /// The top level type definition for all data streams that are frame based.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FrameStreamType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
@@ -12729,11 +14537,15 @@ pub struct FrameStreamType {
     ///
     /// Schema default: `false`.
     pub inverted: Option<bool>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// One of: `ContainerRef`, `ServiceRef`.
     pub choice: FrameStreamChoice,
@@ -12780,12 +14592,16 @@ impl XmlElement for FrameStreamType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
-                "bitRateInBPS" => v.bit_rate_in_bps = Some(r.attr_value(tag, raw)?),
+                "bitRateInBPS" => {
+                    v.bit_rate_in_bps = Some(r.attr_value(tag, raw)?)
+                }
                 "pcmType" => v.pcm_type = Some(r.attr_value(tag, raw)?),
                 "inverted" => v.inverted = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
@@ -12812,26 +14628,34 @@ impl XmlElement for FrameStreamType {
     }
 }
 
-/// Schema for a Header record. A header contains general information about the system or subsystem.
+/// Schema for a Header record. A header contains general information about the
+/// system or subsystem.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct HeaderType {
-    /// This attribute contains an optional version descriptor for this document.
+    /// This attribute contains an optional version descriptor for this
+    /// document.
     pub version: Option<String>,
-    /// This attribute contains an optional date to be associated with this document.
+    /// This attribute contains an optional date to be associated with this
+    /// document.
     pub date: Option<String>,
-    /// This attribute contains optional classification status for use by programs for which that is applicable.
+    /// This attribute contains optional classification status for use by
+    /// programs for which that is applicable.
     ///
     /// Schema default: `NotClassified`.
     pub classification: Option<String>,
-    /// This attribute contains an optional additional instructions attribute to be interpreted by programs that use this attribute.
+    /// This attribute contains an optional additional instructions attribute to
+    /// be interpreted by programs that use this attribute.
     pub classification_instructions: Option<String>,
-    /// This attribute contains a flag describing the state of this document in the evolution of the project using it.
+    /// This attribute contains a flag describing the state of this document in
+    /// the evolution of the project using it.
     pub validation_status: ValidationStatusType,
     /// The AuthorSet contains optional contact information for this document.
     pub author_set: Option<AuthorSetType>,
-    /// The NoteSet contains optional technical information related to the content of this document.
+    /// The NoteSet contains optional technical information related to the
+    /// content of this document.
     pub note_set: Option<NoteSetType>,
-    /// The HistorySet contains optional evolutionary information for data contained in this document.
+    /// The HistorySet contains optional evolutionary information for data
+    /// contained in this document.
     pub history_set: Option<HistorySetType>,
 }
 
@@ -12872,9 +14696,12 @@ impl XmlElement for HeaderType {
             match k {
                 "version" => v.version = Some(r.attr_value(tag, raw)?),
                 "date" => v.date = Some(r.attr_value(tag, raw)?),
-                "classification" => v.classification = Some(r.attr_value(tag, raw)?),
+                "classification" => {
+                    v.classification = Some(r.attr_value(tag, raw)?)
+                }
                 "classificationInstructions" => {
-                    v.classification_instructions = Some(r.attr_value(tag, raw)?)
+                    v.classification_instructions =
+                        Some(r.attr_value(tag, raw)?)
                 }
                 "validationStatus" => {
                     v.validation_status = r.attr_value(tag, raw)?;
@@ -12900,7 +14727,8 @@ impl XmlElement for HeaderType {
     }
 }
 
-/// Describe an unordered collection of History elements. Usage is user defined. See HistoryType.
+/// Describe an unordered collection of History elements. Usage is user defined.
+/// See HistoryType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct HistorySetType {
     /// Contains a history record related to the evolution of this document.
@@ -12931,18 +14759,36 @@ impl XmlElement for HistorySetType {
     }
 }
 
-/// An entry whose name is given by the value of a ParamameterInstance. This entry may be used to implement dwell telemetry streams. The value of the parameter in ParameterInstance must use either the name of the Parameter or its alias. If it's an alias name, the alias namespace is supplied as an attribute.
+/// An entry whose name is given by the value of a ParamameterInstance. This
+/// entry may be used to implement dwell telemetry streams. The value of the
+/// parameter in ParameterInstance must use either the name of the Parameter or
+/// its alias. If it's an alias name, the alias namespace is supplied as an
+/// attribute.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct IndirectParameterRefEntryType {
     /// Optional short description for this entry element.
     pub short_description: Option<String>,
     /// Attribute `aliasNameSpace`.
     pub alias_name_space: Option<String>,
-    /// The start bit 0 position for each container is local to the container, but does include space occupied by inherited containers. When a container is "included", as opposed to inherited, then the interpreting implementation takes into account the start bit position of the referring container when finally assembling the start bits for the post-processed entry content. The default start bit for any entry is 0 bits from the previous entry, making the content contiguous when this element is not used.
+    /// The start bit 0 position for each container is local to the container,
+    /// but does include space occupied by inherited containers. When a
+    /// container is "included", as opposed to inherited, then the interpreting
+    /// implementation takes into account the start bit position of the
+    /// referring container when finally assembling the start bits for the
+    /// post-processed entry content. The default start bit for any entry is 0
+    /// bits from the previous entry, making the content contiguous when this
+    /// element is not used.
     pub location_in_container_in_bits: Option<LocationInContainerInBitsType>,
-    /// May be used when this entry repeats itself in the sequence container. When an entry repeats, it effectively specifies that the same entry is reported more than once in the container and has the same physical meaning. This should not be construed to be equivalent to arrays.
+    /// May be used when this entry repeats itself in the sequence container.
+    /// When an entry repeats, it effectively specifies that the same entry is
+    /// reported more than once in the container and has the same physical
+    /// meaning. This should not be construed to be equivalent to arrays.
     pub repeat_entry: Option<RepeatType>,
-    /// This entry will only be included in the sequence when this condition is true, otherwise it is always included. When the include condition evaluates to false, it is as if the entry does not exist such that any start bit interpretations cannot take into account the space that would have been occupied if this included condition were true.
+    /// This entry will only be included in the sequence when this condition is
+    /// true, otherwise it is always included. When the include condition
+    /// evaluates to false, it is as if the entry does not exist such that any
+    /// start bit interpretations cannot take into account the space that would
+    /// have been occupied if this included condition were true.
     pub include_condition: Option<MatchCriteriaType>,
     /// Optional timing information associated with this entry.
     pub time_association: Option<TimeAssociationType>,
@@ -12986,8 +14832,12 @@ impl XmlElement for IndirectParameterRefEntryType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
-                "aliasNameSpace" => v.alias_name_space = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
+                "aliasNameSpace" => {
+                    v.alias_name_space = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -13018,21 +14868,28 @@ impl XmlElement for IndirectParameterRefEntryType {
 /// A set of labeled inputs is added to the SimpleAlgorithmType
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct InputAlgorithmType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// Element `AlgorithmText`.
     pub algorithm_text: Option<AlgorithmTextType>,
     /// Element `ExternalAlgorithmSet`.
     pub external_algorithm_set: Option<ExternalAlgorithmSetType>,
-    /// The InputSet describes the list of parameters that should be made available as input arguments to the algorithm.
+    /// The InputSet describes the list of parameters that should be made
+    /// available as input arguments to the algorithm.
     pub input_set: Option<InputSetType>,
 }
 
@@ -13071,7 +14928,9 @@ impl XmlElement for InputAlgorithmType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
@@ -13108,7 +14967,9 @@ impl XmlElement for InputAlgorithmType {
 /// A set of labeled outputs are added to the SimpleInputAlgorithmType
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct InputOutputAlgorithmType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
@@ -13116,17 +14977,22 @@ pub struct InputOutputAlgorithmType {
     ///
     /// Schema default: `false`.
     pub thread: Option<bool>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// Element `AlgorithmText`.
     pub algorithm_text: Option<AlgorithmTextType>,
     /// Element `ExternalAlgorithmSet`.
     pub external_algorithm_set: Option<ExternalAlgorithmSetType>,
-    /// The InputSet describes the list of parameters that should be made available as input arguments to the algorithm.
+    /// The InputSet describes the list of parameters that should be made
+    /// available as input arguments to the algorithm.
     pub input_set: Option<InputSetType>,
     /// Element `OutputSet`.
     pub output_set: Option<OutputSetType>,
@@ -13173,7 +15039,9 @@ impl XmlElement for InputOutputAlgorithmType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
@@ -13211,10 +15079,13 @@ impl XmlElement for InputOutputAlgorithmType {
     }
 }
 
-/// Input output algorithm is extended with a set of labeled triggers. See InputOutputAlgorithmType.
+/// Input output algorithm is extended with a set of labeled triggers. See
+/// InputOutputAlgorithmType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct InputOutputTriggerAlgorithmType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
@@ -13222,21 +15093,29 @@ pub struct InputOutputTriggerAlgorithmType {
     ///
     /// Schema default: `false`.
     pub thread: Option<bool>,
-    /// First telemetry container from which the output parameter should be calculated.
+    /// First telemetry container from which the output parameter should be
+    /// calculated.
     pub trigger_container: Option<String>,
-    /// Algorithm processing priority. If more than one algorithm is triggered by the same container, the lowest priority algorithm should be calculated first.
+    /// Algorithm processing priority. If more than one algorithm is triggered
+    /// by the same container, the lowest priority algorithm should be
+    /// calculated first.
     pub priority: Option<i32>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// Element `AlgorithmText`.
     pub algorithm_text: Option<AlgorithmTextType>,
     /// Element `ExternalAlgorithmSet`.
     pub external_algorithm_set: Option<ExternalAlgorithmSetType>,
-    /// The InputSet describes the list of parameters that should be made available as input arguments to the algorithm.
+    /// The InputSet describes the list of parameters that should be made
+    /// available as input arguments to the algorithm.
     pub input_set: Option<InputSetType>,
     /// Element `OutputSet`.
     pub output_set: Option<OutputSetType>,
@@ -13294,13 +15173,17 @@ impl XmlElement for InputOutputTriggerAlgorithmType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "thread" => v.thread = Some(r.attr_value(tag, raw)?),
-                "triggerContainer" => v.trigger_container = Some(r.attr_value(tag, raw)?),
+                "triggerContainer" => {
+                    v.trigger_container = Some(r.attr_value(tag, raw)?)
+                }
                 "priority" => v.priority = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -13337,7 +15220,10 @@ impl XmlElement for InputOutputTriggerAlgorithmType {
     }
 }
 
-/// Names an input parameter to the algorithm. There are two attributes to InputParm, inputName and parameterName. parameterName is a parameter reference name for a parameter that will be used in this algorithm. inputName is an optional "friendly" name for the input parameter.
+/// Names an input parameter to the algorithm. There are two attributes to
+/// InputParm, inputName and parameterName. parameterName is a parameter
+/// reference name for a parameter that will be used in this algorithm.
+/// inputName is an optional "friendly" name for the input parameter.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct InputParameterInstanceRefType {
     /// Attribute `parameterRef`.
@@ -13382,7 +15268,9 @@ impl XmlElement for InputParameterInstanceRefType {
                     seen_parameter_ref = true;
                 }
                 "instance" => v.instance = Some(r.attr_value(tag, raw)?),
-                "useCalibratedValue" => v.use_calibrated_value = Some(r.attr_value(tag, raw)?),
+                "useCalibratedValue" => {
+                    v.use_calibrated_value = Some(r.attr_value(tag, raw)?)
+                }
                 "inputName" => v.input_name = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -13430,36 +15318,59 @@ impl XmlElement for InputSetType {
     }
 }
 
-/// Describes an integer argument type. Several encodings supported. Calibrated integer to integer relationships should be described with this data type. Use the integer data encoding to define calibrators. Joins float as one of the numerics. See IntegerDataEncoding and IntegerDataType.
+/// Describes an integer argument type. Several encodings supported. Calibrated
+/// integer to integer relationships should be described with this data type.
+/// Use the integer data encoding to define calibrators. Joins float as one of
+/// the numerics. See IntegerDataEncoding and IntegerDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct IntegerArgumentType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Used to derive one Data Type from another - will inherit all the attributes from the baseType any of which may be redefined in this type definition.
+    /// Used to derive one Data Type from another - will inherit all the
+    /// attributes from the baseType any of which may be redefined in this type
+    /// definition.
     pub base_type: Option<String>,
-    /// Default/Initial value is always given in calibrated form. Specify the value as a base 10 integer.
+    /// Default/Initial value is always given in calibrated form. Specify the
+    /// value as a base 10 integer.
     pub initial_value: Option<i64>,
-    /// Optional hint to the implementation about the size of the engineering/calibrated data type to use internally. Generally this can be determined by examination of the space required to capture the full range of the encoding, but it is not always clear when calibrators are in use. A tolerant implementation will endeavor to always make sufficient size engineering data types to capture the entire range of possible values.
+    /// Optional hint to the implementation about the size of the
+    /// engineering/calibrated data type to use internally. Generally this can
+    /// be determined by examination of the space required to capture the full
+    /// range of the encoding, but it is not always clear when calibrators are
+    /// in use. A tolerant implementation will endeavor to always make
+    /// sufficient size engineering data types to capture the entire range of
+    /// possible values.
     ///
     /// Schema default: `32`.
     pub size_in_bits: Option<i64>,
-    /// Flag indicating if the engineering/calibrated data type used should support signed representation. This should not be confused with the encoding type for the raw value. The default is true.
+    /// Flag indicating if the engineering/calibrated data type used should
+    /// support signed representation. This should not be confused with the
+    /// encoding type for the raw value. The default is true.
     ///
     /// Schema default: `true`.
     pub signed: Option<bool>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// When appropriate, describe the units of measure that are represented by this argument value.
+    /// When appropriate, describe the units of measure that are represented by
+    /// this argument value.
     pub unit_set: Option<UnitSetType>,
-    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`, `StringDataEncoding`.
+    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding`, `StringDataEncoding`.
     pub choice: Option<IntegerArgumentChoice>,
-    /// This element provides the implementation with assistance rendering the value as a string for users.
+    /// This element provides the implementation with assistance rendering the
+    /// value as a string for users.
     pub to_string: Option<ToStringType>,
     /// Provides additional platform/program specific ranging information.
     pub valid_range_set: Option<ValidIntegerRangeSetType>,
@@ -13515,13 +15426,17 @@ impl XmlElement for IntegerArgumentType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 "sizeInBits" => v.size_in_bits = Some(r.attr_value(tag, raw)?),
                 "signed" => v.signed = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
@@ -13567,7 +15482,8 @@ pub struct IntegerDataEncodingType {
     ///
     /// Schema default: `mostSignificantByteFirst`.
     pub byte_order: Option<String>,
-    /// Specifies integer numeric value to raw encoding method, with the default being "unsigned".
+    /// Specifies integer numeric value to raw encoding method, with the default
+    /// being "unsigned".
     ///
     /// Schema default: `unsigned`.
     pub encoding: Option<IntegerEncodingType>,
@@ -13575,13 +15491,23 @@ pub struct IntegerDataEncodingType {
     ///
     /// Schema default: `8`.
     pub size_in_bits: Option<i64>,
-    /// A changeThreshold may optionally be specified to inform systems of the minimum change in value that is significant. This is used by some systems to limit the telemetry processing and/or recording requirements, such as for an analog-to-digital converter that dithers in the least significant bit. If the value is unspecified or zero, any change is significant.
+    /// A changeThreshold may optionally be specified to inform systems of the
+    /// minimum change in value that is significant. This is used by some
+    /// systems to limit the telemetry processing and/or recording requirements,
+    /// such as for an analog-to-digital converter that dithers in the least
+    /// significant bit. If the value is unspecified or zero, any change is
+    /// significant.
     pub change_threshold: Option<i64>,
-    /// DEPRECATED: Use the ErrorDetectCorrect element in the container elements instead.
+    /// DEPRECATED: Use the ErrorDetectCorrect element in the container elements
+    /// instead.
     pub error_detect_correct: Option<ErrorDetectCorrectType>,
-    /// Calibrator to be applied to the raw uncalibrated value to arrive at the engineering/calibrated value when no Context Calibrators are provided or evaluate to true, based on their MatchCriteria.
+    /// Calibrator to be applied to the raw uncalibrated value to arrive at the
+    /// engineering/calibrated value when no Context Calibrators are provided or
+    /// evaluate to true, based on their MatchCriteria.
     pub default_calibrator: Option<CalibratorType>,
-    /// Calibrator to be applied to the raw uncalibrated value to arrive at the engineering/calibrated value when a MatchCriteria evaluates to true. The first in the list to match takes precedence.
+    /// Calibrator to be applied to the raw uncalibrated value to arrive at the
+    /// engineering/calibrated value when a MatchCriteria evaluates to true. The
+    /// first in the list to match takes precedence.
     pub context_calibrator_list: Option<ContextCalibratorListType>,
 }
 
@@ -13625,7 +15551,9 @@ impl XmlElement for IntegerDataEncodingType {
                 "byteOrder" => v.byte_order = Some(r.attr_value(tag, raw)?),
                 "encoding" => v.encoding = Some(r.attr_value(tag, raw)?),
                 "sizeInBits" => v.size_in_bits = Some(r.attr_value(tag, raw)?),
-                "changeThreshold" => v.change_threshold = Some(r.attr_value(tag, raw)?),
+                "changeThreshold" => {
+                    v.change_threshold = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -13643,38 +15571,70 @@ impl XmlElement for IntegerDataEncodingType {
     }
 }
 
-/// Describe an integer engineering/calibrated data type. Several encodings are supported. See BaseDataType, IntegerParameterType and IntegerArgumentType.
+/// Describe an integer engineering/calibrated data type. Several encodings are
+/// supported. See BaseDataType, IntegerParameterType and IntegerArgumentType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct IntegerDataType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Used to derive one Data Type from another - will inherit all the attributes from the baseType any of which may be redefined in this type definition.
+    /// Used to derive one Data Type from another - will inherit all the
+    /// attributes from the baseType any of which may be redefined in this type
+    /// definition.
     pub base_type: Option<String>,
-    /// Default/Initial value is always given in calibrated form. Specify the value as a base 10 integer.
+    /// Default/Initial value is always given in calibrated form. Specify the
+    /// value as a base 10 integer.
     pub initial_value: Option<i64>,
-    /// Optional hint to the implementation about the size of the engineering/calibrated data type to use internally. Generally this can be determined by examination of the space required to capture the full range of the encoding, but it is not always clear when calibrators are in use. A tolerant implementation will endeavor to always make sufficient size engineering data types to capture the entire range of possible values.
+    /// Optional hint to the implementation about the size of the
+    /// engineering/calibrated data type to use internally. Generally this can
+    /// be determined by examination of the space required to capture the full
+    /// range of the encoding, but it is not always clear when calibrators are
+    /// in use. A tolerant implementation will endeavor to always make
+    /// sufficient size engineering data types to capture the entire range of
+    /// possible values.
     ///
     /// Schema default: `32`.
     pub size_in_bits: Option<i64>,
-    /// Flag indicating if the engineering/calibrated data type used should support signed representation. This should not be confused with the encoding type for the raw value. The default is true.
+    /// Flag indicating if the engineering/calibrated data type used should
+    /// support signed representation. This should not be confused with the
+    /// encoding type for the raw value. The default is true.
     ///
     /// Schema default: `true`.
     pub signed: Option<bool>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// When appropriate, describe the units of measure that are represented by this parameter value.
+    /// When appropriate, describe the units of measure that are represented by
+    /// this parameter value.
     pub unit_set: Option<UnitSetType>,
-    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`, `StringDataEncoding`.
+    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding`, `StringDataEncoding`.
     pub choice: Option<IntegerDataChoice>,
-    /// This element provides the implementation with assistance rendering the value as a string for users.
+    /// This element provides the implementation with assistance rendering the
+    /// value as a string for users.
     pub to_string: Option<ToStringType>,
-    /// The ValidRange defines the span of valid values for this data type. This is a subset within the data type itself. For example, a 16 bit unsigned integer has possible values from 0 to 65535. However, the known possible valid range may only span 0 to 999, due to the physics of the measurement. So, the valid range provides additional boundary/constraint information beyond that of the data encoding in the range of possible values that are meaningful to this parameter. The valid range is not to be construed as an alarm definition and is not affected by any alarm definitions, instead violations of the valid range make a parameter value "unreasonable", as opposed to reasonable to be reported. The exact effect of this state which should be of concern is implementation dependent.
+    /// The ValidRange defines the span of valid values for this data type. This
+    /// is a subset within the data type itself. For example, a 16 bit unsigned
+    /// integer has possible values from 0 to 65535. However, the known possible
+    /// valid range may only span 0 to 999, due to the physics of the
+    /// measurement. So, the valid range provides additional boundary/constraint
+    /// information beyond that of the data encoding in the range of possible
+    /// values that are meaningful to this parameter. The valid range is not to
+    /// be construed as an alarm definition and is not affected by any alarm
+    /// definitions, instead violations of the valid range make a parameter
+    /// value "unreasonable", as opposed to reasonable to be reported. The exact
+    /// effect of this state which should be of concern is implementation
+    /// dependent.
     pub valid_range: Option<IntegerDataValidRangeType>,
 }
 
@@ -13728,13 +15688,17 @@ impl XmlElement for IntegerDataType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 "sizeInBits" => v.size_in_bits = Some(r.attr_value(tag, raw)?),
                 "signed" => v.signed = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
@@ -13775,7 +15739,8 @@ pub struct IntegerDataValidRangeType {
     pub min_inclusive: Option<i64>,
     /// Maximum integer value including itself.
     pub max_inclusive: Option<i64>,
-    /// By default and general recommendation, the valid range is specified in engineering/calibrated values, although this can be adjusted.
+    /// By default and general recommendation, the valid range is specified in
+    /// engineering/calibrated values, although this can be adjusted.
     ///
     /// Schema default: `true`.
     pub valid_range_applies_to_calibrated: Option<bool>,
@@ -13802,10 +15767,15 @@ impl XmlElement for IntegerDataValidRangeType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "minInclusive" => v.min_inclusive = Some(r.attr_value(tag, raw)?),
-                "maxInclusive" => v.max_inclusive = Some(r.attr_value(tag, raw)?),
+                "minInclusive" => {
+                    v.min_inclusive = Some(r.attr_value(tag, raw)?)
+                }
+                "maxInclusive" => {
+                    v.max_inclusive = Some(r.attr_value(tag, raw)?)
+                }
                 "validRangeAppliesToCalibrated" => {
-                    v.valid_range_applies_to_calibrated = Some(r.attr_value(tag, raw)?)
+                    v.valid_range_applies_to_calibrated =
+                        Some(r.attr_value(tag, raw)?)
                 }
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -13815,42 +15785,90 @@ impl XmlElement for IntegerDataValidRangeType {
     }
 }
 
-/// Describe an integer parameter type. Several are supported. Calibrated integer to integer relationships should be described with this data type. Use the integer data encoding to define calibrators. Joins float as one of the numerics. See IntegerDataEncoding and IntegerDataType.
+/// Describe an integer parameter type. Several are supported. Calibrated
+/// integer to integer relationships should be described with this data type.
+/// Use the integer data encoding to define calibrators. Joins float as one of
+/// the numerics. See IntegerDataEncoding and IntegerDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct IntegerParameterType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Used to derive one Data Type from another - will inherit all the attributes from the baseType any of which may be redefined in this type definition.
+    /// Used to derive one Data Type from another - will inherit all the
+    /// attributes from the baseType any of which may be redefined in this type
+    /// definition.
     pub base_type: Option<String>,
-    /// Default/Initial value is always given in calibrated form. Specify the value as a base 10 integer.
+    /// Default/Initial value is always given in calibrated form. Specify the
+    /// value as a base 10 integer.
     pub initial_value: Option<i64>,
-    /// Optional hint to the implementation about the size of the engineering/calibrated data type to use internally. Generally this can be determined by examination of the space required to capture the full range of the encoding, but it is not always clear when calibrators are in use. A tolerant implementation will endeavor to always make sufficient size engineering data types to capture the entire range of possible values.
+    /// Optional hint to the implementation about the size of the
+    /// engineering/calibrated data type to use internally. Generally this can
+    /// be determined by examination of the space required to capture the full
+    /// range of the encoding, but it is not always clear when calibrators are
+    /// in use. A tolerant implementation will endeavor to always make
+    /// sufficient size engineering data types to capture the entire range of
+    /// possible values.
     ///
     /// Schema default: `32`.
     pub size_in_bits: Option<i64>,
-    /// Flag indicating if the engineering/calibrated data type used should support signed representation. This should not be confused with the encoding type for the raw value. The default is true.
+    /// Flag indicating if the engineering/calibrated data type used should
+    /// support signed representation. This should not be confused with the
+    /// encoding type for the raw value. The default is true.
     ///
     /// Schema default: `true`.
     pub signed: Option<bool>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// When appropriate, describe the units of measure that are represented by this parameter value.
+    /// When appropriate, describe the units of measure that are represented by
+    /// this parameter value.
     pub unit_set: Option<UnitSetType>,
-    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`, `StringDataEncoding`.
+    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding`, `StringDataEncoding`.
     pub choice: Option<IntegerParameterChoice>,
-    /// This element provides the implementation with assistance rendering the value as a string for users.
+    /// This element provides the implementation with assistance rendering the
+    /// value as a string for users.
     pub to_string: Option<ToStringType>,
-    /// The ValidRange defines the span of valid values for this data type. This is a subset within the data type itself. For example, a 16 bit unsigned integer has possible values from 0 to 65535. However, the known possible valid range may only span 0 to 999, due to the physics of the measurement. So, the valid range provides additional boundary/constraint information beyond that of the data encoding in the range of possible values that are meaningful to this parameter. The valid range is not to be construed as an alarm definition and is not affected by any alarm definitions, instead violations of the valid range make a parameter value "unreasonable", as opposed to reasonable to be reported. The exact effect of this state which should be of concern is implementation dependent.
+    /// The ValidRange defines the span of valid values for this data type. This
+    /// is a subset within the data type itself. For example, a 16 bit unsigned
+    /// integer has possible values from 0 to 65535. However, the known possible
+    /// valid range may only span 0 to 999, due to the physics of the
+    /// measurement. So, the valid range provides additional boundary/constraint
+    /// information beyond that of the data encoding in the range of possible
+    /// values that are meaningful to this parameter. The valid range is not to
+    /// be construed as an alarm definition and is not affected by any alarm
+    /// definitions, instead violations of the valid range make a parameter
+    /// value "unreasonable", as opposed to reasonable to be reported. The exact
+    /// effect of this state which should be of concern is implementation
+    /// dependent.
     pub valid_range: Option<IntegerDataValidRangeType>,
-    /// Default alarm definitions are those which do not adjust definition logic based on the value of other parameters. Other parameters may participate in the determination of an alarm condition for this parameter, but the definition logic of the alarm on this parameter is constant. If the alarming logic on this parameter changes based on the value of other parameters, then it is a ContextAlarm and belongs in the ContextAlarmList element.
+    /// Default alarm definitions are those which do not adjust definition logic
+    /// based on the value of other parameters. Other parameters may participate
+    /// in the determination of an alarm condition for this parameter, but the
+    /// definition logic of the alarm on this parameter is constant. If the
+    /// alarming logic on this parameter changes based on the value of other
+    /// parameters, then it is a ContextAlarm and belongs in the
+    /// ContextAlarmList element.
     pub default_alarm: Option<NumericAlarmType>,
-    /// Context alarm definitions are those which adjust the definition logic for this parameter based on the value of other parameters. A context which evaluates to being in effect, based on the testing of another parameter, takes precedence over the default alarms in the DefaultAlarm element. If the no context alarm evaluates to being in effect, based on the testing of another parameter, then the default alarm definitions from the DefaultAlarm element will remain in effect. If multiple contexts evaluate to being in effect, then the first one that appears will take precedence.
+    /// Context alarm definitions are those which adjust the definition logic
+    /// for this parameter based on the value of other parameters. A context
+    /// which evaluates to being in effect, based on the testing of another
+    /// parameter, takes precedence over the default alarms in the DefaultAlarm
+    /// element. If the no context alarm evaluates to being in effect, based on
+    /// the testing of another parameter, then the default alarm definitions
+    /// from the DefaultAlarm element will remain in effect. If multiple
+    /// contexts evaluate to being in effect, then the first one that appears
+    /// will take precedence.
     pub context_alarm_list: Option<NumericContextAlarmListType>,
 }
 
@@ -13910,13 +15928,17 @@ impl XmlElement for IntegerParameterType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 "sizeInBits" => v.size_in_bits = Some(r.attr_value(tag, raw)?),
                 "signed" => v.signed = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
@@ -13957,7 +15979,8 @@ impl XmlElement for IntegerParameterType {
     }
 }
 
-/// Describe an integral based range: minInclusive and maxInclusive. Used in a number of locations related to ranges: ValidIntegerRangeSetType for example.
+/// Describe an integral based range: minInclusive and maxInclusive. Used in a
+/// number of locations related to ranges: ValidIntegerRangeSetType for example.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct IntegerRangeType {
     /// Minimum integer value including itself.
@@ -13984,8 +16007,12 @@ impl XmlElement for IntegerRangeType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "minInclusive" => v.min_inclusive = Some(r.attr_value(tag, raw)?),
-                "maxInclusive" => v.max_inclusive = Some(r.attr_value(tag, raw)?),
+                "minInclusive" => {
+                    v.min_inclusive = Some(r.attr_value(tag, raw)?)
+                }
+                "maxInclusive" => {
+                    v.max_inclusive = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -13994,7 +16021,8 @@ impl XmlElement for IntegerRangeType {
     }
 }
 
-/// Contains an Integer value; value may be provided directly or via the value in a parameter.
+/// Contains an Integer value; value may be provided directly or via the value
+/// in a parameter.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct IntegerValueType {
     /// One of: `FixedValue`, `DynamicValue`, `DiscreteLookupList`.
@@ -14021,18 +16049,27 @@ impl XmlElement for IntegerValueType {
     }
 }
 
-/// Describe a type of constraint on the next command, rather than this command. Interlocks apply only to the next command. An interlock will block successive commands until this command has reached a certain stage of verifier. Interlocks are scoped to a SpaceSystem basis: they by default apply to the SpaceSystem the MetaCommand is defined in but this may be overridden. See MetaCommandType and VerifierSetType.
+/// Describe a type of constraint on the next command, rather than this command.
+/// Interlocks apply only to the next command. An interlock will block
+/// successive commands until this command has reached a certain stage of
+/// verifier. Interlocks are scoped to a SpaceSystem basis: they by default
+/// apply to the SpaceSystem the MetaCommand is defined in but this may be
+/// overridden. See MetaCommandType and VerifierSetType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct InterlockType {
-    /// The name of a SpaceSystem this Interlock applies to. By default, it only applies to the SpaceSystem that contains this MetaCommand.
+    /// The name of a SpaceSystem this Interlock applies to. By default, it only
+    /// applies to the SpaceSystem that contains this MetaCommand.
     pub scope_to_space_system: Option<String>,
-    /// The verification stage of the command that releases the interlock, with the default being complete.
+    /// The verification stage of the command that releases the interlock, with
+    /// the default being complete.
     ///
     /// Schema default: `complete`.
     pub verification_to_wait_for: Option<VerifierEnumerationType>,
-    /// Only applies when the verificationToWaitFor attribute is 'queued' or 'executing'.
+    /// Only applies when the verificationToWaitFor attribute is 'queued' or
+    /// 'executing'.
     pub verification_progress_percentage: Option<f64>,
-    /// A flag that indicates that under special circumstances, this Interlock can be suspended.
+    /// A flag that indicates that under special circumstances, this Interlock
+    /// can be suspended.
     ///
     /// Schema default: `false`.
     pub suspendable: Option<bool>,
@@ -14062,12 +16099,15 @@ impl XmlElement for InterlockType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "scopeToSpaceSystem" => v.scope_to_space_system = Some(r.attr_value(tag, raw)?),
+                "scopeToSpaceSystem" => {
+                    v.scope_to_space_system = Some(r.attr_value(tag, raw)?)
+                }
                 "verificationToWaitFor" => {
                     v.verification_to_wait_for = Some(r.attr_value(tag, raw)?)
                 }
                 "verificationProgressPercentage" => {
-                    v.verification_progress_percentage = Some(r.attr_value(tag, raw)?)
+                    v.verification_progress_percentage =
+                        Some(r.attr_value(tag, raw)?)
                 }
                 "suspendable" => v.suspendable = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
@@ -14078,7 +16118,8 @@ impl XmlElement for InterlockType {
     }
 }
 
-/// Like PASCAL strings, the size of the string is given as an integer at the start of the string. SizeTag must be an unsigned Integer
+/// Like PASCAL strings, the size of the string is given as an integer at the
+/// start of the string. SizeTag must be an unsigned Integer
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct LeadingSizeType {
     /// Attribute `sizeInBitsOfSizeTag`.
@@ -14102,7 +16143,9 @@ impl XmlElement for LeadingSizeType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "sizeInBitsOfSizeTag" => v.size_in_bits_of_size_tag = Some(r.attr_value(tag, raw)?),
+                "sizeInBitsOfSizeTag" => {
+                    v.size_in_bits_of_size_tag = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -14111,7 +16154,9 @@ impl XmlElement for LeadingSizeType {
     }
 }
 
-/// A slope and intercept may be applied to scale or shift the value of the parameter in the dynamic value. The default of slope=1 and intercept=0 results in no change to the value.
+/// A slope and intercept may be applied to scale or shift the value of the
+/// parameter in the dynamic value. The default of slope=1 and intercept=0
+/// results in no change to the value.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct LinearAdjustmentType {
     /// Attribute `slope`.
@@ -14152,10 +16197,27 @@ impl XmlElement for LinearAdjustmentType {
     }
 }
 
-/// Describe the absolute or relative bit location of an entry in a container. The "referenceLocation" attribute specifies the starting bit anchor. If no referenceLocation value is given, the entry is assumed to begin at the first bit position after the previous entry. Each container starts at bit 0, thus "containerStart" is an offset from 0. Negative container start bits are before the container and are implementation dependent - these should be flagged as likely errors. "containerEnd" is given as a positive offset from the end of the container, thus a container end of 0 is exactly at the end of the container. Negative container end addresses are after the container and are implementation dependent - these should be flagged as likely errors. Positive "previouEntry" values are offsets from the previous entry - zero (0) is the default which means it follows contiguously from the last occupied bit of the previous entry. A value of one means it is offset 1-bit from the previous entry, and a value of negative 1 (-1) means it overlaps the previous entry by one bit, and so forth. The "nextEntry" attribute value is proposed for deprecation and should be avoided. See SequenceEntryType.
+/// Describe the absolute or relative bit location of an entry in a container.
+/// The "referenceLocation" attribute specifies the starting bit anchor. If no
+/// referenceLocation value is given, the entry is assumed to begin at the first
+/// bit position after the previous entry. Each container starts at bit 0, thus
+/// "containerStart" is an offset from 0. Negative container start bits are
+/// before the container and are implementation dependent - these should be
+/// flagged as likely errors. "containerEnd" is given as a positive offset from
+/// the end of the container, thus a container end of 0 is exactly at the end of
+/// the container. Negative container end addresses are after the container and
+/// are implementation dependent - these should be flagged as likely errors.
+/// Positive "previouEntry" values are offsets from the previous entry - zero
+/// (0) is the default which means it follows contiguously from the last
+/// occupied bit of the previous entry. A value of one means it is offset 1-bit
+/// from the previous entry, and a value of negative 1 (-1) means it overlaps
+/// the previous entry by one bit, and so forth. The "nextEntry" attribute value
+/// is proposed for deprecation and should be avoided. See SequenceEntryType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct LocationInContainerInBitsType {
-    /// Defines the relative reference used to interpret the start bit position. The default is 0 bits from the end of the previousEntry, which makes the entry contiguous.
+    /// Defines the relative reference used to interpret the start bit position.
+    /// The default is 0 bits from the end of the previousEntry, which makes the
+    /// entry contiguous.
     ///
     /// Schema default: `previousEntry`.
     pub reference_location: Option<ReferenceLocationType>,
@@ -14179,7 +16241,9 @@ impl XmlElement for LocationInContainerInBitsType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "referenceLocation" => v.reference_location = Some(r.attr_value(tag, raw)?),
+                "referenceLocation" => {
+                    v.reference_location = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -14189,10 +16253,12 @@ impl XmlElement for LocationInContainerInBitsType {
     }
 }
 
-/// Contains either a simple Comparison, a ComparisonList, an arbitrarily complex BooleanExpression or an escape to an externally defined algorithm
+/// Contains either a simple Comparison, a ComparisonList, an arbitrarily
+/// complex BooleanExpression or an escape to an externally defined algorithm
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct MatchCriteriaType {
-    /// One of: `Comparison`, `ComparisonList`, `BooleanExpression`, `CustomAlgorithm`.
+    /// One of: `Comparison`, `ComparisonList`, `BooleanExpression`,
+    /// `CustomAlgorithm`.
     pub choice: MatchCriteriaChoice,
 }
 
@@ -14216,20 +16282,28 @@ impl XmlElement for MatchCriteriaType {
     }
 }
 
-/// Describe a postfix (Reverse Polish Notation (RPN)) notation based mathmatical equations. See MathOperationType.
+/// Describe a postfix (Reverse Polish Notation (RPN)) notation based
+/// mathmatical equations. See MathOperationType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct MathAlgorithmType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// The contents of the Math Operation as an algorithm definition in RPN. See TriggeredMathOperationType.
+    /// The contents of the Math Operation as an algorithm definition in RPN.
+    /// See TriggeredMathOperationType.
     pub math_operation: TriggeredMathOperationType,
 }
 
@@ -14260,7 +16334,9 @@ impl XmlElement for MathAlgorithmType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
@@ -14289,7 +16365,8 @@ impl XmlElement for MathAlgorithmType {
     }
 }
 
-/// Describe a mathematical function for calibration where the mathematical function is defined using the MathOperationType.
+/// Describe a mathematical function for calibration where the mathematical
+/// function is defined using the MathOperationType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct MathOperationCalibratorType {
     /// Optional name for this calibrator/algorithm
@@ -14298,7 +16375,8 @@ pub struct MathOperationCalibratorType {
     pub short_description: Option<String>,
     /// Optional additional ancillary information for this calibrator/algorithm
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// One of: `ValueOperand`, `ThisParameterOperand`, `Operator`, `ParameterInstanceRefOperand`.
+    /// One of: `ValueOperand`, `ThisParameterOperand`, `Operator`,
+    /// `ParameterInstanceRefOperand`.
     pub items: Vec<MathOperationCalibratorChoice>,
 }
 
@@ -14333,7 +16411,9 @@ impl XmlElement for MathOperationCalibratorType {
             let (k, raw) = a?;
             match k {
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -14349,7 +16429,8 @@ impl XmlElement for MathOperationCalibratorType {
         if v.items.len() < 1 {
             let n = v.items.len();
             return Err(r.too_few(
-                "ValueOperand|ThisParameterOperand|Operator|ParameterInstanceRefOperand",
+                "ValueOperand|ThisParameterOperand|\
+                        Operator|ParameterInstanceRefOperand",
                 1,
                 n,
             ));
@@ -14359,7 +16440,13 @@ impl XmlElement for MathOperationCalibratorType {
     }
 }
 
-/// Postfix (aka Reverse Polish Notation (RPN)) notation is used to describe mathmatical equations. It uses a stack where operands (either fixed values or ParameterInstances) are pushed onto the stack from first to last in the XML. As the operators are specified, each pops off operands as it evaluates them, and pushes the result back onto the stack. In this case postfix is used to avoid having to specify parenthesis. To convert from infix to postfix, use Dijkstra's "shunting yard" algorithm.
+/// Postfix (aka Reverse Polish Notation (RPN)) notation is used to describe
+/// mathmatical equations. It uses a stack where operands (either fixed values
+/// or ParameterInstances) are pushed onto the stack from first to last in the
+/// XML. As the operators are specified, each pops off operands as it evaluates
+/// them, and pushes the result back onto the stack. In this case postfix is
+/// used to avoid having to specify parenthesis. To convert from infix to
+/// postfix, use Dijkstra's "shunting yard" algorithm.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct MathOperationType {
     /// Optional name for this calibrator/algorithm
@@ -14368,7 +16455,8 @@ pub struct MathOperationType {
     pub short_description: Option<String>,
     /// Optional additional ancillary information for this calibrator/algorithm
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// One of: `ValueOperand`, `ThisParameterOperand`, `Operator`, `ParameterInstanceRefOperand`.
+    /// One of: `ValueOperand`, `ThisParameterOperand`, `Operator`,
+    /// `ParameterInstanceRefOperand`.
     pub items: Vec<MathOperationChoice>,
 }
 
@@ -14403,7 +16491,9 @@ impl XmlElement for MathOperationType {
             let (k, raw) = a?;
             match k {
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -14416,7 +16506,8 @@ impl XmlElement for MathOperationType {
         if v.items.len() < 1 {
             let n = v.items.len();
             return Err(r.too_few(
-                "ValueOperand|ThisParameterOperand|Operator|ParameterInstanceRefOperand",
+                "ValueOperand|ThisParameterOperand|\
+                        Operator|ParameterInstanceRefOperand",
                 1,
                 n,
             ));
@@ -14426,7 +16517,10 @@ impl XmlElement for MathOperationType {
     }
 }
 
-/// Order is important only if the name of the AggregateParameter or Aggregate Argument is directly referenced in SequenceContainers. In this case the members are assued to be added sequentially (in the order listed here) into the Container.
+/// Order is important only if the name of the AggregateParameter or Aggregate
+/// Argument is directly referenced in SequenceContainers. In this case the
+/// members are assued to be added sequentially (in the order listed here) into
+/// the Container.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct MemberListType {
     /// Element `Member`.
@@ -14462,22 +16556,40 @@ impl XmlElement for MemberListType {
     }
 }
 
-/// Describe a member field in an AggregateDataType. Each member has a name and a type reference to a data type for the aggregate member name. If this aggregate is a Parameter aggregate, then the typeRef is a parameter type reference. If this aggregate is an Argument aggregate, then the typeRef is an argument type reference. References to an array data type is currently not supported. Circular references are not allowed. See MemberListType. AggregateParameterType and AggregateArgumentType.
+/// Describe a member field in an AggregateDataType. Each member has a name and
+/// a type reference to a data type for the aggregate member name. If this
+/// aggregate is a Parameter aggregate, then the typeRef is a parameter type
+/// reference. If this aggregate is an Argument aggregate, then the typeRef is
+/// an argument type reference. References to an array data type is currently
+/// not supported. Circular references are not allowed. See MemberListType.
+/// AggregateParameterType and AggregateArgumentType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct MemberType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
     /// Attribute `typeRef`.
     pub type_ref: String,
-    /// Used to set the initial calibrated values of Parameters and Arguments. Will overwrite an initial value defined for the ParameterType or ArgumentType definition elements. For integer types it is base 10 form. Floating point types may be specified in normal (100.0) or scientific (1.0e2) form. Time types are specified using the ISO 8601 formats described for XTCE time data types. Initial values for string types, may include C language style (\n, \t, \", \\, etc.) escape sequences.
+    /// Used to set the initial calibrated values of Parameters and Arguments.
+    /// Will overwrite an initial value defined for the ParameterType or
+    /// ArgumentType definition elements. For integer types it is base 10 form.
+    /// Floating point types may be specified in normal (100.0) or scientific
+    /// (1.0e2) form. Time types are specified using the ISO 8601 formats
+    /// described for XTCE time data types. Initial values for string types, may
+    /// include C language style (\n, \t, \", \\, etc.) escape sequences.
     pub initial_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
 }
 
@@ -14512,7 +16624,9 @@ impl XmlElement for MemberType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
@@ -14521,7 +16635,9 @@ impl XmlElement for MemberType {
                     v.type_ref = r.attr_value(tag, raw)?;
                     seen_type_ref = true;
                 }
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -14623,15 +16739,22 @@ impl XmlElement for MessageRefType {
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct MessageSetType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
-    /// Optional name of this defined item. See NameType for restriction information.
+    /// Optional name of this defined item. See NameType for restriction
+    /// information.
     pub name: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// Element `Message`.
     pub message: Vec<MessageType>,
@@ -14668,7 +16791,9 @@ impl XmlElement for MessageSetType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -14696,19 +16821,26 @@ impl XmlElement for MessageSetType {
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct MessageType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// Element `MatchCriteria`.
     pub match_criteria: MatchCriteriaType,
-    /// The ContainerRef should point to ROOT container that will describe an entire packet/minor frame or chunk of telemetry.
+    /// The ContainerRef should point to ROOT container that will describe an
+    /// entire packet/minor frame or chunk of telemetry.
     pub container_ref: ContainerRefType,
 }
 
@@ -14740,7 +16872,9 @@ impl XmlElement for MessageType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
@@ -14773,7 +16907,9 @@ impl XmlElement for MessageType {
     }
 }
 
-/// Describes an unordered collection of command definitions. Duplicates are invalid based on the name attribute of MetaCommand and BlockMetaCommand. See MetaCommandType and BlockMetaCommandType.
+/// Describes an unordered collection of command definitions. Duplicates are
+/// invalid based on the name attribute of MetaCommand and BlockMetaCommand. See
+/// MetaCommandType and BlockMetaCommandType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct MetaCommandSetType {
     /// One of: `MetaCommand`, `MetaCommandRef`, `BlockMetaCommand`.
@@ -14807,17 +16943,26 @@ impl XmlElement for MetaCommandSetType {
         }
         if v.items.len() < 1 {
             let n = v.items.len();
-            return Err(r.too_few("MetaCommand|MetaCommandRef|BlockMetaCommand", 1, n));
+            return Err(r.too_few(
+                "MetaCommand|MetaCommandRef|\
+                        BlockMetaCommand",
+                1,
+                n,
+            ));
         }
         r.close()?;
         Ok(v)
     }
 }
 
-/// Describe the list of MetaCommand definitions that form the block command. Contains an ordered list of MetaCommandSteps where each step is a MetaCommand with associated arguments, duplicates are valid. See BlockMetaCommandType.
+/// Describe the list of MetaCommand definitions that form the block command.
+/// Contains an ordered list of MetaCommandSteps where each step is a
+/// MetaCommand with associated arguments, duplicates are valid. See
+/// BlockMetaCommandType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct MetaCommandStepListType {
-    /// A MetaCommand with specific specified argument values to include in the BlockMetaCommand.
+    /// A MetaCommand with specific specified argument values to include in the
+    /// BlockMetaCommand.
     pub meta_command_step: Vec<MetaCommandStepType>,
 }
 
@@ -14855,7 +17000,8 @@ impl XmlElement for MetaCommandStepListType {
     }
 }
 
-/// Describe a MetaCommand step, consisting MetaCommand reference and argument list. See MetaCommandStepListType and NameReferenceType.
+/// Describe a MetaCommand step, consisting MetaCommand reference and argument
+/// list. See MetaCommandStepListType and NameReferenceType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct MetaCommandStepType {
     /// Attribute `metaCommandRef`.
@@ -14899,45 +17045,80 @@ impl XmlElement for MetaCommandStepType {
     }
 }
 
-/// Describe a command which consists of an abstract portion (MetaCommand) and an optional packaging portion (MetaCommand CommandContainer). An argument list is provided. MetaCommand may extend other MetaCommands and their CommandContainer may extend other CommandContainer or SequenceContainers. A MetaCommand's CommandContainer is private except as referred to in BaseMetaCommand (they are not visible to other containers and cannot be used in an entry list). MetaCommands may also define various other behavioral aspects of a command such as command verifiers. See CommandContainerType, ArgumentListType, BaseMetaCommandType and BaseContainerType.
+/// Describe a command which consists of an abstract portion (MetaCommand) and
+/// an optional packaging portion (MetaCommand CommandContainer). An argument
+/// list is provided. MetaCommand may extend other MetaCommands and their
+/// CommandContainer may extend other CommandContainer or SequenceContainers. A
+/// MetaCommand's CommandContainer is private except as referred to in
+/// BaseMetaCommand (they are not visible to other containers and cannot be used
+/// in an entry list). MetaCommands may also define various other behavioral
+/// aspects of a command such as command verifiers. See CommandContainerType,
+/// ArgumentListType, BaseMetaCommandType and BaseContainerType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct MetaCommandType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Abstract MetaCommand definitions that are not instantiated, rather only used as bases to inherit from to create specialized command definitions.
+    /// Abstract MetaCommand definitions that are not instantiated, rather only
+    /// used as bases to inherit from to create specialized command definitions.
     ///
     /// Schema default: `false`.
     pub abstract_: Option<bool>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// Optional inheritance for this MetaCommand from another named MetaCommand.
+    /// Optional inheritance for this MetaCommand from another named
+    /// MetaCommand.
     pub base_meta_command: Option<BaseMetaCommandType>,
-    /// Optional. Normally used when the database is built in a flat, non-hierarchical format. May be used by implementations to group MetaCommands together.
+    /// Optional. Normally used when the database is built in a flat,
+    /// non-hierarchical format. May be used by implementations to group
+    /// MetaCommands together.
     pub system_name: Option<String>,
-    /// Many commands have one or more options. These are called command arguments. Command arguments may be of any of the standard data types. MetaCommand arguments are local to the MetaCommand, but may be referenced in inherited MetaCommand definitions, generally to apply Argument Assignments to the values.
+    /// Many commands have one or more options. These are called command
+    /// arguments. Command arguments may be of any of the standard data types.
+    /// MetaCommand arguments are local to the MetaCommand, but may be
+    /// referenced in inherited MetaCommand definitions, generally to apply
+    /// Argument Assignments to the values.
     pub argument_list: Option<ArgumentListType>,
     /// Tells how to package/encode this command definition in binary form.
     pub command_container: Option<CommandContainerType>,
     /// List of constraints to check when sending this command.
     pub transmission_constraint_list: Option<TransmissionConstraintListType>,
-    /// Some Command and Control Systems may require special user access or confirmations before transmitting commands with certain levels. The level is inherited from the Base MetaCommand.
+    /// Some Command and Control Systems may require special user access or
+    /// confirmations before transmitting commands with certain levels. The
+    /// level is inherited from the Base MetaCommand.
     pub default_significance: Option<SignificanceType>,
-    /// Some Command and Control Systems may require special user access or confirmations before transmitting commands with certain levels. In addition to the default, Significance can be defined in contexts where it changes based on the values of parameters.
+    /// Some Command and Control Systems may require special user access or
+    /// confirmations before transmitting commands with certain levels. In
+    /// addition to the default, Significance can be defined in contexts where
+    /// it changes based on the values of parameters.
     pub context_significance_list: Option<ContextSignificanceListType>,
-    /// An Interlock is a type of Constraint, but not on Command instances of this MetaCommand; Interlocks apply instead to the next command. An Interlock will block successive commands until this command has reached a certain stage (through verifications). Interlocks are scoped to a SpaceSystem basis.
+    /// An Interlock is a type of Constraint, but not on Command instances of
+    /// this MetaCommand; Interlocks apply instead to the next command. An
+    /// Interlock will block successive commands until this command has reached
+    /// a certain stage (through verifications). Interlocks are scoped to a
+    /// SpaceSystem basis.
     pub interlock: Option<InterlockType>,
-    /// Functional list of conditions/changes to check after sending this command to determine success or failure.
+    /// Functional list of conditions/changes to check after sending this
+    /// command to determine success or failure.
     pub verifier_set: Option<VerifierSetType>,
-    /// List of parameters to set new values upon completion of sending this command.
+    /// List of parameters to set new values upon completion of sending this
+    /// command.
     pub parameter_to_set_list: Option<ParameterToSetListType>,
-    /// List of parameters to suspend alarm processing/detection upon completion of sending this command.
-    pub parameters_to_suspend_alarms_on_set: Option<ParametersToSuspendAlarmsOnSetType>,
+    /// List of parameters to suspend alarm processing/detection upon completion
+    /// of sending this command.
+    pub parameters_to_suspend_alarms_on_set:
+        Option<ParametersToSuspendAlarmsOnSetType>,
 }
 
 impl XmlElement for MetaCommandType {
@@ -15002,7 +17183,9 @@ impl XmlElement for MetaCommandType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
@@ -15061,7 +17244,10 @@ impl XmlElement for MetaCommandType {
     }
 }
 
-/// The alarm multi-range element type permits users to define multiple alarm ranges in a sequence that goes beyond the more typical "inside" and "outside" range definitions. It can be thought of as a "barber pole" definition.
+/// The alarm multi-range element type permits users to define multiple alarm
+/// ranges in a sequence that goes beyond the more typical "inside" and
+/// "outside" range definitions. It can be thought of as a "barber pole"
+/// definition.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct MultiRangeType {
     /// Minimum decimal/real number value including itself.
@@ -15072,7 +17258,16 @@ pub struct MultiRangeType {
     pub max_inclusive: Option<f64>,
     /// Maximum decimal/real number value excluding itself.
     pub max_exclusive: Option<f64>,
-    /// A value of outside specifies that the most severe range is outside all the other ranges: -severe -critical -distress -warning -watch normal +watch +warning +distress +critical +severe. This means each min, max pair are a range: (-inf, min) or (-inf, min], and [max, inf) or (max, inf). However a value of inside "inverts" these bands: -normal -watch -warning -distress -critical severe +critical +distress +warning +watch, +normal. This means each min, max pair form a range of (min, max) or [min, max) or (min, max] or [min, max]. The most common form used is "outside" and it is the default. The set notation used defines parenthesis as exclusive and square brackets as inclusive.
+    /// A value of outside specifies that the most severe range is outside all
+    /// the other ranges: -severe -critical -distress -warning -watch normal
+    /// +watch +warning +distress +critical +severe. This means each min, max
+    /// pair are a range: (-inf, min) or (-inf, min], and [max, inf) or (max,
+    /// inf). However a value of inside "inverts" these bands: -normal -watch
+    /// -warning -distress -critical severe +critical +distress +warning +watch,
+    /// +normal. This means each min, max pair form a range of (min, max) or
+    /// [min, max) or (min, max] or [min, max]. The most common form used is
+    /// "outside" and it is the default. The set notation used defines
+    /// parenthesis as exclusive and square brackets as inclusive.
     ///
     /// Schema default: `outside`.
     pub range_form: Option<RangeFormType>,
@@ -15110,10 +17305,18 @@ impl XmlElement for MultiRangeType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "minInclusive" => v.min_inclusive = Some(r.attr_value(tag, raw)?),
-                "minExclusive" => v.min_exclusive = Some(r.attr_value(tag, raw)?),
-                "maxInclusive" => v.max_inclusive = Some(r.attr_value(tag, raw)?),
-                "maxExclusive" => v.max_exclusive = Some(r.attr_value(tag, raw)?),
+                "minInclusive" => {
+                    v.min_inclusive = Some(r.attr_value(tag, raw)?)
+                }
+                "minExclusive" => {
+                    v.min_exclusive = Some(r.attr_value(tag, raw)?)
+                }
+                "maxInclusive" => {
+                    v.max_inclusive = Some(r.attr_value(tag, raw)?)
+                }
+                "maxExclusive" => {
+                    v.max_exclusive = Some(r.attr_value(tag, raw)?)
+                }
                 "rangeForm" => v.range_form = Some(r.attr_value(tag, raw)?),
                 "level" => v.level = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
@@ -15124,18 +17327,27 @@ impl XmlElement for MultiRangeType {
     }
 }
 
-/// Defines a base schema type definition used by many other schema types throughout schema. Use it to describe a name with optional descriptions, aliases, and ancillary data. See NameType, LongDescriptionType, ShortDescriptionType, AliasSetType and AncillaryDataSetType.
+/// Defines a base schema type definition used by many other schema types
+/// throughout schema. Use it to describe a name with optional descriptions,
+/// aliases, and ancillary data. See NameType, LongDescriptionType,
+/// ShortDescriptionType, AliasSetType and AncillaryDataSetType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct NameDescriptionType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
 }
 
@@ -15165,7 +17377,9 @@ impl XmlElement for NameDescriptionType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
@@ -15190,7 +17404,8 @@ impl XmlElement for NameDescriptionType {
     }
 }
 
-/// Contains an unordered collection of Notes. Usage is user defined. See NoteType.
+/// Contains an unordered collection of Notes. Usage is user defined. See
+/// NoteType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct NoteSetType {
     /// Contains a program defined technical note regarding this document.
@@ -15221,46 +17436,82 @@ impl XmlElement for NoteSetType {
     }
 }
 
-/// This type describes how a numeric value should be represented in engineering/calibrated form. The defaults reflect the most common form.
+/// This type describes how a numeric value should be represented in
+/// engineering/calibrated form. The defaults reflect the most common form.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct NumberFormatType {
-    /// Describes how the engineering/calibrated value of this number should be displayed with respect to the radix. Default is base 10.
+    /// Describes how the engineering/calibrated value of this number should be
+    /// displayed with respect to the radix. Default is base 10.
     ///
     /// Schema default: `Decimal`.
     pub number_base: Option<RadixType>,
-    /// Describes how the engineering/calibrated value of this number should be displayed with respect to the minimum number of fractional digits. The default is 0.
+    /// Describes how the engineering/calibrated value of this number should be
+    /// displayed with respect to the minimum number of fractional digits. The
+    /// default is 0.
     ///
     /// Schema default: `0`.
     pub minimum_fraction_digits: Option<i64>,
-    /// Describes how the engineering/calibrated value of this number should be displayed with respect to the maximum or upper bound of the number of digits. There is no default. No value specified should be interpreted as no upper bound such that all requires digits are used to fully characterize the value.
+    /// Describes how the engineering/calibrated value of this number should be
+    /// displayed with respect to the maximum or upper bound of the number of
+    /// digits. There is no default. No value specified should be interpreted as
+    /// no upper bound such that all requires digits are used to fully
+    /// characterize the value.
     pub maximum_fraction_digits: Option<i64>,
-    /// Describes how the engineering/calibrated value of this number should be displayed with respect to the minimum number of integer digits. The default is 1.
+    /// Describes how the engineering/calibrated value of this number should be
+    /// displayed with respect to the minimum number of integer digits. The
+    /// default is 1.
     ///
     /// Schema default: `1`.
     pub minimum_integer_digits: Option<i64>,
-    /// Describes how the engineering/calibrated value of this number should be displayed with respect to the maximum or upper bound of the integer digits. There is no default. No value specified should be interpreted as no upper bound such that all requires digits are used to fully characterize the value.
+    /// Describes how the engineering/calibrated value of this number should be
+    /// displayed with respect to the maximum or upper bound of the integer
+    /// digits. There is no default. No value specified should be interpreted as
+    /// no upper bound such that all requires digits are used to fully
+    /// characterize the value.
     pub maximum_integer_digits: Option<i64>,
-    /// Describes how the engineering/calibrated value of this number should be displayed with respect to negative values. This attribute specifies the character or characters that should be appended to the numeric value to indicate negative values. The default is none.
+    /// Describes how the engineering/calibrated value of this number should be
+    /// displayed with respect to negative values. This attribute specifies the
+    /// character or characters that should be appended to the numeric value to
+    /// indicate negative values. The default is none.
     ///
     /// Schema default: ``.
     pub negative_suffix: Option<String>,
-    /// Describes how the engineering/calibrated value of this number should be displayed with respect to positive values. This attribute specifies the character or characters that should be appended to the numeric value to indicate positive values. The default is none. Zero is considered to be specific to the implementation/platform and is not implied here.
+    /// Describes how the engineering/calibrated value of this number should be
+    /// displayed with respect to positive values. This attribute specifies the
+    /// character or characters that should be appended to the numeric value to
+    /// indicate positive values. The default is none. Zero is considered to be
+    /// specific to the implementation/platform and is not implied here.
     ///
     /// Schema default: ``.
     pub positive_suffix: Option<String>,
-    /// Describes how the engineering/calibrated value of this number should be displayed with respect to negative values. This attribute specifies the character or characters that should be prepended to the numeric value to indicate negative values. The default is a minus character "-".
+    /// Describes how the engineering/calibrated value of this number should be
+    /// displayed with respect to negative values. This attribute specifies the
+    /// character or characters that should be prepended to the numeric value to
+    /// indicate negative values. The default is a minus character "-".
     ///
     /// Schema default: `-`.
     pub negative_prefix: Option<String>,
-    /// Describes how the engineering/calibrated value of this number should be displayed with respect to positive values. This attribute specifies the character or characters that should be prepended to the numeric value to indicate positive values. The default is none. Zero is considered to be specific to the implementation/platform and is not implied here.
+    /// Describes how the engineering/calibrated value of this number should be
+    /// displayed with respect to positive values. This attribute specifies the
+    /// character or characters that should be prepended to the numeric value to
+    /// indicate positive values. The default is none. Zero is considered to be
+    /// specific to the implementation/platform and is not implied here.
     ///
     /// Schema default: ``.
     pub positive_prefix: Option<String>,
-    /// Describes how the engineering/calibrated value of this number should be displayed with respect to larger values. Groupings by thousand are specific to locale, so the schema only specifies whether they will be present and not which character separators are used. The default is false.
+    /// Describes how the engineering/calibrated value of this number should be
+    /// displayed with respect to larger values. Groupings by thousand are
+    /// specific to locale, so the schema only specifies whether they will be
+    /// present and not which character separators are used. The default is
+    /// false.
     ///
     /// Schema default: `false`.
     pub show_thousands_grouping: Option<bool>,
-    /// Describes how the engineering/calibrated value of this number should be displayed with respect to notation. Engineering, scientific, or traditional decimal notation may be specified. The precise characters used is locale specific for the implementation/platform. The default is "normal" for the traditional notation.
+    /// Describes how the engineering/calibrated value of this number should be
+    /// displayed with respect to notation. Engineering, scientific, or
+    /// traditional decimal notation may be specified. The precise characters
+    /// used is locale specific for the implementation/platform. The default is
+    /// "normal" for the traditional notation.
     ///
     /// Schema default: `normal`.
     pub notation: Option<FloatingPointNotationType>,
@@ -15318,12 +17569,24 @@ impl XmlElement for NumberFormatType {
                 "maximumFractionDigits" => {
                     v.maximum_fraction_digits = Some(r.attr_value(tag, raw)?)
                 }
-                "minimumIntegerDigits" => v.minimum_integer_digits = Some(r.attr_value(tag, raw)?),
-                "maximumIntegerDigits" => v.maximum_integer_digits = Some(r.attr_value(tag, raw)?),
-                "negativeSuffix" => v.negative_suffix = Some(r.attr_value(tag, raw)?),
-                "positiveSuffix" => v.positive_suffix = Some(r.attr_value(tag, raw)?),
-                "negativePrefix" => v.negative_prefix = Some(r.attr_value(tag, raw)?),
-                "positivePrefix" => v.positive_prefix = Some(r.attr_value(tag, raw)?),
+                "minimumIntegerDigits" => {
+                    v.minimum_integer_digits = Some(r.attr_value(tag, raw)?)
+                }
+                "maximumIntegerDigits" => {
+                    v.maximum_integer_digits = Some(r.attr_value(tag, raw)?)
+                }
+                "negativeSuffix" => {
+                    v.negative_suffix = Some(r.attr_value(tag, raw)?)
+                }
+                "positiveSuffix" => {
+                    v.positive_suffix = Some(r.attr_value(tag, raw)?)
+                }
+                "negativePrefix" => {
+                    v.negative_prefix = Some(r.attr_value(tag, raw)?)
+                }
+                "positivePrefix" => {
+                    v.positive_prefix = Some(r.attr_value(tag, raw)?)
+                }
                 "showThousandsGrouping" => {
                     v.show_thousands_grouping = Some(r.attr_value(tag, raw)?)
                 }
@@ -15336,22 +17599,30 @@ impl XmlElement for NumberFormatType {
     }
 }
 
-/// Describe alarm conditions specific to the numeric data types, extends the basic AlarmType with StaticAlarmRanges and ChangeAlarmRanges. See FloatParameterType and IntegerParameterType.
+/// Describe alarm conditions specific to the numeric data types, extends the
+/// basic AlarmType with StaticAlarmRanges and ChangeAlarmRanges. See
+/// FloatParameterType and IntegerParameterType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct NumericAlarmType {
     /// The alarm definition may be named.
     pub name: Option<String>,
     /// An optional brief description of this alarm definition.
     pub short_description: Option<String>,
-    /// The number of successive instances that meet the alarm conditions for the alarm to trigger. The default is 1.
+    /// The number of successive instances that meet the alarm conditions for
+    /// the alarm to trigger. The default is 1.
     ///
     /// Schema default: `1`.
     pub min_violations: Option<i64>,
-    /// Optionally specify the number of successive instances that do not meet the alarm conditions to leave the alarm state. If this attribute is not specified, it is treated as being equal to minViolations (symmetric).
+    /// Optionally specify the number of successive instances that do not meet
+    /// the alarm conditions to leave the alarm state. If this attribute is not
+    /// specified, it is treated as being equal to minViolations (symmetric).
     ///
     /// Schema default: `1`.
     pub min_conformance: Option<i64>,
-    /// The initial state of this alarm definition as delivered. When true, this leaves the alarm definition empty for the parameter and also short circuits the remaining context matches and the default so no alarm is active on the parameter.
+    /// The initial state of this alarm definition as delivered. When true, this
+    /// leaves the alarm definition empty for the parameter and also short
+    /// circuits the remaining context matches and the default so no alarm is
+    /// active on the parameter.
     ///
     /// Schema default: `false`.
     pub disabled: Option<bool>,
@@ -15359,9 +17630,11 @@ pub struct NumericAlarmType {
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// One of: `AlarmConditions`, `CustomAlarm`.
     pub choice: Option<NumericAlarmChoice>,
-    /// StaticAlarmRanges are used to trigger alarms when the parameter value passes some threshold value.
+    /// StaticAlarmRanges are used to trigger alarms when the parameter value
+    /// passes some threshold value.
     pub static_alarm_ranges: Option<AlarmRangesType>,
-    /// ChangeAlarmRanges are used to trigger alarms when the parameter value changes by a rate or quantity from a reference.
+    /// ChangeAlarmRanges are used to trigger alarms when the parameter value
+    /// changes by a rate or quantity from a reference.
     pub change_alarm_ranges: Option<ChangeAlarmRangesType>,
     /// Similar to but more lenient form of StaticAlarmRanges.
     pub alarm_multi_ranges: Option<AlarmMultiRangesType>,
@@ -15410,9 +17683,15 @@ impl XmlElement for NumericAlarmType {
             let (k, raw) = a?;
             match k {
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
-                "minViolations" => v.min_violations = Some(r.attr_value(tag, raw)?),
-                "minConformance" => v.min_conformance = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
+                "minViolations" => {
+                    v.min_violations = Some(r.attr_value(tag, raw)?)
+                }
+                "minConformance" => {
+                    v.min_conformance = Some(r.attr_value(tag, raw)?)
+                }
                 "disabled" => v.disabled = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -15437,10 +17716,18 @@ impl XmlElement for NumericAlarmType {
     }
 }
 
-/// An ordered collection of numeric alarms associated with a context. A context is an alarm definition on a parameter which is valid only in the case of a test on the value of other parameters. Process the contexts in list order. Used by both FloatParameterType and IntegerParameterType. See NumericContextAlarmType.
+/// An ordered collection of numeric alarms associated with a context. A context
+/// is an alarm definition on a parameter which is valid only in the case of a
+/// test on the value of other parameters. Process the contexts in list order.
+/// Used by both FloatParameterType and IntegerParameterType. See
+/// NumericContextAlarmType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct NumericContextAlarmListType {
-    /// A Context contains a new alarm definition and a context match. The match takes precedence over any default alarm when the first in the overall list evaluates to true. It is also possible the alarm definition is empty, in which case the context means no alarm defined when the match is true.
+    /// A Context contains a new alarm definition and a context match. The match
+    /// takes precedence over any default alarm when the first in the overall
+    /// list evaluates to true. It is also possible the alarm definition is
+    /// empty, in which case the context means no alarm defined when the match
+    /// is true.
     pub context_alarm: Vec<NumericContextAlarmType>,
 }
 
@@ -15478,22 +17765,29 @@ impl XmlElement for NumericContextAlarmListType {
     }
 }
 
-/// Describe a parameter dependent context, that when evaluates to true, enables the use of this alarm definition. See ContextMatchType and NumericAlarmType.
+/// Describe a parameter dependent context, that when evaluates to true, enables
+/// the use of this alarm definition. See ContextMatchType and NumericAlarmType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct NumericContextAlarmType {
     /// The alarm definition may be named.
     pub name: Option<String>,
     /// An optional brief description of this alarm definition.
     pub short_description: Option<String>,
-    /// The number of successive instances that meet the alarm conditions for the alarm to trigger. The default is 1.
+    /// The number of successive instances that meet the alarm conditions for
+    /// the alarm to trigger. The default is 1.
     ///
     /// Schema default: `1`.
     pub min_violations: Option<i64>,
-    /// Optionally specify the number of successive instances that do not meet the alarm conditions to leave the alarm state. If this attribute is not specified, it is treated as being equal to minViolations (symmetric).
+    /// Optionally specify the number of successive instances that do not meet
+    /// the alarm conditions to leave the alarm state. If this attribute is not
+    /// specified, it is treated as being equal to minViolations (symmetric).
     ///
     /// Schema default: `1`.
     pub min_conformance: Option<i64>,
-    /// The initial state of this alarm definition as delivered. When true, this leaves the alarm definition empty for the parameter and also short circuits the remaining context matches and the default so no alarm is active on the parameter.
+    /// The initial state of this alarm definition as delivered. When true, this
+    /// leaves the alarm definition empty for the parameter and also short
+    /// circuits the remaining context matches and the default so no alarm is
+    /// active on the parameter.
     ///
     /// Schema default: `false`.
     pub disabled: Option<bool>,
@@ -15501,13 +17795,16 @@ pub struct NumericContextAlarmType {
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// One of: `AlarmConditions`, `CustomAlarm`.
     pub choice: Option<NumericContextAlarmChoice>,
-    /// StaticAlarmRanges are used to trigger alarms when the parameter value passes some threshold value.
+    /// StaticAlarmRanges are used to trigger alarms when the parameter value
+    /// passes some threshold value.
     pub static_alarm_ranges: Option<AlarmRangesType>,
-    /// ChangeAlarmRanges are used to trigger alarms when the parameter value changes by a rate or quantity from a reference.
+    /// ChangeAlarmRanges are used to trigger alarms when the parameter value
+    /// changes by a rate or quantity from a reference.
     pub change_alarm_ranges: Option<ChangeAlarmRangesType>,
     /// Similar to but more lenient form of StaticAlarmRanges.
     pub alarm_multi_ranges: Option<AlarmMultiRangesType>,
-    /// Contains the evaluation criteria for a parameter dependent test, that when evaluates to true, enables this alarm definition.
+    /// Contains the evaluation criteria for a parameter dependent test, that
+    /// when evaluates to true, enables this alarm definition.
     pub context_match: ContextMatchType,
 }
 
@@ -15555,9 +17852,15 @@ impl XmlElement for NumericContextAlarmType {
             let (k, raw) = a?;
             match k {
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
-                "minViolations" => v.min_violations = Some(r.attr_value(tag, raw)?),
-                "minConformance" => v.min_conformance = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
+                "minViolations" => {
+                    v.min_violations = Some(r.attr_value(tag, raw)?)
+                }
+                "minConformance" => {
+                    v.min_conformance = Some(r.attr_value(tag, raw)?)
+                }
                 "disabled" => v.disabled = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -15588,7 +17891,9 @@ impl XmlElement for NumericContextAlarmType {
     }
 }
 
-/// Describe two or more conditions that are logically ored together. Conditions may be a mix of Condition and ANDedCondition. See ORedConditionType and BooleanExpressionType.
+/// Describe two or more conditions that are logically ored together. Conditions
+/// may be a mix of Condition and ANDedCondition. See ORedConditionType and
+/// BooleanExpressionType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ORedConditionsType {
     /// One of: `Condition`, `ANDedConditions`.
@@ -15629,10 +17934,12 @@ impl XmlElement for ORedConditionsType {
     }
 }
 
-/// Describe a reference to container that triggers an event when the telemetry container referred to is updated (processed). See TriggerSetType.
+/// Describe a reference to container that triggers an event when the telemetry
+/// container referred to is updated (processed). See TriggerSetType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct OnContainerUpdateTriggerType {
-    /// Reference to the Container whose update/receipt triggers this algorithm to evaluate.
+    /// Reference to the Container whose update/receipt triggers this algorithm
+    /// to evaluate.
     pub container_ref: String,
 }
 
@@ -15665,10 +17972,13 @@ impl XmlElement for OnContainerUpdateTriggerType {
     }
 }
 
-/// Describe a reference to parameter that triggers an event when the telemetry parameter referred to is updated (processed) with a new value. See TriggerSetType.
+/// Describe a reference to parameter that triggers an event when the telemetry
+/// parameter referred to is updated (processed) with a new value. See
+/// TriggerSetType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct OnParameterUpdateTriggerType {
-    /// Reference to the Parameter whose update triggers this algorithm to evaluate.
+    /// Reference to the Parameter whose update triggers this algorithm to
+    /// evaluate.
     pub parameter_ref: String,
 }
 
@@ -15704,7 +18014,8 @@ impl XmlElement for OnParameterUpdateTriggerType {
 /// Describe a periodic time basis to trigger an event. See TriggerSetType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct OnPeriodicRateTriggerType {
-    /// The periodic rate in time in which this algorithm is triggered to evaluate.
+    /// The periodic rate in time in which this algorithm is triggered to
+    /// evaluate.
     pub fire_rate_in_seconds: f64,
 }
 
@@ -15737,18 +18048,26 @@ impl XmlElement for OnPeriodicRateTriggerType {
     }
 }
 
-/// The type definition used by most elements that have an optional name with optional descriptions.
+/// The type definition used by most elements that have an optional name with
+/// optional descriptions.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct OptionalNameDescriptionType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
-    /// Optional name of this defined item. See NameType for restriction information.
+    /// Optional name of this defined item. See NameType for restriction
+    /// information.
     pub name: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
 }
 
@@ -15779,7 +18098,9 @@ impl XmlElement for OptionalNameDescriptionType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -15798,7 +18119,10 @@ impl XmlElement for OptionalNameDescriptionType {
     }
 }
 
-/// Names an output parameter to the algorithm. There are two attributes to OutputParm, outputName and parameterName. parameterName is a parameter reference name for a parameter that will be updated by this algorithm. outputName is an optional "friendly" name for the output parameter.
+/// Names an output parameter to the algorithm. There are two attributes to
+/// OutputParm, outputName and parameterName. parameterName is a parameter
+/// reference name for a parameter that will be updated by this algorithm.
+/// outputName is an optional "friendly" name for the output parameter.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct OutputParameterRefType {
     /// Attribute `parameterRef`.
@@ -15880,10 +18204,13 @@ impl XmlElement for OutputSetType {
     }
 }
 
-/// A PCM Stream Type is the high level definition for all Pulse Code Modulated (PCM) (i.e., binary) streams.
+/// A PCM Stream Type is the high level definition for all Pulse Code Modulated
+/// (PCM) (i.e., binary) streams.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct PCMStreamType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
@@ -15897,11 +18224,15 @@ pub struct PCMStreamType {
     ///
     /// Schema default: `false`.
     pub inverted: Option<bool>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
 }
 
@@ -15940,12 +18271,16 @@ impl XmlElement for PCMStreamType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
-                "bitRateInBPS" => v.bit_rate_in_bps = Some(r.attr_value(tag, raw)?),
+                "bitRateInBPS" => {
+                    v.bit_rate_in_bps = Some(r.attr_value(tag, raw)?)
+                }
                 "pcmType" => v.pcm_type = Some(r.attr_value(tag, raw)?),
                 "inverted" => v.inverted = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
@@ -15968,7 +18303,11 @@ impl XmlElement for PCMStreamType {
     }
 }
 
-/// A reference to an instance of a Parameter. Used when the value of a parameter is required for a calculation or as an index value. A positive value for instance is forward in time, a negative value for count is backward in time, a 0 value for count means use the current value of the parameter or the first value in a container.
+/// A reference to an instance of a Parameter. Used when the value of a
+/// parameter is required for a calculation or as an index value. A positive
+/// value for instance is forward in time, a negative value for count is
+/// backward in time, a 0 value for count means use the current value of the
+/// parameter or the first value in a container.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ParameterInstanceRefType {
     /// Attribute `parameterRef`.
@@ -16008,7 +18347,9 @@ impl XmlElement for ParameterInstanceRefType {
                     seen_parameter_ref = true;
                 }
                 "instance" => v.instance = Some(r.attr_value(tag, raw)?),
-                "useCalibratedValue" => v.use_calibrated_value = Some(r.attr_value(tag, raw)?),
+                "useCalibratedValue" => {
+                    v.use_calibrated_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -16023,21 +18364,39 @@ impl XmlElement for ParameterInstanceRefType {
 /// Describes extended properties/attributes of Parameter definitions.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ParameterPropertiesType {
-    /// This attribute describes the nature of the source entity for which this parameter receives a value. Implementations assign different attributes/properties internally to a parameter based on the anticipated data source.
+    /// This attribute describes the nature of the source entity for which this
+    /// parameter receives a value. Implementations assign different
+    /// attributes/properties internally to a parameter based on the anticipated
+    /// data source.
     pub data_source: Option<TelemetryDataSourceType>,
-    /// A Parameter marked as 'readOnly' true is non-settable by users and applications/services that do not represent the data source itself. Note that a slight conceptual overlap exists here between the 'dataSource' attribute and this attribute when the data source is 'constant'. For a constant data source, then 'readOnly' should be 'true'. Application implementations may choose to implicitly enforce this. Some implementations have both concepts of a Parameter that is settable or non-settable and a Constant in different parts of their internal data model.
+    /// A Parameter marked as 'readOnly' true is non-settable by users and
+    /// applications/services that do not represent the data source itself. Note
+    /// that a slight conceptual overlap exists here between the 'dataSource'
+    /// attribute and this attribute when the data source is 'constant'. For a
+    /// constant data source, then 'readOnly' should be 'true'. Application
+    /// implementations may choose to implicitly enforce this. Some
+    /// implementations have both concepts of a Parameter that is settable or
+    /// non-settable and a Constant in different parts of their internal data
+    /// model.
     ///
     /// Schema default: `false`.
     pub read_only: Option<bool>,
-    /// A Parameter marked to persist should retain the latest value through resets/restarts to the extent that is possible or defined in the implementation. The net effect is that the initial/default value on a Parameter is only seen once or when the system has a reset to revert to initial/default values.
+    /// A Parameter marked to persist should retain the latest value through
+    /// resets/restarts to the extent that is possible or defined in the
+    /// implementation. The net effect is that the initial/default value on a
+    /// Parameter is only seen once or when the system has a reset to revert to
+    /// initial/default values.
     ///
     /// Schema default: `true`.
     pub persistence: Option<bool>,
-    /// Optional. Normally used when the database is built in a flat, non-hierarchical format.
+    /// Optional. Normally used when the database is built in a flat,
+    /// non-hierarchical format.
     pub system_name: Option<String>,
     /// Optional condition that must be true for this Parameter to be valid.
     pub validity_condition: Option<MatchCriteriaType>,
-    /// When present, this set of elements describes physical address location(s) of the parameter where it is stored. Typically this is on the data source, although that is not constrained by this schema.
+    /// When present, this set of elements describes physical address
+    /// location(s) of the parameter where it is stored. Typically this is on
+    /// the data source, although that is not constrained by this schema.
     pub physical_address_set: Option<PhysicalAddressSetType>,
     /// This time will override any Default value for TimeAssociation.
     pub time_association: Option<TimeAssociationType>,
@@ -16106,11 +18465,25 @@ pub struct ParameterRefEntryType {
     pub short_description: Option<String>,
     /// Attribute `parameterRef`.
     pub parameter_ref: String,
-    /// The start bit 0 position for each container is local to the container, but does include space occupied by inherited containers. When a container is "included", as opposed to inherited, then the interpreting implementation takes into account the start bit position of the referring container when finally assembling the start bits for the post-processed entry content. The default start bit for any entry is 0 bits from the previous entry, making the content contiguous when this element is not used.
+    /// The start bit 0 position for each container is local to the container,
+    /// but does include space occupied by inherited containers. When a
+    /// container is "included", as opposed to inherited, then the interpreting
+    /// implementation takes into account the start bit position of the
+    /// referring container when finally assembling the start bits for the
+    /// post-processed entry content. The default start bit for any entry is 0
+    /// bits from the previous entry, making the content contiguous when this
+    /// element is not used.
     pub location_in_container_in_bits: Option<LocationInContainerInBitsType>,
-    /// May be used when this entry repeats itself in the sequence container. When an entry repeats, it effectively specifies that the same entry is reported more than once in the container and has the same physical meaning. This should not be construed to be equivalent to arrays.
+    /// May be used when this entry repeats itself in the sequence container.
+    /// When an entry repeats, it effectively specifies that the same entry is
+    /// reported more than once in the container and has the same physical
+    /// meaning. This should not be construed to be equivalent to arrays.
     pub repeat_entry: Option<RepeatType>,
-    /// This entry will only be included in the sequence when this condition is true, otherwise it is always included. When the include condition evaluates to false, it is as if the entry does not exist such that any start bit interpretations cannot take into account the space that would have been occupied if this included condition were true.
+    /// This entry will only be included in the sequence when this condition is
+    /// true, otherwise it is always included. When the include condition
+    /// evaluates to false, it is as if the entry does not exist such that any
+    /// start bit interpretations cannot take into account the space that would
+    /// have been occupied if this included condition were true.
     pub include_condition: Option<MatchCriteriaType>,
     /// Optional timing information associated with this entry.
     pub time_association: Option<TimeAssociationType>,
@@ -16150,7 +18523,9 @@ impl XmlElement for ParameterRefEntryType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "parameterRef" => {
                     v.parameter_ref = r.attr_value(tag, raw)?;
                     seen_parameter_ref = true;
@@ -16181,7 +18556,10 @@ impl XmlElement for ParameterRefEntryType {
     }
 }
 
-/// A reference to a Parameter. Uses Unix-like naming across the SpaceSystem Tree (e.g., SimpleSat/Bus/EPDS/BatteryOne/Voltage). To reference an individual member of an array use the zero based bracket notation commonly used in languages like C, C++, and Java.
+/// A reference to a Parameter. Uses Unix-like naming across the SpaceSystem
+/// Tree (e.g., SimpleSat/Bus/EPDS/BatteryOne/Voltage). To reference an
+/// individual member of an array use the zero based bracket notation commonly
+/// used in languages like C, C++, and Java.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ParameterRefType {
     /// Attribute `parameterRef`.
@@ -16217,7 +18595,12 @@ impl XmlElement for ParameterRefType {
     }
 }
 
-/// An entry that is only a portion of a parameter value indicating that the entire parameter value must be assembled from other parameter segments. It is assumed that parameter segments happen sequentially in time, that is the first part if a telemetry parameter first, however (and there's always a however), if this is not the case the order of this parameter segment may be supplied with the order attribute where the first segment order="0".
+/// An entry that is only a portion of a parameter value indicating that the
+/// entire parameter value must be assembled from other parameter segments. It
+/// is assumed that parameter segments happen sequentially in time, that is the
+/// first part if a telemetry parameter first, however (and there's always a
+/// however), if this is not the case the order of this parameter segment may be
+/// supplied with the order attribute where the first segment order="0".
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ParameterSegmentRefEntryType {
     /// Optional short description for this entry element.
@@ -16228,11 +18611,25 @@ pub struct ParameterSegmentRefEntryType {
     pub order: Option<i64>,
     /// Attribute `sizeInBits`.
     pub size_in_bits: i64,
-    /// The start bit 0 position for each container is local to the container, but does include space occupied by inherited containers. When a container is "included", as opposed to inherited, then the interpreting implementation takes into account the start bit position of the referring container when finally assembling the start bits for the post-processed entry content. The default start bit for any entry is 0 bits from the previous entry, making the content contiguous when this element is not used.
+    /// The start bit 0 position for each container is local to the container,
+    /// but does include space occupied by inherited containers. When a
+    /// container is "included", as opposed to inherited, then the interpreting
+    /// implementation takes into account the start bit position of the
+    /// referring container when finally assembling the start bits for the
+    /// post-processed entry content. The default start bit for any entry is 0
+    /// bits from the previous entry, making the content contiguous when this
+    /// element is not used.
     pub location_in_container_in_bits: Option<LocationInContainerInBitsType>,
-    /// May be used when this entry repeats itself in the sequence container. When an entry repeats, it effectively specifies that the same entry is reported more than once in the container and has the same physical meaning. This should not be construed to be equivalent to arrays.
+    /// May be used when this entry repeats itself in the sequence container.
+    /// When an entry repeats, it effectively specifies that the same entry is
+    /// reported more than once in the container and has the same physical
+    /// meaning. This should not be construed to be equivalent to arrays.
     pub repeat_entry: Option<RepeatType>,
-    /// This entry will only be included in the sequence when this condition is true, otherwise it is always included. When the include condition evaluates to false, it is as if the entry does not exist such that any start bit interpretations cannot take into account the space that would have been occupied if this included condition were true.
+    /// This entry will only be included in the sequence when this condition is
+    /// true, otherwise it is always included. When the include condition
+    /// evaluates to false, it is as if the entry does not exist such that any
+    /// start bit interpretations cannot take into account the space that would
+    /// have been occupied if this included condition were true.
     pub include_condition: Option<MatchCriteriaType>,
     /// Optional timing information associated with this entry.
     pub time_association: Option<TimeAssociationType>,
@@ -16277,7 +18674,9 @@ impl XmlElement for ParameterSegmentRefEntryType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "parameterRef" => {
                     v.parameter_ref = r.attr_value(tag, raw)?;
                     seen_parameter_ref = true;
@@ -16316,7 +18715,11 @@ impl XmlElement for ParameterSegmentRefEntryType {
     }
 }
 
-/// Describe an unordered collection of parameters where duplicates defined by the Parameter name attribute are invalid. The ParameterSet exists in both the TelemetryMetaData and the CommandMetaData element so that each may be built independently but from a single namespace. See TelemetryMetaDataType and CommandMetaDataType.
+/// Describe an unordered collection of parameters where duplicates defined by
+/// the Parameter name attribute are invalid. The ParameterSet exists in both
+/// the TelemetryMetaData and the CommandMetaData element so that each may be
+/// built independently but from a single namespace. See TelemetryMetaDataType
+/// and CommandMetaDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ParameterSetType {
     /// One of: `Parameter`, `ParameterRef`.
@@ -16357,7 +18760,8 @@ impl XmlElement for ParameterSetType {
     }
 }
 
-/// Parameters that are set with a new value after the command has been sent. Appended to the Base Command list
+/// Parameters that are set with a new value after the command has been sent.
+/// Appended to the Base Command list
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ParameterToSetListType {
     /// Element `ParameterToSet`.
@@ -16398,12 +18802,15 @@ impl XmlElement for ParameterToSetListType {
     }
 }
 
-/// Sets a Parameter to a new value (either from a derivation or explicitly) after the command has been verified (all verifications have passed).
+/// Sets a Parameter to a new value (either from a derivation or explicitly)
+/// after the command has been verified (all verifications have passed).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ParameterToSetType {
     /// Attribute `parameterRef`.
     pub parameter_ref: String,
-    /// This attribute provides more specific control over when the Parameter value is set. By default, it is when the command have all verifications complete. See VerifierEnumerationType.
+    /// This attribute provides more specific control over when the Parameter
+    /// value is set. By default, it is when the command have all verifications
+    /// complete. See VerifierEnumerationType.
     ///
     /// Schema default: `complete`.
     pub set_on_verification: Option<VerifierEnumerationType>,
@@ -16433,7 +18840,9 @@ impl XmlElement for ParameterToSetType {
                     v.parameter_ref = r.attr_value(tag, raw)?;
                     seen_parameter_ref = true;
                 }
-                "setOnVerification" => v.set_on_verification = Some(r.attr_value(tag, raw)?),
+                "setOnVerification" => {
+                    v.set_on_verification = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -16446,7 +18855,8 @@ impl XmlElement for ParameterToSetType {
     }
 }
 
-/// Will suspend all Alarms associated with this Parameter for the given suspense time after the given verifier
+/// Will suspend all Alarms associated with this Parameter for the given
+/// suspense time after the given verifier
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ParameterToSuspendAlarmsOnType {
     /// Attribute `parameterRef`.
@@ -16486,7 +18896,9 @@ impl XmlElement for ParameterToSuspendAlarmsOnType {
                     v.suspense_time = r.attr_value(tag, raw)?;
                     seen_suspense_time = true;
                 }
-                "verifierToTriggerOn" => v.verifier_to_trigger_on = Some(r.attr_value(tag, raw)?),
+                "verifierToTriggerOn" => {
+                    v.verifier_to_trigger_on = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -16501,24 +18913,51 @@ impl XmlElement for ParameterToSuspendAlarmsOnType {
     }
 }
 
-/// Describe the properties of a telemetry parameter, including its data type (parameter type). The bulk of properties associated with a telemetry parameter are in its parameter type. The initial value specified here, overrides the initial value in the parameter type. A parameter may be local, in which case its parameter type would have no data encodings. Ideally such a definition would also set data source in parameter properties to "local" but the syntax does not enforce this. See BaseDataType, BaseTimeDataType, and NameReferenceType.
+/// Describe the properties of a telemetry parameter, including its data type
+/// (parameter type). The bulk of properties associated with a telemetry
+/// parameter are in its parameter type. The initial value specified here,
+/// overrides the initial value in the parameter type. A parameter may be local,
+/// in which case its parameter type would have no data encodings. Ideally such
+/// a definition would also set data source in parameter properties to "local"
+/// but the syntax does not enforce this. See BaseDataType, BaseTimeDataType,
+/// and NameReferenceType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ParameterType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Specify the reference to the parameter type from the ParameterTypeSet area using the path reference rules, either local to this SpaceSystem, relative, or absolute.
+    /// Specify the reference to the parameter type from the ParameterTypeSet
+    /// area using the path reference rules, either local to this SpaceSystem,
+    /// relative, or absolute.
     pub parameter_type_ref: String,
-    /// Specify as: integer data type using xs:integer, float data type using xs:double, string data type using xs:string, boolean data type using xs:boolean, binary data type using xs:hexBinary, enum data type using label name, relative time data type using xs:duration, absolute time data type using xs:dateTime, arrays using JSON syntax (e.g. '[1, 3, 4]', and aggregates using JSON syntax '{"member1": 1, "member2": "foo"}' ). Values must not exceed the characteristics for the data type or this is a validation error. Takes precedence over an initial value given in the data type. Values are calibrated unless there is an option to override it.
+    /// Specify as: integer data type using xs:integer, float data type using
+    /// xs:double, string data type using xs:string, boolean data type using
+    /// xs:boolean, binary data type using xs:hexBinary, enum data type using
+    /// label name, relative time data type using xs:duration, absolute time
+    /// data type using xs:dateTime, arrays using JSON syntax (e.g. '[1, 3, 4]',
+    /// and aggregates using JSON syntax '{"member1": 1, "member2": "foo"}' ).
+    /// Values must not exceed the characteristics for the data type or this is
+    /// a validation error. Takes precedence over an initial value given in the
+    /// data type. Values are calibrated unless there is an option to override
+    /// it.
     pub initial_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// Specify additional properties for this Parameter used by the implementation of tailor the behavior and attributes of the Parameter. When not specified, the defaults on the ParameterProperties element attributes are assumed.
+    /// Specify additional properties for this Parameter used by the
+    /// implementation of tailor the behavior and attributes of the Parameter.
+    /// When not specified, the defaults on the ParameterProperties element
+    /// attributes are assumed.
     pub parameter_properties: Option<ParameterPropertiesType>,
 }
 
@@ -16556,7 +18995,9 @@ impl XmlElement for ParameterType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
@@ -16565,7 +19006,9 @@ impl XmlElement for ParameterType {
                     v.parameter_type_ref = r.attr_value(tag, raw)?;
                     seen_parameter_type_ref = true;
                 }
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -16592,10 +19035,16 @@ impl XmlElement for ParameterType {
     }
 }
 
-/// Describe an unordered collection of parameter type definitions. These types named for the engineering/calibrated type of the parameter. See BaseDataType and BaseTimeDataType.
+/// Describe an unordered collection of parameter type definitions. These types
+/// named for the engineering/calibrated type of the parameter. See BaseDataType
+/// and BaseTimeDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ParameterTypeSetType {
-    /// One of: `StringParameterType`, `EnumeratedParameterType`, `IntegerParameterType`, `BinaryParameterType`, `FloatParameterType`, `BooleanParameterType`, `RelativeTimeParameterType`, `AbsoluteTimeParameterType`, `ArrayParameterType`, `AggregateParameterType`.
+    /// One of: `StringParameterType`, `EnumeratedParameterType`,
+    /// `IntegerParameterType`, `BinaryParameterType`, `FloatParameterType`,
+    /// `BooleanParameterType`, `RelativeTimeParameterType`,
+    /// `AbsoluteTimeParameterType`, `ArrayParameterType`,
+    /// `AggregateParameterType`.
     pub items: Vec<ParameterTypeSetChoice>,
 }
 
@@ -16626,7 +19075,19 @@ impl XmlElement for ParameterTypeSetType {
         }
         if v.items.len() < 1 {
             let n = v.items.len();
-            return Err(r.too_few("StringParameterType|EnumeratedParameterType|IntegerParameterType|BinaryParameterType|FloatParameterType|BooleanParameterType|RelativeTimeParameterType|AbsoluteTimeParameterType|ArrayParameterType|AggregateParameterType", 1, n));
+            return Err(r.too_few(
+                "StringParameterType|\
+                        EnumeratedParameterType|\
+IntegerParameterType|\
+BinaryParameterType|FloatParameterType|\
+BooleanParameterType|\
+RelativeTimeParameterType|\
+AbsoluteTimeParameterType|\
+ArrayParameterType|\
+AggregateParameterType",
+                1,
+                n,
+            ));
         }
         r.close()?;
         Ok(v)
@@ -16670,7 +19131,8 @@ impl XmlElement for ParameterValueChangeType {
     }
 }
 
-/// Sometimes it is necessary to suspend alarms - particularly 'change' alarms for commands that will change the value of a Parameter
+/// Sometimes it is necessary to suspend alarms - particularly 'change' alarms
+/// for commands that will change the value of a Parameter
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ParametersToSuspendAlarmsOnSetType {
     /// Element `ParameterToSuspendAlarmsOn`.
@@ -16716,15 +19178,20 @@ impl XmlElement for ParametersToSuspendAlarmsOnSetType {
 pub struct ParityType {
     /// The parity form.
     pub type_: ParityFormType,
-    /// An offset of non-zero may be specified to skip some bits against the reference position in the reference attribute.
+    /// An offset of non-zero may be specified to skip some bits against the
+    /// reference position in the reference attribute.
     ///
     /// Schema default: `0`.
     pub bits_from_reference: Option<i64>,
-    /// The bits involved in the calculation may start at the beginning or the end of the container.
+    /// The bits involved in the calculation may start at the beginning or the
+    /// end of the container.
     ///
     /// Schema default: `start`.
     pub reference: Option<ReferencePointType>,
-    /// Reference to the parameter that contains the value of the parity based on this container. This attribute is optional because not all implementations verify (telemetry) or create (telecommand) error control fields using the XTCE definition.
+    /// Reference to the parameter that contains the value of the parity based
+    /// on this container. This attribute is optional because not all
+    /// implementations verify (telemetry) or create (telecommand) error control
+    /// fields using the XTCE definition.
     pub parameter_ref: Option<String>,
 }
 
@@ -16755,9 +19222,13 @@ impl XmlElement for ParityType {
                     v.type_ = r.attr_value(tag, raw)?;
                     seen_type = true;
                 }
-                "bitsFromReference" => v.bits_from_reference = Some(r.attr_value(tag, raw)?),
+                "bitsFromReference" => {
+                    v.bits_from_reference = Some(r.attr_value(tag, raw)?)
+                }
                 "reference" => v.reference = Some(r.attr_value(tag, raw)?),
-                "parameterRef" => v.parameter_ref = Some(r.attr_value(tag, raw)?),
+                "parameterRef" => {
+                    v.parameter_ref = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -16769,7 +19240,8 @@ impl XmlElement for ParityType {
     }
 }
 
-/// Describe a percentage complete that is fixed from 0 to 100, or as value from a parameter. See ExecutionVerifierType.
+/// Describe a percentage complete that is fixed from 0 to 100, or as value from
+/// a parameter. See ExecutionVerifierType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct PercentCompleteType {
     /// One of: `FixedValue`, `DynamicValue`.
@@ -16796,10 +19268,14 @@ impl XmlElement for PercentCompleteType {
     }
 }
 
-/// One or more physical addresses may be associated with each Parameter. Examples of physical addresses include a location on the spacecraft or a location on a data collection bus.
+/// One or more physical addresses may be associated with each Parameter.
+/// Examples of physical addresses include a location on the spacecraft or a
+/// location on a data collection bus.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct PhysicalAddressSetType {
-    /// Contains the address (e.g., channel information) required to process the spacecraft telemetry streams. May be an onboard id, a mux address, or a physical location.
+    /// Contains the address (e.g., channel information) required to process the
+    /// spacecraft telemetry streams. May be an onboard id, a mux address, or a
+    /// physical location.
     pub physical_address: Vec<PhysicalAddressType>,
 }
 
@@ -16827,14 +19303,27 @@ impl XmlElement for PhysicalAddressSetType {
     }
 }
 
-/// Describe the physical address(s) that this parameter is collected from. Examples of physical addresses include a memory location on the spacecraft or a location on a data collection bus, with the source identified with a descriptive name for the region of memory, such as RAM, Flash, EEPROM, and other possibilities that can be adapted for program specific usage.
+/// Describe the physical address(s) that this parameter is collected from.
+/// Examples of physical addresses include a memory location on the spacecraft
+/// or a location on a data collection bus, with the source identified with a
+/// descriptive name for the region of memory, such as RAM, Flash, EEPROM, and
+/// other possibilities that can be adapted for program specific usage.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct PhysicalAddressType {
-    /// A descriptive name for the location, such as a memory type, where this address is located.
+    /// A descriptive name for the location, such as a memory type, where this
+    /// address is located.
     pub source_name: Option<String>,
-    /// The address within the memory location. This specification does not specify program and hardware specific attributes, such as address size and address region starting location. These are part of the spacecraft hardware properties.
+    /// The address within the memory location. This specification does not
+    /// specify program and hardware specific attributes, such as address size
+    /// and address region starting location. These are part of the spacecraft
+    /// hardware properties.
     pub source_address: Option<String>,
-    /// A sub-address may be used to further specify the location if it fractionally occupies the address. Additional possibilities exist for separating partitions of memory or other address based storage mechanisms. This specification does not specify spacecraft specific hardware properties, so usage of addressing information is largely program and platform specific.
+    /// A sub-address may be used to further specify the location if it
+    /// fractionally occupies the address. Additional possibilities exist for
+    /// separating partitions of memory or other address based storage
+    /// mechanisms. This specification does not specify spacecraft specific
+    /// hardware properties, so usage of addressing information is largely
+    /// program and platform specific.
     pub sub_address: Option<Box<PhysicalAddressType>>,
 }
 
@@ -16860,7 +19349,9 @@ impl XmlElement for PhysicalAddressType {
             let (k, raw) = a?;
             match k {
                 "sourceName" => v.source_name = Some(r.attr_value(tag, raw)?),
-                "sourceAddress" => v.source_address = Some(r.attr_value(tag, raw)?),
+                "sourceAddress" => {
+                    v.source_address = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -16872,7 +19363,12 @@ impl XmlElement for PhysicalAddressType {
     }
 }
 
-/// Describe a polynomial equation for calibration. This is a calibration type where a curve in a raw vs calibrated plane is described using a set of polynomial coefficients. Raw values are converted to calibrated values by finding a position on the curve corresponding to the raw value. The first coefficient belongs with the X^0 term, the next coefficient belongs to the X^1 term and so on. See CalibratorType.
+/// Describe a polynomial equation for calibration. This is a calibration type
+/// where a curve in a raw vs calibrated plane is described using a set of
+/// polynomial coefficients. Raw values are converted to calibrated values by
+/// finding a position on the curve corresponding to the raw value. The first
+/// coefficient belongs with the X^0 term, the next coefficient belongs to the
+/// X^1 term and so on. See CalibratorType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct PolynomialCalibratorType {
     /// Optional name for this calibrator/algorithm
@@ -16911,7 +19407,9 @@ impl XmlElement for PolynomialCalibratorType {
             let (k, raw) = a?;
             match k {
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -16930,24 +19428,35 @@ impl XmlElement for PolynomialCalibratorType {
     }
 }
 
-/// A verifer that means the command is scheduled for execution by the destination.
+/// A verifer that means the command is scheduled for execution by the
+/// destination.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct QueuedVerifierType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
-    /// Optional name of this defined item. See NameType for restriction information.
+    /// Optional name of this defined item. See NameType for restriction
+    /// information.
     pub name: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// One of: `ComparisonList`, `ContainerRef`, `ParameterValueChange`, `CustomAlgorithm`, `BooleanExpression`, `Comparison`.
+    /// One of: `ComparisonList`, `ContainerRef`, `ParameterValueChange`,
+    /// `CustomAlgorithm`, `BooleanExpression`, `Comparison`.
     pub choice1: QueuedVerifierChoice1,
     /// One of: `CheckWindow`, `CheckWindowAlgorithms`.
     pub choice2: QueuedVerifierChoice2,
-    /// Optional list of argument values that manifest this post-transmission validation parameter value check. When not present, this check applies to all instances of the command.
+    /// Optional list of argument values that manifest this post-transmission
+    /// validation parameter value check. When not present, this check applies
+    /// to all instances of the command.
     pub argument_restriction_list: Option<ArgumentAssignmentListType>,
 }
 
@@ -16983,7 +19492,9 @@ impl XmlElement for QueuedVerifierType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -17047,16 +19558,24 @@ impl XmlElement for RateInStreamSetType {
     }
 }
 
-/// Define the expected appearance (rate) of a container in a stream where the rate is defined on either a perSecond or perContainer update basis. Many programs and platforms have variable reporting rates for containers and these can be commanded. As a result, this element is only useful to some users and generally does not affect the processing of the received containers themselves. See ContainerType.
+/// Define the expected appearance (rate) of a container in a stream where the
+/// rate is defined on either a perSecond or perContainer update basis. Many
+/// programs and platforms have variable reporting rates for containers and
+/// these can be commanded. As a result, this element is only useful to some
+/// users and generally does not affect the processing of the received
+/// containers themselves. See ContainerType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct RateInStreamType {
-    /// The measurement unit basis for the minimum and maximum appearance count values.
+    /// The measurement unit basis for the minimum and maximum appearance count
+    /// values.
     ///
     /// Schema default: `perSecond`.
     pub basis: Option<BasisType>,
-    /// The minimum rate for the specified basis for which this container should appear in the stream.
+    /// The minimum rate for the specified basis for which this container should
+    /// appear in the stream.
     pub minimum_value: Option<f64>,
-    /// The maximum rate for the specified basis for which this container should appear in the stream.
+    /// The maximum rate for the specified basis for which this container should
+    /// appear in the stream.
     pub maximum_value: Option<f64>,
 }
 
@@ -17082,8 +19601,12 @@ impl XmlElement for RateInStreamType {
             let (k, raw) = a?;
             match k {
                 "basis" => v.basis = Some(r.attr_value(tag, raw)?),
-                "minimumValue" => v.minimum_value = Some(r.attr_value(tag, raw)?),
-                "maximumValue" => v.maximum_value = Some(r.attr_value(tag, raw)?),
+                "minimumValue" => {
+                    v.minimum_value = Some(r.attr_value(tag, raw)?)
+                }
+                "maximumValue" => {
+                    v.maximum_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -17092,16 +19615,24 @@ impl XmlElement for RateInStreamType {
     }
 }
 
-/// Define the expected appearance (rate) of a container in a named stream where the rate is defined on either a perSecond or perContainer update basis. Many programs and platforms have variable reporting rates for containers and these can be commanded. As a result, this element is only useful to some users and generally does not affect the processing of the received containers themselves. See ContainerType and RateInStreamType.
+/// Define the expected appearance (rate) of a container in a named stream where
+/// the rate is defined on either a perSecond or perContainer update basis. Many
+/// programs and platforms have variable reporting rates for containers and
+/// these can be commanded. As a result, this element is only useful to some
+/// users and generally does not affect the processing of the received
+/// containers themselves. See ContainerType and RateInStreamType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct RateInStreamWithStreamNameType {
-    /// The measurement unit basis for the minimum and maximum appearance count values.
+    /// The measurement unit basis for the minimum and maximum appearance count
+    /// values.
     ///
     /// Schema default: `perSecond`.
     pub basis: Option<BasisType>,
-    /// The minimum rate for the specified basis for which this container should appear in the stream.
+    /// The minimum rate for the specified basis for which this container should
+    /// appear in the stream.
     pub minimum_value: Option<f64>,
-    /// The maximum rate for the specified basis for which this container should appear in the stream.
+    /// The maximum rate for the specified basis for which this container should
+    /// appear in the stream.
     pub maximum_value: Option<f64>,
     /// Reference to a named stream for which this rate specification applies.
     pub stream_ref: String,
@@ -17131,8 +19662,12 @@ impl XmlElement for RateInStreamWithStreamNameType {
             let (k, raw) = a?;
             match k {
                 "basis" => v.basis = Some(r.attr_value(tag, raw)?),
-                "minimumValue" => v.minimum_value = Some(r.attr_value(tag, raw)?),
-                "maximumValue" => v.maximum_value = Some(r.attr_value(tag, raw)?),
+                "minimumValue" => {
+                    v.minimum_value = Some(r.attr_value(tag, raw)?)
+                }
+                "maximumValue" => {
+                    v.maximum_value = Some(r.attr_value(tag, raw)?)
+                }
                 "streamRef" => {
                     v.stream_ref = r.attr_value(tag, raw)?;
                     seen_stream_ref = true;
@@ -17151,21 +19686,31 @@ impl XmlElement for RateInStreamWithStreamNameType {
 /// A verifier that simply means the destination has received the command.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ReceivedVerifierType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
-    /// Optional name of this defined item. See NameType for restriction information.
+    /// Optional name of this defined item. See NameType for restriction
+    /// information.
     pub name: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// One of: `ComparisonList`, `ContainerRef`, `ParameterValueChange`, `CustomAlgorithm`, `BooleanExpression`, `Comparison`.
+    /// One of: `ComparisonList`, `ContainerRef`, `ParameterValueChange`,
+    /// `CustomAlgorithm`, `BooleanExpression`, `Comparison`.
     pub choice1: ReceivedVerifierChoice1,
     /// One of: `CheckWindow`, `CheckWindowAlgorithms`.
     pub choice2: ReceivedVerifierChoice2,
-    /// Optional list of argument values that manifest this post-transmission validation parameter value check. When not present, this check applies to all instances of the command.
+    /// Optional list of argument values that manifest this post-transmission
+    /// validation parameter value check. When not present, this check applies
+    /// to all instances of the command.
     pub argument_restriction_list: Option<ArgumentAssignmentListType>,
 }
 
@@ -17201,7 +19746,9 @@ impl XmlElement for ReceivedVerifierType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -17225,7 +19772,10 @@ impl XmlElement for ReceivedVerifierType {
     }
 }
 
-/// Most time values are relative to another time e.g. seconds are relative to minutes, minutes are relative to hours. This type is used to describe this relationship starting with the least significant time Parameter to and progressing to the most significant time parameter.
+/// Most time values are relative to another time e.g. seconds are relative to
+/// minutes, minutes are relative to hours. This type is used to describe this
+/// relationship starting with the least significant time Parameter to and
+/// progressing to the most significant time parameter.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ReferenceTimeType {
     /// One of: `OffsetFrom`, `Epoch`.
@@ -17252,10 +19802,14 @@ impl XmlElement for ReferenceTimeType {
     }
 }
 
-/// Describes a relative time argument type. Relative time parameters are time offsets (e.g. 10 second, 1.24 milliseconds, etc.) See IntegerDataEncodingType, FloatDataEncoding and RelativeTimeDataType.
+/// Describes a relative time argument type. Relative time parameters are time
+/// offsets (e.g. 10 second, 1.24 milliseconds, etc.) See
+/// IntegerDataEncodingType, FloatDataEncoding and RelativeTimeDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct RelativeTimeArgumentType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
@@ -17263,11 +19817,15 @@ pub struct RelativeTimeArgumentType {
     pub base_type: Option<String>,
     /// Attribute `initialValue`.
     pub initial_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// Describes how the raw base counts of the time type are encoded/decoded.
     pub encoding: Option<EncodingType>,
@@ -17313,13 +19871,17 @@ impl XmlElement for RelativeTimeArgumentType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -17346,10 +19908,20 @@ impl XmlElement for RelativeTimeArgumentType {
     }
 }
 
-/// Used to contain a relative time value. Used to describe a relative time. Normally used for time offsets. A Relative time is expressed as PnYn MnDTnH nMnS, where nY represents the number of years, nM the number of months, nD the number of days, 'T' is the date/time separator, nH the number of hours, nM the number of minutes and nS the number of seconds. The number of seconds can include decimal digits to arbitrary precision. For example, to indicate a duration of 1 year, 2 months, 3 days, 10 hours, and 30 minutes, one would write: P1Y2M3DT10H30M. One could also indicate a duration of minus 120 days as: -P120D. An extension of Schema duration type.
+/// Used to contain a relative time value. Used to describe a relative time.
+/// Normally used for time offsets. A Relative time is expressed as PnYn MnDTnH
+/// nMnS, where nY represents the number of years, nM the number of months, nD
+/// the number of days, 'T' is the date/time separator, nH the number of hours,
+/// nM the number of minutes and nS the number of seconds. The number of seconds
+/// can include decimal digits to arbitrary precision. For example, to indicate
+/// a duration of 1 year, 2 months, 3 days, 10 hours, and 30 minutes, one would
+/// write: P1Y2M3DT10H30M. One could also indicate a duration of minus 120 days
+/// as: -P120D. An extension of Schema duration type.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct RelativeTimeDataType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
@@ -17357,11 +19929,15 @@ pub struct RelativeTimeDataType {
     pub base_type: Option<String>,
     /// Attribute `initialValue`.
     pub initial_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// Describes how the raw base counts of the time type are encoded/decoded.
     pub encoding: Option<EncodingType>,
@@ -17407,13 +19983,17 @@ impl XmlElement for RelativeTimeDataType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -17440,10 +20020,14 @@ impl XmlElement for RelativeTimeDataType {
     }
 }
 
-/// Describes a relative time parameter type. Relative time parameters are time offsets (e.g. 10 second, 1.24 milliseconds, etc.) See IntegerDataEncodingType, FloatDataEncoding and RelativeTimeDataType.
+/// Describes a relative time parameter type. Relative time parameters are time
+/// offsets (e.g. 10 second, 1.24 milliseconds, etc.) See
+/// IntegerDataEncodingType, FloatDataEncoding and RelativeTimeDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct RelativeTimeParameterType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
@@ -17451,19 +20035,37 @@ pub struct RelativeTimeParameterType {
     pub base_type: Option<String>,
     /// Attribute `initialValue`.
     pub initial_value: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// Describes how the raw base counts of the time type are encoded/decoded.
     pub encoding: Option<EncodingType>,
     /// Describes origin (epoch or reference) of this time type.
     pub reference_time: Option<ReferenceTimeType>,
-    /// Default alarm definitions are those which do not adjust definition logic based on the value of other parameters. Other parameters may participate in the determination of an alarm condition for this parameter, but the definition logic of the alarm on this parameter is constant. If the alarming logic on this parameter changes based on the value of other parameters, then it is a ContextAlarm and belongs in the ContextAlarmList element.
+    /// Default alarm definitions are those which do not adjust definition logic
+    /// based on the value of other parameters. Other parameters may participate
+    /// in the determination of an alarm condition for this parameter, but the
+    /// definition logic of the alarm on this parameter is constant. If the
+    /// alarming logic on this parameter changes based on the value of other
+    /// parameters, then it is a ContextAlarm and belongs in the
+    /// ContextAlarmList element.
     pub default_alarm: Option<TimeAlarmType>,
-    /// Context alarm definitions are those which adjust the definition logic for this parameter based on the value of other parameters. A context which evaluates to being in effect, based on the testing of another parameter, takes precedence over the default alarms in the DefaultAlarm element. If the no context alarm evaluates to being in effect, based on the testing of another parameter, then the default alarm definitions from the DefaultAlarm element will remain in effect. If multiple contexts evaluate to being in effect, then the first one that appears will take precedence.
+    /// Context alarm definitions are those which adjust the definition logic
+    /// for this parameter based on the value of other parameters. A context
+    /// which evaluates to being in effect, based on the testing of another
+    /// parameter, takes precedence over the default alarms in the DefaultAlarm
+    /// element. If the no context alarm evaluates to being in effect, based on
+    /// the testing of another parameter, then the default alarm definitions
+    /// from the DefaultAlarm element will remain in effect. If multiple
+    /// contexts evaluate to being in effect, then the first one that appears
+    /// will take precedence.
     pub context_alarm_list: Option<TimeContextAlarmListType>,
 }
 
@@ -17511,13 +20113,17 @@ impl XmlElement for RelativeTimeParameterType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -17550,12 +20156,21 @@ impl XmlElement for RelativeTimeParameterType {
     }
 }
 
-/// Contains elements that describe how an Entry is identically repeated. This includes a Count of the number of appearances and an optional Offset in bits that may occur between appearances. A Count of 1 indicates no repetition. The Offset default is 0 when not specified.
+/// Contains elements that describe how an Entry is identically repeated. This
+/// includes a Count of the number of appearances and an optional Offset in bits
+/// that may occur between appearances. A Count of 1 indicates no repetition.
+/// The Offset default is 0 when not specified.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct RepeatType {
-    /// Value (either fixed or dynamic) that contains the count of appearances for an Entry. The value must be positive where 1 is the same as not specifying a RepeatEntry element at all.
+    /// Value (either fixed or dynamic) that contains the count of appearances
+    /// for an Entry. The value must be positive where 1 is the same as not
+    /// specifying a RepeatEntry element at all.
     pub count: IntegerValueType,
-    /// Value (either fixed or dynamic) that contains an optional offset in bits between repeats of the Entry. The default is 0, which is contiguous. The value must be 0 or positive. Empty offset after the last repeat count is not implicitly reserved, so the parent EntryList should consider if these are occupied bits when placing the next Entry.
+    /// Value (either fixed or dynamic) that contains an optional offset in bits
+    /// between repeats of the Entry. The default is 0, which is contiguous. The
+    /// value must be 0 or positive. Empty offset after the last repeat count is
+    /// not implicitly reserved, so the parent EntryList should consider if
+    /// these are occupied bits when placing the next Entry.
     pub offset: Option<IntegerValueType>,
 }
 
@@ -17588,12 +20203,19 @@ impl XmlElement for RepeatType {
     }
 }
 
-/// Define one or more conditions (constraints) for container inheritance. A container is instantiable if its constraints are true. Constraint conditions may be a comparison, a list of comparisons, a boolean expression, or a graph of containers that are instantiable (if all containers are instantiable the condition is true). See BaseContainerType, ComparisonType, ComparisonListType, BooleanExpressionType and NextContainerType.
+/// Define one or more conditions (constraints) for container inheritance. A
+/// container is instantiable if its constraints are true. Constraint conditions
+/// may be a comparison, a list of comparisons, a boolean expression, or a graph
+/// of containers that are instantiable (if all containers are instantiable the
+/// condition is true). See BaseContainerType, ComparisonType,
+/// ComparisonListType, BooleanExpressionType and NextContainerType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct RestrictionCriteriaType {
-    /// One of: `Comparison`, `ComparisonList`, `BooleanExpression`, `CustomAlgorithm`.
+    /// One of: `Comparison`, `ComparisonList`, `BooleanExpression`,
+    /// `CustomAlgorithm`.
     pub choice: RestrictionCriteriaChoice,
-    /// Reference to the named container that must follow this container in the stream sequence.
+    /// Reference to the named container that must follow this container in the
+    /// stream sequence.
     pub next_container: Option<ContainerRefType>,
 }
 
@@ -17623,24 +20245,37 @@ impl XmlElement for RestrictionCriteriaType {
     }
 }
 
-/// Sent from range means the command has been transmitted to the spacecraft by the network that connects the ground system to the spacecraft. Typically, this verifier would come from something other than the spacecraft, such as a modem or front end processor.
+/// Sent from range means the command has been transmitted to the spacecraft by
+/// the network that connects the ground system to the spacecraft. Typically,
+/// this verifier would come from something other than the spacecraft, such as a
+/// modem or front end processor.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct SentFromRangeVerifierType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
-    /// Optional name of this defined item. See NameType for restriction information.
+    /// Optional name of this defined item. See NameType for restriction
+    /// information.
     pub name: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// One of: `ComparisonList`, `ContainerRef`, `ParameterValueChange`, `CustomAlgorithm`, `BooleanExpression`, `Comparison`.
+    /// One of: `ComparisonList`, `ContainerRef`, `ParameterValueChange`,
+    /// `CustomAlgorithm`, `BooleanExpression`, `Comparison`.
     pub choice1: SentFromRangeVerifierChoice1,
     /// One of: `CheckWindow`, `CheckWindowAlgorithms`.
     pub choice2: SentFromRangeVerifierChoice2,
-    /// Optional list of argument values that manifest this post-transmission validation parameter value check. When not present, this check applies to all instances of the command.
+    /// Optional list of argument values that manifest this post-transmission
+    /// validation parameter value check. When not present, this check applies
+    /// to all instances of the command.
     pub argument_restriction_list: Option<ArgumentAssignmentListType>,
 }
 
@@ -17676,7 +20311,9 @@ impl XmlElement for SentFromRangeVerifierType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -17700,32 +20337,52 @@ impl XmlElement for SentFromRangeVerifierType {
     }
 }
 
-/// Describes the binary layout/packing of data and also related properties, including an entry list of parameters, parameter segments, array parameters, stream segments, containers, and container segments. Sequence containers may extend other sequence containers (see BaseContainerType). The parent container's entries are placed before the entries in the child container forming one entry list. An inheritance chain may be formed using this mechanism, but only one entry list is being created. Sequence containers may be marked as "abstract", when this occurs an instance of it cannot itself be created. The idle pattern is part of any unallocated space in the container. See EntryListType.
+/// Describes the binary layout/packing of data and also related properties,
+/// including an entry list of parameters, parameter segments, array parameters,
+/// stream segments, containers, and container segments. Sequence containers may
+/// extend other sequence containers (see BaseContainerType). The parent
+/// container's entries are placed before the entries in the child container
+/// forming one entry list. An inheritance chain may be formed using this
+/// mechanism, but only one entry list is being created. Sequence containers may
+/// be marked as "abstract", when this occurs an instance of it cannot itself be
+/// created. The idle pattern is part of any unallocated space in the container.
+/// See EntryListType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct SequenceContainerType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Abstract container definitions that are not instantiated, rather only used as bases to inherit from to create specialized container definitions.
+    /// Abstract container definitions that are not instantiated, rather only
+    /// used as bases to inherit from to create specialized container
+    /// definitions.
     ///
     /// Schema default: `false`.
     pub abstract_: Option<bool>,
-    /// The idle pattern is part of any unallocated space in the container. This is uncommon.
+    /// The idle pattern is part of any unallocated space in the container. This
+    /// is uncommon.
     ///
     /// Schema default: `0`.
     pub idle_pattern: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// Element `DefaultRateInStream`.
     pub default_rate_in_stream: Option<RateInStreamType>,
     /// Element `RateInStreamSet`.
     pub rate_in_stream_set: Option<RateInStreamSetType>,
-    /// May be used to indicate error detection and correction, change byte order, provide the size (when it can't be derived), or perform some custom processing.
+    /// May be used to indicate error detection and correction, change byte
+    /// order, provide the size (when it can't be derived), or perform some
+    /// custom processing.
     pub binary_encoding: Option<ContainerBinaryDataEncodingType>,
     /// List of item entries to pack/encode into this container definition.
     pub entry_list: EntryListType,
@@ -17778,7 +20435,9 @@ impl XmlElement for SequenceContainerType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
@@ -17821,16 +20480,38 @@ impl XmlElement for SequenceContainerType {
     }
 }
 
-/// Defines an abstract schema type used to create other entry types. Describe an entry's location in the container (See LocationInContainerInBitsType). The location may be fixed or dynamic, absolute or relative. Entries may be included depending on the value of a condition (See IncludeConditionType), and entries may also repeat (see RepeatEntryType). The entry's IncludeCondition resolves to true, it is fully-resolved when its size is computable after RepeatEntry has been accounted for and then offset by LocationInContainer. See EntryListType, IncludeConditionType, RepeatEntryType and LocationInContainerInBitsType.
+/// Defines an abstract schema type used to create other entry types. Describe
+/// an entry's location in the container (See LocationInContainerInBitsType).
+/// The location may be fixed or dynamic, absolute or relative. Entries may be
+/// included depending on the value of a condition (See IncludeConditionType),
+/// and entries may also repeat (see RepeatEntryType). The entry's
+/// IncludeCondition resolves to true, it is fully-resolved when its size is
+/// computable after RepeatEntry has been accounted for and then offset by
+/// LocationInContainer. See EntryListType, IncludeConditionType,
+/// RepeatEntryType and LocationInContainerInBitsType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct SequenceEntryType {
     /// Optional short description for this entry element.
     pub short_description: Option<String>,
-    /// The start bit 0 position for each container is local to the container, but does include space occupied by inherited containers. When a container is "included", as opposed to inherited, then the interpreting implementation takes into account the start bit position of the referring container when finally assembling the start bits for the post-processed entry content. The default start bit for any entry is 0 bits from the previous entry, making the content contiguous when this element is not used.
+    /// The start bit 0 position for each container is local to the container,
+    /// but does include space occupied by inherited containers. When a
+    /// container is "included", as opposed to inherited, then the interpreting
+    /// implementation takes into account the start bit position of the
+    /// referring container when finally assembling the start bits for the
+    /// post-processed entry content. The default start bit for any entry is 0
+    /// bits from the previous entry, making the content contiguous when this
+    /// element is not used.
     pub location_in_container_in_bits: Option<LocationInContainerInBitsType>,
-    /// May be used when this entry repeats itself in the sequence container. When an entry repeats, it effectively specifies that the same entry is reported more than once in the container and has the same physical meaning. This should not be construed to be equivalent to arrays.
+    /// May be used when this entry repeats itself in the sequence container.
+    /// When an entry repeats, it effectively specifies that the same entry is
+    /// reported more than once in the container and has the same physical
+    /// meaning. This should not be construed to be equivalent to arrays.
     pub repeat_entry: Option<RepeatType>,
-    /// This entry will only be included in the sequence when this condition is true, otherwise it is always included. When the include condition evaluates to false, it is as if the entry does not exist such that any start bit interpretations cannot take into account the space that would have been occupied if this included condition were true.
+    /// This entry will only be included in the sequence when this condition is
+    /// true, otherwise it is always included. When the include condition
+    /// evaluates to false, it is as if the entry does not exist such that any
+    /// start bit interpretations cannot take into account the space that would
+    /// have been occupied if this included condition were true.
     pub include_condition: Option<MatchCriteriaType>,
     /// Optional timing information associated with this entry.
     pub time_association: Option<TimeAssociationType>,
@@ -17868,7 +20549,9 @@ impl XmlElement for SequenceEntryType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -17964,18 +20647,25 @@ impl XmlElement for ServiceSetType {
     }
 }
 
-/// Holds a set of services, logical groups of containers OR messages (not both).
+/// Holds a set of services, logical groups of containers OR messages (not
+/// both).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ServiceType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// One of: `MessageRefSet`, `ContainerRefSet`.
     pub choice: ServiceChoice,
@@ -18008,7 +20698,9 @@ impl XmlElement for ServiceType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
@@ -18034,10 +20726,12 @@ impl XmlElement for ServiceType {
     }
 }
 
-/// Significance provides some cautionary information about the potential consequence of each MetaCommand.
+/// Significance provides some cautionary information about the potential
+/// consequence of each MetaCommand.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct SignificanceType {
-    /// If none is supplied, then the current SpaceSystem is assumed to be the one at risk by the issuance of this command
+    /// If none is supplied, then the current SpaceSystem is assumed to be the
+    /// one at risk by the issuance of this command
     pub space_system_at_risk: Option<String>,
     /// Attribute `reasonForWarning`.
     pub reason_for_warning: Option<String>,
@@ -18068,9 +20762,15 @@ impl XmlElement for SignificanceType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "spaceSystemAtRisk" => v.space_system_at_risk = Some(r.attr_value(tag, raw)?),
-                "reasonForWarning" => v.reason_for_warning = Some(r.attr_value(tag, raw)?),
-                "consequenceLevel" => v.consequence_level = Some(r.attr_value(tag, raw)?),
+                "spaceSystemAtRisk" => {
+                    v.space_system_at_risk = Some(r.attr_value(tag, raw)?)
+                }
+                "reasonForWarning" => {
+                    v.reason_for_warning = Some(r.attr_value(tag, raw)?)
+                }
+                "consequenceLevel" => {
+                    v.consequence_level = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -18079,18 +20779,28 @@ impl XmlElement for SignificanceType {
     }
 }
 
-/// The simplest form of algorithm, a SimpleAlgorithmType contains an area for a free-form pseudo code description of the algorithm plus a Set of references to external algorithms. External algorithms are usually unique to a ground system type. Multiple external algorithms are possible because XTCE documents may be used across multiple ground systems.
+/// The simplest form of algorithm, a SimpleAlgorithmType contains an area for a
+/// free-form pseudo code description of the algorithm plus a Set of references
+/// to external algorithms. External algorithms are usually unique to a ground
+/// system type. Multiple external algorithms are possible because XTCE
+/// documents may be used across multiple ground systems.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct SimpleAlgorithmType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// Element `AlgorithmText`.
     pub algorithm_text: Option<AlgorithmTextType>,
@@ -18130,7 +20840,9 @@ impl XmlElement for SimpleAlgorithmType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
@@ -18163,7 +20875,9 @@ impl XmlElement for SimpleAlgorithmType {
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct SizeInBitsFixedType {
-    /// Size in bits of this string data type for both the memory allocation in the implementing software and also the size in bits for this parameter when it appears in a container.
+    /// Size in bits of this string data type for both the memory allocation in
+    /// the implementing software and also the size in bits for this parameter
+    /// when it appears in a container.
     pub fixed_value: i64,
 }
 
@@ -18192,11 +20906,18 @@ impl XmlElement for SizeInBitsFixedType {
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct SizeInBitsType {
-    /// This is the simplest case of a string data type where the encoding size of the string does not change.
+    /// This is the simplest case of a string data type where the encoding size
+    /// of the string does not change.
     pub fixed: SizeInBitsFixedType,
-    /// The termination character that represents the end of the string contents. For C and most strings, this is null (00), which is the default.
+    /// The termination character that represents the end of the string
+    /// contents. For C and most strings, this is null (00), which is the
+    /// default.
     pub termination_char: Option<String>,
-    /// In some string implementations, the size of the string contents (not the memory allocation size) is determined by a leading numeric value. This is sometimes referred to as Pascal strings. If a LeadingSize is specified, then the TerminationChar element does not have a functional meaning.
+    /// In some string implementations, the size of the string contents (not the
+    /// memory allocation size) is determined by a leading numeric value. This
+    /// is sometimes referred to as Pascal strings. If a LeadingSize is
+    /// specified, then the TerminationChar element does not have a functional
+    /// meaning.
     pub leading_size: Option<LeadingSizeType>,
 }
 
@@ -18235,18 +20956,27 @@ impl XmlElement for SizeInBitsType {
     }
 }
 
-/// SpaceSystem is a collection of SpaceSystem(s) including space assets, ground assets, multi-satellite systems and sub-systems. A SpaceSystem is the root element for the set of data necessary to monitor and command an arbitrary space device - this includes the binary decomposition the data streams going into and out of a device.
+/// SpaceSystem is a collection of SpaceSystem(s) including space assets, ground
+/// assets, multi-satellite systems and sub-systems. A SpaceSystem is the root
+/// element for the set of data necessary to monitor and command an arbitrary
+/// space device - this includes the binary decomposition the data streams going
+/// into and out of a device.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct SpaceSystemType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Type of the space system. Represents what from a space enterprise this SpaceSystem element represents. See the individual enumeration descriptions in SystemTypeType.
+    /// Type of the space system. Represents what from a space enterprise this
+    /// SpaceSystem element represents. See the individual enumeration
+    /// descriptions in SystemTypeType.
     ///
     /// Schema default: `unknown`.
     pub system_type: Option<SystemTypeType>,
-    /// Broad name for the type of asset, such as spacecraft, aircraft, device, or any other that makes sense for the system.
+    /// Broad name for the type of asset, such as spacecraft, aircraft, device,
+    /// or any other that makes sense for the system.
     ///
     /// Schema default: `unknown`.
     pub asset_type: Option<String>,
@@ -18254,21 +20984,33 @@ pub struct SpaceSystemType {
     pub operational_status: Option<String>,
     /// Attribute `xml:base`.
     pub xml_base: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// The Header element contains optional descriptive information about this SpaceSystem or the document as a whole when specified at the root SpaceSystem.
+    /// The Header element contains optional descriptive information about this
+    /// SpaceSystem or the document as a whole when specified at the root
+    /// SpaceSystem.
     pub header: Option<HeaderType>,
-    /// This element contains descriptions of the telemetry created on the space asset/device and sent to other data consumers.
+    /// This element contains descriptions of the telemetry created on the space
+    /// asset/device and sent to other data consumers.
     pub telemetry_meta_data: Option<TelemetryMetaDataType>,
-    /// This element contains descriptions of the commands and their associated constraints and verifications that can be sent to the space asset/device.
+    /// This element contains descriptions of the commands and their associated
+    /// constraints and verifications that can be sent to the space
+    /// asset/device.
     pub command_meta_data: Option<CommandMetaDataType>,
     /// Element `ServiceSet`.
     pub service_set: Option<ServiceSetType>,
-    /// Additional SpaceSystem elements may be used like namespaces to segregate portions of the space asset/device into convenient groupings or may be used to specialize a product line generic SpaceSystem to a specific asset instance.
+    /// Additional SpaceSystem elements may be used like namespaces to segregate
+    /// portions of the space asset/device into convenient groupings or may be
+    /// used to specialize a product line generic SpaceSystem to a specific
+    /// asset instance.
     pub space_system: Vec<SpaceSystemType>,
 }
 
@@ -18325,14 +21067,18 @@ impl XmlElement for SpaceSystemType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "systemType" => v.system_type = Some(r.attr_value(tag, raw)?),
                 "assetType" => v.asset_type = Some(r.attr_value(tag, raw)?),
-                "operationalStatus" => v.operational_status = Some(r.attr_value(tag, raw)?),
+                "operationalStatus" => {
+                    v.operational_status = Some(r.attr_value(tag, raw)?)
+                }
                 "xml:base" => v.xml_base = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -18369,18 +21115,28 @@ impl XmlElement for SpaceSystemType {
     }
 }
 
-/// Describe a spline function for calibration using a set of at least 2 points. Raw values are converted to calibrated values by finding a position on the line corresponding to the raw value. The line may be interpolated and/or extrapolated as needed. The interpolation order may be specified for all the points and overridden on individual points. The algorithm triggers on the input parameter. See CalibratorType.
+/// Describe a spline function for calibration using a set of at least 2 points.
+/// Raw values are converted to calibrated values by finding a position on the
+/// line corresponding to the raw value. The line may be interpolated and/or
+/// extrapolated as needed. The interpolation order may be specified for all the
+/// points and overridden on individual points. The algorithm triggers on the
+/// input parameter. See CalibratorType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct SplineCalibratorType {
     /// Optional name for this calibrator/algorithm
     pub name: Option<String>,
     /// Optional description for this calibrator/algorithm
     pub short_description: Option<String>,
-    /// The interpolation order to apply to the overall spline function. Order 0 is no slope between the points (flat). Order 1 is linear interpolation. Order 2 would be quadratic and in this special case, 3 points would be required, etc.
+    /// The interpolation order to apply to the overall spline function. Order 0
+    /// is no slope between the points (flat). Order 1 is linear interpolation.
+    /// Order 2 would be quadratic and in this special case, 3 points would be
+    /// required, etc.
     ///
     /// Schema default: `1`.
     pub order: Option<i64>,
-    /// Extrapolation allows the closest outside point and the associated interpolation to extend outside of the range of the points in the spline function.
+    /// Extrapolation allows the closest outside point and the associated
+    /// interpolation to extend outside of the range of the points in the spline
+    /// function.
     ///
     /// Schema default: `false`.
     pub extrapolate: Option<bool>,
@@ -18427,7 +21183,9 @@ impl XmlElement for SplineCalibratorType {
             let (k, raw) = a?;
             match k {
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "order" => v.order = Some(r.attr_value(tag, raw)?),
                 "extrapolate" => v.extrapolate = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
@@ -18448,16 +21206,23 @@ impl XmlElement for SplineCalibratorType {
     }
 }
 
-/// A spline, or piecewise defined function, is a set on points from which a curve may be drawn to interpolate raw to calibrated values
+/// A spline, or piecewise defined function, is a set on points from which a
+/// curve may be drawn to interpolate raw to calibrated values
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct SplinePointType {
-    /// The order of a SplineCalibrator refers to the interpolation function. Order 0 is a flat line from the defined point (inclusive) to the next point (exclusive). Order 1 is linear interpolation between two points. Order 2 is quadratic fit and requires at least 3 points (unusual case). This order is generally not needed, but may be used to override the interpolation order for this point.
+    /// The order of a SplineCalibrator refers to the interpolation function.
+    /// Order 0 is a flat line from the defined point (inclusive) to the next
+    /// point (exclusive). Order 1 is linear interpolation between two points.
+    /// Order 2 is quadratic fit and requires at least 3 points (unusual case).
+    /// This order is generally not needed, but may be used to override the
+    /// interpolation order for this point.
     ///
     /// Schema default: `1`.
     pub order: Option<i64>,
     /// The raw encoded value.
     pub raw: f64,
-    /// The engineering/calibrated value associated with the raw value for this point.
+    /// The engineering/calibrated value associated with the raw value for this
+    /// point.
     pub calibrated: f64,
 }
 
@@ -18539,7 +21304,11 @@ impl XmlElement for StreamRefType {
     }
 }
 
-/// An entry that is a portion of a stream (streams are by definition, assumed continuous) It is assumed that stream segments happen sequentially in time, that is the first part if a steam first, however, if this is not the case the order of the stream segments may be supplied with the order attribute where the first segment order="0".
+/// An entry that is a portion of a stream (streams are by definition, assumed
+/// continuous) It is assumed that stream segments happen sequentially in time,
+/// that is the first part if a steam first, however, if this is not the case
+/// the order of the stream segments may be supplied with the order attribute
+/// where the first segment order="0".
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StreamSegmentEntryType {
     /// Optional short description for this entry element.
@@ -18550,11 +21319,25 @@ pub struct StreamSegmentEntryType {
     pub order: Option<i64>,
     /// Attribute `sizeInBits`.
     pub size_in_bits: i64,
-    /// The start bit 0 position for each container is local to the container, but does include space occupied by inherited containers. When a container is "included", as opposed to inherited, then the interpreting implementation takes into account the start bit position of the referring container when finally assembling the start bits for the post-processed entry content. The default start bit for any entry is 0 bits from the previous entry, making the content contiguous when this element is not used.
+    /// The start bit 0 position for each container is local to the container,
+    /// but does include space occupied by inherited containers. When a
+    /// container is "included", as opposed to inherited, then the interpreting
+    /// implementation takes into account the start bit position of the
+    /// referring container when finally assembling the start bits for the
+    /// post-processed entry content. The default start bit for any entry is 0
+    /// bits from the previous entry, making the content contiguous when this
+    /// element is not used.
     pub location_in_container_in_bits: Option<LocationInContainerInBitsType>,
-    /// May be used when this entry repeats itself in the sequence container. When an entry repeats, it effectively specifies that the same entry is reported more than once in the container and has the same physical meaning. This should not be construed to be equivalent to arrays.
+    /// May be used when this entry repeats itself in the sequence container.
+    /// When an entry repeats, it effectively specifies that the same entry is
+    /// reported more than once in the container and has the same physical
+    /// meaning. This should not be construed to be equivalent to arrays.
     pub repeat_entry: Option<RepeatType>,
-    /// This entry will only be included in the sequence when this condition is true, otherwise it is always included. When the include condition evaluates to false, it is as if the entry does not exist such that any start bit interpretations cannot take into account the space that would have been occupied if this included condition were true.
+    /// This entry will only be included in the sequence when this condition is
+    /// true, otherwise it is always included. When the include condition
+    /// evaluates to false, it is as if the entry does not exist such that any
+    /// start bit interpretations cannot take into account the space that would
+    /// have been occupied if this included condition were true.
     pub include_condition: Option<MatchCriteriaType>,
     /// Optional timing information associated with this entry.
     pub time_association: Option<TimeAssociationType>,
@@ -18599,7 +21382,9 @@ impl XmlElement for StreamSegmentEntryType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "streamRef" => {
                     v.stream_ref = r.attr_value(tag, raw)?;
                     seen_stream_ref = true;
@@ -18648,7 +21433,12 @@ pub struct StreamSetType {
 impl XmlElement for StreamSetType {
     fn write_xml(&self, w: &mut Writer<'_>, tag: &str) -> Result<()> {
         w.start(tag);
-        check_count(self.items.len(), 1, None, "StreamSetType.StreamSetChoice")?;
+        check_count(
+            self.items.len(),
+            1,
+            None,
+            "StreamSetType.StreamSetChoice",
+        )?;
         for v in &self.items {
             v.write_xml(w)?;
         }
@@ -18667,14 +21457,22 @@ impl XmlElement for StreamSetType {
         }
         if v.items.len() < 1 {
             let n = v.items.len();
-            return Err(r.too_few("FixedFrameStream|VariableFrameStream|CustomStream", 1, n));
+            return Err(r.too_few(
+                "FixedFrameStream|VariableFrameStream|\
+                        CustomStream",
+                1,
+                n,
+            ));
         }
         r.close()?;
         Ok(v)
     }
 }
 
-/// Describe a string alarm condition based on matching a regular expression. The level and regular expression are described. The specific implementation of the regular expression syntax is not specified in the schema at this time. See StringAlarmListType.
+/// Describe a string alarm condition based on matching a regular expression.
+/// The level and regular expression are described. The specific implementation
+/// of the regular expression syntax is not specified in the schema at this
+/// time. See StringAlarmListType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StringAlarmLevelType {
     /// Attribute `alarmLevel`.
@@ -18721,7 +21519,9 @@ impl XmlElement for StringAlarmLevelType {
     }
 }
 
-/// Describe an ordered collection of string alarms, where duplicates are valid. Evaluate the alarms in list order. The first to evaluate to true takes precedence. See StringAlarmLevelType.
+/// Describe an ordered collection of string alarms, where duplicates are valid.
+/// Evaluate the alarms in list order. The first to evaluate to true takes
+/// precedence. See StringAlarmLevelType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StringAlarmListType {
     /// Element `StringAlarm`.
@@ -18762,22 +21562,31 @@ impl XmlElement for StringAlarmListType {
     }
 }
 
-/// Describe alarms specific to the string data type, extends the basic AlarmType, while adding a StringAlarmList and defaultAlarmLevel attribute. The string alarm list is evaluated in list order. See ConcernsLevelsType and StringAlarmListType.
+/// Describe alarms specific to the string data type, extends the basic
+/// AlarmType, while adding a StringAlarmList and defaultAlarmLevel attribute.
+/// The string alarm list is evaluated in list order. See ConcernsLevelsType and
+/// StringAlarmListType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StringAlarmType {
     /// The alarm definition may be named.
     pub name: Option<String>,
     /// An optional brief description of this alarm definition.
     pub short_description: Option<String>,
-    /// The number of successive instances that meet the alarm conditions for the alarm to trigger. The default is 1.
+    /// The number of successive instances that meet the alarm conditions for
+    /// the alarm to trigger. The default is 1.
     ///
     /// Schema default: `1`.
     pub min_violations: Option<i64>,
-    /// Optionally specify the number of successive instances that do not meet the alarm conditions to leave the alarm state. If this attribute is not specified, it is treated as being equal to minViolations (symmetric).
+    /// Optionally specify the number of successive instances that do not meet
+    /// the alarm conditions to leave the alarm state. If this attribute is not
+    /// specified, it is treated as being equal to minViolations (symmetric).
     ///
     /// Schema default: `1`.
     pub min_conformance: Option<i64>,
-    /// The initial state of this alarm definition as delivered. When true, this leaves the alarm definition empty for the parameter and also short circuits the remaining context matches and the default so no alarm is active on the parameter.
+    /// The initial state of this alarm definition as delivered. When true, this
+    /// leaves the alarm definition empty for the parameter and also short
+    /// circuits the remaining context matches and the default so no alarm is
+    /// active on the parameter.
     ///
     /// Schema default: `false`.
     pub disabled: Option<bool>,
@@ -18833,11 +21642,19 @@ impl XmlElement for StringAlarmType {
             let (k, raw) = a?;
             match k {
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
-                "minViolations" => v.min_violations = Some(r.attr_value(tag, raw)?),
-                "minConformance" => v.min_conformance = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
+                "minViolations" => {
+                    v.min_violations = Some(r.attr_value(tag, raw)?)
+                }
+                "minConformance" => {
+                    v.min_conformance = Some(r.attr_value(tag, raw)?)
+                }
                 "disabled" => v.disabled = Some(r.attr_value(tag, raw)?),
-                "defaultAlarmLevel" => v.default_alarm_level = Some(r.attr_value(tag, raw)?),
+                "defaultAlarmLevel" => {
+                    v.default_alarm_level = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -18855,30 +21672,49 @@ impl XmlElement for StringAlarmType {
     }
 }
 
-/// Describes a string parameter type. Three forms are supported: fixed length, variable length and variable length using a prefix. See StringDataEncodingType and StringDataType.
+/// Describes a string parameter type. Three forms are supported: fixed length,
+/// variable length and variable length using a prefix. See
+/// StringDataEncodingType and StringDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StringArgumentType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Used to derive one Data Type from another - will inherit all the attributes from the baseType any of which may be redefined in this type definition.
+    /// Used to derive one Data Type from another - will inherit all the
+    /// attributes from the baseType any of which may be redefined in this type
+    /// definition.
     pub base_type: Option<String>,
-    /// Initial values for string types, may include C language style (\n, \t, \", \\, etc.) escape sequences.
+    /// Initial values for string types, may include C language style (\n, \t,
+    /// \", \\, etc.) escape sequences.
     pub initial_value: Option<String>,
     /// restriction pattern is a regular expression
     pub restriction_pattern: Option<String>,
-    /// Optional hint to the implementation about the size of the engineering/calibrated data type to use internally. Generally this can be determined by examination of the encoding information for the string, but it is not always clear, so this attribute allows the extra hint when needed. A tolerant implementation will endeavor to always make sufficient size engineering data types to capture the entire range of possible characters.
+    /// Optional hint to the implementation about the size of the
+    /// engineering/calibrated data type to use internally. Generally this can
+    /// be determined by examination of the encoding information for the string,
+    /// but it is not always clear, so this attribute allows the extra hint when
+    /// needed. A tolerant implementation will endeavor to always make
+    /// sufficient size engineering data types to capture the entire range of
+    /// possible characters.
     pub character_width: Option<CharacterWidthType>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// When appropriate, describe the units of measure that are represented by this argument value.
+    /// When appropriate, describe the units of measure that are represented by
+    /// this argument value.
     pub unit_set: Option<UnitSetType>,
-    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`, `StringDataEncoding`.
+    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding`, `StringDataEncoding`.
     pub choice: Option<StringArgumentChoice>,
     /// Element `SizeRangeInCharacters`.
     pub size_range_in_characters: Option<IntegerRangeType>,
@@ -18931,15 +21767,23 @@ impl XmlElement for StringArgumentType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
-                "restrictionPattern" => v.restriction_pattern = Some(r.attr_value(tag, raw)?),
-                "characterWidth" => v.character_width = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
+                "restrictionPattern" => {
+                    v.restriction_pattern = Some(r.attr_value(tag, raw)?)
+                }
+                "characterWidth" => {
+                    v.character_width = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -18969,10 +21813,15 @@ impl XmlElement for StringArgumentType {
     }
 }
 
-/// Describe an ordered collection of context string alarms, duplicates are valid. Process the contexts in list order. See StringContextAlarmType.
+/// Describe an ordered collection of context string alarms, duplicates are
+/// valid. Process the contexts in list order. See StringContextAlarmType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StringContextAlarmListType {
-    /// A Context contains a new alarm definition and a context match. The match takes precedence over any default alarm when the first in the overall list evaluates to true. It is also possible the alarm definition is empty, in which case the context means no alarm defined when the match is true.
+    /// A Context contains a new alarm definition and a context match. The match
+    /// takes precedence over any default alarm when the first in the overall
+    /// list evaluates to true. It is also possible the alarm definition is
+    /// empty, in which case the context means no alarm defined when the match
+    /// is true.
     pub context_alarm: Vec<StringContextAlarmType>,
 }
 
@@ -19010,22 +21859,29 @@ impl XmlElement for StringContextAlarmListType {
     }
 }
 
-/// Describe a context that when true the alarm may be evaluated. See ContextMatchType and StringAlarmType.
+/// Describe a context that when true the alarm may be evaluated. See
+/// ContextMatchType and StringAlarmType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StringContextAlarmType {
     /// The alarm definition may be named.
     pub name: Option<String>,
     /// An optional brief description of this alarm definition.
     pub short_description: Option<String>,
-    /// The number of successive instances that meet the alarm conditions for the alarm to trigger. The default is 1.
+    /// The number of successive instances that meet the alarm conditions for
+    /// the alarm to trigger. The default is 1.
     ///
     /// Schema default: `1`.
     pub min_violations: Option<i64>,
-    /// Optionally specify the number of successive instances that do not meet the alarm conditions to leave the alarm state. If this attribute is not specified, it is treated as being equal to minViolations (symmetric).
+    /// Optionally specify the number of successive instances that do not meet
+    /// the alarm conditions to leave the alarm state. If this attribute is not
+    /// specified, it is treated as being equal to minViolations (symmetric).
     ///
     /// Schema default: `1`.
     pub min_conformance: Option<i64>,
-    /// The initial state of this alarm definition as delivered. When true, this leaves the alarm definition empty for the parameter and also short circuits the remaining context matches and the default so no alarm is active on the parameter.
+    /// The initial state of this alarm definition as delivered. When true, this
+    /// leaves the alarm definition empty for the parameter and also short
+    /// circuits the remaining context matches and the default so no alarm is
+    /// active on the parameter.
     ///
     /// Schema default: `false`.
     pub disabled: Option<bool>,
@@ -19084,11 +21940,19 @@ impl XmlElement for StringContextAlarmType {
             let (k, raw) = a?;
             match k {
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
-                "minViolations" => v.min_violations = Some(r.attr_value(tag, raw)?),
-                "minConformance" => v.min_conformance = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
+                "minViolations" => {
+                    v.min_violations = Some(r.attr_value(tag, raw)?)
+                }
+                "minConformance" => {
+                    v.min_conformance = Some(r.attr_value(tag, raw)?)
+                }
                 "disabled" => v.disabled = Some(r.attr_value(tag, raw)?),
-                "defaultAlarmLevel" => v.default_alarm_level = Some(r.attr_value(tag, raw)?),
+                "defaultAlarmLevel" => {
+                    v.default_alarm_level = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -19112,7 +21976,8 @@ impl XmlElement for StringContextAlarmType {
     }
 }
 
-/// Describe common encodings of string data: UTF-8 and UTF-16. See StringDataType.
+/// Describe common encodings of string data: UTF-8 and UTF-16. See
+/// StringDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StringDataEncodingType {
     /// Describes the bit ordering of the encoded value.
@@ -19127,7 +21992,8 @@ pub struct StringDataEncodingType {
     ///
     /// Schema default: `UTF-8`.
     pub encoding: Option<StringEncodingType>,
-    /// DEPRECATED: Use the ErrorDetectCorrect element in the container elements instead.
+    /// DEPRECATED: Use the ErrorDetectCorrect element in the container elements
+    /// instead.
     pub error_detect_correct: Option<ErrorDetectCorrectType>,
     /// One of: `SizeInBits`, `Variable`.
     pub choice: StringDataEncodingChoice,
@@ -19173,32 +22039,60 @@ impl XmlElement for StringDataEncodingType {
     }
 }
 
-/// Defines a base schema type for StringParameterType and StringArgumentType, adding initial value, restriction pattern, character width, and size range in characters. The initial value if set is the initial value of all instances of the child types. The restriction pattern is a regular expression enforcing the string value to this pattern. The character width is on the local data type side. And the size range in character restricts the character set. For telemetered values, if the restriction pattern of size range in character is not met, the item is invalid. See BaseDataType, StringParameterType, StringArgumentType, CharacterWidthType and IntegerRangeType.
+/// Defines a base schema type for StringParameterType and StringArgumentType,
+/// adding initial value, restriction pattern, character width, and size range
+/// in characters. The initial value if set is the initial value of all
+/// instances of the child types. The restriction pattern is a regular
+/// expression enforcing the string value to this pattern. The character width
+/// is on the local data type side. And the size range in character restricts
+/// the character set. For telemetered values, if the restriction pattern of
+/// size range in character is not met, the item is invalid. See BaseDataType,
+/// StringParameterType, StringArgumentType, CharacterWidthType and
+/// IntegerRangeType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StringDataType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Used to derive one Data Type from another - will inherit all the attributes from the baseType any of which may be redefined in this type definition.
+    /// Used to derive one Data Type from another - will inherit all the
+    /// attributes from the baseType any of which may be redefined in this type
+    /// definition.
     pub base_type: Option<String>,
-    /// Initial values for string types, may include C language style (\n, \t, \", \\, etc.) escape sequences.
+    /// Initial values for string types, may include C language style (\n, \t,
+    /// \", \\, etc.) escape sequences.
     pub initial_value: Option<String>,
     /// restriction pattern is a regular expression
     pub restriction_pattern: Option<String>,
-    /// Optional hint to the implementation about the size of the engineering/calibrated data type to use internally. Generally this can be determined by examination of the encoding information for the string, but it is not always clear, so this attribute allows the extra hint when needed. A tolerant implementation will endeavor to always make sufficient size engineering data types to capture the entire range of possible characters.
+    /// Optional hint to the implementation about the size of the
+    /// engineering/calibrated data type to use internally. Generally this can
+    /// be determined by examination of the encoding information for the string,
+    /// but it is not always clear, so this attribute allows the extra hint when
+    /// needed. A tolerant implementation will endeavor to always make
+    /// sufficient size engineering data types to capture the entire range of
+    /// possible characters.
     pub character_width: Option<CharacterWidthType>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// When appropriate, describe the units of measure that are represented by this parameter value.
+    /// When appropriate, describe the units of measure that are represented by
+    /// this parameter value.
     pub unit_set: Option<UnitSetType>,
-    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`, `StringDataEncoding`.
+    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding`, `StringDataEncoding`.
     pub choice: Option<StringDataChoice>,
-    /// The size in bits may be greater than or equal to minInclusive. It may be less than or equal to maxInclusive. They both may be set indicating a closed range.
+    /// The size in bits may be greater than or equal to minInclusive. It may be
+    /// less than or equal to maxInclusive. They both may be set indicating a
+    /// closed range.
     pub size_range_in_characters: Option<IntegerRangeType>,
 }
 
@@ -19249,15 +22143,23 @@ impl XmlElement for StringDataType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
-                "restrictionPattern" => v.restriction_pattern = Some(r.attr_value(tag, raw)?),
-                "characterWidth" => v.character_width = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
+                "restrictionPattern" => {
+                    v.restriction_pattern = Some(r.attr_value(tag, raw)?)
+                }
+                "characterWidth" => {
+                    v.character_width = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -19287,36 +22189,71 @@ impl XmlElement for StringDataType {
     }
 }
 
-/// Describes a string parameter type. Three forms are supported: fixed length, variable length and variable length using a prefix. See StringDataEncodingType and StringDataType.
+/// Describes a string parameter type. Three forms are supported: fixed length,
+/// variable length and variable length using a prefix. See
+/// StringDataEncodingType and StringDataType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StringParameterType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
-    /// Used to derive one Data Type from another - will inherit all the attributes from the baseType any of which may be redefined in this type definition.
+    /// Used to derive one Data Type from another - will inherit all the
+    /// attributes from the baseType any of which may be redefined in this type
+    /// definition.
     pub base_type: Option<String>,
-    /// Initial values for string types, may include C language style (\n, \t, \", \\, etc.) escape sequences.
+    /// Initial values for string types, may include C language style (\n, \t,
+    /// \", \\, etc.) escape sequences.
     pub initial_value: Option<String>,
     /// restriction pattern is a regular expression
     pub restriction_pattern: Option<String>,
-    /// Optional hint to the implementation about the size of the engineering/calibrated data type to use internally. Generally this can be determined by examination of the encoding information for the string, but it is not always clear, so this attribute allows the extra hint when needed. A tolerant implementation will endeavor to always make sufficient size engineering data types to capture the entire range of possible characters.
+    /// Optional hint to the implementation about the size of the
+    /// engineering/calibrated data type to use internally. Generally this can
+    /// be determined by examination of the encoding information for the string,
+    /// but it is not always clear, so this attribute allows the extra hint when
+    /// needed. A tolerant implementation will endeavor to always make
+    /// sufficient size engineering data types to capture the entire range of
+    /// possible characters.
     pub character_width: Option<CharacterWidthType>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// When appropriate, describe the units of measure that are represented by this parameter value.
+    /// When appropriate, describe the units of measure that are represented by
+    /// this parameter value.
     pub unit_set: Option<UnitSetType>,
-    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`, `StringDataEncoding`.
+    /// One of: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding`, `StringDataEncoding`.
     pub choice: Option<StringParameterChoice>,
-    /// The size in bits may be greater than or equal to minInclusive. It may be less than or equal to maxInclusive. They both may be set indicating a closed range.
+    /// The size in bits may be greater than or equal to minInclusive. It may be
+    /// less than or equal to maxInclusive. They both may be set indicating a
+    /// closed range.
     pub size_range_in_characters: Option<IntegerRangeType>,
-    /// Default alarm definitions are those which do not adjust definition logic based on the value of other parameters. Other parameters may participate in the determination of an alarm condition for this parameter, but the definition logic of the alarm on this parameter is constant. If the alarming logic on this parameter changes based on the value of other parameters, then it is a ContextAlarm and belongs in the ContextAlarmList element.
+    /// Default alarm definitions are those which do not adjust definition logic
+    /// based on the value of other parameters. Other parameters may participate
+    /// in the determination of an alarm condition for this parameter, but the
+    /// definition logic of the alarm on this parameter is constant. If the
+    /// alarming logic on this parameter changes based on the value of other
+    /// parameters, then it is a ContextAlarm and belongs in the
+    /// ContextAlarmList element.
     pub default_alarm: Option<StringAlarmType>,
-    /// Context alarm definitions are those which adjust the definition logic for this parameter based on the value of other parameters. A context which evaluates to being in effect, based on the testing of another parameter, takes precedence over the default alarms in the DefaultAlarm element. If the no context alarm evaluates to being in effect, based on the testing of another parameter, then the default alarm definitions from the DefaultAlarm element will remain in effect. If multiple contexts evaluate to being in effect, then the first one that appears will take precedence.
+    /// Context alarm definitions are those which adjust the definition logic
+    /// for this parameter based on the value of other parameters. A context
+    /// which evaluates to being in effect, based on the testing of another
+    /// parameter, takes precedence over the default alarms in the DefaultAlarm
+    /// element. If the no context alarm evaluates to being in effect, based on
+    /// the testing of another parameter, then the default alarm definitions
+    /// from the DefaultAlarm element will remain in effect. If multiple
+    /// contexts evaluate to being in effect, then the first one that appears
+    /// will take precedence.
     pub context_alarm_list: Option<StringContextAlarmListType>,
 }
 
@@ -19373,15 +22310,23 @@ impl XmlElement for StringParameterType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
                 "baseType" => v.base_type = Some(r.attr_value(tag, raw)?),
-                "initialValue" => v.initial_value = Some(r.attr_value(tag, raw)?),
-                "restrictionPattern" => v.restriction_pattern = Some(r.attr_value(tag, raw)?),
-                "characterWidth" => v.character_width = Some(r.attr_value(tag, raw)?),
+                "initialValue" => {
+                    v.initial_value = Some(r.attr_value(tag, raw)?)
+                }
+                "restrictionPattern" => {
+                    v.restriction_pattern = Some(r.attr_value(tag, raw)?)
+                }
+                "characterWidth" => {
+                    v.character_width = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -19464,10 +22409,13 @@ impl XmlElement for SyncPatternType {
                     seen_pattern = true;
                 }
                 "bitLocationFromStartOfContainer" => {
-                    v.bit_location_from_start_of_container = Some(r.attr_value(tag, raw)?)
+                    v.bit_location_from_start_of_container =
+                        Some(r.attr_value(tag, raw)?)
                 }
                 "mask" => v.mask = Some(r.attr_value(tag, raw)?),
-                "maskLengthInBits" => v.mask_length_in_bits = Some(r.attr_value(tag, raw)?),
+                "maskLengthInBits" => {
+                    v.mask_length_in_bits = Some(r.attr_value(tag, raw)?)
+                }
                 "patternLengthInBits" => {
                     v.pattern_length_in_bits = r.attr_value(tag, raw)?;
                     seen_pattern_length_in_bits = true;
@@ -19486,7 +22434,16 @@ impl XmlElement for SyncPatternType {
     }
 }
 
-/// A Sync Strategy specifies the strategy on how to find frames within a stream of PCM data. The sync strategy is based upon a state machine that begins in the 'Search' state until the first sync marker is found. Then it goes into the 'Verify' state until a specified number of successive good sync markers are found. Then, the state machine goes into the 'Lock' state, in the 'Lock' state frames are considered good. Should a sync marker be missed in the 'Lock' state, the state machine will transition into the 'Check' state, if the next sync marker is where it's expected within a specified number of frames, then the state machine will transition back to the 'Lock' state, it not it will transition back to 'Search'.
+/// A Sync Strategy specifies the strategy on how to find frames within a stream
+/// of PCM data. The sync strategy is based upon a state machine that begins in
+/// the 'Search' state until the first sync marker is found. Then it goes into
+/// the 'Verify' state until a specified number of successive good sync markers
+/// are found. Then, the state machine goes into the 'Lock' state, in the 'Lock'
+/// state frames are considered good. Should a sync marker be missed in the
+/// 'Lock' state, the state machine will transition into the 'Check' state, if
+/// the next sync marker is where it's expected within a specified number of
+/// frames, then the state machine will transition back to the 'Lock' state, it
+/// not it will transition back to 'Search'.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct SyncStrategyType {
     /// Attribute `verifyToLockGoodFrames`.
@@ -19536,7 +22493,8 @@ impl XmlElement for SyncStrategyType {
                     v.check_to_lock_good_frames = Some(r.attr_value(tag, raw)?)
                 }
                 "maxBitErrorsInSyncPattern" => {
-                    v.max_bit_errors_in_sync_pattern = Some(r.attr_value(tag, raw)?)
+                    v.max_bit_errors_in_sync_pattern =
+                        Some(r.attr_value(tag, raw)?)
                 }
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -19556,9 +22514,17 @@ pub struct TelemetryMetaDataType {
     pub parameter_type_set: Option<ParameterTypeSetType>,
     /// A list of Parameters for this Space System.
     pub parameter_set: Option<ParameterSetType>,
-    /// Holds the list of all potential container definitions for telemetry. Containers may parts of packets or TDM, and then groups of the containers, and then an entire entity -- such as a packet. In order to maximize re-used for duplication, the pieces may defined once here, and then assembled as needed into larger structures, also here.
+    /// Holds the list of all potential container definitions for telemetry.
+    /// Containers may parts of packets or TDM, and then groups of the
+    /// containers, and then an entire entity -- such as a packet. In order to
+    /// maximize re-used for duplication, the pieces may defined once here, and
+    /// then assembled as needed into larger structures, also here.
     pub container_set: Option<ContainerSetType>,
-    /// Messages are an alternative method of uniquely identifying containers within a Service. A message provides a test in the form of MatchCriteria to match to a container. A simple example might be: [When minorframeID=21, the message is the 21st minorframe container. The collection of messages to search thru will be bound by a Service.
+    /// Messages are an alternative method of uniquely identifying containers
+    /// within a Service. A message provides a test in the form of MatchCriteria
+    /// to match to a container. A simple example might be: [When
+    /// minorframeID=21, the message is the 21st minorframe container. The
+    /// collection of messages to search thru will be bound by a Service.
     pub message_set: Option<MessageSetType>,
     /// Element `StreamSet`.
     pub stream_set: Option<StreamSetType>,
@@ -19625,7 +22591,9 @@ impl XmlElement for TelemetryMetaDataType {
 pub struct TermType {
     /// The coefficient in a single term of a polynomial expression.
     pub coefficient: f64,
-    /// The exponent in a single term of a polynomial expression. Should negative exponents be required, use a Math Calibrator style of definition for this type.
+    /// The exponent in a single term of a polynomial expression. Should
+    /// negative exponents be required, use a Math Calibrator style of
+    /// definition for this type.
     pub exponent: i64,
 }
 
@@ -19673,7 +22641,16 @@ pub struct TimeAlarmRangesType {
     pub name: Option<String>,
     /// An optional brief description of this alarm definition.
     pub short_description: Option<String>,
-    /// A value of outside specifies that the most severe range is outside all the other ranges: -severe -critical -distress -warning -watch normal +watch +warning +distress +critical +severe. This means each min, max pair are a range: (-inf, min) or (-inf, min], and [max, inf) or (max, inf). However a value of inside "inverts" these bands: -normal -watch -warning -distress -critical severe +critical +distress +warning +watch, +normal. This means each min, max pair form a range of (min, max) or [min, max) or (min, max] or [min, max]. The most common form used is "outside" and it is the default. The set notation used defines parenthesis as exclusive and square brackets as inclusive.
+    /// A value of outside specifies that the most severe range is outside all
+    /// the other ranges: -severe -critical -distress -warning -watch normal
+    /// +watch +warning +distress +critical +severe. This means each min, max
+    /// pair are a range: (-inf, min) or (-inf, min], and [max, inf) or (max,
+    /// inf). However a value of inside "inverts" these bands: -normal -watch
+    /// -warning -distress -critical severe +critical +distress +warning +watch,
+    /// +normal. This means each min, max pair form a range of (min, max) or
+    /// [min, max) or (min, max] or [min, max]. The most common form used is
+    /// "outside" and it is the default. The set notation used defines
+    /// parenthesis as exclusive and square brackets as inclusive.
     ///
     /// Schema default: `outside`.
     pub range_form: Option<RangeFormType>,
@@ -19683,15 +22660,20 @@ pub struct TimeAlarmRangesType {
     pub time_units: Option<TimeUnitsType>,
     /// Element `AncillaryDataSet`.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// A range of least concern. Considered to be below the most commonly used Warning level.
+    /// A range of least concern. Considered to be below the most commonly used
+    /// Warning level.
     pub watch_range: Option<FloatRangeType>,
-    /// A range of concern that represents the most commonly used minimum concern level for many software applications.
+    /// A range of concern that represents the most commonly used minimum
+    /// concern level for many software applications.
     pub warning_range: Option<FloatRangeType>,
-    /// A range of concern in between the most commonly used Warning and Critical levels.
+    /// A range of concern in between the most commonly used Warning and
+    /// Critical levels.
     pub distress_range: Option<FloatRangeType>,
-    /// A range of concern that represents the most commonly used maximum concern level for many software applications.
+    /// A range of concern that represents the most commonly used maximum
+    /// concern level for many software applications.
     pub critical_range: Option<FloatRangeType>,
-    /// A range of highest concern. Considered to be above the most commonly used Critical level.
+    /// A range of highest concern. Considered to be above the most commonly
+    /// used Critical level.
     pub severe_range: Option<FloatRangeType>,
 }
 
@@ -19738,7 +22720,9 @@ impl XmlElement for TimeAlarmRangesType {
             let (k, raw) = a?;
             match k {
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "rangeForm" => v.range_form = Some(r.attr_value(tag, raw)?),
                 "timeUnits" => v.time_units = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
@@ -19774,15 +22758,21 @@ pub struct TimeAlarmType {
     pub name: Option<String>,
     /// An optional brief description of this alarm definition.
     pub short_description: Option<String>,
-    /// The number of successive instances that meet the alarm conditions for the alarm to trigger. The default is 1.
+    /// The number of successive instances that meet the alarm conditions for
+    /// the alarm to trigger. The default is 1.
     ///
     /// Schema default: `1`.
     pub min_violations: Option<i64>,
-    /// Optionally specify the number of successive instances that do not meet the alarm conditions to leave the alarm state. If this attribute is not specified, it is treated as being equal to minViolations (symmetric).
+    /// Optionally specify the number of successive instances that do not meet
+    /// the alarm conditions to leave the alarm state. If this attribute is not
+    /// specified, it is treated as being equal to minViolations (symmetric).
     ///
     /// Schema default: `1`.
     pub min_conformance: Option<i64>,
-    /// The initial state of this alarm definition as delivered. When true, this leaves the alarm definition empty for the parameter and also short circuits the remaining context matches and the default so no alarm is active on the parameter.
+    /// The initial state of this alarm definition as delivered. When true, this
+    /// leaves the alarm definition empty for the parameter and also short
+    /// circuits the remaining context matches and the default so no alarm is
+    /// active on the parameter.
     ///
     /// Schema default: `false`.
     pub disabled: Option<bool>,
@@ -19790,9 +22780,12 @@ pub struct TimeAlarmType {
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// One of: `AlarmConditions`, `CustomAlarm`.
     pub choice: Option<TimeAlarmChoice>,
-    /// StaticAlarmRanges are used to trigger alarms when the parameter value passes some threshold value
+    /// StaticAlarmRanges are used to trigger alarms when the parameter value
+    /// passes some threshold value
     pub static_alarm_ranges: Option<TimeAlarmRangesType>,
-    /// ChangePerSecondAlarmRanges are used to trigger alarms when the parameter value's rate-of-change passes some threshold value. An alarm condition that triggers when the value changes too fast (or too slow)
+    /// ChangePerSecondAlarmRanges are used to trigger alarms when the parameter
+    /// value's rate-of-change passes some threshold value. An alarm condition
+    /// that triggers when the value changes too fast (or too slow)
     pub change_per_second_alarm_ranges: Option<TimeAlarmRangesType>,
 }
 
@@ -19836,9 +22829,15 @@ impl XmlElement for TimeAlarmType {
             let (k, raw) = a?;
             match k {
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
-                "minViolations" => v.min_violations = Some(r.attr_value(tag, raw)?),
-                "minConformance" => v.min_conformance = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
+                "minViolations" => {
+                    v.min_violations = Some(r.attr_value(tag, raw)?)
+                }
+                "minConformance" => {
+                    v.min_conformance = Some(r.attr_value(tag, raw)?)
+                }
                 "disabled" => v.disabled = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -19860,7 +22859,12 @@ impl XmlElement for TimeAlarmType {
     }
 }
 
-/// Describes a time association consisting of an instance of an absolute time parameter (parameterRef) and this entry. Because telemetry parameter instances are oftentimes "time-tagged" with a timing signal either provided on the ground or on the space system. This data element allows one to specify which of possibly many AbsoluteTimeParameters to use to "time-tag" parameter instances with. See AbsoluteTimeParameterType.
+/// Describes a time association consisting of an instance of an absolute time
+/// parameter (parameterRef) and this entry. Because telemetry parameter
+/// instances are oftentimes "time-tagged" with a timing signal either provided
+/// on the ground or on the space system. This data element allows one to
+/// specify which of possibly many AbsoluteTimeParameters to use to "time-tag"
+/// parameter instances with. See AbsoluteTimeParameterType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct TimeAssociationType {
     /// Attribute `parameterRef`.
@@ -19873,11 +22877,15 @@ pub struct TimeAssociationType {
     ///
     /// Schema default: `true`.
     pub use_calibrated_value: Option<bool>,
-    /// If true, then the current value of the AbsoluteTime will be projected to current time. In other words, if the value of the AbsoluteTime parameter was set 10 seconds ago, then 10 seconds will be added to its value before associating this time with the parameter.
+    /// If true, then the current value of the AbsoluteTime will be projected to
+    /// current time. In other words, if the value of the AbsoluteTime parameter
+    /// was set 10 seconds ago, then 10 seconds will be added to its value
+    /// before associating this time with the parameter.
     ///
     /// Schema default: `true`.
     pub interpolate_time: Option<bool>,
-    /// The offset is used to supply a relative time offset from the time association and to this parameter
+    /// The offset is used to supply a relative time offset from the time
+    /// association and to this parameter
     pub offset: Option<f64>,
     /// Specify the units the offset is in, the default is seconds.
     ///
@@ -19919,8 +22927,12 @@ impl XmlElement for TimeAssociationType {
                     seen_parameter_ref = true;
                 }
                 "instance" => v.instance = Some(r.attr_value(tag, raw)?),
-                "useCalibratedValue" => v.use_calibrated_value = Some(r.attr_value(tag, raw)?),
-                "interpolateTime" => v.interpolate_time = Some(r.attr_value(tag, raw)?),
+                "useCalibratedValue" => {
+                    v.use_calibrated_value = Some(r.attr_value(tag, raw)?)
+                }
+                "interpolateTime" => {
+                    v.interpolate_time = Some(r.attr_value(tag, raw)?)
+                }
                 "offset" => v.offset = Some(r.attr_value(tag, raw)?),
                 "unit" => v.unit = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
@@ -19934,10 +22946,17 @@ impl XmlElement for TimeAssociationType {
     }
 }
 
-/// An ordered collection of temporal alarms associated with a context. A context is an alarm definition on a parameter which is valid only in the case of a test on the value of other parameters. Process the contexts in list order. See TimeContextAlarmType.
+/// An ordered collection of temporal alarms associated with a context. A
+/// context is an alarm definition on a parameter which is valid only in the
+/// case of a test on the value of other parameters. Process the contexts in
+/// list order. See TimeContextAlarmType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct TimeContextAlarmListType {
-    /// A Context contains a new alarm definition and a context match. The match takes precedence over any default alarm when the first in the overall list evaluates to true. It is also possible the alarm definition is empty, in which case the context means no alarm defined when the match is true.
+    /// A Context contains a new alarm definition and a context match. The match
+    /// takes precedence over any default alarm when the first in the overall
+    /// list evaluates to true. It is also possible the alarm definition is
+    /// empty, in which case the context means no alarm defined when the match
+    /// is true.
     pub context_alarm: Vec<TimeContextAlarmType>,
 }
 
@@ -19975,22 +22994,29 @@ impl XmlElement for TimeContextAlarmListType {
     }
 }
 
-/// Context alarms are applied when the ContextMatch is true. Context alarms override Default alarms
+/// Context alarms are applied when the ContextMatch is true. Context alarms
+/// override Default alarms
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct TimeContextAlarmType {
     /// The alarm definition may be named.
     pub name: Option<String>,
     /// An optional brief description of this alarm definition.
     pub short_description: Option<String>,
-    /// The number of successive instances that meet the alarm conditions for the alarm to trigger. The default is 1.
+    /// The number of successive instances that meet the alarm conditions for
+    /// the alarm to trigger. The default is 1.
     ///
     /// Schema default: `1`.
     pub min_violations: Option<i64>,
-    /// Optionally specify the number of successive instances that do not meet the alarm conditions to leave the alarm state. If this attribute is not specified, it is treated as being equal to minViolations (symmetric).
+    /// Optionally specify the number of successive instances that do not meet
+    /// the alarm conditions to leave the alarm state. If this attribute is not
+    /// specified, it is treated as being equal to minViolations (symmetric).
     ///
     /// Schema default: `1`.
     pub min_conformance: Option<i64>,
-    /// The initial state of this alarm definition as delivered. When true, this leaves the alarm definition empty for the parameter and also short circuits the remaining context matches and the default so no alarm is active on the parameter.
+    /// The initial state of this alarm definition as delivered. When true, this
+    /// leaves the alarm definition empty for the parameter and also short
+    /// circuits the remaining context matches and the default so no alarm is
+    /// active on the parameter.
     ///
     /// Schema default: `false`.
     pub disabled: Option<bool>,
@@ -19998,9 +23024,12 @@ pub struct TimeContextAlarmType {
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// One of: `AlarmConditions`, `CustomAlarm`.
     pub choice: Option<TimeContextAlarmChoice>,
-    /// StaticAlarmRanges are used to trigger alarms when the parameter value passes some threshold value
+    /// StaticAlarmRanges are used to trigger alarms when the parameter value
+    /// passes some threshold value
     pub static_alarm_ranges: Option<TimeAlarmRangesType>,
-    /// ChangePerSecondAlarmRanges are used to trigger alarms when the parameter value's rate-of-change passes some threshold value. An alarm condition that triggers when the value changes too fast (or too slow)
+    /// ChangePerSecondAlarmRanges are used to trigger alarms when the parameter
+    /// value's rate-of-change passes some threshold value. An alarm condition
+    /// that triggers when the value changes too fast (or too slow)
     pub change_per_second_alarm_ranges: Option<TimeAlarmRangesType>,
     /// Element `ContextMatch`.
     pub context_match: ContextMatchType,
@@ -20047,9 +23076,15 @@ impl XmlElement for TimeContextAlarmType {
             let (k, raw) = a?;
             match k {
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
-                "minViolations" => v.min_violations = Some(r.attr_value(tag, raw)?),
-                "minConformance" => v.min_conformance = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
+                "minViolations" => {
+                    v.min_violations = Some(r.attr_value(tag, raw)?)
+                }
+                "minConformance" => {
+                    v.min_conformance = Some(r.attr_value(tag, raw)?)
+                }
                 "disabled" => v.disabled = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -20077,7 +23112,8 @@ impl XmlElement for TimeContextAlarmType {
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ToStringType {
-    /// This element describes how a numeric value should be represented in engineering/calibrated form. The defaults reflect the most common form.
+    /// This element describes how a numeric value should be represented in
+    /// engineering/calibrated form. The defaults reflect the most common form.
     pub number_format: NumberFormatType,
 }
 
@@ -20104,24 +23140,37 @@ impl XmlElement for ToStringType {
     }
 }
 
-/// Transferred to range means the command has been received to the network that connects the ground system to the spacecraft. Typically, this verifier would come from something other than the spacecraft, such as a modem or front end processor.
+/// Transferred to range means the command has been received to the network that
+/// connects the ground system to the spacecraft. Typically, this verifier would
+/// come from something other than the spacecraft, such as a modem or front end
+/// processor.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct TransferredToRangeVerifierType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
-    /// Optional name of this defined item. See NameType for restriction information.
+    /// Optional name of this defined item. See NameType for restriction
+    /// information.
     pub name: Option<String>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// One of: `ComparisonList`, `ContainerRef`, `ParameterValueChange`, `CustomAlgorithm`, `BooleanExpression`, `Comparison`.
+    /// One of: `ComparisonList`, `ContainerRef`, `ParameterValueChange`,
+    /// `CustomAlgorithm`, `BooleanExpression`, `Comparison`.
     pub choice1: TransferredToRangeVerifierChoice1,
     /// One of: `CheckWindow`, `CheckWindowAlgorithms`.
     pub choice2: TransferredToRangeVerifierChoice2,
-    /// Optional list of argument values that manifest this post-transmission validation parameter value check. When not present, this check applies to all instances of the command.
+    /// Optional list of argument values that manifest this post-transmission
+    /// validation parameter value check. When not present, this check applies
+    /// to all instances of the command.
     pub argument_restriction_list: Option<ArgumentAssignmentListType>,
 }
 
@@ -20157,7 +23206,9 @@ impl XmlElement for TransferredToRangeVerifierType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -20181,10 +23232,13 @@ impl XmlElement for TransferredToRangeVerifierType {
     }
 }
 
-/// Appended to the TramsmissionConstraint List of the base command. Constraints are checked in order.
+/// Appended to the TramsmissionConstraint List of the base command. Constraints
+/// are checked in order.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct TransmissionConstraintListType {
-    /// A constraint that potentially blocks transmission of this command based on parameter values for all instances or optionally limited to only when specified argument values are used in the command.
+    /// A constraint that potentially blocks transmission of this command based
+    /// on parameter values for all instances or optionally limited to only when
+    /// specified argument values are used in the command.
     pub transmission_constraint: Vec<TransmissionConstraintType>,
 }
 
@@ -20222,7 +23276,9 @@ impl XmlElement for TransmissionConstraintListType {
     }
 }
 
-/// A CommandTransmission constraint is used to check that the command can be run in the current operating mode and may block the transmission of the command if the constraint condition is true.
+/// A CommandTransmission constraint is used to check that the command can be
+/// run in the current operating mode and may block the transmission of the
+/// command if the constraint condition is true.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct TransmissionConstraintType {
     /// Pause during timeOut, fail when the timeout passes
@@ -20231,9 +23287,11 @@ pub struct TransmissionConstraintType {
     ///
     /// Schema default: `false`.
     pub suspendable: Option<bool>,
-    /// One of: `Comparison`, `ComparisonList`, `BooleanExpression`, `CustomAlgorithm`.
+    /// One of: `Comparison`, `ComparisonList`, `BooleanExpression`,
+    /// `CustomAlgorithm`.
     pub choice: TransmissionConstraintChoice,
-    /// Optional list of argument values that manifest this pre-transmission constraint parameter value check.
+    /// Optional list of argument values that manifest this pre-transmission
+    /// constraint parameter value check.
     pub argument_restriction_list: Option<ArgumentAssignmentListType>,
 }
 
@@ -20273,16 +23331,22 @@ impl XmlElement for TransmissionConstraintType {
     }
 }
 
-/// A trigger is used to initiate the processing of some algorithm. A trigger may be based on an update of a Parameter, receipt of a Container, or on a time basis. Triggers may also have a maximum rate that limits how often the trigger can be invoked.
+/// A trigger is used to initiate the processing of some algorithm. A trigger
+/// may be based on an update of a Parameter, receipt of a Container, or on a
+/// time basis. Triggers may also have a maximum rate that limits how often the
+/// trigger can be invoked.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct TriggerSetType {
     /// Triggers may optionally be named.
     pub name: Option<String>,
-    /// This attribute is a maximum rate that constrains how quickly this trigger may evaluate the algorithm to avoid flooding the implementation. The default is once per second. Setting to 0 results in no maximum.
+    /// This attribute is a maximum rate that constrains how quickly this
+    /// trigger may evaluate the algorithm to avoid flooding the implementation.
+    /// The default is once per second. Setting to 0 results in no maximum.
     ///
     /// Schema default: `1`.
     pub trigger_rate: Option<i64>,
-    /// One of: `OnParameterUpdateTrigger`, `OnContainerUpdateTrigger`, `OnPeriodicRateTrigger`.
+    /// One of: `OnParameterUpdateTrigger`, `OnContainerUpdateTrigger`,
+    /// `OnPeriodicRateTrigger`.
     pub items: Vec<TriggerSetChoice>,
 }
 
@@ -20295,7 +23359,12 @@ impl XmlElement for TriggerSetType {
         if let Some(v) = &self.trigger_rate {
             w.attr("triggerRate", v);
         }
-        check_count(self.items.len(), 1, None, "TriggerSetType.TriggerSetChoice")?;
+        check_count(
+            self.items.len(),
+            1,
+            None,
+            "TriggerSetType.TriggerSetChoice",
+        )?;
         for v in &self.items {
             v.write_xml(w)?;
         }
@@ -20319,7 +23388,9 @@ impl XmlElement for TriggerSetType {
         if v.items.len() < 1 {
             let n = v.items.len();
             return Err(r.too_few(
-                "OnParameterUpdateTrigger|OnContainerUpdateTrigger|OnPeriodicRateTrigger",
+                "OnParameterUpdateTrigger|\
+                        OnContainerUpdateTrigger|\
+OnPeriodicRateTrigger",
                 1,
                 n,
             ));
@@ -20339,7 +23410,8 @@ pub struct TriggeredMathOperationType {
     pub output_parameter_ref: String,
     /// Optional additional ancillary information for this calibrator/algorithm
     pub ancillary_data_set: Option<AncillaryDataSetType>,
-    /// One of: `ValueOperand`, `ThisParameterOperand`, `Operator`, `ParameterInstanceRefOperand`.
+    /// One of: `ValueOperand`, `ThisParameterOperand`, `Operator`,
+    /// `ParameterInstanceRefOperand`.
     pub items: Vec<TriggeredMathOperationChoice>,
     /// Element `TriggerSet`.
     pub trigger_set: TriggerSetType,
@@ -20379,7 +23451,9 @@ impl XmlElement for TriggeredMathOperationType {
             let (k, raw) = a?;
             match k {
                 "name" => v.name = Some(r.attr_value(tag, raw)?),
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "outputParameterRef" => {
                     v.output_parameter_ref = r.attr_value(tag, raw)?;
                     seen_output_parameter_ref = true;
@@ -20402,7 +23476,8 @@ impl XmlElement for TriggeredMathOperationType {
         if v.items.len() < 1 {
             let n = v.items.len();
             return Err(r.too_few(
-                "ValueOperand|ThisParameterOperand|Operator|ParameterInstanceRefOperand",
+                "ValueOperand|ThisParameterOperand|\
+                        Operator|ParameterInstanceRefOperand",
                 1,
                 n,
             ));
@@ -20416,10 +23491,14 @@ impl XmlElement for TriggeredMathOperationType {
     }
 }
 
-/// Describe an ordered collection of units that form a unit-expression. Units may be described for both calibrated/engineering values and also potentially uncalibrated/raw values. See UnitType.
+/// Describe an ordered collection of units that form a unit-expression. Units
+/// may be described for both calibrated/engineering values and also potentially
+/// uncalibrated/raw values. See UnitType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct UnitSetType {
-    /// Describe the exponent, factor, form, and description for a unit. The attributes are optional because different programs use this element in different ways, depending on vendor support.
+    /// Describe the exponent, factor, form, and description for a unit. The
+    /// attributes are optional because different programs use this element in
+    /// different ways, depending on vendor support.
     pub unit: Vec<UnitType>,
 }
 
@@ -20447,20 +23526,39 @@ impl XmlElement for UnitSetType {
     }
 }
 
-/// Describe the exponent, factor, form, and description for a unit. The unit itself is in element Unit in UnitSet. See UnitSetType. The attributes are optional because different programs use this element in different ways, depending on vendor support.
+/// Describe the exponent, factor, form, and description for a unit. The unit
+/// itself is in element Unit in UnitSet. See UnitSetType. The attributes are
+/// optional because different programs use this element in different ways,
+/// depending on vendor support.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct UnitType {
-    /// Optional attribute used in conjunction with the "factor" attribute where some programs choose to specify the unit definition with these machine processable algebraic features. For example, a unit text of "meters" may have a "power" attribute of 2, resulting "meters squared" as the actual unit. This is not commonly used. The most common method for "meters squared" is to use the text content of the Unit element in a form like "m^2".
+    /// Optional attribute used in conjunction with the "factor" attribute where
+    /// some programs choose to specify the unit definition with these machine
+    /// processable algebraic features. For example, a unit text of "meters" may
+    /// have a "power" attribute of 2, resulting "meters squared" as the actual
+    /// unit. This is not commonly used. The most common method for "meters
+    /// squared" is to use the text content of the Unit element in a form like
+    /// "m^2".
     ///
     /// Schema default: `1`.
     pub power: Option<f64>,
-    /// Optional attribute used in conjunction with the "power" attribute where some programs choose to specify the unit definition with these machine processable algebraic features. For example, a unit text of "meters" may have a "factor" attribute of 2, resulting "2 times meters" as the actual unit. This is not commonly used. The most common method for "2 times meters" is to use the text content of the Unit element in a form like "2*m".
+    /// Optional attribute used in conjunction with the "power" attribute where
+    /// some programs choose to specify the unit definition with these machine
+    /// processable algebraic features. For example, a unit text of "meters" may
+    /// have a "factor" attribute of 2, resulting "2 times meters" as the actual
+    /// unit. This is not commonly used. The most common method for "2 times
+    /// meters" is to use the text content of the Unit element in a form like
+    /// "2*m".
     ///
     /// Schema default: `1`.
     pub factor: Option<String>,
-    /// A description of the unit, which may be for expanded human readability or for specification of the nature/property of the unit. For example, meters per second squared is of a nature/property of acceleration.
+    /// A description of the unit, which may be for expanded human readability
+    /// or for specification of the nature/property of the unit. For example,
+    /// meters per second squared is of a nature/property of acceleration.
     pub description: Option<String>,
-    /// The default value "calibrated" is most common practice to specify units at the engineering/calibrated value, it is possible to specify an additional Unit element for the raw/uncalibrated value.
+    /// The default value "calibrated" is most common practice to specify units
+    /// at the engineering/calibrated value, it is possible to specify an
+    /// additional Unit element for the raw/uncalibrated value.
     ///
     /// Schema default: `calibrated`.
     pub form: Option<UnitFormType>,
@@ -20505,14 +23603,24 @@ impl XmlElement for UnitType {
     }
 }
 
-/// Numerical ranges that define the universe of valid values for this argument. A single range is the most common, although it is possible to define multiple ranges when the valid values are not contiguous.
+/// Numerical ranges that define the universe of valid values for this argument.
+/// A single range is the most common, although it is possible to define
+/// multiple ranges when the valid values are not contiguous.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ValidFloatRangeSetType {
-    /// By default and general recommendation, the valid range is specified in engineering/calibrated values, although this can be adjusted.
+    /// By default and general recommendation, the valid range is specified in
+    /// engineering/calibrated values, although this can be adjusted.
     ///
     /// Schema default: `true`.
     pub valid_range_applies_to_calibrated: Option<bool>,
-    /// A valid range constrains the whole set of possible values that could be encoded by the data type to a more "valid" or "reasonable" set of values. This should be treated as a boundary check in an implementation to validate the input or output value. Typically, only 1 range is used. In cases where multiple ranges are used, then the value is valid when it is valid in any of the provided ranges. Implementations may also use these ranges to enhance user interface displays and other visualization widgets as appropriate for the type.
+    /// A valid range constrains the whole set of possible values that could be
+    /// encoded by the data type to a more "valid" or "reasonable" set of
+    /// values. This should be treated as a boundary check in an implementation
+    /// to validate the input or output value. Typically, only 1 range is used.
+    /// In cases where multiple ranges are used, then the value is valid when it
+    /// is valid in any of the provided ranges. Implementations may also use
+    /// these ranges to enhance user interface displays and other visualization
+    /// widgets as appropriate for the type.
     pub valid_range: Vec<FloatRangeType>,
 }
 
@@ -20541,7 +23649,8 @@ impl XmlElement for ValidFloatRangeSetType {
             let (k, raw) = a?;
             match k {
                 "validRangeAppliesToCalibrated" => {
-                    v.valid_range_applies_to_calibrated = Some(r.attr_value(tag, raw)?)
+                    v.valid_range_applies_to_calibrated =
+                        Some(r.attr_value(tag, raw)?)
                 }
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -20558,14 +23667,24 @@ impl XmlElement for ValidFloatRangeSetType {
     }
 }
 
-/// Numerical ranges that define the universe of valid values for this argument. A single range is the most common, although it is possible to define multiple ranges when the valid values are not contiguous.
+/// Numerical ranges that define the universe of valid values for this argument.
+/// A single range is the most common, although it is possible to define
+/// multiple ranges when the valid values are not contiguous.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ValidIntegerRangeSetType {
-    /// By default and general recommendation, the valid range is specified in engineering/calibrated values, although this can be adjusted.
+    /// By default and general recommendation, the valid range is specified in
+    /// engineering/calibrated values, although this can be adjusted.
     ///
     /// Schema default: `true`.
     pub valid_range_applies_to_calibrated: Option<bool>,
-    /// A valid range constrains the whole set of possible values that could be encoded by the data type to a more "valid" or "reasonable" set of values. This should be treated as a boundary check in an implementation to validate the input or output value. Typically, only 1 range is used. In cases where multiple ranges are used, then the value is valid when it is valid in any of the provided ranges. Implementations may also use these ranges to enhance user interface displays and other visualization widgets as appropriate for the type.
+    /// A valid range constrains the whole set of possible values that could be
+    /// encoded by the data type to a more "valid" or "reasonable" set of
+    /// values. This should be treated as a boundary check in an implementation
+    /// to validate the input or output value. Typically, only 1 range is used.
+    /// In cases where multiple ranges are used, then the value is valid when it
+    /// is valid in any of the provided ranges. Implementations may also use
+    /// these ranges to enhance user interface displays and other visualization
+    /// widgets as appropriate for the type.
     pub valid_range: Vec<IntegerRangeType>,
 }
 
@@ -20594,7 +23713,8 @@ impl XmlElement for ValidIntegerRangeSetType {
             let (k, raw) = a?;
             match k {
                 "validRangeAppliesToCalibrated" => {
-                    v.valid_range_applies_to_calibrated = Some(r.attr_value(tag, raw)?)
+                    v.valid_range_applies_to_calibrated =
+                        Some(r.attr_value(tag, raw)?)
                 }
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -20614,13 +23734,17 @@ impl XmlElement for ValidIntegerRangeSetType {
 /// Describe a value and an associated string label, see EnumerationListType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ValueEnumerationType {
-    /// Numeric raw/uncalibrated value to associate with a string enumeration label.
+    /// Numeric raw/uncalibrated value to associate with a string enumeration
+    /// label.
     pub value: i64,
-    /// If max value is given, the label maps to a range where value is less than or equal to maxValue. The range is inclusive.
+    /// If max value is given, the label maps to a range where value is less
+    /// than or equal to maxValue. The range is inclusive.
     pub max_value: Option<i64>,
-    /// String enumeration label to apply to this value definition in the enumeration.
+    /// String enumeration label to apply to this value definition in the
+    /// enumeration.
     pub label: String,
-    /// An optional additional string description can be specified for this enumeration label to provide extended information if desired.
+    /// An optional additional string description can be specified for this
+    /// enumeration label to provide extended information if desired.
     pub short_description: Option<String>,
 }
 
@@ -20655,7 +23779,9 @@ impl XmlElement for ValueEnumerationType {
                     v.label = r.attr_value(tag, raw)?;
                     seen_label = true;
                 }
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -20670,10 +23796,15 @@ impl XmlElement for ValueEnumerationType {
     }
 }
 
-/// For streams that contain a series of frames with a variable frame length where the frames are found by looking for a series of one's or zero's (usually one's). The series is called the flag. in the PCM stream that are usually made to be illegal in the PCM stream by zero or one bit insertion.
+/// For streams that contain a series of frames with a variable frame length
+/// where the frames are found by looking for a series of one's or zero's
+/// (usually one's). The series is called the flag. in the PCM stream that are
+/// usually made to be illegal in the PCM stream by zero or one bit insertion.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct VariableFrameStreamType {
-    /// Optional short description to be used for explanation of this item. It is recommended that the short description be kept under 80 characters in length.
+    /// Optional short description to be used for explanation of this item. It
+    /// is recommended that the short description be kept under 80 characters in
+    /// length.
     pub short_description: Option<String>,
     /// The name of this defined item. See NameType for restriction information.
     pub name: String,
@@ -20687,11 +23818,15 @@ pub struct VariableFrameStreamType {
     ///
     /// Schema default: `false`.
     pub inverted: Option<bool>,
-    /// Optional long form description to be used for explanatory descriptions of this item and may include HTML markup using CDATA. Long Descriptions are of unbounded length.
+    /// Optional long form description to be used for explanatory descriptions
+    /// of this item and may include HTML markup using CDATA. Long Descriptions
+    /// are of unbounded length.
     pub long_description: Option<String>,
-    /// Used to contain an alias (alternate) name or ID for this item. See AliasSetType for additional explanation.
+    /// Used to contain an alias (alternate) name or ID for this item. See
+    /// AliasSetType for additional explanation.
     pub alias_set: Option<AliasSetType>,
-    /// Use for any non-standard data associated with this named item. See AncillaryDataSetType for additional explanation.
+    /// Use for any non-standard data associated with this named item. See
+    /// AncillaryDataSetType for additional explanation.
     pub ancillary_data_set: Option<AncillaryDataSetType>,
     /// One of: `ContainerRef`, `ServiceRef`.
     pub choice: VariableFrameStreamChoice,
@@ -20741,12 +23876,16 @@ impl XmlElement for VariableFrameStreamType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "shortDescription" => v.short_description = Some(r.attr_value(tag, raw)?),
+                "shortDescription" => {
+                    v.short_description = Some(r.attr_value(tag, raw)?)
+                }
                 "name" => {
                     v.name = r.attr_value(tag, raw)?;
                     seen_name = true;
                 }
-                "bitRateInBPS" => v.bit_rate_in_bps = Some(r.attr_value(tag, raw)?),
+                "bitRateInBPS" => {
+                    v.bit_rate_in_bps = Some(r.attr_value(tag, raw)?)
+                }
                 "pcmType" => v.pcm_type = Some(r.attr_value(tag, raw)?),
                 "inverted" => v.inverted = Some(r.attr_value(tag, raw)?),
                 _ => r.unknown_attr(tag, k)?,
@@ -20829,7 +23968,8 @@ impl XmlElement for VariableFrameSyncStrategyType {
                     v.check_to_lock_good_frames = Some(r.attr_value(tag, raw)?)
                 }
                 "maxBitErrorsInSyncPattern" => {
-                    v.max_bit_errors_in_sync_pattern = Some(r.attr_value(tag, raw)?)
+                    v.max_bit_errors_in_sync_pattern =
+                        Some(r.attr_value(tag, raw)?)
                 }
                 _ => r.unknown_attr(tag, k)?,
             }
@@ -20849,7 +23989,9 @@ impl XmlElement for VariableFrameSyncStrategyType {
 /// Describe a variable string whose length may change between samples.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct VariableStringType {
-    /// The upper bound of the size of this string data type so that the implementation can reserve/allocate enough memory to capture all reported instances of the string.
+    /// The upper bound of the size of this string data type so that the
+    /// implementation can reserve/allocate enough memory to capture all
+    /// reported instances of the string.
     pub max_size_in_bits: i64,
     /// One of: `DynamicValue`, `DiscreteLookupList`.
     pub choice1: Option<VariableStringChoice1>,
@@ -20894,24 +24036,48 @@ impl XmlElement for VariableStringType {
     }
 }
 
-/// Describe a collection of unordered verifiers. A command verifier is a conditional check on the telemetry from a SpaceSystem that that provides positive indication on the processing state of a command. There are eight different verifiers each associated with different states in command processing: TransferredToRange, TransferredFromRange, Received, Accepted, Queued, Execution, Complete, and Failed. There may be multiple "complete" and "execution" verifiers. If the MetaCommand is part of an inheritance relation (BaseMetaCommand), the "complete" and "execution" verifier sets are appended to any defined in the parent MetaCommand. All others will override a verifier defined in a BaseMetaCommand. Duplicate verifiers in the list of CompleteVerifiers and ExecutionVerifiers before and after appending to the verifiers in BaseMetaCommand should be avoided. See MetaCommandType and BaseMetaCommandType for additional information.
+/// Describe a collection of unordered verifiers. A command verifier is a
+/// conditional check on the telemetry from a SpaceSystem that that provides
+/// positive indication on the processing state of a command. There are eight
+/// different verifiers each associated with different states in command
+/// processing: TransferredToRange, TransferredFromRange, Received, Accepted,
+/// Queued, Execution, Complete, and Failed. There may be multiple "complete"
+/// and "execution" verifiers. If the MetaCommand is part of an inheritance
+/// relation (BaseMetaCommand), the "complete" and "execution" verifier sets are
+/// appended to any defined in the parent MetaCommand. All others will override
+/// a verifier defined in a BaseMetaCommand. Duplicate verifiers in the list of
+/// CompleteVerifiers and ExecutionVerifiers before and after appending to the
+/// verifiers in BaseMetaCommand should be avoided. See MetaCommandType and
+/// BaseMetaCommandType for additional information.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct VerifierSetType {
-    /// Transferred to range means the command has been received to the network that connects the ground system to the spacecraft. Typically, this verifier would come from something other than the spacecraft, such as a modem or front end processor.
+    /// Transferred to range means the command has been received to the network
+    /// that connects the ground system to the spacecraft. Typically, this
+    /// verifier would come from something other than the spacecraft, such as a
+    /// modem or front end processor.
     pub transferred_to_range_verifier: Option<TransferredToRangeVerifierType>,
-    /// Sent from range means the command has been transmitted to the spacecraft by the network that connects the ground system to the spacecraft. Typically, this verifier would come from something other than the spacecraft, such as a modem or front end processor.
+    /// Sent from range means the command has been transmitted to the spacecraft
+    /// by the network that connects the ground system to the spacecraft.
+    /// Typically, this verifier would come from something other than the
+    /// spacecraft, such as a modem or front end processor.
     pub sent_from_range_verifier: Option<SentFromRangeVerifierType>,
     /// A verifier that simply means the destination has received the command.
     pub received_verifier: Option<ReceivedVerifierType>,
     /// A verifier that means the destination has accepted the command.
     pub accepted_verifier: Option<AcceptedVerifierType>,
-    /// A verifer that means the command is scheduled for execution by the destination.
+    /// A verifer that means the command is scheduled for execution by the
+    /// destination.
     pub queued_verifier: Option<QueuedVerifierType>,
-    /// A verifier that indicates that the command is being executed. An optional Element indicates how far along the command has progressed either as a fixed value or an (possibly scaled) ParameterInstance value.
+    /// A verifier that indicates that the command is being executed. An
+    /// optional Element indicates how far along the command has progressed
+    /// either as a fixed value or an (possibly scaled) ParameterInstance value.
     pub execution_verifier: Vec<ExecutionVerifierType>,
-    /// A possible set of verifiers that all must be true for the command be considered completed. Consider that some may not participate due to argument value restriction, if that element is used.
+    /// A possible set of verifiers that all must be true for the command be
+    /// considered completed. Consider that some may not participate due to
+    /// argument value restriction, if that element is used.
     pub complete_verifier: Vec<CompleteVerifierType>,
-    /// When true, indicates that the command failed. timeToWait is how long to wait for the FailedVerifier to test true.
+    /// When true, indicates that the command failed. timeToWait is how long to
+    /// wait for the FailedVerifier to test true.
     pub failed_verifier: Option<FailedVerifierType>,
 }
 
@@ -20981,18 +24147,24 @@ impl XmlElement for VerifierSetType {
     }
 }
 
-/// Describe an exclusive or (XOR) checksum definition. See ErrorDetectCorrectType.
+/// Describe an exclusive or (XOR) checksum definition. See
+/// ErrorDetectCorrectType.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct XORType {
-    /// An offset of non-zero may be specified to skip some bits against the reference position in the reference attribute.
+    /// An offset of non-zero may be specified to skip some bits against the
+    /// reference position in the reference attribute.
     ///
     /// Schema default: `0`.
     pub bits_from_reference: Option<i64>,
-    /// The bits involved in the calculation may start at the beginning or the end of the container.
+    /// The bits involved in the calculation may start at the beginning or the
+    /// end of the container.
     ///
     /// Schema default: `start`.
     pub reference: Option<ReferencePointType>,
-    /// Reference to the parameter that contains the value of this computed XOR based on this container. This attribute is optional because not all implementations verify (telemetry) or create (telecommand) error control fields using the XTCE definition.
+    /// Reference to the parameter that contains the value of this computed XOR
+    /// based on this container. This attribute is optional because not all
+    /// implementations verify (telemetry) or create (telecommand) error control
+    /// fields using the XTCE definition.
     pub parameter_ref: Option<String>,
 }
 
@@ -21017,9 +24189,13 @@ impl XmlElement for XORType {
         for a in tag.attrs() {
             let (k, raw) = a?;
             match k {
-                "bitsFromReference" => v.bits_from_reference = Some(r.attr_value(tag, raw)?),
+                "bitsFromReference" => {
+                    v.bits_from_reference = Some(r.attr_value(tag, raw)?)
+                }
                 "reference" => v.reference = Some(r.attr_value(tag, raw)?),
-                "parameterRef" => v.parameter_ref = Some(r.attr_value(tag, raw)?),
+                "parameterRef" => {
+                    v.parameter_ref = Some(r.attr_value(tag, raw)?)
+                }
                 _ => r.unknown_attr(tag, k)?,
             }
         }
@@ -21031,9 +24207,13 @@ impl XmlElement for XORType {
 /// Alternatives of a `<choice>` in [`ANDedConditionsType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum ANDedConditionsChoice {
-    /// Condition elements describe a test similar to the Comparison element except that the parameters used have additional flexibility for the compare.
+    /// Condition elements describe a test similar to the Comparison element
+    /// except that the parameters used have additional flexibility for the
+    /// compare.
     Condition(ComparisonCheckType),
-    /// This element describes tests similar to the ComparisonList element except that the parameters used are more flexible and the and/or for multiple checks can be specified.
+    /// This element describes tests similar to the ComparisonList element
+    /// except that the parameters used are more flexible and the and/or for
+    /// multiple checks can be specified.
     ORedConditions(Box<ORedConditionsType>),
 }
 
@@ -21079,11 +24259,15 @@ impl ANDedConditionsChoice {
 pub enum AcceptedVerifierChoice1 {
     /// Verification is a list of comparisons.
     ComparisonList(ComparisonListType),
-    /// Verification is a new instance of the referenced container. For example, sending a command to download memory then receiving a packet with the memory download would be verified upon receipt of the packet.
+    /// Verification is a new instance of the referenced container. For example,
+    /// sending a command to download memory then receiving a packet with the
+    /// memory download would be verified upon receipt of the packet.
     ContainerRef(ContainerRefType),
-    /// Verification is a telemetry parameter value change on the ground. For example, a command counter.
+    /// Verification is a telemetry parameter value change on the ground. For
+    /// example, a command counter.
     ParameterValueChange(ParameterValueChangeType),
-    /// Verification is outside the scope of regular command and telemetry processing.
+    /// Verification is outside the scope of regular command and telemetry
+    /// processing.
     CustomAlgorithm(InputAlgorithmType),
     /// Verification is a boolean expression of conditions.
     BooleanExpression(BooleanExpressionType),
@@ -21127,9 +24311,13 @@ impl AcceptedVerifierChoice1 {
         match self {
             Self::ComparisonList(v) => v.write_xml(w, "ComparisonList")?,
             Self::ContainerRef(v) => v.write_xml(w, "ContainerRef")?,
-            Self::ParameterValueChange(v) => v.write_xml(w, "ParameterValueChange")?,
+            Self::ParameterValueChange(v) => {
+                v.write_xml(w, "ParameterValueChange")?
+            }
             Self::CustomAlgorithm(v) => v.write_xml(w, "CustomAlgorithm")?,
-            Self::BooleanExpression(v) => v.write_xml(w, "BooleanExpression")?,
+            Self::BooleanExpression(v) => {
+                v.write_xml(w, "BooleanExpression")?
+            }
             Self::Comparison(v) => v.write_xml(w, "Comparison")?,
         }
         Ok(())
@@ -21139,11 +24327,21 @@ impl AcceptedVerifierChoice1 {
         Ok(match r.peek_child()? {
             Some("ComparisonList") => Self::ComparisonList(r.read_child()?),
             Some("ContainerRef") => Self::ContainerRef(r.read_child()?),
-            Some("ParameterValueChange") => Self::ParameterValueChange(r.read_child()?),
+            Some("ParameterValueChange") => {
+                Self::ParameterValueChange(r.read_child()?)
+            }
             Some("CustomAlgorithm") => Self::CustomAlgorithm(r.read_child()?),
-            Some("BooleanExpression") => Self::BooleanExpression(r.read_child()?),
+            Some("BooleanExpression") => {
+                Self::BooleanExpression(r.read_child()?)
+            }
             Some("Comparison") => Self::Comparison(r.read_child()?),
-            _ => return Err(r.expected("ComparisonList|ContainerRef|ParameterValueChange|CustomAlgorithm|BooleanExpression|Comparison")),
+            _ => {
+                return Err(r.expected(
+                    "ComparisonList|ContainerRef|\
+                            ParameterValueChange|CustomAlgorithm|\
+BooleanExpression|Comparison",
+                ))
+            }
         })
     }
 }
@@ -21180,7 +24378,9 @@ impl AcceptedVerifierChoice2 {
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::CheckWindow(v) => v.write_xml(w, "CheckWindow")?,
-            Self::CheckWindowAlgorithms(v) => v.write_xml(w, "CheckWindowAlgorithms")?,
+            Self::CheckWindowAlgorithms(v) => {
+                v.write_xml(w, "CheckWindowAlgorithms")?
+            }
         }
         Ok(())
     }
@@ -21188,7 +24388,9 @@ impl AcceptedVerifierChoice2 {
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("CheckWindow") => Self::CheckWindow(r.read_child()?),
-            Some("CheckWindowAlgorithms") => Self::CheckWindowAlgorithms(r.read_child()?),
+            Some("CheckWindowAlgorithms") => {
+                Self::CheckWindowAlgorithms(r.read_child()?)
+            }
             _ => return Err(r.expected("CheckWindow|CheckWindowAlgorithms")),
         })
     }
@@ -21197,9 +24399,12 @@ impl AcceptedVerifierChoice2 {
 /// Alternatives of a `<choice>` in [`AlarmType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum AlarmChoice {
-    /// A MatchCriteria may be specified for each of the 5 alarm levels. Each level is optional and the alarm should be the highest level to test true.
+    /// A MatchCriteria may be specified for each of the 5 alarm levels. Each
+    /// level is optional and the alarm should be the highest level to test
+    /// true.
     AlarmConditions(AlarmConditionsType),
-    /// An escape for ridiculously complex alarm conditions. Will trigger on changes to the containing Parameter.
+    /// An escape for ridiculously complex alarm conditions. Will trigger on
+    /// changes to the containing Parameter.
     CustomAlarm(CustomAlarmType),
 }
 
@@ -21287,9 +24492,13 @@ impl AlgorithmSetChoice {
 /// Alternatives of a `<choice>` in [`ArgumentANDedConditionsType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum ArgumentANDedConditionsChoice {
-    /// Condition elements describe a test similar to the Comparison element except that the arguments/parameters used have additional flexibility for the compare.
+    /// Condition elements describe a test similar to the Comparison element
+    /// except that the arguments/parameters used have additional flexibility
+    /// for the compare.
     Condition(ArgumentComparisonCheckType),
-    /// This element describes tests similar to the ComparisonList element except that the arguments/parameters used are more flexible and the and/or for multiple checks can be specified.
+    /// This element describes tests similar to the ComparisonList element
+    /// except that the arguments/parameters used are more flexible and the
+    /// and/or for multiple checks can be specified.
     ORedConditions(Box<ArgumentORedConditionsType>),
 }
 
@@ -21333,13 +24542,18 @@ impl ArgumentANDedConditionsChoice {
 /// Alternatives of a `<choice>` in [`ArgumentBaseDataType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum ArgumentBaseDataChoice {
-    /// Binary encoding is typically a "pass through" raw encoding form where one of the more common encodings is not required for the argument. A custom transformation capability is available if needed.
+    /// Binary encoding is typically a "pass through" raw encoding form where
+    /// one of the more common encodings is not required for the argument. A
+    /// custom transformation capability is available if needed.
     BinaryDataEncoding(ArgumentBinaryDataEncodingType),
-    /// Float encoding is a common encoding where the raw binary is in a form that gets interpreted as a decimal numeric value.
+    /// Float encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a decimal numeric value.
     FloatDataEncoding(FloatDataEncodingType),
-    /// Integer encoding is a common encoding where the raw binary is in a form that gets interpreted as an integral value, either signed or unsigned.
+    /// Integer encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as an integral value, either signed or unsigned.
     IntegerDataEncoding(IntegerDataEncodingType),
-    /// String encoding is a common encoding where the raw binary is in a form that gets interpreted as a character sequence.
+    /// String encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a character sequence.
     StringDataEncoding(ArgumentStringDataEncodingType),
 }
 
@@ -21373,23 +24587,40 @@ impl ArgumentBaseDataChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::BinaryDataEncoding(v) => v.write_xml(w, "BinaryDataEncoding")?,
-            Self::FloatDataEncoding(v) => v.write_xml(w, "FloatDataEncoding")?,
-            Self::IntegerDataEncoding(v) => v.write_xml(w, "IntegerDataEncoding")?,
-            Self::StringDataEncoding(v) => v.write_xml(w, "StringDataEncoding")?,
+            Self::BinaryDataEncoding(v) => {
+                v.write_xml(w, "BinaryDataEncoding")?
+            }
+            Self::FloatDataEncoding(v) => {
+                v.write_xml(w, "FloatDataEncoding")?
+            }
+            Self::IntegerDataEncoding(v) => {
+                v.write_xml(w, "IntegerDataEncoding")?
+            }
+            Self::StringDataEncoding(v) => {
+                v.write_xml(w, "StringDataEncoding")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("BinaryDataEncoding") => Self::BinaryDataEncoding(r.read_child()?),
-            Some("FloatDataEncoding") => Self::FloatDataEncoding(r.read_child()?),
-            Some("IntegerDataEncoding") => Self::IntegerDataEncoding(r.read_child()?),
-            Some("StringDataEncoding") => Self::StringDataEncoding(r.read_child()?),
+            Some("BinaryDataEncoding") => {
+                Self::BinaryDataEncoding(r.read_child()?)
+            }
+            Some("FloatDataEncoding") => {
+                Self::FloatDataEncoding(r.read_child()?)
+            }
+            Some("IntegerDataEncoding") => {
+                Self::IntegerDataEncoding(r.read_child()?)
+            }
+            Some("StringDataEncoding") => {
+                Self::StringDataEncoding(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "BinaryDataEncoding|FloatDataEncoding|IntegerDataEncoding|StringDataEncoding",
+                    "BinaryDataEncoding|FloatDataEncoding|\
+                            IntegerDataEncoding|StringDataEncoding",
                 ))
             }
         })
@@ -21399,13 +24630,18 @@ impl ArgumentBaseDataChoice {
 /// Alternatives of a `<choice>` in [`ArgumentBinaryDataType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum ArgumentBinaryDataChoice {
-    /// Binary encoding is typically a "pass through" raw encoding form where one of the more common encodings is not required for the argument. A custom transformation capability is available if needed.
+    /// Binary encoding is typically a "pass through" raw encoding form where
+    /// one of the more common encodings is not required for the argument. A
+    /// custom transformation capability is available if needed.
     BinaryDataEncoding(ArgumentBinaryDataEncodingType),
-    /// Float encoding is a common encoding where the raw binary is in a form that gets interpreted as a decimal numeric value.
+    /// Float encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a decimal numeric value.
     FloatDataEncoding(FloatDataEncodingType),
-    /// Integer encoding is a common encoding where the raw binary is in a form that gets interpreted as an integral value, either signed or unsigned.
+    /// Integer encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as an integral value, either signed or unsigned.
     IntegerDataEncoding(IntegerDataEncodingType),
-    /// String encoding is a common encoding where the raw binary is in a form that gets interpreted as a character sequence.
+    /// String encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a character sequence.
     StringDataEncoding(ArgumentStringDataEncodingType),
 }
 
@@ -21439,23 +24675,40 @@ impl ArgumentBinaryDataChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::BinaryDataEncoding(v) => v.write_xml(w, "BinaryDataEncoding")?,
-            Self::FloatDataEncoding(v) => v.write_xml(w, "FloatDataEncoding")?,
-            Self::IntegerDataEncoding(v) => v.write_xml(w, "IntegerDataEncoding")?,
-            Self::StringDataEncoding(v) => v.write_xml(w, "StringDataEncoding")?,
+            Self::BinaryDataEncoding(v) => {
+                v.write_xml(w, "BinaryDataEncoding")?
+            }
+            Self::FloatDataEncoding(v) => {
+                v.write_xml(w, "FloatDataEncoding")?
+            }
+            Self::IntegerDataEncoding(v) => {
+                v.write_xml(w, "IntegerDataEncoding")?
+            }
+            Self::StringDataEncoding(v) => {
+                v.write_xml(w, "StringDataEncoding")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("BinaryDataEncoding") => Self::BinaryDataEncoding(r.read_child()?),
-            Some("FloatDataEncoding") => Self::FloatDataEncoding(r.read_child()?),
-            Some("IntegerDataEncoding") => Self::IntegerDataEncoding(r.read_child()?),
-            Some("StringDataEncoding") => Self::StringDataEncoding(r.read_child()?),
+            Some("BinaryDataEncoding") => {
+                Self::BinaryDataEncoding(r.read_child()?)
+            }
+            Some("FloatDataEncoding") => {
+                Self::FloatDataEncoding(r.read_child()?)
+            }
+            Some("IntegerDataEncoding") => {
+                Self::IntegerDataEncoding(r.read_child()?)
+            }
+            Some("StringDataEncoding") => {
+                Self::StringDataEncoding(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "BinaryDataEncoding|FloatDataEncoding|IntegerDataEncoding|StringDataEncoding",
+                    "BinaryDataEncoding|FloatDataEncoding|\
+                            IntegerDataEncoding|StringDataEncoding",
                 ))
             }
         })
@@ -21465,13 +24718,18 @@ impl ArgumentBinaryDataChoice {
 /// Alternatives of a `<choice>` in [`ArgumentBooleanDataType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum ArgumentBooleanDataChoice {
-    /// Binary encoding is typically a "pass through" raw encoding form where one of the more common encodings is not required for the argument. A custom transformation capability is available if needed.
+    /// Binary encoding is typically a "pass through" raw encoding form where
+    /// one of the more common encodings is not required for the argument. A
+    /// custom transformation capability is available if needed.
     BinaryDataEncoding(ArgumentBinaryDataEncodingType),
-    /// Float encoding is a common encoding where the raw binary is in a form that gets interpreted as a decimal numeric value.
+    /// Float encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a decimal numeric value.
     FloatDataEncoding(FloatDataEncodingType),
-    /// Integer encoding is a common encoding where the raw binary is in a form that gets interpreted as an integral value, either signed or unsigned.
+    /// Integer encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as an integral value, either signed or unsigned.
     IntegerDataEncoding(IntegerDataEncodingType),
-    /// String encoding is a common encoding where the raw binary is in a form that gets interpreted as a character sequence.
+    /// String encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a character sequence.
     StringDataEncoding(ArgumentStringDataEncodingType),
 }
 
@@ -21505,23 +24763,40 @@ impl ArgumentBooleanDataChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::BinaryDataEncoding(v) => v.write_xml(w, "BinaryDataEncoding")?,
-            Self::FloatDataEncoding(v) => v.write_xml(w, "FloatDataEncoding")?,
-            Self::IntegerDataEncoding(v) => v.write_xml(w, "IntegerDataEncoding")?,
-            Self::StringDataEncoding(v) => v.write_xml(w, "StringDataEncoding")?,
+            Self::BinaryDataEncoding(v) => {
+                v.write_xml(w, "BinaryDataEncoding")?
+            }
+            Self::FloatDataEncoding(v) => {
+                v.write_xml(w, "FloatDataEncoding")?
+            }
+            Self::IntegerDataEncoding(v) => {
+                v.write_xml(w, "IntegerDataEncoding")?
+            }
+            Self::StringDataEncoding(v) => {
+                v.write_xml(w, "StringDataEncoding")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("BinaryDataEncoding") => Self::BinaryDataEncoding(r.read_child()?),
-            Some("FloatDataEncoding") => Self::FloatDataEncoding(r.read_child()?),
-            Some("IntegerDataEncoding") => Self::IntegerDataEncoding(r.read_child()?),
-            Some("StringDataEncoding") => Self::StringDataEncoding(r.read_child()?),
+            Some("BinaryDataEncoding") => {
+                Self::BinaryDataEncoding(r.read_child()?)
+            }
+            Some("FloatDataEncoding") => {
+                Self::FloatDataEncoding(r.read_child()?)
+            }
+            Some("IntegerDataEncoding") => {
+                Self::IntegerDataEncoding(r.read_child()?)
+            }
+            Some("StringDataEncoding") => {
+                Self::StringDataEncoding(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "BinaryDataEncoding|FloatDataEncoding|IntegerDataEncoding|StringDataEncoding",
+                    "BinaryDataEncoding|FloatDataEncoding|\
+                            IntegerDataEncoding|StringDataEncoding",
                 ))
             }
         })
@@ -21531,11 +24806,14 @@ impl ArgumentBooleanDataChoice {
 /// Alternatives of a `<choice>` in [`ArgumentBooleanExpressionType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum ArgumentBooleanExpressionChoice {
-    /// Condition elements describe a test similar to the Comparison element except that the arguments/parameters used have additional flexibility.
+    /// Condition elements describe a test similar to the Comparison element
+    /// except that the arguments/parameters used have additional flexibility.
     Condition(ArgumentComparisonCheckType),
-    /// This element describes tests similar to the ComparisonList element except that the arguments/parameters used are more flexible.
+    /// This element describes tests similar to the ComparisonList element
+    /// except that the arguments/parameters used are more flexible.
     ANDedConditions(ArgumentANDedConditionsType),
-    /// This element describes tests similar to the ComparisonList element except that the arguments/parameters used are more flexible.
+    /// This element describes tests similar to the ComparisonList element
+    /// except that the arguments/parameters used are more flexible.
     ORedConditions(ArgumentORedConditionsType),
 }
 
@@ -21574,7 +24852,11 @@ impl ArgumentBooleanExpressionChoice {
             Some("Condition") => Self::Condition(r.read_child()?),
             Some("ANDedConditions") => Self::ANDedConditions(r.read_child()?),
             Some("ORedConditions") => Self::ORedConditions(r.read_child()?),
-            _ => return Err(r.expected("Condition|ANDedConditions|ORedConditions")),
+            _ => {
+                return Err(
+                    r.expected("Condition|ANDedConditions|ORedConditions")
+                )
+            }
         })
     }
 }
@@ -21610,17 +24892,29 @@ impl ArgumentComparisonCheckChoice1 {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::ParameterInstanceRef(v) => v.write_xml(w, "ParameterInstanceRef")?,
-            Self::ArgumentInstanceRef(v) => v.write_xml(w, "ArgumentInstanceRef")?,
+            Self::ParameterInstanceRef(v) => {
+                v.write_xml(w, "ParameterInstanceRef")?
+            }
+            Self::ArgumentInstanceRef(v) => {
+                v.write_xml(w, "ArgumentInstanceRef")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("ParameterInstanceRef") => Self::ParameterInstanceRef(r.read_child()?),
-            Some("ArgumentInstanceRef") => Self::ArgumentInstanceRef(r.read_child()?),
-            _ => return Err(r.expected("ParameterInstanceRef|ArgumentInstanceRef")),
+            Some("ParameterInstanceRef") => {
+                Self::ParameterInstanceRef(r.read_child()?)
+            }
+            Some("ArgumentInstanceRef") => {
+                Self::ArgumentInstanceRef(r.read_child()?)
+            }
+            _ => {
+                return Err(
+                    r.expected("ParameterInstanceRef|ArgumentInstanceRef")
+                )
+            }
         })
     }
 }
@@ -21628,11 +24922,20 @@ impl ArgumentComparisonCheckChoice1 {
 /// Alternatives of a `<choice>` in [`ArgumentComparisonCheckType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum ArgumentComparisonCheckChoice2 {
-    /// Right hand side parameter instance. Parameter is assumed to be of the same type as the comparison Argument or Parameter.
+    /// Right hand side parameter instance. Parameter is assumed to be of the
+    /// same type as the comparison Argument or Parameter.
     ParameterInstanceRef(ParameterInstanceRefType),
-    /// Right hand side argument instance. Argument is assumed to be of the same type as the comparison Argument or Parameter.
+    /// Right hand side argument instance. Argument is assumed to be of the same
+    /// type as the comparison Argument or Parameter.
     ArgumentInstanceRef(ArgumentInstanceRefType),
-    /// Specify as: integer data type using xs:integer, float data type using xs:double, string data type using xs:string, boolean data type using xs:boolean, binary data type using xs:hexBinary, enum data type using label name, relative time data type using xs:duration, absolute time data type using xs:dateTime. Values must not exceed the characteristics for the data type or this is a validation error. Takes precedence over an initial value given in the data type. Values are calibrated unless there is an option to override it.
+    /// Specify as: integer data type using xs:integer, float data type using
+    /// xs:double, string data type using xs:string, boolean data type using
+    /// xs:boolean, binary data type using xs:hexBinary, enum data type using
+    /// label name, relative time data type using xs:duration, absolute time
+    /// data type using xs:dateTime. Values must not exceed the characteristics
+    /// for the data type or this is a validation error. Takes precedence over
+    /// an initial value given in the data type. Values are calibrated unless
+    /// there is an option to override it.
     Value(String),
 }
 
@@ -21662,8 +24965,12 @@ impl ArgumentComparisonCheckChoice2 {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::ParameterInstanceRef(v) => v.write_xml(w, "ParameterInstanceRef")?,
-            Self::ArgumentInstanceRef(v) => v.write_xml(w, "ArgumentInstanceRef")?,
+            Self::ParameterInstanceRef(v) => {
+                v.write_xml(w, "ParameterInstanceRef")?
+            }
+            Self::ArgumentInstanceRef(v) => {
+                v.write_xml(w, "ArgumentInstanceRef")?
+            }
             Self::Value(v) => w.leaf("Value", v),
         }
         Ok(())
@@ -21671,10 +24978,19 @@ impl ArgumentComparisonCheckChoice2 {
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("ParameterInstanceRef") => Self::ParameterInstanceRef(r.read_child()?),
-            Some("ArgumentInstanceRef") => Self::ArgumentInstanceRef(r.read_child()?),
+            Some("ParameterInstanceRef") => {
+                Self::ParameterInstanceRef(r.read_child()?)
+            }
+            Some("ArgumentInstanceRef") => {
+                Self::ArgumentInstanceRef(r.read_child()?)
+            }
             Some("Value") => Self::Value(r.read_leaf()?),
-            _ => return Err(r.expected("ParameterInstanceRef|ArgumentInstanceRef|Value")),
+            _ => {
+                return Err(r.expected(
+                    "ParameterInstanceRef|\
+                            ArgumentInstanceRef|Value",
+                ))
+            }
         })
     }
 }
@@ -21682,9 +24998,11 @@ impl ArgumentComparisonCheckChoice2 {
 /// Alternatives of a `<choice>` in [`ArgumentComparisonType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum ArgumentComparisonChoice {
-    /// This parameter instance is being compared to the value in the parent element using the comparison defined there also.
+    /// This parameter instance is being compared to the value in the parent
+    /// element using the comparison defined there also.
     ParameterInstanceRef(ParameterInstanceRefType),
-    /// This argument instance is being compared to the value in the parent element using the comparison defined there also.
+    /// This argument instance is being compared to the value in the parent
+    /// element using the comparison defined there also.
     ArgumentInstanceRef(ArgumentInstanceRefType),
 }
 
@@ -21710,17 +25028,29 @@ impl ArgumentComparisonChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::ParameterInstanceRef(v) => v.write_xml(w, "ParameterInstanceRef")?,
-            Self::ArgumentInstanceRef(v) => v.write_xml(w, "ArgumentInstanceRef")?,
+            Self::ParameterInstanceRef(v) => {
+                v.write_xml(w, "ParameterInstanceRef")?
+            }
+            Self::ArgumentInstanceRef(v) => {
+                v.write_xml(w, "ArgumentInstanceRef")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("ParameterInstanceRef") => Self::ParameterInstanceRef(r.read_child()?),
-            Some("ArgumentInstanceRef") => Self::ArgumentInstanceRef(r.read_child()?),
-            _ => return Err(r.expected("ParameterInstanceRef|ArgumentInstanceRef")),
+            Some("ParameterInstanceRef") => {
+                Self::ParameterInstanceRef(r.read_child()?)
+            }
+            Some("ArgumentInstanceRef") => {
+                Self::ArgumentInstanceRef(r.read_child()?)
+            }
+            _ => {
+                return Err(
+                    r.expected("ParameterInstanceRef|ArgumentInstanceRef")
+                )
+            }
         })
     }
 }
@@ -21728,11 +25058,15 @@ impl ArgumentComparisonChoice {
 /// Alternatives of a `<choice>` in [`ArgumentDiscreteLookupType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum ArgumentDiscreteLookupChoice {
-    /// A simple comparison check involving a single test of an argument or parameter value.
+    /// A simple comparison check involving a single test of an argument or
+    /// parameter value.
     Comparison(ArgumentComparisonType),
-    /// A series of simple comparison checks with an implicit 'and' in that they all must be true for the overall condition to be true.
+    /// A series of simple comparison checks with an implicit 'and' in that they
+    /// all must be true for the overall condition to be true.
     ComparisonList(ArgumentComparisonListType),
-    /// An arbitrarily complex boolean expression that has additional flexibility on the terms beyond the Comparison and ComparisonList elements.
+    /// An arbitrarily complex boolean expression that has additional
+    /// flexibility on the terms beyond the Comparison and ComparisonList
+    /// elements.
     BooleanExpression(ArgumentBooleanExpressionType),
     /// An escape to an externally defined algorithm.
     CustomAlgorithm(ArgumentInputAlgorithmType),
@@ -21749,7 +25083,10 @@ impl ArgumentDiscreteLookupChoice {
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
-            "Comparison" | "ComparisonList" | "BooleanExpression" | "CustomAlgorithm"
+            "Comparison"
+                | "ComparisonList"
+                | "BooleanExpression"
+                | "CustomAlgorithm"
         )
     }
 
@@ -21767,7 +25104,9 @@ impl ArgumentDiscreteLookupChoice {
         match self {
             Self::Comparison(v) => v.write_xml(w, "Comparison")?,
             Self::ComparisonList(v) => v.write_xml(w, "ComparisonList")?,
-            Self::BooleanExpression(v) => v.write_xml(w, "BooleanExpression")?,
+            Self::BooleanExpression(v) => {
+                v.write_xml(w, "BooleanExpression")?
+            }
             Self::CustomAlgorithm(v) => v.write_xml(w, "CustomAlgorithm")?,
         }
         Ok(())
@@ -21777,12 +25116,15 @@ impl ArgumentDiscreteLookupChoice {
         Ok(match r.peek_child()? {
             Some("Comparison") => Self::Comparison(r.read_child()?),
             Some("ComparisonList") => Self::ComparisonList(r.read_child()?),
-            Some("BooleanExpression") => Self::BooleanExpression(r.read_child()?),
+            Some("BooleanExpression") => {
+                Self::BooleanExpression(r.read_child()?)
+            }
             Some("CustomAlgorithm") => Self::CustomAlgorithm(r.read_child()?),
             _ => {
-                return Err(
-                    r.expected("Comparison|ComparisonList|BooleanExpression|CustomAlgorithm")
-                )
+                return Err(r.expected(
+                    "Comparison|ComparisonList|\
+                            BooleanExpression|CustomAlgorithm",
+                ))
             }
         })
     }
@@ -21819,17 +25161,29 @@ impl ArgumentDynamicValueChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::ArgumentInstanceRef(v) => v.write_xml(w, "ArgumentInstanceRef")?,
-            Self::ParameterInstanceRef(v) => v.write_xml(w, "ParameterInstanceRef")?,
+            Self::ArgumentInstanceRef(v) => {
+                v.write_xml(w, "ArgumentInstanceRef")?
+            }
+            Self::ParameterInstanceRef(v) => {
+                v.write_xml(w, "ParameterInstanceRef")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("ArgumentInstanceRef") => Self::ArgumentInstanceRef(r.read_child()?),
-            Some("ParameterInstanceRef") => Self::ParameterInstanceRef(r.read_child()?),
-            _ => return Err(r.expected("ArgumentInstanceRef|ParameterInstanceRef")),
+            Some("ArgumentInstanceRef") => {
+                Self::ArgumentInstanceRef(r.read_child()?)
+            }
+            Some("ParameterInstanceRef") => {
+                Self::ParameterInstanceRef(r.read_child()?)
+            }
+            _ => {
+                return Err(
+                    r.expected("ArgumentInstanceRef|ParameterInstanceRef")
+                )
+            }
         })
     }
 }
@@ -21837,13 +25191,18 @@ impl ArgumentDynamicValueChoice {
 /// Alternatives of a `<choice>` in [`ArgumentEnumeratedDataType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum ArgumentEnumeratedDataChoice {
-    /// Binary encoding is typically a "pass through" raw encoding form where one of the more common encodings is not required for the argument. A custom transformation capability is available if needed.
+    /// Binary encoding is typically a "pass through" raw encoding form where
+    /// one of the more common encodings is not required for the argument. A
+    /// custom transformation capability is available if needed.
     BinaryDataEncoding(ArgumentBinaryDataEncodingType),
-    /// Float encoding is a common encoding where the raw binary is in a form that gets interpreted as a decimal numeric value.
+    /// Float encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a decimal numeric value.
     FloatDataEncoding(FloatDataEncodingType),
-    /// Integer encoding is a common encoding where the raw binary is in a form that gets interpreted as an integral value, either signed or unsigned.
+    /// Integer encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as an integral value, either signed or unsigned.
     IntegerDataEncoding(IntegerDataEncodingType),
-    /// String encoding is a common encoding where the raw binary is in a form that gets interpreted as a character sequence.
+    /// String encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a character sequence.
     StringDataEncoding(ArgumentStringDataEncodingType),
 }
 
@@ -21877,23 +25236,40 @@ impl ArgumentEnumeratedDataChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::BinaryDataEncoding(v) => v.write_xml(w, "BinaryDataEncoding")?,
-            Self::FloatDataEncoding(v) => v.write_xml(w, "FloatDataEncoding")?,
-            Self::IntegerDataEncoding(v) => v.write_xml(w, "IntegerDataEncoding")?,
-            Self::StringDataEncoding(v) => v.write_xml(w, "StringDataEncoding")?,
+            Self::BinaryDataEncoding(v) => {
+                v.write_xml(w, "BinaryDataEncoding")?
+            }
+            Self::FloatDataEncoding(v) => {
+                v.write_xml(w, "FloatDataEncoding")?
+            }
+            Self::IntegerDataEncoding(v) => {
+                v.write_xml(w, "IntegerDataEncoding")?
+            }
+            Self::StringDataEncoding(v) => {
+                v.write_xml(w, "StringDataEncoding")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("BinaryDataEncoding") => Self::BinaryDataEncoding(r.read_child()?),
-            Some("FloatDataEncoding") => Self::FloatDataEncoding(r.read_child()?),
-            Some("IntegerDataEncoding") => Self::IntegerDataEncoding(r.read_child()?),
-            Some("StringDataEncoding") => Self::StringDataEncoding(r.read_child()?),
+            Some("BinaryDataEncoding") => {
+                Self::BinaryDataEncoding(r.read_child()?)
+            }
+            Some("FloatDataEncoding") => {
+                Self::FloatDataEncoding(r.read_child()?)
+            }
+            Some("IntegerDataEncoding") => {
+                Self::IntegerDataEncoding(r.read_child()?)
+            }
+            Some("StringDataEncoding") => {
+                Self::StringDataEncoding(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "BinaryDataEncoding|FloatDataEncoding|IntegerDataEncoding|StringDataEncoding",
+                    "BinaryDataEncoding|FloatDataEncoding|\
+                            IntegerDataEncoding|StringDataEncoding",
                 ))
             }
         })
@@ -21903,13 +25279,18 @@ impl ArgumentEnumeratedDataChoice {
 /// Alternatives of a `<choice>` in [`ArgumentFloatDataType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum ArgumentFloatDataChoice {
-    /// Binary encoding is typically a "pass through" raw encoding form where one of the more common encodings is not required for the argument. A custom transformation capability is available if needed.
+    /// Binary encoding is typically a "pass through" raw encoding form where
+    /// one of the more common encodings is not required for the argument. A
+    /// custom transformation capability is available if needed.
     BinaryDataEncoding(ArgumentBinaryDataEncodingType),
-    /// Float encoding is a common encoding where the raw binary is in a form that gets interpreted as a decimal numeric value.
+    /// Float encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a decimal numeric value.
     FloatDataEncoding(FloatDataEncodingType),
-    /// Integer encoding is a common encoding where the raw binary is in a form that gets interpreted as an integral value, either signed or unsigned.
+    /// Integer encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as an integral value, either signed or unsigned.
     IntegerDataEncoding(IntegerDataEncodingType),
-    /// String encoding is a common encoding where the raw binary is in a form that gets interpreted as a character sequence.
+    /// String encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a character sequence.
     StringDataEncoding(ArgumentStringDataEncodingType),
 }
 
@@ -21943,23 +25324,40 @@ impl ArgumentFloatDataChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::BinaryDataEncoding(v) => v.write_xml(w, "BinaryDataEncoding")?,
-            Self::FloatDataEncoding(v) => v.write_xml(w, "FloatDataEncoding")?,
-            Self::IntegerDataEncoding(v) => v.write_xml(w, "IntegerDataEncoding")?,
-            Self::StringDataEncoding(v) => v.write_xml(w, "StringDataEncoding")?,
+            Self::BinaryDataEncoding(v) => {
+                v.write_xml(w, "BinaryDataEncoding")?
+            }
+            Self::FloatDataEncoding(v) => {
+                v.write_xml(w, "FloatDataEncoding")?
+            }
+            Self::IntegerDataEncoding(v) => {
+                v.write_xml(w, "IntegerDataEncoding")?
+            }
+            Self::StringDataEncoding(v) => {
+                v.write_xml(w, "StringDataEncoding")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("BinaryDataEncoding") => Self::BinaryDataEncoding(r.read_child()?),
-            Some("FloatDataEncoding") => Self::FloatDataEncoding(r.read_child()?),
-            Some("IntegerDataEncoding") => Self::IntegerDataEncoding(r.read_child()?),
-            Some("StringDataEncoding") => Self::StringDataEncoding(r.read_child()?),
+            Some("BinaryDataEncoding") => {
+                Self::BinaryDataEncoding(r.read_child()?)
+            }
+            Some("FloatDataEncoding") => {
+                Self::FloatDataEncoding(r.read_child()?)
+            }
+            Some("IntegerDataEncoding") => {
+                Self::IntegerDataEncoding(r.read_child()?)
+            }
+            Some("StringDataEncoding") => {
+                Self::StringDataEncoding(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "BinaryDataEncoding|FloatDataEncoding|IntegerDataEncoding|StringDataEncoding",
+                    "BinaryDataEncoding|FloatDataEncoding|\
+                            IntegerDataEncoding|StringDataEncoding",
                 ))
             }
         })
@@ -21988,7 +25386,9 @@ impl ArgumentInputSetChoice {
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
-            "InputParameterInstanceRef" | "InputArgumentInstanceRef" | "Constant"
+            "InputParameterInstanceRef"
+                | "InputArgumentInstanceRef"
+                | "Constant"
         )
     }
 
@@ -22003,8 +25403,12 @@ impl ArgumentInputSetChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::InputParameterInstanceRef(v) => v.write_xml(w, "InputParameterInstanceRef")?,
-            Self::InputArgumentInstanceRef(v) => v.write_xml(w, "InputArgumentInstanceRef")?,
+            Self::InputParameterInstanceRef(v) => {
+                v.write_xml(w, "InputParameterInstanceRef")?
+            }
+            Self::InputArgumentInstanceRef(v) => {
+                v.write_xml(w, "InputArgumentInstanceRef")?
+            }
             Self::Constant(v) => v.write_xml(w, "Constant")?,
         }
         Ok(())
@@ -22012,13 +25416,18 @@ impl ArgumentInputSetChoice {
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("InputParameterInstanceRef") => Self::InputParameterInstanceRef(r.read_child()?),
-            Some("InputArgumentInstanceRef") => Self::InputArgumentInstanceRef(r.read_child()?),
+            Some("InputParameterInstanceRef") => {
+                Self::InputParameterInstanceRef(r.read_child()?)
+            }
+            Some("InputArgumentInstanceRef") => {
+                Self::InputArgumentInstanceRef(r.read_child()?)
+            }
             Some("Constant") => Self::Constant(r.read_child()?),
             _ => {
-                return Err(
-                    r.expected("InputParameterInstanceRef|InputArgumentInstanceRef|Constant")
-                )
+                return Err(r.expected(
+                    "InputParameterInstanceRef|\
+                            InputArgumentInstanceRef|Constant",
+                ))
             }
         })
     }
@@ -22027,13 +25436,18 @@ impl ArgumentInputSetChoice {
 /// Alternatives of a `<choice>` in [`ArgumentIntegerDataType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum ArgumentIntegerDataChoice {
-    /// Binary encoding is typically a "pass through" raw encoding form where one of the more common encodings is not required for the argument. A custom transformation capability is available if needed.
+    /// Binary encoding is typically a "pass through" raw encoding form where
+    /// one of the more common encodings is not required for the argument. A
+    /// custom transformation capability is available if needed.
     BinaryDataEncoding(ArgumentBinaryDataEncodingType),
-    /// Float encoding is a common encoding where the raw binary is in a form that gets interpreted as a decimal numeric value.
+    /// Float encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a decimal numeric value.
     FloatDataEncoding(FloatDataEncodingType),
-    /// Integer encoding is a common encoding where the raw binary is in a form that gets interpreted as an integral value, either signed or unsigned.
+    /// Integer encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as an integral value, either signed or unsigned.
     IntegerDataEncoding(IntegerDataEncodingType),
-    /// String encoding is a common encoding where the raw binary is in a form that gets interpreted as a character sequence.
+    /// String encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a character sequence.
     StringDataEncoding(ArgumentStringDataEncodingType),
 }
 
@@ -22067,23 +25481,40 @@ impl ArgumentIntegerDataChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::BinaryDataEncoding(v) => v.write_xml(w, "BinaryDataEncoding")?,
-            Self::FloatDataEncoding(v) => v.write_xml(w, "FloatDataEncoding")?,
-            Self::IntegerDataEncoding(v) => v.write_xml(w, "IntegerDataEncoding")?,
-            Self::StringDataEncoding(v) => v.write_xml(w, "StringDataEncoding")?,
+            Self::BinaryDataEncoding(v) => {
+                v.write_xml(w, "BinaryDataEncoding")?
+            }
+            Self::FloatDataEncoding(v) => {
+                v.write_xml(w, "FloatDataEncoding")?
+            }
+            Self::IntegerDataEncoding(v) => {
+                v.write_xml(w, "IntegerDataEncoding")?
+            }
+            Self::StringDataEncoding(v) => {
+                v.write_xml(w, "StringDataEncoding")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("BinaryDataEncoding") => Self::BinaryDataEncoding(r.read_child()?),
-            Some("FloatDataEncoding") => Self::FloatDataEncoding(r.read_child()?),
-            Some("IntegerDataEncoding") => Self::IntegerDataEncoding(r.read_child()?),
-            Some("StringDataEncoding") => Self::StringDataEncoding(r.read_child()?),
+            Some("BinaryDataEncoding") => {
+                Self::BinaryDataEncoding(r.read_child()?)
+            }
+            Some("FloatDataEncoding") => {
+                Self::FloatDataEncoding(r.read_child()?)
+            }
+            Some("IntegerDataEncoding") => {
+                Self::IntegerDataEncoding(r.read_child()?)
+            }
+            Some("StringDataEncoding") => {
+                Self::StringDataEncoding(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "BinaryDataEncoding|FloatDataEncoding|IntegerDataEncoding|StringDataEncoding",
+                    "BinaryDataEncoding|FloatDataEncoding|\
+                            IntegerDataEncoding|StringDataEncoding",
                 ))
             }
         })
@@ -22095,9 +25526,12 @@ impl ArgumentIntegerDataChoice {
 pub enum ArgumentIntegerValueChoice {
     /// Use a fixed integer value.
     FixedValue(i64),
-    /// Determine the value by interrogating an instance of an argument or parameter.
+    /// Determine the value by interrogating an instance of an argument or
+    /// parameter.
     DynamicValue(ArgumentDynamicValueType),
-    /// Determine the value by interrogating an instance of an argument or parameter and selecting a specified value based on tests of the value of that argument or parameter.
+    /// Determine the value by interrogating an instance of an argument or
+    /// parameter and selecting a specified value based on tests of the value of
+    /// that argument or parameter.
     DiscreteLookupList(ArgumentDiscreteLookupListType),
 }
 
@@ -22126,7 +25560,9 @@ impl ArgumentIntegerValueChoice {
         match self {
             Self::FixedValue(v) => w.leaf("FixedValue", v),
             Self::DynamicValue(v) => v.write_xml(w, "DynamicValue")?,
-            Self::DiscreteLookupList(v) => v.write_xml(w, "DiscreteLookupList")?,
+            Self::DiscreteLookupList(v) => {
+                v.write_xml(w, "DiscreteLookupList")?
+            }
         }
         Ok(())
     }
@@ -22135,8 +25571,15 @@ impl ArgumentIntegerValueChoice {
         Ok(match r.peek_child()? {
             Some("FixedValue") => Self::FixedValue(r.read_leaf()?),
             Some("DynamicValue") => Self::DynamicValue(r.read_child()?),
-            Some("DiscreteLookupList") => Self::DiscreteLookupList(r.read_child()?),
-            _ => return Err(r.expected("FixedValue|DynamicValue|DiscreteLookupList")),
+            Some("DiscreteLookupList") => {
+                Self::DiscreteLookupList(r.read_child()?)
+            }
+            _ => {
+                return Err(r.expected(
+                    "FixedValue|DynamicValue|\
+                            DiscreteLookupList",
+                ))
+            }
         })
     }
 }
@@ -22146,9 +25589,12 @@ impl ArgumentIntegerValueChoice {
 pub enum ArgumentLocationInContainerInBitsChoice {
     /// Use a fixed integer value.
     FixedValue(i64),
-    /// Determine the value by interrogating an instance of an argument or parameter.
+    /// Determine the value by interrogating an instance of an argument or
+    /// parameter.
     DynamicValue(ArgumentDynamicValueType),
-    /// Determine the value by interrogating an instance of an argument or parameter and selecting a specified value based on tests of the value of that argument or parameter.
+    /// Determine the value by interrogating an instance of an argument or
+    /// parameter and selecting a specified value based on tests of the value of
+    /// that argument or parameter.
     DiscreteLookupList(ArgumentDiscreteLookupListType),
 }
 
@@ -22177,7 +25623,9 @@ impl ArgumentLocationInContainerInBitsChoice {
         match self {
             Self::FixedValue(v) => w.leaf("FixedValue", v),
             Self::DynamicValue(v) => v.write_xml(w, "DynamicValue")?,
-            Self::DiscreteLookupList(v) => v.write_xml(w, "DiscreteLookupList")?,
+            Self::DiscreteLookupList(v) => {
+                v.write_xml(w, "DiscreteLookupList")?
+            }
         }
         Ok(())
     }
@@ -22186,8 +25634,15 @@ impl ArgumentLocationInContainerInBitsChoice {
         Ok(match r.peek_child()? {
             Some("FixedValue") => Self::FixedValue(r.read_leaf()?),
             Some("DynamicValue") => Self::DynamicValue(r.read_child()?),
-            Some("DiscreteLookupList") => Self::DiscreteLookupList(r.read_child()?),
-            _ => return Err(r.expected("FixedValue|DynamicValue|DiscreteLookupList")),
+            Some("DiscreteLookupList") => {
+                Self::DiscreteLookupList(r.read_child()?)
+            }
+            _ => {
+                return Err(r.expected(
+                    "FixedValue|DynamicValue|\
+                            DiscreteLookupList",
+                ))
+            }
         })
     }
 }
@@ -22195,11 +25650,15 @@ impl ArgumentLocationInContainerInBitsChoice {
 /// Alternatives of a `<choice>` in [`ArgumentMatchCriteriaType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum ArgumentMatchCriteriaChoice {
-    /// A simple comparison check involving a single test of an argument or parameter value.
+    /// A simple comparison check involving a single test of an argument or
+    /// parameter value.
     Comparison(ArgumentComparisonType),
-    /// A series of simple comparison checks with an implicit 'and' in that they all must be true for the overall condition to be true.
+    /// A series of simple comparison checks with an implicit 'and' in that they
+    /// all must be true for the overall condition to be true.
     ComparisonList(ArgumentComparisonListType),
-    /// An arbitrarily complex boolean expression that has additional flexibility on the terms beyond the Comparison and ComparisonList elements.
+    /// An arbitrarily complex boolean expression that has additional
+    /// flexibility on the terms beyond the Comparison and ComparisonList
+    /// elements.
     BooleanExpression(ArgumentBooleanExpressionType),
     /// An escape to an externally defined algorithm.
     CustomAlgorithm(ArgumentInputAlgorithmType),
@@ -22216,7 +25675,10 @@ impl ArgumentMatchCriteriaChoice {
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
-            "Comparison" | "ComparisonList" | "BooleanExpression" | "CustomAlgorithm"
+            "Comparison"
+                | "ComparisonList"
+                | "BooleanExpression"
+                | "CustomAlgorithm"
         )
     }
 
@@ -22234,7 +25696,9 @@ impl ArgumentMatchCriteriaChoice {
         match self {
             Self::Comparison(v) => v.write_xml(w, "Comparison")?,
             Self::ComparisonList(v) => v.write_xml(w, "ComparisonList")?,
-            Self::BooleanExpression(v) => v.write_xml(w, "BooleanExpression")?,
+            Self::BooleanExpression(v) => {
+                v.write_xml(w, "BooleanExpression")?
+            }
             Self::CustomAlgorithm(v) => v.write_xml(w, "CustomAlgorithm")?,
         }
         Ok(())
@@ -22244,12 +25708,15 @@ impl ArgumentMatchCriteriaChoice {
         Ok(match r.peek_child()? {
             Some("Comparison") => Self::Comparison(r.read_child()?),
             Some("ComparisonList") => Self::ComparisonList(r.read_child()?),
-            Some("BooleanExpression") => Self::BooleanExpression(r.read_child()?),
+            Some("BooleanExpression") => {
+                Self::BooleanExpression(r.read_child()?)
+            }
             Some("CustomAlgorithm") => Self::CustomAlgorithm(r.read_child()?),
             _ => {
-                return Err(
-                    r.expected("Comparison|ComparisonList|BooleanExpression|CustomAlgorithm")
-                )
+                return Err(r.expected(
+                    "Comparison|ComparisonList|\
+                            BooleanExpression|CustomAlgorithm",
+                ))
             }
         })
     }
@@ -22260,13 +25727,22 @@ impl ArgumentMatchCriteriaChoice {
 pub enum ArgumentMathOperationChoice {
     /// Use a constant in the calculation.
     ValueOperand(String),
-    /// Use the value of the target parameter in the calculation. It is the calibrated/engineering value only. If the raw value is needed, specify it explicitly using ParameterInstanceRefOperand. Note this element has no content.
+    /// Use the value of the target parameter in the calculation. It is the
+    /// calibrated/engineering value only. If the raw value is needed, specify
+    /// it explicitly using ParameterInstanceRefOperand. Note this element has
+    /// no content.
     ThisParameterOperand(String),
-    /// All operators utilize operands on the top values in the stack and leaving the result on the top of the stack. Ternary operators utilize the top three operands on the stack, binary operators utilize the top two operands on the stack, and unary operators use the top operand on the stack.
+    /// All operators utilize operands on the top values in the stack and
+    /// leaving the result on the top of the stack. Ternary operators utilize
+    /// the top three operands on the stack, binary operators utilize the top
+    /// two operands on the stack, and unary operators use the top operand on
+    /// the stack.
     Operator(MathOperatorsType),
-    /// This element is used to reference the last received/assigned value of any Parameter in this math operation.
+    /// This element is used to reference the last received/assigned value of
+    /// any Parameter in this math operation.
     ParameterInstanceRefOperand(ParameterInstanceRefType),
-    /// This element is used to reference a value of any Argument from this command instance in this math operation.
+    /// This element is used to reference a value of any Argument from this
+    /// command instance in this math operation.
     ArgumentInstanceRefOperand(ArgumentInstanceRefType),
 }
 
@@ -22295,7 +25771,9 @@ impl ArgumentMathOperationChoice {
             Self::ValueOperand(_) => "ValueOperand",
             Self::ThisParameterOperand(_) => "ThisParameterOperand",
             Self::Operator(_) => "Operator",
-            Self::ParameterInstanceRefOperand(_) => "ParameterInstanceRefOperand",
+            Self::ParameterInstanceRefOperand(_) => {
+                "ParameterInstanceRefOperand"
+            }
             Self::ArgumentInstanceRefOperand(_) => "ArgumentInstanceRefOperand",
         }
     }
@@ -22308,7 +25786,9 @@ impl ArgumentMathOperationChoice {
             Self::ParameterInstanceRefOperand(v) => {
                 v.write_xml(w, "ParameterInstanceRefOperand")?
             }
-            Self::ArgumentInstanceRefOperand(v) => v.write_xml(w, "ArgumentInstanceRefOperand")?,
+            Self::ArgumentInstanceRefOperand(v) => {
+                v.write_xml(w, "ArgumentInstanceRefOperand")?
+            }
         }
         Ok(())
     }
@@ -22316,11 +25796,23 @@ impl ArgumentMathOperationChoice {
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("ValueOperand") => Self::ValueOperand(r.read_leaf()?),
-            Some("ThisParameterOperand") => Self::ThisParameterOperand(r.read_leaf()?),
+            Some("ThisParameterOperand") => {
+                Self::ThisParameterOperand(r.read_leaf()?)
+            }
             Some("Operator") => Self::Operator(r.read_leaf()?),
-            Some("ParameterInstanceRefOperand") => Self::ParameterInstanceRefOperand(r.read_child()?),
-            Some("ArgumentInstanceRefOperand") => Self::ArgumentInstanceRefOperand(r.read_child()?),
-            _ => return Err(r.expected("ValueOperand|ThisParameterOperand|Operator|ParameterInstanceRefOperand|ArgumentInstanceRefOperand")),
+            Some("ParameterInstanceRefOperand") => {
+                Self::ParameterInstanceRefOperand(r.read_child()?)
+            }
+            Some("ArgumentInstanceRefOperand") => {
+                Self::ArgumentInstanceRefOperand(r.read_child()?)
+            }
+            _ => {
+                return Err(r.expected(
+                    "ValueOperand|ThisParameterOperand|\
+                            Operator|ParameterInstanceRefOperand|\
+ArgumentInstanceRefOperand",
+                ))
+            }
         })
     }
 }
@@ -22328,9 +25820,13 @@ impl ArgumentMathOperationChoice {
 /// Alternatives of a `<choice>` in [`ArgumentORedConditionsType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum ArgumentORedConditionsChoice {
-    /// Condition elements describe a test similar to the Comparison element except that the arguments/parameters used have additional flexibility for the compare.
+    /// Condition elements describe a test similar to the Comparison element
+    /// except that the arguments/parameters used have additional flexibility
+    /// for the compare.
     Condition(ArgumentComparisonCheckType),
-    /// This element describes tests similar to the ComparisonList element except that the arguments/parameters used are more flexible and the and/or for multiple checks can be specified.
+    /// This element describes tests similar to the ComparisonList element
+    /// except that the arguments/parameters used are more flexible and the
+    /// and/or for multiple checks can be specified.
     ANDedConditions(Box<ArgumentANDedConditionsType>),
 }
 
@@ -22374,13 +25870,18 @@ impl ArgumentORedConditionsChoice {
 /// Alternatives of a `<choice>` in [`ArgumentStringDataType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum ArgumentStringDataChoice {
-    /// Binary encoding is typically a "pass through" raw encoding form where one of the more common encodings is not required for the argument. A custom transformation capability is available if needed.
+    /// Binary encoding is typically a "pass through" raw encoding form where
+    /// one of the more common encodings is not required for the argument. A
+    /// custom transformation capability is available if needed.
     BinaryDataEncoding(ArgumentBinaryDataEncodingType),
-    /// Float encoding is a common encoding where the raw binary is in a form that gets interpreted as a decimal numeric value.
+    /// Float encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a decimal numeric value.
     FloatDataEncoding(FloatDataEncodingType),
-    /// Integer encoding is a common encoding where the raw binary is in a form that gets interpreted as an integral value, either signed or unsigned.
+    /// Integer encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as an integral value, either signed or unsigned.
     IntegerDataEncoding(IntegerDataEncodingType),
-    /// String encoding is a common encoding where the raw binary is in a form that gets interpreted as a character sequence.
+    /// String encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a character sequence.
     StringDataEncoding(ArgumentStringDataEncodingType),
 }
 
@@ -22414,23 +25915,40 @@ impl ArgumentStringDataChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::BinaryDataEncoding(v) => v.write_xml(w, "BinaryDataEncoding")?,
-            Self::FloatDataEncoding(v) => v.write_xml(w, "FloatDataEncoding")?,
-            Self::IntegerDataEncoding(v) => v.write_xml(w, "IntegerDataEncoding")?,
-            Self::StringDataEncoding(v) => v.write_xml(w, "StringDataEncoding")?,
+            Self::BinaryDataEncoding(v) => {
+                v.write_xml(w, "BinaryDataEncoding")?
+            }
+            Self::FloatDataEncoding(v) => {
+                v.write_xml(w, "FloatDataEncoding")?
+            }
+            Self::IntegerDataEncoding(v) => {
+                v.write_xml(w, "IntegerDataEncoding")?
+            }
+            Self::StringDataEncoding(v) => {
+                v.write_xml(w, "StringDataEncoding")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("BinaryDataEncoding") => Self::BinaryDataEncoding(r.read_child()?),
-            Some("FloatDataEncoding") => Self::FloatDataEncoding(r.read_child()?),
-            Some("IntegerDataEncoding") => Self::IntegerDataEncoding(r.read_child()?),
-            Some("StringDataEncoding") => Self::StringDataEncoding(r.read_child()?),
+            Some("BinaryDataEncoding") => {
+                Self::BinaryDataEncoding(r.read_child()?)
+            }
+            Some("FloatDataEncoding") => {
+                Self::FloatDataEncoding(r.read_child()?)
+            }
+            Some("IntegerDataEncoding") => {
+                Self::IntegerDataEncoding(r.read_child()?)
+            }
+            Some("StringDataEncoding") => {
+                Self::StringDataEncoding(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "BinaryDataEncoding|FloatDataEncoding|IntegerDataEncoding|StringDataEncoding",
+                    "BinaryDataEncoding|FloatDataEncoding|\
+                            IntegerDataEncoding|StringDataEncoding",
                 ))
             }
         })
@@ -22440,9 +25958,20 @@ impl ArgumentStringDataChoice {
 /// Alternatives of a `<choice>` in [`ArgumentStringDataEncodingType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum ArgumentStringDataEncodingChoice {
-    /// Static length strings do not change in overall length between samples. They may terminate before the end of their buffer using a terminating character, or by various lookups, or calculations. But they have a maximum fixed size, and the data itself is always within that maximum size.
+    /// Static length strings do not change in overall length between samples.
+    /// They may terminate before the end of their buffer using a terminating
+    /// character, or by various lookups, or calculations. But they have a
+    /// maximum fixed size, and the data itself is always within that maximum
+    /// size.
     SizeInBits(SizeInBitsType),
-    /// Variable length strings are those where the space occupied in a container can vary. If the string has variable content but occupies the same amount of space when encoded should use the SizeInBits element. Specification of a variable length string needs to consider that the implementation needs to allocate space to store the string. Specify the maximum possible length of the string data type for memory purposes and also specify the bit size of the string to use in containers with the dynamic elements.
+    /// Variable length strings are those where the space occupied in a
+    /// container can vary. If the string has variable content but occupies the
+    /// same amount of space when encoded should use the SizeInBits element.
+    /// Specification of a variable length string needs to consider that the
+    /// implementation needs to allocate space to store the string. Specify the
+    /// maximum possible length of the string data type for memory purposes and
+    /// also specify the bit size of the string to use in containers with the
+    /// dynamic elements.
     Variable(ArgumentVariableStringType),
 }
 
@@ -22486,25 +26015,35 @@ impl ArgumentStringDataEncodingChoice {
 /// Alternatives of a `<choice>` in [`ArgumentTypeSetType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum ArgumentTypeSetChoice {
-    /// Describe an argument type that has an engineering/calibrated value in the form of a character string.
+    /// Describe an argument type that has an engineering/calibrated value in
+    /// the form of a character string.
     StringArgumentType(StringArgumentType),
-    /// Describe an argument type that has an engineering/calibrated value in the form of an enumeration.
+    /// Describe an argument type that has an engineering/calibrated value in
+    /// the form of an enumeration.
     EnumeratedArgumentType(EnumeratedArgumentType),
-    /// Describe an argument type that has an engineering/calibrated value in the form of an integer.
+    /// Describe an argument type that has an engineering/calibrated value in
+    /// the form of an integer.
     IntegerArgumentType(IntegerArgumentType),
-    /// Describe an argument type that has an engineering/calibrated value in the form of a binary (usually hex represented).
+    /// Describe an argument type that has an engineering/calibrated value in
+    /// the form of a binary (usually hex represented).
     BinaryArgumentType(BinaryArgumentType),
-    /// Describe an argument type that has an engineering/calibrated value in the form of a decimal.
+    /// Describe an argument type that has an engineering/calibrated value in
+    /// the form of a decimal.
     FloatArgumentType(FloatArgumentType),
-    /// Describe an argument type that has an engineering/calibrated value in the form of a boolean enumeration.
+    /// Describe an argument type that has an engineering/calibrated value in
+    /// the form of a boolean enumeration.
     BooleanArgumentType(BooleanArgumentType),
-    /// Describe an argument type that has an engineering/calibrated value in the form of a duration in time.
+    /// Describe an argument type that has an engineering/calibrated value in
+    /// the form of a duration in time.
     RelativeTimeArgumentType(RelativeTimeArgumentType),
-    /// Describe an argument type that has an engineering/calibrated value in the form of an instant in time.
+    /// Describe an argument type that has an engineering/calibrated value in
+    /// the form of an instant in time.
     AbsoluteTimeArgumentType(AbsoluteTimeArgumentType),
-    /// Describe an argument type that has an engineering/calibrated value in the form of an array of a primitive type.
+    /// Describe an argument type that has an engineering/calibrated value in
+    /// the form of an array of a primitive type.
     ArrayArgumentType(ArrayArgumentType),
-    /// Describe an argument type that has an engineering/calibrated value in the form of a structure of arguments of other types.
+    /// Describe an argument type that has an engineering/calibrated value in
+    /// the form of a structure of arguments of other types.
     AggregateArgumentType(AggregateArgumentType),
 }
 
@@ -22550,33 +26089,83 @@ impl ArgumentTypeSetChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::StringArgumentType(v) => v.write_xml(w, "StringArgumentType")?,
-            Self::EnumeratedArgumentType(v) => v.write_xml(w, "EnumeratedArgumentType")?,
-            Self::IntegerArgumentType(v) => v.write_xml(w, "IntegerArgumentType")?,
-            Self::BinaryArgumentType(v) => v.write_xml(w, "BinaryArgumentType")?,
-            Self::FloatArgumentType(v) => v.write_xml(w, "FloatArgumentType")?,
-            Self::BooleanArgumentType(v) => v.write_xml(w, "BooleanArgumentType")?,
-            Self::RelativeTimeArgumentType(v) => v.write_xml(w, "RelativeTimeArgumentType")?,
-            Self::AbsoluteTimeArgumentType(v) => v.write_xml(w, "AbsoluteTimeArgumentType")?,
-            Self::ArrayArgumentType(v) => v.write_xml(w, "ArrayArgumentType")?,
-            Self::AggregateArgumentType(v) => v.write_xml(w, "AggregateArgumentType")?,
+            Self::StringArgumentType(v) => {
+                v.write_xml(w, "StringArgumentType")?
+            }
+            Self::EnumeratedArgumentType(v) => {
+                v.write_xml(w, "EnumeratedArgumentType")?
+            }
+            Self::IntegerArgumentType(v) => {
+                v.write_xml(w, "IntegerArgumentType")?
+            }
+            Self::BinaryArgumentType(v) => {
+                v.write_xml(w, "BinaryArgumentType")?
+            }
+            Self::FloatArgumentType(v) => {
+                v.write_xml(w, "FloatArgumentType")?
+            }
+            Self::BooleanArgumentType(v) => {
+                v.write_xml(w, "BooleanArgumentType")?
+            }
+            Self::RelativeTimeArgumentType(v) => {
+                v.write_xml(w, "RelativeTimeArgumentType")?
+            }
+            Self::AbsoluteTimeArgumentType(v) => {
+                v.write_xml(w, "AbsoluteTimeArgumentType")?
+            }
+            Self::ArrayArgumentType(v) => {
+                v.write_xml(w, "ArrayArgumentType")?
+            }
+            Self::AggregateArgumentType(v) => {
+                v.write_xml(w, "AggregateArgumentType")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("StringArgumentType") => Self::StringArgumentType(r.read_child()?),
-            Some("EnumeratedArgumentType") => Self::EnumeratedArgumentType(r.read_child()?),
-            Some("IntegerArgumentType") => Self::IntegerArgumentType(r.read_child()?),
-            Some("BinaryArgumentType") => Self::BinaryArgumentType(r.read_child()?),
-            Some("FloatArgumentType") => Self::FloatArgumentType(r.read_child()?),
-            Some("BooleanArgumentType") => Self::BooleanArgumentType(r.read_child()?),
-            Some("RelativeTimeArgumentType") => Self::RelativeTimeArgumentType(r.read_child()?),
-            Some("AbsoluteTimeArgumentType") => Self::AbsoluteTimeArgumentType(r.read_child()?),
-            Some("ArrayArgumentType") => Self::ArrayArgumentType(r.read_child()?),
-            Some("AggregateArgumentType") => Self::AggregateArgumentType(r.read_child()?),
-            _ => return Err(r.expected("StringArgumentType|EnumeratedArgumentType|IntegerArgumentType|BinaryArgumentType|FloatArgumentType|BooleanArgumentType|RelativeTimeArgumentType|AbsoluteTimeArgumentType|ArrayArgumentType|AggregateArgumentType")),
+            Some("StringArgumentType") => {
+                Self::StringArgumentType(r.read_child()?)
+            }
+            Some("EnumeratedArgumentType") => {
+                Self::EnumeratedArgumentType(r.read_child()?)
+            }
+            Some("IntegerArgumentType") => {
+                Self::IntegerArgumentType(r.read_child()?)
+            }
+            Some("BinaryArgumentType") => {
+                Self::BinaryArgumentType(r.read_child()?)
+            }
+            Some("FloatArgumentType") => {
+                Self::FloatArgumentType(r.read_child()?)
+            }
+            Some("BooleanArgumentType") => {
+                Self::BooleanArgumentType(r.read_child()?)
+            }
+            Some("RelativeTimeArgumentType") => {
+                Self::RelativeTimeArgumentType(r.read_child()?)
+            }
+            Some("AbsoluteTimeArgumentType") => {
+                Self::AbsoluteTimeArgumentType(r.read_child()?)
+            }
+            Some("ArrayArgumentType") => {
+                Self::ArrayArgumentType(r.read_child()?)
+            }
+            Some("AggregateArgumentType") => {
+                Self::AggregateArgumentType(r.read_child()?)
+            }
+            _ => {
+                return Err(r.expected(
+                    "StringArgumentType|\
+                            EnumeratedArgumentType|\
+IntegerArgumentType|BinaryArgumentType|\
+FloatArgumentType|BooleanArgumentType|\
+RelativeTimeArgumentType|\
+AbsoluteTimeArgumentType|\
+ArrayArgumentType|AggregateArgumentType",
+                ))
+            }
         })
     }
 }
@@ -22584,9 +26173,12 @@ impl ArgumentTypeSetChoice {
 /// Alternatives of a `<choice>` in [`ArgumentVariableStringType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum ArgumentVariableStringChoice1 {
-    /// Determine the container size in bits by interrogating an instance of a parameter or argument.
+    /// Determine the container size in bits by interrogating an instance of a
+    /// parameter or argument.
     DynamicValue(ArgumentDynamicValueType),
-    /// Determine the container size in bits by interrogating an instance of a parameter or argument and selecting a specified value based on tests of the value of that parameter or argument.
+    /// Determine the container size in bits by interrogating an instance of a
+    /// parameter or argument and selecting a specified value based on tests of
+    /// the value of that parameter or argument.
     DiscreteLookupList(ArgumentDiscreteLookupListType),
 }
 
@@ -22613,7 +26205,9 @@ impl ArgumentVariableStringChoice1 {
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::DynamicValue(v) => v.write_xml(w, "DynamicValue")?,
-            Self::DiscreteLookupList(v) => v.write_xml(w, "DiscreteLookupList")?,
+            Self::DiscreteLookupList(v) => {
+                v.write_xml(w, "DiscreteLookupList")?
+            }
         }
         Ok(())
     }
@@ -22621,7 +26215,9 @@ impl ArgumentVariableStringChoice1 {
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("DynamicValue") => Self::DynamicValue(r.read_child()?),
-            Some("DiscreteLookupList") => Self::DiscreteLookupList(r.read_child()?),
+            Some("DiscreteLookupList") => {
+                Self::DiscreteLookupList(r.read_child()?)
+            }
             _ => return Err(r.expected("DynamicValue|DiscreteLookupList")),
         })
     }
@@ -22630,9 +26226,15 @@ impl ArgumentVariableStringChoice1 {
 /// Alternatives of a `<choice>` in [`ArgumentVariableStringType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum ArgumentVariableStringChoice2 {
-    /// In some string implementations, the size of the string contents (not the memory allocation size) is determined by a leading numeric value. This is sometimes referred to as Pascal strings. If a LeadingSize is specified, then the TerminationChar element does not have a functional meaning.
+    /// In some string implementations, the size of the string contents (not the
+    /// memory allocation size) is determined by a leading numeric value. This
+    /// is sometimes referred to as Pascal strings. If a LeadingSize is
+    /// specified, then the TerminationChar element does not have a functional
+    /// meaning.
     LeadingSize(LeadingSizeType),
-    /// The termination character that represents the end of the string contents. For C and most strings, this is null (00), which is the default.
+    /// The termination character that represents the end of the string
+    /// contents. For C and most strings, this is null (00), which is the
+    /// default.
     TerminationChar(String),
 }
 
@@ -22676,13 +26278,18 @@ impl ArgumentVariableStringChoice2 {
 /// Alternatives of a `<choice>` in [`BaseDataType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum BaseDataChoice {
-    /// Binary encoding is typically a "pass through" raw encoding form where one of the more common encodings is not required for the parameter. A custom transformation capability is available if needed.
+    /// Binary encoding is typically a "pass through" raw encoding form where
+    /// one of the more common encodings is not required for the parameter. A
+    /// custom transformation capability is available if needed.
     BinaryDataEncoding(BinaryDataEncodingType),
-    /// Float encoding is a common encoding where the raw binary is in a form that gets interpreted as a decimal numeric value.
+    /// Float encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a decimal numeric value.
     FloatDataEncoding(FloatDataEncodingType),
-    /// Integer encoding is a common encoding where the raw binary is in a form that gets interpreted as an integral value, either signed or unsigned.
+    /// Integer encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as an integral value, either signed or unsigned.
     IntegerDataEncoding(IntegerDataEncodingType),
-    /// String encoding is a common encoding where the raw binary is in a form that gets interpreted as a character sequence.
+    /// String encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a character sequence.
     StringDataEncoding(StringDataEncodingType),
 }
 
@@ -22716,23 +26323,40 @@ impl BaseDataChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::BinaryDataEncoding(v) => v.write_xml(w, "BinaryDataEncoding")?,
-            Self::FloatDataEncoding(v) => v.write_xml(w, "FloatDataEncoding")?,
-            Self::IntegerDataEncoding(v) => v.write_xml(w, "IntegerDataEncoding")?,
-            Self::StringDataEncoding(v) => v.write_xml(w, "StringDataEncoding")?,
+            Self::BinaryDataEncoding(v) => {
+                v.write_xml(w, "BinaryDataEncoding")?
+            }
+            Self::FloatDataEncoding(v) => {
+                v.write_xml(w, "FloatDataEncoding")?
+            }
+            Self::IntegerDataEncoding(v) => {
+                v.write_xml(w, "IntegerDataEncoding")?
+            }
+            Self::StringDataEncoding(v) => {
+                v.write_xml(w, "StringDataEncoding")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("BinaryDataEncoding") => Self::BinaryDataEncoding(r.read_child()?),
-            Some("FloatDataEncoding") => Self::FloatDataEncoding(r.read_child()?),
-            Some("IntegerDataEncoding") => Self::IntegerDataEncoding(r.read_child()?),
-            Some("StringDataEncoding") => Self::StringDataEncoding(r.read_child()?),
+            Some("BinaryDataEncoding") => {
+                Self::BinaryDataEncoding(r.read_child()?)
+            }
+            Some("FloatDataEncoding") => {
+                Self::FloatDataEncoding(r.read_child()?)
+            }
+            Some("IntegerDataEncoding") => {
+                Self::IntegerDataEncoding(r.read_child()?)
+            }
+            Some("StringDataEncoding") => {
+                Self::StringDataEncoding(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "BinaryDataEncoding|FloatDataEncoding|IntegerDataEncoding|StringDataEncoding",
+                    "BinaryDataEncoding|FloatDataEncoding|\
+                            IntegerDataEncoding|StringDataEncoding",
                 ))
             }
         })
@@ -22742,9 +26366,12 @@ impl BaseDataChoice {
 /// Alternatives of a `<choice>` in [`BinaryAlarmType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum BinaryAlarmChoice {
-    /// A MatchCriteria may be specified for each of the 5 alarm levels. Each level is optional and the alarm should be the highest level to test true.
+    /// A MatchCriteria may be specified for each of the 5 alarm levels. Each
+    /// level is optional and the alarm should be the highest level to test
+    /// true.
     AlarmConditions(AlarmConditionsType),
-    /// An escape for ridiculously complex alarm conditions. Will trigger on changes to the containing Parameter.
+    /// An escape for ridiculously complex alarm conditions. Will trigger on
+    /// changes to the containing Parameter.
     CustomAlarm(CustomAlarmType),
 }
 
@@ -22788,13 +26415,18 @@ impl BinaryAlarmChoice {
 /// Alternatives of a `<choice>` in [`BinaryArgumentType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum BinaryArgumentChoice {
-    /// Binary encoding is typically a "pass through" raw encoding form where one of the more common encodings is not required for the argument. A custom transformation capability is available if needed.
+    /// Binary encoding is typically a "pass through" raw encoding form where
+    /// one of the more common encodings is not required for the argument. A
+    /// custom transformation capability is available if needed.
     BinaryDataEncoding(ArgumentBinaryDataEncodingType),
-    /// Float encoding is a common encoding where the raw binary is in a form that gets interpreted as a decimal numeric value.
+    /// Float encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a decimal numeric value.
     FloatDataEncoding(FloatDataEncodingType),
-    /// Integer encoding is a common encoding where the raw binary is in a form that gets interpreted as an integral value, either signed or unsigned.
+    /// Integer encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as an integral value, either signed or unsigned.
     IntegerDataEncoding(IntegerDataEncodingType),
-    /// String encoding is a common encoding where the raw binary is in a form that gets interpreted as a character sequence.
+    /// String encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a character sequence.
     StringDataEncoding(ArgumentStringDataEncodingType),
 }
 
@@ -22828,23 +26460,40 @@ impl BinaryArgumentChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::BinaryDataEncoding(v) => v.write_xml(w, "BinaryDataEncoding")?,
-            Self::FloatDataEncoding(v) => v.write_xml(w, "FloatDataEncoding")?,
-            Self::IntegerDataEncoding(v) => v.write_xml(w, "IntegerDataEncoding")?,
-            Self::StringDataEncoding(v) => v.write_xml(w, "StringDataEncoding")?,
+            Self::BinaryDataEncoding(v) => {
+                v.write_xml(w, "BinaryDataEncoding")?
+            }
+            Self::FloatDataEncoding(v) => {
+                v.write_xml(w, "FloatDataEncoding")?
+            }
+            Self::IntegerDataEncoding(v) => {
+                v.write_xml(w, "IntegerDataEncoding")?
+            }
+            Self::StringDataEncoding(v) => {
+                v.write_xml(w, "StringDataEncoding")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("BinaryDataEncoding") => Self::BinaryDataEncoding(r.read_child()?),
-            Some("FloatDataEncoding") => Self::FloatDataEncoding(r.read_child()?),
-            Some("IntegerDataEncoding") => Self::IntegerDataEncoding(r.read_child()?),
-            Some("StringDataEncoding") => Self::StringDataEncoding(r.read_child()?),
+            Some("BinaryDataEncoding") => {
+                Self::BinaryDataEncoding(r.read_child()?)
+            }
+            Some("FloatDataEncoding") => {
+                Self::FloatDataEncoding(r.read_child()?)
+            }
+            Some("IntegerDataEncoding") => {
+                Self::IntegerDataEncoding(r.read_child()?)
+            }
+            Some("StringDataEncoding") => {
+                Self::StringDataEncoding(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "BinaryDataEncoding|FloatDataEncoding|IntegerDataEncoding|StringDataEncoding",
+                    "BinaryDataEncoding|FloatDataEncoding|\
+                            IntegerDataEncoding|StringDataEncoding",
                 ))
             }
         })
@@ -22854,9 +26503,12 @@ impl BinaryArgumentChoice {
 /// Alternatives of a `<choice>` in [`BinaryContextAlarmType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum BinaryContextAlarmChoice {
-    /// A MatchCriteria may be specified for each of the 5 alarm levels. Each level is optional and the alarm should be the highest level to test true.
+    /// A MatchCriteria may be specified for each of the 5 alarm levels. Each
+    /// level is optional and the alarm should be the highest level to test
+    /// true.
     AlarmConditions(AlarmConditionsType),
-    /// An escape for ridiculously complex alarm conditions. Will trigger on changes to the containing Parameter.
+    /// An escape for ridiculously complex alarm conditions. Will trigger on
+    /// changes to the containing Parameter.
     CustomAlarm(CustomAlarmType),
 }
 
@@ -22900,13 +26552,18 @@ impl BinaryContextAlarmChoice {
 /// Alternatives of a `<choice>` in [`BinaryDataType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum BinaryDataChoice {
-    /// Binary encoding is typically a "pass through" raw encoding form where one of the more common encodings is not required for the parameter. A custom transformation capability is available if needed.
+    /// Binary encoding is typically a "pass through" raw encoding form where
+    /// one of the more common encodings is not required for the parameter. A
+    /// custom transformation capability is available if needed.
     BinaryDataEncoding(BinaryDataEncodingType),
-    /// Float encoding is a common encoding where the raw binary is in a form that gets interpreted as a decimal numeric value.
+    /// Float encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a decimal numeric value.
     FloatDataEncoding(FloatDataEncodingType),
-    /// Integer encoding is a common encoding where the raw binary is in a form that gets interpreted as an integral value, either signed or unsigned.
+    /// Integer encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as an integral value, either signed or unsigned.
     IntegerDataEncoding(IntegerDataEncodingType),
-    /// String encoding is a common encoding where the raw binary is in a form that gets interpreted as a character sequence.
+    /// String encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a character sequence.
     StringDataEncoding(StringDataEncodingType),
 }
 
@@ -22940,23 +26597,40 @@ impl BinaryDataChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::BinaryDataEncoding(v) => v.write_xml(w, "BinaryDataEncoding")?,
-            Self::FloatDataEncoding(v) => v.write_xml(w, "FloatDataEncoding")?,
-            Self::IntegerDataEncoding(v) => v.write_xml(w, "IntegerDataEncoding")?,
-            Self::StringDataEncoding(v) => v.write_xml(w, "StringDataEncoding")?,
+            Self::BinaryDataEncoding(v) => {
+                v.write_xml(w, "BinaryDataEncoding")?
+            }
+            Self::FloatDataEncoding(v) => {
+                v.write_xml(w, "FloatDataEncoding")?
+            }
+            Self::IntegerDataEncoding(v) => {
+                v.write_xml(w, "IntegerDataEncoding")?
+            }
+            Self::StringDataEncoding(v) => {
+                v.write_xml(w, "StringDataEncoding")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("BinaryDataEncoding") => Self::BinaryDataEncoding(r.read_child()?),
-            Some("FloatDataEncoding") => Self::FloatDataEncoding(r.read_child()?),
-            Some("IntegerDataEncoding") => Self::IntegerDataEncoding(r.read_child()?),
-            Some("StringDataEncoding") => Self::StringDataEncoding(r.read_child()?),
+            Some("BinaryDataEncoding") => {
+                Self::BinaryDataEncoding(r.read_child()?)
+            }
+            Some("FloatDataEncoding") => {
+                Self::FloatDataEncoding(r.read_child()?)
+            }
+            Some("IntegerDataEncoding") => {
+                Self::IntegerDataEncoding(r.read_child()?)
+            }
+            Some("StringDataEncoding") => {
+                Self::StringDataEncoding(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "BinaryDataEncoding|FloatDataEncoding|IntegerDataEncoding|StringDataEncoding",
+                    "BinaryDataEncoding|FloatDataEncoding|\
+                            IntegerDataEncoding|StringDataEncoding",
                 ))
             }
         })
@@ -22966,13 +26640,18 @@ impl BinaryDataChoice {
 /// Alternatives of a `<choice>` in [`BinaryParameterType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum BinaryParameterChoice {
-    /// Binary encoding is typically a "pass through" raw encoding form where one of the more common encodings is not required for the parameter. A custom transformation capability is available if needed.
+    /// Binary encoding is typically a "pass through" raw encoding form where
+    /// one of the more common encodings is not required for the parameter. A
+    /// custom transformation capability is available if needed.
     BinaryDataEncoding(BinaryDataEncodingType),
-    /// Float encoding is a common encoding where the raw binary is in a form that gets interpreted as a decimal numeric value.
+    /// Float encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a decimal numeric value.
     FloatDataEncoding(FloatDataEncodingType),
-    /// Integer encoding is a common encoding where the raw binary is in a form that gets interpreted as an integral value, either signed or unsigned.
+    /// Integer encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as an integral value, either signed or unsigned.
     IntegerDataEncoding(IntegerDataEncodingType),
-    /// String encoding is a common encoding where the raw binary is in a form that gets interpreted as a character sequence.
+    /// String encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a character sequence.
     StringDataEncoding(StringDataEncodingType),
 }
 
@@ -23006,23 +26685,40 @@ impl BinaryParameterChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::BinaryDataEncoding(v) => v.write_xml(w, "BinaryDataEncoding")?,
-            Self::FloatDataEncoding(v) => v.write_xml(w, "FloatDataEncoding")?,
-            Self::IntegerDataEncoding(v) => v.write_xml(w, "IntegerDataEncoding")?,
-            Self::StringDataEncoding(v) => v.write_xml(w, "StringDataEncoding")?,
+            Self::BinaryDataEncoding(v) => {
+                v.write_xml(w, "BinaryDataEncoding")?
+            }
+            Self::FloatDataEncoding(v) => {
+                v.write_xml(w, "FloatDataEncoding")?
+            }
+            Self::IntegerDataEncoding(v) => {
+                v.write_xml(w, "IntegerDataEncoding")?
+            }
+            Self::StringDataEncoding(v) => {
+                v.write_xml(w, "StringDataEncoding")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("BinaryDataEncoding") => Self::BinaryDataEncoding(r.read_child()?),
-            Some("FloatDataEncoding") => Self::FloatDataEncoding(r.read_child()?),
-            Some("IntegerDataEncoding") => Self::IntegerDataEncoding(r.read_child()?),
-            Some("StringDataEncoding") => Self::StringDataEncoding(r.read_child()?),
+            Some("BinaryDataEncoding") => {
+                Self::BinaryDataEncoding(r.read_child()?)
+            }
+            Some("FloatDataEncoding") => {
+                Self::FloatDataEncoding(r.read_child()?)
+            }
+            Some("IntegerDataEncoding") => {
+                Self::IntegerDataEncoding(r.read_child()?)
+            }
+            Some("StringDataEncoding") => {
+                Self::StringDataEncoding(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "BinaryDataEncoding|FloatDataEncoding|IntegerDataEncoding|StringDataEncoding",
+                    "BinaryDataEncoding|FloatDataEncoding|\
+                            IntegerDataEncoding|StringDataEncoding",
                 ))
             }
         })
@@ -23032,9 +26728,12 @@ impl BinaryParameterChoice {
 /// Alternatives of a `<choice>` in [`BooleanAlarmType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum BooleanAlarmChoice {
-    /// A MatchCriteria may be specified for each of the 5 alarm levels. Each level is optional and the alarm should be the highest level to test true.
+    /// A MatchCriteria may be specified for each of the 5 alarm levels. Each
+    /// level is optional and the alarm should be the highest level to test
+    /// true.
     AlarmConditions(AlarmConditionsType),
-    /// An escape for ridiculously complex alarm conditions. Will trigger on changes to the containing Parameter.
+    /// An escape for ridiculously complex alarm conditions. Will trigger on
+    /// changes to the containing Parameter.
     CustomAlarm(CustomAlarmType),
 }
 
@@ -23078,13 +26777,18 @@ impl BooleanAlarmChoice {
 /// Alternatives of a `<choice>` in [`BooleanArgumentType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum BooleanArgumentChoice {
-    /// Binary encoding is typically a "pass through" raw encoding form where one of the more common encodings is not required for the argument. A custom transformation capability is available if needed.
+    /// Binary encoding is typically a "pass through" raw encoding form where
+    /// one of the more common encodings is not required for the argument. A
+    /// custom transformation capability is available if needed.
     BinaryDataEncoding(ArgumentBinaryDataEncodingType),
-    /// Float encoding is a common encoding where the raw binary is in a form that gets interpreted as a decimal numeric value.
+    /// Float encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a decimal numeric value.
     FloatDataEncoding(FloatDataEncodingType),
-    /// Integer encoding is a common encoding where the raw binary is in a form that gets interpreted as an integral value, either signed or unsigned.
+    /// Integer encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as an integral value, either signed or unsigned.
     IntegerDataEncoding(IntegerDataEncodingType),
-    /// String encoding is a common encoding where the raw binary is in a form that gets interpreted as a character sequence.
+    /// String encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a character sequence.
     StringDataEncoding(ArgumentStringDataEncodingType),
 }
 
@@ -23118,23 +26822,40 @@ impl BooleanArgumentChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::BinaryDataEncoding(v) => v.write_xml(w, "BinaryDataEncoding")?,
-            Self::FloatDataEncoding(v) => v.write_xml(w, "FloatDataEncoding")?,
-            Self::IntegerDataEncoding(v) => v.write_xml(w, "IntegerDataEncoding")?,
-            Self::StringDataEncoding(v) => v.write_xml(w, "StringDataEncoding")?,
+            Self::BinaryDataEncoding(v) => {
+                v.write_xml(w, "BinaryDataEncoding")?
+            }
+            Self::FloatDataEncoding(v) => {
+                v.write_xml(w, "FloatDataEncoding")?
+            }
+            Self::IntegerDataEncoding(v) => {
+                v.write_xml(w, "IntegerDataEncoding")?
+            }
+            Self::StringDataEncoding(v) => {
+                v.write_xml(w, "StringDataEncoding")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("BinaryDataEncoding") => Self::BinaryDataEncoding(r.read_child()?),
-            Some("FloatDataEncoding") => Self::FloatDataEncoding(r.read_child()?),
-            Some("IntegerDataEncoding") => Self::IntegerDataEncoding(r.read_child()?),
-            Some("StringDataEncoding") => Self::StringDataEncoding(r.read_child()?),
+            Some("BinaryDataEncoding") => {
+                Self::BinaryDataEncoding(r.read_child()?)
+            }
+            Some("FloatDataEncoding") => {
+                Self::FloatDataEncoding(r.read_child()?)
+            }
+            Some("IntegerDataEncoding") => {
+                Self::IntegerDataEncoding(r.read_child()?)
+            }
+            Some("StringDataEncoding") => {
+                Self::StringDataEncoding(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "BinaryDataEncoding|FloatDataEncoding|IntegerDataEncoding|StringDataEncoding",
+                    "BinaryDataEncoding|FloatDataEncoding|\
+                            IntegerDataEncoding|StringDataEncoding",
                 ))
             }
         })
@@ -23144,9 +26865,12 @@ impl BooleanArgumentChoice {
 /// Alternatives of a `<choice>` in [`BooleanContextAlarmType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum BooleanContextAlarmChoice {
-    /// A MatchCriteria may be specified for each of the 5 alarm levels. Each level is optional and the alarm should be the highest level to test true.
+    /// A MatchCriteria may be specified for each of the 5 alarm levels. Each
+    /// level is optional and the alarm should be the highest level to test
+    /// true.
     AlarmConditions(AlarmConditionsType),
-    /// An escape for ridiculously complex alarm conditions. Will trigger on changes to the containing Parameter.
+    /// An escape for ridiculously complex alarm conditions. Will trigger on
+    /// changes to the containing Parameter.
     CustomAlarm(CustomAlarmType),
 }
 
@@ -23190,13 +26914,18 @@ impl BooleanContextAlarmChoice {
 /// Alternatives of a `<choice>` in [`BooleanDataType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum BooleanDataChoice {
-    /// Binary encoding is typically a "pass through" raw encoding form where one of the more common encodings is not required for the parameter. A custom transformation capability is available if needed.
+    /// Binary encoding is typically a "pass through" raw encoding form where
+    /// one of the more common encodings is not required for the parameter. A
+    /// custom transformation capability is available if needed.
     BinaryDataEncoding(BinaryDataEncodingType),
-    /// Float encoding is a common encoding where the raw binary is in a form that gets interpreted as a decimal numeric value.
+    /// Float encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a decimal numeric value.
     FloatDataEncoding(FloatDataEncodingType),
-    /// Integer encoding is a common encoding where the raw binary is in a form that gets interpreted as an integral value, either signed or unsigned.
+    /// Integer encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as an integral value, either signed or unsigned.
     IntegerDataEncoding(IntegerDataEncodingType),
-    /// String encoding is a common encoding where the raw binary is in a form that gets interpreted as a character sequence.
+    /// String encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a character sequence.
     StringDataEncoding(StringDataEncodingType),
 }
 
@@ -23230,23 +26959,40 @@ impl BooleanDataChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::BinaryDataEncoding(v) => v.write_xml(w, "BinaryDataEncoding")?,
-            Self::FloatDataEncoding(v) => v.write_xml(w, "FloatDataEncoding")?,
-            Self::IntegerDataEncoding(v) => v.write_xml(w, "IntegerDataEncoding")?,
-            Self::StringDataEncoding(v) => v.write_xml(w, "StringDataEncoding")?,
+            Self::BinaryDataEncoding(v) => {
+                v.write_xml(w, "BinaryDataEncoding")?
+            }
+            Self::FloatDataEncoding(v) => {
+                v.write_xml(w, "FloatDataEncoding")?
+            }
+            Self::IntegerDataEncoding(v) => {
+                v.write_xml(w, "IntegerDataEncoding")?
+            }
+            Self::StringDataEncoding(v) => {
+                v.write_xml(w, "StringDataEncoding")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("BinaryDataEncoding") => Self::BinaryDataEncoding(r.read_child()?),
-            Some("FloatDataEncoding") => Self::FloatDataEncoding(r.read_child()?),
-            Some("IntegerDataEncoding") => Self::IntegerDataEncoding(r.read_child()?),
-            Some("StringDataEncoding") => Self::StringDataEncoding(r.read_child()?),
+            Some("BinaryDataEncoding") => {
+                Self::BinaryDataEncoding(r.read_child()?)
+            }
+            Some("FloatDataEncoding") => {
+                Self::FloatDataEncoding(r.read_child()?)
+            }
+            Some("IntegerDataEncoding") => {
+                Self::IntegerDataEncoding(r.read_child()?)
+            }
+            Some("StringDataEncoding") => {
+                Self::StringDataEncoding(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "BinaryDataEncoding|FloatDataEncoding|IntegerDataEncoding|StringDataEncoding",
+                    "BinaryDataEncoding|FloatDataEncoding|\
+                            IntegerDataEncoding|StringDataEncoding",
                 ))
             }
         })
@@ -23256,11 +27002,14 @@ impl BooleanDataChoice {
 /// Alternatives of a `<choice>` in [`BooleanExpressionType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum BooleanExpressionChoice {
-    /// Condition elements describe a test similar to the Comparison element except that the parameters used have additional flexibility.
+    /// Condition elements describe a test similar to the Comparison element
+    /// except that the parameters used have additional flexibility.
     Condition(ComparisonCheckType),
-    /// This element describes tests similar to the ComparisonList element except that the parameters used are more flexible.
+    /// This element describes tests similar to the ComparisonList element
+    /// except that the parameters used are more flexible.
     ANDedConditions(ANDedConditionsType),
-    /// This element describes tests similar to the ComparisonList element except that the parameters used are more flexible.
+    /// This element describes tests similar to the ComparisonList element
+    /// except that the parameters used are more flexible.
     ORedConditions(ORedConditionsType),
 }
 
@@ -23299,7 +27048,11 @@ impl BooleanExpressionChoice {
             Some("Condition") => Self::Condition(r.read_child()?),
             Some("ANDedConditions") => Self::ANDedConditions(r.read_child()?),
             Some("ORedConditions") => Self::ORedConditions(r.read_child()?),
-            _ => return Err(r.expected("Condition|ANDedConditions|ORedConditions")),
+            _ => {
+                return Err(
+                    r.expected("Condition|ANDedConditions|ORedConditions")
+                )
+            }
         })
     }
 }
@@ -23307,13 +27060,18 @@ impl BooleanExpressionChoice {
 /// Alternatives of a `<choice>` in [`BooleanParameterType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum BooleanParameterChoice {
-    /// Binary encoding is typically a "pass through" raw encoding form where one of the more common encodings is not required for the parameter. A custom transformation capability is available if needed.
+    /// Binary encoding is typically a "pass through" raw encoding form where
+    /// one of the more common encodings is not required for the parameter. A
+    /// custom transformation capability is available if needed.
     BinaryDataEncoding(BinaryDataEncodingType),
-    /// Float encoding is a common encoding where the raw binary is in a form that gets interpreted as a decimal numeric value.
+    /// Float encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a decimal numeric value.
     FloatDataEncoding(FloatDataEncodingType),
-    /// Integer encoding is a common encoding where the raw binary is in a form that gets interpreted as an integral value, either signed or unsigned.
+    /// Integer encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as an integral value, either signed or unsigned.
     IntegerDataEncoding(IntegerDataEncodingType),
-    /// String encoding is a common encoding where the raw binary is in a form that gets interpreted as a character sequence.
+    /// String encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a character sequence.
     StringDataEncoding(StringDataEncodingType),
 }
 
@@ -23347,23 +27105,40 @@ impl BooleanParameterChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::BinaryDataEncoding(v) => v.write_xml(w, "BinaryDataEncoding")?,
-            Self::FloatDataEncoding(v) => v.write_xml(w, "FloatDataEncoding")?,
-            Self::IntegerDataEncoding(v) => v.write_xml(w, "IntegerDataEncoding")?,
-            Self::StringDataEncoding(v) => v.write_xml(w, "StringDataEncoding")?,
+            Self::BinaryDataEncoding(v) => {
+                v.write_xml(w, "BinaryDataEncoding")?
+            }
+            Self::FloatDataEncoding(v) => {
+                v.write_xml(w, "FloatDataEncoding")?
+            }
+            Self::IntegerDataEncoding(v) => {
+                v.write_xml(w, "IntegerDataEncoding")?
+            }
+            Self::StringDataEncoding(v) => {
+                v.write_xml(w, "StringDataEncoding")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("BinaryDataEncoding") => Self::BinaryDataEncoding(r.read_child()?),
-            Some("FloatDataEncoding") => Self::FloatDataEncoding(r.read_child()?),
-            Some("IntegerDataEncoding") => Self::IntegerDataEncoding(r.read_child()?),
-            Some("StringDataEncoding") => Self::StringDataEncoding(r.read_child()?),
+            Some("BinaryDataEncoding") => {
+                Self::BinaryDataEncoding(r.read_child()?)
+            }
+            Some("FloatDataEncoding") => {
+                Self::FloatDataEncoding(r.read_child()?)
+            }
+            Some("IntegerDataEncoding") => {
+                Self::IntegerDataEncoding(r.read_child()?)
+            }
+            Some("StringDataEncoding") => {
+                Self::StringDataEncoding(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "BinaryDataEncoding|FloatDataEncoding|IntegerDataEncoding|StringDataEncoding",
+                    "BinaryDataEncoding|FloatDataEncoding|\
+                            IntegerDataEncoding|StringDataEncoding",
                 ))
             }
         })
@@ -23377,7 +27152,8 @@ pub enum CalibratorChoice {
     SplineCalibrator(SplineCalibratorType),
     /// Describes a calibrator in the form of a polynomial function
     PolynomialCalibrator(PolynomialCalibratorType),
-    /// Describes a calibrator in the form of a user/program/implementation defined function
+    /// Describes a calibrator in the form of a user/program/implementation
+    /// defined function
     MathOperationCalibrator(MathOperationCalibratorType),
 }
 
@@ -23392,7 +27168,9 @@ impl CalibratorChoice {
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
-            "SplineCalibrator" | "PolynomialCalibrator" | "MathOperationCalibrator"
+            "SplineCalibrator"
+                | "PolynomialCalibrator"
+                | "MathOperationCalibrator"
         )
     }
 
@@ -23408,8 +27186,12 @@ impl CalibratorChoice {
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::SplineCalibrator(v) => v.write_xml(w, "SplineCalibrator")?,
-            Self::PolynomialCalibrator(v) => v.write_xml(w, "PolynomialCalibrator")?,
-            Self::MathOperationCalibrator(v) => v.write_xml(w, "MathOperationCalibrator")?,
+            Self::PolynomialCalibrator(v) => {
+                v.write_xml(w, "PolynomialCalibrator")?
+            }
+            Self::MathOperationCalibrator(v) => {
+                v.write_xml(w, "MathOperationCalibrator")?
+            }
         }
         Ok(())
     }
@@ -23417,12 +27199,17 @@ impl CalibratorChoice {
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("SplineCalibrator") => Self::SplineCalibrator(r.read_child()?),
-            Some("PolynomialCalibrator") => Self::PolynomialCalibrator(r.read_child()?),
-            Some("MathOperationCalibrator") => Self::MathOperationCalibrator(r.read_child()?),
+            Some("PolynomialCalibrator") => {
+                Self::PolynomialCalibrator(r.read_child()?)
+            }
+            Some("MathOperationCalibrator") => {
+                Self::MathOperationCalibrator(r.read_child()?)
+            }
             _ => {
-                return Err(
-                    r.expected("SplineCalibrator|PolynomialCalibrator|MathOperationCalibrator")
-                )
+                return Err(r.expected(
+                    "SplineCalibrator|PolynomialCalibrator|\
+                            MathOperationCalibrator",
+                ))
             }
         })
     }
@@ -23433,23 +27220,36 @@ impl CalibratorChoice {
 pub enum CommandContainerEntryListChoice {
     /// Specify a Parameter to be a part of this container layout definition.
     ParameterRefEntry(ArgumentParameterRefEntryType),
-    /// Specify a portion of a Parameter to be a part of this container layout definition. This is used when the Parameter is reported in fractional parts in the container before being fully updated.
+    /// Specify a portion of a Parameter to be a part of this container layout
+    /// definition. This is used when the Parameter is reported in fractional
+    /// parts in the container before being fully updated.
     ParameterSegmentRefEntry(ArgumentParameterSegmentRefEntryType),
-    /// Specify the content of another Container to be a part of this container layout definition.
+    /// Specify the content of another Container to be a part of this container
+    /// layout definition.
     ContainerRefEntry(ArgumentContainerRefEntryType),
-    /// Specify a portion of another Container to be a part of this container layout definition.
+    /// Specify a portion of another Container to be a part of this container
+    /// layout definition.
     ContainerSegmentRefEntry(ArgumentContainerSegmentRefEntryType),
-    /// Specify a portion of a Stream to be a part of this container layout definition.
+    /// Specify a portion of a Stream to be a part of this container layout
+    /// definition.
     StreamSegmentEntry(ArgumentStreamSegmentEntryType),
-    /// Specify a previous (not last reported) value of a Parmeter to be a part of this container layout definition.
+    /// Specify a previous (not last reported) value of a Parmeter to be a part
+    /// of this container layout definition.
     IndirectParameterRefEntry(ArgumentIndirectParameterRefEntryType),
-    /// Specify an Array Type Parameter to be a part of this container layout definition when the Container does not populate the entire space of the Array contents. If the entire space of the Array is populated, a tolerant implementation will accept ParameterRefEntry also.
+    /// Specify an Array Type Parameter to be a part of this container layout
+    /// definition when the Container does not populate the entire space of the
+    /// Array contents. If the entire space of the Array is populated, a
+    /// tolerant implementation will accept ParameterRefEntry also.
     ArrayParameterRefEntry(ArgumentArrayParameterRefEntryType),
     /// Specify an Argument to be a part of this container layout definition.
     ArgumentRefEntry(ArgumentArgumentRefEntryType),
-    /// Specify an Array Type Argument to be a part of this container layout definition when the Container does not populate the entire space of the Array contents. If the entire space of the Array is populated, a tolerant implementation will accept ArgumentRefEntry also.
+    /// Specify an Array Type Argument to be a part of this container layout
+    /// definition when the Container does not populate the entire space of the
+    /// Array contents. If the entire space of the Array is populated, a
+    /// tolerant implementation will accept ArgumentRefEntry also.
     ArrayArgumentRefEntry(ArgumentArrayArgumentRefEntryType),
-    /// Specify an immutable value to be a part of this container layout definition.
+    /// Specify an immutable value to be a part of this container layout
+    /// definition.
     FixedValueEntry(ArgumentFixedValueEntryType),
 }
 
@@ -23495,15 +27295,31 @@ impl CommandContainerEntryListChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::ParameterRefEntry(v) => v.write_xml(w, "ParameterRefEntry")?,
-            Self::ParameterSegmentRefEntry(v) => v.write_xml(w, "ParameterSegmentRefEntry")?,
-            Self::ContainerRefEntry(v) => v.write_xml(w, "ContainerRefEntry")?,
-            Self::ContainerSegmentRefEntry(v) => v.write_xml(w, "ContainerSegmentRefEntry")?,
-            Self::StreamSegmentEntry(v) => v.write_xml(w, "StreamSegmentEntry")?,
-            Self::IndirectParameterRefEntry(v) => v.write_xml(w, "IndirectParameterRefEntry")?,
-            Self::ArrayParameterRefEntry(v) => v.write_xml(w, "ArrayParameterRefEntry")?,
+            Self::ParameterRefEntry(v) => {
+                v.write_xml(w, "ParameterRefEntry")?
+            }
+            Self::ParameterSegmentRefEntry(v) => {
+                v.write_xml(w, "ParameterSegmentRefEntry")?
+            }
+            Self::ContainerRefEntry(v) => {
+                v.write_xml(w, "ContainerRefEntry")?
+            }
+            Self::ContainerSegmentRefEntry(v) => {
+                v.write_xml(w, "ContainerSegmentRefEntry")?
+            }
+            Self::StreamSegmentEntry(v) => {
+                v.write_xml(w, "StreamSegmentEntry")?
+            }
+            Self::IndirectParameterRefEntry(v) => {
+                v.write_xml(w, "IndirectParameterRefEntry")?
+            }
+            Self::ArrayParameterRefEntry(v) => {
+                v.write_xml(w, "ArrayParameterRefEntry")?
+            }
             Self::ArgumentRefEntry(v) => v.write_xml(w, "ArgumentRefEntry")?,
-            Self::ArrayArgumentRefEntry(v) => v.write_xml(w, "ArrayArgumentRefEntry")?,
+            Self::ArrayArgumentRefEntry(v) => {
+                v.write_xml(w, "ArrayArgumentRefEntry")?
+            }
             Self::FixedValueEntry(v) => v.write_xml(w, "FixedValueEntry")?,
         }
         Ok(())
@@ -23511,17 +27327,44 @@ impl CommandContainerEntryListChoice {
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("ParameterRefEntry") => Self::ParameterRefEntry(r.read_child()?),
-            Some("ParameterSegmentRefEntry") => Self::ParameterSegmentRefEntry(r.read_child()?),
-            Some("ContainerRefEntry") => Self::ContainerRefEntry(r.read_child()?),
-            Some("ContainerSegmentRefEntry") => Self::ContainerSegmentRefEntry(r.read_child()?),
-            Some("StreamSegmentEntry") => Self::StreamSegmentEntry(r.read_child()?),
-            Some("IndirectParameterRefEntry") => Self::IndirectParameterRefEntry(r.read_child()?),
-            Some("ArrayParameterRefEntry") => Self::ArrayParameterRefEntry(r.read_child()?),
+            Some("ParameterRefEntry") => {
+                Self::ParameterRefEntry(r.read_child()?)
+            }
+            Some("ParameterSegmentRefEntry") => {
+                Self::ParameterSegmentRefEntry(r.read_child()?)
+            }
+            Some("ContainerRefEntry") => {
+                Self::ContainerRefEntry(r.read_child()?)
+            }
+            Some("ContainerSegmentRefEntry") => {
+                Self::ContainerSegmentRefEntry(r.read_child()?)
+            }
+            Some("StreamSegmentEntry") => {
+                Self::StreamSegmentEntry(r.read_child()?)
+            }
+            Some("IndirectParameterRefEntry") => {
+                Self::IndirectParameterRefEntry(r.read_child()?)
+            }
+            Some("ArrayParameterRefEntry") => {
+                Self::ArrayParameterRefEntry(r.read_child()?)
+            }
             Some("ArgumentRefEntry") => Self::ArgumentRefEntry(r.read_child()?),
-            Some("ArrayArgumentRefEntry") => Self::ArrayArgumentRefEntry(r.read_child()?),
+            Some("ArrayArgumentRefEntry") => {
+                Self::ArrayArgumentRefEntry(r.read_child()?)
+            }
             Some("FixedValueEntry") => Self::FixedValueEntry(r.read_child()?),
-            _ => return Err(r.expected("ParameterRefEntry|ParameterSegmentRefEntry|ContainerRefEntry|ContainerSegmentRefEntry|StreamSegmentEntry|IndirectParameterRefEntry|ArrayParameterRefEntry|ArgumentRefEntry|ArrayArgumentRefEntry|FixedValueEntry")),
+            _ => {
+                return Err(r.expected(
+                    "ParameterRefEntry|\
+                            ParameterSegmentRefEntry|\
+ContainerRefEntry|\
+ContainerSegmentRefEntry|\
+StreamSegmentEntry|\
+IndirectParameterRefEntry|\
+ArrayParameterRefEntry|ArgumentRefEntry|\
+ArrayArgumentRefEntry|FixedValueEntry",
+                ))
+            }
         })
     }
 }
@@ -23531,11 +27374,15 @@ impl CommandContainerEntryListChoice {
 pub enum CommandVerifierChoice1 {
     /// Verification is a list of comparisons.
     ComparisonList(ComparisonListType),
-    /// Verification is a new instance of the referenced container. For example, sending a command to download memory then receiving a packet with the memory download would be verified upon receipt of the packet.
+    /// Verification is a new instance of the referenced container. For example,
+    /// sending a command to download memory then receiving a packet with the
+    /// memory download would be verified upon receipt of the packet.
     ContainerRef(ContainerRefType),
-    /// Verification is a telemetry parameter value change on the ground. For example, a command counter.
+    /// Verification is a telemetry parameter value change on the ground. For
+    /// example, a command counter.
     ParameterValueChange(ParameterValueChangeType),
-    /// Verification is outside the scope of regular command and telemetry processing.
+    /// Verification is outside the scope of regular command and telemetry
+    /// processing.
     CustomAlgorithm(InputAlgorithmType),
     /// Verification is a boolean expression of conditions.
     BooleanExpression(BooleanExpressionType),
@@ -23579,9 +27426,13 @@ impl CommandVerifierChoice1 {
         match self {
             Self::ComparisonList(v) => v.write_xml(w, "ComparisonList")?,
             Self::ContainerRef(v) => v.write_xml(w, "ContainerRef")?,
-            Self::ParameterValueChange(v) => v.write_xml(w, "ParameterValueChange")?,
+            Self::ParameterValueChange(v) => {
+                v.write_xml(w, "ParameterValueChange")?
+            }
             Self::CustomAlgorithm(v) => v.write_xml(w, "CustomAlgorithm")?,
-            Self::BooleanExpression(v) => v.write_xml(w, "BooleanExpression")?,
+            Self::BooleanExpression(v) => {
+                v.write_xml(w, "BooleanExpression")?
+            }
             Self::Comparison(v) => v.write_xml(w, "Comparison")?,
         }
         Ok(())
@@ -23591,11 +27442,21 @@ impl CommandVerifierChoice1 {
         Ok(match r.peek_child()? {
             Some("ComparisonList") => Self::ComparisonList(r.read_child()?),
             Some("ContainerRef") => Self::ContainerRef(r.read_child()?),
-            Some("ParameterValueChange") => Self::ParameterValueChange(r.read_child()?),
+            Some("ParameterValueChange") => {
+                Self::ParameterValueChange(r.read_child()?)
+            }
             Some("CustomAlgorithm") => Self::CustomAlgorithm(r.read_child()?),
-            Some("BooleanExpression") => Self::BooleanExpression(r.read_child()?),
+            Some("BooleanExpression") => {
+                Self::BooleanExpression(r.read_child()?)
+            }
             Some("Comparison") => Self::Comparison(r.read_child()?),
-            _ => return Err(r.expected("ComparisonList|ContainerRef|ParameterValueChange|CustomAlgorithm|BooleanExpression|Comparison")),
+            _ => {
+                return Err(r.expected(
+                    "ComparisonList|ContainerRef|\
+                            ParameterValueChange|CustomAlgorithm|\
+BooleanExpression|Comparison",
+                ))
+            }
         })
     }
 }
@@ -23632,7 +27493,9 @@ impl CommandVerifierChoice2 {
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::CheckWindow(v) => v.write_xml(w, "CheckWindow")?,
-            Self::CheckWindowAlgorithms(v) => v.write_xml(w, "CheckWindowAlgorithms")?,
+            Self::CheckWindowAlgorithms(v) => {
+                v.write_xml(w, "CheckWindowAlgorithms")?
+            }
         }
         Ok(())
     }
@@ -23640,7 +27503,9 @@ impl CommandVerifierChoice2 {
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("CheckWindow") => Self::CheckWindow(r.read_child()?),
-            Some("CheckWindowAlgorithms") => Self::CheckWindowAlgorithms(r.read_child()?),
+            Some("CheckWindowAlgorithms") => {
+                Self::CheckWindowAlgorithms(r.read_child()?)
+            }
             _ => return Err(r.expected("CheckWindow|CheckWindowAlgorithms")),
         })
     }
@@ -23649,9 +27514,17 @@ impl CommandVerifierChoice2 {
 /// Alternatives of a `<choice>` in [`ComparisonCheckType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum ComparisonCheckChoice {
-    /// Right hand side parameter instance. Parameter is assumed to be of the same type as the comparison Parameter.
+    /// Right hand side parameter instance. Parameter is assumed to be of the
+    /// same type as the comparison Parameter.
     ParameterInstanceRef(ParameterInstanceRefType),
-    /// Right hand side value. Specify as: integer data type using xs:integer, float data type using xs:double, string data type using xs:string, boolean data type using xs:boolean, binary data type using xs:hexBinary, enum data type using label name, relative time data type using xs:duration, absolute time data type using xs:dateTime. Values must not exceed the characteristics for the data type or this is a validation error. Takes precedence over an initial value given in the data type. Values are calibrated unless there is an option to override it.
+    /// Right hand side value. Specify as: integer data type using xs:integer,
+    /// float data type using xs:double, string data type using xs:string,
+    /// boolean data type using xs:boolean, binary data type using xs:hexBinary,
+    /// enum data type using label name, relative time data type using
+    /// xs:duration, absolute time data type using xs:dateTime. Values must not
+    /// exceed the characteristics for the data type or this is a validation
+    /// error. Takes precedence over an initial value given in the data type.
+    /// Values are calibrated unless there is an option to override it.
     Value(String),
 }
 
@@ -23677,7 +27550,9 @@ impl ComparisonCheckChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::ParameterInstanceRef(v) => v.write_xml(w, "ParameterInstanceRef")?,
+            Self::ParameterInstanceRef(v) => {
+                v.write_xml(w, "ParameterInstanceRef")?
+            }
             Self::Value(v) => w.leaf("Value", v),
         }
         Ok(())
@@ -23685,7 +27560,9 @@ impl ComparisonCheckChoice {
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("ParameterInstanceRef") => Self::ParameterInstanceRef(r.read_child()?),
+            Some("ParameterInstanceRef") => {
+                Self::ParameterInstanceRef(r.read_child()?)
+            }
             Some("Value") => Self::Value(r.read_leaf()?),
             _ => return Err(r.expected("ParameterInstanceRef|Value")),
         })
@@ -23697,11 +27574,15 @@ impl ComparisonCheckChoice {
 pub enum CompleteVerifierChoice1 {
     /// Verification is a list of comparisons.
     ComparisonList(ComparisonListType),
-    /// Verification is a new instance of the referenced container. For example, sending a command to download memory then receiving a packet with the memory download would be verified upon receipt of the packet.
+    /// Verification is a new instance of the referenced container. For example,
+    /// sending a command to download memory then receiving a packet with the
+    /// memory download would be verified upon receipt of the packet.
     ContainerRef(ContainerRefType),
-    /// Verification is a telemetry parameter value change on the ground. For example, a command counter.
+    /// Verification is a telemetry parameter value change on the ground. For
+    /// example, a command counter.
     ParameterValueChange(ParameterValueChangeType),
-    /// Verification is outside the scope of regular command and telemetry processing.
+    /// Verification is outside the scope of regular command and telemetry
+    /// processing.
     CustomAlgorithm(InputAlgorithmType),
     /// Verification is a boolean expression of conditions.
     BooleanExpression(BooleanExpressionType),
@@ -23745,9 +27626,13 @@ impl CompleteVerifierChoice1 {
         match self {
             Self::ComparisonList(v) => v.write_xml(w, "ComparisonList")?,
             Self::ContainerRef(v) => v.write_xml(w, "ContainerRef")?,
-            Self::ParameterValueChange(v) => v.write_xml(w, "ParameterValueChange")?,
+            Self::ParameterValueChange(v) => {
+                v.write_xml(w, "ParameterValueChange")?
+            }
             Self::CustomAlgorithm(v) => v.write_xml(w, "CustomAlgorithm")?,
-            Self::BooleanExpression(v) => v.write_xml(w, "BooleanExpression")?,
+            Self::BooleanExpression(v) => {
+                v.write_xml(w, "BooleanExpression")?
+            }
             Self::Comparison(v) => v.write_xml(w, "Comparison")?,
         }
         Ok(())
@@ -23757,11 +27642,21 @@ impl CompleteVerifierChoice1 {
         Ok(match r.peek_child()? {
             Some("ComparisonList") => Self::ComparisonList(r.read_child()?),
             Some("ContainerRef") => Self::ContainerRef(r.read_child()?),
-            Some("ParameterValueChange") => Self::ParameterValueChange(r.read_child()?),
+            Some("ParameterValueChange") => {
+                Self::ParameterValueChange(r.read_child()?)
+            }
             Some("CustomAlgorithm") => Self::CustomAlgorithm(r.read_child()?),
-            Some("BooleanExpression") => Self::BooleanExpression(r.read_child()?),
+            Some("BooleanExpression") => {
+                Self::BooleanExpression(r.read_child()?)
+            }
             Some("Comparison") => Self::Comparison(r.read_child()?),
-            _ => return Err(r.expected("ComparisonList|ContainerRef|ParameterValueChange|CustomAlgorithm|BooleanExpression|Comparison")),
+            _ => {
+                return Err(r.expected(
+                    "ComparisonList|ContainerRef|\
+                            ParameterValueChange|CustomAlgorithm|\
+BooleanExpression|Comparison",
+                ))
+            }
         })
     }
 }
@@ -23798,7 +27693,9 @@ impl CompleteVerifierChoice2 {
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::CheckWindow(v) => v.write_xml(w, "CheckWindow")?,
-            Self::CheckWindowAlgorithms(v) => v.write_xml(w, "CheckWindowAlgorithms")?,
+            Self::CheckWindowAlgorithms(v) => {
+                v.write_xml(w, "CheckWindowAlgorithms")?
+            }
         }
         Ok(())
     }
@@ -23806,7 +27703,9 @@ impl CompleteVerifierChoice2 {
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("CheckWindow") => Self::CheckWindow(r.read_child()?),
-            Some("CheckWindowAlgorithms") => Self::CheckWindowAlgorithms(r.read_child()?),
+            Some("CheckWindowAlgorithms") => {
+                Self::CheckWindowAlgorithms(r.read_child()?)
+            }
             _ => return Err(r.expected("CheckWindow|CheckWindowAlgorithms")),
         })
     }
@@ -23817,9 +27716,12 @@ impl CompleteVerifierChoice2 {
 pub enum ContextMatchChoice {
     /// A simple comparison check involving a single test of a parameter value.
     Comparison(ComparisonType),
-    /// A series of simple comparison checks with an implicit 'and' in that they all must be true for the overall condition to be true.
+    /// A series of simple comparison checks with an implicit 'and' in that they
+    /// all must be true for the overall condition to be true.
     ComparisonList(ComparisonListType),
-    /// An arbitrarily complex boolean expression that has additional flexibility on the terms beyond the Comparison and ComparisonList elements.
+    /// An arbitrarily complex boolean expression that has additional
+    /// flexibility on the terms beyond the Comparison and ComparisonList
+    /// elements.
     BooleanExpression(BooleanExpressionType),
     /// An escape to an externally defined algorithm.
     CustomAlgorithm(InputAlgorithmType),
@@ -23836,7 +27738,10 @@ impl ContextMatchChoice {
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
-            "Comparison" | "ComparisonList" | "BooleanExpression" | "CustomAlgorithm"
+            "Comparison"
+                | "ComparisonList"
+                | "BooleanExpression"
+                | "CustomAlgorithm"
         )
     }
 
@@ -23854,7 +27759,9 @@ impl ContextMatchChoice {
         match self {
             Self::Comparison(v) => v.write_xml(w, "Comparison")?,
             Self::ComparisonList(v) => v.write_xml(w, "ComparisonList")?,
-            Self::BooleanExpression(v) => v.write_xml(w, "BooleanExpression")?,
+            Self::BooleanExpression(v) => {
+                v.write_xml(w, "BooleanExpression")?
+            }
             Self::CustomAlgorithm(v) => v.write_xml(w, "CustomAlgorithm")?,
         }
         Ok(())
@@ -23864,12 +27771,15 @@ impl ContextMatchChoice {
         Ok(match r.peek_child()? {
             Some("Comparison") => Self::Comparison(r.read_child()?),
             Some("ComparisonList") => Self::ComparisonList(r.read_child()?),
-            Some("BooleanExpression") => Self::BooleanExpression(r.read_child()?),
+            Some("BooleanExpression") => {
+                Self::BooleanExpression(r.read_child()?)
+            }
             Some("CustomAlgorithm") => Self::CustomAlgorithm(r.read_child()?),
             _ => {
-                return Err(
-                    r.expected("Comparison|ComparisonList|BooleanExpression|CustomAlgorithm")
-                )
+                return Err(r.expected(
+                    "Comparison|ComparisonList|\
+                            BooleanExpression|CustomAlgorithm",
+                ))
             }
         })
     }
@@ -23880,9 +27790,12 @@ impl ContextMatchChoice {
 pub enum DiscreteLookupChoice {
     /// A simple comparison check involving a single test of a parameter value.
     Comparison(ComparisonType),
-    /// A series of simple comparison checks with an implicit 'and' in that they all must be true for the overall condition to be true.
+    /// A series of simple comparison checks with an implicit 'and' in that they
+    /// all must be true for the overall condition to be true.
     ComparisonList(ComparisonListType),
-    /// An arbitrarily complex boolean expression that has additional flexibility on the terms beyond the Comparison and ComparisonList elements.
+    /// An arbitrarily complex boolean expression that has additional
+    /// flexibility on the terms beyond the Comparison and ComparisonList
+    /// elements.
     BooleanExpression(BooleanExpressionType),
     /// An escape to an externally defined algorithm.
     CustomAlgorithm(InputAlgorithmType),
@@ -23899,7 +27812,10 @@ impl DiscreteLookupChoice {
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
-            "Comparison" | "ComparisonList" | "BooleanExpression" | "CustomAlgorithm"
+            "Comparison"
+                | "ComparisonList"
+                | "BooleanExpression"
+                | "CustomAlgorithm"
         )
     }
 
@@ -23917,7 +27833,9 @@ impl DiscreteLookupChoice {
         match self {
             Self::Comparison(v) => v.write_xml(w, "Comparison")?,
             Self::ComparisonList(v) => v.write_xml(w, "ComparisonList")?,
-            Self::BooleanExpression(v) => v.write_xml(w, "BooleanExpression")?,
+            Self::BooleanExpression(v) => {
+                v.write_xml(w, "BooleanExpression")?
+            }
             Self::CustomAlgorithm(v) => v.write_xml(w, "CustomAlgorithm")?,
         }
         Ok(())
@@ -23927,12 +27845,15 @@ impl DiscreteLookupChoice {
         Ok(match r.peek_child()? {
             Some("Comparison") => Self::Comparison(r.read_child()?),
             Some("ComparisonList") => Self::ComparisonList(r.read_child()?),
-            Some("BooleanExpression") => Self::BooleanExpression(r.read_child()?),
+            Some("BooleanExpression") => {
+                Self::BooleanExpression(r.read_child()?)
+            }
             Some("CustomAlgorithm") => Self::CustomAlgorithm(r.read_child()?),
             _ => {
-                return Err(
-                    r.expected("Comparison|ComparisonList|BooleanExpression|CustomAlgorithm")
-                )
+                return Err(r.expected(
+                    "Comparison|ComparisonList|\
+                            BooleanExpression|CustomAlgorithm",
+                ))
             }
         })
     }
@@ -23941,13 +27862,18 @@ impl DiscreteLookupChoice {
 /// Alternatives of a `<choice>` in [`EncodingType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum EncodingChoice {
-    /// Binary encoding is typically a "pass through" raw encoding form where one of the more common encodings is not required for the parameter. A custom transformation capability is available if needed.
+    /// Binary encoding is typically a "pass through" raw encoding form where
+    /// one of the more common encodings is not required for the parameter. A
+    /// custom transformation capability is available if needed.
     BinaryDataEncoding(BinaryDataEncodingType),
-    /// Float encoding is a common encoding where the raw binary is in a form that gets interpreted as a decimal numeric value.
+    /// Float encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a decimal numeric value.
     FloatDataEncoding(FloatDataEncodingType),
-    /// Integer encoding is a common encoding where the raw binary is in a form that gets interpreted as an integral value, either signed or unsigned.
+    /// Integer encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as an integral value, either signed or unsigned.
     IntegerDataEncoding(IntegerDataEncodingType),
-    /// String encoding is a common encoding where the raw binary is in a form that gets interpreted as a character sequence.
+    /// String encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a character sequence.
     StringDataEncoding(StringDataEncodingType),
 }
 
@@ -23981,23 +27907,40 @@ impl EncodingChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::BinaryDataEncoding(v) => v.write_xml(w, "BinaryDataEncoding")?,
-            Self::FloatDataEncoding(v) => v.write_xml(w, "FloatDataEncoding")?,
-            Self::IntegerDataEncoding(v) => v.write_xml(w, "IntegerDataEncoding")?,
-            Self::StringDataEncoding(v) => v.write_xml(w, "StringDataEncoding")?,
+            Self::BinaryDataEncoding(v) => {
+                v.write_xml(w, "BinaryDataEncoding")?
+            }
+            Self::FloatDataEncoding(v) => {
+                v.write_xml(w, "FloatDataEncoding")?
+            }
+            Self::IntegerDataEncoding(v) => {
+                v.write_xml(w, "IntegerDataEncoding")?
+            }
+            Self::StringDataEncoding(v) => {
+                v.write_xml(w, "StringDataEncoding")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("BinaryDataEncoding") => Self::BinaryDataEncoding(r.read_child()?),
-            Some("FloatDataEncoding") => Self::FloatDataEncoding(r.read_child()?),
-            Some("IntegerDataEncoding") => Self::IntegerDataEncoding(r.read_child()?),
-            Some("StringDataEncoding") => Self::StringDataEncoding(r.read_child()?),
+            Some("BinaryDataEncoding") => {
+                Self::BinaryDataEncoding(r.read_child()?)
+            }
+            Some("FloatDataEncoding") => {
+                Self::FloatDataEncoding(r.read_child()?)
+            }
+            Some("IntegerDataEncoding") => {
+                Self::IntegerDataEncoding(r.read_child()?)
+            }
+            Some("StringDataEncoding") => {
+                Self::StringDataEncoding(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "BinaryDataEncoding|FloatDataEncoding|IntegerDataEncoding|StringDataEncoding",
+                    "BinaryDataEncoding|FloatDataEncoding|\
+                            IntegerDataEncoding|StringDataEncoding",
                 ))
             }
         })
@@ -24009,17 +27952,26 @@ impl EncodingChoice {
 pub enum EntryListChoice {
     /// Specify a Parameter to be a part of this container layout definition.
     ParameterRefEntry(ParameterRefEntryType),
-    /// Specify a portion of a Parameter to be a part of this container layout definition. This is used when the Parameter is reported in fractional parts in the container before being fully updated.
+    /// Specify a portion of a Parameter to be a part of this container layout
+    /// definition. This is used when the Parameter is reported in fractional
+    /// parts in the container before being fully updated.
     ParameterSegmentRefEntry(ParameterSegmentRefEntryType),
-    /// Specify the content of another Container to be a part of this container layout definition.
+    /// Specify the content of another Container to be a part of this container
+    /// layout definition.
     ContainerRefEntry(ContainerRefEntryType),
-    /// Specify a portion of another Container to be a part of this container layout definition.
+    /// Specify a portion of another Container to be a part of this container
+    /// layout definition.
     ContainerSegmentRefEntry(ContainerSegmentRefEntryType),
-    /// Specify a portion of a Stream to be a part of this container layout definition.
+    /// Specify a portion of a Stream to be a part of this container layout
+    /// definition.
     StreamSegmentEntry(StreamSegmentEntryType),
-    /// Specify a previous (not last reported) value of a Parmeter to be a part of this container layout definition.
+    /// Specify a previous (not last reported) value of a Parmeter to be a part
+    /// of this container layout definition.
     IndirectParameterRefEntry(IndirectParameterRefEntryType),
-    /// Specify an Array Type Parameter to be a part of this container layout definition when the Container does not populate the entire space of the Array contents. If the entire space of the Array is populated, a tolerant implementation will accept ParameterRefEntry also.
+    /// Specify an Array Type Parameter to be a part of this container layout
+    /// definition when the Container does not populate the entire space of the
+    /// Array contents. If the entire space of the Array is populated, a
+    /// tolerant implementation will accept ParameterRefEntry also.
     ArrayParameterRefEntry(ArrayParameterRefEntryType),
 }
 
@@ -24059,27 +28011,65 @@ impl EntryListChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::ParameterRefEntry(v) => v.write_xml(w, "ParameterRefEntry")?,
-            Self::ParameterSegmentRefEntry(v) => v.write_xml(w, "ParameterSegmentRefEntry")?,
-            Self::ContainerRefEntry(v) => v.write_xml(w, "ContainerRefEntry")?,
-            Self::ContainerSegmentRefEntry(v) => v.write_xml(w, "ContainerSegmentRefEntry")?,
-            Self::StreamSegmentEntry(v) => v.write_xml(w, "StreamSegmentEntry")?,
-            Self::IndirectParameterRefEntry(v) => v.write_xml(w, "IndirectParameterRefEntry")?,
-            Self::ArrayParameterRefEntry(v) => v.write_xml(w, "ArrayParameterRefEntry")?,
+            Self::ParameterRefEntry(v) => {
+                v.write_xml(w, "ParameterRefEntry")?
+            }
+            Self::ParameterSegmentRefEntry(v) => {
+                v.write_xml(w, "ParameterSegmentRefEntry")?
+            }
+            Self::ContainerRefEntry(v) => {
+                v.write_xml(w, "ContainerRefEntry")?
+            }
+            Self::ContainerSegmentRefEntry(v) => {
+                v.write_xml(w, "ContainerSegmentRefEntry")?
+            }
+            Self::StreamSegmentEntry(v) => {
+                v.write_xml(w, "StreamSegmentEntry")?
+            }
+            Self::IndirectParameterRefEntry(v) => {
+                v.write_xml(w, "IndirectParameterRefEntry")?
+            }
+            Self::ArrayParameterRefEntry(v) => {
+                v.write_xml(w, "ArrayParameterRefEntry")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("ParameterRefEntry") => Self::ParameterRefEntry(r.read_child()?),
-            Some("ParameterSegmentRefEntry") => Self::ParameterSegmentRefEntry(r.read_child()?),
-            Some("ContainerRefEntry") => Self::ContainerRefEntry(r.read_child()?),
-            Some("ContainerSegmentRefEntry") => Self::ContainerSegmentRefEntry(r.read_child()?),
-            Some("StreamSegmentEntry") => Self::StreamSegmentEntry(r.read_child()?),
-            Some("IndirectParameterRefEntry") => Self::IndirectParameterRefEntry(r.read_child()?),
-            Some("ArrayParameterRefEntry") => Self::ArrayParameterRefEntry(r.read_child()?),
-            _ => return Err(r.expected("ParameterRefEntry|ParameterSegmentRefEntry|ContainerRefEntry|ContainerSegmentRefEntry|StreamSegmentEntry|IndirectParameterRefEntry|ArrayParameterRefEntry")),
+            Some("ParameterRefEntry") => {
+                Self::ParameterRefEntry(r.read_child()?)
+            }
+            Some("ParameterSegmentRefEntry") => {
+                Self::ParameterSegmentRefEntry(r.read_child()?)
+            }
+            Some("ContainerRefEntry") => {
+                Self::ContainerRefEntry(r.read_child()?)
+            }
+            Some("ContainerSegmentRefEntry") => {
+                Self::ContainerSegmentRefEntry(r.read_child()?)
+            }
+            Some("StreamSegmentEntry") => {
+                Self::StreamSegmentEntry(r.read_child()?)
+            }
+            Some("IndirectParameterRefEntry") => {
+                Self::IndirectParameterRefEntry(r.read_child()?)
+            }
+            Some("ArrayParameterRefEntry") => {
+                Self::ArrayParameterRefEntry(r.read_child()?)
+            }
+            _ => {
+                return Err(r.expected(
+                    "ParameterRefEntry|\
+                            ParameterSegmentRefEntry|\
+ContainerRefEntry|\
+ContainerSegmentRefEntry|\
+StreamSegmentEntry|\
+IndirectParameterRefEntry|\
+ArrayParameterRefEntry",
+                ))
+            }
         })
     }
 }
@@ -24087,13 +28077,18 @@ impl EntryListChoice {
 /// Alternatives of a `<choice>` in [`EnumeratedArgumentType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum EnumeratedArgumentChoice {
-    /// Binary encoding is typically a "pass through" raw encoding form where one of the more common encodings is not required for the argument. A custom transformation capability is available if needed.
+    /// Binary encoding is typically a "pass through" raw encoding form where
+    /// one of the more common encodings is not required for the argument. A
+    /// custom transformation capability is available if needed.
     BinaryDataEncoding(ArgumentBinaryDataEncodingType),
-    /// Float encoding is a common encoding where the raw binary is in a form that gets interpreted as a decimal numeric value.
+    /// Float encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a decimal numeric value.
     FloatDataEncoding(FloatDataEncodingType),
-    /// Integer encoding is a common encoding where the raw binary is in a form that gets interpreted as an integral value, either signed or unsigned.
+    /// Integer encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as an integral value, either signed or unsigned.
     IntegerDataEncoding(IntegerDataEncodingType),
-    /// String encoding is a common encoding where the raw binary is in a form that gets interpreted as a character sequence.
+    /// String encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a character sequence.
     StringDataEncoding(ArgumentStringDataEncodingType),
 }
 
@@ -24127,23 +28122,40 @@ impl EnumeratedArgumentChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::BinaryDataEncoding(v) => v.write_xml(w, "BinaryDataEncoding")?,
-            Self::FloatDataEncoding(v) => v.write_xml(w, "FloatDataEncoding")?,
-            Self::IntegerDataEncoding(v) => v.write_xml(w, "IntegerDataEncoding")?,
-            Self::StringDataEncoding(v) => v.write_xml(w, "StringDataEncoding")?,
+            Self::BinaryDataEncoding(v) => {
+                v.write_xml(w, "BinaryDataEncoding")?
+            }
+            Self::FloatDataEncoding(v) => {
+                v.write_xml(w, "FloatDataEncoding")?
+            }
+            Self::IntegerDataEncoding(v) => {
+                v.write_xml(w, "IntegerDataEncoding")?
+            }
+            Self::StringDataEncoding(v) => {
+                v.write_xml(w, "StringDataEncoding")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("BinaryDataEncoding") => Self::BinaryDataEncoding(r.read_child()?),
-            Some("FloatDataEncoding") => Self::FloatDataEncoding(r.read_child()?),
-            Some("IntegerDataEncoding") => Self::IntegerDataEncoding(r.read_child()?),
-            Some("StringDataEncoding") => Self::StringDataEncoding(r.read_child()?),
+            Some("BinaryDataEncoding") => {
+                Self::BinaryDataEncoding(r.read_child()?)
+            }
+            Some("FloatDataEncoding") => {
+                Self::FloatDataEncoding(r.read_child()?)
+            }
+            Some("IntegerDataEncoding") => {
+                Self::IntegerDataEncoding(r.read_child()?)
+            }
+            Some("StringDataEncoding") => {
+                Self::StringDataEncoding(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "BinaryDataEncoding|FloatDataEncoding|IntegerDataEncoding|StringDataEncoding",
+                    "BinaryDataEncoding|FloatDataEncoding|\
+                            IntegerDataEncoding|StringDataEncoding",
                 ))
             }
         })
@@ -24153,13 +28165,18 @@ impl EnumeratedArgumentChoice {
 /// Alternatives of a `<choice>` in [`EnumeratedDataType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum EnumeratedDataChoice {
-    /// Binary encoding is typically a "pass through" raw encoding form where one of the more common encodings is not required for the parameter. A custom transformation capability is available if needed.
+    /// Binary encoding is typically a "pass through" raw encoding form where
+    /// one of the more common encodings is not required for the parameter. A
+    /// custom transformation capability is available if needed.
     BinaryDataEncoding(BinaryDataEncodingType),
-    /// Float encoding is a common encoding where the raw binary is in a form that gets interpreted as a decimal numeric value.
+    /// Float encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a decimal numeric value.
     FloatDataEncoding(FloatDataEncodingType),
-    /// Integer encoding is a common encoding where the raw binary is in a form that gets interpreted as an integral value, either signed or unsigned.
+    /// Integer encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as an integral value, either signed or unsigned.
     IntegerDataEncoding(IntegerDataEncodingType),
-    /// String encoding is a common encoding where the raw binary is in a form that gets interpreted as a character sequence.
+    /// String encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a character sequence.
     StringDataEncoding(StringDataEncodingType),
 }
 
@@ -24193,23 +28210,40 @@ impl EnumeratedDataChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::BinaryDataEncoding(v) => v.write_xml(w, "BinaryDataEncoding")?,
-            Self::FloatDataEncoding(v) => v.write_xml(w, "FloatDataEncoding")?,
-            Self::IntegerDataEncoding(v) => v.write_xml(w, "IntegerDataEncoding")?,
-            Self::StringDataEncoding(v) => v.write_xml(w, "StringDataEncoding")?,
+            Self::BinaryDataEncoding(v) => {
+                v.write_xml(w, "BinaryDataEncoding")?
+            }
+            Self::FloatDataEncoding(v) => {
+                v.write_xml(w, "FloatDataEncoding")?
+            }
+            Self::IntegerDataEncoding(v) => {
+                v.write_xml(w, "IntegerDataEncoding")?
+            }
+            Self::StringDataEncoding(v) => {
+                v.write_xml(w, "StringDataEncoding")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("BinaryDataEncoding") => Self::BinaryDataEncoding(r.read_child()?),
-            Some("FloatDataEncoding") => Self::FloatDataEncoding(r.read_child()?),
-            Some("IntegerDataEncoding") => Self::IntegerDataEncoding(r.read_child()?),
-            Some("StringDataEncoding") => Self::StringDataEncoding(r.read_child()?),
+            Some("BinaryDataEncoding") => {
+                Self::BinaryDataEncoding(r.read_child()?)
+            }
+            Some("FloatDataEncoding") => {
+                Self::FloatDataEncoding(r.read_child()?)
+            }
+            Some("IntegerDataEncoding") => {
+                Self::IntegerDataEncoding(r.read_child()?)
+            }
+            Some("StringDataEncoding") => {
+                Self::StringDataEncoding(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "BinaryDataEncoding|FloatDataEncoding|IntegerDataEncoding|StringDataEncoding",
+                    "BinaryDataEncoding|FloatDataEncoding|\
+                            IntegerDataEncoding|StringDataEncoding",
                 ))
             }
         })
@@ -24219,13 +28253,18 @@ impl EnumeratedDataChoice {
 /// Alternatives of a `<choice>` in [`EnumeratedParameterType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum EnumeratedParameterChoice {
-    /// Binary encoding is typically a "pass through" raw encoding form where one of the more common encodings is not required for the parameter. A custom transformation capability is available if needed.
+    /// Binary encoding is typically a "pass through" raw encoding form where
+    /// one of the more common encodings is not required for the parameter. A
+    /// custom transformation capability is available if needed.
     BinaryDataEncoding(BinaryDataEncodingType),
-    /// Float encoding is a common encoding where the raw binary is in a form that gets interpreted as a decimal numeric value.
+    /// Float encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a decimal numeric value.
     FloatDataEncoding(FloatDataEncodingType),
-    /// Integer encoding is a common encoding where the raw binary is in a form that gets interpreted as an integral value, either signed or unsigned.
+    /// Integer encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as an integral value, either signed or unsigned.
     IntegerDataEncoding(IntegerDataEncodingType),
-    /// String encoding is a common encoding where the raw binary is in a form that gets interpreted as a character sequence.
+    /// String encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a character sequence.
     StringDataEncoding(StringDataEncodingType),
 }
 
@@ -24259,23 +28298,40 @@ impl EnumeratedParameterChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::BinaryDataEncoding(v) => v.write_xml(w, "BinaryDataEncoding")?,
-            Self::FloatDataEncoding(v) => v.write_xml(w, "FloatDataEncoding")?,
-            Self::IntegerDataEncoding(v) => v.write_xml(w, "IntegerDataEncoding")?,
-            Self::StringDataEncoding(v) => v.write_xml(w, "StringDataEncoding")?,
+            Self::BinaryDataEncoding(v) => {
+                v.write_xml(w, "BinaryDataEncoding")?
+            }
+            Self::FloatDataEncoding(v) => {
+                v.write_xml(w, "FloatDataEncoding")?
+            }
+            Self::IntegerDataEncoding(v) => {
+                v.write_xml(w, "IntegerDataEncoding")?
+            }
+            Self::StringDataEncoding(v) => {
+                v.write_xml(w, "StringDataEncoding")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("BinaryDataEncoding") => Self::BinaryDataEncoding(r.read_child()?),
-            Some("FloatDataEncoding") => Self::FloatDataEncoding(r.read_child()?),
-            Some("IntegerDataEncoding") => Self::IntegerDataEncoding(r.read_child()?),
-            Some("StringDataEncoding") => Self::StringDataEncoding(r.read_child()?),
+            Some("BinaryDataEncoding") => {
+                Self::BinaryDataEncoding(r.read_child()?)
+            }
+            Some("FloatDataEncoding") => {
+                Self::FloatDataEncoding(r.read_child()?)
+            }
+            Some("IntegerDataEncoding") => {
+                Self::IntegerDataEncoding(r.read_child()?)
+            }
+            Some("StringDataEncoding") => {
+                Self::StringDataEncoding(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "BinaryDataEncoding|FloatDataEncoding|IntegerDataEncoding|StringDataEncoding",
+                    "BinaryDataEncoding|FloatDataEncoding|\
+                            IntegerDataEncoding|StringDataEncoding",
                 ))
             }
         })
@@ -24285,9 +28341,12 @@ impl EnumeratedParameterChoice {
 /// Alternatives of a `<choice>` in [`EnumerationAlarmType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum EnumerationAlarmChoice {
-    /// A MatchCriteria may be specified for each of the 5 alarm levels. Each level is optional and the alarm should be the highest level to test true.
+    /// A MatchCriteria may be specified for each of the 5 alarm levels. Each
+    /// level is optional and the alarm should be the highest level to test
+    /// true.
     AlarmConditions(AlarmConditionsType),
-    /// An escape for ridiculously complex alarm conditions. Will trigger on changes to the containing Parameter.
+    /// An escape for ridiculously complex alarm conditions. Will trigger on
+    /// changes to the containing Parameter.
     CustomAlarm(CustomAlarmType),
 }
 
@@ -24331,9 +28390,12 @@ impl EnumerationAlarmChoice {
 /// Alternatives of a `<choice>` in [`EnumerationContextAlarmType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum EnumerationContextAlarmChoice {
-    /// A MatchCriteria may be specified for each of the 5 alarm levels. Each level is optional and the alarm should be the highest level to test true.
+    /// A MatchCriteria may be specified for each of the 5 alarm levels. Each
+    /// level is optional and the alarm should be the highest level to test
+    /// true.
     AlarmConditions(AlarmConditionsType),
-    /// An escape for ridiculously complex alarm conditions. Will trigger on changes to the containing Parameter.
+    /// An escape for ridiculously complex alarm conditions. Will trigger on
+    /// changes to the containing Parameter.
     CustomAlarm(CustomAlarmType),
 }
 
@@ -24377,11 +28439,14 @@ impl EnumerationContextAlarmChoice {
 /// Alternatives of a `<choice>` in [`ErrorDetectCorrectType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum ErrorDetectCorrectChoice {
-    /// Describe checksum or hash function applied to all or part of this container definition.
+    /// Describe checksum or hash function applied to all or part of this
+    /// container definition.
     Checksum(ChecksumType),
-    /// Describe a Cyclic Redundancy Check (CRC) algorithm applied to all or part of this container definition.
+    /// Describe a Cyclic Redundancy Check (CRC) algorithm applied to all or
+    /// part of this container definition.
     CRC(CRCType),
-    /// Describe an "exclusive or" (XOR) checksum applied to all or part of this container definition.
+    /// Describe an "exclusive or" (XOR) checksum applied to all or part of this
+    /// container definition.
     XOR(XORType),
     /// Describe a parity applied to all or part of this container definition.
     Parity(ParityType),
@@ -24435,11 +28500,15 @@ impl ErrorDetectCorrectChoice {
 pub enum ExecutionVerifierChoice1 {
     /// Verification is a list of comparisons.
     ComparisonList(ComparisonListType),
-    /// Verification is a new instance of the referenced container. For example, sending a command to download memory then receiving a packet with the memory download would be verified upon receipt of the packet.
+    /// Verification is a new instance of the referenced container. For example,
+    /// sending a command to download memory then receiving a packet with the
+    /// memory download would be verified upon receipt of the packet.
     ContainerRef(ContainerRefType),
-    /// Verification is a telemetry parameter value change on the ground. For example, a command counter.
+    /// Verification is a telemetry parameter value change on the ground. For
+    /// example, a command counter.
     ParameterValueChange(ParameterValueChangeType),
-    /// Verification is outside the scope of regular command and telemetry processing.
+    /// Verification is outside the scope of regular command and telemetry
+    /// processing.
     CustomAlgorithm(InputAlgorithmType),
     /// Verification is a boolean expression of conditions.
     BooleanExpression(BooleanExpressionType),
@@ -24483,9 +28552,13 @@ impl ExecutionVerifierChoice1 {
         match self {
             Self::ComparisonList(v) => v.write_xml(w, "ComparisonList")?,
             Self::ContainerRef(v) => v.write_xml(w, "ContainerRef")?,
-            Self::ParameterValueChange(v) => v.write_xml(w, "ParameterValueChange")?,
+            Self::ParameterValueChange(v) => {
+                v.write_xml(w, "ParameterValueChange")?
+            }
             Self::CustomAlgorithm(v) => v.write_xml(w, "CustomAlgorithm")?,
-            Self::BooleanExpression(v) => v.write_xml(w, "BooleanExpression")?,
+            Self::BooleanExpression(v) => {
+                v.write_xml(w, "BooleanExpression")?
+            }
             Self::Comparison(v) => v.write_xml(w, "Comparison")?,
         }
         Ok(())
@@ -24495,11 +28568,21 @@ impl ExecutionVerifierChoice1 {
         Ok(match r.peek_child()? {
             Some("ComparisonList") => Self::ComparisonList(r.read_child()?),
             Some("ContainerRef") => Self::ContainerRef(r.read_child()?),
-            Some("ParameterValueChange") => Self::ParameterValueChange(r.read_child()?),
+            Some("ParameterValueChange") => {
+                Self::ParameterValueChange(r.read_child()?)
+            }
             Some("CustomAlgorithm") => Self::CustomAlgorithm(r.read_child()?),
-            Some("BooleanExpression") => Self::BooleanExpression(r.read_child()?),
+            Some("BooleanExpression") => {
+                Self::BooleanExpression(r.read_child()?)
+            }
             Some("Comparison") => Self::Comparison(r.read_child()?),
-            _ => return Err(r.expected("ComparisonList|ContainerRef|ParameterValueChange|CustomAlgorithm|BooleanExpression|Comparison")),
+            _ => {
+                return Err(r.expected(
+                    "ComparisonList|ContainerRef|\
+                            ParameterValueChange|CustomAlgorithm|\
+BooleanExpression|Comparison",
+                ))
+            }
         })
     }
 }
@@ -24536,7 +28619,9 @@ impl ExecutionVerifierChoice2 {
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::CheckWindow(v) => v.write_xml(w, "CheckWindow")?,
-            Self::CheckWindowAlgorithms(v) => v.write_xml(w, "CheckWindowAlgorithms")?,
+            Self::CheckWindowAlgorithms(v) => {
+                v.write_xml(w, "CheckWindowAlgorithms")?
+            }
         }
         Ok(())
     }
@@ -24544,7 +28629,9 @@ impl ExecutionVerifierChoice2 {
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("CheckWindow") => Self::CheckWindow(r.read_child()?),
-            Some("CheckWindowAlgorithms") => Self::CheckWindowAlgorithms(r.read_child()?),
+            Some("CheckWindowAlgorithms") => {
+                Self::CheckWindowAlgorithms(r.read_child()?)
+            }
             _ => return Err(r.expected("CheckWindow|CheckWindowAlgorithms")),
         })
     }
@@ -24555,11 +28642,15 @@ impl ExecutionVerifierChoice2 {
 pub enum FailedVerifierChoice1 {
     /// Verification is a list of comparisons.
     ComparisonList(ComparisonListType),
-    /// Verification is a new instance of the referenced container. For example, sending a command to download memory then receiving a packet with the memory download would be verified upon receipt of the packet.
+    /// Verification is a new instance of the referenced container. For example,
+    /// sending a command to download memory then receiving a packet with the
+    /// memory download would be verified upon receipt of the packet.
     ContainerRef(ContainerRefType),
-    /// Verification is a telemetry parameter value change on the ground. For example, a command counter.
+    /// Verification is a telemetry parameter value change on the ground. For
+    /// example, a command counter.
     ParameterValueChange(ParameterValueChangeType),
-    /// Verification is outside the scope of regular command and telemetry processing.
+    /// Verification is outside the scope of regular command and telemetry
+    /// processing.
     CustomAlgorithm(InputAlgorithmType),
     /// Verification is a boolean expression of conditions.
     BooleanExpression(BooleanExpressionType),
@@ -24603,9 +28694,13 @@ impl FailedVerifierChoice1 {
         match self {
             Self::ComparisonList(v) => v.write_xml(w, "ComparisonList")?,
             Self::ContainerRef(v) => v.write_xml(w, "ContainerRef")?,
-            Self::ParameterValueChange(v) => v.write_xml(w, "ParameterValueChange")?,
+            Self::ParameterValueChange(v) => {
+                v.write_xml(w, "ParameterValueChange")?
+            }
             Self::CustomAlgorithm(v) => v.write_xml(w, "CustomAlgorithm")?,
-            Self::BooleanExpression(v) => v.write_xml(w, "BooleanExpression")?,
+            Self::BooleanExpression(v) => {
+                v.write_xml(w, "BooleanExpression")?
+            }
             Self::Comparison(v) => v.write_xml(w, "Comparison")?,
         }
         Ok(())
@@ -24615,11 +28710,21 @@ impl FailedVerifierChoice1 {
         Ok(match r.peek_child()? {
             Some("ComparisonList") => Self::ComparisonList(r.read_child()?),
             Some("ContainerRef") => Self::ContainerRef(r.read_child()?),
-            Some("ParameterValueChange") => Self::ParameterValueChange(r.read_child()?),
+            Some("ParameterValueChange") => {
+                Self::ParameterValueChange(r.read_child()?)
+            }
             Some("CustomAlgorithm") => Self::CustomAlgorithm(r.read_child()?),
-            Some("BooleanExpression") => Self::BooleanExpression(r.read_child()?),
+            Some("BooleanExpression") => {
+                Self::BooleanExpression(r.read_child()?)
+            }
             Some("Comparison") => Self::Comparison(r.read_child()?),
-            _ => return Err(r.expected("ComparisonList|ContainerRef|ParameterValueChange|CustomAlgorithm|BooleanExpression|Comparison")),
+            _ => {
+                return Err(r.expected(
+                    "ComparisonList|ContainerRef|\
+                            ParameterValueChange|CustomAlgorithm|\
+BooleanExpression|Comparison",
+                ))
+            }
         })
     }
 }
@@ -24656,7 +28761,9 @@ impl FailedVerifierChoice2 {
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::CheckWindow(v) => v.write_xml(w, "CheckWindow")?,
-            Self::CheckWindowAlgorithms(v) => v.write_xml(w, "CheckWindowAlgorithms")?,
+            Self::CheckWindowAlgorithms(v) => {
+                v.write_xml(w, "CheckWindowAlgorithms")?
+            }
         }
         Ok(())
     }
@@ -24664,7 +28771,9 @@ impl FailedVerifierChoice2 {
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("CheckWindow") => Self::CheckWindow(r.read_child()?),
-            Some("CheckWindowAlgorithms") => Self::CheckWindowAlgorithms(r.read_child()?),
+            Some("CheckWindowAlgorithms") => {
+                Self::CheckWindowAlgorithms(r.read_child()?)
+            }
             _ => return Err(r.expected("CheckWindow|CheckWindowAlgorithms")),
         })
     }
@@ -24673,7 +28782,9 @@ impl FailedVerifierChoice2 {
 /// Alternatives of a `<choice>` in [`FixedFrameStreamType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum FixedFrameStreamChoice {
-    /// This Container (usually abstract) is the container that is in the fixed frame stream. Normally, this is a general container type from which many specific containers are inherited.
+    /// This Container (usually abstract) is the container that is in the fixed
+    /// frame stream. Normally, this is a general container type from which many
+    /// specific containers are inherited.
     ContainerRef(ContainerRefType),
     ServiceRef(ServiceRefType),
 }
@@ -24718,13 +28829,18 @@ impl FixedFrameStreamChoice {
 /// Alternatives of a `<choice>` in [`FloatArgumentType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum FloatArgumentChoice {
-    /// Binary encoding is typically a "pass through" raw encoding form where one of the more common encodings is not required for the argument. A custom transformation capability is available if needed.
+    /// Binary encoding is typically a "pass through" raw encoding form where
+    /// one of the more common encodings is not required for the argument. A
+    /// custom transformation capability is available if needed.
     BinaryDataEncoding(ArgumentBinaryDataEncodingType),
-    /// Float encoding is a common encoding where the raw binary is in a form that gets interpreted as a decimal numeric value.
+    /// Float encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a decimal numeric value.
     FloatDataEncoding(FloatDataEncodingType),
-    /// Integer encoding is a common encoding where the raw binary is in a form that gets interpreted as an integral value, either signed or unsigned.
+    /// Integer encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as an integral value, either signed or unsigned.
     IntegerDataEncoding(IntegerDataEncodingType),
-    /// String encoding is a common encoding where the raw binary is in a form that gets interpreted as a character sequence.
+    /// String encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a character sequence.
     StringDataEncoding(ArgumentStringDataEncodingType),
 }
 
@@ -24758,23 +28874,40 @@ impl FloatArgumentChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::BinaryDataEncoding(v) => v.write_xml(w, "BinaryDataEncoding")?,
-            Self::FloatDataEncoding(v) => v.write_xml(w, "FloatDataEncoding")?,
-            Self::IntegerDataEncoding(v) => v.write_xml(w, "IntegerDataEncoding")?,
-            Self::StringDataEncoding(v) => v.write_xml(w, "StringDataEncoding")?,
+            Self::BinaryDataEncoding(v) => {
+                v.write_xml(w, "BinaryDataEncoding")?
+            }
+            Self::FloatDataEncoding(v) => {
+                v.write_xml(w, "FloatDataEncoding")?
+            }
+            Self::IntegerDataEncoding(v) => {
+                v.write_xml(w, "IntegerDataEncoding")?
+            }
+            Self::StringDataEncoding(v) => {
+                v.write_xml(w, "StringDataEncoding")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("BinaryDataEncoding") => Self::BinaryDataEncoding(r.read_child()?),
-            Some("FloatDataEncoding") => Self::FloatDataEncoding(r.read_child()?),
-            Some("IntegerDataEncoding") => Self::IntegerDataEncoding(r.read_child()?),
-            Some("StringDataEncoding") => Self::StringDataEncoding(r.read_child()?),
+            Some("BinaryDataEncoding") => {
+                Self::BinaryDataEncoding(r.read_child()?)
+            }
+            Some("FloatDataEncoding") => {
+                Self::FloatDataEncoding(r.read_child()?)
+            }
+            Some("IntegerDataEncoding") => {
+                Self::IntegerDataEncoding(r.read_child()?)
+            }
+            Some("StringDataEncoding") => {
+                Self::StringDataEncoding(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "BinaryDataEncoding|FloatDataEncoding|IntegerDataEncoding|StringDataEncoding",
+                    "BinaryDataEncoding|FloatDataEncoding|\
+                            IntegerDataEncoding|StringDataEncoding",
                 ))
             }
         })
@@ -24784,13 +28917,18 @@ impl FloatArgumentChoice {
 /// Alternatives of a `<choice>` in [`FloatDataType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum FloatDataChoice {
-    /// Binary encoding is typically a "pass through" raw encoding form where one of the more common encodings is not required for the parameter. A custom transformation capability is available if needed.
+    /// Binary encoding is typically a "pass through" raw encoding form where
+    /// one of the more common encodings is not required for the parameter. A
+    /// custom transformation capability is available if needed.
     BinaryDataEncoding(BinaryDataEncodingType),
-    /// Float encoding is a common encoding where the raw binary is in a form that gets interpreted as a decimal numeric value.
+    /// Float encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a decimal numeric value.
     FloatDataEncoding(FloatDataEncodingType),
-    /// Integer encoding is a common encoding where the raw binary is in a form that gets interpreted as an integral value, either signed or unsigned.
+    /// Integer encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as an integral value, either signed or unsigned.
     IntegerDataEncoding(IntegerDataEncodingType),
-    /// String encoding is a common encoding where the raw binary is in a form that gets interpreted as a character sequence.
+    /// String encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a character sequence.
     StringDataEncoding(StringDataEncodingType),
 }
 
@@ -24824,23 +28962,40 @@ impl FloatDataChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::BinaryDataEncoding(v) => v.write_xml(w, "BinaryDataEncoding")?,
-            Self::FloatDataEncoding(v) => v.write_xml(w, "FloatDataEncoding")?,
-            Self::IntegerDataEncoding(v) => v.write_xml(w, "IntegerDataEncoding")?,
-            Self::StringDataEncoding(v) => v.write_xml(w, "StringDataEncoding")?,
+            Self::BinaryDataEncoding(v) => {
+                v.write_xml(w, "BinaryDataEncoding")?
+            }
+            Self::FloatDataEncoding(v) => {
+                v.write_xml(w, "FloatDataEncoding")?
+            }
+            Self::IntegerDataEncoding(v) => {
+                v.write_xml(w, "IntegerDataEncoding")?
+            }
+            Self::StringDataEncoding(v) => {
+                v.write_xml(w, "StringDataEncoding")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("BinaryDataEncoding") => Self::BinaryDataEncoding(r.read_child()?),
-            Some("FloatDataEncoding") => Self::FloatDataEncoding(r.read_child()?),
-            Some("IntegerDataEncoding") => Self::IntegerDataEncoding(r.read_child()?),
-            Some("StringDataEncoding") => Self::StringDataEncoding(r.read_child()?),
+            Some("BinaryDataEncoding") => {
+                Self::BinaryDataEncoding(r.read_child()?)
+            }
+            Some("FloatDataEncoding") => {
+                Self::FloatDataEncoding(r.read_child()?)
+            }
+            Some("IntegerDataEncoding") => {
+                Self::IntegerDataEncoding(r.read_child()?)
+            }
+            Some("StringDataEncoding") => {
+                Self::StringDataEncoding(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "BinaryDataEncoding|FloatDataEncoding|IntegerDataEncoding|StringDataEncoding",
+                    "BinaryDataEncoding|FloatDataEncoding|\
+                            IntegerDataEncoding|StringDataEncoding",
                 ))
             }
         })
@@ -24850,13 +29005,18 @@ impl FloatDataChoice {
 /// Alternatives of a `<choice>` in [`FloatParameterType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum FloatParameterChoice {
-    /// Binary encoding is typically a "pass through" raw encoding form where one of the more common encodings is not required for the parameter. A custom transformation capability is available if needed.
+    /// Binary encoding is typically a "pass through" raw encoding form where
+    /// one of the more common encodings is not required for the parameter. A
+    /// custom transformation capability is available if needed.
     BinaryDataEncoding(BinaryDataEncodingType),
-    /// Float encoding is a common encoding where the raw binary is in a form that gets interpreted as a decimal numeric value.
+    /// Float encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a decimal numeric value.
     FloatDataEncoding(FloatDataEncodingType),
-    /// Integer encoding is a common encoding where the raw binary is in a form that gets interpreted as an integral value, either signed or unsigned.
+    /// Integer encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as an integral value, either signed or unsigned.
     IntegerDataEncoding(IntegerDataEncodingType),
-    /// String encoding is a common encoding where the raw binary is in a form that gets interpreted as a character sequence.
+    /// String encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a character sequence.
     StringDataEncoding(StringDataEncodingType),
 }
 
@@ -24890,23 +29050,40 @@ impl FloatParameterChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::BinaryDataEncoding(v) => v.write_xml(w, "BinaryDataEncoding")?,
-            Self::FloatDataEncoding(v) => v.write_xml(w, "FloatDataEncoding")?,
-            Self::IntegerDataEncoding(v) => v.write_xml(w, "IntegerDataEncoding")?,
-            Self::StringDataEncoding(v) => v.write_xml(w, "StringDataEncoding")?,
+            Self::BinaryDataEncoding(v) => {
+                v.write_xml(w, "BinaryDataEncoding")?
+            }
+            Self::FloatDataEncoding(v) => {
+                v.write_xml(w, "FloatDataEncoding")?
+            }
+            Self::IntegerDataEncoding(v) => {
+                v.write_xml(w, "IntegerDataEncoding")?
+            }
+            Self::StringDataEncoding(v) => {
+                v.write_xml(w, "StringDataEncoding")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("BinaryDataEncoding") => Self::BinaryDataEncoding(r.read_child()?),
-            Some("FloatDataEncoding") => Self::FloatDataEncoding(r.read_child()?),
-            Some("IntegerDataEncoding") => Self::IntegerDataEncoding(r.read_child()?),
-            Some("StringDataEncoding") => Self::StringDataEncoding(r.read_child()?),
+            Some("BinaryDataEncoding") => {
+                Self::BinaryDataEncoding(r.read_child()?)
+            }
+            Some("FloatDataEncoding") => {
+                Self::FloatDataEncoding(r.read_child()?)
+            }
+            Some("IntegerDataEncoding") => {
+                Self::IntegerDataEncoding(r.read_child()?)
+            }
+            Some("StringDataEncoding") => {
+                Self::StringDataEncoding(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "BinaryDataEncoding|FloatDataEncoding|IntegerDataEncoding|StringDataEncoding",
+                    "BinaryDataEncoding|FloatDataEncoding|\
+                            IntegerDataEncoding|StringDataEncoding",
                 ))
             }
         })
@@ -24916,7 +29093,9 @@ impl FloatParameterChoice {
 /// Alternatives of a `<choice>` in [`FrameStreamType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum FrameStreamChoice {
-    /// This Container (usually abstract) is the container that is in the fixed frame stream. Normally, this is a general container type from which many specific containers are inherited.
+    /// This Container (usually abstract) is the container that is in the fixed
+    /// frame stream. Normally, this is a general container type from which many
+    /// specific containers are inherited.
     ContainerRef(ContainerRefType),
     ServiceRef(ServiceRefType),
 }
@@ -24989,7 +29168,9 @@ impl InputSetChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::InputParameterInstanceRef(v) => v.write_xml(w, "InputParameterInstanceRef")?,
+            Self::InputParameterInstanceRef(v) => {
+                v.write_xml(w, "InputParameterInstanceRef")?
+            }
             Self::Constant(v) => v.write_xml(w, "Constant")?,
         }
         Ok(())
@@ -24997,7 +29178,9 @@ impl InputSetChoice {
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("InputParameterInstanceRef") => Self::InputParameterInstanceRef(r.read_child()?),
+            Some("InputParameterInstanceRef") => {
+                Self::InputParameterInstanceRef(r.read_child()?)
+            }
             Some("Constant") => Self::Constant(r.read_child()?),
             _ => return Err(r.expected("InputParameterInstanceRef|Constant")),
         })
@@ -25007,13 +29190,18 @@ impl InputSetChoice {
 /// Alternatives of a `<choice>` in [`IntegerArgumentType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum IntegerArgumentChoice {
-    /// Binary encoding is typically a "pass through" raw encoding form where one of the more common encodings is not required for the argument. A custom transformation capability is available if needed.
+    /// Binary encoding is typically a "pass through" raw encoding form where
+    /// one of the more common encodings is not required for the argument. A
+    /// custom transformation capability is available if needed.
     BinaryDataEncoding(ArgumentBinaryDataEncodingType),
-    /// Float encoding is a common encoding where the raw binary is in a form that gets interpreted as a decimal numeric value.
+    /// Float encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a decimal numeric value.
     FloatDataEncoding(FloatDataEncodingType),
-    /// Integer encoding is a common encoding where the raw binary is in a form that gets interpreted as an integral value, either signed or unsigned.
+    /// Integer encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as an integral value, either signed or unsigned.
     IntegerDataEncoding(IntegerDataEncodingType),
-    /// String encoding is a common encoding where the raw binary is in a form that gets interpreted as a character sequence.
+    /// String encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a character sequence.
     StringDataEncoding(ArgumentStringDataEncodingType),
 }
 
@@ -25047,23 +29235,40 @@ impl IntegerArgumentChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::BinaryDataEncoding(v) => v.write_xml(w, "BinaryDataEncoding")?,
-            Self::FloatDataEncoding(v) => v.write_xml(w, "FloatDataEncoding")?,
-            Self::IntegerDataEncoding(v) => v.write_xml(w, "IntegerDataEncoding")?,
-            Self::StringDataEncoding(v) => v.write_xml(w, "StringDataEncoding")?,
+            Self::BinaryDataEncoding(v) => {
+                v.write_xml(w, "BinaryDataEncoding")?
+            }
+            Self::FloatDataEncoding(v) => {
+                v.write_xml(w, "FloatDataEncoding")?
+            }
+            Self::IntegerDataEncoding(v) => {
+                v.write_xml(w, "IntegerDataEncoding")?
+            }
+            Self::StringDataEncoding(v) => {
+                v.write_xml(w, "StringDataEncoding")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("BinaryDataEncoding") => Self::BinaryDataEncoding(r.read_child()?),
-            Some("FloatDataEncoding") => Self::FloatDataEncoding(r.read_child()?),
-            Some("IntegerDataEncoding") => Self::IntegerDataEncoding(r.read_child()?),
-            Some("StringDataEncoding") => Self::StringDataEncoding(r.read_child()?),
+            Some("BinaryDataEncoding") => {
+                Self::BinaryDataEncoding(r.read_child()?)
+            }
+            Some("FloatDataEncoding") => {
+                Self::FloatDataEncoding(r.read_child()?)
+            }
+            Some("IntegerDataEncoding") => {
+                Self::IntegerDataEncoding(r.read_child()?)
+            }
+            Some("StringDataEncoding") => {
+                Self::StringDataEncoding(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "BinaryDataEncoding|FloatDataEncoding|IntegerDataEncoding|StringDataEncoding",
+                    "BinaryDataEncoding|FloatDataEncoding|\
+                            IntegerDataEncoding|StringDataEncoding",
                 ))
             }
         })
@@ -25073,13 +29278,18 @@ impl IntegerArgumentChoice {
 /// Alternatives of a `<choice>` in [`IntegerDataType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum IntegerDataChoice {
-    /// Binary encoding is typically a "pass through" raw encoding form where one of the more common encodings is not required for the parameter. A custom transformation capability is available if needed.
+    /// Binary encoding is typically a "pass through" raw encoding form where
+    /// one of the more common encodings is not required for the parameter. A
+    /// custom transformation capability is available if needed.
     BinaryDataEncoding(BinaryDataEncodingType),
-    /// Float encoding is a common encoding where the raw binary is in a form that gets interpreted as a decimal numeric value.
+    /// Float encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a decimal numeric value.
     FloatDataEncoding(FloatDataEncodingType),
-    /// Integer encoding is a common encoding where the raw binary is in a form that gets interpreted as an integral value, either signed or unsigned.
+    /// Integer encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as an integral value, either signed or unsigned.
     IntegerDataEncoding(IntegerDataEncodingType),
-    /// String encoding is a common encoding where the raw binary is in a form that gets interpreted as a character sequence.
+    /// String encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a character sequence.
     StringDataEncoding(StringDataEncodingType),
 }
 
@@ -25113,23 +29323,40 @@ impl IntegerDataChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::BinaryDataEncoding(v) => v.write_xml(w, "BinaryDataEncoding")?,
-            Self::FloatDataEncoding(v) => v.write_xml(w, "FloatDataEncoding")?,
-            Self::IntegerDataEncoding(v) => v.write_xml(w, "IntegerDataEncoding")?,
-            Self::StringDataEncoding(v) => v.write_xml(w, "StringDataEncoding")?,
+            Self::BinaryDataEncoding(v) => {
+                v.write_xml(w, "BinaryDataEncoding")?
+            }
+            Self::FloatDataEncoding(v) => {
+                v.write_xml(w, "FloatDataEncoding")?
+            }
+            Self::IntegerDataEncoding(v) => {
+                v.write_xml(w, "IntegerDataEncoding")?
+            }
+            Self::StringDataEncoding(v) => {
+                v.write_xml(w, "StringDataEncoding")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("BinaryDataEncoding") => Self::BinaryDataEncoding(r.read_child()?),
-            Some("FloatDataEncoding") => Self::FloatDataEncoding(r.read_child()?),
-            Some("IntegerDataEncoding") => Self::IntegerDataEncoding(r.read_child()?),
-            Some("StringDataEncoding") => Self::StringDataEncoding(r.read_child()?),
+            Some("BinaryDataEncoding") => {
+                Self::BinaryDataEncoding(r.read_child()?)
+            }
+            Some("FloatDataEncoding") => {
+                Self::FloatDataEncoding(r.read_child()?)
+            }
+            Some("IntegerDataEncoding") => {
+                Self::IntegerDataEncoding(r.read_child()?)
+            }
+            Some("StringDataEncoding") => {
+                Self::StringDataEncoding(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "BinaryDataEncoding|FloatDataEncoding|IntegerDataEncoding|StringDataEncoding",
+                    "BinaryDataEncoding|FloatDataEncoding|\
+                            IntegerDataEncoding|StringDataEncoding",
                 ))
             }
         })
@@ -25139,13 +29366,18 @@ impl IntegerDataChoice {
 /// Alternatives of a `<choice>` in [`IntegerParameterType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum IntegerParameterChoice {
-    /// Binary encoding is typically a "pass through" raw encoding form where one of the more common encodings is not required for the parameter. A custom transformation capability is available if needed.
+    /// Binary encoding is typically a "pass through" raw encoding form where
+    /// one of the more common encodings is not required for the parameter. A
+    /// custom transformation capability is available if needed.
     BinaryDataEncoding(BinaryDataEncodingType),
-    /// Float encoding is a common encoding where the raw binary is in a form that gets interpreted as a decimal numeric value.
+    /// Float encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a decimal numeric value.
     FloatDataEncoding(FloatDataEncodingType),
-    /// Integer encoding is a common encoding where the raw binary is in a form that gets interpreted as an integral value, either signed or unsigned.
+    /// Integer encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as an integral value, either signed or unsigned.
     IntegerDataEncoding(IntegerDataEncodingType),
-    /// String encoding is a common encoding where the raw binary is in a form that gets interpreted as a character sequence.
+    /// String encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a character sequence.
     StringDataEncoding(StringDataEncodingType),
 }
 
@@ -25179,23 +29411,40 @@ impl IntegerParameterChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::BinaryDataEncoding(v) => v.write_xml(w, "BinaryDataEncoding")?,
-            Self::FloatDataEncoding(v) => v.write_xml(w, "FloatDataEncoding")?,
-            Self::IntegerDataEncoding(v) => v.write_xml(w, "IntegerDataEncoding")?,
-            Self::StringDataEncoding(v) => v.write_xml(w, "StringDataEncoding")?,
+            Self::BinaryDataEncoding(v) => {
+                v.write_xml(w, "BinaryDataEncoding")?
+            }
+            Self::FloatDataEncoding(v) => {
+                v.write_xml(w, "FloatDataEncoding")?
+            }
+            Self::IntegerDataEncoding(v) => {
+                v.write_xml(w, "IntegerDataEncoding")?
+            }
+            Self::StringDataEncoding(v) => {
+                v.write_xml(w, "StringDataEncoding")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("BinaryDataEncoding") => Self::BinaryDataEncoding(r.read_child()?),
-            Some("FloatDataEncoding") => Self::FloatDataEncoding(r.read_child()?),
-            Some("IntegerDataEncoding") => Self::IntegerDataEncoding(r.read_child()?),
-            Some("StringDataEncoding") => Self::StringDataEncoding(r.read_child()?),
+            Some("BinaryDataEncoding") => {
+                Self::BinaryDataEncoding(r.read_child()?)
+            }
+            Some("FloatDataEncoding") => {
+                Self::FloatDataEncoding(r.read_child()?)
+            }
+            Some("IntegerDataEncoding") => {
+                Self::IntegerDataEncoding(r.read_child()?)
+            }
+            Some("StringDataEncoding") => {
+                Self::StringDataEncoding(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "BinaryDataEncoding|FloatDataEncoding|IntegerDataEncoding|StringDataEncoding",
+                    "BinaryDataEncoding|FloatDataEncoding|\
+                            IntegerDataEncoding|StringDataEncoding",
                 ))
             }
         })
@@ -25209,7 +29458,9 @@ pub enum IntegerValueChoice {
     FixedValue(i64),
     /// Determine the value by interrogating an instance of a parameter.
     DynamicValue(DynamicValueType),
-    /// Determine the value by interrogating an instance of a parameter and selecting a specified value based on tests of the value of that parameter.
+    /// Determine the value by interrogating an instance of a parameter and
+    /// selecting a specified value based on tests of the value of that
+    /// parameter.
     DiscreteLookupList(DiscreteLookupListType),
 }
 
@@ -25238,7 +29489,9 @@ impl IntegerValueChoice {
         match self {
             Self::FixedValue(v) => w.leaf("FixedValue", v),
             Self::DynamicValue(v) => v.write_xml(w, "DynamicValue")?,
-            Self::DiscreteLookupList(v) => v.write_xml(w, "DiscreteLookupList")?,
+            Self::DiscreteLookupList(v) => {
+                v.write_xml(w, "DiscreteLookupList")?
+            }
         }
         Ok(())
     }
@@ -25247,8 +29500,15 @@ impl IntegerValueChoice {
         Ok(match r.peek_child()? {
             Some("FixedValue") => Self::FixedValue(r.read_leaf()?),
             Some("DynamicValue") => Self::DynamicValue(r.read_child()?),
-            Some("DiscreteLookupList") => Self::DiscreteLookupList(r.read_child()?),
-            _ => return Err(r.expected("FixedValue|DynamicValue|DiscreteLookupList")),
+            Some("DiscreteLookupList") => {
+                Self::DiscreteLookupList(r.read_child()?)
+            }
+            _ => {
+                return Err(r.expected(
+                    "FixedValue|DynamicValue|\
+                            DiscreteLookupList",
+                ))
+            }
         })
     }
 }
@@ -25260,7 +29520,9 @@ pub enum LocationInContainerInBitsChoice {
     FixedValue(i64),
     /// Determine the value by interrogating an instance of a parameter.
     DynamicValue(DynamicValueType),
-    /// Determine the value by interrogating an instance of a parameter and selecting a specified value based on tests of the value of that parameter.
+    /// Determine the value by interrogating an instance of a parameter and
+    /// selecting a specified value based on tests of the value of that
+    /// parameter.
     DiscreteLookupList(DiscreteLookupListType),
 }
 
@@ -25289,7 +29551,9 @@ impl LocationInContainerInBitsChoice {
         match self {
             Self::FixedValue(v) => w.leaf("FixedValue", v),
             Self::DynamicValue(v) => v.write_xml(w, "DynamicValue")?,
-            Self::DiscreteLookupList(v) => v.write_xml(w, "DiscreteLookupList")?,
+            Self::DiscreteLookupList(v) => {
+                v.write_xml(w, "DiscreteLookupList")?
+            }
         }
         Ok(())
     }
@@ -25298,8 +29562,15 @@ impl LocationInContainerInBitsChoice {
         Ok(match r.peek_child()? {
             Some("FixedValue") => Self::FixedValue(r.read_leaf()?),
             Some("DynamicValue") => Self::DynamicValue(r.read_child()?),
-            Some("DiscreteLookupList") => Self::DiscreteLookupList(r.read_child()?),
-            _ => return Err(r.expected("FixedValue|DynamicValue|DiscreteLookupList")),
+            Some("DiscreteLookupList") => {
+                Self::DiscreteLookupList(r.read_child()?)
+            }
+            _ => {
+                return Err(r.expected(
+                    "FixedValue|DynamicValue|\
+                            DiscreteLookupList",
+                ))
+            }
         })
     }
 }
@@ -25309,9 +29580,12 @@ impl LocationInContainerInBitsChoice {
 pub enum MatchCriteriaChoice {
     /// A simple comparison check involving a single test of a parameter value.
     Comparison(ComparisonType),
-    /// A series of simple comparison checks with an implicit 'and' in that they all must be true for the overall condition to be true.
+    /// A series of simple comparison checks with an implicit 'and' in that they
+    /// all must be true for the overall condition to be true.
     ComparisonList(ComparisonListType),
-    /// An arbitrarily complex boolean expression that has additional flexibility on the terms beyond the Comparison and ComparisonList elements.
+    /// An arbitrarily complex boolean expression that has additional
+    /// flexibility on the terms beyond the Comparison and ComparisonList
+    /// elements.
     BooleanExpression(BooleanExpressionType),
     /// An escape to an externally defined algorithm.
     CustomAlgorithm(InputAlgorithmType),
@@ -25328,7 +29602,10 @@ impl MatchCriteriaChoice {
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
-            "Comparison" | "ComparisonList" | "BooleanExpression" | "CustomAlgorithm"
+            "Comparison"
+                | "ComparisonList"
+                | "BooleanExpression"
+                | "CustomAlgorithm"
         )
     }
 
@@ -25346,7 +29623,9 @@ impl MatchCriteriaChoice {
         match self {
             Self::Comparison(v) => v.write_xml(w, "Comparison")?,
             Self::ComparisonList(v) => v.write_xml(w, "ComparisonList")?,
-            Self::BooleanExpression(v) => v.write_xml(w, "BooleanExpression")?,
+            Self::BooleanExpression(v) => {
+                v.write_xml(w, "BooleanExpression")?
+            }
             Self::CustomAlgorithm(v) => v.write_xml(w, "CustomAlgorithm")?,
         }
         Ok(())
@@ -25356,12 +29635,15 @@ impl MatchCriteriaChoice {
         Ok(match r.peek_child()? {
             Some("Comparison") => Self::Comparison(r.read_child()?),
             Some("ComparisonList") => Self::ComparisonList(r.read_child()?),
-            Some("BooleanExpression") => Self::BooleanExpression(r.read_child()?),
+            Some("BooleanExpression") => {
+                Self::BooleanExpression(r.read_child()?)
+            }
             Some("CustomAlgorithm") => Self::CustomAlgorithm(r.read_child()?),
             _ => {
-                return Err(
-                    r.expected("Comparison|ComparisonList|BooleanExpression|CustomAlgorithm")
-                )
+                return Err(r.expected(
+                    "Comparison|ComparisonList|\
+                            BooleanExpression|CustomAlgorithm",
+                ))
             }
         })
     }
@@ -25372,11 +29654,19 @@ impl MatchCriteriaChoice {
 pub enum MathOperationCalibratorChoice {
     /// Use a constant in the calculation.
     ValueOperand(String),
-    /// Use the value of this parameter in the calculation. It is the calibrator's value only. If the raw value is needed, specify it explicitly using ParameterInstanceRefOperand. Note this element has no content.
+    /// Use the value of this parameter in the calculation. It is the
+    /// calibrator's value only. If the raw value is needed, specify it
+    /// explicitly using ParameterInstanceRefOperand. Note this element has no
+    /// content.
     ThisParameterOperand(String),
-    /// All operators utilize operands on the top values in the stack and leaving the result on the top of the stack. Ternary operators utilize the top three operands on the stack, binary operators utilize the top two operands on the stack, and unary operators use the top operand on the stack.
+    /// All operators utilize operands on the top values in the stack and
+    /// leaving the result on the top of the stack. Ternary operators utilize
+    /// the top three operands on the stack, binary operators utilize the top
+    /// two operands on the stack, and unary operators use the top operand on
+    /// the stack.
     Operator(MathOperatorsType),
-    /// This element is used to reference the last received/assigned value of any Parameter in this math operation.
+    /// This element is used to reference the last received/assigned value of
+    /// any Parameter in this math operation.
     ParameterInstanceRefOperand(ParameterInstanceRefType),
 }
 
@@ -25391,7 +29681,10 @@ impl MathOperationCalibratorChoice {
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
-            "ValueOperand" | "ThisParameterOperand" | "Operator" | "ParameterInstanceRefOperand"
+            "ValueOperand"
+                | "ThisParameterOperand"
+                | "Operator"
+                | "ParameterInstanceRefOperand"
         )
     }
 
@@ -25401,7 +29694,9 @@ impl MathOperationCalibratorChoice {
             Self::ValueOperand(_) => "ValueOperand",
             Self::ThisParameterOperand(_) => "ThisParameterOperand",
             Self::Operator(_) => "Operator",
-            Self::ParameterInstanceRefOperand(_) => "ParameterInstanceRefOperand",
+            Self::ParameterInstanceRefOperand(_) => {
+                "ParameterInstanceRefOperand"
+            }
         }
     }
 
@@ -25420,14 +29715,17 @@ impl MathOperationCalibratorChoice {
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("ValueOperand") => Self::ValueOperand(r.read_leaf()?),
-            Some("ThisParameterOperand") => Self::ThisParameterOperand(r.read_leaf()?),
+            Some("ThisParameterOperand") => {
+                Self::ThisParameterOperand(r.read_leaf()?)
+            }
             Some("Operator") => Self::Operator(r.read_leaf()?),
             Some("ParameterInstanceRefOperand") => {
                 Self::ParameterInstanceRefOperand(r.read_child()?)
             }
             _ => {
                 return Err(r.expected(
-                    "ValueOperand|ThisParameterOperand|Operator|ParameterInstanceRefOperand",
+                    "ValueOperand|ThisParameterOperand|\
+                            Operator|ParameterInstanceRefOperand",
                 ))
             }
         })
@@ -25439,11 +29737,19 @@ impl MathOperationCalibratorChoice {
 pub enum MathOperationChoice {
     /// Use a constant in the calculation.
     ValueOperand(String),
-    /// Use the value of this parameter in the calculation. It is the calibrator's value only. If the raw value is needed, specify it explicitly using ParameterInstanceRefOperand. Note this element has no content.
+    /// Use the value of this parameter in the calculation. It is the
+    /// calibrator's value only. If the raw value is needed, specify it
+    /// explicitly using ParameterInstanceRefOperand. Note this element has no
+    /// content.
     ThisParameterOperand(String),
-    /// All operators utilize operands on the top values in the stack and leaving the result on the top of the stack. Ternary operators utilize the top three operands on the stack, binary operators utilize the top two operands on the stack, and unary operators use the top operand on the stack.
+    /// All operators utilize operands on the top values in the stack and
+    /// leaving the result on the top of the stack. Ternary operators utilize
+    /// the top three operands on the stack, binary operators utilize the top
+    /// two operands on the stack, and unary operators use the top operand on
+    /// the stack.
     Operator(MathOperatorsType),
-    /// This element is used to reference the last received/assigned value of any Parameter in this math operation.
+    /// This element is used to reference the last received/assigned value of
+    /// any Parameter in this math operation.
     ParameterInstanceRefOperand(ParameterInstanceRefType),
 }
 
@@ -25458,7 +29764,10 @@ impl MathOperationChoice {
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
-            "ValueOperand" | "ThisParameterOperand" | "Operator" | "ParameterInstanceRefOperand"
+            "ValueOperand"
+                | "ThisParameterOperand"
+                | "Operator"
+                | "ParameterInstanceRefOperand"
         )
     }
 
@@ -25468,7 +29777,9 @@ impl MathOperationChoice {
             Self::ValueOperand(_) => "ValueOperand",
             Self::ThisParameterOperand(_) => "ThisParameterOperand",
             Self::Operator(_) => "Operator",
-            Self::ParameterInstanceRefOperand(_) => "ParameterInstanceRefOperand",
+            Self::ParameterInstanceRefOperand(_) => {
+                "ParameterInstanceRefOperand"
+            }
         }
     }
 
@@ -25487,14 +29798,17 @@ impl MathOperationChoice {
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("ValueOperand") => Self::ValueOperand(r.read_leaf()?),
-            Some("ThisParameterOperand") => Self::ThisParameterOperand(r.read_leaf()?),
+            Some("ThisParameterOperand") => {
+                Self::ThisParameterOperand(r.read_leaf()?)
+            }
             Some("Operator") => Self::Operator(r.read_leaf()?),
             Some("ParameterInstanceRefOperand") => {
                 Self::ParameterInstanceRefOperand(r.read_child()?)
             }
             _ => {
                 return Err(r.expected(
-                    "ValueOperand|ThisParameterOperand|Operator|ParameterInstanceRefOperand",
+                    "ValueOperand|ThisParameterOperand|\
+                            Operator|ParameterInstanceRefOperand",
                 ))
             }
         })
@@ -25504,11 +29818,14 @@ impl MathOperationChoice {
 /// Alternatives of a `<choice>` in [`MetaCommandSetType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum MetaCommandSetChoice {
-    /// All atomic commands to be sent on this mission are listed here. In addition this area has verification and validation information.
+    /// All atomic commands to be sent on this mission are listed here. In
+    /// addition this area has verification and validation information.
     MetaCommand(MetaCommandType),
-    /// Used to include a MetaCommand defined in another sub-system in this sub-system.
+    /// Used to include a MetaCommand defined in another sub-system in this
+    /// sub-system.
     MetaCommandRef(String),
-    /// Used to define a command that includes more than one atomic MetaCommand definition.
+    /// Used to define a command that includes more than one atomic MetaCommand
+    /// definition.
     BlockMetaCommand(BlockMetaCommandType),
 }
 
@@ -25547,7 +29864,12 @@ impl MetaCommandSetChoice {
             Some("MetaCommand") => Self::MetaCommand(r.read_child()?),
             Some("MetaCommandRef") => Self::MetaCommandRef(r.read_leaf()?),
             Some("BlockMetaCommand") => Self::BlockMetaCommand(r.read_child()?),
-            _ => return Err(r.expected("MetaCommand|MetaCommandRef|BlockMetaCommand")),
+            _ => {
+                return Err(r.expected(
+                    "MetaCommand|MetaCommandRef|\
+                            BlockMetaCommand",
+                ))
+            }
         })
     }
 }
@@ -25555,9 +29877,12 @@ impl MetaCommandSetChoice {
 /// Alternatives of a `<choice>` in [`NumericAlarmType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum NumericAlarmChoice {
-    /// A MatchCriteria may be specified for each of the 5 alarm levels. Each level is optional and the alarm should be the highest level to test true.
+    /// A MatchCriteria may be specified for each of the 5 alarm levels. Each
+    /// level is optional and the alarm should be the highest level to test
+    /// true.
     AlarmConditions(AlarmConditionsType),
-    /// An escape for ridiculously complex alarm conditions. Will trigger on changes to the containing Parameter.
+    /// An escape for ridiculously complex alarm conditions. Will trigger on
+    /// changes to the containing Parameter.
     CustomAlarm(CustomAlarmType),
 }
 
@@ -25601,9 +29926,12 @@ impl NumericAlarmChoice {
 /// Alternatives of a `<choice>` in [`NumericContextAlarmType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum NumericContextAlarmChoice {
-    /// A MatchCriteria may be specified for each of the 5 alarm levels. Each level is optional and the alarm should be the highest level to test true.
+    /// A MatchCriteria may be specified for each of the 5 alarm levels. Each
+    /// level is optional and the alarm should be the highest level to test
+    /// true.
     AlarmConditions(AlarmConditionsType),
-    /// An escape for ridiculously complex alarm conditions. Will trigger on changes to the containing Parameter.
+    /// An escape for ridiculously complex alarm conditions. Will trigger on
+    /// changes to the containing Parameter.
     CustomAlarm(CustomAlarmType),
 }
 
@@ -25647,9 +29975,13 @@ impl NumericContextAlarmChoice {
 /// Alternatives of a `<choice>` in [`ORedConditionsType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum ORedConditionsChoice {
-    /// Condition elements describe a test similar to the Comparison element except that the parameters used have additional flexibility for the compare.
+    /// Condition elements describe a test similar to the Comparison element
+    /// except that the parameters used have additional flexibility for the
+    /// compare.
     Condition(ComparisonCheckType),
-    /// This element describes tests similar to the ComparisonList element except that the parameters used are more flexible and the and/or for multiple checks can be specified.
+    /// This element describes tests similar to the ComparisonList element
+    /// except that the parameters used are more flexible and the and/or for
+    /// multiple checks can be specified.
     ANDedConditions(Box<ANDedConditionsType>),
 }
 
@@ -25695,7 +30027,8 @@ impl ORedConditionsChoice {
 pub enum ParameterSetChoice {
     /// Defines a named and typed Parameter.
     Parameter(ParameterType),
-    /// Used to include a Parameter defined in another sub-system in this sub-system.
+    /// Used to include a Parameter defined in another sub-system in this
+    /// sub-system.
     ParameterRef(ParameterRefType),
 }
 
@@ -25739,9 +30072,15 @@ impl ParameterSetChoice {
 /// Alternatives of a `<choice>` in [`ParameterToSetType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParameterToSetChoice {
-    /// Specify a simple algorithm to use to set the target Parameter value. See ArgumentMathOperationType.
+    /// Specify a simple algorithm to use to set the target Parameter value. See
+    /// ArgumentMathOperationType.
     Derivation(ArgumentMathOperationType),
-    /// Specify value as a string compliant with the XML schema (xs) type specified for each XTCE type: integer=xs:integer; float=xs:double; string=xs:string; boolean=xs:boolean; binary=xs:hexBinary; enum=xs:string from EnumerationList; relative time= xs:duration; absolute time=xs:dateTime. Supplied value must be within the ValidRange specified for the Parameter and appropriate for the type.
+    /// Specify value as a string compliant with the XML schema (xs) type
+    /// specified for each XTCE type: integer=xs:integer; float=xs:double;
+    /// string=xs:string; boolean=xs:boolean; binary=xs:hexBinary;
+    /// enum=xs:string from EnumerationList; relative time= xs:duration;
+    /// absolute time=xs:dateTime. Supplied value must be within the ValidRange
+    /// specified for the Parameter and appropriate for the type.
     NewValue(String),
 }
 
@@ -25785,25 +30124,35 @@ impl ParameterToSetChoice {
 /// Alternatives of a `<choice>` in [`ParameterTypeSetType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParameterTypeSetChoice {
-    /// Describe a parameter type that has an engineering/calibrated value in the form of a character string.
+    /// Describe a parameter type that has an engineering/calibrated value in
+    /// the form of a character string.
     StringParameterType(StringParameterType),
-    /// Describe a parameter type that has an engineering/calibrated value in the form of an enumeration.
+    /// Describe a parameter type that has an engineering/calibrated value in
+    /// the form of an enumeration.
     EnumeratedParameterType(EnumeratedParameterType),
-    /// Describe a parameter type that has an engineering/calibrated value in the form of an integer.
+    /// Describe a parameter type that has an engineering/calibrated value in
+    /// the form of an integer.
     IntegerParameterType(IntegerParameterType),
-    /// Describe a parameter type that has an engineering/calibrated value in the form of a binary (usually hex represented).
+    /// Describe a parameter type that has an engineering/calibrated value in
+    /// the form of a binary (usually hex represented).
     BinaryParameterType(BinaryParameterType),
-    /// Describe a parameter type that has an engineering/calibrated value in the form of a decimal.
+    /// Describe a parameter type that has an engineering/calibrated value in
+    /// the form of a decimal.
     FloatParameterType(FloatParameterType),
-    /// Describe a parameter type that has an engineering/calibrated value in the form of a boolean enumeration.
+    /// Describe a parameter type that has an engineering/calibrated value in
+    /// the form of a boolean enumeration.
     BooleanParameterType(BooleanParameterType),
-    /// Describe a parameter type that has an engineering/calibrated value in the form of a duration in time.
+    /// Describe a parameter type that has an engineering/calibrated value in
+    /// the form of a duration in time.
     RelativeTimeParameterType(RelativeTimeParameterType),
-    /// Describe a parameter type that has an engineering/calibrated value in the form of an instant in time.
+    /// Describe a parameter type that has an engineering/calibrated value in
+    /// the form of an instant in time.
     AbsoluteTimeParameterType(AbsoluteTimeParameterType),
-    /// Describe a parameter type that has an engineering/calibrated value in the form of an array of a primitive type.
+    /// Describe a parameter type that has an engineering/calibrated value in
+    /// the form of an array of a primitive type.
     ArrayParameterType(ArrayParameterType),
-    /// Describe a parameter type that has an engineering/calibrated value in the form of a structure of parameters of other types.
+    /// Describe a parameter type that has an engineering/calibrated value in
+    /// the form of a structure of parameters of other types.
     AggregateParameterType(AggregateParameterType),
 }
 
@@ -25849,33 +30198,85 @@ impl ParameterTypeSetChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::StringParameterType(v) => v.write_xml(w, "StringParameterType")?,
-            Self::EnumeratedParameterType(v) => v.write_xml(w, "EnumeratedParameterType")?,
-            Self::IntegerParameterType(v) => v.write_xml(w, "IntegerParameterType")?,
-            Self::BinaryParameterType(v) => v.write_xml(w, "BinaryParameterType")?,
-            Self::FloatParameterType(v) => v.write_xml(w, "FloatParameterType")?,
-            Self::BooleanParameterType(v) => v.write_xml(w, "BooleanParameterType")?,
-            Self::RelativeTimeParameterType(v) => v.write_xml(w, "RelativeTimeParameterType")?,
-            Self::AbsoluteTimeParameterType(v) => v.write_xml(w, "AbsoluteTimeParameterType")?,
-            Self::ArrayParameterType(v) => v.write_xml(w, "ArrayParameterType")?,
-            Self::AggregateParameterType(v) => v.write_xml(w, "AggregateParameterType")?,
+            Self::StringParameterType(v) => {
+                v.write_xml(w, "StringParameterType")?
+            }
+            Self::EnumeratedParameterType(v) => {
+                v.write_xml(w, "EnumeratedParameterType")?
+            }
+            Self::IntegerParameterType(v) => {
+                v.write_xml(w, "IntegerParameterType")?
+            }
+            Self::BinaryParameterType(v) => {
+                v.write_xml(w, "BinaryParameterType")?
+            }
+            Self::FloatParameterType(v) => {
+                v.write_xml(w, "FloatParameterType")?
+            }
+            Self::BooleanParameterType(v) => {
+                v.write_xml(w, "BooleanParameterType")?
+            }
+            Self::RelativeTimeParameterType(v) => {
+                v.write_xml(w, "RelativeTimeParameterType")?
+            }
+            Self::AbsoluteTimeParameterType(v) => {
+                v.write_xml(w, "AbsoluteTimeParameterType")?
+            }
+            Self::ArrayParameterType(v) => {
+                v.write_xml(w, "ArrayParameterType")?
+            }
+            Self::AggregateParameterType(v) => {
+                v.write_xml(w, "AggregateParameterType")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("StringParameterType") => Self::StringParameterType(r.read_child()?),
-            Some("EnumeratedParameterType") => Self::EnumeratedParameterType(r.read_child()?),
-            Some("IntegerParameterType") => Self::IntegerParameterType(r.read_child()?),
-            Some("BinaryParameterType") => Self::BinaryParameterType(r.read_child()?),
-            Some("FloatParameterType") => Self::FloatParameterType(r.read_child()?),
-            Some("BooleanParameterType") => Self::BooleanParameterType(r.read_child()?),
-            Some("RelativeTimeParameterType") => Self::RelativeTimeParameterType(r.read_child()?),
-            Some("AbsoluteTimeParameterType") => Self::AbsoluteTimeParameterType(r.read_child()?),
-            Some("ArrayParameterType") => Self::ArrayParameterType(r.read_child()?),
-            Some("AggregateParameterType") => Self::AggregateParameterType(r.read_child()?),
-            _ => return Err(r.expected("StringParameterType|EnumeratedParameterType|IntegerParameterType|BinaryParameterType|FloatParameterType|BooleanParameterType|RelativeTimeParameterType|AbsoluteTimeParameterType|ArrayParameterType|AggregateParameterType")),
+            Some("StringParameterType") => {
+                Self::StringParameterType(r.read_child()?)
+            }
+            Some("EnumeratedParameterType") => {
+                Self::EnumeratedParameterType(r.read_child()?)
+            }
+            Some("IntegerParameterType") => {
+                Self::IntegerParameterType(r.read_child()?)
+            }
+            Some("BinaryParameterType") => {
+                Self::BinaryParameterType(r.read_child()?)
+            }
+            Some("FloatParameterType") => {
+                Self::FloatParameterType(r.read_child()?)
+            }
+            Some("BooleanParameterType") => {
+                Self::BooleanParameterType(r.read_child()?)
+            }
+            Some("RelativeTimeParameterType") => {
+                Self::RelativeTimeParameterType(r.read_child()?)
+            }
+            Some("AbsoluteTimeParameterType") => {
+                Self::AbsoluteTimeParameterType(r.read_child()?)
+            }
+            Some("ArrayParameterType") => {
+                Self::ArrayParameterType(r.read_child()?)
+            }
+            Some("AggregateParameterType") => {
+                Self::AggregateParameterType(r.read_child()?)
+            }
+            _ => {
+                return Err(r.expected(
+                    "StringParameterType|\
+                            EnumeratedParameterType|\
+IntegerParameterType|\
+BinaryParameterType|FloatParameterType|\
+BooleanParameterType|\
+RelativeTimeParameterType|\
+AbsoluteTimeParameterType|\
+ArrayParameterType|\
+AggregateParameterType",
+                ))
+            }
         })
     }
 }
@@ -25885,7 +30286,10 @@ impl ParameterTypeSetChoice {
 pub enum PercentCompleteChoice {
     /// 0 to 100 percent
     FixedValue(f64),
-    /// Uses a parameter instance to obtain the value. The parameter value may be optionally adjusted by a Linear function or use a series of boolean expressions to lookup the value. Anything more complex and a DynamicValue with a CustomAlgorithm may be used.
+    /// Uses a parameter instance to obtain the value. The parameter value may
+    /// be optionally adjusted by a Linear function or use a series of boolean
+    /// expressions to lookup the value. Anything more complex and a
+    /// DynamicValue with a CustomAlgorithm may be used.
     DynamicValue(DynamicValueType),
 }
 
@@ -25931,11 +30335,15 @@ impl PercentCompleteChoice {
 pub enum QueuedVerifierChoice1 {
     /// Verification is a list of comparisons.
     ComparisonList(ComparisonListType),
-    /// Verification is a new instance of the referenced container. For example, sending a command to download memory then receiving a packet with the memory download would be verified upon receipt of the packet.
+    /// Verification is a new instance of the referenced container. For example,
+    /// sending a command to download memory then receiving a packet with the
+    /// memory download would be verified upon receipt of the packet.
     ContainerRef(ContainerRefType),
-    /// Verification is a telemetry parameter value change on the ground. For example, a command counter.
+    /// Verification is a telemetry parameter value change on the ground. For
+    /// example, a command counter.
     ParameterValueChange(ParameterValueChangeType),
-    /// Verification is outside the scope of regular command and telemetry processing.
+    /// Verification is outside the scope of regular command and telemetry
+    /// processing.
     CustomAlgorithm(InputAlgorithmType),
     /// Verification is a boolean expression of conditions.
     BooleanExpression(BooleanExpressionType),
@@ -25979,9 +30387,13 @@ impl QueuedVerifierChoice1 {
         match self {
             Self::ComparisonList(v) => v.write_xml(w, "ComparisonList")?,
             Self::ContainerRef(v) => v.write_xml(w, "ContainerRef")?,
-            Self::ParameterValueChange(v) => v.write_xml(w, "ParameterValueChange")?,
+            Self::ParameterValueChange(v) => {
+                v.write_xml(w, "ParameterValueChange")?
+            }
             Self::CustomAlgorithm(v) => v.write_xml(w, "CustomAlgorithm")?,
-            Self::BooleanExpression(v) => v.write_xml(w, "BooleanExpression")?,
+            Self::BooleanExpression(v) => {
+                v.write_xml(w, "BooleanExpression")?
+            }
             Self::Comparison(v) => v.write_xml(w, "Comparison")?,
         }
         Ok(())
@@ -25991,11 +30403,21 @@ impl QueuedVerifierChoice1 {
         Ok(match r.peek_child()? {
             Some("ComparisonList") => Self::ComparisonList(r.read_child()?),
             Some("ContainerRef") => Self::ContainerRef(r.read_child()?),
-            Some("ParameterValueChange") => Self::ParameterValueChange(r.read_child()?),
+            Some("ParameterValueChange") => {
+                Self::ParameterValueChange(r.read_child()?)
+            }
             Some("CustomAlgorithm") => Self::CustomAlgorithm(r.read_child()?),
-            Some("BooleanExpression") => Self::BooleanExpression(r.read_child()?),
+            Some("BooleanExpression") => {
+                Self::BooleanExpression(r.read_child()?)
+            }
             Some("Comparison") => Self::Comparison(r.read_child()?),
-            _ => return Err(r.expected("ComparisonList|ContainerRef|ParameterValueChange|CustomAlgorithm|BooleanExpression|Comparison")),
+            _ => {
+                return Err(r.expected(
+                    "ComparisonList|ContainerRef|\
+                            ParameterValueChange|CustomAlgorithm|\
+BooleanExpression|Comparison",
+                ))
+            }
         })
     }
 }
@@ -26032,7 +30454,9 @@ impl QueuedVerifierChoice2 {
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::CheckWindow(v) => v.write_xml(w, "CheckWindow")?,
-            Self::CheckWindowAlgorithms(v) => v.write_xml(w, "CheckWindowAlgorithms")?,
+            Self::CheckWindowAlgorithms(v) => {
+                v.write_xml(w, "CheckWindowAlgorithms")?
+            }
         }
         Ok(())
     }
@@ -26040,7 +30464,9 @@ impl QueuedVerifierChoice2 {
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("CheckWindow") => Self::CheckWindow(r.read_child()?),
-            Some("CheckWindowAlgorithms") => Self::CheckWindowAlgorithms(r.read_child()?),
+            Some("CheckWindowAlgorithms") => {
+                Self::CheckWindowAlgorithms(r.read_child()?)
+            }
             _ => return Err(r.expected("CheckWindow|CheckWindowAlgorithms")),
         })
     }
@@ -26051,11 +30477,15 @@ impl QueuedVerifierChoice2 {
 pub enum ReceivedVerifierChoice1 {
     /// Verification is a list of comparisons.
     ComparisonList(ComparisonListType),
-    /// Verification is a new instance of the referenced container. For example, sending a command to download memory then receiving a packet with the memory download would be verified upon receipt of the packet.
+    /// Verification is a new instance of the referenced container. For example,
+    /// sending a command to download memory then receiving a packet with the
+    /// memory download would be verified upon receipt of the packet.
     ContainerRef(ContainerRefType),
-    /// Verification is a telemetry parameter value change on the ground. For example, a command counter.
+    /// Verification is a telemetry parameter value change on the ground. For
+    /// example, a command counter.
     ParameterValueChange(ParameterValueChangeType),
-    /// Verification is outside the scope of regular command and telemetry processing.
+    /// Verification is outside the scope of regular command and telemetry
+    /// processing.
     CustomAlgorithm(InputAlgorithmType),
     /// Verification is a boolean expression of conditions.
     BooleanExpression(BooleanExpressionType),
@@ -26099,9 +30529,13 @@ impl ReceivedVerifierChoice1 {
         match self {
             Self::ComparisonList(v) => v.write_xml(w, "ComparisonList")?,
             Self::ContainerRef(v) => v.write_xml(w, "ContainerRef")?,
-            Self::ParameterValueChange(v) => v.write_xml(w, "ParameterValueChange")?,
+            Self::ParameterValueChange(v) => {
+                v.write_xml(w, "ParameterValueChange")?
+            }
             Self::CustomAlgorithm(v) => v.write_xml(w, "CustomAlgorithm")?,
-            Self::BooleanExpression(v) => v.write_xml(w, "BooleanExpression")?,
+            Self::BooleanExpression(v) => {
+                v.write_xml(w, "BooleanExpression")?
+            }
             Self::Comparison(v) => v.write_xml(w, "Comparison")?,
         }
         Ok(())
@@ -26111,11 +30545,21 @@ impl ReceivedVerifierChoice1 {
         Ok(match r.peek_child()? {
             Some("ComparisonList") => Self::ComparisonList(r.read_child()?),
             Some("ContainerRef") => Self::ContainerRef(r.read_child()?),
-            Some("ParameterValueChange") => Self::ParameterValueChange(r.read_child()?),
+            Some("ParameterValueChange") => {
+                Self::ParameterValueChange(r.read_child()?)
+            }
             Some("CustomAlgorithm") => Self::CustomAlgorithm(r.read_child()?),
-            Some("BooleanExpression") => Self::BooleanExpression(r.read_child()?),
+            Some("BooleanExpression") => {
+                Self::BooleanExpression(r.read_child()?)
+            }
             Some("Comparison") => Self::Comparison(r.read_child()?),
-            _ => return Err(r.expected("ComparisonList|ContainerRef|ParameterValueChange|CustomAlgorithm|BooleanExpression|Comparison")),
+            _ => {
+                return Err(r.expected(
+                    "ComparisonList|ContainerRef|\
+                            ParameterValueChange|CustomAlgorithm|\
+BooleanExpression|Comparison",
+                ))
+            }
         })
     }
 }
@@ -26152,7 +30596,9 @@ impl ReceivedVerifierChoice2 {
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::CheckWindow(v) => v.write_xml(w, "CheckWindow")?,
-            Self::CheckWindowAlgorithms(v) => v.write_xml(w, "CheckWindowAlgorithms")?,
+            Self::CheckWindowAlgorithms(v) => {
+                v.write_xml(w, "CheckWindowAlgorithms")?
+            }
         }
         Ok(())
     }
@@ -26160,7 +30606,9 @@ impl ReceivedVerifierChoice2 {
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("CheckWindow") => Self::CheckWindow(r.read_child()?),
-            Some("CheckWindowAlgorithms") => Self::CheckWindowAlgorithms(r.read_child()?),
+            Some("CheckWindowAlgorithms") => {
+                Self::CheckWindowAlgorithms(r.read_child()?)
+            }
             _ => return Err(r.expected("CheckWindow|CheckWindowAlgorithms")),
         })
     }
@@ -26170,7 +30618,10 @@ impl ReceivedVerifierChoice2 {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ReferenceTimeChoice {
     OffsetFrom(ParameterInstanceRefType),
-    /// Epochs may be specified as an xs date where time is implied to be 00:00:00, xs dateTime, or string enumeration of common epochs. The enumerations are TAI (used by CCSDS and others), J2000, UNIX (also known as POSIX), and GPS.
+    /// Epochs may be specified as an xs date where time is implied to be
+    /// 00:00:00, xs dateTime, or string enumeration of common epochs. The
+    /// enumerations are TAI (used by CCSDS and others), J2000, UNIX (also known
+    /// as POSIX), and GPS.
     Epoch(String),
 }
 
@@ -26216,9 +30667,12 @@ impl ReferenceTimeChoice {
 pub enum RestrictionCriteriaChoice {
     /// A simple comparison check involving a single test of a parameter value.
     Comparison(ComparisonType),
-    /// A series of simple comparison checks with an implicit 'and' in that they all must be true for the overall condition to be true.
+    /// A series of simple comparison checks with an implicit 'and' in that they
+    /// all must be true for the overall condition to be true.
     ComparisonList(ComparisonListType),
-    /// An arbitrarily complex boolean expression that has additional flexibility on the terms beyond the Comparison and ComparisonList elements.
+    /// An arbitrarily complex boolean expression that has additional
+    /// flexibility on the terms beyond the Comparison and ComparisonList
+    /// elements.
     BooleanExpression(BooleanExpressionType),
     /// An escape to an externally defined algorithm.
     CustomAlgorithm(InputAlgorithmType),
@@ -26235,7 +30689,10 @@ impl RestrictionCriteriaChoice {
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
-            "Comparison" | "ComparisonList" | "BooleanExpression" | "CustomAlgorithm"
+            "Comparison"
+                | "ComparisonList"
+                | "BooleanExpression"
+                | "CustomAlgorithm"
         )
     }
 
@@ -26253,7 +30710,9 @@ impl RestrictionCriteriaChoice {
         match self {
             Self::Comparison(v) => v.write_xml(w, "Comparison")?,
             Self::ComparisonList(v) => v.write_xml(w, "ComparisonList")?,
-            Self::BooleanExpression(v) => v.write_xml(w, "BooleanExpression")?,
+            Self::BooleanExpression(v) => {
+                v.write_xml(w, "BooleanExpression")?
+            }
             Self::CustomAlgorithm(v) => v.write_xml(w, "CustomAlgorithm")?,
         }
         Ok(())
@@ -26263,12 +30722,15 @@ impl RestrictionCriteriaChoice {
         Ok(match r.peek_child()? {
             Some("Comparison") => Self::Comparison(r.read_child()?),
             Some("ComparisonList") => Self::ComparisonList(r.read_child()?),
-            Some("BooleanExpression") => Self::BooleanExpression(r.read_child()?),
+            Some("BooleanExpression") => {
+                Self::BooleanExpression(r.read_child()?)
+            }
             Some("CustomAlgorithm") => Self::CustomAlgorithm(r.read_child()?),
             _ => {
-                return Err(
-                    r.expected("Comparison|ComparisonList|BooleanExpression|CustomAlgorithm")
-                )
+                return Err(r.expected(
+                    "Comparison|ComparisonList|\
+                            BooleanExpression|CustomAlgorithm",
+                ))
             }
         })
     }
@@ -26279,11 +30741,15 @@ impl RestrictionCriteriaChoice {
 pub enum SentFromRangeVerifierChoice1 {
     /// Verification is a list of comparisons.
     ComparisonList(ComparisonListType),
-    /// Verification is a new instance of the referenced container. For example, sending a command to download memory then receiving a packet with the memory download would be verified upon receipt of the packet.
+    /// Verification is a new instance of the referenced container. For example,
+    /// sending a command to download memory then receiving a packet with the
+    /// memory download would be verified upon receipt of the packet.
     ContainerRef(ContainerRefType),
-    /// Verification is a telemetry parameter value change on the ground. For example, a command counter.
+    /// Verification is a telemetry parameter value change on the ground. For
+    /// example, a command counter.
     ParameterValueChange(ParameterValueChangeType),
-    /// Verification is outside the scope of regular command and telemetry processing.
+    /// Verification is outside the scope of regular command and telemetry
+    /// processing.
     CustomAlgorithm(InputAlgorithmType),
     /// Verification is a boolean expression of conditions.
     BooleanExpression(BooleanExpressionType),
@@ -26327,9 +30793,13 @@ impl SentFromRangeVerifierChoice1 {
         match self {
             Self::ComparisonList(v) => v.write_xml(w, "ComparisonList")?,
             Self::ContainerRef(v) => v.write_xml(w, "ContainerRef")?,
-            Self::ParameterValueChange(v) => v.write_xml(w, "ParameterValueChange")?,
+            Self::ParameterValueChange(v) => {
+                v.write_xml(w, "ParameterValueChange")?
+            }
             Self::CustomAlgorithm(v) => v.write_xml(w, "CustomAlgorithm")?,
-            Self::BooleanExpression(v) => v.write_xml(w, "BooleanExpression")?,
+            Self::BooleanExpression(v) => {
+                v.write_xml(w, "BooleanExpression")?
+            }
             Self::Comparison(v) => v.write_xml(w, "Comparison")?,
         }
         Ok(())
@@ -26339,11 +30809,21 @@ impl SentFromRangeVerifierChoice1 {
         Ok(match r.peek_child()? {
             Some("ComparisonList") => Self::ComparisonList(r.read_child()?),
             Some("ContainerRef") => Self::ContainerRef(r.read_child()?),
-            Some("ParameterValueChange") => Self::ParameterValueChange(r.read_child()?),
+            Some("ParameterValueChange") => {
+                Self::ParameterValueChange(r.read_child()?)
+            }
             Some("CustomAlgorithm") => Self::CustomAlgorithm(r.read_child()?),
-            Some("BooleanExpression") => Self::BooleanExpression(r.read_child()?),
+            Some("BooleanExpression") => {
+                Self::BooleanExpression(r.read_child()?)
+            }
             Some("Comparison") => Self::Comparison(r.read_child()?),
-            _ => return Err(r.expected("ComparisonList|ContainerRef|ParameterValueChange|CustomAlgorithm|BooleanExpression|Comparison")),
+            _ => {
+                return Err(r.expected(
+                    "ComparisonList|ContainerRef|\
+                            ParameterValueChange|CustomAlgorithm|\
+BooleanExpression|Comparison",
+                ))
+            }
         })
     }
 }
@@ -26380,7 +30860,9 @@ impl SentFromRangeVerifierChoice2 {
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::CheckWindow(v) => v.write_xml(w, "CheckWindow")?,
-            Self::CheckWindowAlgorithms(v) => v.write_xml(w, "CheckWindowAlgorithms")?,
+            Self::CheckWindowAlgorithms(v) => {
+                v.write_xml(w, "CheckWindowAlgorithms")?
+            }
         }
         Ok(())
     }
@@ -26388,7 +30870,9 @@ impl SentFromRangeVerifierChoice2 {
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("CheckWindow") => Self::CheckWindow(r.read_child()?),
-            Some("CheckWindowAlgorithms") => Self::CheckWindowAlgorithms(r.read_child()?),
+            Some("CheckWindowAlgorithms") => {
+                Self::CheckWindowAlgorithms(r.read_child()?)
+            }
             _ => return Err(r.expected("CheckWindow|CheckWindowAlgorithms")),
         })
     }
@@ -26473,7 +30957,9 @@ impl StreamSetChoice {
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::FixedFrameStream(v) => v.write_xml(w, "FixedFrameStream")?,
-            Self::VariableFrameStream(v) => v.write_xml(w, "VariableFrameStream")?,
+            Self::VariableFrameStream(v) => {
+                v.write_xml(w, "VariableFrameStream")?
+            }
             Self::CustomStream(v) => v.write_xml(w, "CustomStream")?,
         }
         Ok(())
@@ -26482,9 +30968,16 @@ impl StreamSetChoice {
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("FixedFrameStream") => Self::FixedFrameStream(r.read_child()?),
-            Some("VariableFrameStream") => Self::VariableFrameStream(r.read_child()?),
+            Some("VariableFrameStream") => {
+                Self::VariableFrameStream(r.read_child()?)
+            }
             Some("CustomStream") => Self::CustomStream(r.read_child()?),
-            _ => return Err(r.expected("FixedFrameStream|VariableFrameStream|CustomStream")),
+            _ => {
+                return Err(r.expected(
+                    "FixedFrameStream|VariableFrameStream|\
+                            CustomStream",
+                ))
+            }
         })
     }
 }
@@ -26492,9 +30985,12 @@ impl StreamSetChoice {
 /// Alternatives of a `<choice>` in [`StringAlarmType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum StringAlarmChoice {
-    /// A MatchCriteria may be specified for each of the 5 alarm levels. Each level is optional and the alarm should be the highest level to test true.
+    /// A MatchCriteria may be specified for each of the 5 alarm levels. Each
+    /// level is optional and the alarm should be the highest level to test
+    /// true.
     AlarmConditions(AlarmConditionsType),
-    /// An escape for ridiculously complex alarm conditions. Will trigger on changes to the containing Parameter.
+    /// An escape for ridiculously complex alarm conditions. Will trigger on
+    /// changes to the containing Parameter.
     CustomAlarm(CustomAlarmType),
 }
 
@@ -26538,13 +31034,18 @@ impl StringAlarmChoice {
 /// Alternatives of a `<choice>` in [`StringArgumentType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum StringArgumentChoice {
-    /// Binary encoding is typically a "pass through" raw encoding form where one of the more common encodings is not required for the argument. A custom transformation capability is available if needed.
+    /// Binary encoding is typically a "pass through" raw encoding form where
+    /// one of the more common encodings is not required for the argument. A
+    /// custom transformation capability is available if needed.
     BinaryDataEncoding(ArgumentBinaryDataEncodingType),
-    /// Float encoding is a common encoding where the raw binary is in a form that gets interpreted as a decimal numeric value.
+    /// Float encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a decimal numeric value.
     FloatDataEncoding(FloatDataEncodingType),
-    /// Integer encoding is a common encoding where the raw binary is in a form that gets interpreted as an integral value, either signed or unsigned.
+    /// Integer encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as an integral value, either signed or unsigned.
     IntegerDataEncoding(IntegerDataEncodingType),
-    /// String encoding is a common encoding where the raw binary is in a form that gets interpreted as a character sequence.
+    /// String encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a character sequence.
     StringDataEncoding(ArgumentStringDataEncodingType),
 }
 
@@ -26578,23 +31079,40 @@ impl StringArgumentChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::BinaryDataEncoding(v) => v.write_xml(w, "BinaryDataEncoding")?,
-            Self::FloatDataEncoding(v) => v.write_xml(w, "FloatDataEncoding")?,
-            Self::IntegerDataEncoding(v) => v.write_xml(w, "IntegerDataEncoding")?,
-            Self::StringDataEncoding(v) => v.write_xml(w, "StringDataEncoding")?,
+            Self::BinaryDataEncoding(v) => {
+                v.write_xml(w, "BinaryDataEncoding")?
+            }
+            Self::FloatDataEncoding(v) => {
+                v.write_xml(w, "FloatDataEncoding")?
+            }
+            Self::IntegerDataEncoding(v) => {
+                v.write_xml(w, "IntegerDataEncoding")?
+            }
+            Self::StringDataEncoding(v) => {
+                v.write_xml(w, "StringDataEncoding")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("BinaryDataEncoding") => Self::BinaryDataEncoding(r.read_child()?),
-            Some("FloatDataEncoding") => Self::FloatDataEncoding(r.read_child()?),
-            Some("IntegerDataEncoding") => Self::IntegerDataEncoding(r.read_child()?),
-            Some("StringDataEncoding") => Self::StringDataEncoding(r.read_child()?),
+            Some("BinaryDataEncoding") => {
+                Self::BinaryDataEncoding(r.read_child()?)
+            }
+            Some("FloatDataEncoding") => {
+                Self::FloatDataEncoding(r.read_child()?)
+            }
+            Some("IntegerDataEncoding") => {
+                Self::IntegerDataEncoding(r.read_child()?)
+            }
+            Some("StringDataEncoding") => {
+                Self::StringDataEncoding(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "BinaryDataEncoding|FloatDataEncoding|IntegerDataEncoding|StringDataEncoding",
+                    "BinaryDataEncoding|FloatDataEncoding|\
+                            IntegerDataEncoding|StringDataEncoding",
                 ))
             }
         })
@@ -26604,9 +31122,12 @@ impl StringArgumentChoice {
 /// Alternatives of a `<choice>` in [`StringContextAlarmType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum StringContextAlarmChoice {
-    /// A MatchCriteria may be specified for each of the 5 alarm levels. Each level is optional and the alarm should be the highest level to test true.
+    /// A MatchCriteria may be specified for each of the 5 alarm levels. Each
+    /// level is optional and the alarm should be the highest level to test
+    /// true.
     AlarmConditions(AlarmConditionsType),
-    /// An escape for ridiculously complex alarm conditions. Will trigger on changes to the containing Parameter.
+    /// An escape for ridiculously complex alarm conditions. Will trigger on
+    /// changes to the containing Parameter.
     CustomAlarm(CustomAlarmType),
 }
 
@@ -26650,13 +31171,18 @@ impl StringContextAlarmChoice {
 /// Alternatives of a `<choice>` in [`StringDataType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum StringDataChoice {
-    /// Binary encoding is typically a "pass through" raw encoding form where one of the more common encodings is not required for the parameter. A custom transformation capability is available if needed.
+    /// Binary encoding is typically a "pass through" raw encoding form where
+    /// one of the more common encodings is not required for the parameter. A
+    /// custom transformation capability is available if needed.
     BinaryDataEncoding(BinaryDataEncodingType),
-    /// Float encoding is a common encoding where the raw binary is in a form that gets interpreted as a decimal numeric value.
+    /// Float encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a decimal numeric value.
     FloatDataEncoding(FloatDataEncodingType),
-    /// Integer encoding is a common encoding where the raw binary is in a form that gets interpreted as an integral value, either signed or unsigned.
+    /// Integer encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as an integral value, either signed or unsigned.
     IntegerDataEncoding(IntegerDataEncodingType),
-    /// String encoding is a common encoding where the raw binary is in a form that gets interpreted as a character sequence.
+    /// String encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a character sequence.
     StringDataEncoding(StringDataEncodingType),
 }
 
@@ -26690,23 +31216,40 @@ impl StringDataChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::BinaryDataEncoding(v) => v.write_xml(w, "BinaryDataEncoding")?,
-            Self::FloatDataEncoding(v) => v.write_xml(w, "FloatDataEncoding")?,
-            Self::IntegerDataEncoding(v) => v.write_xml(w, "IntegerDataEncoding")?,
-            Self::StringDataEncoding(v) => v.write_xml(w, "StringDataEncoding")?,
+            Self::BinaryDataEncoding(v) => {
+                v.write_xml(w, "BinaryDataEncoding")?
+            }
+            Self::FloatDataEncoding(v) => {
+                v.write_xml(w, "FloatDataEncoding")?
+            }
+            Self::IntegerDataEncoding(v) => {
+                v.write_xml(w, "IntegerDataEncoding")?
+            }
+            Self::StringDataEncoding(v) => {
+                v.write_xml(w, "StringDataEncoding")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("BinaryDataEncoding") => Self::BinaryDataEncoding(r.read_child()?),
-            Some("FloatDataEncoding") => Self::FloatDataEncoding(r.read_child()?),
-            Some("IntegerDataEncoding") => Self::IntegerDataEncoding(r.read_child()?),
-            Some("StringDataEncoding") => Self::StringDataEncoding(r.read_child()?),
+            Some("BinaryDataEncoding") => {
+                Self::BinaryDataEncoding(r.read_child()?)
+            }
+            Some("FloatDataEncoding") => {
+                Self::FloatDataEncoding(r.read_child()?)
+            }
+            Some("IntegerDataEncoding") => {
+                Self::IntegerDataEncoding(r.read_child()?)
+            }
+            Some("StringDataEncoding") => {
+                Self::StringDataEncoding(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "BinaryDataEncoding|FloatDataEncoding|IntegerDataEncoding|StringDataEncoding",
+                    "BinaryDataEncoding|FloatDataEncoding|\
+                            IntegerDataEncoding|StringDataEncoding",
                 ))
             }
         })
@@ -26716,9 +31259,20 @@ impl StringDataChoice {
 /// Alternatives of a `<choice>` in [`StringDataEncodingType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum StringDataEncodingChoice {
-    /// Static length strings do not change in overall length between samples. They may terminate before the end of their buffer using a terminating character, or by various lookups, or calculations. But they have a maximum fixed size, and the data itself is always within that maximum size.
+    /// Static length strings do not change in overall length between samples.
+    /// They may terminate before the end of their buffer using a terminating
+    /// character, or by various lookups, or calculations. But they have a
+    /// maximum fixed size, and the data itself is always within that maximum
+    /// size.
     SizeInBits(SizeInBitsType),
-    /// Variable length strings are those where the space occupied in a container can vary. If the string has variable content but occupies the same amount of space when encoded should use the SizeInBits element. Specification of a variable length string needs to consider that the implementation needs to allocate space to store the string. Specify the maximum possible length of the string data type for memory purposes and also specify the bit size of the string to use in containers with the dynamic elements.
+    /// Variable length strings are those where the space occupied in a
+    /// container can vary. If the string has variable content but occupies the
+    /// same amount of space when encoded should use the SizeInBits element.
+    /// Specification of a variable length string needs to consider that the
+    /// implementation needs to allocate space to store the string. Specify the
+    /// maximum possible length of the string data type for memory purposes and
+    /// also specify the bit size of the string to use in containers with the
+    /// dynamic elements.
     Variable(VariableStringType),
 }
 
@@ -26762,13 +31316,18 @@ impl StringDataEncodingChoice {
 /// Alternatives of a `<choice>` in [`StringParameterType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum StringParameterChoice {
-    /// Binary encoding is typically a "pass through" raw encoding form where one of the more common encodings is not required for the parameter. A custom transformation capability is available if needed.
+    /// Binary encoding is typically a "pass through" raw encoding form where
+    /// one of the more common encodings is not required for the parameter. A
+    /// custom transformation capability is available if needed.
     BinaryDataEncoding(BinaryDataEncodingType),
-    /// Float encoding is a common encoding where the raw binary is in a form that gets interpreted as a decimal numeric value.
+    /// Float encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a decimal numeric value.
     FloatDataEncoding(FloatDataEncodingType),
-    /// Integer encoding is a common encoding where the raw binary is in a form that gets interpreted as an integral value, either signed or unsigned.
+    /// Integer encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as an integral value, either signed or unsigned.
     IntegerDataEncoding(IntegerDataEncodingType),
-    /// String encoding is a common encoding where the raw binary is in a form that gets interpreted as a character sequence.
+    /// String encoding is a common encoding where the raw binary is in a form
+    /// that gets interpreted as a character sequence.
     StringDataEncoding(StringDataEncodingType),
 }
 
@@ -26802,23 +31361,40 @@ impl StringParameterChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::BinaryDataEncoding(v) => v.write_xml(w, "BinaryDataEncoding")?,
-            Self::FloatDataEncoding(v) => v.write_xml(w, "FloatDataEncoding")?,
-            Self::IntegerDataEncoding(v) => v.write_xml(w, "IntegerDataEncoding")?,
-            Self::StringDataEncoding(v) => v.write_xml(w, "StringDataEncoding")?,
+            Self::BinaryDataEncoding(v) => {
+                v.write_xml(w, "BinaryDataEncoding")?
+            }
+            Self::FloatDataEncoding(v) => {
+                v.write_xml(w, "FloatDataEncoding")?
+            }
+            Self::IntegerDataEncoding(v) => {
+                v.write_xml(w, "IntegerDataEncoding")?
+            }
+            Self::StringDataEncoding(v) => {
+                v.write_xml(w, "StringDataEncoding")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("BinaryDataEncoding") => Self::BinaryDataEncoding(r.read_child()?),
-            Some("FloatDataEncoding") => Self::FloatDataEncoding(r.read_child()?),
-            Some("IntegerDataEncoding") => Self::IntegerDataEncoding(r.read_child()?),
-            Some("StringDataEncoding") => Self::StringDataEncoding(r.read_child()?),
+            Some("BinaryDataEncoding") => {
+                Self::BinaryDataEncoding(r.read_child()?)
+            }
+            Some("FloatDataEncoding") => {
+                Self::FloatDataEncoding(r.read_child()?)
+            }
+            Some("IntegerDataEncoding") => {
+                Self::IntegerDataEncoding(r.read_child()?)
+            }
+            Some("StringDataEncoding") => {
+                Self::StringDataEncoding(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "BinaryDataEncoding|FloatDataEncoding|IntegerDataEncoding|StringDataEncoding",
+                    "BinaryDataEncoding|FloatDataEncoding|\
+                            IntegerDataEncoding|StringDataEncoding",
                 ))
             }
         })
@@ -26828,9 +31404,12 @@ impl StringParameterChoice {
 /// Alternatives of a `<choice>` in [`TimeAlarmType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum TimeAlarmChoice {
-    /// A MatchCriteria may be specified for each of the 5 alarm levels. Each level is optional and the alarm should be the highest level to test true.
+    /// A MatchCriteria may be specified for each of the 5 alarm levels. Each
+    /// level is optional and the alarm should be the highest level to test
+    /// true.
     AlarmConditions(AlarmConditionsType),
-    /// An escape for ridiculously complex alarm conditions. Will trigger on changes to the containing Parameter.
+    /// An escape for ridiculously complex alarm conditions. Will trigger on
+    /// changes to the containing Parameter.
     CustomAlarm(CustomAlarmType),
 }
 
@@ -26874,9 +31453,12 @@ impl TimeAlarmChoice {
 /// Alternatives of a `<choice>` in [`TimeContextAlarmType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum TimeContextAlarmChoice {
-    /// A MatchCriteria may be specified for each of the 5 alarm levels. Each level is optional and the alarm should be the highest level to test true.
+    /// A MatchCriteria may be specified for each of the 5 alarm levels. Each
+    /// level is optional and the alarm should be the highest level to test
+    /// true.
     AlarmConditions(AlarmConditionsType),
-    /// An escape for ridiculously complex alarm conditions. Will trigger on changes to the containing Parameter.
+    /// An escape for ridiculously complex alarm conditions. Will trigger on
+    /// changes to the containing Parameter.
     CustomAlarm(CustomAlarmType),
 }
 
@@ -26922,11 +31504,15 @@ impl TimeContextAlarmChoice {
 pub enum TransferredToRangeVerifierChoice1 {
     /// Verification is a list of comparisons.
     ComparisonList(ComparisonListType),
-    /// Verification is a new instance of the referenced container. For example, sending a command to download memory then receiving a packet with the memory download would be verified upon receipt of the packet.
+    /// Verification is a new instance of the referenced container. For example,
+    /// sending a command to download memory then receiving a packet with the
+    /// memory download would be verified upon receipt of the packet.
     ContainerRef(ContainerRefType),
-    /// Verification is a telemetry parameter value change on the ground. For example, a command counter.
+    /// Verification is a telemetry parameter value change on the ground. For
+    /// example, a command counter.
     ParameterValueChange(ParameterValueChangeType),
-    /// Verification is outside the scope of regular command and telemetry processing.
+    /// Verification is outside the scope of regular command and telemetry
+    /// processing.
     CustomAlgorithm(InputAlgorithmType),
     /// Verification is a boolean expression of conditions.
     BooleanExpression(BooleanExpressionType),
@@ -26970,9 +31556,13 @@ impl TransferredToRangeVerifierChoice1 {
         match self {
             Self::ComparisonList(v) => v.write_xml(w, "ComparisonList")?,
             Self::ContainerRef(v) => v.write_xml(w, "ContainerRef")?,
-            Self::ParameterValueChange(v) => v.write_xml(w, "ParameterValueChange")?,
+            Self::ParameterValueChange(v) => {
+                v.write_xml(w, "ParameterValueChange")?
+            }
             Self::CustomAlgorithm(v) => v.write_xml(w, "CustomAlgorithm")?,
-            Self::BooleanExpression(v) => v.write_xml(w, "BooleanExpression")?,
+            Self::BooleanExpression(v) => {
+                v.write_xml(w, "BooleanExpression")?
+            }
             Self::Comparison(v) => v.write_xml(w, "Comparison")?,
         }
         Ok(())
@@ -26982,11 +31572,21 @@ impl TransferredToRangeVerifierChoice1 {
         Ok(match r.peek_child()? {
             Some("ComparisonList") => Self::ComparisonList(r.read_child()?),
             Some("ContainerRef") => Self::ContainerRef(r.read_child()?),
-            Some("ParameterValueChange") => Self::ParameterValueChange(r.read_child()?),
+            Some("ParameterValueChange") => {
+                Self::ParameterValueChange(r.read_child()?)
+            }
             Some("CustomAlgorithm") => Self::CustomAlgorithm(r.read_child()?),
-            Some("BooleanExpression") => Self::BooleanExpression(r.read_child()?),
+            Some("BooleanExpression") => {
+                Self::BooleanExpression(r.read_child()?)
+            }
             Some("Comparison") => Self::Comparison(r.read_child()?),
-            _ => return Err(r.expected("ComparisonList|ContainerRef|ParameterValueChange|CustomAlgorithm|BooleanExpression|Comparison")),
+            _ => {
+                return Err(r.expected(
+                    "ComparisonList|ContainerRef|\
+                            ParameterValueChange|CustomAlgorithm|\
+BooleanExpression|Comparison",
+                ))
+            }
         })
     }
 }
@@ -27023,7 +31623,9 @@ impl TransferredToRangeVerifierChoice2 {
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::CheckWindow(v) => v.write_xml(w, "CheckWindow")?,
-            Self::CheckWindowAlgorithms(v) => v.write_xml(w, "CheckWindowAlgorithms")?,
+            Self::CheckWindowAlgorithms(v) => {
+                v.write_xml(w, "CheckWindowAlgorithms")?
+            }
         }
         Ok(())
     }
@@ -27031,7 +31633,9 @@ impl TransferredToRangeVerifierChoice2 {
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("CheckWindow") => Self::CheckWindow(r.read_child()?),
-            Some("CheckWindowAlgorithms") => Self::CheckWindowAlgorithms(r.read_child()?),
+            Some("CheckWindowAlgorithms") => {
+                Self::CheckWindowAlgorithms(r.read_child()?)
+            }
             _ => return Err(r.expected("CheckWindow|CheckWindowAlgorithms")),
         })
     }
@@ -27042,9 +31646,12 @@ impl TransferredToRangeVerifierChoice2 {
 pub enum TransmissionConstraintChoice {
     /// A simple comparison check involving a single test of a parameter value.
     Comparison(ComparisonType),
-    /// A series of simple comparison checks with an implicit 'and' in that they all must be true for the overall condition to be true.
+    /// A series of simple comparison checks with an implicit 'and' in that they
+    /// all must be true for the overall condition to be true.
     ComparisonList(ComparisonListType),
-    /// An arbitrarily complex boolean expression that has additional flexibility on the terms beyond the Comparison and ComparisonList elements.
+    /// An arbitrarily complex boolean expression that has additional
+    /// flexibility on the terms beyond the Comparison and ComparisonList
+    /// elements.
     BooleanExpression(BooleanExpressionType),
     /// An escape to an externally defined algorithm.
     CustomAlgorithm(InputAlgorithmType),
@@ -27061,7 +31668,10 @@ impl TransmissionConstraintChoice {
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
-            "Comparison" | "ComparisonList" | "BooleanExpression" | "CustomAlgorithm"
+            "Comparison"
+                | "ComparisonList"
+                | "BooleanExpression"
+                | "CustomAlgorithm"
         )
     }
 
@@ -27079,7 +31689,9 @@ impl TransmissionConstraintChoice {
         match self {
             Self::Comparison(v) => v.write_xml(w, "Comparison")?,
             Self::ComparisonList(v) => v.write_xml(w, "ComparisonList")?,
-            Self::BooleanExpression(v) => v.write_xml(w, "BooleanExpression")?,
+            Self::BooleanExpression(v) => {
+                v.write_xml(w, "BooleanExpression")?
+            }
             Self::CustomAlgorithm(v) => v.write_xml(w, "CustomAlgorithm")?,
         }
         Ok(())
@@ -27089,12 +31701,15 @@ impl TransmissionConstraintChoice {
         Ok(match r.peek_child()? {
             Some("Comparison") => Self::Comparison(r.read_child()?),
             Some("ComparisonList") => Self::ComparisonList(r.read_child()?),
-            Some("BooleanExpression") => Self::BooleanExpression(r.read_child()?),
+            Some("BooleanExpression") => {
+                Self::BooleanExpression(r.read_child()?)
+            }
             Some("CustomAlgorithm") => Self::CustomAlgorithm(r.read_child()?),
             _ => {
-                return Err(
-                    r.expected("Comparison|ComparisonList|BooleanExpression|CustomAlgorithm")
-                )
+                return Err(r.expected(
+                    "Comparison|ComparisonList|\
+                            BooleanExpression|CustomAlgorithm",
+                ))
             }
         })
     }
@@ -27103,11 +31718,14 @@ impl TransmissionConstraintChoice {
 /// Alternatives of a `<choice>` in [`TriggerSetType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum TriggerSetChoice {
-    /// This element instructs the trigger to invoke the algorithm evaluation when a Parameter update is received.
+    /// This element instructs the trigger to invoke the algorithm evaluation
+    /// when a Parameter update is received.
     OnParameterUpdateTrigger(OnParameterUpdateTriggerType),
-    /// This element instructs the trigger to invoke the algorithm evaluation when a Container is received.
+    /// This element instructs the trigger to invoke the algorithm evaluation
+    /// when a Container is received.
     OnContainerUpdateTrigger(OnContainerUpdateTriggerType),
-    /// This element instructs the trigger to invoke the algorithm evaluation using a timer.
+    /// This element instructs the trigger to invoke the algorithm evaluation
+    /// using a timer.
     OnPeriodicRateTrigger(OnPeriodicRateTriggerType),
 }
 
@@ -27122,7 +31740,9 @@ impl TriggerSetChoice {
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
-            "OnParameterUpdateTrigger" | "OnContainerUpdateTrigger" | "OnPeriodicRateTrigger"
+            "OnParameterUpdateTrigger"
+                | "OnContainerUpdateTrigger"
+                | "OnPeriodicRateTrigger"
         )
     }
 
@@ -27137,21 +31757,35 @@ impl TriggerSetChoice {
 
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
-            Self::OnParameterUpdateTrigger(v) => v.write_xml(w, "OnParameterUpdateTrigger")?,
-            Self::OnContainerUpdateTrigger(v) => v.write_xml(w, "OnContainerUpdateTrigger")?,
-            Self::OnPeriodicRateTrigger(v) => v.write_xml(w, "OnPeriodicRateTrigger")?,
+            Self::OnParameterUpdateTrigger(v) => {
+                v.write_xml(w, "OnParameterUpdateTrigger")?
+            }
+            Self::OnContainerUpdateTrigger(v) => {
+                v.write_xml(w, "OnContainerUpdateTrigger")?
+            }
+            Self::OnPeriodicRateTrigger(v) => {
+                v.write_xml(w, "OnPeriodicRateTrigger")?
+            }
         }
         Ok(())
     }
 
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
-            Some("OnParameterUpdateTrigger") => Self::OnParameterUpdateTrigger(r.read_child()?),
-            Some("OnContainerUpdateTrigger") => Self::OnContainerUpdateTrigger(r.read_child()?),
-            Some("OnPeriodicRateTrigger") => Self::OnPeriodicRateTrigger(r.read_child()?),
+            Some("OnParameterUpdateTrigger") => {
+                Self::OnParameterUpdateTrigger(r.read_child()?)
+            }
+            Some("OnContainerUpdateTrigger") => {
+                Self::OnContainerUpdateTrigger(r.read_child()?)
+            }
+            Some("OnPeriodicRateTrigger") => {
+                Self::OnPeriodicRateTrigger(r.read_child()?)
+            }
             _ => {
                 return Err(r.expected(
-                    "OnParameterUpdateTrigger|OnContainerUpdateTrigger|OnPeriodicRateTrigger",
+                    "OnParameterUpdateTrigger|\
+                            OnContainerUpdateTrigger|\
+OnPeriodicRateTrigger",
                 ))
             }
         })
@@ -27163,11 +31797,19 @@ impl TriggerSetChoice {
 pub enum TriggeredMathOperationChoice {
     /// Use a constant in the calculation.
     ValueOperand(String),
-    /// Use the value of this parameter in the calculation. It is the calibrator's value only. If the raw value is needed, specify it explicitly using ParameterInstanceRefOperand. Note this element has no content.
+    /// Use the value of this parameter in the calculation. It is the
+    /// calibrator's value only. If the raw value is needed, specify it
+    /// explicitly using ParameterInstanceRefOperand. Note this element has no
+    /// content.
     ThisParameterOperand(String),
-    /// All operators utilize operands on the top values in the stack and leaving the result on the top of the stack. Ternary operators utilize the top three operands on the stack, binary operators utilize the top two operands on the stack, and unary operators use the top operand on the stack.
+    /// All operators utilize operands on the top values in the stack and
+    /// leaving the result on the top of the stack. Ternary operators utilize
+    /// the top three operands on the stack, binary operators utilize the top
+    /// two operands on the stack, and unary operators use the top operand on
+    /// the stack.
     Operator(MathOperatorsType),
-    /// This element is used to reference the last received/assigned value of any Parameter in this math operation.
+    /// This element is used to reference the last received/assigned value of
+    /// any Parameter in this math operation.
     ParameterInstanceRefOperand(ParameterInstanceRefType),
 }
 
@@ -27182,7 +31824,10 @@ impl TriggeredMathOperationChoice {
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
-            "ValueOperand" | "ThisParameterOperand" | "Operator" | "ParameterInstanceRefOperand"
+            "ValueOperand"
+                | "ThisParameterOperand"
+                | "Operator"
+                | "ParameterInstanceRefOperand"
         )
     }
 
@@ -27192,7 +31837,9 @@ impl TriggeredMathOperationChoice {
             Self::ValueOperand(_) => "ValueOperand",
             Self::ThisParameterOperand(_) => "ThisParameterOperand",
             Self::Operator(_) => "Operator",
-            Self::ParameterInstanceRefOperand(_) => "ParameterInstanceRefOperand",
+            Self::ParameterInstanceRefOperand(_) => {
+                "ParameterInstanceRefOperand"
+            }
         }
     }
 
@@ -27211,14 +31858,17 @@ impl TriggeredMathOperationChoice {
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("ValueOperand") => Self::ValueOperand(r.read_leaf()?),
-            Some("ThisParameterOperand") => Self::ThisParameterOperand(r.read_leaf()?),
+            Some("ThisParameterOperand") => {
+                Self::ThisParameterOperand(r.read_leaf()?)
+            }
             Some("Operator") => Self::Operator(r.read_leaf()?),
             Some("ParameterInstanceRefOperand") => {
                 Self::ParameterInstanceRefOperand(r.read_child()?)
             }
             _ => {
                 return Err(r.expected(
-                    "ValueOperand|ThisParameterOperand|Operator|ParameterInstanceRefOperand",
+                    "ValueOperand|ThisParameterOperand|\
+                            Operator|ParameterInstanceRefOperand",
                 ))
             }
         })
@@ -27228,7 +31878,9 @@ impl TriggeredMathOperationChoice {
 /// Alternatives of a `<choice>` in [`VariableFrameStreamType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum VariableFrameStreamChoice {
-    /// This Container (usually abstract) is the container that is in the fixed frame stream. Normally, this is a general container type from which many specific containers are inherited.
+    /// This Container (usually abstract) is the container that is in the fixed
+    /// frame stream. Normally, this is a general container type from which many
+    /// specific containers are inherited.
     ContainerRef(ContainerRefType),
     ServiceRef(ServiceRefType),
 }
@@ -27273,9 +31925,12 @@ impl VariableFrameStreamChoice {
 /// Alternatives of a `<choice>` in [`VariableStringType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum VariableStringChoice1 {
-    /// Determine the container size in bits by interrogating an instance of a parameter.
+    /// Determine the container size in bits by interrogating an instance of a
+    /// parameter.
     DynamicValue(DynamicValueType),
-    /// Determine the container size in bits by interrogating an instance of a parameter and selecting a specified value based on tests of the value of that parameter.
+    /// Determine the container size in bits by interrogating an instance of a
+    /// parameter and selecting a specified value based on tests of the value of
+    /// that parameter.
     DiscreteLookupList(DiscreteLookupListType),
 }
 
@@ -27302,7 +31957,9 @@ impl VariableStringChoice1 {
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::DynamicValue(v) => v.write_xml(w, "DynamicValue")?,
-            Self::DiscreteLookupList(v) => v.write_xml(w, "DiscreteLookupList")?,
+            Self::DiscreteLookupList(v) => {
+                v.write_xml(w, "DiscreteLookupList")?
+            }
         }
         Ok(())
     }
@@ -27310,7 +31967,9 @@ impl VariableStringChoice1 {
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("DynamicValue") => Self::DynamicValue(r.read_child()?),
-            Some("DiscreteLookupList") => Self::DiscreteLookupList(r.read_child()?),
+            Some("DiscreteLookupList") => {
+                Self::DiscreteLookupList(r.read_child()?)
+            }
             _ => return Err(r.expected("DynamicValue|DiscreteLookupList")),
         })
     }
@@ -27319,9 +31978,15 @@ impl VariableStringChoice1 {
 /// Alternatives of a `<choice>` in [`VariableStringType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum VariableStringChoice2 {
-    /// In some string implementations, the size of the string contents (not the memory allocation size) is determined by a leading numeric value. This is sometimes referred to as Pascal strings. If a LeadingSize is specified, then the TerminationChar element does not have a functional meaning.
+    /// In some string implementations, the size of the string contents (not the
+    /// memory allocation size) is determined by a leading numeric value. This
+    /// is sometimes referred to as Pascal strings. If a LeadingSize is
+    /// specified, then the TerminationChar element does not have a functional
+    /// meaning.
     LeadingSize(LeadingSizeType),
-    /// The termination character that represents the end of the string contents. For C and most strings, this is null (00), which is the default.
+    /// The termination character that represents the end of the string
+    /// contents. For C and most strings, this is null (00), which is the
+    /// default.
     TerminationChar(String),
 }
 

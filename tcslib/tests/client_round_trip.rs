@@ -20,7 +20,7 @@ use tcslibgs::{
     ConfigTelemetry, ConfigVersion, ConnectTelemetry, DHSample, NodeCounts,
     NodeId, NodeTelemetry, PingTelemetry, QueryNodeSampleTelemetry,
     QueryNodeTelemetry, Reason, RestartArmTelemetry, RestartTelemetry,
-    SetNodeTelemetry, Telemetry,
+    SetNodeTelemetry, TcsError, Telemetry,
 };
 
 fn stub_sample(first: u8) -> DHSample {
@@ -284,16 +284,35 @@ fn every_operation_reaches_the_spacecraft_and_comes_back() {
         client.restart_arm(ArmKey(0x1234)).unwrap(),
         CommandStatus::Success
     );
+    // The station hears generation 4 before it restarts the vehicle.
+    assert_eq!(client.beacon_heard(4, false), None);
     assert_eq!(
         client.restart(ArmKey(0x1234)).unwrap(),
         CommandStatus::Success
     );
-    assert_eq!(
-        client
-            .configure(BeaconInterval::of(Duration::from_secs(1)))
-            .unwrap(),
-        CommandStatus::Success
+
+    // Nothing may follow a RESTART until a beacon says it is done: refused
+    // here, unsent, so the stand-in is not asked it.
+    let configure = |client: &mut tcslib::TcsClient| {
+        client.configure(BeaconInterval::of(Duration::from_secs(1)))
+    };
+    let refused = configure(&mut client).expect_err("refused while waiting");
+    assert!(
+        matches!(refused, TcsError::AwaitingRestart(_)),
+        "{refused:?}"
     );
+    assert!(refused.to_string().contains("generation other than 4"));
+    // Not by the old generation's beacons, restarting or not, nor by the
+    // new one's while it says it is restarting.
+    assert_eq!(client.beacon_heard(4, true), None);
+    assert_eq!(client.beacon_heard(4, false), None);
+    assert_eq!(client.beacon_heard(5, true), None);
+    assert!(client.restart_wait().is_some());
+    // By a new generation that is not restarting.
+    let ended = client.beacon_heard(5, false).expect("it ends the wait");
+    assert_eq!(ended.before, Some(4));
+    assert!(client.restart_wait().is_none());
+    assert_eq!(configure(&mut client).unwrap(), CommandStatus::Success);
 
     stub.join().expect("the stand-in answered every command");
 }

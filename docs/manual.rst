@@ -2049,7 +2049,7 @@ The beacon example
 
 What a ground station knows about a spacecraft without asking it anything.
 tcspecial sends a beacon from ``beacon.send`` to ``beacon.recv`` every
-``beacon.interval`` for as long as it runs, over a socket of its own and
+``beacon.default_interval`` for as long as it runs, over a socket of its own and
 whether or not anything has connected to it -- so this example commands
 nothing, and still says whether the vehicle is alive, which build it is, and
 whether the configuration it is serving is the one the ground read.
@@ -2075,10 +2075,12 @@ none of it is the program's own:
   find where the beacons are, starts the loop on a thread of its own, and puts
   each pass in the window.
 
-A beacon is 34 bytes in a fixed layout: ``tcspecial`` and a space, the
+A beacon is 57 bytes in a fixed layout: ``tcspecial`` and a space, the
 version's major, minor and patch a byte each, a space, the sixteen bytes of
-the configuration's MD5 digest, and the beacon's number in four bytes, most
-significant first. The layout is described in XTCE, in
+the configuration's MD5 digest, the beacon's number and the generation number
+in four bytes each, most significant first, a byte whose top bit says a
+restart has been initiated, the sixteen bytes of the interface's digest, and a
+CRC-16 of everything before it. The layout is described in XTCE, in
 ``tcslibgs/xtce/beacon.xml``, and tcspecial packs each beacon, and
 ``tcslib::beacon`` unpacks it, with the code tcs-xtce generates from that file:
 ``tcslibgs::Beacon``. The example's test packs the beacon it sends the same
@@ -3633,10 +3635,29 @@ Restart
   links closed, the log flushed -- and runs itself again in the same process,
   reading its configuration file again: a changed configuration is flown this
   way. It keeps the descriptors it was started with, such as a socket or pipe
-  a supervisor handed it, and closes everything it opened itself. Its beacons
-  start again at #1. On a system where it cannot do that -- one with neither
-  ``/proc/self/fd`` nor ``/dev/fd`` to say what it was started with -- it says
-  so on its error output and exits.
+  a supervisor handed it, and closes everything it opened itself. On a system
+  where it cannot do that -- one with neither ``/proc/self/fd`` nor
+  ``/dev/fd`` to say what it was started with -- it says so on its error
+  output and exits, so run tcspecial under a supervisor that starts it again
+  when it exits.
+
+  The beacons are how the ground learns the restart happened. From the
+  moment the restart is taken, every beacon carries a *restarting* flag --
+  the panel's line ends ``, RESTARTING`` -- and one goes at once, the rest
+  every ``beacon.reset_interval``. The tcspecial that comes back counts
+  itself a new *generation*, one more than the last, which it keeps in the
+  file the ``tcspecial`` section's ``state_file`` names; its beacons start
+  again at #1, say the new generation and have the flag clear. They go
+  every ``beacon.reset_interval`` until the first command from the MOC
+  arrives, and every ``beacon.default_interval`` after that.
+
+  Once a station has sent a restart it sends nothing more to the vehicle
+  until a beacon of the new generation, not restarting, arrives: the
+  vehicle that comes back may read packets differently from the one that
+  went, and the beacon -- not the answer to the restart, which may never
+  arrive -- is what says it is back. A command tried in between is refused
+  by the station, unsent, saying which generation it is waiting to see
+  change.
 
 The remaining four -- ``Query``, ``Query DH``, ``Start DH`` and ``Stop DH`` --
 answer in ``Last Response`` and send nothing. Starting and stopping a handler
@@ -3645,7 +3666,8 @@ without anyone asking.
 
 Beaconing
 ^^^^^^^^^
-TCSpecial sends a beacon at the interval its configuration states, from the
+TCSpecial sends a beacon every ``beacon.default_interval``, or every
+``beacon.reset_interval`` across a restart (see Restart, above), from the
 address the payload set's ``tcspecial`` section names to the address beside it,
 or ``tcspecial.yaml``'s pair for a set with no section. Tcsmoc binds that same
 receiving address, having read the same files. Tcsmoc displays the
@@ -3679,8 +3701,8 @@ each.
 
 Which colour the indicator shows is decided by how many beacons have gone
 missing since the last one arrived. A beacon is missed once the
-configuration's ``beacon.interval`` has passed without it, so the count goes
-up by one each interval, and a new beacon puts it back to nought:
+configuration's ``beacon.default_interval`` has passed without it, so the
+count goes up by one each interval, and a new beacon puts it back to nought:
 
 ================  ===============  =======
 Beacons missed    Indicator        Stage

@@ -24,6 +24,7 @@ from tcslib.beacon import (  # noqa: E402
     Stage,
     Step,
 )
+from tcslibgs import interface  # noqa: E402
 from tcslibgs.beacon import BEACON_BYTES, Beacon, BeaconError  # noqa: E402
 from tcslibgs.configuration import HostPort  # noqa: E402
 
@@ -32,13 +33,36 @@ SECOND = 1_000_000_000
 AT = 1_000_000 * SECOND
 
 
-def a_beacon(sequence=2, digest=None, version=(0, 1, 0)):
+def crc16(data):
+    """The CCSDS CRC-16, written out here rather than taken from the code
+    under test."""
+    crc = 0xFFFF
+    for byte in data:
+        crc ^= byte << 8
+        for _ in range(8):
+            crc = ((crc << 1) ^ 0x1021) if crc & 0x8000 else crc << 1
+            crc &= 0xFFFF
+    return crc
+
+
+def sealed(body):
+    """``body`` with the CRC of it after it, as every beacon ends."""
+    return body + struct.pack(">H", crc16(body))
+
+
+def a_beacon(sequence=2, digest=None, version=(0, 1, 0), generation=1,
+             restarting=False, interface_digest=None):
     """A beacon, as tcspecial sends one: the name, the version a byte a part,
-    a space, the digest, and the number, four bytes big-endian."""
+    a space, the digest, the number and the generation, four bytes
+    big-endian each, the restarting bit and seven spare, the interface's
+    digest and the CRC."""
     digest = digest or [36, 195, 155, 114, 7, 4, 241, 185,
                         121, 87, 153, 67, 108, 53, 167, 176]
-    return (b"tcspecial " + bytes(version) + b" " + bytes(digest)
-            + struct.pack(">I", sequence))
+    interface_digest = interface_digest or interface.of_this_tree()
+    return sealed(b"tcspecial " + bytes(version) + b" " + bytes(digest)
+                  + struct.pack(">II", sequence, generation)
+                  + bytes([0x80 if restarting else 0])
+                  + bytes(interface_digest))
 
 
 def schedule():
@@ -170,15 +194,38 @@ class LayoutTest(unittest.TestCase):
         digest = bytes([0xD4, 0x1D, 0x8C, 0xD9, 0x8F, 0x00, 0xB2, 0x04,
                         0xE9, 0x80, 0x09, 0x98, 0xEC, 0xF8, 0x42, 0x7E])
         packed = Beacon(sequence=0x01020304, version=(1, 2, 3),
-                        digest=digest).to_bytes()
+                        digest=digest, generation=0x0A0B0C0D,
+                        restarting=True).to_bytes()
         self.assertEqual(packed, a_beacon(sequence=0x01020304,
                                           digest=list(digest),
-                                          version=(1, 2, 3)))
+                                          version=(1, 2, 3),
+                                          generation=0x0A0B0C0D,
+                                          restarting=True))
         self.assertEqual(len(packed), BEACON_BYTES)
-        self.assertEqual(BEACON_BYTES, 34)
+        self.assertEqual(BEACON_BYTES, 57)
+
+    def test_the_crc_is_the_ccsds_one(self):
+        self.assertEqual(crc16(b"123456789"), 0x29B1)
+
+    def test_a_beacon_whose_crc_fails_is_refused(self):
+        damaged = bytearray(a_beacon())
+        damaged[30] ^= 1
+        with self.assertRaisesRegex(BeaconError, "CRC"):
+            Beacon.read(bytes(damaged))
+
+    def test_this_trees_interface_is_the_one_the_rust_was_built_with(self):
+        # The constant `make interface-digest` wrote for the Rust, read from
+        # its source: one digest, computed by two runtimes, must agree.
+        source = (Path(__file__).resolve().parents[2] / "tcslibgs" / "src"
+                  / "interface_digest.rs").read_text()
+        rust = bytes(int(byte, 16)
+                     for byte in __import__("re").findall(r"0x([0-9a-f]{2})",
+                                                          source))
+        self.assertEqual(interface.of_this_tree(), rust)
 
     def test_a_beacon_reads_back_as_itself(self):
-        sent = Beacon(sequence=7, version=(1, 2, 3), digest=bytes(range(16)))
+        sent = Beacon(sequence=7, version=(1, 2, 3), digest=bytes(range(16)),
+                      generation=4, restarting=True)
         self.assertEqual(Beacon.read(sent.to_bytes()), sent)
         with self.assertRaises(BeaconError):
             Beacon.read(sent.to_bytes() + b"\0")
@@ -202,8 +249,16 @@ class HearingTest(unittest.TestCase):
 
     def test_a_beacon_is_shown_by_what_it_said(self):
         datagram = a_beacon(sequence=3, digest=[0xAB] * 16, version=(1, 2, 3))
-        want = f"tcspecial v1.2.3 md5 {'ab' * 16}"
+        want = f"tcspecial v1.2.3 md5 {'ab' * 16} generation 1"
         self.assertEqual(beacon.message_of(datagram), want)
+        restarting = a_beacon(sequence=3, digest=[0xAB] * 16,
+                              version=(1, 2, 3), generation=12,
+                              restarting=True)
+        self.assertEqual(
+            beacon.message_of(restarting),
+            f"tcspecial v1.2.3 md5 {'ab' * 16} generation 12, RESTARTING")
+        heard = beacon.hear(restarting, None)
+        self.assertEqual((heard.generation, heard.restarting), (12, True))
         self.assertEqual(beacon.hear(datagram, None).sequence, 3)
         self.assertIsNone(beacon.hear(b"hello", None).sequence)
 
@@ -226,16 +281,26 @@ class HearingTest(unittest.TestCase):
         self.assertEqual(beacon.hear(good, None).sequence, 3)
         self.assertIsNone(beacon.hear(good + b"\0", None).sequence)
         self.assertIsNone(beacon.hear(good[:-1], None).sequence)
-        self.assertIsNone(beacon.hear(b"T" + good[1:], None).sequence)
         self.assertIsNone(
-            beacon.hear(good[:13] + b"-" + good[14:], None).sequence)
+            beacon.hear(sealed(b"T" + good[1:-2]), None).sequence)
+        self.assertIsNone(
+            beacon.hear(sealed(good[:13] + b"-" + good[14:-2]),
+                        None).sequence)
 
     def test_a_beacons_number_says_what_happened_before_it(self):
-        self.assertEqual(beacon.counted(None, 7), (Counted.FIRST, 0))
-        self.assertEqual(beacon.counted(7, 8), (Counted.NEXT, 0))
-        self.assertEqual(beacon.counted(7, 10), (Counted.MISSED, 2))
-        self.assertEqual(beacon.counted(7, 7), (Counted.RESTARTED, 0))
-        self.assertEqual(beacon.counted(7, 1), (Counted.RESTARTED, 0))
+        self.assertEqual(beacon.counted(None, (3, 7)), (Counted.FIRST, 0))
+        self.assertEqual(beacon.counted((3, 7), (3, 8)), (Counted.NEXT, 0))
+        self.assertEqual(beacon.counted((3, 7), (3, 10)), (Counted.MISSED, 2))
+        self.assertEqual(beacon.counted((3, 7), (3, 7)),
+                         (Counted.RESTARTED, 0))
+        self.assertEqual(beacon.counted((3, 7), (3, 1)),
+                         (Counted.RESTARTED, 0))
+
+    def test_a_generation_that_changes_is_a_restart(self):
+        self.assertEqual(beacon.counted((3, 5), (4, 90)),
+                         (Counted.RESTARTED, 0))
+        self.assertEqual(beacon.counted((9, 5), (1, 6)),
+                         (Counted.RESTARTED, 0))
 
     def test_a_beacon_is_shown_by_when_it_arrived(self):
         self.assertEqual(beacon.received_at(None), "--:--:--")
@@ -288,6 +353,14 @@ class LoopTest(unittest.TestCase):
         self.assertTrue(
             any("start again at #1" in r for r in restart.remarks),
             restart.remarks)
+        initiated = self.beacons.heard(
+            a_beacon(sequence=2, restarting=True), sender)
+        self.assertIn("tcspecial has initiated a restart: generation 1 is "
+                      "ending", initiated.remarks)
+        started = self.beacons.heard(
+            a_beacon(sequence=1, generation=2), sender)
+        self.assertIn("tcspecial has restarted: generation 2 is flying, "
+                      "after 1", started.remarks)
 
     def test_a_datagram_from_the_wrong_place_is_not_a_beacon(self):
         wrong = self.beacons.heard(a_beacon(), ("127.0.0.1", 9999))

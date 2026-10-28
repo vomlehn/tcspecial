@@ -48,6 +48,11 @@ pub enum TcsError {
     #[error("Not armed for restart")]
     NotArmed,
 
+    /// A command refused by the ground's own client, unsent: a RESTART was
+    /// sent, and nothing more may be until a beacon says it is done.
+    #[error("{0}")]
+    AwaitingRestart(String),
+
     #[error("Invalid arm key")]
     InvalidArmKey,
 

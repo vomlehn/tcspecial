@@ -144,14 +144,16 @@ fn against_a_vehicle(program: &Path) -> String {
 
     let dir = tempfile::tempdir().expect("a directory");
     let configuration = dir.path().join("ground.yaml");
+    let state = dir.path().join("tcspecial.state").display().to_string();
     std::fs::write(
         &configuration,
         format!(
             "tcspecial:
   gateway: radio
   beacon:
-    interval: \"5 s\"
+    default_interval: \"5 s\"
     recv: \"127.0.0.1:{beacons}\"
+    reset_interval: \"1 s\"
     send: \"127.0.0.1:{}\"
   log:
     directory: \"{}\"
@@ -162,6 +164,7 @@ fn against_a_vehicle(program: &Path) -> String {
   payload_telemetry:
     dest_base: \"127.0.0.1:{}\"
     source_base: \"127.0.0.1:{}\"
+  state_file: \"{state}\"
   tcs_cmd:
     recv: \"127.0.0.1:{}\"
     send: \"127.0.0.1:{cmd_from}\"
@@ -207,7 +210,7 @@ vehicle:
             while !stop.load(Ordering::Relaxed) {
                 sequence += 1;
                 let datagram =
-                    Beacon::new(sequence, version, digest).to_bytes();
+                    Beacon::new(sequence, version, digest, 1).to_bytes();
                 let _ = beacon.send_to(&datagram, ("127.0.0.1", beacons));
 
                 // A ping, answered as the ping node answers it, down to where
@@ -350,7 +353,9 @@ vehicle:
     // configuration's, which differs between the two runs.
     let expected = [
         format!("configuration: md5 {digest}"),
-        format!("beacon: Heard, tcspecial v{version} md5 {digest}"),
+        format!(
+            "beacon: Heard, tcspecial v{version} md5 {digest} generation 1"
+        ),
         "connect: agrees".to_string(),
         "ping: answered".to_string(),
         "query ping (node 1): Success, running".to_string(),
@@ -360,6 +365,7 @@ vehicle:
         "sample ping: took \"ping\" of 6 bytes, gave nothing".to_string(),
         "configure: beacon every 5 s, done".to_string(),
         "restart: armed done, restarted done".to_string(),
+        "restart: awaiting a beacon of the next generation: yes".to_string(),
         "ping ping through moc: sent".to_string(),
         "data from ping: hello from ping".to_string(),
         "ping ping: answered, round trip timed, up and down summing to it \

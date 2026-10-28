@@ -84,17 +84,12 @@ fn a_free_port() -> u16 {
         .port()
 }
 
-/// How many allocations unpacking one beacon makes: tcs-xtce's Rust decoder
-/// reads the name and the space as Strings and the digest as a Vec. See
-/// `tcslibgs::Beacon::read`. Should tcs-xtce come to decode into fixed
-/// storage, as its C decoder does, this is nought and the test below says so.
-const UNPACKING_ALLOCATES: usize = 3;
-
-/// Once the first has been heard, a beacon pass allocates nothing but what
-/// unpacking the beacon does: not for what the beacon said, nor for the pass
-/// it hands back.
+/// Once the first has been heard, a beacon pass allocates nothing: not to
+/// unpack the beacon, which tcs-xtce's Rust decoder does into fixed buffers
+/// (see `tcslibgs::Beacon::read`), not for what the beacon said, and not for
+/// the pass it hands back.
 #[test]
-fn a_beacon_pass_allocates_nothing_but_the_unpacking() {
+fn a_beacon_pass_allocates_nothing() {
     let vehicle = UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
     let from = vehicle.local_addr().expect("its address");
     let port = a_free_port();
@@ -116,7 +111,8 @@ fn a_beacon_pass_allocates_nothing_but_the_unpacking() {
         return;
     };
     let beacon = |sequence: u32| {
-        Beacon::new(sequence, ConfigVersion::of_this_build(), digest).to_bytes()
+        Beacon::new(sequence, ConfigVersion::of_this_build(), digest, 1)
+            .to_bytes()
     };
     let datagrams: Vec<Vec<u8>> = (1..=23).map(beacon).collect();
 
@@ -140,13 +136,7 @@ fn a_beacon_pass_allocates_nothing_but_the_unpacking() {
             heard(&mut beacons);
         }
     });
-    assert_eq!(
-        made,
-        20 * UNPACKING_ALLOCATES,
-        "twenty beacon passes allocated {made} times, where unpacking twenty \
-         beacons allocates {}",
-        20 * UNPACKING_ALLOCATES
-    );
+    assert_eq!(made, 0, "twenty beacon passes allocated {made} times");
 }
 
 /// A datum received into a buffer made beforehand allocates nothing.

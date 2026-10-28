@@ -585,7 +585,7 @@ has two and a timing, and the log has a place and a size. The other two,
 ``gateway`` and ``restart_arm_valid``, are one fact each and are written as
 one. ``gateway`` is what the vehicle answers to -- see `Gateways: what the
 vehicle answers to`_. A prefix repeated
-on two or three flat names -- ``beacon.send``, ``beacon.recv``, ``beacon.interval`` -- is a subsection
+on two or three flat names -- ``beacon.send``, ``beacon.recv``, ``beacon.default_interval`` -- is a subsection
 somebody declined to write, and the names under one are short for the same
 reason: ``beacon.send`` says what ``beacon.send`` said, where the reader is
 already looking at the beacon.
@@ -869,7 +869,7 @@ is stated once, in ``tcspecial``:
      tcs_cmd: { cmd_msgid: "0x4280", response_msgid: "0x4200" }
      payload_command: { cmd_base: "0x4290", response_base: "0x4210" }
      payload_telemetry: { tlm_base: "0x4220" }
-     beacon: { interval: "5 s", tlm_msgid: "0x4201" }
+     beacon: { default_interval: "5 s", tlm_msgid: "0x4201" }
 
    gateway:
      - name: fsw
@@ -1017,9 +1017,9 @@ Requirement
 Requirement
     ``CONNECT`` and the beacon go over the bus as they go over the radio: the
     first on ``tcs_cmd``, the second published on ``beacon.tlm_msgid`` every
-    ``beacon.interval``. What the cFS side does with the beacon -- forward it
-    to the ground, record it, watch it -- is the mission's, and the digest it
-    carries is the same digest.
+    ``beacon.default_interval``. What the cFS side does with the beacon --
+    forward it to the ground, record it, watch it -- is the mission's, and
+    the digest it carries is the same digest.
 
 Requirement
     A ``gateway_cfs`` node that the bus sends through -- a command binding
@@ -1236,7 +1236,7 @@ Requirement
     attributes, the links and the command bindings -- across every included
     file, the same for either spelling, and not the editor's layout or the
     description. tcspecial says its digest as it starts and sends it in a
-    beacon every ``beacon.interval``, from ``beacon.send`` to
+    beacon every ``beacon.default_interval``, from ``beacon.send`` to
     ``beacon.recv``. tcsmoc compares the digest in each beacon with the one it
     computed itself; when they differ it says so on the beacon line and the
     console and asks the operator whether to continue anyway, quitting -- and
@@ -2136,7 +2136,7 @@ the node threads
 
 the beacons
     Their own thread: a beacon every
-    ``beacon.interval``, carrying the digest of the configuration, from
+    ``beacon.default_interval``, carrying the digest of the configuration, from
     ``beacon.send`` to ``beacon.recv``.
 
 Requirement
@@ -3064,8 +3064,9 @@ Requirement
     whatever a supervisor handed it. Which those were is asked as the process
     starts, before anything is opened, from ``/proc/self/fd`` or ``/dev/fd``.
     The process id stays the same, so a supervisor sees one process
-    throughout, and the beacons start again at #1, which is how the ground
-    tells a restart from a gap.
+    throughout, and the beacons start again at #1 in the next generation,
+    which is how the ground tells a restart from a gap: see `The generation
+    number and the state file`_.
 
 Requirement
     Where that cannot be done -- neither directory could be read as the
@@ -5480,12 +5481,29 @@ it is published.
 |                |            |           | of beacons this process has sent,  |
 |                |            |           | from one, most significant byte    |
 |                |            |           | first                              |
+|                +------------+-----------+------------------------------------+
+|                | generation | 4 bytes   | How many times tcspecial has       |
+|                |            |           | started, from the state file, most |
+|                |            |           | significant byte first             |
+|                +------------+-----------+------------------------------------+
+|                | restarting | 1 bit     | Set once a restart is initiated:   |
+|                |            |           | the most significant bit of its    |
+|                |            |           | byte                               |
+|                +------------+-----------+------------------------------------+
+|                | spare      | 7 bits    | Nought                             |
+|                +------------+-----------+------------------------------------+
+|                | interface  | 16 bytes  | The digest of the interface this   |
+|                |            |           | tcspecial speaks                   |
+|                +------------+-----------+------------------------------------+
+|                | crc        | 2 bytes   | The CCSDS CRC-16 of every byte     |
+|                |            |           | before it                          |
 +----------------+------------+-----------+------------------------------------+
 
 Requirement
-    A beacon is exactly 34 bytes, in the layout above, and the ground refuses
-    a datagram of any other length or without the name and the space where
-    they belong, showing what arrived rather than a beacon. Something else
+    A beacon is exactly 57 bytes, in the layout above, and the ground refuses
+    a datagram of any other length, without the name and the space where
+    they belong, with a spare bit set or whose CRC does not match, showing
+    what arrived rather than a beacon. Something else
     sending to the beacon port is then seen for what it is.
 
 Requirement
@@ -5494,12 +5512,12 @@ Requirement
     by ``make beacon-packet`` in ``tcslibgs/`` and never written by hand.
 
 Requirement
-    Packing a beacon allocates nothing once the packer is made: tcspecial's
-    beacon thread makes one ``BeaconPacker`` when it starts and packs every
-    beacon into its buffer. Unpacking one allocates three times, because
-    tcs-xtce's Rust decoder hands back the name, the space and the digest as a
-    ``String``, a ``String`` and a ``Vec``; ``tcslib``'s tests hold a beacon
-    pass to exactly those.
+    Neither packing nor unpacking a beacon allocates once the packer is made:
+    tcspecial's beacon thread makes one ``BeaconPacker`` when it starts and
+    packs every beacon into its buffer, and the code that unpacks one is
+    generated with ``--dynamic-allocations false``, so the digests are read
+    into fixed buffers. ``tcslib``'s tests hold a beacon pass to no
+    allocation at all.
 
 Requirement
     A beacon carries no time. What the ground shows is when the last one
@@ -5520,10 +5538,12 @@ Requirement
     digests, which is the difference a version would have told.
 
 Requirement
-    The MOC shows what the last beacon said as one line, each of the two
+    The MOC shows what the last beacon said as one line, each part
     labelled: ``tcspecial v0.1.0 md5`` and the digest's sixteen bytes in
-    hex with nothing between them. The answer to a ``CONNECT`` is
-    written the same way; see `What Each End Read`_.
+    hex with nothing between them, then ``generation`` and the generation
+    number, then ``, RESTARTING`` while the restarting bit is set. The answer
+    to a ``CONNECT`` is written the same way, up to the generation; see
+    `What Each End Read`_.
 
 Requirement
     Both are settled when the process starts, not read when a beacon goes
@@ -5561,6 +5581,456 @@ Requirement
     A number that does not go forward is therefore a restart rather than a
     gap, and the MOC says which it was: *n beacons did not arrive*, or *the
     beacons start again at #1, so tcspecial has restarted*.
+
+The Interface, the Fallback and Switching Over
+==============================================
+
+This section is the whole of what was asked for when the link was moved from
+JSON to XTCE: what every packet is, the two interfaces the vehicle speaks,
+how a new interface and everything it needs is uploaded and protected, how
+the vehicle restarts onto it, what the beacon says while it does, and what
+the ground may send meanwhile. Each requirement is stated here once; where
+another section says the same thing, this one is the one it follows.
+
+.. note::
+   **What runs today.** The beacon carries the generation number, the
+   restarting bit, the interface digest and a CRC, and is read without
+   allocating. ``state_file``, ``beacon.default_interval`` and
+   ``beacon.reset_interval`` are read; every start counts itself in the
+   state file before its first beacon; the beacon goes fast from start, and
+   from a restart's being initiated, and slows when a command from the MOC
+   is taken. ``tcslibgs::interface`` gives the interface digest in Rust and
+   Python. ``tcslib``'s ``TcsClient``, and through it the C/C++ library,
+   holds a station's commands from a RESTART until a beacon says it is done,
+   and the beacon watches in Rust and Python judge a restart by the
+   generation. Commands and answers are still JSON on the link, and carry no
+   CRC or generation; the fallback interface and its link, load sets,
+   uploads, SWITCH, the golden build, the refusal of full-interface commands
+   on an interface mismatch and ``tcsverify --interface`` are designed here
+   and not yet built.
+
+Every packet is XTCE
+--------------------
+
+Requirement
+    Every packet on every link between the MOC and tcspecial -- each command,
+    each answer and the beacon -- has a layout stated in XTCE and is packed
+    and unpacked by the code tcs-xtce generates from that statement. Nothing
+    on a link is JSON, and nothing that packs or unpacks a packet is written
+    by hand.
+
+Requirement
+    Commands and answers are built on a base container that holds the CCSDS
+    primary header, so that a ground system that reads CCSDS Space Packets
+    from an XTCE mission database -- Yamcs is one -- reads them with no code
+    of its own. The beacon keeps the name and version it starts with, which
+    are what let a person reading a capture see what it is.
+
+Requirement
+    Every packet ends with a CRC-16 (polynomial ``0x1021``, initial
+    remainder ``0xFFFF``, the CCSDS one) over every byte before it, stated in
+    its container's ``ErrorDetectCorrect``. A packet whose CRC does not match
+    is dropped and counted, and nothing it says is acted on.
+
+UDP has a checksum of its own, but over IPv4 a sender may leave it out --
+nought in that field means "not computed" -- and a receiver then has nothing
+to check. A packet that carries its own check is valid whatever carried it,
+which is what lets the same definition of *valid* serve a radio, an SBN peer
+and a loopback.
+
+Requirement
+    A packet is *valid* when it passes its own check, or, where the transport
+    beneath it guarantees end-to-end integrity and the packet carries no check
+    of its own, when the transport delivered it. A valid packet from the MOC
+    is one that is valid and came from where the configuration says the MOC
+    sends from (``tcslibgs::came_from``). Nothing else is.
+
+Requirement
+    The generated Rust that tcspecial packs and unpacks with allocates
+    nothing: it is generated with ``--dynamic-allocations false``, so that a
+    string or a binary field is a fixed-capacity buffer whose capacity the
+    XTCE states, and decoding a command in the main loop touches no heap.
+
+Two interfaces
+--------------
+
+The vehicle speaks two interfaces, each a set of XTCE documents with a
+digest of its own: the *full* interface, which is everything the ground can
+ask of the vehicle, and the *fallback* interface, which is just enough to put
+a new full interface on the vehicle and switch to it.
+
+Requirement
+    The *interface digest* of an interface is the tcs-xtce digest of its set
+    of XTCE documents: the MD5 of what the documents mean, which leaves out
+    comments, whitespace, attribute order and the order of the members of a
+    set, and which tcs-xtce computes identically in Rust, C/C++ and Python.
+    Two programs speak the same interface when, and only when, their digests
+    are the same.
+
+Requirement
+    The fallback interface is its own XTCE document,
+    ``tcslibgs/xtce/fallback.xml``: its own ``SpaceSystem``, sharing no type,
+    parameter or container with the full interface, so that no change to the
+    full interface can change it. It is compiled into every build, and no
+    upload replaces it.
+
+Requirement
+    The fallback interface is taken on a link of its own -- ``fallback.recv``
+    and ``fallback.send`` in the ``tcspecial`` section, required -- and is
+    always taken, whichever full interface is running. A full interface that
+    cannot be decoded, or that the ground and the vehicle disagree about, then
+    still leaves a way in.
+
+Requirement
+    The fallback interface is PING; CONNECT, whose answer carries the build,
+    the configuration digest, the interface digest and the generation number;
+    the upload commands below; and SWITCH_ARM and SWITCH. It has nothing that
+    starts, stops or sets a node, changes the beacon interval or changes what
+    any payload does: what it can do to the vehicle is put files in the
+    staging area and switch to them.
+
+Requirement
+    The full interface is read and write: every command the vehicle takes,
+    the fallback's among them.
+
+Requirement
+    The ground compares interface digests before it sends a full-interface
+    command: ``tcslib`` refuses to send one while the last beacon's
+    interface digest differs from the digest of the documents the ground
+    read, and says which documents and which two digests. Fallback commands
+    are never refused for this, because they are how a mismatch is fixed.
+
+Reading, writing and checking an interface
+------------------------------------------
+
+Requirement
+    ``tcslibgs::interface`` is the one place an interface is read, written
+    and checked, and the vehicle, ``tcslib``, ``tcsverify`` and ``tcsgui``
+    all go through it:
+
+    * *read*: the documents of an interface and the manifest they hold, and
+      their interface digest;
+    * *write*: a load set into a directory -- the documents, the build and
+      every file the manifest names -- and the upload commands that carry it
+      to the vehicle, a piece at a time;
+    * *check*: that a directory holds exactly the load set its manifest
+      describes, every file of the size and digest it states, and that the
+      configuration in it passes ``tcsverify``'s ``verify`` against the
+      interface in it.
+
+Requirement
+    ``tcsverify --interface <documents>`` prints an interface's digest and
+    every problem with its manifest, with the file and line of each, and
+    ``tcsverify --interface <documents> --load-set <directory>`` checks a load
+    set as the vehicle will check it before switching to it.
+
+The load set
+------------
+
+A full interface is compiled into the build that speaks it: tcs-xtce
+generates code from XTCE and does not interpret it. A new interface is
+therefore a new build, and a new build is only useful with the configuration
+it serves and the programs and data of the app nodes in that configuration.
+All of them together are a *load set*, and a load set is switched to whole or
+not at all.
+
+Requirement
+    The full interface's XTCE states its load set, in ``AncillaryData`` named
+    ``tcspecial.load``, one entry for every file in it: its role, its path
+    within the load set, its size in bytes and its MD5. The roles are
+    ``executable`` (exactly one: the tcspecial built from these documents),
+    ``configuration`` (exactly one), ``app_program`` and ``app_data``. An app
+    entry names the app node it belongs to, by the node's name in the
+    configuration.
+
+Requirement
+    A load set is refused, by ``tcsverify`` on the ground and by the vehicle
+    before it switches, unless the manifest and the configuration agree:
+    every app node in the configuration has its program in the manifest, and
+    every file each app node's attributes name is in it; every app entry
+    names an app node the configuration has; and no file is in the manifest
+    twice or in the directory without being in the manifest.
+
+The XTCE documents cannot list themselves -- a document cannot hold its own
+digest -- so they are named by the interface digest instead: the SWITCH that
+starts a load set carries the interface digest it means, and the vehicle
+switches only to the set with that digest.
+
+Requirement
+    A build knows the interface digest it was generated from, and refuses to
+    start from a load set whose documents have another: a load set holding
+    one build and another build's documents is a load set the ground would
+    misread.
+
+Requirement
+    The vehicle keeps each load set in a directory of its own, named by its
+    interface digest in hex, under the directory the ``loads`` attribute of
+    the ``tcspecial`` section names. Uploads go to a staging directory beside
+    them, and the running load set is never written to.
+
+Uploading, and keeping what was uploaded
+----------------------------------------
+
+Requirement
+    A file is uploaded with FILE_OPEN, naming the load set, the path and the
+    size and MD5 the whole file will have; FILE_WRITE, carrying an offset and
+    up to one packet of bytes; and FILE_CLOSE, which is answered ``Success``
+    only when the bytes written are the size and the MD5 FILE_OPEN stated.
+    Each is idempotent: a FILE_WRITE repeated writes the same bytes to the
+    same place, and FILE_OPEN of a file already complete and correct answers
+    ``AlreadyExists``.
+
+Requirement
+    LOAD_CHECK checks a staged load set as ``tcsverify`` does and, when it
+    passes, moves it from staging to its own directory under ``loads``, in one
+    rename.
+
+Requirement
+    Every file uploaded is made read-only as FILE_CLOSE accepts it -- mode
+    ``0444``, or ``0555`` for an ``executable`` or ``app_program`` -- and a load
+    set's directory is made read-only (``0555``) as LOAD_CHECK accepts it, so
+    that nothing in it can be removed, renamed or written. Where the file
+    system allows it, each is also made immutable (``FS_IMMUTABLE_FL``, what
+    ``chattr +i`` sets), which a process running as root cannot get round
+    by accident; where it does not, the log says so once, at start.
+
+Whether a file can be deleted is decided by the directory it is in, not by
+the file: a file of mode ``0444`` in a directory that can be written is
+removed by ``rm -f`` without a question. That is why the directory is made
+read-only as well as the files, and why the immutable attribute is used
+where there is one: an operator logged in as root has every permission,
+and the immutable attribute is the one thing that asks first.
+
+Requirement
+    LOAD_UNLOCK makes a load set's directory and files writable again, so
+    that it can be replaced or removed, and LOAD_REMOVE removes one. Both
+    refuse the running load set and the one the vehicle would fall back to,
+    answering ``InvalidParameter`` and saying which it is.
+
+Restarting onto a load set
+--------------------------
+
+Requirement
+    A switch is a full restart, never a change made in place: every node
+    stopped, the log flushed, the process run again. Nothing then survives
+    the switch except what is on disk, so nothing the old interface left in
+    memory can be read with the new one.
+
+Requirement
+    SWITCH_ARM and SWITCH are armed as RESTART_ARM and RESTART are, and
+    SWITCH carries the interface digest of the load set to switch to. A
+    SWITCH is refused, ``NotFound``, unless that load set has passed
+    LOAD_CHECK, and is checked again -- every size and every MD5 -- just
+    before the restart, because storage can change between the two.
+
+Requirement
+    The executable the vehicle is installed with is the *golden* build. It is
+    always what starts: on every start it reads the state file and, where a
+    load set is chosen, checks it and runs that load set's executable with
+    that load set's configuration. A golden build carries the fallback
+    interface and a full interface of its own, and runs with them when no
+    load set is chosen or the chosen one fails its check.
+
+Requirement
+    A load set starts on trial. The state file counts its starts, and it is
+    confirmed by the first valid packet from the MOC that reaches it. A load
+    set that has started ``load_trials`` times -- three where the
+    configuration does not say -- without being confirmed is not started
+    again: the golden build falls back to the last confirmed load set, or to
+    itself, and says so in the log and in the answer to CONNECT.
+
+Requirement
+    tcspecial runs under a supervisor that starts it again when it exits.
+    Every failure above that ends the process -- a restart that cannot
+    ``exec``, a load set that fails its check -- relies on that, and the
+    manual says how to set one up.
+
+The generation number and the state file
+----------------------------------------
+
+Requirement
+    The ``tcspecial`` section's ``state_file``, required, is the path of the
+    file in which tcspecial keeps what must survive a restart: the
+    generation number, and, once there are load sets, which one is chosen,
+    which is confirmed and how many times each has started.
+
+Requirement
+    Every start of tcspecial -- a commanded restart, a crash the supervisor
+    restarted, a power cycle -- adds one to the generation number and writes
+    it to the state file before the first beacon goes. A start that cannot
+    write it says why on its error output and does not start: a vehicle that
+    beaconed a generation it had not kept would beacon it again after the
+    next start.
+
+Requirement
+    The state file is written whole, to a file beside it that is then
+    renamed over it, with the file and its directory flushed to storage
+    before the rename is relied on, and it carries a CRC of its own. A
+    power failure part way through therefore leaves the old file or the new
+    one, never half of each. A state file that does not exist is a first
+    start, generation 1. One that exists and fails its CRC or cannot be read
+    is reported in the log, and the generation then starts again from 1: a
+    vehicle that would not start because a counter was damaged would be lost
+    to a counter.
+
+Requirement
+    The ground judges that tcspecial has restarted when the generation in a
+    beacon differs from the one in the beacon before it, not only when it is
+    greater, so that a generation that started again from 1 is still seen as
+    a restart. The beacon sequence starting again at 1 says the same thing,
+    and either is enough.
+
+The beacon across a restart
+---------------------------
+
+Requirement
+    The beacon carries the generation number, four bytes, and a *restarting*
+    bit, which is set from the moment a restart has been initiated -- an
+    armed RESTART or SWITCH taken -- until the process ends.
+
+Requirement
+    The beacon has two intervals, both required and both lengths of time:
+    ``beacon.default_interval``, how often it beacons once the MOC has been
+    heard from, and ``beacon.reset_interval``, how often it beacons across a
+    restart, which is not nought and not longer than
+    ``beacon.default_interval``. The one that was ``beacon.interval`` is
+    ``beacon.default_interval``, and a file still writing ``interval`` is
+    told so by name.
+
+Requirement
+    When a restart is initiated, a beacon with the restarting bit set is sent
+    at once, and from then on beacons are sent every ``reset_interval``.
+
+Requirement
+    Every start of tcspecial beacons every ``reset_interval``, and its
+    first beacon follows the generation number's being incremented and the
+    restarting bit's being cleared: the first beacon of a start already
+    says the new generation, with the bit clear.
+
+Requirement
+    The interval goes back to ``default_interval`` when the first valid
+    packet from the MOC arrives, on any of the links the MOC sends on -- but
+    not once a restart has been initiated, when the beacons stay at
+    ``reset_interval`` until the process ends. A CONFIG taken later sets it
+    as it always has.
+
+The beacon goes fast across a restart because that is when the ground most
+needs to know how the vehicle is: that the restart was taken, and that it has
+come back, with which generation and which interface. It slows when the MOC
+is heard from because from then on the ground can ask, and the link is the
+ground's again.
+
+What the ground may send meanwhile
+----------------------------------
+
+The beacon is the acknowledgement of a RESTART or a SWITCH, not the answer to
+it. The answer is a packet like any other on a link that loses them, and the
+vehicle may be gone before it is sent again, so the ground may never hear one;
+the beacons keep coming whatever happens to the answer. A beacon with the
+restarting bit set says the restart was taken, and a beacon of a new
+generation with the bit clear says it is done. Until the second, the ground
+cannot know which definitions a packet it sends would be read with, so it
+sends none.
+
+Requirement
+    Once the MOC has sent a SWITCH -- or a RESTART -- it sends no command at
+    all until it has a beacon whose generation differs from the generation of
+    the last beacon before the SWITCH was sent, with the restarting bit
+    clear: a beacon saying that tcspecial has started again, and is using
+    the definitions it has started with. ``tcslib``'s ``TcsClient`` holds to
+    this itself, refusing any command in between with an error that says
+    which generation it is waiting to see change.
+
+Requirement
+    The wait does not depend on the answer: one that never arrives leaves it
+    standing until the beacon comes. An answer that does arrive and says
+    the command was refused ends it, because then nothing was initiated and
+    the definitions have not changed. An operator can end it by hand, which
+    the station records with the generation it was waiting on; nothing else
+    ends it.
+
+Requirement
+    Every command carries the generation number the ground last heard, and
+    the vehicle refuses one carrying any other generation, answering
+    ``InvalidParameter``. A command sent before a restart and delivered after
+    it -- which on a link several light-seconds long is the usual case, not
+    the rare one -- is then refused instead of being read with definitions it
+    was not written for. PING and CONNECT are taken whatever generation they
+    carry, so a ground station that has not yet heard a beacon can still find
+    out what is flying.
+
+Holes in this, and what closes them
+-----------------------------------
+
+What was looked for: any way the ground and the vehicle could come to
+disagree about which definitions are in use, any way a vehicle could be left
+with no way in, and any way an upload could be lost or damaged. Each is
+paired with the requirement above that closes it.
+
+UDP may carry no checksum
+    Over IPv4 a UDP checksum of nought means none was computed, so "the
+    transport checked it" is not true of UDP. Every packet carries its own
+    CRC-16, and only a packet that passes it is valid.
+
+A read-only file can still be deleted
+    Deleting is permitted by the directory, not the file, and root is
+    permitted everything. The load set's directory is made read-only too, and
+    the immutable attribute is set where the file system has one.
+
+A new build that cannot start
+    An executable that crashes at start cannot roll itself back. The golden
+    build always starts first, counts each load set's starts, and stops
+    starting one that has not been confirmed within ``load_trials``.
+
+A restart that never comes back
+    A restart whose ``exec`` fails ends the process. The supervisor starts it
+    again; without one the vehicle is gone, which is why one is required.
+
+A damaged or half-written state file
+    Written whole and renamed into place, with a CRC; a damaged one starts
+    the generation again from 1, and the ground judges a restart by any change
+    of generation, so a reset count is still seen.
+
+A beacon with the restarting bit lost
+    The bit is a courtesy: the ground does not need to see it, because the
+    change of generation in the first beacon after the restart says the same
+    thing, and beacons are fast throughout.
+
+Commands in flight across the switch
+    A command sent before the SWITCH and arriving after the restart would be
+    decoded by the new interface. Every command carries the generation it was
+    sent for, and a command for another generation is refused.
+
+A wait that never ends
+    If the SWITCH was refused, or never arrived, no new generation comes.
+    A refusal ends the wait; a SWITCH that never arrived shows as beacons of
+    the old generation with the restarting bit clear, and the operator may
+    end the wait by hand.
+
+A stray packet resetting the beacon interval
+    Only a valid packet from the address the configuration says the MOC
+    sends from counts as the MOC being heard.
+
+A load set that is incomplete, or not what the ground meant
+    The manifest names every file with its size and MD5, the SWITCH names the
+    interface digest, and the vehicle checks the set at LOAD_CHECK and again
+    at the SWITCH. A build refuses documents of another digest.
+
+A configuration the new build would refuse
+    LOAD_CHECK runs ``verify`` on the load set's configuration with the load
+    set's interface, so a configuration refused when it is loaded is refused
+    before the vehicle switches to it, not after.
+
+The full interface breaking the way in
+    The fallback interface has its own document and its own link, and no
+    upload replaces it.
+
+Still open
+    The command link carries no authentication. Anyone who can reach it can
+    arm and restart the vehicle, upload a load set and switch to it; an arm
+    key on an open link is a guard against mistakes, not against anybody.
+    CCSDS SDLS, or authentication at the radio, is the remedy, and it is not
+    designed here.
 
 TCSpecial
 =========
@@ -9565,9 +10035,10 @@ fans the beacons out -- rather than something the network did silently.
 
 Requirement
     Every configuration states where beacons come from, where they are
-    received, and how often: ``beacon.send``, ``beacon.recv`` and
-    ``beacon.interval``, in its ``tcspecial`` section. None has a default and
-    none may be left out.
+    received, and how often: ``beacon.send``, ``beacon.recv``,
+    ``beacon.default_interval`` and ``beacon.reset_interval``, in its
+    ``tcspecial`` section, and where it keeps its generation number,
+    ``state_file``. None has a default and none may be left out.
 
 Requirement
     How often is a length of time, like every other length of time in these
@@ -10372,7 +10843,7 @@ CI must periodically send a Telemetry::Beacon message with a timestamp and uniqu
    which this did not ask for.
 
    It no longer carries a timestamp. Since the beacon became the fixed
-   34-byte layout described under Beacon, which has no time in it, the ground
+   layout described under Beacon, which has no time in it, the ground
    goes by when each beacon arrives, which it did already. This requirement
    says otherwise and is not met: one of the two is to change.
 

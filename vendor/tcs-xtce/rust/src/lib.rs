@@ -11,7 +11,7 @@
 //! generates from a mission's XTCE document.
 //!
 //! ```
-//! use xtce::{Document, SpaceSystemType};
+//! use tcs_xtce::{Document, SpaceSystemType};
 //!
 //! let mut doc = Document::new(SpaceSystemType {
 //!     name: "Demo".into(),
@@ -23,7 +23,9 @@
 //! ```
 
 pub mod buffer;
+pub mod digest;
 pub mod document;
+pub mod fixed;
 pub mod generated;
 pub mod packet;
 pub mod value;

@@ -9,6 +9,7 @@ pub mod endpoint;
 pub mod node;
 pub mod runtime;
 pub mod segsend;
+pub mod state;
 pub mod telemetry_log;
 // The visual window, which never flies: see the `visual` feature.
 #[cfg(feature = "visual")]

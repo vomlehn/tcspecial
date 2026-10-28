@@ -11,22 +11,9 @@ import re
 import xml.etree.ElementTree as ET
 from typing import Optional
 
-from .model import (
-    BUILTINS,
-    STRING,
-    UNBOUNDED,
-    Attribute,
-    Choice,
-    ComplexRef,
-    ComplexType,
-    Element,
-    EnumRef,
-    EnumType,
-    Schema,
-    ScalarRef,
-    Sequence,
-    TypeRef,
-)
+from .model import (BUILTINS, STRING, UNBOUNDED, Attribute, Choice, ComplexRef,
+                    ComplexType, Element, EnumRef, EnumType, Schema, ScalarRef,
+                    Sequence, TypeRef)
 
 XS = "{http://www.w3.org/2001/XMLSchema}"
 
@@ -75,7 +62,8 @@ class _Parser:
     def simple_ref(self, name: str) -> TypeRef:
         """Resolve a named simple type (XSD builtin or schema-defined)."""
         prefix, local = _local(name)
-        if prefix is None and local in BUILTINS and local not in self.simple_nodes:
+        if (prefix is None and local in BUILTINS
+                and local not in self.simple_nodes):
             return ScalarRef(BUILTINS[local], builtin=local)
         if local in self.schema.enums:
             return EnumRef(local)
@@ -91,7 +79,8 @@ class _Parser:
     def define_simple(self, name: str, node: ET.Element) -> TypeRef:
         restriction = node.find(f"{XS}restriction")
         if restriction is not None:
-            values = [e.get("value", "") for e in restriction.findall(f"{XS}enumeration")]
+            values = [e.get("value", "")
+                      for e in restriction.findall(f"{XS}enumeration")]
             if values:
                 self.schema.enums[name] = EnumType(name, values, _doc(node))
                 return EnumRef(name)
@@ -105,7 +94,8 @@ class _Parser:
             ref = ScalarRef(inner.kind, name, inner.builtin)
             self.schema.simple[name] = ref
             return ref
-        if node.find(f"{XS}union") is not None or node.find(f"{XS}list") is not None:
+        if (node.find(f"{XS}union") is not None
+                or node.find(f"{XS}list") is not None):
             # Unions mix enumerations and patterns; keep the lexical form.
             ref = ScalarRef(STRING, name)
             self.schema.simple[name] = ref
@@ -137,12 +127,8 @@ class _Parser:
     def unique(self, name: str) -> str:
         base, n = name, 2
         taken = lambda s: (  # noqa: E731
-            s in self.complex_nodes
-            or s in self.simple_nodes
-            or s in self.raw
-            or s in self.schema.enums
-            or s in self.schema.simple
-        )
+            s in self.complex_nodes or s in self.simple_nodes or s in self.raw
+            or s in self.schema.enums or s in self.schema.simple)
         while taken(name):
             name = f"{base}{n}"
             n += 1
@@ -154,17 +140,14 @@ class _Parser:
         ref = node.get("ref")
         if ref is not None:
             # Only xml:base is referenced by XTCE.
-            return Attribute(ref, ScalarRef(STRING), node.get("use") == "required")
+            return Attribute(ref, ScalarRef(STRING),
+                             node.get("use") == "required")
         name = node.get("name")
         if name is None:
             raise XsdError(f"attribute without name in {owner}")
-        return Attribute(
-            name=name,
-            type=self.type_of(node, owner),
-            required=node.get("use") == "required",
-            default=node.get("default"),
-            doc=_doc(node),
-        )
+        return Attribute(name=name, type=self.type_of(node, owner),
+                         required=node.get("use") == "required",
+                         default=node.get("default"), doc=_doc(node))
 
     def parse_particle(self, node: ET.Element, owner: str):
         lo, hi = _occurs(node)
@@ -174,21 +157,13 @@ class _Parser:
             if ref is not None:
                 _, local = _local(ref)
                 target = self.element_nodes[local]
-                return Element(local, self.type_of(target, owner), lo, hi, doc=_doc(node))
-            return Element(
-                node.get("name", ""),
-                self.type_of(node, owner),
-                lo,
-                hi,
-                fixed=node.get("fixed"),
-                doc=_doc(node),
-            )
+                return Element(local, self.type_of(target, owner), lo, hi,
+                               doc=_doc(node))
+            return Element(node.get("name", ""), self.type_of(node, owner), lo,
+                           hi, fixed=node.get("fixed"), doc=_doc(node))
         if tag in (f"{XS}sequence", f"{XS}choice"):
-            items = [
-                self.parse_particle(c, owner)
-                for c in node
-                if c.tag not in (f"{XS}annotation",)
-            ]
+            items = [self.parse_particle(c, owner) for c in node
+                     if c.tag not in (f"{XS}annotation",)]
             cls = Sequence if tag == f"{XS}sequence" else Choice
             return cls(items, lo, hi)
         raise XsdError(f"unsupported particle {tag} in {owner}")
@@ -200,31 +175,32 @@ class _Parser:
                 ct.attributes.append(self.parse_attribute(child, ct.name))
             elif child.tag in (f"{XS}sequence", f"{XS}choice"):
                 p = self.parse_particle(child, ct.name)
-                ct.content = p if isinstance(p, Sequence) and p.min == p.max == 1 else Sequence([p])
+                ct.content = (p if isinstance(p, Sequence)
+                              and p.min == p.max == 1 else Sequence([p]))
             elif child.tag == f"{XS}annotation":
                 pass
-            elif child.tag in (f"{XS}anyAttribute", f"{XS}group", f"{XS}attributeGroup"):
+            elif (child.tag in (f"{XS}anyAttribute", f"{XS}group",
+                                f"{XS}attributeGroup")):
                 raise XsdError(f"unsupported {child.tag} in {ct.name}")
 
-    def parse_complex(self, name: str, node: ET.Element, anonymous: bool = False) -> ComplexType:
-        ct = ComplexType(
-            name=name,
-            abstract=node.get("abstract") == "true",
-            doc=_doc(node),
-            anonymous=anonymous,
-        )
+    def parse_complex(self, name: str, node: ET.Element,
+                      anonymous: bool = False) -> ComplexType:
+        ct = ComplexType(name=name, abstract=node.get("abstract") == "true",
+                         doc=_doc(node), anonymous=anonymous)
         cc = node.find(f"{XS}complexContent")
         sc = node.find(f"{XS}simpleContent")
         if cc is not None:
             ext = cc.find(f"{XS}extension")
             if ext is None:
-                raise XsdError(f"complexContent restriction unsupported in {name}")
+                raise XsdError("complexContent restriction unsupported in "
+                               f"{name}")
             _, ct.base = _local(ext.get("base", ""))
             self.parse_body(ct, ext)
         elif sc is not None:
             ext = sc.find(f"{XS}extension")
             if ext is None:
-                raise XsdError(f"simpleContent restriction unsupported in {name}")
+                raise XsdError("simpleContent restriction unsupported in "
+                               f"{name}")
             base = self.simple_ref(ext.get("base", ""))
             if not isinstance(base, ScalarRef):
                 base = ScalarRef(STRING)
@@ -234,7 +210,8 @@ class _Parser:
             self.parse_body(ct, node)
             if node.get("mixed") == "true":
                 if ct.content is not None:
-                    raise XsdError(f"mixed content with elements unsupported in {name}")
+                    raise XsdError("mixed content with elements unsupported "
+                                   f"in {name}")
                 ct.text = ScalarRef(STRING)
         return ct
 
@@ -277,16 +254,11 @@ class _Parser:
             items.extend(base.content.items)
         if ct.content is not None:
             items.extend(ct.content.items)
-        return ComplexType(
-            name=ct.name,
-            abstract=ct.abstract,
-            base=ct.base,
-            attributes=base.attributes + ct.attributes,
-            content=Sequence(items) if items else None,
-            text=ct.text or base.text,
-            doc=ct.doc,
-            anonymous=ct.anonymous,
-        )
+        return ComplexType(name=ct.name, abstract=ct.abstract, base=ct.base,
+                           attributes=base.attributes + ct.attributes,
+                           content=Sequence(items) if items else None,
+                           text=ct.text or base.text, doc=ct.doc,
+                           anonymous=ct.anonymous)
 
 
 def parse(path: str) -> Schema:

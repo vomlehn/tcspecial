@@ -100,11 +100,11 @@ Languages:
 ### beacon
 
 What a ground station can know about a spacecraft without asking it anything.
-tcspecial sends a beacon every `beacon.interval` for as long as it runs, over
-a socket of its own, whether or not anything has connected to it -- so this
-example commands nothing and still says whether the vehicle is alive, which
-build it is, and whether the configuration it is serving is the one the ground
-read.
+tcspecial sends a beacon every `beacon.default_interval` for as long as it
+runs, over a socket of its own, whether or not anything has connected to it --
+so this example commands nothing and still says whether the vehicle is alive,
+which build it is, and whether the configuration it is serving is the one the
+ground read.
 
 It is also the example of how a ground program is put together, because almost
 nothing in it is its own:
@@ -119,9 +119,11 @@ nothing in it is its own:
   beacons are, starts the loop on a thread, and puts each pass in the window.
   That is all of it, but for a button.
 
-A beacon is 34 bytes: `tcspecial` and a space, the version's major, minor and
-patch a byte each, a space, the configuration's MD5 digest, and the beacon's
-number in four bytes, most significant first. The layout is described once,
+A beacon is 57 bytes: `tcspecial` and a space, the version's major, minor and
+patch a byte each, a space, the configuration's MD5 digest, the beacon's
+number and the generation number in four bytes each, most significant first,
+a byte whose top bit says a restart has begun, the interface's digest and a
+CRC-16. The layout is described once,
 in XTCE, in `tcslibgs/xtce/beacon.xml`; tcspecial packs every beacon and
 `tcslib::beacon` unpacks it with the code tcs-xtce generates from that file,
 `tcslibgs::Beacon`, and this example's test packs the beacon it sends the same

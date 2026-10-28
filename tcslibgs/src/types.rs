@@ -1524,16 +1524,29 @@ pub struct BeaconJson {
     ///
     /// One grammar for every length of time a configuration states; see
     /// [`crate::graph::parse_interval`]. It was `interval_ms`, a bare count of
-    /// milliseconds, and [`BeaconJson::interval_ms`] is named below so that a
-    /// file still writing it is told the name this has now.
-    pub interval: String,
-    /// Named here only to be refused: see [`BeaconJson::interval`].
+    /// milliseconds, and then `interval`, until there were two intervals and
+    /// a bare `interval` no longer said which; both are named below so that
+    /// a file still writing either is told the name this has now.
+    pub default_interval: String,
+    /// Named here only to be refused: see [`BeaconJson::default_interval`].
     ///
     /// A file written before the rename would otherwise be told that
-    /// `interval` is missing, and left to notice that the word it wrote says
-    /// the same thing.
+    /// `default_interval` is missing, and left to notice that the word it
+    /// wrote says the same thing.
+    #[serde(default)]
+    pub interval: Option<String>,
+    /// Named here only to be refused, for the same reason.
     #[serde(default)]
     pub interval_ms: Option<u32>,
+    /// How often a beacon is sent across a restart, as a length of time:
+    /// from the moment a restart is initiated, and from every start until
+    /// the first valid packet from the MOC arrives.
+    ///
+    /// Required, as the interval is, and for the same reason: across a
+    /// restart is when the ground most needs to hear from the vehicle, and
+    /// how often it does is not something a file should be silently given.
+    /// See "The beacon across a restart" in `docs/design.rst`.
+    pub reset_interval: String,
     /// Where beacons originate, as `address:port`.
     ///
     /// tcspecial makes the socket it sends beacons on out of this: it is the
@@ -1671,6 +1684,14 @@ pub struct CIConfigJson {
     /// `20 min`, `90 s`. Absent is [`crate::RESTART_ARM_VALID_DEFAULT`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub restart_arm_valid: Option<String>,
+    /// The file tcspecial keeps what must survive a restart in: the
+    /// generation number, which every start adds one to.
+    ///
+    /// Required, with no default: where a vehicle keeps state across a power
+    /// cycle is a fact about its storage, and a default would be a path that
+    /// exists on a desk and not on the vehicle. See "The generation number
+    /// and the state file" in `docs/design.rst`.
+    pub state_file: String,
 }
 
 /// How long an arm lasts, from what `restart_arm_valid` says.
@@ -1713,6 +1734,8 @@ pub struct CIConfig {
     pub payload_command_source_base: HostPort,
     pub payload_command_dest_base: HostPort,
     pub beacon_interval: Duration,
+    /// How often beacons go across a restart: `beacon.reset_interval`.
+    pub reset_interval: Duration,
     /// Where beacons originate: tcspecial binds this and sends from it.
     ///
     /// Settled when the file is read rather than where the beacon is sent,
@@ -1732,6 +1755,8 @@ pub struct CIConfig {
     pub restart_arm_valid: Duration,
     /// What the vehicle answers to.
     pub gateway: crate::gateway::GatewayKind,
+    /// Where the generation number is kept: `state_file`.
+    pub state_file: String,
 }
 
 impl CIConfigJson {
@@ -1759,11 +1784,19 @@ impl CIConfigJson {
         let beacon_send = host_port_of("beacon.send", &self.beacon.send)?;
         let beacon_recv = host_port_of("beacon.recv", &self.beacon.recv)?;
 
-        // The attribute's old name, said by name rather than by its absence.
+        // The attribute's old names, said by name rather than by its
+        // absence.
         if self.beacon.interval_ms.is_some() {
             return Err(
-                "beacon.interval_ms is beacon.interval now, and is a length of \
-                 time: 5 s rather than 5000"
+                "beacon.interval_ms is beacon.default_interval now, and is a \
+                 length of time: 5 s rather than 5000"
+                    .to_string(),
+            );
+        }
+        if self.beacon.interval.is_some() {
+            return Err(
+                "beacon.interval is beacon.default_interval now, beside \
+                 beacon.reset_interval: rename it"
                     .to_string(),
             );
         }
@@ -1772,12 +1805,23 @@ impl CIConfigJson {
         // than that could be set here and never commanded -- refused where
         // the file is read rather than at the first CONFIG.
         let beacon_interval =
-            crate::graph::parse_interval(&self.beacon.interval)
-                .map_err(|why| format!("beacon.interval: {why}"))?;
+            crate::graph::parse_interval(&self.beacon.default_interval)
+                .map_err(|why| format!("beacon.default_interval: {why}"))?;
         if u32::try_from(beacon_interval.as_millis()).is_err() {
             return Err(
-                "beacon.interval: longer than the protocol can carry, which \
-                        counts milliseconds in four bytes"
+                "beacon.default_interval: longer than the protocol can \
+                 carry, which counts milliseconds in four bytes"
+                    .to_string(),
+            );
+        }
+
+        let reset_interval =
+            reset_interval_of(&self.beacon.reset_interval, beacon_interval)?;
+        if self.state_file.trim().is_empty() {
+            return Err(
+                "state_file is empty: give the path of the file tcspecial \
+                 keeps its generation number in, on storage that survives a \
+                 power cycle"
                     .to_string(),
             );
         }
@@ -1816,6 +1860,7 @@ impl CIConfigJson {
             payload_source_base,
             payload_dest_base,
             beacon_interval,
+            reset_interval,
             beacon_send,
             beacon_recv,
             log_dir: self.log.directory.clone(),
@@ -1825,8 +1870,41 @@ impl CIConfigJson {
                 None => crate::RESTART_ARM_VALID_DEFAULT,
             },
             gateway: self.gateway,
+            state_file: self.state_file.trim().to_string(),
         })
     }
+}
+
+/// How often beacons go across a restart, from what
+/// `beacon.reset_interval` says and the `beacon.default_interval` it must not
+/// be longer than.
+///
+/// Nought is refused, as it is for an arm: a vehicle that beaconed every
+/// nought seconds would flood the link at the moment the ground most needs
+/// it. Longer than the interval is refused too, because the point of it is
+/// that a restart is heard about sooner than a beacon would otherwise come,
+/// and one that made the ground wait longer is a configuration nobody means.
+pub fn reset_interval_of(
+    said: &str,
+    beacon_interval: Duration,
+) -> Result<Duration, String> {
+    let interval = crate::graph::parse_interval(said)
+        .map_err(|why| format!("beacon.reset_interval: {why}"))?;
+    if interval.is_zero() {
+        return Err("beacon.reset_interval is nought, which is a vehicle \
+             beaconing as fast as it can across every restart: give it a \
+             length of time, as 1 s"
+            .to_string());
+    }
+    if interval > beacon_interval {
+        return Err(format!(
+            "beacon.reset_interval is {said}, longer than \
+             beacon.default_interval: across a restart the beacon is meant to come \
+             sooner, not later, so make it no longer than {:?}",
+            beacon_interval
+        ));
+    }
+    Ok(interval)
 }
 
 /// Result status for command responses

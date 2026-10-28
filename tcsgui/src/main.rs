@@ -8582,7 +8582,7 @@ mod tests {
         // has no value that is right until somebody says so, and "how often
         // does the vehicle say it is alive" has one.
         assert_eq!(
-            said.get("beacon.interval").map(String::as_str),
+            said.get("beacon.default_interval").map(String::as_str),
             Some("1 s")
         );
         // And none of it is a fault: the editor is lazy, and a configuration

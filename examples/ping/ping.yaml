@@ -10,8 +10,9 @@ tcspecial:
   # shows the same panel, so that it says whether the vehicle is alive before
   # anybody presses Ping.
   beacon:
-    interval: "5 s"
+    default_interval: "5 s"
     recv: "127.0.0.1:7510"
+    reset_interval: "1 s"
     send: "0.0.0.0:7500"
   gateway: "radio"
   log:
@@ -23,6 +24,9 @@ tcspecial:
   payload_telemetry:
     dest_base: "127.0.0.1:7410"
     source_base: "0.0.0.0:7400"
+  # tcspecial counts its starts in this file, which must be on storage
+  # that survives a power cycle on a vehicle.
+  state_file: "/tmp/tcspecial-ping.state"
   tcs_cmd:
     recv: "0.0.0.0:7200"
     send: "127.0.0.1:7210"

@@ -582,6 +582,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "bnum"
+version = "0.14.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1b08cb4ecbb540b940016b0a0f35b7e48ab0cc372ab88150c351de4cc469959"
+
+[[package]]
 name = "borsh"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4479,6 +4485,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "tcs-xtce"
+version = "0.3.0"
+dependencies = [
+ "bnum",
+]
+
+[[package]]
 name = "tcsapp"
 version = "0.1.0"
 dependencies = [
@@ -4542,9 +4555,9 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_norway",
+ "tcs-xtce",
  "tempfile",
  "thiserror 1.0.69",
- "xtce",
 ]
 
 [[package]]
@@ -5995,10 +6008,6 @@ name = "xmlwriter"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec7a2a501ed189703dba8b08142f057e887dfc4b2cc4db2d343ac6376ba3e0b9"
-
-[[package]]
-name = "xtce"
-version = "0.1.0"
 
 [[package]]
 name = "yazi"

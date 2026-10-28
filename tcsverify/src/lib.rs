@@ -1069,6 +1069,7 @@ mod tests {
     const SOUND_GRAPH: &str = "\
 tcspecial:
   gateway: radio
+  state_file: /tmp/tcspecial-test.state
   tcs_cmd:
     recv: 0.0.0.0:4000
     send: 127.0.0.1:4100
@@ -1079,7 +1080,8 @@ tcspecial:
     source_base: 0.0.0.0:6000
     dest_base: 127.0.0.1:6100
   beacon:
-    interval: 5 s
+    default_interval: 5 s
+    reset_interval: 5 s
     send: \"0.0.0.0:5550\"
     recv: \"127.0.0.1:5650\"
 payload_groups:
@@ -1368,8 +1370,10 @@ vehicle:
 description: two payloads
 tcspecial:
   gateway: radio
+  state_file: /tmp/tcspecial-test.state
   beacon:
-    interval: \"5 s\"
+    default_interval: \"5 s\"
+    reset_interval: \"5 s\"
     recv: \"127.0.0.1:5650\"
     send: \"0.0.0.0:5550\"
   log:
@@ -1468,7 +1472,7 @@ payloads:
         // Each beside the node it is about, in the order the file wrote them.
         let lines: Vec<usize> =
             report.findings.iter().map(|f| f.line).collect();
-        assert_eq!(lines, vec![21, 26, 31], "{:?}", report.findings);
+        assert_eq!(lines, vec![23, 28, 33], "{:?}", report.findings);
         for (finding, missing) in
             report
                 .findings
@@ -1573,7 +1577,7 @@ payloads:
             // An element the editor's section has no field for.
             ("<x>34</x>", "<z>34</z>"),
             // A closing tag that is not its element's.
-            ("5 s</interval>", "5 s</intervl>"),
+            ("5 s</default_interval>", "5 s</default_intervl>"),
         ] {
             let text = good.replacen(from, to, 1);
             let (_dir, path) = graph_written(".xml", &text);

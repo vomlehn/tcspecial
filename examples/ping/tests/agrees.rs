@@ -84,7 +84,7 @@ fn worked_out() -> Vec<(String, String)> {
     vec![
         ("beacon.send".to_string(), link.send.to_string()),
         ("beacon.recv".to_string(), link.recv.to_string()),
-        ("beacon.interval".to_string(), interval.to_string()),
+        ("beacon.default_interval".to_string(), interval.to_string()),
         ("uplink".to_string(), uplink),
         ("downlink".to_string(), downlink),
         (

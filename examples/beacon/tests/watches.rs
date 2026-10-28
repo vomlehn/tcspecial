@@ -105,7 +105,8 @@ fn a_beacon_from_the_configured_address_is_heard() {
     let version = ConfigVersion::of_this_build();
     // Packed by tcs-xtce, from the layout in tcslibgs/xtce/beacon.xml, as
     // tcspecial packs every beacon it sends.
-    let beacon = Beacon::new(7, version, ConfigDigest([0x5a; 16])).to_bytes();
+    let beacon =
+        Beacon::new(7, version, ConfigDigest([0x5a; 16]), 1).to_bytes();
     vehicle.send_to(&beacon, at).expect("the vehicle beacons");
 
     let pass = station.pass();

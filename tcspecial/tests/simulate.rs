@@ -12,17 +12,20 @@ use std::process::Command;
 fn configuration(dir: &std::path::Path) -> std::path::PathBuf {
     let path = dir.join("vehicle.yaml");
     let missing = dir.join("telemetry");
+    let state = dir.join("tcspecial.state").display().to_string();
     std::fs::write(
         &path,
         format!(
             "tcspecial:
   gateway: radio
-  beacon: {{ interval: \"5 s\", recv: \"127.0.0.1:1\", send: \"127.0.0.1:2\" }}
+  beacon: {{ default_interval: \"5 s\", reset_interval: \"1 s\", \
+  recv: \"127.0.0.1:1\", send: \"127.0.0.1:2\" }}
   log: {{ directory: \"{}\", segment_size: \"65536\" }}
   payload_command: {{ dest_base: \"127.0.0.1:3\", \
   source_base: \"127.0.0.1:4\" }}
   payload_telemetry: {{ dest_base: \"127.0.0.1:5\", \
   source_base: \"127.0.0.1:6\" }}
+  state_file: \"{state}\"
   tcs_cmd: {{ recv: \"127.0.0.1:7\", send: \"127.0.0.1:8\" }}
 payloads:
   - name: sensor
@@ -92,22 +95,27 @@ fn a_stand_in_is_allowed_where_the_mode_allows_it() {
 fn a_stand_in_is_where_a_simulated_channel_is_reached() {
     let dir = tempfile::tempdir().expect("a directory");
     let path = dir.path().join("vehicle.yaml");
+    let state = dir.path().join("tcspecial.state").display().to_string();
     std::fs::write(
         &path,
-        "tcspecial:
+        format!(
+            "tcspecial:
   gateway: radio
-  beacon: { interval: \"5 s\", recv: \"127.0.0.1:1\", send: \"127.0.0.1:2\" }
-  payload_command: { dest_base: \"127.0.0.1:3\", source_base: \"127.0.0.1:4\" }
-  payload_telemetry: { dest_base: \"127.0.0.1:5\", \
-  source_base: \"127.0.0.1:6\" }
-  tcs_cmd: { recv: \"127.0.0.1:7\", send: \"127.0.0.1:8\" }
+  beacon: {{ default_interval: \"5 s\", reset_interval: \"1 s\", \
+  recv: \"127.0.0.1:1\", send: \"127.0.0.1:2\" }}
+  payload_command: {{ dest_base: \"127.0.0.1:3\", source_base: \"127.0.0.1:4\" }}
+  payload_telemetry: {{ dest_base: \"127.0.0.1:5\", \
+  source_base: \"127.0.0.1:6\" }}
+  state_file: \"{state}\"
+  tcs_cmd: {{ recv: \"127.0.0.1:7\", send: \"127.0.0.1:8\" }}
 payloads:
   - name: channel
     type: rpmsg
     path: \"/nonexistent/rpmsg0\"
     service: \"payload-telemetry\"
     stand_in: \"127.0.0.1:9\"
-",
+"
+        ),
     )
     .expect("written");
     let said = |mode: &str| {

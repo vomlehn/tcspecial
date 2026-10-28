@@ -259,7 +259,7 @@ class Setup:
         return "\n".join([
             f"beacon.send {self.beacon.send}",
             f"beacon.recv {self.beacon.recv}",
-            f"beacon.interval {self.beacon_interval}",
+            f"beacon.default_interval {self.beacon_interval}",
             f"uplink {self.uplink}",
             f"downlink {self.downlink}",
             f"digest {self.digest}",

@@ -2463,9 +2463,11 @@ pub fn thermostat_example() -> Document {
         ("payload_command.dest_base", "0.0.0.0:4200"),
         ("payload_telemetry.source_base", "0.0.0.0:6000"),
         ("payload_telemetry.dest_base", "127.0.0.1:6100"),
-        ("beacon.interval", "5 s"),
+        ("beacon.default_interval", "5 s"),
+        ("beacon.reset_interval", "1 s"),
         ("beacon.send", "0.0.0.0:5550"),
         ("beacon.recv", "127.0.0.1:5650"),
+        ("state_file", "/tmp/tcspecial-thermostat.state"),
         ("log.directory", "/var/log/tcspecial"),
         ("log.segment_size", "65536"),
     ] {
@@ -2891,9 +2893,11 @@ mod tests {
             ("payload_command.dest_base", "0.0.0.0:4200"),
             ("payload_telemetry.source_base", "0.0.0.0:6000"),
             ("payload_telemetry.dest_base", "127.0.0.1:6100"),
-            ("beacon.interval", "5 s"),
+            ("beacon.default_interval", "5 s"),
+            ("beacon.reset_interval", "1 s"),
             ("beacon.send", "0.0.0.0:5550"),
             ("beacon.recv", "127.0.0.1:5650"),
+            ("state_file", "/var/lib/tcspecial/state"),
         ];
 
         let filled = |wrong: Option<(&str, &str)>| {
@@ -2925,6 +2929,8 @@ mod tests {
             ("gateway", "cfs", "not yet built"),
             ("beacon.send", "10.0.0.1", "address:port"),
             ("beacon.recv", "127.0.0.1:0", "port 0"),
+            // Slower across a restart than otherwise, which defeats it.
+            ("beacon.reset_interval", "10 s", "no longer than"),
             // Half a command interface, which is the one way an attribute
             // carrying two things goes wrong.
             ("tcs_cmd.recv", "0.0.0.0", "address:port"),

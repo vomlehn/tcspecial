@@ -21,6 +21,7 @@ fn a_missing_log_directory_is_named_with_what_to_do() {
     let dir = tempfile::tempdir().expect("a directory");
     let missing = dir.path().join("telemetry");
     let configuration = dir.path().join("vehicle.yaml");
+    let state = dir.path().join("tcspecial.state").display().to_string();
     // Nothing to open but the log, which is opened before anything else.
     let at = || format!("127.0.0.1:{}", free());
     std::fs::write(
@@ -28,10 +29,12 @@ fn a_missing_log_directory_is_named_with_what_to_do() {
         format!(
             "tcspecial:
   gateway: radio
-  beacon: {{ interval: \"5 s\", recv: \"{}\", send: \"{}\" }}
+  beacon: {{ default_interval: \"5 s\", reset_interval: \"1 s\", \
+  recv: \"{}\", send: \"{}\" }}
   log: {{ directory: \"{}\", segment_size: \"65536\" }}
   payload_command: {{ dest_base: \"{}\", source_base: \"{}\" }}
   payload_telemetry: {{ dest_base: \"{}\", source_base: \"{}\" }}
+  state_file: \"{state}\"
   tcs_cmd: {{ recv: \"{}\", send: \"{}\" }}
 ",
             at(),

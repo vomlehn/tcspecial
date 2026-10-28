@@ -9,6 +9,7 @@ import subprocess
 import sys
 
 from . import binding, xsd
+from .wrap import WIDTH, split_rust_strings, wrap
 
 
 def write_if_changed(path: str, text: str) -> None:
@@ -26,15 +27,21 @@ def write_if_changed(path: str, text: str) -> None:
 
 
 def rustfmt(text: str) -> str:
+    """Format Rust with rustfmt at the project's line width, then wrap what
+    rustfmt leaves too long: comments, and code it can't lay out."""
+    text = wrap(_rustfmt(split_rust_strings(text)), "rust")
+    # Format the wrapped code again, so that it is what cargo fmt would
+    # make of it.
+    return wrap(_rustfmt(text), "rust")
+
+
+def _rustfmt(text: str) -> str:
     exe = shutil.which("rustfmt")
     if exe is None:
         sys.exit("error: rustfmt is required to generate Rust code")
     res = subprocess.run(
-        [exe, "--edition", "2021", "--emit", "stdout"],
-        input=text,
-        capture_output=True,
-        text=True,
-    )
+        [exe, "--edition", "2021", "--config", f"max_width={WIDTH}", "--emit",
+         "stdout"], input=text, capture_output=True, text=True)
     if res.returncode != 0:
         sys.exit(f"error: rustfmt failed:\n{res.stderr}")
     return res.stdout
@@ -44,10 +51,15 @@ def main() -> None:
     p = argparse.ArgumentParser(prog="xtcegen", description=__doc__)
     p.add_argument("--xsd", required=True, help="path to SpaceSystem.xsd")
     p.add_argument("--rust", help="output path of the generated Rust module")
-    p.add_argument("--cpp-header", help="output path of the generated C++ header")
-    p.add_argument("--cpp-source", help="output path of the generated C++ source")
-    p.add_argument("--python", help="output path of the generated Python module")
-    p.add_argument("--sample", help="write schema-covering sample documents to this directory")
+    p.add_argument("--cpp-header",
+                   help="output path of the generated C++ header")
+    p.add_argument("--cpp-source",
+                   help="output path of the generated C++ source")
+    p.add_argument("--python",
+                   help="output path of the generated Python module")
+    p.add_argument("--sample",
+                   help="write schema-covering sample documents to this "
+                        "directory")
     args = p.parse_args()
 
     schema = xsd.parse(args.xsd)
@@ -61,13 +73,13 @@ def main() -> None:
 
         header, source = emit_cpp.emit(b)
         if args.cpp_header:
-            write_if_changed(args.cpp_header, header)
+            write_if_changed(args.cpp_header, wrap(header, "c"))
         if args.cpp_source:
-            write_if_changed(args.cpp_source, source)
+            write_if_changed(args.cpp_source, wrap(source, "c"))
     if args.python:
         from . import emit_python
 
-        write_if_changed(args.python, emit_python.emit(b))
+        write_if_changed(args.python, wrap(emit_python.emit(b), "python"))
     if args.sample:
         from . import sample
 

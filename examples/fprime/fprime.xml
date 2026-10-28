@@ -14,8 +14,9 @@
              component, which is a ground station built on tcslib-c as far as
              tcspecial can tell. -->
         <beacon>
-            <interval>5 s</interval>
+            <default_interval>5 s</default_interval>
             <recv>127.0.0.1:9510</recv>
+            <reset_interval>1 s</reset_interval>
             <send>0.0.0.0:9500</send>
         </beacon>
         <gateway>fprime</gateway>
@@ -31,6 +32,9 @@
             <dest_base>127.0.0.1:9410</dest_base>
             <source_base>0.0.0.0:9400</source_base>
         </payload_telemetry>
+        <!-- tcspecial counts its starts in this file, which must be on
+             storage that survives a power cycle on a vehicle. -->
+        <state_file>/tmp/tcspecial-fprime.state</state_file>
         <tcs_cmd>
             <recv>0.0.0.0:9200</recv>
             <send>127.0.0.1:9210</send>

@@ -19,8 +19,8 @@ for each:
   data arrive on are worked out from the configuration, the same way
   tcspecial works them out, so the two ends cannot disagree about them.
 - **Knowing it is there.** `beacon` listens for the beacon tcspecial sends on
-  its own, every `beacon.interval`, whether or not anyone has connected. It
-  says which build is running, which configuration it is serving and the
+  its own, every `beacon.default_interval`, whether or not anyone has
+  connected. It says which build is running, which configuration it is serving and the
   digest of the files it read. It is the one thing a ground station can know
   about a spacecraft without having asked it anything.
 - **Waiting for the simulator.** `simulator::wait` asks tcssim, at the

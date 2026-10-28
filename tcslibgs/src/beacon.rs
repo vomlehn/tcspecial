@@ -1,10 +1,12 @@
 //! The beacon, as it goes on the link.
 //!
-//! What tcspecial sends every `beacon.interval`, whether or not anything has
-//! connected to it: the build it is and the digest of the configuration it
-//! read, and the beacon's own number. A ground station that is only listening
-//! can then see which software is flying and which payload set it is serving,
-//! rather than having to ask before it can know.
+//! What tcspecial sends every `beacon.default_interval`, whether or not anything has
+//! connected to it: the build it is, the digest of the configuration it read,
+//! the beacon's own number, how many times tcspecial has started, whether a
+//! restart is under way, and which interface it speaks. A ground station that
+//! is only listening can then see which software is flying, which payload set
+//! it is serving and whether it has just come back, rather than having to ask
+//! before it can know.
 //!
 //! The layout is stated once, in XTCE, in `tcslibgs/xtce/beacon.xml`, and
 //! packed and unpacked by the code tcs-xtce generates from it: the Rust in
@@ -13,15 +15,20 @@
 //! disagree about where a byte goes.
 //!
 //! ```text
-//! "tcspecial " major minor patch " " digest[16] sequence[4, big-endian]
+//! "tcspecial " major minor patch " " digest[16] sequence[4] generation[4]
+//! restarting:1 spare:7 interface[16] crc[2]
 //! ```
+//!
+//! The numbers are most significant byte first, and the CRC is the CCSDS
+//! CRC-16 over every byte before it.
 
 use std::fmt;
 
-use xtce::packet::{Codec, Packet, PacketError};
+use tcs_xtce::packet::{Codec, Packet, PacketError};
 
 use crate::beacon_packet;
 use crate::config_digest::{ConfigDigest, ConfigVersion};
+use crate::interface::InterfaceDigest;
 
 /// How long a beacon is: every one is exactly this long.
 pub const BEACON_BYTES: usize = beacon_packet::Beacon::MAX_BYTES;
@@ -44,19 +51,46 @@ pub struct Beacon {
     /// says which payload set it is serving: a configuration states no version
     /// of its own.
     pub digest: ConfigDigest,
+    /// How many times tcspecial has started on this vehicle, kept in its
+    /// state file across every restart, crash and power cycle.
+    ///
+    /// The ground judges a restart by this changing, not by its growing: a
+    /// state file that was damaged starts the count again from one, and a
+    /// count that went down is a restart as surely as one that went up.
+    pub generation: u32,
+    /// Whether a restart has been initiated: an armed RESTART was taken, and
+    /// the process is about to end and run again.
+    ///
+    /// Set from then until the process ends, and clear in every beacon of a
+    /// process that has just started.
+    pub restarting: bool,
+    /// The interface the sender speaks: the digest of the XTCE documents it
+    /// was built from. See [`crate::interface`].
+    pub interface: InterfaceDigest,
 }
 
 impl Beacon {
+    /// A beacon from a process that is running normally: not restarting, and
+    /// speaking the interface this build was generated from.
     pub fn new(
         sequence: u32,
         version: ConfigVersion,
         digest: ConfigDigest,
+        generation: u32,
     ) -> Self {
         Self {
             sequence,
             version,
             digest,
+            generation,
+            restarting: false,
+            interface: InterfaceDigest::of_this_build(),
         }
+    }
+
+    /// This beacon, saying whether a restart has been initiated.
+    pub fn restarting(self, restarting: bool) -> Self {
+        Self { restarting, ..self }
     }
 
     /// The beacon a datagram holds, or why it holds none.
@@ -68,17 +102,14 @@ impl Beacon {
         if datagram.len() != BEACON_BYTES {
             return Err(BeaconError::Length(datagram.len()));
         }
-        // This allocates, three times a beacon: tcs-xtce's Rust decoder hands
-        // back the name and the space it checks as Strings and the digest as
-        // a Vec. It is the only decoder of the layout there is, and the
-        // layout is stated once, so it is used as it stands; each allocation
-        // is freed before this returns, and a beacon arrives once an
-        // interval. tcs-xtce's C decoder fills fixed arrays instead, and its
-        // Rust one would be worth the same.
+        // Allocates nothing: the codec is generated without dynamic
+        // allocation, so the digests are fixed buffers.
         let packet = beacon_packet::Beacon::decode(datagram)
             .map_err(BeaconError::Packet)?;
         let mut digest = [0u8; 16];
         digest.copy_from_slice(&packet.digest);
+        let mut interface = [0u8; 16];
+        interface.copy_from_slice(&packet.interface);
         Ok(Beacon {
             sequence: packet.sequence,
             version: ConfigVersion {
@@ -87,6 +118,9 @@ impl Beacon {
                 patch: packet.patch,
             },
             digest: ConfigDigest(digest),
+            generation: packet.generation,
+            restarting: packet.restarting,
+            interface: InterfaceDigest(interface),
         })
     }
 
@@ -103,8 +137,7 @@ impl Beacon {
 /// Packs beacons into a buffer it keeps, for a loop that sends them.
 ///
 /// Everything a beacon is packed with is made here, once: the buffer, sized
-/// for a beacon, and the packet tcs-xtce packs from, whose digest is a vector
-/// that each beacon is copied into rather than one made for it.
+/// for a beacon, and the packet tcs-xtce packs from.
 #[derive(Debug, Clone)]
 pub struct BeaconPacker {
     codec: Codec,
@@ -115,10 +148,7 @@ impl BeaconPacker {
     pub fn new() -> Self {
         Self {
             codec: Codec::for_packet::<beacon_packet::Beacon>(),
-            packet: beacon_packet::Beacon {
-                digest: vec![0u8; 16],
-                ..Default::default()
-            },
+            packet: beacon_packet::Beacon::default(),
         }
     }
 
@@ -128,9 +158,15 @@ impl BeaconPacker {
         self.packet.major = beacon.version.major;
         self.packet.minor = beacon.version.minor;
         self.packet.patch = beacon.version.patch;
-        self.packet.digest.copy_from_slice(&beacon.digest.0);
+        self.packet.generation = beacon.generation;
+        self.packet.restarting = beacon.restarting;
         // Every field is a fixed size and every value fits it, so there is
-        // nothing a beacon can hold that does not pack.
+        // nothing a beacon can hold that does not pack: the digests are
+        // sixteen bytes into buffers of sixteen.
+        self.packet.digest.clear();
+        let _ = self.packet.digest.extend_from_slice(&beacon.digest.0);
+        self.packet.interface.clear();
+        let _ = self.packet.interface.extend_from_slice(&beacon.interface.0);
         self.codec
             .encode(&self.packet)
             .expect("every beacon fits the beacon layout")
@@ -161,6 +197,11 @@ impl fmt::Display for BeaconError {
                  other than tcspecial, or a tcspecial of another layout, is \
                  sending to the beacon port"
             ),
+            BeaconError::Packet(PacketError::BadChecksum { .. }) => write!(
+                f,
+                "a beacon whose CRC does not match what it carries: it was \
+                 damaged on the way, and nothing in it can be believed"
+            ),
             BeaconError::Packet(why) => write!(
                 f,
                 "not a beacon ({why}): something other than tcspecial is \
@@ -187,42 +228,112 @@ mod tests {
         ])
     }
 
+    /// The CCSDS CRC-16, written out here rather than taken from tcs-xtce,
+    /// so that the test says what the layout is independently of the code
+    /// that packs it.
+    fn crc16(bytes: &[u8]) -> u16 {
+        let mut crc: u16 = 0xffff;
+        for &byte in bytes {
+            crc ^= u16::from(byte) << 8;
+            for _ in 0..8 {
+                crc = if crc & 0x8000 != 0 {
+                    (crc << 1) ^ 0x1021
+                } else {
+                    crc << 1
+                };
+            }
+        }
+        crc
+    }
+
+    /// `packed` with its CRC made right again, for a test that changes a
+    /// byte to see what else refuses it.
+    fn sealed(packed: &mut [u8]) {
+        let end = packed.len() - 2;
+        let crc = crc16(&packed[..end]).to_be_bytes();
+        packed[end..].copy_from_slice(&crc);
+    }
+
     #[test]
-    fn a_beacon_is_the_name_the_version_a_space_the_digest_and_its_number() {
-        let packed = Beacon::new(0x01020304, version(), digest()).to_bytes();
+    fn the_crc_is_the_ccsds_one() {
+        // The CRC catalogue's check value for CRC-16/IBM-3740, which is the
+        // CCSDS polynomial and initial remainder.
+        assert_eq!(crc16(b"123456789"), 0x29b1);
+    }
+
+    #[test]
+    fn a_beacon_is_its_fields_in_order_and_a_crc() {
+        let beacon = Beacon::new(0x01020304, version(), digest(), 0x0a0b0c0d)
+            .restarting(true);
+        let packed = beacon.to_bytes();
         let mut want = b"tcspecial ".to_vec();
         want.extend([1, 2, 3]);
         want.push(b' ');
         want.extend(digest().0);
         want.extend([1, 2, 3, 4]);
+        want.extend([0x0a, 0x0b, 0x0c, 0x0d]);
+        want.push(0x80);
+        want.extend(InterfaceDigest::of_this_build().0);
+        want.extend(crc16(&want).to_be_bytes());
         assert_eq!(packed, want);
         assert_eq!(packed.len(), BEACON_BYTES);
-        assert_eq!(BEACON_BYTES, 34);
+        assert_eq!(BEACON_BYTES, 57);
     }
 
     #[test]
     fn a_beacon_reads_back_as_itself() {
-        let beacon = Beacon::new(7, version(), digest());
+        let beacon = Beacon::new(7, version(), digest(), 3);
         assert_eq!(Beacon::read(&beacon.to_bytes()), Ok(beacon));
+        let restarting = beacon.restarting(true);
+        assert_eq!(Beacon::read(&restarting.to_bytes()), Ok(restarting));
     }
 
     #[test]
     fn one_packer_packs_beacon_after_beacon_in_the_one_buffer() {
         let mut packer = BeaconPacker::new();
-        let first = packer.pack(&Beacon::new(1, version(), digest())).as_ptr();
+        let first = packer
+            .pack(&Beacon::new(1, version(), digest(), 1))
+            .as_ptr();
         let other = Beacon::new(
             2,
             ConfigVersion::of_this_build(),
             ConfigDigest([9; 16]),
+            2,
         );
         let second = packer.pack(&other);
         assert_eq!(second.as_ptr(), first);
         assert_eq!(Beacon::read(second), Ok(other));
     }
 
+    /// A beacon damaged on the way is refused, and says that is what it is.
+    #[test]
+    fn a_beacon_whose_crc_fails_is_refused() {
+        let mut packed = Beacon::new(1, version(), digest(), 1).to_bytes();
+        packed[30] ^= 0x01;
+        let why = Beacon::read(&packed).expect_err("it was damaged");
+        assert!(
+            matches!(why, BeaconError::Packet(PacketError::BadChecksum { .. })),
+            "{why:?}"
+        );
+        assert!(why.to_string().contains("CRC"), "{why}");
+    }
+
+    /// The spare bits are nought, and a beacon with any of them set is not
+    /// one this ground reads: a layout that used them would be another.
+    #[test]
+    fn a_beacon_with_a_spare_bit_set_is_refused() {
+        let mut packed = Beacon::new(1, version(), digest(), 1).to_bytes();
+        packed[38] |= 0x01;
+        sealed(&mut packed);
+        assert!(matches!(
+            Beacon::read(&packed),
+            Err(BeaconError::Packet(PacketError::Mismatch { .. }))
+        ));
+    }
+
     #[test]
     fn a_datagram_of_another_length_is_not_a_beacon() {
-        let mut packed = Beacon::new(1, version(), digest()).to_bytes();
+        let mut packed = Beacon::new(1, version(), digest(), 1).to_bytes();
         packed.push(0);
         assert_eq!(
             Beacon::read(&packed),
@@ -233,15 +344,17 @@ mod tests {
 
     #[test]
     fn a_datagram_without_the_name_or_the_space_is_not_a_beacon() {
-        let good = Beacon::new(1, version(), digest()).to_bytes();
+        let good = Beacon::new(1, version(), digest(), 1).to_bytes();
         let mut renamed = good.clone();
         renamed[0] = b'T';
+        sealed(&mut renamed);
         assert!(matches!(
             Beacon::read(&renamed),
             Err(BeaconError::Packet(PacketError::Mismatch { .. }))
         ));
         let mut unspaced = good;
         unspaced[13] = b'-';
+        sealed(&mut unspaced);
         assert!(matches!(
             Beacon::read(&unspaced),
             Err(BeaconError::Packet(PacketError::Mismatch { .. }))

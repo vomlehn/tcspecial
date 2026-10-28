@@ -12,8 +12,9 @@ tcspecial:
   # far end of each is the F´ deployment's TcsBridge component, which is a
   # ground station built on tcslib-c as far as tcspecial can tell.
   beacon:
-    interval: "5 s"
+    default_interval: "5 s"
     recv: "127.0.0.1:9510"
+    reset_interval: "1 s"
     send: "0.0.0.0:9500"
   gateway: "fprime"
   log:
@@ -25,6 +26,9 @@ tcspecial:
   payload_telemetry:
     dest_base: "127.0.0.1:9410"
     source_base: "0.0.0.0:9400"
+  # tcspecial counts its starts in this file, which must be on storage
+  # that survives a power cycle on a vehicle.
+  state_file: "/tmp/tcspecial-fprime.state"
   tcs_cmd:
     recv: "0.0.0.0:9200"
     send: "127.0.0.1:9210"

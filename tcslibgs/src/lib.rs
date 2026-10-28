@@ -19,6 +19,8 @@ mod beacon_packet;
 pub mod commands;
 pub mod config;
 pub mod config_digest;
+/// The CRC every packet ends with, for what is not a packet.
+pub mod crc;
 pub mod display;
 pub mod endpoint_config;
 pub mod error;
@@ -26,6 +28,12 @@ pub mod format;
 /// What the vehicle answers to: the ground by radio, cFS, or F´.
 pub mod gateway;
 pub mod graph;
+/// The XTCE documents every packet on the link is stated in, and the digest
+/// that says which of them a program speaks.
+pub mod interface;
+/// The digest of this build's interface, which `make interface-digest`
+/// generated from `xtce/`: used through [`interface`].
+mod interface_digest;
 pub mod node;
 pub mod parameters;
 pub mod protocol;
@@ -59,6 +67,7 @@ pub use display::{screen_height, Edge};
 pub use endpoint_config::Scalar;
 pub use error::*;
 pub use format::*;
+pub use interface::InterfaceDigest;
 pub use node::payload::can::CanParams;
 pub use node::payload::gpio::{Bias, Edge as LineEdge, GpioParams};
 pub use node::payload::hdlc::{

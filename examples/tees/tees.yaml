@@ -7,8 +7,9 @@ tcspecial:
   # Every port is in the eight thousands, which no other example uses, so this
   # one can be left running while another is looked at.
   beacon:
-    interval: "5 s"
+    default_interval: "5 s"
     recv: "127.0.0.1:8510"
+    reset_interval: "1 s"
     send: "0.0.0.0:8500"
   gateway: "radio"
   log:
@@ -20,6 +21,9 @@ tcspecial:
   payload_telemetry:
     dest_base: "127.0.0.1:8410"
     source_base: "0.0.0.0:8400"
+  # tcspecial counts its starts in this file, which must be on storage
+  # that survives a power cycle on a vehicle.
+  state_file: "/tmp/tcspecial-tees.state"
   tcs_cmd:
     recv: "0.0.0.0:8200"
     send: "127.0.0.1:8210"

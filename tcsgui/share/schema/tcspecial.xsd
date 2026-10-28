@@ -376,7 +376,12 @@
       <xs:element name="beacon" minOccurs="0">
         <xs:complexType>
           <xs:all>
-            <xs:element name="interval" type="xs:string" minOccurs="0"/>
+            <xs:element name="default_interval" type="xs:string"
+                        minOccurs="0"/>
+            <!-- How often a beacon is sent across a restart: not nought,
+                 and no longer than interval. -->
+            <xs:element name="reset_interval" type="xs:string"
+                        minOccurs="0"/>
             <xs:element name="send" type="socket" minOccurs="0"/>
             <xs:element name="recv" type="socket" minOccurs="0"/>
           </xs:all>
@@ -393,6 +398,9 @@
       <!-- How long a RESTART_ARM licenses a RESTART for, as a length of
            time: 20 min. Twenty minutes where it is not stated. -->
       <xs:element name="restart_arm_valid" type="xs:string" minOccurs="0"/>
+      <!-- The file tcspecial counts its starts in, on storage that
+           survives a power cycle. -->
+      <xs:element name="state_file" type="xs:string" minOccurs="0"/>
       <!-- Where tcsgui writes the Rust it generates from this configuration.
            The one attribute of this section about building the software rather
            than about running it: nothing aboard reads it. -->

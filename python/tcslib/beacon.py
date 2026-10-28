@@ -8,7 +8,7 @@ holds the two to one another with the same examples the Rust tests use.
 
 A beacon says that tcspecial is running, which build it is, which version of
 a configuration it is serving and the digest of the files it read. It arrives
-on its own, every ``beacon.interval``, over a socket of its own, and it keeps
+on its own, every ``beacon.default_interval``, over a socket of its own, and it keeps
 arriving whether or not a ground station has connected -- so it is the one
 thing a ground station can know about a spacecraft without having asked it
 anything.
@@ -322,6 +322,10 @@ class Heard:
     message: str
     #: The beacon's own number, if it was a beacon this can read.
     sequence: int = None
+    #: How many times tcspecial has started, if it was a beacon this can read.
+    generation: int = None
+    #: Whether it said a restart has been initiated.
+    restarting: bool = False
     #: What is wrong with the configuration it announces, if anything.
     differs: str = None
 
@@ -336,6 +340,8 @@ def _beacon_of(datagram):
         "sequence": beacon.sequence,
         "version": version_text(beacon.version),
         "digest": digest_text(beacon.digest),
+        "generation": beacon.generation,
+        "restarting": beacon.restarting,
     }
 
 
@@ -350,6 +356,8 @@ def hear(datagram, expected):
     return Heard(
         message=f"{why} -- {message}" if why else message,
         sequence=None if beacon is None else beacon["sequence"],
+        generation=None if beacon is None else beacon["generation"],
+        restarting=beacon is not None and beacon["restarting"],
         differs=why,
     )
 
@@ -370,7 +378,9 @@ def message_of(datagram):
     is shown as what arrived, cut short."""
     beacon = _beacon_of(datagram)
     if beacon is not None:
-        return what_it_read(beacon["version"], beacon["digest"])
+        said = (what_it_read(beacon["version"], beacon["digest"])
+                + f" generation {beacon['generation']}")
+        return said + ", RESTARTING" if beacon["restarting"] else said
     text = datagram.decode("utf-8", errors="replace")
     head = text[:40]
     return (
@@ -391,9 +401,13 @@ class Counted(enum.Enum):
 
 def counted(last, now):
     """What ``now`` says about the beacons between it and ``last``: the kind,
-    and how many were missed."""
+    and how many were missed. Each is a beacon's generation and number, as a
+    pair: a generation that changed, either way, is a restart."""
     if last is None:
         return Counted.FIRST, 0
+    if last[0] != now[0]:
+        return Counted.RESTARTED, 0
+    last, now = last[1], now[1]
     if now <= last:
         return Counted.RESTARTED, 0
     if now == last + 1:
@@ -447,7 +461,8 @@ class Beacons:
         self._socket = None
         self._at = None
         self._said = NO_BEACON_MESSAGE
-        self._sequence = None
+        self._count = None
+        self._restarting = False
         self._differed = False
         # The last stranger warned of, so that one sending steadily is warned
         # of once and not on every datagram.
@@ -523,18 +538,32 @@ class Beacons:
             self._differed = heard.differs is not None
 
         if heard.sequence is not None:
-            kind, missed = counted(self._sequence, heard.sequence)
+            now = (heard.generation, heard.sequence)
+            last = self._count
+            kind, missed = counted(last, now)
             if kind is Counted.MISSED:
                 remarks.append(
                     f"{missed} beacon{'' if missed == 1 else 's'} did not "
-                    f"arrive: #{heard.sequence} came after #{self._sequence}"
+                    f"arrive: #{heard.sequence} came after #{last[1]}"
+                )
+            elif kind is Counted.RESTARTED and last[0] != now[0]:
+                remarks.append(
+                    f"tcspecial has restarted: generation {now[0]} is "
+                    f"flying, after {last[0]}"
                 )
             elif kind is Counted.RESTARTED:
                 remarks.append(
                     f"the beacons start again at #{heard.sequence}, so "
                     "tcspecial has restarted"
                 )
-            self._sequence = heard.sequence
+            # Said once, on the beacon that first says it.
+            if heard.restarting and not self._restarting:
+                remarks.append(
+                    "tcspecial has initiated a restart: generation "
+                    f"{heard.generation} is ending"
+                )
+            self._count = now
+            self._restarting = heard.restarting
 
         return self.after(Arrived.BEACON, remarks, heard.message)
 

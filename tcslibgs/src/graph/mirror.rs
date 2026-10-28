@@ -189,6 +189,7 @@ mod tests {
             format!(
                 "tcspecial:
   gateway: radio
+  state_file: /tmp/tcspecial-test.state
   tcs_cmd:
     recv: 0.0.0.0:4000
     send: 127.0.0.1:4100
@@ -199,7 +200,8 @@ mod tests {
     source_base: 0.0.0.0:6000
     dest_base: 127.0.0.1:6100
   beacon:
-    interval: 5 s
+    default_interval: 5 s
+    reset_interval: 5 s
     send: \"0.0.0.0:5550\"
     recv: \"127.0.0.1:5650\"
 moc:

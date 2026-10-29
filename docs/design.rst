@@ -7040,6 +7040,49 @@ its data needs. A new interface is a new node type, and its stand-in is a
 UDP ``stand_in`` where the operating system has nothing to stand in for it:
 see `Saying Which Payloads Are Simulated`_.
 
+Lunar lander interfaces tcspecial speaks
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+These are the payload interfaces the Moon's landers offer that tcspecial
+supports, with the payload type that speaks each. Landers are named by series
+-- Apollo 11 to 17 are "Apollo", Peregrine and Griffin are "Astrobotic" --
+and what each lander offers is from its published payload description. The
+table above has them all, the interfaces tcspecial does not yet support
+included -- SpaceWire, MIL-STD-1553B and time at the tone among them -- and
+where each row comes from.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 30 40
+
+   * - interface
+     - payload type
+     - landers
+   * - RS-422 asynchronous serial
+     - ``serial``
+     - Astrobotic, Chang'e, Intuitive Machines, Masten
+   * - RS-422 carrying SLIP and UDP
+     - ``network``, over UDP, with the line made an IP interface by
+       ``slattach``
+     - Astrobotic
+   * - Ethernet
+     - ``network``
+     - Intuitive Machines
+   * - 802.11 wireless LAN, to a payload deployed from the lander
+     - ``network``, once the link is up
+     - Astrobotic, Firefly
+   * - CAN
+     - ``can``
+     - Intuitive Machines
+   * - Analog telemetry channels
+     - ``iio``, where the converter is an IIO device
+     - Apollo, Luna, Surveyor
+   * - Discrete commands and status lines
+     - ``gpio``
+     - Apollo, Luna, Surveyor
+   * - Serial data clocked out by the lander
+     - ``spi``, which clocks the same way and is a different protocol
+     - Apollo
+
 The Visual Window
 -----------------
 A configuration is a drawing in tcsgui and a running process in tcspecial, and

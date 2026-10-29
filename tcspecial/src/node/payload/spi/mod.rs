@@ -228,13 +228,7 @@ fn set_u8(
     on: &str,
     wanted: &str,
 ) -> TcsResult<()> {
-    set(
-        fd,
-        request,
-        &value as *const u8 as *const libc::c_void,
-        on,
-        wanted,
-    )
+    set(fd, request, &value, on, wanted)
 }
 
 fn set_u32(
@@ -244,28 +238,43 @@ fn set_u32(
     on: &str,
     wanted: &str,
 ) -> TcsResult<()> {
-    set(
-        fd,
-        request,
-        &value as *const u32 as *const libc::c_void,
-        on,
-        wanted,
-    )
+    set(fd, request, &value, on, wanted)
+}
+
+/// How many bytes an ioctl request says its argument is.
+///
+/// The size field of the request number, as `_IOC_SIZE` reads it: 13 bits
+/// from bit 16 hold it on every architecture Linux has, 14 on most.
+fn argument_bytes(request: libc::c_ulong) -> usize {
+    ((request >> 16) & 0x1fff) as usize
 }
 
 /// Make one request of the open device, saying what was being set if it fails.
 ///
 /// A node that is not a spidev answers `ENOTTY`, which says nothing on its
 /// own about what was attempted.
-fn set(
+///
+/// The value is checked against the size the request's number gives before
+/// it is passed, so a request and a value that disagree are refused rather
+/// than letting the kernel read past the value.
+fn set<T>(
     fd: RawFd,
     request: libc::c_ulong,
-    value: *const libc::c_void,
+    value: &T,
     on: &str,
     wanted: &str,
 ) -> TcsResult<()> {
-    // SAFETY: fd is open for the lifetime of the borrow, and the pointer is
-    // to a live value of the width the request's number encodes.
+    if argument_bytes(request) != std::mem::size_of::<T>() {
+        return Err(TcsError::Endpoint(format!(
+            "{on}: setting {wanted} takes {} bytes, not the {} given",
+            argument_bytes(request),
+            std::mem::size_of::<T>()
+        )));
+    }
+    // SAFETY: the pointer is to `value`, alive and as wide as the request
+    // says, which was checked above; the kernel only reads it, for a write
+    // request, and an fd that is not open is refused with EBADF.
+    let value = value as *const T as *const libc::c_void;
     if unsafe { libc::ioctl(fd, request, value) } < 0 {
         let why = std::io::Error::last_os_error();
         return Err(TcsError::Endpoint(format!(
@@ -307,6 +316,30 @@ impl EndpointWritable for SpiEndpoint {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Each request is made with a value as wide as its number says: one
+    /// byte for the mode, the bit order and the word size, four for the
+    /// speed.
+    #[test]
+    fn each_request_is_as_wide_as_its_value() {
+        for request in [
+            SPI_IOC_WR_MODE,
+            SPI_IOC_WR_LSB_FIRST,
+            SPI_IOC_WR_BITS_PER_WORD,
+        ] {
+            assert_eq!(argument_bytes(request), 1, "{request:#x}");
+        }
+        assert_eq!(argument_bytes(SPI_IOC_WR_MAX_SPEED_HZ), 4);
+    }
+
+    /// A value of another width is refused before the kernel is asked, which
+    /// would otherwise read past it.
+    #[test]
+    fn a_value_of_the_wrong_width_is_refused() {
+        let why = set_u8(-1, SPI_IOC_WR_MAX_SPEED_HZ, 1, "spi", "its speed")
+            .expect_err("one byte where four are read");
+        assert!(format!("{why}").contains("takes 4 bytes"), "{why}");
+    }
 
     /// The four modes are the two clock bits, and the chip select polarity is
     /// a bit beside them rather than part of the mode.

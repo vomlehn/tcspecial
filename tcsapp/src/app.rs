@@ -49,6 +49,7 @@ use std::fs::File;
 use std::io;
 use std::os::fd::{FromRawFd, RawFd};
 use std::os::unix::net::UnixStream;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::{is_handed_over, is_open, packet, Interface};
 
@@ -375,7 +376,16 @@ pub fn complain(message: &str) {
     let _ = packet::write(&mut *errors, message.as_bytes());
 }
 
-/// Whether this program was run the way this kind of app is run.
+/// Whether the interfaces have been taken: see [`taking`].
+static TAKEN: AtomicBool = AtomicBool::new(false);
+
+/// Whether this program was run the way this kind of app is run, and if it
+/// was, the interfaces are this call's to take.
+///
+/// Once, for the life of the program: each interface's descriptor is owned by
+/// the handle `inherited` makes of it, and a second `inherited` would make a
+/// second owner of each, which would close it twice. So the second call is
+/// refused, rather than relying on every program to call it once.
 ///
 /// Every data interface it supports handed over, and every data interface it
 /// does not support not. Both halves, because each catches a different
@@ -428,25 +438,54 @@ fn taking(supported: &[Interface]) -> Result<(), String> {
             Interface::Errors.fd()
         ));
     }
+    take_once(&TAKEN)
+}
+
+/// Note that the interfaces are taken, unless they have been already.
+///
+/// # Arguments
+///
+/// * `taken` - Whether they have been: [`TAKEN`], or a test's own.
+///
+/// # Errors
+///
+/// Why not, if they have been taken already.
+fn take_once(taken: &AtomicBool) -> Result<(), String> {
+    if taken.swap(true, Ordering::SeqCst) {
+        return Err("the interfaces have been taken already: an app takes \
+                    them once, with the one inherited it is"
+            .to_string());
+    }
     Ok(())
 }
 
 /// One of the two interfaces that is read and written, which is a socket.
 ///
-/// # Safety
-///
-/// Called once per interface, from the `inherited` of the one kind of app that
-/// supports it, which is itself called once at the start of a program: the
-/// descriptor is owned from here on and closed when the handle is dropped.
+/// Called only from an `inherited`, once [`taking`] has said the interfaces
+/// are its to take, which it says once: the descriptor is owned from here on
+/// and closed when the handle is dropped.
 fn stream(interface: Interface) -> UnixStream {
     unsafe { UnixStream::from_raw_fd(interface.fd() as RawFd) }
 }
 
 /// And the one that is only written, which need be no more than a file.
 ///
-/// # Safety
-///
-/// As [`stream`].
+/// Called as [`stream`] is.
 fn file(interface: Interface) -> File {
     unsafe { File::from_raw_fd(interface.fd() as RawFd) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The interfaces are taken once, and a second taking is refused rather
+    /// than making a second owner of each descriptor.
+    #[test]
+    fn the_interfaces_are_taken_once() {
+        let taken = AtomicBool::new(false);
+        assert_eq!(take_once(&taken), Ok(()));
+        let why = take_once(&taken).expect_err("a second taking");
+        assert!(why.contains("taken already"), "{why}");
+    }
 }

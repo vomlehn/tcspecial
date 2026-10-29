@@ -443,6 +443,9 @@ fn bind_to_interface(
     interface: &str,
     index: libc::c_uint,
 ) -> TcsResult<()> {
+    // SAFETY: sockaddr_ll is a C struct of integers and a byte array, for
+    // which all zeroes is a valid value -- and the one bind wants for the
+    // fields not set below.
     let mut address: libc::sockaddr_ll = unsafe { mem::zeroed() };
     address.sll_family = libc::AF_PACKET as u16;
     address.sll_protocol = (libc::ETH_P_ALL as u16).to_be();
@@ -516,6 +519,8 @@ impl EndpointWritable for HdlcEndpoint {
     /// Addressed to the interface rather than to anybody on it: a raw HDLC
     /// frame carries no address, there being one far end and no bus.
     fn write(&mut self, data: &[u8]) -> TcsResult<usize> {
+        // SAFETY: sockaddr_ll is a C struct of integers and a byte array, for
+        // which all zeroes is a valid value.
         let mut address: libc::sockaddr_ll = unsafe { mem::zeroed() };
         address.sll_family = libc::AF_PACKET as u16;
         address.sll_protocol = (libc::ETH_P_ALL as u16).to_be();

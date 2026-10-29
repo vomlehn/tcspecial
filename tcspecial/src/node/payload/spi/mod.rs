@@ -75,7 +75,12 @@ enum Clocking {
 /// the discipline that would otherwise sit between the two ends of a link
 /// carrying device data.
 fn make_raw(fd: RawFd, on: &str) -> TcsResult<()> {
+    // SAFETY: termios is a C struct of integers and arrays of integers, for
+    // which all zeroes is a valid value; tcgetattr overwrites it anyway.
     let mut terms: libc::termios = unsafe { std::mem::zeroed() };
+    // SAFETY: tcgetattr needs an open descriptor and a termios it can write.
+    // The one caller passes the descriptor of the `device` it has just
+    // opened and still holds; `terms` is local and mutably borrowed.
     if unsafe { libc::tcgetattr(fd, &mut terms) } != 0 {
         return Err(TcsError::Endpoint(format!(
             "{on} is a terminal whose terms cannot be read: {}",
@@ -83,8 +88,12 @@ fn make_raw(fd: RawFd, on: &str) -> TcsResult<()> {
         )));
     }
 
+    // SAFETY: cfmakeraw needs a termios it can write, which `terms` is,
+    // filled in by tcgetattr above.
     unsafe { libc::cfmakeraw(&mut terms) };
 
+    // SAFETY: tcsetattr needs an open descriptor and a termios it can read:
+    // `fd` is open as for tcgetattr, and `terms` is local.
     if unsafe { libc::tcsetattr(fd, libc::TCSANOW, &terms) } != 0 {
         return Err(TcsError::Endpoint(format!(
             "{on} is a terminal that cannot be set raw: {}",
@@ -345,6 +354,8 @@ mod tests {
         use std::io::Write;
         use std::os::unix::io::FromRawFd;
 
+        // SAFETY: posix_openpt takes only flags and has no preconditions;
+        // its result is checked before it is used.
         let master_fd =
             unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY) };
         assert!(
@@ -352,17 +363,31 @@ mod tests {
             "no pty: {}",
             std::io::Error::last_os_error()
         );
+        // SAFETY: from_raw_fd needs sole ownership of an open descriptor.
+        // `master_fd` was just opened, is checked above, and nothing else
+        // takes ownership of it; the uses below only borrow it while the File
+        // is alive.
         let mut master = unsafe { File::from_raw_fd(master_fd) };
+        // SAFETY: grantpt needs an open pty master, which `master_fd` is,
+        // owned by the File above for the rest of the test.
         assert_eq!(unsafe { libc::grantpt(master_fd) }, 0);
+        // SAFETY: as for grantpt.
         assert_eq!(unsafe { libc::unlockpt(master_fd) }, 0);
 
         let mut name = [0 as libc::c_char; 128];
         assert_eq!(
+            // SAFETY: ptsname_r needs an open pty master and a buffer it can
+            // write of the length it is given: `name` is a local array, and
+            // its own length is what is passed.
             unsafe {
                 libc::ptsname_r(master_fd, name.as_mut_ptr(), name.len())
             },
             0
         );
+        // SAFETY: from_ptr needs a NUL-terminated string that outlives the
+        // borrow. ptsname_r returned 0, so it wrote a terminated name into
+        // `name` (it fails with ERANGE rather than truncate), and `name`
+        // outlives the CStr, which is copied out at once.
         let slave = unsafe { std::ffi::CStr::from_ptr(name.as_ptr()) }
             .to_string_lossy()
             .into_owned();

@@ -248,6 +248,7 @@ mod tests {
             // return a status.
             let flags = unsafe { libc::fcntl(self.as_raw_fd(), libc::F_GETFL) };
             if flags < 0
+                // SAFETY: as for F_GETFL; `self` holds the file open.
                 || unsafe {
                     libc::fcntl(
                         self.as_raw_fd(),

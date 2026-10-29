@@ -1442,7 +1442,8 @@ the UART driver and is told through an ioctl.
                      Required of a line that states rs485: true
    rs485_delay_before_send
                      how long to hold the bus before the first bit, as a
-                     length of time: 2 ms. Default none
+                     length of time in whole milliseconds: 2 ms. Default
+                     none
    rs485_delay_after_send
                      and after the last
 
@@ -1452,7 +1453,10 @@ pin through an inverter -- so a line that states ``rs485: true`` must state it,
 and a line that got it the wrong way round would transmit exactly when it
 should be listening. The delays default to nought, which is right where the
 transceivers are quick enough, and a delay longer than a second is refused as
-microseconds mistaken for milliseconds.
+microseconds mistaken for milliseconds. Linux holds the delays in whole
+milliseconds, so a delay that is not one -- ``500 us``, ``1.5 ms`` -- is
+refused rather than rounded: a fraction would be dropped on the way to the
+port, and ``500 us`` would be no delay at all.
 
 The turnaround details are refused on a line that does not state
 ``rs485: true``, and all of it is refused on a synchronous line: the kernel's

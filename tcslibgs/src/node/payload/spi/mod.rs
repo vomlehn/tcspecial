@@ -137,7 +137,7 @@ fn parse_spi_mode(group: &str, s: &Scalar) -> EndpointConfigResult<SpiMode> {
         "3" => Ok(SpiMode::Mode3),
         other => Err(bad(
             group,
-            &format!("mode: \"{other}\" is not one of 0, 1, 2, or 3"),
+            &format!("spi_mode: \"{other}\" is not one of 0, 1, 2, or 3"),
         )),
     }
 }

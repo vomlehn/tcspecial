@@ -412,6 +412,7 @@ class Counted(enum.Enum):
     NEXT = "next"
     MISSED = "missed"
     RESTARTED = "restarted"
+    LATE = "late"
 
 
 def counted(last, now):
@@ -423,8 +424,12 @@ def counted(last, now):
     if last[0] != now[0]:
         return Counted.RESTARTED, 0
     last, now = last[1], now[1]
-    if now <= last:
+    # #1 is a start that kept no generation; any other number at or before
+    # the last is the link's, delayed or delivered twice: the Rust's rule.
+    if now == 1 and last != 1:
         return Counted.RESTARTED, 0
+    if now <= last:
+        return Counted.LATE, 0
     if now == last + 1:
         return Counted.NEXT, 0
     return Counted.MISSED, now - last - 1
@@ -562,7 +567,13 @@ class Beacons:
                 )
             elif kind is Counted.RESTARTED:
                 remarks.append(restarted(last, now, heard.commanded_restart))
-            self._count = now
+            elif kind is Counted.LATE:
+                remarks.append(
+                    f"beacon #{heard.sequence} arrived late, after #{last[1]}"
+                )
+            # A late beacon is the past: the count goes on from the later one.
+            if kind is not Counted.LATE:
+                self._count = now
 
         return self.after(Arrived.BEACON, remarks, heard.message)
 

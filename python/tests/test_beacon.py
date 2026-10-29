@@ -268,7 +268,9 @@ class HearingTest(unittest.TestCase):
         self.assertEqual(beacon.counted((3, 7), (3, 8)), (Counted.NEXT, 0))
         self.assertEqual(beacon.counted((3, 7), (3, 10)), (Counted.MISSED, 2))
         self.assertEqual(beacon.counted((3, 7), (3, 7)),
-                         (Counted.RESTARTED, 0))
+                         (Counted.LATE, 0))
+        self.assertEqual(beacon.counted((3, 7), (3, 6)),
+                         (Counted.LATE, 0))
         self.assertEqual(beacon.counted((3, 7), (3, 1)),
                          (Counted.RESTARTED, 0))
 
@@ -325,6 +327,10 @@ class LoopTest(unittest.TestCase):
                       again.remarks)
         self.assertFalse(any("DIFFERS" in r for r in again.remarks),
                          "said once, when it starts")
+        late = self.beacons.heard(a_beacon(sequence=3), sender)
+        self.assertIn("beacon #3 arrived late, after #4", late.remarks)
+        self.assertFalse(any("restarted" in r for r in late.remarks),
+                         late.remarks)
         restart = self.beacons.heard(a_beacon(sequence=1), sender)
         self.assertTrue(
             any("start again at #1" in r for r in restart.remarks),

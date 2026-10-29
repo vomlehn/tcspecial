@@ -661,6 +661,11 @@ pub enum Counted {
     /// The numbering started again, or the generation changed, which is a
     /// spacecraft that restarted.
     Restarted,
+    /// A beacon of the same start as the last, numbered at or before it:
+    /// one delayed past a later one, or one delivered twice. The link keeps
+    /// no order, so this is the link's doing and not the spacecraft's, and
+    /// the count goes on from the later one.
+    Late,
 }
 
 /// What `now` says about the beacons between it and `last`.
@@ -690,13 +695,17 @@ pub struct Count {
 
 /// What `now` says about the beacons since `last`, both of one generation.
 fn counted_within(last: u32, now: u32) -> Counted {
-    // A counter kept by the sender goes backwards only when the sender
-    // starts again, so that is what this is -- the generation says so too,
-    // and a damaged state file is the case where it might not. It would also
-    // do so after 2^32 beacons, which at five seconds each is six centuries;
-    // a wrap is not worth telling from a restart.
-    if now <= last {
+    // A number at or before the last is a beacon the link delayed or
+    // delivered twice: the generation, not the number, says a start, and the
+    // link never keeps order. Except #1, which is a start that kept no
+    // generation -- a damaged state file starts the count again from one, as
+    // it may have been -- and which a late beacon is only at the very first.
+    // A count that wraps would also go backwards, after 2^32 beacons, which
+    // at five seconds each is six centuries.
+    if now == 1 && last != 1 {
         Counted::Restarted
+    } else if now <= last {
+        Counted::Late
     } else if now == last + 1 {
         Counted::Next
     } else {
@@ -933,7 +942,17 @@ impl Beacons {
                             now,
                             beacon.commanded_restart,
                         )),
+                        Counted::Late => remarks.push(format!(
+                            "beacon #{} arrived late, after #{}",
+                            now.sequence,
+                            last.map_or(0, |last| last.sequence)
+                        )),
                         Counted::First | Counted::Next => {}
+                    }
+                    // A late beacon is the past: what is known is what the
+                    // later one said.
+                    if counted(last, now) == Counted::Late {
+                        return self.after(Arrived::Beacon);
                     }
                     self.count = Some(now);
                     self.last.generation = Some(beacon.generation);
@@ -1451,14 +1470,15 @@ mod tests {
         assert_eq!(counted(Some(at(5)), at(7)), Counted::Missed(1));
         assert_eq!(counted(Some(at(5)), at(105)), Counted::Missed(99));
 
-        // A number that does not go forward is a sender that started again:
-        // the count is the sender's, and it begins at one.
+        // A number that starts again at one is a sender that started again,
+        // in a generation it could not count: the count is the sender's,
+        // and it begins at one.
         assert_eq!(counted(Some(at(99)), at(1)), Counted::Restarted);
-        assert_eq!(
-            counted(Some(at(99)), at(99)),
-            Counted::Restarted,
-            "the same twice"
-        );
+        // Any other that does not go forward is the link's: delayed past a
+        // later one, or delivered twice.
+        assert_eq!(counted(Some(at(99)), at(98)), Counted::Late);
+        assert_eq!(counted(Some(at(99)), at(99)), Counted::Late, "twice");
+        assert_eq!(counted(Some(at(1)), at(1)), Counted::Late);
     }
 
     /// A generation that changes is a restart, whichever way it changes and

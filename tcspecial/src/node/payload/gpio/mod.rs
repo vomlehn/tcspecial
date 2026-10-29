@@ -403,16 +403,27 @@ fn ask_for_lines(
         )));
     }
 
+    // Owned at once, so that a failure below closes it rather than leaving
+    // the lines held by a descriptor nobody has.
+    // SAFETY: the kernel has just given this descriptor, and nothing else
+    // owns it.
+    let lines = unsafe { File::from_raw_fd(request.fd) };
+
     // Read without waiting, as every other endpoint does, and for a sharper
     // reason here: a read gathers every event that is waiting, so a blocking
     // descriptor would have it wait for the next one after collecting the
     // last -- a conduit stopped until a line happened to change again, with
     // the events it had already gathered unreported.
-    // SAFETY: both calls take the descriptor by value and return a status.
-    let flags = unsafe { libc::fcntl(request.fd, libc::F_GETFL) };
+    // SAFETY: both calls take the descriptor by value and return a status,
+    // and `lines` keeps it open across them.
+    let flags = unsafe { libc::fcntl(lines.as_raw_fd(), libc::F_GETFL) };
     if flags < 0
         || unsafe {
-            libc::fcntl(request.fd, libc::F_SETFL, flags | libc::O_NONBLOCK)
+            libc::fcntl(
+                lines.as_raw_fd(),
+                libc::F_SETFL,
+                flags | libc::O_NONBLOCK,
+            )
         } < 0
     {
         return Err(TcsError::Endpoint(format!(
@@ -421,9 +432,7 @@ fn ask_for_lines(
         )));
     }
 
-    // SAFETY: the kernel has just given this descriptor, and nothing else
-    // owns it.
-    Ok(unsafe { File::from_raw_fd(request.fd) })
+    Ok(lines)
 }
 
 /// What arrived, as the state the lines are to be driven to.

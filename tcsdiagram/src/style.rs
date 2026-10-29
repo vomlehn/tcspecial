@@ -443,10 +443,10 @@ pub fn polygon_of(
 
 /// The shape to fill, as path data in the node's own coordinates.
 ///
-/// Closed, whatever the line does, and empty for a rounded outline -- which
-/// the markup fills with a Rectangle's own background. One pixel to one
-/// coordinate, so the markup draws it one to one and a stroke keeps its width:
-/// a viewbox stretched to fit would stretch the line with it.
+/// Closed, whatever the line does, and for every outline, a rounded one's
+/// arcs included: see [`polygon_of`]. One pixel to one coordinate, so the
+/// markup draws it one to one and a stroke keeps its width: a viewbox
+/// stretched to fit would stretch the line with it.
 ///
 /// # Arguments
 ///

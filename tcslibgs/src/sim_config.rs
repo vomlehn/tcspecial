@@ -699,13 +699,8 @@ fn nothing_unknown(
         return Ok(());
     };
 
-    // The two the tcspecial configuration spells without a prefix. Someone
-    // writing a simulator file beside a tcspecial configuration, or copying
-    // from one, writes them the way the tcspecial configuration does -- so they
-    // are named here and answered with the name this file uses, rather than
-    // reported as words nothing knows. The two the payload configuration
-    // states. Someone writing a simulator file beside one, or copying from it,
-    // writes them the way that file does
+    // What the payload configuration states. Someone writing a simulator
+    // file beside one, or copying from it, writes them the way that file does
     // -- so they are named here and answered with the file they belong in,
     // rather than reported as words nothing knows.
     if let Some(given) = ["address", "port", "payload_interface"]

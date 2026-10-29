@@ -10931,3 +10931,27 @@ The middle part of the tcsmoc window is for viewing telemetry from individual DH
    spacecraft's count of what its handler had read. The count shown before was
    the spacecraft's, which is the other direction, and read nought for a
    payload nobody sends to.
+
+See Also
+========
+
+`tcs-xtce manual <https://vomlehn.github.io/tcs-xtce/docs/manual.html>`__
+    tcs-xtce turns an XTCE description of telemetry and command packets
+    into Rust, C, C++ and Python code that encodes and decodes them. The
+    manual says how to generate that code and use it.
+
+`Tcslog manual <https://vomlehn.github.io/tcslog/docs/manual.html>`__
+    Tcslog is flight software that stores telemetry on board a vehicle that
+    is often out of contact. The manual says how to write a log, read it
+    back, and what each outcome of reading means.
+
+`TCSpecial manual <https://vomlehn.github.io/tcspecial/docs/manual.html>`__
+    TCSpecial is flight software that connects the devices aboard a
+    vehicle to the places their data has to reach, aboard and on the
+    ground. The manual says how to configure, build and run it.
+
+`Third-party integration`__
+    The plan for making the tcs projects work with NASA's core Flight
+    System (cFS) and JPL's F´ (F Prime). Work in progress.
+
+.. __: https://vomlehn.github.io/tcspecial/docs/third-party.html

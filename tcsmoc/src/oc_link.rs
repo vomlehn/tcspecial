@@ -114,7 +114,7 @@ mod tests {
         };
         assert_eq!(
             arrival.panel_lines(),
-            (at.time_of_day(), "30 1D 79 11".to_string())
+            (at.time_of_day(), "11 79 1D 30".to_string())
         );
     }
 

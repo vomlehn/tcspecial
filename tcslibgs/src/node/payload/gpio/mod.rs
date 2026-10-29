@@ -35,7 +35,7 @@ use crate::endpoint_config::{
 ///
 /// Sixteen: the time as eight, the line's offset as four, and what it became
 /// as four. The time is a [`crate::Timestamp`] -- microseconds since the
-/// epoch, least significant byte first -- which is what every other time in
+/// epoch, most significant byte first -- which is what every other time in
 /// this project is, so a line's change and a telemetry response can be read
 /// against each other; the offset is there because one
 /// payload may watch several lines, and without it an event says only that

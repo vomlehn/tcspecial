@@ -11,7 +11,7 @@
 //! [`EVENT_BYTES`] bytes: when it happened, which line, and what it became.
 //!
 //! The time is a [`Timestamp`] -- microseconds since the UNIX epoch, eight
-//! bytes, least significant first -- which is what every other time in this
+//! bytes, most significant first -- which is what every other time in this
 //! project is, so a line's change and a telemetry response can be read
 //! against each other. The kernel's own timestamp is
 //! nanoseconds on a monotonic clock, which says nothing to a ground station;
@@ -244,9 +244,9 @@ fn levels_of(what: &str, fd: RawFd, count: usize) -> TcsResult<u64> {
 /// and this one's is when the vehicle looked.
 fn level_record(offset: u32, high: bool, now: SystemTime) -> [u8; EVENT_BYTES] {
     let mut record = [0u8; EVENT_BYTES];
-    record[..8].copy_from_slice(&Timestamp::at(now).to_le_bytes());
-    record[8..12].copy_from_slice(&offset.to_le_bytes());
-    record[12..].copy_from_slice(&u32::from(high).to_le_bytes());
+    record[..8].copy_from_slice(&Timestamp::at(now).to_be_bytes());
+    record[8..12].copy_from_slice(&offset.to_be_bytes());
+    record[12..].copy_from_slice(&u32::from(high).to_be_bytes());
     record
 }
 
@@ -467,9 +467,8 @@ fn values_for(count: usize, wanted: bool) -> LineValues {
 
 /// One event as the bytes a conduit carries: the time, the line, the value.
 ///
-/// Little-endian, because the two ends of this link are the same machine --
-/// the handler makes these and the ground reads them, and a device set that
-/// crossed architectures would have said so somewhere. That is also the
+/// Most significant byte first, as everything this software puts on the
+/// network is unless the protocol it goes in says otherwise. That is the
 /// order a [`Timestamp`] goes on the wire in, so the eight bytes of time
 /// here are the eight bytes of time in a telemetry response.
 fn record_of(event: &LineEvent, now: SystemTime) -> [u8; EVENT_BYTES] {
@@ -485,9 +484,9 @@ fn record_of(event: &LineEvent, now: SystemTime) -> [u8; EVENT_BYTES] {
         0
     };
 
-    record[..8].copy_from_slice(&Timestamp::at(now).to_le_bytes());
-    record[8..12].copy_from_slice(&event.offset.to_le_bytes());
-    record[12..].copy_from_slice(&value.to_le_bytes());
+    record[..8].copy_from_slice(&Timestamp::at(now).to_be_bytes());
+    record[8..12].copy_from_slice(&event.offset.to_be_bytes());
+    record[12..].copy_from_slice(&value.to_be_bytes());
     record
 }
 
@@ -771,15 +770,15 @@ mod tests {
         let record = record_of(&rising, at);
         assert_eq!(record.len(), EVENT_BYTES);
         assert_eq!(
-            Timestamp::from_le_bytes(record[..8].try_into().unwrap()),
+            Timestamp::from_be_bytes(record[..8].try_into().unwrap()),
             Timestamp {
                 micros: 1_700_000_000_123_000
             },
             "the time is a Timestamp, not the kernel's own clock"
         );
-        assert_eq!(u32::from_le_bytes(record[8..12].try_into().unwrap()), 7);
+        assert_eq!(u32::from_be_bytes(record[8..12].try_into().unwrap()), 7);
         assert_eq!(
-            u32::from_le_bytes(record[12..].try_into().unwrap()),
+            u32::from_be_bytes(record[12..].try_into().unwrap()),
             1,
             "a rising edge is a line that became high"
         );
@@ -791,7 +790,7 @@ mod tests {
             ..rising
         };
         let record = record_of(&falling, at);
-        assert_eq!(u32::from_le_bytes(record[12..].try_into().unwrap()), 0);
+        assert_eq!(u32::from_be_bytes(record[12..].try_into().unwrap()), 0);
     }
 
     /// A chip that is not there is reported.
@@ -909,10 +908,10 @@ mod tests {
 
         // The first is the rising edge and the second the falling one, in the
         // order they happened.
-        assert_eq!(u32::from_le_bytes(buffer[8..12].try_into().unwrap()), 3);
-        assert_eq!(u32::from_le_bytes(buffer[12..16].try_into().unwrap()), 1);
+        assert_eq!(u32::from_be_bytes(buffer[8..12].try_into().unwrap()), 3);
+        assert_eq!(u32::from_be_bytes(buffer[12..16].try_into().unwrap()), 1);
         assert_eq!(
-            u32::from_le_bytes(
+            u32::from_be_bytes(
                 buffer[EVENT_BYTES + 12..EVENT_BYTES + 16]
                     .try_into()
                     .unwrap()

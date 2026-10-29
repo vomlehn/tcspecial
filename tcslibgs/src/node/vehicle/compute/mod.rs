@@ -95,7 +95,7 @@ pub fn micro_kelvin(number: f64) -> Result<i32, String> {
 }
 
 /// A value as it travels: four bytes of a signed count of micro-kelvin,
-/// little endian.
+/// most significant first.
 ///
 /// A temperature is carried as a whole number of micro-kelvin rather than as
 /// the double the arithmetic produced. The unit is finer than any sensor here
@@ -112,10 +112,12 @@ pub fn micro_kelvin(number: f64) -> Result<i32, String> {
 /// 4295 K. And a difference of two temperatures is a temperature's width,
 /// which a band is, and that is signed by nature.
 ///
-/// Little endian because every other number this software puts on a wire is:
-/// a timestamp's microseconds, a node's id, a beacon interval. A sensor's own
-/// bytes are the exception and say which way round they are -- `i16_be`,
-/// `u24_be` -- because the part decides that and the file states it.
+/// Most significant first because everything this software puts on the
+/// network is, unless the protocol it goes in says otherwise: a timestamp's
+/// microseconds, a node's id, a beacon interval, every field of a command and
+/// an answer. A sensor's own bytes are the exception and say which way round
+/// they are -- `i16_le`, `u24_be` -- because the part decides that and the
+/// file states it.
 ///
 /// What it costs is the range, which is where this is refused rather than
 /// wrapped: see [`micro_kelvin`]. And a value in a telemetry log is four bytes
@@ -129,7 +131,7 @@ pub fn as_value(number: f64) -> Result<Vec<u8>, String> {
 /// The same, as the four bytes themselves, allocating nothing: what a
 /// computation aboard makes a value with, once the vehicle is running.
 pub fn value_bytes(number: f64) -> Result<[u8; VALUE_BYTES], String> {
-    Ok(micro_kelvin(number)?.to_le_bytes())
+    Ok(micro_kelvin(number)?.to_be_bytes())
 }
 
 /// A value that arrived, as a number of kelvin.
@@ -153,7 +155,7 @@ pub fn from_value(data: &[u8], what: &str) -> Result<f64, String> {
         )
     })?;
 
-    Ok(f64::from(i32::from_le_bytes(bytes)) / MICRO_KELVIN)
+    Ok(f64::from(i32::from_be_bytes(bytes)) / MICRO_KELVIN)
 }
 
 /// Whether what this computation produces is a value.
@@ -670,7 +672,9 @@ mod tests {
         }
     }
 
-    /// A value is four bytes of micro-kelvin, least significant first.
+    /// A value is four bytes of micro-kelvin, most significant first, written
+    /// out by hand so that the test states the order rather than taking it
+    /// from the code it checks.
     ///
     /// Rounded to the unit and exact in it: what goes on the link is a whole
     /// number of micro-kelvin, so every node that reads it reads the same
@@ -679,14 +683,14 @@ mod tests {
     fn a_value_is_a_count_of_micro_kelvin() {
         assert_eq!(
             as_value(293.15).expect("a temperature"),
-            293_150_000_i32.to_le_bytes()
+            [0x11, 0x79, 0x1d, 0x30]
         );
         assert_eq!(as_value(0.0).expect("nought").len(), VALUE_BYTES);
         // Below zero, which is what the sign is for: a conversion with the
         // wrong offset produces one, and it must arrive as what it is.
         assert_eq!(
             as_value(-40.0).expect("below zero"),
-            (-40_000_000_i32).to_le_bytes()
+            [0xfd, 0x9d, 0xa6, 0x00]
         );
 
         // The trip is exact for every temperature that is a whole number of
@@ -756,7 +760,7 @@ mod tests {
         // pattern of a 32-bit integer that is not a number of micro-kelvin.
         // What a sensor cannot produce is refused where a value is made.
         assert_eq!(
-            from_value(&[0xFF, 0xFF, 0xFF, 0x7F], "the top"),
+            from_value(&[0x7F, 0xFF, 0xFF, 0xFF], "the top"),
             Ok(2147.483647)
         );
     }

@@ -1814,7 +1814,8 @@ rs485_rts_on_send true | false -- the level of RTS while sending.
                   Required of a line that states rs485: true
 rs485_delay_before_send
                   how long to hold the bus before the first bit, as a
-                  length of time: 2 ms. Default none
+                  length of time in whole milliseconds: 2 ms. Default
+                  none
 rs485_delay_after_send
                   and after the last
 </pre>
@@ -1824,7 +1825,10 @@ pin through an inverter -- so a line that states <tt class="docutils literal">rs
 and a line that got it the wrong way round would transmit exactly when it
 should be listening. The delays default to nought, which is right where the
 transceivers are quick enough, and a delay longer than a second is refused as
-microseconds mistaken for milliseconds.</p>
+microseconds mistaken for milliseconds. Linux holds the delays in whole
+milliseconds, so a delay that is not one -- <tt class="docutils literal">500 us</tt>, <tt class="docutils literal">1.5 ms</tt> -- is
+refused rather than rounded: a fraction would be dropped on the way to the
+port, and <tt class="docutils literal">500 us</tt> would be no delay at all.</p>
 <p>The turnaround details are refused on a line that does not state
 <tt class="docutils literal">rs485: true</tt>, and all of it is refused on a synchronous line: the kernel's
 RS-485 support is part of its start-stop drivers, where a synchronous line is

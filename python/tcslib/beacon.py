@@ -322,9 +322,7 @@ class Heard:
     message: str
     #: The beacon's own number, if it was a beacon this can read.
     sequence: int = None
-    #: How many times tcspecial has started, if it was a beacon this can read.
-    generation: int = None
-    #: Whether it said the ground commanded the start that sent it.
+    #: Whether it said a restart the ground commanded is under way.
     commanded_restart: bool = False
     #: What is wrong with the configuration it announces, if anything.
     differs: str = None
@@ -340,7 +338,6 @@ def _beacon_of(datagram):
         "sequence": beacon.sequence,
         "version": version_text(beacon.version),
         "digest": digest_text(beacon.digest),
-        "generation": beacon.generation,
         "commanded_restart": beacon.commanded_restart,
     }
 
@@ -356,23 +353,19 @@ def hear(datagram, expected):
     return Heard(
         message=f"{why} -- {message}" if why else message,
         sequence=None if beacon is None else beacon["sequence"],
-        generation=None if beacon is None else beacon["generation"],
         commanded_restart=(beacon is not None
                            and beacon["commanded_restart"]),
         differs=why,
     )
 
 
-def restarted(last, now, commanded):
-    """What to say of a restart, from the count before it and the count
-    now, each a (generation, sequence) pair, and whether the start that came
-    back was commanded: the same words as the Rust's."""
+def restarted(now, commanded):
+    """What to say of a restart, from the number the beacons start again at
+    and whether a commanded restart is under way: the same words as the
+    Rust's."""
     how = ("as commanded" if commanded
            else "without being commanded to, with the definitions it had")
-    if last is not None and last[0] != now[0]:
-        return (f"tcspecial has restarted {how}: generation {now[0]} is "
-                f"flying, after {last[0]}")
-    return (f"the beacons start again at #{now[1]}, so tcspecial has "
+    return (f"the beacons start again at #{now}, so tcspecial has "
             f"restarted {how}")
 
 
@@ -392,8 +385,7 @@ def message_of(datagram):
     is shown as what arrived, cut short."""
     beacon = _beacon_of(datagram)
     if beacon is not None:
-        said = (what_it_read(beacon["version"], beacon["digest"])
-                + f" generation {beacon['generation']}")
+        said = what_it_read(beacon["version"], beacon["digest"])
         return (said + ", COMMANDED RESTART" if beacon["commanded_restart"]
                 else said)
     text = datagram.decode("utf-8", errors="replace")
@@ -412,28 +404,20 @@ class Counted(enum.Enum):
     NEXT = "next"
     MISSED = "missed"
     RESTARTED = "restarted"
-    LATE = "late"
+    REPEATED = "repeated"
 
 
 def counted(last, now):
-    """What ``now`` says about the beacons between it and ``last``: the kind,
-    and how many were missed. Each is a beacon's generation and number, as a
-    pair: a generation that changed, either way, is a restart."""
+    """What beacon number ``now`` says about the beacons since number
+    ``last``: the kind, and how many were missed. The link delivers in order,
+    so a number that goes back is a restart, and the same number again is the
+    radio's repeat: the Rust's rule."""
     if last is None:
         return Counted.FIRST, 0
-    if last[0] != now[0]:
-        # Earlier, and not #1: a beacon of a start that has gone, delayed
-        # past the new start's. The Rust's rule.
-        if now[0] < last[0] and now[1] != 1:
-            return Counted.LATE, 0
+    if now == last:
+        return Counted.REPEATED, 0
+    if now < last:
         return Counted.RESTARTED, 0
-    last, now = last[1], now[1]
-    # #1 is a start that kept no generation; any other number at or before
-    # the last is the link's, delayed or delivered twice: the Rust's rule.
-    if now == 1 and last != 1:
-        return Counted.RESTARTED, 0
-    if now <= last:
-        return Counted.LATE, 0
     if now == last + 1:
         return Counted.NEXT, 0
     return Counted.MISSED, now - last - 1
@@ -486,10 +470,6 @@ class Beacons:
         self._at = None
         self._said = NO_BEACON_MESSAGE
         self._count = None
-        # A beacon of an earlier generation taken for late, so that a second
-        # of that generation after it is taken for the start it is: see
-        # tcslib::beacon::Counter.
-        self._late = None
         self._differed = False
         # The last stranger warned of, so that one sending steadily is warned
         # of once and not on every datagram.
@@ -565,35 +545,18 @@ class Beacons:
             self._differed = heard.differs is not None
 
         if heard.sequence is not None:
-            now = (heard.generation, heard.sequence)
+            now = heard.sequence
             last = self._count
             kind, missed = counted(last, now)
-            if kind is Counted.LATE and last[0] != now[0]:
-                late = self._late
-                if late is not None and late[0] == now[0] and late[1] < now[1]:
-                    kind = Counted.RESTARTED
-                else:
-                    self._late = now
             if kind is Counted.MISSED:
                 remarks.append(
                     f"{missed} beacon{'' if missed == 1 else 's'} did not "
-                    f"arrive: #{heard.sequence} came after #{last[1]}"
+                    f"arrive: #{now} came after #{last}"
                 )
             elif kind is Counted.RESTARTED:
-                remarks.append(restarted(last, now, heard.commanded_restart))
-            elif kind is Counted.LATE and last[0] != now[0]:
-                remarks.append(
-                    f"beacon #{now[1]} of generation {now[0]} arrived late, "
-                    f"after generation {last[0]} #{last[1]}"
-                )
-            elif kind is Counted.LATE:
-                remarks.append(
-                    f"beacon #{heard.sequence} arrived late, after #{last[1]}"
-                )
-            # A late beacon is the past: the count goes on from the later one.
-            if kind is not Counted.LATE:
-                self._count = now
-                self._late = None
+                remarks.append(restarted(now, heard.commanded_restart))
+            # A repeat is the radio's, and says nothing new.
+            self._count = now
 
         return self.after(Arrived.BEACON, remarks, heard.message)
 

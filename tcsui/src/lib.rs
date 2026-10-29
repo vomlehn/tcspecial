@@ -138,6 +138,26 @@ pub struct Shown {
     /// [`tcslib::beacon::Stage::label`]. Read from the same reading as the
     /// colour, so the two cannot disagree.
     pub stage: String,
+    /// What the field beside the indicator says of a restart:
+    /// [`RESTARTED_CONNECT`] where the last beacon carried the
+    /// commanded-restart bit, and nothing where it did not.
+    pub restart: &'static str,
+}
+
+/// What the field beside the indicator says while the beacons carry the
+/// commanded-restart bit: tcspecial has restarted, or is restarting, as
+/// commanded, and the ground is to CONNECT before anything else, which is
+/// what clears the bit.
+pub const RESTARTED_CONNECT: &str = "Restarted\u{2014}connect";
+
+/// What that field says of a beacon whose commanded-restart bit is
+/// `commanded`.
+pub fn restart_of(commanded: bool) -> &'static str {
+    if commanded {
+        RESTARTED_CONNECT
+    } else {
+        ""
+    }
 }
 
 impl Shown {
@@ -148,6 +168,7 @@ impl Shown {
             received: received_at(pass.at),
             message: pass.said.clone(),
             stage: pass.showing.stage.label().to_string(),
+            restart: restart_of(pass.commanded_restart),
         }
     }
 
@@ -162,6 +183,7 @@ impl Shown {
             received: received_at(at),
             message: said.to_string(),
             stage: showing.stage.label().to_string(),
+            restart: "",
         }
     }
 }
@@ -369,6 +391,14 @@ mod tests {
             Shown::at(&schedule.after(None, SystemTime::now()), None, "<none>");
         assert_eq!(nothing.received, "--:--:--");
         assert_eq!(nothing.indicator, palette::unknown());
+    }
+
+    /// The field beside the indicator says to connect while the beacons
+    /// carry the commanded-restart bit, and nothing while they do not.
+    #[test]
+    fn the_restart_field_says_to_connect_while_the_bit_is_set() {
+        assert_eq!(restart_of(true), "Restarted\u{2014}connect");
+        assert_eq!(restart_of(false), "");
     }
 
     /// The ping panel's rows, before anything is sent and once an answer has

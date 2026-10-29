@@ -40,7 +40,6 @@ impl StatusType {
     pub const NOT_FOUND: Self = Self(5);
     pub const ALREADY_EXISTS: Self = Self(6);
     pub const TIMEOUT: Self = Self(7);
-    pub const WRONG_GENERATION: Self = Self(8);
     pub const STALE: Self = Self(9);
 
     /// The label of this value, if the enumeration lists it.
@@ -54,7 +53,6 @@ impl StatusType {
             5 => Some("NotFound"),
             6 => Some("AlreadyExists"),
             7 => Some("Timeout"),
-            8 => Some("WrongGeneration"),
             9 => Some("Stale"),
             _ => None,
         }
@@ -2216,8 +2214,6 @@ pub struct Ping {
     pub seq_count: u16,
     /// `/TcsLink/Command#Sequence` (/TcsLink/U32Arg)
     pub sequence: u32,
-    /// `/TcsLink/Command#Generation` (/TcsLink/U32Arg)
-    pub generation: u32,
 }
 
 impl Ping {
@@ -2253,7 +2249,7 @@ impl Ping {
 
 impl Packet for Ping {
     const NAME: &'static str = "/TcsLink/Ping";
-    const MAX_BYTES: usize = 15;
+    const MAX_BYTES: usize = 11;
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
@@ -2267,7 +2263,6 @@ impl Packet for Ping {
         r.limit(v53 as u64, -1, "PacketLength")?;
         let v54 = r.uint_order(8, false, "Opcode")? as u8;
         let v55 = r.uint_order(32, false, "Sequence")? as u32;
-        let v56 = r.uint_order(32, false, "Generation")? as u32;
         if !((v47 as i128) == 0) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/TcsCommand",
@@ -2309,7 +2304,6 @@ impl Packet for Ping {
             Ping {
                 seq_count: v52,
                 sequence: v55,
-                generation: v56,
             },
             r.used(),
         ))
@@ -2334,11 +2328,6 @@ impl Packet for Ping {
             false,
             pk::from_unsigned(self.sequence as u64, 32, "Sequence")?,
         );
-        w.uint_order(
-            32,
-            false,
-            pk::from_unsigned(self.generation as u64, 32, "Generation")?,
-        );
         w.patch_length(l53, 16, false, -1, "PacketLength")?;
         Ok(())
     }
@@ -2351,8 +2340,6 @@ impl fmt::Display for Ping {
         write!(f, "{}", self.seq_count)?;
         f.write_str(", sequence=")?;
         write!(f, "{}", self.sequence)?;
-        f.write_str(", generation=")?;
-        write!(f, "{}", self.generation)?;
         f.write_char('}')
     }
 }
@@ -2370,8 +2357,6 @@ pub struct RestartArm {
     pub seq_count: u16,
     /// `/TcsLink/Command#Sequence` (/TcsLink/U32Arg)
     pub sequence: u32,
-    /// `/TcsLink/Command#Generation` (/TcsLink/U32Arg)
-    pub generation: u32,
     /// `/TcsLink/RestartArm#ArmKey` (/TcsLink/U64Arg)
     pub arm_key: u64,
 }
@@ -2409,7 +2394,7 @@ impl RestartArm {
 
 impl Packet for RestartArm {
     const NAME: &'static str = "/TcsLink/RestartArm";
-    const MAX_BYTES: usize = 23;
+    const MAX_BYTES: usize = 19;
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
@@ -2423,7 +2408,6 @@ impl Packet for RestartArm {
         r.limit(v53 as u64, -1, "PacketLength")?;
         let v54 = r.uint_order(8, false, "Opcode")? as u8;
         let v55 = r.uint_order(32, false, "Sequence")? as u32;
-        let v56 = r.uint_order(32, false, "Generation")? as u32;
         if !((v47 as i128) == 0) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/TcsCommand",
@@ -2460,14 +2444,13 @@ impl Packet for RestartArm {
                 criterion: "Opcode = 2",
             });
         }
-        let v57 = r.uint_order(64, false, "ArmKey")? as u64;
+        let v56 = r.uint_order(64, false, "ArmKey")? as u64;
         r.finish("PacketLength")?;
         Ok((
             RestartArm {
                 seq_count: v52,
                 sequence: v55,
-                generation: v56,
-                arm_key: v57,
+                arm_key: v56,
             },
             r.used(),
         ))
@@ -2493,11 +2476,6 @@ impl Packet for RestartArm {
             pk::from_unsigned(self.sequence as u64, 32, "Sequence")?,
         );
         w.uint_order(
-            32,
-            false,
-            pk::from_unsigned(self.generation as u64, 32, "Generation")?,
-        );
-        w.uint_order(
             64,
             false,
             pk::from_unsigned(self.arm_key as u64, 64, "ArmKey")?,
@@ -2514,8 +2492,6 @@ impl fmt::Display for RestartArm {
         write!(f, "{}", self.seq_count)?;
         f.write_str(", sequence=")?;
         write!(f, "{}", self.sequence)?;
-        f.write_str(", generation=")?;
-        write!(f, "{}", self.generation)?;
         f.write_str(", arm_key=")?;
         write!(f, "{}", self.arm_key)?;
         f.write_char('}')
@@ -2535,8 +2511,6 @@ pub struct Restart {
     pub seq_count: u16,
     /// `/TcsLink/Command#Sequence` (/TcsLink/U32Arg)
     pub sequence: u32,
-    /// `/TcsLink/Command#Generation` (/TcsLink/U32Arg)
-    pub generation: u32,
     /// `/TcsLink/Restart#ArmKey` (/TcsLink/U64Arg)
     pub arm_key: u64,
 }
@@ -2574,7 +2548,7 @@ impl Restart {
 
 impl Packet for Restart {
     const NAME: &'static str = "/TcsLink/Restart";
-    const MAX_BYTES: usize = 23;
+    const MAX_BYTES: usize = 19;
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
@@ -2588,7 +2562,6 @@ impl Packet for Restart {
         r.limit(v53 as u64, -1, "PacketLength")?;
         let v54 = r.uint_order(8, false, "Opcode")? as u8;
         let v55 = r.uint_order(32, false, "Sequence")? as u32;
-        let v56 = r.uint_order(32, false, "Generation")? as u32;
         if !((v47 as i128) == 0) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/TcsCommand",
@@ -2625,14 +2598,13 @@ impl Packet for Restart {
                 criterion: "Opcode = 3",
             });
         }
-        let v58 = r.uint_order(64, false, "ArmKey")? as u64;
+        let v57 = r.uint_order(64, false, "ArmKey")? as u64;
         r.finish("PacketLength")?;
         Ok((
             Restart {
                 seq_count: v52,
                 sequence: v55,
-                generation: v56,
-                arm_key: v58,
+                arm_key: v57,
             },
             r.used(),
         ))
@@ -2658,11 +2630,6 @@ impl Packet for Restart {
             pk::from_unsigned(self.sequence as u64, 32, "Sequence")?,
         );
         w.uint_order(
-            32,
-            false,
-            pk::from_unsigned(self.generation as u64, 32, "Generation")?,
-        );
-        w.uint_order(
             64,
             false,
             pk::from_unsigned(self.arm_key as u64, 64, "ArmKey")?,
@@ -2679,8 +2646,6 @@ impl fmt::Display for Restart {
         write!(f, "{}", self.seq_count)?;
         f.write_str(", sequence=")?;
         write!(f, "{}", self.sequence)?;
-        f.write_str(", generation=")?;
-        write!(f, "{}", self.generation)?;
         f.write_str(", arm_key=")?;
         write!(f, "{}", self.arm_key)?;
         f.write_char('}')
@@ -2700,8 +2665,6 @@ pub struct Connect {
     pub seq_count: u16,
     /// `/TcsLink/Command#Sequence` (/TcsLink/U32Arg)
     pub sequence: u32,
-    /// `/TcsLink/Command#Generation` (/TcsLink/U32Arg)
-    pub generation: u32,
     /// `/TcsLink/Connect#Major` (/TcsLink/U8Arg)
     pub major: u8,
     /// `/TcsLink/Connect#Minor` (/TcsLink/U8Arg)
@@ -2745,7 +2708,7 @@ impl Connect {
 
 impl Packet for Connect {
     const NAME: &'static str = "/TcsLink/Connect";
-    const MAX_BYTES: usize = 34;
+    const MAX_BYTES: usize = 30;
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
@@ -2759,7 +2722,6 @@ impl Packet for Connect {
         r.limit(v53 as u64, -1, "PacketLength")?;
         let v54 = r.uint_order(8, false, "Opcode")? as u8;
         let v55 = r.uint_order(32, false, "Sequence")? as u32;
-        let v56 = r.uint_order(32, false, "Generation")? as u32;
         if !((v47 as i128) == 0) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/TcsCommand",
@@ -2796,20 +2758,19 @@ impl Packet for Connect {
                 criterion: "Opcode = 4",
             });
         }
-        let v59 = r.uint_order(8, false, "Major")? as u8;
-        let v60 = r.uint_order(8, false, "Minor")? as u8;
-        let v61 = r.uint_order(8, false, "Patch")? as u8;
-        let v62 = r.fixed_bytes::<16>(16, "Digest")?;
+        let v58 = r.uint_order(8, false, "Major")? as u8;
+        let v59 = r.uint_order(8, false, "Minor")? as u8;
+        let v60 = r.uint_order(8, false, "Patch")? as u8;
+        let v61 = r.fixed_bytes::<16>(16, "Digest")?;
         r.finish("PacketLength")?;
         Ok((
             Connect {
                 seq_count: v52,
                 sequence: v55,
-                generation: v56,
-                major: v59,
-                minor: v60,
-                patch: v61,
-                digest: v62,
+                major: v58,
+                minor: v59,
+                patch: v60,
+                digest: v61,
             },
             r.used(),
         ))
@@ -2833,11 +2794,6 @@ impl Packet for Connect {
             32,
             false,
             pk::from_unsigned(self.sequence as u64, 32, "Sequence")?,
-        );
-        w.uint_order(
-            32,
-            false,
-            pk::from_unsigned(self.generation as u64, 32, "Generation")?,
         );
         w.uint_order(
             8,
@@ -2867,8 +2823,6 @@ impl fmt::Display for Connect {
         write!(f, "{}", self.seq_count)?;
         f.write_str(", sequence=")?;
         write!(f, "{}", self.sequence)?;
-        f.write_str(", generation=")?;
-        write!(f, "{}", self.generation)?;
         f.write_str(", major=")?;
         write!(f, "{}", self.major)?;
         f.write_str(", minor=")?;
@@ -2894,8 +2848,6 @@ pub struct Config {
     pub seq_count: u16,
     /// `/TcsLink/Command#Sequence` (/TcsLink/U32Arg)
     pub sequence: u32,
-    /// `/TcsLink/Command#Generation` (/TcsLink/U32Arg)
-    pub generation: u32,
     /// `/TcsLink/Config#BeaconInterval` (/TcsLink/U64Arg)
     pub beacon_interval: u64,
 }
@@ -2933,7 +2885,7 @@ impl Config {
 
 impl Packet for Config {
     const NAME: &'static str = "/TcsLink/Config";
-    const MAX_BYTES: usize = 23;
+    const MAX_BYTES: usize = 19;
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
@@ -2947,7 +2899,6 @@ impl Packet for Config {
         r.limit(v53 as u64, -1, "PacketLength")?;
         let v54 = r.uint_order(8, false, "Opcode")? as u8;
         let v55 = r.uint_order(32, false, "Sequence")? as u32;
-        let v56 = r.uint_order(32, false, "Generation")? as u32;
         if !((v47 as i128) == 0) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/TcsCommand",
@@ -2984,14 +2935,13 @@ impl Packet for Config {
                 criterion: "Opcode = 32",
             });
         }
-        let v63 = r.uint_order(64, false, "BeaconInterval")? as u64;
+        let v62 = r.uint_order(64, false, "BeaconInterval")? as u64;
         r.finish("PacketLength")?;
         Ok((
             Config {
                 seq_count: v52,
                 sequence: v55,
-                generation: v56,
-                beacon_interval: v63,
+                beacon_interval: v62,
             },
             r.used(),
         ))
@@ -3017,11 +2967,6 @@ impl Packet for Config {
             pk::from_unsigned(self.sequence as u64, 32, "Sequence")?,
         );
         w.uint_order(
-            32,
-            false,
-            pk::from_unsigned(self.generation as u64, 32, "Generation")?,
-        );
-        w.uint_order(
             64,
             false,
             pk::from_unsigned(
@@ -3042,8 +2987,6 @@ impl fmt::Display for Config {
         write!(f, "{}", self.seq_count)?;
         f.write_str(", sequence=")?;
         write!(f, "{}", self.sequence)?;
-        f.write_str(", generation=")?;
-        write!(f, "{}", self.generation)?;
         f.write_str(", beacon_interval=")?;
         write!(f, "{}", self.beacon_interval)?;
         f.write_char('}')
@@ -3063,8 +3006,6 @@ pub struct StartNode {
     pub seq_count: u16,
     /// `/TcsLink/Command#Sequence` (/TcsLink/U32Arg)
     pub sequence: u32,
-    /// `/TcsLink/Command#Generation` (/TcsLink/U32Arg)
-    pub generation: u32,
     /// `/TcsLink/StartNode#Node` (/TcsLink/U32Arg)
     pub node: u32,
 }
@@ -3102,7 +3043,7 @@ impl StartNode {
 
 impl Packet for StartNode {
     const NAME: &'static str = "/TcsLink/StartNode";
-    const MAX_BYTES: usize = 19;
+    const MAX_BYTES: usize = 15;
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
@@ -3116,7 +3057,6 @@ impl Packet for StartNode {
         r.limit(v53 as u64, -1, "PacketLength")?;
         let v54 = r.uint_order(8, false, "Opcode")? as u8;
         let v55 = r.uint_order(32, false, "Sequence")? as u32;
-        let v56 = r.uint_order(32, false, "Generation")? as u32;
         if !((v47 as i128) == 0) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/TcsCommand",
@@ -3153,14 +3093,13 @@ impl Packet for StartNode {
                 criterion: "Opcode = 48",
             });
         }
-        let v64 = r.uint_order(32, false, "Node")? as u32;
+        let v63 = r.uint_order(32, false, "Node")? as u32;
         r.finish("PacketLength")?;
         Ok((
             StartNode {
                 seq_count: v52,
                 sequence: v55,
-                generation: v56,
-                node: v64,
+                node: v63,
             },
             r.used(),
         ))
@@ -3188,11 +3127,6 @@ impl Packet for StartNode {
         w.uint_order(
             32,
             false,
-            pk::from_unsigned(self.generation as u64, 32, "Generation")?,
-        );
-        w.uint_order(
-            32,
-            false,
             pk::from_unsigned(self.node as u64, 32, "Node")?,
         );
         w.patch_length(l53, 16, false, -1, "PacketLength")?;
@@ -3207,8 +3141,6 @@ impl fmt::Display for StartNode {
         write!(f, "{}", self.seq_count)?;
         f.write_str(", sequence=")?;
         write!(f, "{}", self.sequence)?;
-        f.write_str(", generation=")?;
-        write!(f, "{}", self.generation)?;
         f.write_str(", node=")?;
         write!(f, "{}", self.node)?;
         f.write_char('}')
@@ -3228,8 +3160,6 @@ pub struct StopNode {
     pub seq_count: u16,
     /// `/TcsLink/Command#Sequence` (/TcsLink/U32Arg)
     pub sequence: u32,
-    /// `/TcsLink/Command#Generation` (/TcsLink/U32Arg)
-    pub generation: u32,
     /// `/TcsLink/StopNode#Node` (/TcsLink/U32Arg)
     pub node: u32,
 }
@@ -3267,7 +3197,7 @@ impl StopNode {
 
 impl Packet for StopNode {
     const NAME: &'static str = "/TcsLink/StopNode";
-    const MAX_BYTES: usize = 19;
+    const MAX_BYTES: usize = 15;
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
@@ -3281,7 +3211,6 @@ impl Packet for StopNode {
         r.limit(v53 as u64, -1, "PacketLength")?;
         let v54 = r.uint_order(8, false, "Opcode")? as u8;
         let v55 = r.uint_order(32, false, "Sequence")? as u32;
-        let v56 = r.uint_order(32, false, "Generation")? as u32;
         if !((v47 as i128) == 0) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/TcsCommand",
@@ -3318,14 +3247,13 @@ impl Packet for StopNode {
                 criterion: "Opcode = 49",
             });
         }
-        let v65 = r.uint_order(32, false, "Node")? as u32;
+        let v64 = r.uint_order(32, false, "Node")? as u32;
         r.finish("PacketLength")?;
         Ok((
             StopNode {
                 seq_count: v52,
                 sequence: v55,
-                generation: v56,
-                node: v65,
+                node: v64,
             },
             r.used(),
         ))
@@ -3353,11 +3281,6 @@ impl Packet for StopNode {
         w.uint_order(
             32,
             false,
-            pk::from_unsigned(self.generation as u64, 32, "Generation")?,
-        );
-        w.uint_order(
-            32,
-            false,
             pk::from_unsigned(self.node as u64, 32, "Node")?,
         );
         w.patch_length(l53, 16, false, -1, "PacketLength")?;
@@ -3372,8 +3295,6 @@ impl fmt::Display for StopNode {
         write!(f, "{}", self.seq_count)?;
         f.write_str(", sequence=")?;
         write!(f, "{}", self.sequence)?;
-        f.write_str(", generation=")?;
-        write!(f, "{}", self.generation)?;
         f.write_str(", node=")?;
         write!(f, "{}", self.node)?;
         f.write_char('}')
@@ -3396,8 +3317,6 @@ pub struct SetNode {
     pub seq_count: u16,
     /// `/TcsLink/Command#Sequence` (/TcsLink/U32Arg)
     pub sequence: u32,
-    /// `/TcsLink/Command#Generation` (/TcsLink/U32Arg)
-    pub generation: u32,
     /// `/TcsLink/SetNode#Node` (/TcsLink/U32Arg)
     pub node: u32,
     /// `/TcsLink/SetNode#Attribute` (/TcsLink/AttributeArg)
@@ -3439,7 +3358,7 @@ impl SetNode {
 
 impl Packet for SetNode {
     const NAME: &'static str = "/TcsLink/SetNode";
-    const MAX_BYTES: usize = 342;
+    const MAX_BYTES: usize = 338;
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
@@ -3453,7 +3372,6 @@ impl Packet for SetNode {
         r.limit(v53 as u64, -1, "PacketLength")?;
         let v54 = r.uint_order(8, false, "Opcode")? as u8;
         let v55 = r.uint_order(32, false, "Sequence")? as u32;
-        let v56 = r.uint_order(32, false, "Generation")? as u32;
         if !((v47 as i128) == 0) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/TcsCommand",
@@ -3490,8 +3408,8 @@ impl Packet for SetNode {
                 criterion: "Opcode = 50",
             });
         }
-        let v66 = r.uint_order(32, false, "Node")? as u32;
-        let v67 = pk::read_fixed_string::<64, 65>(
+        let v65 = r.uint_order(32, false, "Node")? as u32;
+        let v66 = pk::read_fixed_string::<64, 65>(
             &mut r,
             &StringSpec {
                 fixed_bits: None,
@@ -3502,9 +3420,9 @@ impl Packet for SetNode {
             },
             "Attribute",
         )?;
-        let v68 = r.uint_order(16, false, "ValueLength")? as u16;
-        let v69 = r.fixed_bytes::<256>(
-            pk::dynamic_size(v68 as f64, 8.0, 0.0, 8, 256, "Value")?,
+        let v67 = r.uint_order(16, false, "ValueLength")? as u16;
+        let v68 = r.fixed_bytes::<256>(
+            pk::dynamic_size(v67 as f64, 8.0, 0.0, 8, 256, "Value")?,
             "Value",
         )?;
         r.finish("PacketLength")?;
@@ -3512,17 +3430,16 @@ impl Packet for SetNode {
             SetNode {
                 seq_count: v52,
                 sequence: v55,
-                generation: v56,
-                node: v66,
-                attribute: v67,
-                value_: v69,
+                node: v65,
+                attribute: v66,
+                value_: v68,
             },
             r.used(),
         ))
     }
 
     fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
-        let d68 = u16::try_from(pk::size_source(
+        let d67 = u16::try_from(pk::size_source(
             self.value_.len(),
             8.0,
             0.0,
@@ -3554,11 +3471,6 @@ impl Packet for SetNode {
         w.uint_order(
             32,
             false,
-            pk::from_unsigned(self.generation as u64, 32, "Generation")?,
-        );
-        w.uint_order(
-            32,
-            false,
             pk::from_unsigned(self.node as u64, 32, "Node")?,
         );
         pk::write_string(
@@ -3576,10 +3488,10 @@ impl Packet for SetNode {
         w.uint_order(
             16,
             false,
-            pk::from_unsigned(d68 as u64, 16, "ValueLength")?,
+            pk::from_unsigned(d67 as u64, 16, "ValueLength")?,
         );
         {
-            let n = pk::dynamic_size(d68 as f64, 8.0, 0.0, 8, 256, "Value")?;
+            let n = pk::dynamic_size(d67 as f64, 8.0, 0.0, 8, 256, "Value")?;
             if self.value_.len() != n {
                 return Err(PacketError::BadSize { field: "Value" });
             }
@@ -3597,8 +3509,6 @@ impl fmt::Display for SetNode {
         write!(f, "{}", self.seq_count)?;
         f.write_str(", sequence=")?;
         write!(f, "{}", self.sequence)?;
-        f.write_str(", generation=")?;
-        write!(f, "{}", self.generation)?;
         f.write_str(", node=")?;
         write!(f, "{}", self.node)?;
         f.write_str(", attribute=")?;
@@ -3622,8 +3532,6 @@ pub struct QueryNode {
     pub seq_count: u16,
     /// `/TcsLink/Command#Sequence` (/TcsLink/U32Arg)
     pub sequence: u32,
-    /// `/TcsLink/Command#Generation` (/TcsLink/U32Arg)
-    pub generation: u32,
     /// `/TcsLink/QueryNode#Node` (/TcsLink/U32Arg)
     pub node: u32,
 }
@@ -3661,7 +3569,7 @@ impl QueryNode {
 
 impl Packet for QueryNode {
     const NAME: &'static str = "/TcsLink/QueryNode";
-    const MAX_BYTES: usize = 19;
+    const MAX_BYTES: usize = 15;
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
@@ -3675,7 +3583,6 @@ impl Packet for QueryNode {
         r.limit(v53 as u64, -1, "PacketLength")?;
         let v54 = r.uint_order(8, false, "Opcode")? as u8;
         let v55 = r.uint_order(32, false, "Sequence")? as u32;
-        let v56 = r.uint_order(32, false, "Generation")? as u32;
         if !((v47 as i128) == 0) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/TcsCommand",
@@ -3712,14 +3619,13 @@ impl Packet for QueryNode {
                 criterion: "Opcode = 51",
             });
         }
-        let v70 = r.uint_order(32, false, "Node")? as u32;
+        let v69 = r.uint_order(32, false, "Node")? as u32;
         r.finish("PacketLength")?;
         Ok((
             QueryNode {
                 seq_count: v52,
                 sequence: v55,
-                generation: v56,
-                node: v70,
+                node: v69,
             },
             r.used(),
         ))
@@ -3747,11 +3653,6 @@ impl Packet for QueryNode {
         w.uint_order(
             32,
             false,
-            pk::from_unsigned(self.generation as u64, 32, "Generation")?,
-        );
-        w.uint_order(
-            32,
-            false,
             pk::from_unsigned(self.node as u64, 32, "Node")?,
         );
         w.patch_length(l53, 16, false, -1, "PacketLength")?;
@@ -3766,8 +3667,6 @@ impl fmt::Display for QueryNode {
         write!(f, "{}", self.seq_count)?;
         f.write_str(", sequence=")?;
         write!(f, "{}", self.sequence)?;
-        f.write_str(", generation=")?;
-        write!(f, "{}", self.generation)?;
         f.write_str(", node=")?;
         write!(f, "{}", self.node)?;
         f.write_char('}')
@@ -3787,8 +3686,6 @@ pub struct QueryNodeSample {
     pub seq_count: u16,
     /// `/TcsLink/Command#Sequence` (/TcsLink/U32Arg)
     pub sequence: u32,
-    /// `/TcsLink/Command#Generation` (/TcsLink/U32Arg)
-    pub generation: u32,
     /// `/TcsLink/QueryNodeSample#Node` (/TcsLink/U32Arg)
     pub node: u32,
 }
@@ -3826,7 +3723,7 @@ impl QueryNodeSample {
 
 impl Packet for QueryNodeSample {
     const NAME: &'static str = "/TcsLink/QueryNodeSample";
-    const MAX_BYTES: usize = 19;
+    const MAX_BYTES: usize = 15;
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
@@ -3840,7 +3737,6 @@ impl Packet for QueryNodeSample {
         r.limit(v53 as u64, -1, "PacketLength")?;
         let v54 = r.uint_order(8, false, "Opcode")? as u8;
         let v55 = r.uint_order(32, false, "Sequence")? as u32;
-        let v56 = r.uint_order(32, false, "Generation")? as u32;
         if !((v47 as i128) == 0) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/TcsCommand",
@@ -3877,14 +3773,13 @@ impl Packet for QueryNodeSample {
                 criterion: "Opcode = 52",
             });
         }
-        let v71 = r.uint_order(32, false, "Node")? as u32;
+        let v70 = r.uint_order(32, false, "Node")? as u32;
         r.finish("PacketLength")?;
         Ok((
             QueryNodeSample {
                 seq_count: v52,
                 sequence: v55,
-                generation: v56,
-                node: v71,
+                node: v70,
             },
             r.used(),
         ))
@@ -3912,11 +3807,6 @@ impl Packet for QueryNodeSample {
         w.uint_order(
             32,
             false,
-            pk::from_unsigned(self.generation as u64, 32, "Generation")?,
-        );
-        w.uint_order(
-            32,
-            false,
             pk::from_unsigned(self.node as u64, 32, "Node")?,
         );
         w.patch_length(l53, 16, false, -1, "PacketLength")?;
@@ -3931,8 +3821,6 @@ impl fmt::Display for QueryNodeSample {
         write!(f, "{}", self.seq_count)?;
         f.write_str(", sequence=")?;
         write!(f, "{}", self.sequence)?;
-        f.write_str(", generation=")?;
-        write!(f, "{}", self.generation)?;
         f.write_str(", node=")?;
         write!(f, "{}", self.node)?;
         f.write_char('}')
@@ -4491,7 +4379,7 @@ pub enum CommandKind {
 
 impl Packet for CommandKind {
     const NAME: &'static str = "/TcsLink/Command";
-    const MAX_BYTES: usize = 342;
+    const MAX_BYTES: usize = 338;
 
     /// Decodes the root's entries, then picks the first child (in
     /// document order) whose criteria match, recursively.
@@ -4507,7 +4395,6 @@ impl Packet for CommandKind {
         r.limit(v53 as u64, -1, "PacketLength")?;
         let v54 = r.uint_order(8, false, "Opcode")? as u8;
         let v55 = r.uint_order(32, false, "Sequence")? as u32;
-        let v56 = r.uint_order(32, false, "Generation")? as u32;
         if ((v47 as i128) == 0)
             && ((v48 as i128) == 1)
             && ((v49 as i128) == 0)
@@ -4520,98 +4407,91 @@ impl Packet for CommandKind {
                     Self::Ping(Ping {
                         seq_count: v52,
                         sequence: v55,
-                        generation: v56,
                     }),
                     r.used(),
                 ));
             }
             if (v54 as i128) == 2 {
-                let v57 = r.uint_order(64, false, "ArmKey")? as u64;
+                let v56 = r.uint_order(64, false, "ArmKey")? as u64;
                 r.finish("PacketLength")?;
                 return Ok((
                     Self::RestartArm(RestartArm {
                         seq_count: v52,
                         sequence: v55,
-                        generation: v56,
-                        arm_key: v57,
+                        arm_key: v56,
                     }),
                     r.used(),
                 ));
             }
             if (v54 as i128) == 3 {
-                let v58 = r.uint_order(64, false, "ArmKey")? as u64;
+                let v57 = r.uint_order(64, false, "ArmKey")? as u64;
                 r.finish("PacketLength")?;
                 return Ok((
                     Self::Restart(Restart {
                         seq_count: v52,
                         sequence: v55,
-                        generation: v56,
-                        arm_key: v58,
+                        arm_key: v57,
                     }),
                     r.used(),
                 ));
             }
             if (v54 as i128) == 4 {
-                let v59 = r.uint_order(8, false, "Major")? as u8;
-                let v60 = r.uint_order(8, false, "Minor")? as u8;
-                let v61 = r.uint_order(8, false, "Patch")? as u8;
-                let v62 = r.fixed_bytes::<16>(16, "Digest")?;
+                let v58 = r.uint_order(8, false, "Major")? as u8;
+                let v59 = r.uint_order(8, false, "Minor")? as u8;
+                let v60 = r.uint_order(8, false, "Patch")? as u8;
+                let v61 = r.fixed_bytes::<16>(16, "Digest")?;
                 r.finish("PacketLength")?;
                 return Ok((
                     Self::Connect(Connect {
                         seq_count: v52,
                         sequence: v55,
-                        generation: v56,
-                        major: v59,
-                        minor: v60,
-                        patch: v61,
-                        digest: v62,
+                        major: v58,
+                        minor: v59,
+                        patch: v60,
+                        digest: v61,
                     }),
                     r.used(),
                 ));
             }
             if (v54 as i128) == 32 {
-                let v63 = r.uint_order(64, false, "BeaconInterval")? as u64;
+                let v62 = r.uint_order(64, false, "BeaconInterval")? as u64;
                 r.finish("PacketLength")?;
                 return Ok((
                     Self::Config(Config {
                         seq_count: v52,
                         sequence: v55,
-                        generation: v56,
-                        beacon_interval: v63,
+                        beacon_interval: v62,
                     }),
                     r.used(),
                 ));
             }
             if (v54 as i128) == 48 {
-                let v64 = r.uint_order(32, false, "Node")? as u32;
+                let v63 = r.uint_order(32, false, "Node")? as u32;
                 r.finish("PacketLength")?;
                 return Ok((
                     Self::StartNode(StartNode {
                         seq_count: v52,
                         sequence: v55,
-                        generation: v56,
-                        node: v64,
+                        node: v63,
                     }),
                     r.used(),
                 ));
             }
             if (v54 as i128) == 49 {
-                let v65 = r.uint_order(32, false, "Node")? as u32;
+                let v64 = r.uint_order(32, false, "Node")? as u32;
                 r.finish("PacketLength")?;
                 return Ok((
                     Self::StopNode(StopNode {
                         seq_count: v52,
                         sequence: v55,
-                        generation: v56,
-                        node: v65,
+                        node: v64,
                     }),
                     r.used(),
                 ));
             }
             if (v54 as i128) == 50 {
-                let v66 = r.uint_order(32, false, "Node")? as u32;
-                let v67 = pk::read_fixed_string::<64, 65>(
+                let v65 = r.uint_order(32, false, "Node")? as u32;
+                let v66 = pk::read_fixed_string::<64, 65>(
                     &mut r,
                     &StringSpec {
                         fixed_bits: None,
@@ -4622,9 +4502,9 @@ impl Packet for CommandKind {
                     },
                     "Attribute",
                 )?;
-                let v68 = r.uint_order(16, false, "ValueLength")? as u16;
-                let v69 = r.fixed_bytes::<256>(
-                    pk::dynamic_size(v68 as f64, 8.0, 0.0, 8, 256, "Value")?,
+                let v67 = r.uint_order(16, false, "ValueLength")? as u16;
+                let v68 = r.fixed_bytes::<256>(
+                    pk::dynamic_size(v67 as f64, 8.0, 0.0, 8, 256, "Value")?,
                     "Value",
                 )?;
                 r.finish("PacketLength")?;
@@ -4632,36 +4512,33 @@ impl Packet for CommandKind {
                     Self::SetNode(SetNode {
                         seq_count: v52,
                         sequence: v55,
-                        generation: v56,
-                        node: v66,
-                        attribute: v67,
-                        value_: v69,
+                        node: v65,
+                        attribute: v66,
+                        value_: v68,
                     }),
                     r.used(),
                 ));
             }
             if (v54 as i128) == 51 {
-                let v70 = r.uint_order(32, false, "Node")? as u32;
+                let v69 = r.uint_order(32, false, "Node")? as u32;
                 r.finish("PacketLength")?;
                 return Ok((
                     Self::QueryNode(QueryNode {
                         seq_count: v52,
                         sequence: v55,
-                        generation: v56,
-                        node: v70,
+                        node: v69,
                     }),
                     r.used(),
                 ));
             }
             if (v54 as i128) == 52 {
-                let v71 = r.uint_order(32, false, "Node")? as u32;
+                let v70 = r.uint_order(32, false, "Node")? as u32;
                 r.finish("PacketLength")?;
                 return Ok((
                     Self::QueryNodeSample(QueryNodeSample {
                         seq_count: v52,
                         sequence: v55,
-                        generation: v56,
-                        node: v71,
+                        node: v70,
                     }),
                     r.used(),
                 ));

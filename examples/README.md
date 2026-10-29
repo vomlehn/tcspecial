@@ -119,15 +119,21 @@ nothing in it is its own:
   beacons are, starts the loop on a thread, and puts each pass in the window.
   That is all of it, but for a button.
 
-A beacon is 55 bytes: `tcspecial` and a space, the version's major, minor and
-patch a byte each, a space, the configuration's MD5 digest, the beacon's
-number and the generation number in four bytes each, most significant first,
-a byte whose top bit says a restart has begun, and the interface's digest.
-The layout is described once,
-in XTCE, in `tcslibgs/xtce/beacon.xml`; tcspecial packs every beacon and
-`tcslib::beacon` unpacks it with the code tcs-xtce generates from that file,
-`tcslibgs::Beacon`, and this example's test packs the beacon it sends the same
-way. tcs-xtce itself is in `vendor/tcs-xtce`.
+A beacon is a line of text, six fields with a colon between each: the name
+`tcspecial`, the version as `major.minor.patch`, the configuration's MD5
+digest in lower-case hex, the beacon's number in decimal, `restart` while a
+restart the ground commanded is under way and the MOC has not connected
+since or `normal` otherwise, and the interface's digest in hex:
+
+```
+tcspecial:0.1.0:36999e46a4bf436854442d8f97a2248d:42:normal:0123...cdef
+```
+
+It is text so that it can be read as it is, in a packet capture or with any
+UDP listener. tcspecial writes every beacon and `tcslib::beacon` reads it
+with `tcslibgs::Beacon`, and this example's test writes the beacon it sends
+the same way. The window shows it differently, as `tcspecial v0.1.0 md5
+<digest>`.
 
 After the indicator, on its `Status:` row, is the stage the indicator is at,
 in a word: `Unheard` before any beacon has arrived, `Heard` while beacons are
@@ -200,8 +206,9 @@ answer, matched by count, arrives.
 It is built the way the `beacon` program is, from the same two halves written again
 in Python: `python/tcslib/beacon.py` after `tcslib::beacon`,
 `python/tcsui/beacon_panel.py` after `tcsui`, and `python/tcslibgs` for the
-ping format, the beacon's layout and the configuration. Beacons are unpacked
-with tcs-xtce's Python runtime, from `vendor/tcs-xtce` in this tree. `ping_ground.py` here is the ping's own
+ping format, the beacon and the configuration. The interface digest beacons
+are checked against is worked out with tcs-xtce's Python runtime, from
+`vendor/tcs-xtce` in this tree. `ping_ground.py` here is the ping's own
 part, with no window. The Rust crate beside them is the tests that hold the
 Python to the Rust; `cargo test` runs them.
 

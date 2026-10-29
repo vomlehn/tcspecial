@@ -506,10 +506,7 @@ pub struct Heard {
     pub message: String,
     /// The beacon's own number, if it was a beacon this build can read.
     pub sequence: Option<u32>,
-    /// How many times tcspecial has started, if it was a beacon this build
-    /// can read.
-    pub generation: Option<u32>,
-    /// Whether it said the ground commanded the start that sent it.
+    /// Whether it said a restart the ground commanded is under way.
     pub commanded_restart: bool,
     /// What is wrong with the configuration it announces, if anything: see
     /// [`differs`].
@@ -524,7 +521,6 @@ pub fn hear(datagram: &[u8], expected: Option<ConfigDigest>) -> Heard {
     Heard {
         message,
         sequence: reading.sequence,
-        generation: reading.beacon.map(|beacon| beacon.generation),
         commanded_restart: reading
             .beacon
             .is_some_and(|beacon| beacon.commanded_restart),
@@ -627,7 +623,6 @@ fn write_message(
     match read {
         Ok(beacon) => {
             write_what_it_read(beacon.version, beacon.digest, out);
-            let _ = write!(out, " generation {}", beacon.generation);
             if beacon.commanded_restart {
                 out.push_str(", COMMANDED RESTART");
             }
@@ -658,114 +653,34 @@ pub enum Counted {
     Next,
     /// This many beacons did not arrive.
     Missed(u32),
-    /// The numbering started again, or the generation changed, which is a
-    /// spacecraft that restarted.
+    /// The numbering went back, which is a spacecraft that restarted: the
+    /// count is the sender's, and starts again at one when tcspecial does.
     Restarted,
-    /// A beacon the link delayed past a later one, or delivered twice: one
-    /// of the same start as the last numbered at or before it, or one of an
-    /// earlier generation. The link keeps no order, so this is the link's
-    /// doing and not the spacecraft's, and the count goes on from the later
-    /// one. See [`Counter`] for when an earlier generation is a start after
-    /// all.
-    Late,
+    /// The same number as the last: the radio delivered it twice. It counts
+    /// for nothing.
+    Repeated,
 }
 
-/// What `now` says about the beacons between it and `last`.
+/// What a beacon numbered `now` says about the beacons since the one
+/// numbered `last`.
 ///
 /// This is what the number is for. A beacon says nothing but that the
 /// spacecraft is alive, and without a number a ground station cannot tell a
 /// beacon it missed -- a lost datagram, a network that dropped it -- from one
 /// the spacecraft never sent. The age says how long ago the last one was; this
 /// says how many there should have been.
-pub fn counted(last: Option<Count>, now: Count) -> Counted {
+///
+/// The link delivers in order, so a number that goes back is a start and
+/// not a beacon delayed: see "What is assumed" in `docs/design.rst`. A count
+/// that wraps would also go back, after 2^32 beacons, which at five seconds
+/// each is six centuries.
+pub fn counted(last: Option<u32>, now: u32) -> Counted {
     match last {
         None => Counted::First,
-        // A later generation is a start. So is an earlier one numbered #1,
-        // which is how a start whose state file was damaged, and which
-        // counted again from one, begins: see `tcslibgs::Beacon::generation`.
-        // Any other earlier one is a beacon of a start that has gone,
-        // delayed past the beacons of the one that replaced it.
-        Some(last) if last.generation != now.generation => {
-            if now.generation < last.generation && now.sequence != 1 {
-                Counted::Late
-            } else {
-                Counted::Restarted
-            }
-        }
-        Some(last) => counted_within(last.sequence, now.sequence),
-    }
-}
-
-/// The count of the beacons heard: the last that counted, and whether the
-/// beacon before this one was of an earlier generation and taken for late.
-///
-/// Late beacons come singly, delayed one at a time on the way; a start
-/// whose state file was damaged, counting again from one, sends one after
-/// another. So a beacon of an earlier generation is taken for late, and a
-/// second of that same generation, numbered after the first, is taken for
-/// the start it is -- its #1 having been lost -- rather than every beacon of
-/// it being taken for late for ever.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct Counter {
-    last: Option<Count>,
-    late: Option<Count>,
-}
-
-impl Counter {
-    /// The last beacon that counted.
-    pub fn last(&self) -> Option<Count> {
-        self.last
-    }
-
-    /// What a beacon numbered `now` says, which goes into the count unless
-    /// it was late.
-    pub fn heard(&mut self, now: Count) -> Counted {
-        let mut kind = counted(self.last, now);
-        let earlier = self.last.is_some_and(|l| l.generation != now.generation);
-        if kind == Counted::Late && earlier {
-            let again = self.late.is_some_and(|late| {
-                late.generation == now.generation
-                    && late.sequence < now.sequence
-            });
-            if again {
-                kind = Counted::Restarted;
-            } else {
-                self.late = Some(now);
-            }
-        }
-        if kind != Counted::Late {
-            self.last = Some(now);
-            self.late = None;
-        }
-        kind
-    }
-}
-
-/// Where a beacon is in the count: which start of tcspecial sent it, and
-/// which of that start's beacons it is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Count {
-    pub generation: u32,
-    pub sequence: u32,
-}
-
-/// What `now` says about the beacons since `last`, both of one generation.
-fn counted_within(last: u32, now: u32) -> Counted {
-    // A number at or before the last is a beacon the link delayed or
-    // delivered twice: the generation, not the number, says a start, and the
-    // link never keeps order. Except #1, which is a start that kept no
-    // generation -- a damaged state file starts the count again from one, as
-    // it may have been -- and which a late beacon is only at the very first.
-    // A count that wraps would also go backwards, after 2^32 beacons, which
-    // at five seconds each is six centuries.
-    if now == 1 && last != 1 {
-        Counted::Restarted
-    } else if now <= last {
-        Counted::Late
-    } else if now == last + 1 {
-        Counted::Next
-    } else {
-        Counted::Missed(now - last - 1)
+        Some(last) if now == last => Counted::Repeated,
+        Some(last) if now < last => Counted::Restarted,
+        Some(last) if now == last + 1 => Counted::Next,
+        Some(last) => Counted::Missed(now - last - 1),
     }
 }
 
@@ -796,11 +711,12 @@ pub struct Pass {
     pub at: Option<SystemTime>,
     /// What that beacon said.
     pub said: String,
-    /// The generation the last beacon carried, if one has arrived: which
-    /// start of tcspecial is flying. Kept as `at` is.
-    pub generation: Option<u32>,
-    /// Whether the last beacon said the ground commanded the start that sent
-    /// it. Kept as `at` is.
+    /// Whether the beacon this pass heard says tcspecial has started again
+    /// since the one before it: its number went back. False on a pass that
+    /// heard none.
+    pub restarted: bool,
+    /// Whether the last beacon said a restart the ground commanded is under
+    /// way. Kept as `at` is.
     pub commanded_restart: bool,
     /// Whether the spacecraft is being heard from, which is the same reading
     /// as the stage in the form a program acts on.
@@ -845,9 +761,9 @@ pub struct Beacons {
     /// allocates nothing but the remark or warning it makes, on the pass
     /// where something changed.
     last: Pass,
-    /// The generation and number of the last beacon, so the next can say
-    /// what happened in between.
-    count: Counter,
+    /// The number of the last beacon, so the next can say what happened in
+    /// between.
+    count: Option<u32>,
     /// Whether the last beacon announced a different configuration, so that
     /// the change is remarked on and the state is not.
     differed: bool,
@@ -879,7 +795,7 @@ impl Beacons {
             showing: Showing::UNHEARD,
             at: None,
             said,
-            generation: None,
+            restarted: false,
             commanded_restart: false,
             contact: Contact::Lost,
             remarks: Vec::with_capacity(REMARKS_AT_ONCE),
@@ -892,7 +808,7 @@ impl Beacons {
             expected,
             at: None,
             last,
-            count: Counter::default(),
+            count: None,
             differed: false,
             stranger: None,
         })
@@ -921,6 +837,7 @@ impl Beacons {
     pub fn pass(&mut self) -> &Pass {
         self.last.remarks.clear();
         self.last.warnings.clear();
+        self.last.restarted = false;
         let waiting = self.schedule.after(self.at, SystemTime::now());
         // A failure to set the timeout is treated as the socket having
         // failed, which is what it is: the alternative is a pass that waits
@@ -975,34 +892,28 @@ impl Beacons {
                 }
 
                 if let Some(beacon) = heard.beacon {
-                    let now = Count {
-                        generation: beacon.generation,
-                        sequence: beacon.sequence,
-                    };
-                    let last = self.count.last();
-                    let kind = self.count.heard(now);
+                    let now = beacon.sequence;
+                    let last = self.count;
+                    let kind = counted(last, now);
                     match kind {
                         Counted::Missed(missed) => remarks.push(format!(
-                            "{missed} beacon{} did not arrive: #{} came after \
-                             #{}",
+                            "{missed} beacon{} did not arrive: #{now} came \
+                             after #{}",
                             if missed == 1 { "" } else { "s" },
-                            now.sequence,
-                            last.map_or(0, |last| last.sequence)
+                            last.unwrap_or(0)
                         )),
-                        Counted::Restarted => remarks.push(restarted(
-                            last,
-                            now,
-                            beacon.commanded_restart,
-                        )),
-                        Counted::Late => remarks.push(late(last, now)),
+                        Counted::Restarted => remarks
+                            .push(restarted(now, beacon.commanded_restart)),
+                        // The radio's doing, not the spacecraft's: what is
+                        // known is what the first of the two said, and it
+                        // is not said again.
+                        Counted::Repeated => {
+                            return self.after(Arrived::Beacon);
+                        }
                         Counted::First | Counted::Next => {}
                     }
-                    // A late beacon is the past: what is known is what the
-                    // later one said.
-                    if kind == Counted::Late {
-                        return self.after(Arrived::Beacon);
-                    }
-                    self.last.generation = Some(beacon.generation);
+                    self.count = Some(now);
+                    self.last.restarted = kind == Counted::Restarted;
                     self.last.commanded_restart = beacon.commanded_restart;
                 }
 
@@ -1054,46 +965,21 @@ impl Beacons {
     }
 }
 
-/// What to say of a restart seen between `last` and `now`: by the
-/// generation, where it changed, and by the numbering where it did not.
+/// What to say of a restart: the beacons start again at `now`.
 ///
 /// And which kind of restart it was. A commanded one is the ground's own
 /// doing, and may have brought other definitions; one nobody commanded is a
 /// crash or a power cycle, which the ground has to look into, and which runs
 /// with the definitions it had.
-fn restarted(last: Option<Count>, now: Count, commanded: bool) -> String {
+fn restarted(now: u32, commanded: bool) -> String {
     let how = if commanded {
         "as commanded"
     } else {
         "without being commanded to, with the definitions it had"
     };
-    match last {
-        Some(last) if last.generation != now.generation => format!(
-            "tcspecial has restarted {how}: generation {} is flying, after {}",
-            now.generation, last.generation
-        ),
-        _ => format!(
-            "the beacons start again at #{}, so tcspecial has restarted {how}",
-            now.sequence
-        ),
-    }
-}
-
-/// What to say of a beacon that arrived late: the same words in every station
-/// and in the Python.
-fn late(last: Option<Count>, now: Count) -> String {
-    match last {
-        Some(last) if last.generation != now.generation => format!(
-            "beacon #{} of generation {} arrived late, after generation {} \
-             #{}",
-            now.sequence, now.generation, last.generation, last.sequence
-        ),
-        _ => format!(
-            "beacon #{} arrived late, after #{}",
-            now.sequence,
-            last.map_or(0, |last| last.sequence)
-        ),
-    }
+    format!(
+        "the beacons start again at #{now}, so tcspecial has restarted {how}"
+    )
 }
 
 /// What to say of a datagram from `from` on the beacon link, which beacons
@@ -1421,7 +1307,7 @@ mod tests {
         assert!(said.contains(&ours.to_string()), "{said}");
 
         let version = ConfigVersion::of_this_build();
-        let datagram = Beacon::new(1, version, theirs, 1).to_bytes();
+        let datagram = Beacon::new(1, version, theirs).to_bytes();
 
         let heard = hear(&datagram, Some(ours));
         assert!(heard.differs.is_some());
@@ -1449,28 +1335,27 @@ mod tests {
             patch: 3,
         };
         let digest = ConfigDigest([0xab; 16]);
-        let datagram = Beacon::new(3, version, digest, 12).to_bytes();
+        let datagram = Beacon::new(3, version, digest).to_bytes();
 
         // Each labelled, the version three decimal parts, and the digest hex
         // with nothing between the bytes. No configuration version: a
-        // configuration states none. Then which start of tcspecial sent it.
+        // configuration states none.
         let read = format!("tcspecial v1.2.3 md5 {}", "ab".repeat(16));
-        assert_eq!(message_of(&datagram), format!("{read} generation 12"));
+        assert_eq!(message_of(&datagram), read);
 
         // And the answer to a CONNECT is written by the same function, so the
         // two lines cannot come to disagree about how to say it.
         assert_eq!(what_it_read(version, digest), read);
 
-        // A beacon from a start the ground commanded says so.
-        let commanded = Beacon::new(4, version, digest, 12)
+        // A beacon sent while a commanded restart is under way says so.
+        let commanded = Beacon::new(4, version, digest)
             .commanded_restart(true)
             .to_bytes();
         assert_eq!(
             message_of(&commanded),
-            format!("{read} generation 12, COMMANDED RESTART")
+            format!("{read}, COMMANDED RESTART")
         );
         let heard = hear(&commanded, None);
-        assert_eq!(heard.generation, Some(12));
         assert!(heard.commanded_restart);
         assert!(!hear(&datagram, None).commanded_restart);
 
@@ -1516,90 +1401,37 @@ mod tests {
     /// those are a network to look at and a spacecraft to look at.
     #[test]
     fn a_beacons_number_says_what_happened_before_it() {
-        let at = |sequence| Count {
-            generation: 3,
-            sequence,
-        };
-        assert_eq!(counted(None, at(1)), Counted::First);
+        assert_eq!(counted(None, 1), Counted::First);
         assert_eq!(
-            counted(None, at(4096)),
+            counted(None, 4096),
             Counted::First,
             "a station may start late"
         );
 
-        assert_eq!(counted(Some(at(1)), at(2)), Counted::Next);
-        assert_eq!(counted(Some(at(41)), at(42)), Counted::Next);
+        assert_eq!(counted(Some(1), 2), Counted::Next);
+        assert_eq!(counted(Some(41), 42), Counted::Next);
 
-        assert_eq!(counted(Some(at(5)), at(7)), Counted::Missed(1));
-        assert_eq!(counted(Some(at(5)), at(105)), Counted::Missed(99));
+        assert_eq!(counted(Some(5), 7), Counted::Missed(1));
+        assert_eq!(counted(Some(5), 105), Counted::Missed(99));
 
-        // A number that starts again at one is a sender that started again,
-        // in a generation it could not count: the count is the sender's,
-        // and it begins at one.
-        assert_eq!(counted(Some(at(99)), at(1)), Counted::Restarted);
-        // Any other that does not go forward is the link's: delayed past a
-        // later one, or delivered twice.
-        assert_eq!(counted(Some(at(99)), at(98)), Counted::Late);
-        assert_eq!(counted(Some(at(99)), at(99)), Counted::Late, "twice");
-        assert_eq!(counted(Some(at(1)), at(1)), Counted::Late);
-    }
+        // A number that goes back is a sender that started again: the count
+        // is the sender's, and it begins at one. The link delivers in order,
+        // so it is not a beacon delayed; its #1 may have been lost.
+        assert_eq!(counted(Some(99), 1), Counted::Restarted);
+        assert_eq!(counted(Some(99), 3), Counted::Restarted);
+        // The same number again is the radio's: delivered twice.
+        assert_eq!(counted(Some(99), 99), Counted::Repeated);
+        assert_eq!(counted(Some(1), 1), Counted::Repeated);
 
-    /// A generation that changes is a restart, whichever way it changes and
-    /// whatever the numbering says: a restart the numbering would miss --
-    /// the second start's beacons overtaking the count the first had reached
-    /// while nothing was heard -- is still seen, and so is a count that went
-    /// back because the state file was damaged.
-    #[test]
-    fn a_generation_that_changes_is_a_restart() {
-        let count = |generation, sequence| Count {
-            generation,
-            sequence,
-        };
         assert_eq!(
-            counted(Some(count(3, 5)), count(4, 90)),
-            Counted::Restarted
-        );
-        // Down, numbered #1: a start that counted again from one.
-        assert_eq!(counted(Some(count(9, 5)), count(1, 1)), Counted::Restarted);
-        // Down, numbered otherwise: a beacon of a start that has gone.
-        assert_eq!(counted(Some(count(9, 5)), count(8, 40)), Counted::Late);
-        assert_eq!(counted(Some(count(4, 5)), count(4, 6)), Counted::Next);
-        assert_eq!(
-            restarted(Some(count(3, 5)), count(4, 90), true),
-            "tcspecial has restarted as commanded: generation 4 is flying, \
-             after 3"
+            restarted(1, true),
+            "the beacons start again at #1, so tcspecial has restarted as \
+             commanded"
         );
         assert_eq!(
-            restarted(Some(count(3, 5)), count(4, 90), false),
-            "tcspecial has restarted without being commanded to, with the \
-             definitions it had: generation 4 is flying, after 3"
-        );
-    }
-
-    /// A beacon of an earlier generation is late, and counts for nothing;
-    /// a second of that generation, numbered after it, is the start it is,
-    /// whose #1 was lost.
-    #[test]
-    fn a_beacon_of_an_earlier_generation_is_late_unless_another_follows() {
-        let count = |generation, sequence| Count {
-            generation,
-            sequence,
-        };
-        let mut counter = Counter::default();
-        assert_eq!(counter.heard(count(5, 1)), Counted::First);
-        assert_eq!(counter.heard(count(5, 2)), Counted::Next);
-        assert_eq!(counter.heard(count(4, 90)), Counted::Late);
-        assert_eq!(counter.last(), Some(count(5, 2)), "not counted");
-        assert_eq!(counter.heard(count(5, 3)), Counted::Next);
-
-        // A damaged state file: generation 1 again, its #1 lost.
-        assert_eq!(counter.heard(count(1, 2)), Counted::Late);
-        assert_eq!(counter.heard(count(1, 3)), Counted::Restarted);
-        assert_eq!(counter.last(), Some(count(1, 3)));
-        assert_eq!(counter.heard(count(1, 4)), Counted::Next);
-        assert_eq!(
-            late(Some(count(5, 3)), count(4, 90)),
-            "beacon #90 of generation 4 arrived late, after generation 5 #3"
+            restarted(3, false),
+            "the beacons start again at #3, so tcspecial has restarted \
+             without being commanded to, with the definitions it had"
         );
     }
 
@@ -1749,7 +1581,7 @@ mod tests {
             UdpSocket::bind("127.0.0.1:0").expect("a socket for the stranger");
         let version = ConfigVersion::of_this_build();
         let datagram =
-            Beacon::new(1, version, ConfigDigest([0; 16]), 1).to_bytes();
+            Beacon::new(1, version, ConfigDigest([0; 16])).to_bytes();
         stranger
             .send_to(&datagram, recv)
             .expect("the stranger sends");

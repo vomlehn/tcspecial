@@ -22,8 +22,12 @@ linkage throughout, and nothing in it that C++ will not compile.
   beacons arrive, and each `tcs_beacons_pass` says how long since the last
   one: the stage (Unheard, Heard, Aging or Waiting), whether an indicator
   showing it is lit, whether the spacecraft is being heard from, when the last
-  beacon arrived and what it said. Each pass also gives remarks, which are
-  news, and warnings, which are to be said whether or not anybody asked.
+  beacon arrived and what it said. It also says whether this pass's beacon
+  started the count again, which is how a restart is known, and whether its
+  commanded-restart flag said `restart`, which it does from a restart the
+  ground commanded until the MOC connects. Each pass also gives remarks,
+  which are news, and warnings, which are to be said whether or not anybody
+  asked.
 - **The vehicle's data.** `tcs_moc_open` opens a `moc` node, and each
   `tcs_moc_receive` returns one datum and the name of the node that produced
   it.
@@ -31,7 +35,13 @@ linkage throughout, and nothing in it that C++ will not compile.
   configuration states. `tcs_client_connect` says whether the vehicle is
   flying this configuration; then ping; start, stop or query a node by its
   id, set one of its attributes, or ask for the last datum it moved each way;
-  retime the beacon; and arm a restart and restart the vehicle.
+  retime the beacon; and arm a restart and restart the vehicle. The client
+  learns which generation of tcspecial is flying from the answer to connect,
+  so until one is answered, and again after a beacon whose number went back
+  or an answer from another generation, it refuses every command but ping
+  and connect, unsent. `tcs_client_beacon_heard` tells it of each pass's
+  beacon; after a restart is sent it is what ends the wait for the vehicle
+  to come back.
 - **Pinging a ping node.** `tcs_pinger_open` finds the first `ping` node the
   ground can reach both ways and its `moc` node. `tcs_pinger_ping` sends a
   ping up; its answer comes down as the ping node's data, which a station

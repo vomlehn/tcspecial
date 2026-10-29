@@ -316,18 +316,18 @@ fn segsend_for(graph: &Graph) -> Result<SegSend, String> {
 
 /// Start sending beacons where the configuration's `tcspecial` section says.
 ///
-/// From `beacon.send` to `beacon.recv`, every `beacon.default_interval`, carrying
-/// this build's version, the configuration's digest and this start's
-/// generation -- counted in `state_file` here, before the first beacon goes,
-/// so that the first beacon already says it. Every
-/// `beacon.reset_interval` until the MOC is heard from, as every start
-/// is: see [`BeaconSend::heard_from_moc`].
+/// From `beacon.send` to `beacon.recv`, carrying this build's version, the
+/// configuration's digest and whether this start was commanded -- read from
+/// `state_file` here, before the first beacon goes, so that the first beacon
+/// already says it. Every `beacon.reset_interval` until the MOC connects, as
+/// every start is, and every `beacon.default_interval` after that: see
+/// [`BeaconSend::connected`].
 /// An interval of nought sends none. Recorded in the telemetry log, which is
 /// the vehicle's own account of what it sent.
 ///
-/// Returns the generation as well, which the command links refuse a command
-/// of any other generation by. Nought, which no start is, where there is no
-/// `tcspecial` section, which takes no commands either.
+/// Returns the generation as well, which every answer carries. Nought, which
+/// no start is, where there is no `tcspecial` section, which takes no
+/// commands either.
 ///
 /// A `beacon.send` that cannot be bound, or a `beacon.recv` that does not
 /// resolve, stops the start: a vehicle flying without beacons is one the

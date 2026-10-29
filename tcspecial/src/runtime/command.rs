@@ -116,9 +116,8 @@ pub struct Flying {
     pub version: ConfigVersion,
     /// The digest of the configuration file this process read.
     pub digest: ConfigDigest,
-    /// This start's generation, from the state file: a command sent for
-    /// any other is refused, but for PING and CONNECT. See
-    /// [`tcslibgs::CommandType::always_taken`].
+    /// This start's generation, from the state file, which every answer
+    /// carries so that the ground hears of a restart from any of them.
     pub generation: u32,
 }
 
@@ -295,8 +294,10 @@ struct Serving {
     /// none before the first. A command older than it is answered `Stale`
     /// and not acted on: see [`tcslibgs::CommandType::always_taken`].
     ///
-    /// Not kept across a restart, because it need not be: a command sent
-    /// before one is of the generation before, and refused for that.
+    /// Not kept across a restart, because it need not be: the link
+    /// delivers in order, so a command sent before a RESTART arrives before
+    /// it, and a ground station sends nothing but PING and CONNECT after a
+    /// RESTART until it hears the start that came back.
     newest: Option<u32>,
 }
 
@@ -399,13 +400,6 @@ impl Serving {
             }
         };
 
-        // A valid packet from the MOC: from where the configuration says, and
-        // a command. The beacons go back to their interval if they were
-        // going fast because nothing had come since this process started.
-        if let Some(beacon) = self.beacon.as_ref() {
-            beacon.heard_from_moc();
-        }
-
         trace!("{}: {command:?}", spelling(link.which));
         // Every answer says which start of tcspecial made it, stamped here,
         // where every answer goes out, so that none can be sent without it.
@@ -427,8 +421,8 @@ impl Serving {
         // taken before the links close under it.
         if self.restarting {
             self.restarting = false;
-            // Initiated now: the beacons say so from here until the process
-            // ends, starting with one at once.
+            // Initiated now: the beacons carry the commanded-restart bit from
+            // here, fast, starting with one at once, until the process ends.
             if let Some(beacon) = self.beacon.as_ref() {
                 beacon.restart_initiated();
             }
@@ -458,24 +452,6 @@ impl Serving {
                 spelling(command.link())
             );
             return answer_to(command, CommandStatus::InvalidCommand);
-        }
-
-        // Sent for another start of tcspecial than this one: before a
-        // restart and delivered after it, or by a station that has not heard
-        // which generation is flying. Refused rather than read, because the
-        // definitions it was written for may not be this start's.
-        if !command.cmd_type().always_taken()
-            && command.generation() != self.flying.generation
-        {
-            warn!(
-                "{:?} {} was sent for generation {} and this is generation \
-                 {}: refused, and nothing in it acted on",
-                command.cmd_type(),
-                sequence,
-                command.generation(),
-                self.flying.generation
-            );
-            return answer_to(command, CommandStatus::WrongGeneration);
         }
 
         // Older than one already taken: overtaken on the link by a later
@@ -508,12 +484,19 @@ impl Serving {
             // does not match does not send them.
             // And the newest command taken, which is where a station whose
             // count has gone back starts it again.
-            Command::Connect(_) => Telemetry::Connect(ConnectTelemetry::new(
-                sequence,
-                self.flying.version,
-                self.flying.digest,
-                self.newest.unwrap_or(sequence),
-            )),
+            // The MOC has connected: the beacons clear the commanded-restart
+            // bit and go back to their interval.
+            Command::Connect(_) => {
+                if let Some(beacon) = self.beacon.as_ref() {
+                    beacon.connected();
+                }
+                Telemetry::Connect(ConnectTelemetry::new(
+                    sequence,
+                    self.flying.version,
+                    self.flying.digest,
+                    self.newest.unwrap_or(sequence),
+                ))
+            }
 
             // The beacon thread is retimed where it waits, so the next beacon
             // goes at the new interval rather than after the old one elapses.
@@ -880,18 +863,11 @@ mod tests {
     }
 
     /// Ask on a link and read the answer, or say nothing came.
-    ///
-    /// For the generation flying, as a station that has heard it sends, but
-    /// where the command was given one of its own.
     fn ask(
         ground: &UdpSocket,
         at: SocketAddr,
         command: &Command,
     ) -> Option<Telemetry> {
-        let command = match command.generation() {
-            0 => command.clone().for_generation(GENERATION),
-            _ => command.clone(),
-        };
         let asked = command.to_bytes();
         ground.send_to(&asked, at).expect("it is sent");
         let mut buffer = [0u8; COMMAND_BYTES];
@@ -1004,71 +980,6 @@ mod tests {
                 assert_eq!(tm.header.generation, GENERATION, "this start");
             }
             other => panic!("expected a connect answer, got {other:?}"),
-        }
-    }
-
-    /// A command sent for another generation is refused and not acted on,
-    /// whichever generation that is -- the one before, or none at all from
-    /// a station that has heard neither a beacon nor a CONNECT's answer --
-    /// but a PING and a CONNECT are answered whatever generation they say,
-    /// because they are how a station finds out which one is flying.
-    #[test]
-    fn a_command_for_another_generation_is_refused() {
-        let graph = two_nodes();
-        let states = Arc::new(NodeStates::of(&graph).expect("states"));
-        let ids = tcslibgs::graph::telemetry::ids(&graph);
-        let inside = NodeId::of(ids["inside"]);
-        let (bench, done) = a_pass_answering(|_| Ok(()));
-        let (ground, commands) = started_with(states.clone(), bench);
-        let node_at = commands.node_address();
-        let at = commands.spacecraft_address();
-
-        for other in [GENERATION - 1, GENERATION + 1, 0] {
-            let stop = Command::StopNode(NodeCommand::stop(4, inside));
-            // `ask` stamps nought as the generation flying, so nought is
-            // sent by hand.
-            let answer = if other == 0 {
-                ground
-                    .send_to(&stop.to_bytes(), node_at)
-                    .expect("it is sent");
-                let mut buffer = [0u8; COMMAND_BYTES];
-                let (size, _) = ground.recv_from(&mut buffer).expect("one");
-                Telemetry::read(&buffer[..size]).ok()
-            } else {
-                ask(&ground, node_at, &stop.for_generation(other))
-            };
-            match answer {
-                Some(Telemetry::StopNode(tm)) => assert_eq!(
-                    tm.header.status,
-                    CommandStatus::WrongGeneration,
-                    "generation {other}"
-                ),
-                other => panic!("expected a stop answer, got {other:?}"),
-            }
-            assert!(states.is_enabled("inside"), "the node was not stopped");
-            assert!(done.lock().expect("the record").is_empty());
-
-            let ping = Command::Ping(tcslibgs::PingCommand::new(5))
-                .for_generation(other.max(1) + 10);
-            match ask(&ground, at, &ping) {
-                Some(Telemetry::Ping(tm)) => {
-                    assert_eq!(tm.header.status, CommandStatus::Success)
-                }
-                other => panic!("expected a ping answer, got {other:?}"),
-            }
-            let connect = Command::Connect(tcslibgs::ConnectCommand::new(
-                6,
-                ConfigVersion::of_this_build(),
-                ConfigDigest([0x5Au8; 16]),
-            ))
-            .for_generation(other.max(1) + 10);
-            match ask(&ground, at, &connect) {
-                Some(Telemetry::Connect(tm)) => {
-                    assert_eq!(tm.header.status, CommandStatus::Success);
-                    assert_eq!(tm.header.generation, GENERATION);
-                }
-                other => panic!("expected a connect answer, got {other:?}"),
-            }
         }
     }
 
@@ -1671,8 +1582,7 @@ mod tests {
                     &Command::Restart(tcslibgs::RestartCommand::new(
                         1,
                         ArmKey(7),
-                    ))
-                    .for_generation(GENERATION),
+                    )),
                 )
                 .status()
         };
@@ -1725,8 +1635,7 @@ mod tests {
                     &Command::RestartArm(tcslibgs::RestartArmCommand::new(
                         sequence,
                         ArmKey(key),
-                    ))
-                    .for_generation(GENERATION),
+                    )),
                 )
                 .status()
         };

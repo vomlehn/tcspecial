@@ -210,7 +210,7 @@ vehicle:
             while !stop.load(Ordering::Relaxed) {
                 sequence += 1;
                 let datagram =
-                    Beacon::new(sequence, version, digest, 1).to_bytes();
+                    Beacon::new(sequence, version, digest).to_bytes();
                 let _ = beacon.send_to(&datagram, ("127.0.0.1", beacons));
 
                 // A ping, answered as the ping node answers it, down to where
@@ -352,9 +352,7 @@ vehicle:
     // configuration's, which differs between the two runs.
     let expected = [
         format!("configuration: md5 {digest}"),
-        format!(
-            "beacon: Heard, tcspecial v{version} md5 {digest} generation 1"
-        ),
+        format!("beacon: Heard, tcspecial v{version} md5 {digest}"),
         "connect: agrees".to_string(),
         "ping: answered".to_string(),
         "query ping (node 1): Success, running".to_string(),
@@ -364,7 +362,7 @@ vehicle:
         "sample ping: took \"ping\" of 6 bytes, gave nothing".to_string(),
         "configure: beacon every 5 s, done".to_string(),
         "restart: armed done, restarted done".to_string(),
-        "restart: awaiting a beacon of the next generation: yes".to_string(),
+        "restart: awaiting a beacon that starts again: yes".to_string(),
         "ping ping through moc: sent".to_string(),
         "data from ping: hello from ping".to_string(),
         "ping ping: answered, round trip timed, up and down summing to it \

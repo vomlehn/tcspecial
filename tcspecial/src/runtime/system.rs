@@ -2199,7 +2199,6 @@ vehicle:
             7,
             ConfigVersion::of_this_build(),
             ConfigDigest([0x5a; 16]),
-            1,
         );
         let answer =
             Telemetry::Ping(PingTelemetry::new(3, CommandStatus::Success));

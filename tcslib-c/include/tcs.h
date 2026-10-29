@@ -105,10 +105,11 @@ typedef struct tcs_pass {
 	int heard;        /* whether any beacon has arrived */
 	int64_t at_seconds; /* when the last one arrived: seconds since 1970, */
 	uint32_t at_nanos;  /* and nanoseconds; both 0 where none has */
-	uint32_t generation; /* how many times tcspecial has started, as the
-	                        last beacon said; 0 where none has arrived */
-	int commanded_restart; /* whether it said the ground commanded the
-	                          start that sent it */
+	int restarted;    /* whether the beacon this pass heard says tcspecial
+	                     has started again: its number went back */
+	int commanded_restart; /* whether the last beacon said a restart the
+	                          ground commanded is under way: set from the
+	                          RESTART until the vehicle takes a CONNECT */
 } tcs_pass;
 
 /* The ground's end of the beacon link: a socket where the configuration says
@@ -123,9 +124,9 @@ tcs_beacons *tcs_beacons_listen(const tcs_configuration *configuration);
  * waits for one. */
 int tcs_beacons_pass(tcs_beacons *beacons, tcs_pass *pass);
 
-/* What the last beacon said: "tcspecial v0.1.0 md5 ... generation 1", with
- * ", COMMANDED RESTART" after it where the ground commanded the start that
- * sent it, or "<none>". */
+/* What the last beacon said: "tcspecial v0.1.0 md5 ...", with
+ * ", COMMANDED RESTART" after it while a commanded restart is under way, or
+ * "<none>". */
 const char *tcs_beacons_said(const tcs_beacons *beacons);
 
 /* What the last pass had to say on a console, which is news: beacons missed,
@@ -174,11 +175,8 @@ typedef enum tcs_status {
 	TCS_STATUS_NOT_FOUND = 5,
 	TCS_STATUS_ALREADY_EXISTS = 6,
 	TCS_STATUS_TIMEOUT = 7,
-	/* Sent for another generation of tcspecial than the one flying, and
-	 * not acted on: the vehicle restarted since this client last heard
-	 * which generation it is. Connect again, or hand the client the next
-	 * pass's beacon, before the next command. */
-	TCS_STATUS_WRONG_GENERATION = 8,
+	/* 8 is not used: it was a command sent for another generation, when a
+	 * command carried one. */
 	/* Older than a command the vehicle has already taken since it last
 	 * started, and not acted on: overtaken on the link by a later one, or
 	 * sent by a client whose count has gone back. The client starts its
@@ -199,11 +197,13 @@ tcs_client *tcs_client_open(const tcs_configuration *configuration);
  * the vehicle is flying this configuration -- the digests match -- and 0
  * where it is not, in which case no node command should be sent.
  *
- * The answer also says which generation of tcspecial is flying, which every
- * command after it is sent for; a beacon handed to tcs_client_beacon_heard
- * says the same. Until one of the two has, every command but PING and
- * CONNECT fails, unsent, because the vehicle refuses a command sent for any
- * generation but its own. */
+ * The answer also says which generation of tcspecial is flying, and clears
+ * the commanded-restart bit in the vehicle's beacons. Until a Connect has
+ * been answered, and again once a beacon handed to tcs_client_beacon_heard
+ * says tcspecial has started again or an answer comes from another
+ * generation, every command but PING and CONNECT fails, unsent, because what
+ * the vehicle flies may have changed. A command carries no generation, only
+ * its sequence. */
 int tcs_client_connect(tcs_client *client, int *agrees);
 
 /* Ask whether the vehicle's command link answers. */
@@ -226,13 +226,14 @@ int tcs_client_restart_arm(tcs_client *client, uint64_t key,
 			   tcs_status *status);
 
 /* Restart the vehicle, which the last RESTART_ARM must have armed with the
- * same key: the process restarts, its generation goes up by one, its beacons
- * start again at #1 and say the start was commanded.
+ * same key: the beacons carry the commanded-restart bit from then, the
+ * process restarts, and its beacons start again at #1, the bit still set
+ * until a Connect.
  *
  * Never send it again for want of an answer: the beacons say whether it was
  * taken. From the moment it is sent, every command on this client is
- * refused, unsent, until a beacon of another generation says tcspecial has
- * started again: the beacon is the acknowledgement, and the
+ * refused, unsent, until a beacon whose number starts again says tcspecial
+ * has started again, and then all but PING and CONNECT until a Connect: the beacon is the acknowledgement, and the
  * answer to the RESTART may never arrive. Hand the client each pass's beacon
  * with tcs_client_beacon_heard. A RESTART answered as refused ends the wait
  * at once. */

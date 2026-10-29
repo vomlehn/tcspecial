@@ -336,7 +336,7 @@ Number of nodes
 Times
    Times are 64-bit counts of microseconds since the UNIX epoch, which run
    to the year 586524; all ones means the clock failed. The beacon interval,
-   ``beacon.default_interval``, and the interval across a restart,
+   ``beacon.default_interval``, and the interval until the MOC connects,
    ``beacon.reset_interval``, are at most 2\ :sup:`64` - 1 microseconds,
    about 585,000 years, which is what the eight bytes of microseconds a
    ``CONFIG`` carries state; the reset interval is no longer than the
@@ -351,7 +351,8 @@ Counters
    The beacon's sequence number is 32 bits and wraps, and the ground takes
    a sequence that goes backwards as a restart: at one beacon every 5
    seconds, that happens after about 680 years. The generation, which
-   counts restarts, is 32 bits and wraps, skipping 0.
+   counts starts and is carried in every answer, is 32 bits and wraps,
+   skipping 0.
 
 Data sizes
    Aboard, one read delivers at most 4096 bytes, so ``max_length`` is at
@@ -2073,11 +2074,13 @@ The beacon example
    ``examples/beacon``: a beacon, and a window watching it.
 
 What a ground station knows about a spacecraft without asking it anything.
-tcspecial sends a beacon from ``beacon.send`` to ``beacon.recv`` every
-``beacon.default_interval`` for as long as it runs, over a socket of its own and
-whether or not anything has connected to it -- so this example commands
-nothing, and still says whether the vehicle is alive, which build it is, and
-whether the configuration it is serving is the one the ground read.
+tcspecial sends a beacon from ``beacon.send`` to ``beacon.recv`` for as long
+as it runs, over a socket of its own and whether or not anything has connected
+to it -- every ``beacon.reset_interval`` until a MOC connects, and every
+``beacon.default_interval`` after -- so this example commands nothing, and
+still says whether the vehicle is alive, which build it is, and whether the
+configuration it is serving is the one the ground read. Since nothing here
+connects, its beacons go every ``beacon.reset_interval`` throughout.
 
 The ports are the example's own, a hundred above the other examples', so the
 watcher can be left running while another example is looked at. Its one
@@ -2100,16 +2103,28 @@ none of it is the program's own:
   find where the beacons are, starts the loop on a thread of its own, and puts
   each pass in the window.
 
-A beacon is 55 bytes in a fixed layout: ``tcspecial`` and a space, the
-version's major, minor and patch a byte each, a space, the sixteen bytes of
-the configuration's MD5 digest, the beacon's number and the generation number
-in four bytes each, most significant first, a byte whose top bit says a
-restart has been initiated, and the sixteen bytes of the interface's digest. The layout is described in XTCE, in
-``tcslibgs/xtce/beacon.xml``, and tcspecial packs each beacon, and
-``tcslib::beacon`` unpacks it, with the code tcs-xtce generates from that file:
-``tcslibgs::Beacon``. The example's test packs the beacon it sends the same
-way. Nothing about the layout is written by hand, so to change it, change the
-XML and run ``make beacon-packet`` in ``tcslibgs/``.
+A beacon is a line of text, at most 106 bytes and with no newline at the
+end: six fields with a colon between each -- the name ``tcspecial``, the
+version as ``major.minor.patch``, the configuration's MD5 digest as 32
+lower-case hex digits, the beacon's number in decimal, the commanded-restart
+flag, written ``restart`` while a restart the ground commanded is under way
+and the MOC has not connected since and ``normal`` otherwise, and the
+interface's digest, also as 32 hex digits:
+
+.. code-block:: text
+
+   tcspecial:0.1.0:36999e46a4bf436854442d8f97a2248d:42:normal:0123...cdef
+
+It is text so that it can be read as it is, in a packet capture, a log or
+with any UDP listener, with nothing to decode it. That is what goes on the
+wire; what the window shows on its ``Last msg:`` line is written for the
+window, as ``tcspecial v0.1.0 md5`` and the digest. tcspecial writes each
+beacon, and ``tcslib::beacon`` reads it, with ``tcslibgs::Beacon``, which
+the Python in ``python/tcslibgs/beacon.py`` says again, held to it by the
+same examples in their tests. The example's test writes the beacon it sends
+the same way. A beacon is read strictly: anything with a field out of its
+form, a seventh field, a trailing colon or newline, or more than 106 bytes,
+is not a beacon.
 
 tcsmoc shows that same panel from that same library, in a row beside its
 command link. That is the point of their being apart: what a beacon means is
@@ -2156,9 +2171,10 @@ device id. Each time is seconds since the UNIX epoch to the nanosecond:
 
 The ground station is a Python 3 program, ``ping_moc.py``, that uses nothing
 outside the standard library to read the XML spelling of its configuration --
-its window is tkinter -- and PyYAML to read the YAML one. It unpacks beacons
-with tcs-xtce's Python runtime, which is in this tree, in ``vendor/tcs-xtce``,
-and found from there. It shows the beacon
+its window is tkinter -- and PyYAML to read the YAML one. A beacon is text and
+needs nothing to read; the interface digest it is compared with is worked
+out with tcs-xtce's Python runtime, which is in this tree, in
+``vendor/tcs-xtce``, and found from there. It shows the beacon
 panel, the last ping sent and when, the last answer received and when, and
 three times:
 
@@ -3444,15 +3460,27 @@ the beacon box
   .. code-block:: console
 
      2 beacons did not arrive: #9 came after #6
-     beacon #8 arrived late, after #9
      the beacons start again at #1, so tcspecial has restarted as commanded
 
   A beacon says only that the spacecraft is alive, so without the number a
   beacon that was lost on the way reads exactly like one that was never sent.
-  The radio may deliver a beacon twice, and should one ever arrive out of
-  order all the same, a beacon
-  numbered before the last one heard is said to be late rather than taken for
-  a restart.
+  The radio delivers in order, so a number lower than the last one heard
+  means tcspecial has started again and is counting from one; the same
+  number as the last is the radio delivering a beacon twice, and counts for
+  nothing. A restart nobody commanded is said as ``the beacons start again
+  at #1, so tcspecial has restarted without being commanded to, with the
+  definitions it had``.
+
+  To the right of the indicator is a field that reads ``Restarted—connect``
+  while the last beacon's commanded-restart flag said ``restart``, and is
+  empty while it said ``normal``. The flag is set from the moment tcspecial
+  takes an
+  ``Initiate restart`` until it takes a ``Connect`` from the MOC, so the
+  field is telling the operator what to do next: press ``Connect``, which
+  clears it. While the flag is set the message line also ends
+  ``, COMMANDED RESTART``, which is how the window writes it. The
+  ``beacon`` example's window has the panel without this field, since it
+  sends no commands and so cannot connect.
 
   A datagram that reaches the beacon address from anywhere but where the
   configuration says beacons come from is not a beacon, and is ignored. That
@@ -3656,7 +3684,7 @@ ARM Restart
   enough that an arm left behind does not stand ready for the next restart
   anybody sends.
 
-Restart
+Initiate restart
   Restarts the spacecraft software, which only a restart armed with the same
   key within the time an arm lasts does. The arm is used up by it; a restart
   with the wrong key is refused and leaves the arm standing. tcspecial
@@ -3670,45 +3698,56 @@ Restart
   output and exits, so run tcspecial under a supervisor that starts it again
   when it exits.
 
-  The beacons are how the ground learns the restart happened. From the
-  moment the restart is taken one beacon goes at once, and the rest every
+  The beacons are how the ground learns the restart happened. The moment
+  the restart is taken tcspecial sets the *commanded-restart* flag in its
+  beacons, which then say ``restart`` where they said ``normal`` -- the
+  Beacon box's field beside the indicator reads
+  ``Restarted—connect``, and the message line ends ``, COMMANDED RESTART``
+  -- and sends one beacon at once and the rest every
   ``beacon.reset_interval``. The tcspecial that comes back counts itself a
   new *generation*, one more than the last, which it keeps in the file the
   ``tcspecial`` section's ``state_file`` names; its beacons start again at
-  #1, say the new generation, and carry a *commanded restart* flag -- the
-  panel's line ends ``, COMMANDED RESTART`` -- saying it is the start the
-  restart asked for. They go every ``beacon.reset_interval`` until the
-  first command from the MOC arrives, and every ``beacon.default_interval``
-  after that.
+  #1 with the flag still set, saying it is the start the restart asked for.
+  Every start beacons every ``beacon.reset_interval`` until the MOC
+  connects. When tcspecial takes a ``Connect`` it clears the flag, sends a
+  beacon at once, and from then on beacons every
+  ``beacon.default_interval``, or the interval the last ``Config`` set. A
+  ``Connect`` taken after the restart is initiated and before the old
+  tcspecial has gone neither clears the flag nor slows the beacons: the
+  restart is still under way.
 
   A tcspecial that starts again for any other reason -- it crashed and its
   supervisor started it, or the vehicle lost power -- also counts a new
-  generation, but its beacons do not carry the flag, and it runs with the
-  configuration it had. A station waiting on a restart that sees a new
-  generation without the flag says so: the restart it sent did not happen,
-  and the vehicle restarted for a reason of its own, which is worth finding
-  out before the restart is sent again.
+  generation and starts its beacons again at #1, but they say ``normal``,
+  and it runs with the configuration it had. A station waiting on a
+  restart that sees the beacons start again without the flag says so: the
+  restart it sent did not happen, and the vehicle restarted for a reason of
+  its own, which is worth finding out before the restart is sent again.
 
   Once a station has sent a restart it sends nothing more to the vehicle
-  until a beacon of a new generation arrives: the
-  vehicle that comes back may read packets differently from the one that
-  went, and the beacon -- not the answer to the restart, which may never
-  arrive -- is what says it is back. A command tried in between is refused
-  by the station, unsent, saying which generation it is waiting to see
-  change.
+  until a beacon arrives whose number has gone back: the vehicle that comes
+  back may read packets differently from the one that went, and the beacon
+  -- not the answer to the restart, which may never arrive -- is what says
+  it is back. A command tried in between is refused by the station, unsent.
+  When the wait ends, ``Last Response`` says which it was -- ``tcspecial
+  has started again as commanded: Connect before anything else``, or
+  ``tcspecial started again without being commanded to, so the restart
+  initiated here did not happen: Connect before anything else`` -- and the
+  station refuses everything but a ping and a ``Connect`` until it has
+  connected.
 
-  Every command carries the generation the station last heard, from a
-  beacon or from the answer to Connect, and the vehicle refuses one sent for
-  any other, answering ``WrongGeneration``: a command sent before a restart
-  and arriving after it is not acted on. Every answer says the generation
-  that made it, so an answer from a vehicle that has restarted since is
-  noticed too. Connect again after a ``WrongGeneration``, or after an answer
-  of another generation; until then the station refuses every command but a
-  ping and a Connect, unsent.
+  A command carries its sequence number and no generation. Every answer
+  says the generation that made it, and the station learns which
+  generation is flying from the answer to ``Connect``, since the beacons do
+  not say. So an answer from a vehicle that has restarted since, or a
+  beacon whose number has gone back, is noticed: from then on the station
+  refuses every command but a ping and a Connect, unsent, until a
+  ``Connect`` is answered.
 
-  A command older than one the vehicle has already taken -- overtaken on
-  the way by a later one -- is answered ``Stale`` and not acted on: the
-  later command is the one that counts. A station that has been started
+  A command older than one the vehicle has already taken -- sent by a
+  station whose count has gone back, or overtaken on the way should the
+  link ever deliver out of order -- is answered ``Stale`` and not acted on:
+  the later command is the one that counts. A station that has been started
   again may find its commands answered ``Stale`` until it connects, since
   the answer to Connect tells it where to go on counting from.
 
@@ -3724,8 +3763,9 @@ without anyone asking.
 
 Beaconing
 ^^^^^^^^^
-TCSpecial sends a beacon every ``beacon.default_interval``, or every
-``beacon.reset_interval`` across a restart (see Restart, above), from the
+TCSpecial sends a beacon every ``beacon.reset_interval`` from when it starts,
+or from when a restart is initiated, until it takes a ``Connect``, and every
+``beacon.default_interval`` after that (see Initiate restart, above), from the
 address the payload set's ``tcspecial`` section names to the address beside it,
 or ``tcspecial.yaml``'s pair for a set with no section. Tcsmoc binds that same
 receiving address, having read the same files. Tcsmoc displays the
@@ -3919,7 +3959,8 @@ graph, and ``Cargo.lock`` says which version of each is built.
 
 Every one is fetched from `crates.io <https://crates.io>`_, the Rust package
 registry, which is where ``cargo build`` downloads it from, but one: ``xtce``,
-tcs-xtce's runtime, which packs and unpacks the beacon, is taken from a copy in
+tcs-xtce's runtime, which packs and unpacks the commands and answers, is
+taken from a copy in
 ``vendor/tcs-xtce`` until tcs-xtce is published, and is not listed below. Each
 name below links to its page there, the version links to its documentation on
 `docs.rs <https://docs.rs>`_, and the last column to the repository its source

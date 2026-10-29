@@ -1654,6 +1654,41 @@ mod tests {
                 .any(|line| line == "tcspecial v0.1.0 md5 0123456789abcdef"),
             "what the beacon said is not on screen: {shown:?}"
         );
+        assert!(
+            !shown.iter().any(|line| line == tcsui::RESTARTED_CONNECT),
+            "no restart said of a beacon without the bit: {shown:?}"
+        );
+
+        // A beacon carrying the commanded-restart bit says, beside the
+        // indicator, to connect; the next without it clears that.
+        let restarted = tcsui::Shown {
+            restart: tcsui::restart_of(true),
+            ..tcsui::Shown::at(
+                &tcslib::beacon::Schedule::standard().at(Duration::ZERO),
+                None,
+                "",
+            )
+        };
+        beacon_receive::show_beacon(&ui, &restarted);
+        assert!(
+            on_screen(&ui)
+                .iter()
+                .any(|line| line == tcsui::RESTARTED_CONNECT),
+            "the restart field does not say to connect"
+        );
+        beacon_receive::show_beacon(
+            &ui,
+            &tcsui::Shown {
+                restart: tcsui::restart_of(false),
+                ..restarted
+            },
+        );
+        assert!(
+            !on_screen(&ui)
+                .iter()
+                .any(|line| line == tcsui::RESTARTED_CONNECT),
+            "the restart field was not cleared"
+        );
     }
 
     /// The window size the design document states is the one the rule gives.

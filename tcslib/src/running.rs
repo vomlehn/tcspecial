@@ -1,7 +1,7 @@
 //! That a ground station's loop, once running, allocates nothing: a beacon
 //! pass, a datum from a `moc` node, a ping and its answer, and a command
-//! sent. A beacon pass allocates only what unpacking the beacon does, which
-//! `tcslibgs::Beacon::read` says, and why.
+//! sent. A beacon is text, read in place by `tcslibgs::Beacon::read`, so a
+//! beacon pass allocates nothing to unpack it.
 //!
 //! One test binary has one allocator, so these are together, under the one
 //! that counts.
@@ -85,9 +85,8 @@ fn a_free_port() -> u16 {
 }
 
 /// Once the first has been heard, a beacon pass allocates nothing: not to
-/// unpack the beacon, which tcs-xtce's Rust decoder does into fixed buffers
-/// (see `tcslibgs::Beacon::read`), not for what the beacon said, and not for
-/// the pass it hands back.
+/// unpack the beacon, which `tcslibgs::Beacon::read` reads in place, not for
+/// what the beacon said, and not for the pass it hands back.
 #[test]
 fn a_beacon_pass_allocates_nothing() {
     let vehicle = UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
@@ -111,8 +110,7 @@ fn a_beacon_pass_allocates_nothing() {
         return;
     };
     let beacon = |sequence: u32| {
-        Beacon::new(sequence, ConfigVersion::of_this_build(), digest, 1)
-            .to_bytes()
+        Beacon::new(sequence, ConfigVersion::of_this_build(), digest).to_bytes()
     };
     let datagrams: Vec<Vec<u8>> = (1..=23).map(beacon).collect();
 

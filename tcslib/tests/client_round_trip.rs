@@ -50,13 +50,8 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
             let command = Command::read(&buffer[..size])
                 .expect("the client sent a valid command");
             let seq = command.sequence();
-            // Answered as the generation the command was sent for, as a
-            // vehicle that took it would be; generation 1 for one sent for
-            // none, a PING or a CONNECT before anything was heard.
-            let generation = match command.generation() {
-                0 => 1,
-                sent => sent,
-            };
+            // Answered as generation 1, the one start this stand-in is.
+            let generation = 1;
 
             let answer = match command {
                 Command::Ping(_) => Telemetry::Ping(PingTelemetry::new(
@@ -156,9 +151,11 @@ fn client_to(addr: &str) -> TcsClient {
     let mut client =
         TcsClient::of_a_graph(Box::new(spacecraft), Box::new(nodes));
     client.set_timeout(Duration::from_secs(10));
-    // A station that has heard a beacon, so that its node commands are sent
-    // for a generation rather than refused unsent.
-    client.beacon_heard(1, false);
+    // A station that has connected, so that it knows which generation is
+    // flying and its node commands are sent rather than refused unsent.
+    client
+        .connect(ConfigVersion::of_this_build(), ConfigDigest([0x5A; 16]))
+        .expect("connected");
     client
 }
 
@@ -184,7 +181,7 @@ fn stub_counts() -> NodeCounts {
 /// What a node has moved comes back whole, and so does what it last moved.
 #[test]
 fn what_a_node_has_moved_comes_back() {
-    let (addr, stub) = stub_spacecraft(2);
+    let (addr, stub) = stub_spacecraft(3);
     let mut client = client_to(&addr);
 
     let (status, enabled, counts) =
@@ -210,7 +207,7 @@ fn what_a_node_has_moved_comes_back() {
 /// A node's attribute is set by the node's id and the attribute's name.
 #[test]
 fn a_nodes_attribute_is_set_by_id_and_name() {
-    let (addr, stub) = stub_spacecraft(2);
+    let (addr, stub) = stub_spacecraft(3);
     let mut client = client_to(&addr);
 
     let (status, node, reason) = client
@@ -241,7 +238,7 @@ fn a_nodes_attribute_is_set_by_id_and_name() {
 /// with the command and the id says which node the pair was about.
 #[test]
 fn a_node_is_commanded_by_its_id_and_the_answer_says_which() {
-    let (addr, stub) = stub_spacecraft(2);
+    let (addr, stub) = stub_spacecraft(3);
     let mut client = client_to(&addr);
 
     let (status, node) = client.start_node(NodeId::of(3)).expect("an answer");
@@ -294,8 +291,6 @@ fn every_operation_reaches_the_spacecraft_and_comes_back() {
         client.restart_arm(ArmKey(0x1234)).unwrap(),
         CommandStatus::Success
     );
-    // The station hears generation 4 before it restarts the vehicle.
-    assert_eq!(client.beacon_heard(4, false), None);
     assert_eq!(
         client.restart(ArmKey(0x1234)).unwrap(),
         CommandStatus::Success
@@ -311,15 +306,20 @@ fn every_operation_reaches_the_spacecraft_and_comes_back() {
         matches!(refused, TcsError::AwaitingRestart(_)),
         "{refused:?}"
     );
-    assert!(refused.to_string().contains("generation other than 4"));
-    // Not by the old generation's beacons.
-    assert_eq!(client.beacon_heard(4, false), None);
+    assert!(refused.to_string().contains("starts again"));
+    // Not by the old start's beacons, though they carry the bit.
+    assert_eq!(client.beacon_heard(false, true), None);
     assert!(client.restart_wait().is_some());
     // By the next start, which says it was the one commanded.
-    let ended = client.beacon_heard(5, true).expect("it ends the wait");
-    assert_eq!((ended.before, ended.generation), (4, 5));
+    let ended = client.beacon_heard(true, true).expect("it ends the wait");
     assert!(ended.commanded);
     assert!(client.restart_wait().is_none());
+    // And then a CONNECT, before anything but a PING.
+    assert!(matches!(
+        configure(&mut client),
+        Err(TcsError::GenerationUnknown(_))
+    ));
+    client.connect(version, digest).unwrap();
     assert_eq!(configure(&mut client).unwrap(), CommandStatus::Success);
 
     stub.join().expect("the stand-in answered every command");

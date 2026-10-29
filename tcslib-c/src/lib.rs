@@ -420,7 +420,7 @@ pub struct tcs_pass {
     heard: c_int,
     at_seconds: i64,
     at_nanos: u32,
-    generation: u32,
+    restarted: c_int,
     commanded_restart: c_int,
 }
 
@@ -444,9 +444,10 @@ pub struct tcs_beacons {
     said: Text<TEXT_BYTES>,
     remarks: Notes,
     warnings: Notes,
-    /// The last beacon's generation and whether its start was commanded, for
-    /// `tcs_client_beacon_heard`: `None` before one has arrived.
-    last: Option<(u32, bool)>,
+    /// Whether the beacon the last pass heard says tcspecial started again,
+    /// and whether it says a commanded restart is under way, for
+    /// `tcs_client_beacon_heard`: `None` where the last pass heard none.
+    last: Option<(bool, bool)>,
 }
 
 /// Listen where the configuration says beacons arrive.
@@ -523,10 +524,11 @@ pub unsafe extern "C" fn tcs_beacons_pass(
             heard: c_int::from(found.at.is_some()),
             at_seconds: i64::try_from(at.as_secs()).unwrap_or(i64::MAX),
             at_nanos: at.subsec_nanos(),
-            generation: found.generation.unwrap_or(0),
+            restarted: c_int::from(found.restarted),
             commanded_restart: c_int::from(found.commanded_restart),
         };
-        watch.last = found.generation.map(|g| (g, found.commanded_restart));
+        watch.last = (found.arrived == tcslib::beacon::Arrived::Beacon)
+            .then_some((found.restarted, found.commanded_restart));
         watch.said.set(&found.said);
         watch.remarks.set(&found.remarks);
         watch.warnings.set(&found.warnings);
@@ -747,7 +749,6 @@ fn status_number(status: CommandStatus) -> c_int {
         CommandStatus::NotFound => 5,
         CommandStatus::AlreadyExists => 6,
         CommandStatus::Timeout => 7,
-        CommandStatus::WrongGeneration => 8,
         CommandStatus::Stale => 9,
     }
 }
@@ -764,7 +765,6 @@ pub extern "C" fn tcs_status_name(status: c_int) -> *const c_char {
         5 => c"NotFound",
         6 => c"AlreadyExists",
         7 => c"Timeout",
-        8 => c"WrongGeneration",
         9 => c"Stale",
         _ => c"",
     };
@@ -1023,10 +1023,10 @@ pub unsafe extern "C" fn tcs_client_beacon_heard(
     guard(-1, || {
         let link = handle_of_mut(client, "the client")?;
         let watch = handle_of(beacons, "the beacons")?;
-        let Some((generation, commanded)) = watch.last else {
+        let Some((restarted, commanded)) = watch.last else {
             return Ok(0);
         };
-        Ok(match link.client.beacon_heard(generation, commanded) {
+        Ok(match link.client.beacon_heard(restarted, commanded) {
             Some(ended) if ended.commanded => 1,
             Some(_) => 2,
             None => 0,

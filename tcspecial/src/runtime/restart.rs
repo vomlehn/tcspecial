@@ -1,6 +1,6 @@
 //! Restarting tcspecial in place: what an armed RESTART does.
 //!
-//! The process runs itself again. Everything it opened is closed, and it
+//! The process runs itself again. Everything it opened is closed as it
 //! `exec`s its own executable with the arguments it was started with, keeping
 //! the descriptors it was started with and only those: standard input, output
 //! and error, and whatever a supervisor handed it -- a socket it listens on, a
@@ -99,6 +99,13 @@ pub fn if_asked() {
 
 /// Close everything this process opened, keep `inherited`, and become
 /// `started.program` again. Returns only to say why it could not.
+///
+/// What this process opened is marked close-on-exec rather than closed here,
+/// so the kernel closes it all at the moment the exec succeeds. Closed one by
+/// one beforehand, a descriptor's number could be reused by a thread still
+/// running before the exec -- a write meant for one device landing on another
+/// -- and an exec that failed would leave owners of descriptors that were
+/// gone.
 fn run_again(started: &Started, inherited: &[libc::c_int]) -> String {
     let program = match CString::new(started.program.as_os_str().as_bytes()) {
         Ok(program) => program,
@@ -132,9 +139,15 @@ fn run_again(started: &Started, inherited: &[libc::c_int]) -> String {
     };
     for fd in open {
         if !inherited.contains(&fd) {
-            // SAFETY: closing a descriptor this process opened. The threads
-            // that use them go with the exec below.
-            unsafe { libc::close(fd) };
+            // SAFETY: setting a descriptor's flags, which leaves it open and
+            // owned as it was until the exec; one that has gone since is
+            // refused by the kernel and is nothing to close.
+            unsafe {
+                let flags = libc::fcntl(fd, libc::F_GETFD);
+                if flags >= 0 {
+                    libc::fcntl(fd, libc::F_SETFD, flags | libc::FD_CLOEXEC);
+                }
+            }
         }
     }
     // Kept across the exec, whatever has been done to them since: they were

@@ -32,7 +32,22 @@ pub(crate) struct SimulatedNode {
 }
 
 impl SimulatedNode {
-    /// Open a pty and make `path` lead to its slave.
+    /// Opens a pty, sets its master raw and non-blocking, and makes a path
+    /// lead to its slave.
+    ///
+    /// # Arguments
+    ///
+    /// * `what` - What stands in, for the log line that says where.
+    /// * `path` - The configured path a handler opens.
+    ///
+    /// # Returns
+    ///
+    /// The pty, which takes the link away again when dropped.
+    ///
+    /// # Errors
+    ///
+    /// A message saying what failed if the pty cannot be opened or set up,
+    /// or the path cannot be made to lead to it.
     pub(crate) fn open(what: &str, path: &str) -> Result<Self, String> {
         let named = PathBuf::from(path);
         let (master, slave) = open_pty()?;
@@ -76,7 +91,15 @@ impl Drop for SimulatedNode {
     }
 }
 
-/// Open a pty, returning the master and the slave's name.
+/// Opens a pty and unlocks its slave.
+///
+/// # Returns
+///
+/// The master and the slave's name.
+///
+/// # Errors
+///
+/// A message saying which step failed, and the system's reason.
 fn open_pty() -> Result<(File, String), String> {
     // SAFETY: each call is given what it documents and its result is checked
     // before anything is done with it.
@@ -118,8 +141,20 @@ fn open_pty() -> Result<(File, String), String> {
     Ok((master, slave))
 }
 
-/// Take the line discipline out of the way: no echo, no editing, no newline
-/// translation. A payload link carries bytes, not lines of text.
+/// Takes the line discipline out of the way: no echo, no editing, no
+/// newline translation. A payload link carries bytes, not lines of text.
+///
+/// # Arguments
+///
+/// * `fd` - The terminal to set raw.
+///
+/// # Returns
+///
+/// Nothing, once the terminal is raw.
+///
+/// # Errors
+///
+/// A message if its settings cannot be read or written.
 pub(crate) fn make_raw(fd: RawFd) -> Result<(), String> {
     let mut terms: libc::termios = unsafe { std::mem::zeroed() };
     if unsafe { libc::tcgetattr(fd, &mut terms) } != 0 {
@@ -138,7 +173,20 @@ pub(crate) fn make_raw(fd: RawFd) -> Result<(), String> {
     Ok(())
 }
 
-/// Reads must not wait: one thread does the receiving and the sending both.
+/// Makes reads on a descriptor not wait: one thread does the receiving and
+/// the sending both.
+///
+/// # Arguments
+///
+/// * `fd` - The descriptor, the pty's master.
+///
+/// # Returns
+///
+/// Nothing, once the descriptor is non-blocking.
+///
+/// # Errors
+///
+/// A message if its flags cannot be read or written.
 fn set_nonblocking(fd: RawFd) -> Result<(), String> {
     let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
     if flags < 0

@@ -41,7 +41,11 @@ impl Mode {
     /// Every mode, in the words the flag takes.
     pub const NAMES: [&'static str; 3] = ["none", "some", "all"];
 
-    /// The word the flag takes for this mode.
+    /// Names this mode as the flag takes it.
+    ///
+    /// # Returns
+    ///
+    /// `none`, `some` or `all`.
     pub fn name(self) -> &'static str {
         match self {
             Mode::None => "none",
@@ -50,6 +54,15 @@ impl Mode {
         }
     }
 
+    /// Reads the mode a flag's word names.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The word after `--simulate=`.
+    ///
+    /// # Returns
+    ///
+    /// The mode, or `None` for a word that names none.
     fn from_name(name: &str) -> Option<Mode> {
         match name {
             "none" => Some(Mode::None),
@@ -80,6 +93,19 @@ impl fmt::Display for Mode {
 /// refused, naming the three modes: a second `--simulate` is more likely a
 /// mistake about which run this is than something meant to override the
 /// first.
+///
+/// # Arguments
+///
+/// * `args` - The program's arguments.
+///
+/// # Returns
+///
+/// The mode, and the arguments without the flag, in their order.
+///
+/// # Errors
+///
+/// A message naming the three modes, for a mode that is not one of them, a
+/// `--simulate` with no mode, or the flag given twice.
 pub fn take_mode(args: Vec<String>) -> Result<(Mode, Vec<String>), String> {
     let modes = Mode::NAMES.join(", ");
     let mut mode = None;
@@ -152,6 +178,18 @@ pub struct Judged {
 }
 
 impl Judged {
+    /// Judges a payload a stand-in.
+    ///
+    /// # Arguments
+    ///
+    /// * `found`       - What was found, as a clause about what the node
+    ///                   reaches.
+    /// * `attribute`   - The attribute that says what the node reaches.
+    /// * `to_stand_in` - What would make the payload a stand-in.
+    ///
+    /// # Returns
+    ///
+    /// The judgement.
     pub fn stand_in(
         found: String,
         attribute: &'static str,
@@ -165,6 +203,18 @@ impl Judged {
         }
     }
 
+    /// Judges a payload hardware.
+    ///
+    /// # Arguments
+    ///
+    /// * `found`       - What was found, as a clause about what the node
+    ///                   reaches.
+    /// * `attribute`   - The attribute that says what the node reaches.
+    /// * `to_stand_in` - What would make the payload a stand-in.
+    ///
+    /// # Returns
+    ///
+    /// The judgement.
     pub fn hardware(
         found: String,
         attribute: &'static str,
@@ -178,6 +228,18 @@ impl Judged {
         }
     }
 
+    /// Judges a payload one about which nothing could be told.
+    ///
+    /// # Arguments
+    ///
+    /// * `found`       - What was found, as a clause about what the node
+    ///                   reaches.
+    /// * `attribute`   - The attribute that says what the node reaches.
+    /// * `to_stand_in` - What would make the payload a stand-in.
+    ///
+    /// # Returns
+    ///
+    /// The judgement.
     pub fn cannot_tell(
         found: String,
         attribute: &'static str,
@@ -191,6 +253,18 @@ impl Judged {
         }
     }
 
+    /// Judges a payload one with nothing where it should be.
+    ///
+    /// # Arguments
+    ///
+    /// * `found`       - What was found, as a clause about what the node
+    ///                   reaches.
+    /// * `attribute`   - The attribute that says what the node reaches.
+    /// * `to_stand_in` - What would make the payload a stand-in.
+    ///
+    /// # Returns
+    ///
+    /// The judgement.
     pub fn absent(
         found: String,
         attribute: &'static str,
@@ -208,7 +282,11 @@ impl Judged {
         self.verdict == Verdict::StandIn
     }
 
-    /// What was found, in a word and a clause: for the startup summary.
+    /// Says what was found, in a word and a clause: for the startup summary.
+    ///
+    /// # Returns
+    ///
+    /// The verdict in a word, then what was found.
     pub fn said(&self) -> String {
         let word = match self.verdict {
             Verdict::StandIn => "a stand-in",
@@ -239,12 +317,25 @@ impl Host {
         }
     }
 
-    /// The kernel's directory for the character device at `path`, or what
-    /// was found there instead, as a clause.
+    /// Finds the kernel's directory for a character device.
     ///
     /// Through `/sys/dev/char/<major>:<minor>`, which every character device
     /// the kernel made has: a device node's name says nothing, since anyone
     /// can make one called anything, and its numbers say which device it is.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The device node's path, followed through any links.
+    ///
+    /// # Returns
+    ///
+    /// The device's directory under this host's `/sys`.
+    ///
+    /// # Errors
+    ///
+    /// [`Unseen`], saying as a clause what was found at the path instead:
+    /// nothing, something that is not a character device, or one the kernel
+    /// does not describe.
     pub fn device_of(&self, path: &str) -> Result<PathBuf, Unseen> {
         let (major, minor) = character_device(path)?;
         let entry = self.sys.join(format!("dev/char/{major}:{minor}"));
@@ -268,7 +359,16 @@ pub struct Unseen {
 }
 
 impl Unseen {
-    /// As the judgement of a payload.
+    /// Makes what was seen the judgement of a payload.
+    ///
+    /// # Arguments
+    ///
+    /// * `attribute`   - The attribute that says what the node reaches.
+    /// * `to_stand_in` - What would make the payload a stand-in.
+    ///
+    /// # Returns
+    ///
+    /// Absent when nothing was at the path, and cannot-tell otherwise.
     pub fn judged(
         self,
         attribute: &'static str,
@@ -282,8 +382,21 @@ impl Unseen {
     }
 }
 
-/// The device numbers of the character device at `path`, following links, or
-/// what is there instead, as a clause.
+/// Reads the device numbers of a character device, following links.
+///
+/// # Arguments
+///
+/// * `path` - The device node's path.
+///
+/// # Returns
+///
+/// Its major and minor numbers.
+///
+/// # Errors
+///
+/// [`Unseen`], saying as a clause what is there instead: nothing, which is
+/// absent, or something that cannot be looked at or is not a character
+/// device.
 pub(crate) fn character_device(path: &str) -> Result<(u64, u64), Unseen> {
     let unseen = |said: String| Unseen {
         absent: false,
@@ -318,7 +431,15 @@ pub(crate) fn character_device(path: &str) -> Result<(u64, u64), Unseen> {
     }
 }
 
-/// What a file that is not a character device is, for a clause.
+/// Says what a file that is not a character device is, for a clause.
+///
+/// # Arguments
+///
+/// * `found` - The file's metadata.
+///
+/// # Returns
+///
+/// What it is, such as "a directory".
 #[cfg(unix)]
 fn kind_of_file(found: &std::fs::Metadata) -> &'static str {
     use std::os::unix::fs::FileTypeExt;
@@ -348,13 +469,25 @@ fn split_device(device: u64) -> (u64, u64) {
 /// The majors Linux gives a pseudo-terminal's slave: 136 to 143.
 const PTY_SLAVE_MAJORS: std::ops::RangeInclusive<u64> = 136..=143;
 
-/// Whether `path` resolves to a pseudo-terminal's slave, which is what tcssim
-/// makes for a payload reached through a device node: the one judgement of
-/// serial, spi, rpmsg and device-file payloads, and the second of an iio one.
+/// Judges whether a path resolves to a pseudo-terminal's slave, which is what
+/// tcssim makes for a payload reached through a device node: the one
+/// judgement of serial, spi, rpmsg and device-file payloads, and the second
+/// of an iio one.
 ///
 /// By the device's numbers, after following every link: tcssim links the
 /// payload's path to the slave it made, and a name under `/dev/pts` is only a
 /// name.
+///
+/// # Arguments
+///
+/// * `path`        - The device node's path.
+/// * `attribute`   - The attribute that names it.
+/// * `to_stand_in` - What would make the payload a stand-in.
+///
+/// # Returns
+///
+/// A stand-in for a pseudo-terminal's slave, hardware for any other
+/// character device, and what [`Unseen::judged`] says for anything else.
 pub(crate) fn pseudo_terminal(
     path: &str,
     attribute: &'static str,
@@ -395,7 +528,7 @@ pub fn counted(node: &Node) -> bool {
         && DHType::from_spelling(&node.node_type).is_some()
 }
 
-/// What `node` was found to be under `mode`, where the mode counts it.
+/// Judges what a node was found to be under a mode, where the mode counts it.
 ///
 /// From what is at the end of the endpoint tcspecial will open under `mode`,
 /// by its type's own rule: its own endpoint, or the UDP socket its
@@ -404,6 +537,17 @@ pub fn counted(node: &Node) -> bool {
 /// before anything is opened: opening is not always harmless, since a serial
 /// port raises its modem lines as it opens and a GPIO line requested as an
 /// output is driven the moment the request is granted.
+///
+/// # Arguments
+///
+/// * `host` - The host, whose `/sys` is read.
+/// * `node` - The node judged.
+/// * `mode` - The run's mode, which says which endpoint is opened.
+///
+/// # Returns
+///
+/// The judgement, naming `stand_in` as what to change where that is what is
+/// opened, or `None` for a node the mode does not count.
 pub fn judge(host: &Host, node: &Node, mode: Mode) -> Option<Judged> {
     if !counted(node) {
         return None;
@@ -442,12 +586,21 @@ pub fn judge(host: &Host, node: &Node, mode: Mode) -> Option<Judged> {
     Some(judged)
 }
 
-/// Everything about a run's payloads that `mode` forbids, each naming the
-/// node, what it reaches, what was found there and the mode, and saying what
-/// would satisfy the mode. Empty where the run may go ahead.
+/// Lists everything about a run's payloads that a mode forbids.
 ///
 /// Every refusal rather than the first, as every other check here gives
 /// them: a run with three payloads on the wrong bus is one trip to a desk.
+///
+/// # Arguments
+///
+/// * `mode`     - The run's mode.
+/// * `payloads` - Each payload's name and judgement.
+///
+/// # Returns
+///
+/// The refusals, each naming the node, what it reaches, what was found
+/// there and the mode, and saying what would satisfy the mode. Empty where
+/// the run may go ahead.
 pub fn refusals(mode: Mode, payloads: &[(&str, &Judged)]) -> Vec<String> {
     let flag = format!("{FLAG}={mode}");
     match mode {
@@ -522,9 +675,10 @@ pub fn tcssim_makes(node_type: &str) -> bool {
     !matches!(node_type, "i2c" | "gpio" | "can" | "hdlc")
 }
 
-/// What is wrong, if anything, with a payload's `simulate` against what is at
-/// its endpoint: for tcssim, which compares the two before it stands in for
-/// anything. See "Saying Which Payloads Are Simulated" in docs/design.rst.
+/// Says what is wrong, if anything, with a payload's `simulate` against what
+/// is at its endpoint: for tcssim, which compares the two before it stands in
+/// for anything. See "Saying Which Payloads Are Simulated" in
+/// docs/design.rst.
 ///
 /// `simulate: true` where the endpoint is real hardware is a configuration
 /// pointing at hardware in a file that says it is simulated; `simulate:
@@ -532,9 +686,22 @@ pub fn tcssim_makes(node_type: &str) -> bool {
 /// would in fact simulate. Nothing at the path is a disagreement only for a
 /// stand-in the kernel makes, which has to be there before tcssim starts.
 ///
-/// `simulate` is `None` for a payload the simulator file does not name, which
-/// is the real device; one whose endpoint is a stand-in all the same is
-/// refused, so that every simulated device is one tcssim controls and shows.
+/// A payload the simulator file does not name is the real device; one whose
+/// endpoint is a stand-in all the same is refused, so that every simulated
+/// device is one tcssim controls and shows.
+///
+/// # Arguments
+///
+/// * `name`      - The payload's name.
+/// * `node_type` - Its node type, which says whether tcssim makes its
+///                 stand-in itself.
+/// * `simulate`  - Its `simulate`, or `None` where the simulator file does
+///                 not name it.
+/// * `judged`    - What was found at its endpoint.
+///
+/// # Returns
+///
+/// What is wrong, or `None` when the two agree.
 pub fn disagreement(
     name: &str,
     node_type: &str,
@@ -572,6 +739,15 @@ pub fn disagreement(
     }
 }
 
+/// Lists payloads' names for a message.
+///
+/// # Arguments
+///
+/// * `payloads` - Each payload's name and judgement.
+///
+/// # Returns
+///
+/// The names, joined with commas.
 fn names(payloads: &[(&str, &Judged)]) -> String {
     payloads
         .iter()
@@ -637,6 +813,11 @@ mod tests {
         }
     }
 
+    /// Makes the judgement of an I2C payload on the stub's adapter.
+    ///
+    /// # Returns
+    ///
+    /// A stand-in.
     fn stand_in() -> Judged {
         Judged::stand_in(
             "/dev/i2c-7 is the i2c-stub's adapter".into(),
@@ -645,6 +826,11 @@ mod tests {
         )
     }
 
+    /// Makes the judgement of an I2C payload on a real adapter.
+    ///
+    /// # Returns
+    ///
+    /// Hardware.
     fn hardware() -> Judged {
         Judged::hardware(
             "/dev/i2c-1 is a real adapter (gmbus)".into(),

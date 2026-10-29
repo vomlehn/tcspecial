@@ -124,6 +124,10 @@ impl Terminals {
     /// takes its terminals from `tcslibgs::graph::terminals`, and the tree is
     /// held against that -- see
     /// `tests::the_trees_terminals_are_the_schemas`.
+    ///
+    /// # Returns
+    ///
+    /// Each terminal's name with whether this type has it.
     #[cfg(test)]
     pub fn each(&self) -> [(&'static str, bool); 4] {
         [
@@ -244,6 +248,15 @@ struct SaidAttribute {
 /// In the order a reader meets them: sorted by path, which puts a directory's
 /// descriptions together and keeps the palette's order stable from one run to
 /// the next.
+///
+/// # Arguments
+///
+/// * `root` - The top of the description tree.
+///
+/// # Returns
+///
+/// The descriptions read, sorted by path, and a message for every directory or
+/// file that could not be read and for every name described more than once.
 pub fn read_tree(root: &Path) -> (Vec<Described>, Vec<String>) {
     let mut described = Vec::new();
     let mut trouble = Vec::new();
@@ -279,6 +292,15 @@ pub fn read_tree(root: &Path) -> (Vec<Described>, Vec<String>) {
 }
 
 /// Every description file under `where_`, as paths relative to `root`.
+///
+/// # Arguments
+///
+/// * `root`    - The top of the tree, which the paths found are made relative
+///               to.
+/// * `where_`  - The directory to search, recursively.
+/// * `found`   - Where each YAML or XML file found is added.
+/// * `trouble` - Where a message is added for each directory or entry that
+///               cannot be read.
 fn walk(
     root: &Path,
     where_: &Path,
@@ -322,6 +344,21 @@ fn walk(
 }
 
 /// One description, read from `root`-relative `path`.
+///
+/// # Arguments
+///
+/// * `root` - The top of the description tree.
+/// * `path` - The description file, relative to `root`.
+///
+/// # Returns
+///
+/// The description, with names, types and prose trimmed.
+///
+/// # Errors
+///
+/// A message naming the file if it cannot be loaded, says no node or type, has
+/// an attribute with no name, an unknown kind, or a `required` or terminal flag
+/// that is not `true` or `false`.
 fn read_one(root: &Path, path: &Path) -> Result<Described, String> {
     let whole = root.join(path);
     let said: Said = tcslibgs::load_config_file(&whole)
@@ -438,6 +475,15 @@ fn read_one(root: &Path, path: &Path) -> Result<Described, String> {
 ///
 /// A description is written for people and wraps where it suits the file; what
 /// shows it is one line of a palette or one row of a panel.
+///
+/// # Arguments
+///
+/// * `said` - The prose, if the file has any.
+///
+/// # Returns
+///
+/// The prose on one line, its runs of white space each made one space; empty if
+/// there is none.
 fn said_about(said: Option<&Scalar>) -> String {
     said.map(|about| {
         about
@@ -461,6 +507,10 @@ impl Described {
     /// Shown rather than hidden, for the reason an unrecognised attribute is
     /// shown: a value that is in the file and not on the panel is a value
     /// somebody has to open the file to find.
+    ///
+    /// # Returns
+    ///
+    /// Each field's name, with whether it is required.
     #[cfg(test)]
     pub fn asked(&self) -> Vec<(String, bool)> {
         self.fields()
@@ -475,6 +525,11 @@ impl Described {
     /// attribute the description sets rather than asks for is text, like any
     /// other it says nothing about -- it is not offered at all, the editor
     /// having filled it in.
+    ///
+    /// # Returns
+    ///
+    /// The attributes the description sets, as required text, then those it
+    /// asks for that it does not set.
     pub fn fields(&self) -> Vec<Attribute> {
         let mut asked: Vec<Attribute> = self
             .sets
@@ -509,6 +564,16 @@ impl Described {
 /// `None` for a node the tree says nothing about, which is every payload: the
 /// editor then asks for what the *type* says it needs, as it did before there
 /// was a tree.
+///
+/// # Arguments
+///
+/// * `described`  - The descriptions to choose among.
+/// * `node_type`  - The node's type, as the configuration writes it.
+/// * `attributes` - The node's attributes, by name.
+///
+/// # Returns
+///
+/// The best-fitting description, or `None` if none fits.
 pub fn matching<'a>(
     described: &'a [Described],
     node_type: &str,
@@ -542,6 +607,10 @@ pub fn matching<'a>(
 /// `None` if none of them is there, and that is not an error: an editor with no
 /// description tree offers the node types it was built knowing, which is what
 /// it offered before there was a tree at all.
+///
+/// # Returns
+///
+/// The first of the directories above that exists, or `None`.
 pub fn data_dir() -> Option<PathBuf> {
     let mut tried: Vec<PathBuf> = Vec::new();
 
@@ -604,6 +673,15 @@ pub const SIM_JSON_SCHEMA: &str = "tcspecial-sim.schema.json";
 /// a file that says where its schema would be is more use to a reader than a
 /// file that says nothing, and the one being written is not the place to
 /// report that this program was not installed.
+///
+/// # Arguments
+///
+/// * `destination` - The file being written.
+/// * `schema`      - The schema's file name, such as [`CONFIG_JSON_SCHEMA`].
+///
+/// # Returns
+///
+/// The schema's path, relative to `destination` or absolute.
 pub fn schema_reference(destination: &Path, schema: &str) -> String {
     // The source tree, from the file outwards. Six levels is past the deepest
     // a configuration sits in this repository (`tcslibgs/tests/actual`) with
@@ -642,6 +720,11 @@ pub fn nodes_in(data: &Path) -> PathBuf {
 /// Every description the editor can find, and everything wrong with the tree.
 ///
 /// Nothing and no complaint where there is no tree: see [`data_dir`].
+///
+/// # Returns
+///
+/// The descriptions and the trouble found, as [`read_tree`] gives them; both
+/// empty where there is no tree.
 pub fn described() -> (Vec<Described>, Vec<String>) {
     match data_dir().map(|data| nodes_in(&data)) {
         Some(tree) if tree.is_dir() => read_tree(&tree),

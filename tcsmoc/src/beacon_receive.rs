@@ -85,11 +85,34 @@ pub fn contact_made(was: Contact, now: Contact) -> bool {
 pub struct BeaconReceive;
 
 impl BeaconReceive {
-    /// Start watching, and return nothing where the socket cannot be bound.
+    /// Starts watching, on a thread of its own, and returns nothing where
+    /// the socket cannot be bound.
     ///
     /// A ground station that cannot bind where beacons arrive is a ground
     /// station that will never hear one, which is said here rather than left
     /// to look like a spacecraft that is not beaconing.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui_weak`  - The window each pass's reading and the hold are shown
+    ///                in.
+    /// * `link`     - Where the beacons arrive.
+    /// * `schedule` - How often beacons are expected, and so when one is
+    ///                late.
+    /// * `decided`  - The contact flag each pass writes and the hold each
+    ///                beacon is handed to.
+    /// * `expected` - The digest of the configuration this MOC read, which
+    ///                each beacon's is compared with; `None` compares
+    ///                nothing.
+    /// * `ask`      - Asks the operator whether to continue when the beacons
+    ///                announce a configuration that differs; `None` only
+    ///                says so on the console.
+    /// * `contacts` - What to do as contact is lost and as it is made.
+    ///
+    /// # Returns
+    ///
+    /// The watch, or `None` if the beacon socket could not be bound, which
+    /// is said on standard error.
     pub fn new(
         ui_weak: Weak<MainWindow>,
         link: Link,
@@ -199,8 +222,13 @@ pub(crate) fn show_beacon(ui: &MainWindow, shown: &Shown) {
     ui.set_beacon_last_msg(SharedString::from(shown.message.clone()));
 }
 
-/// Put whether the station's data is held in the window, and why: the line
+/// Puts whether the station's data is held in the window, and why: the line
 /// beside the beacon, with the Path purged button that ends it.
+///
+/// # Arguments
+///
+/// * `ui`   - The window.
+/// * `held` - Why the data is held, or `None` when it is not.
 pub(crate) fn show_hold(ui: &MainWindow, held: Option<tcslib::moc::Hold>) {
     ui.set_data_held(held.is_some());
     ui.set_data_held_why(SharedString::from(

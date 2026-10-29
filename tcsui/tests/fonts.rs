@@ -12,7 +12,17 @@ fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("..")
 }
 
-/// Every `.slint` file in the repository, but for build output.
+/// Finds every `.slint` file under a directory, but for build output and
+/// hidden directories.
+///
+/// # Arguments
+///
+/// * `dir`   - The directory to search, recursively.
+/// * `found` - Where each file's path is added.
+///
+/// # Panics
+///
+/// If a directory or one of its entries cannot be read.
 fn slint_files(dir: &Path, found: &mut Vec<PathBuf>) {
     for entry in std::fs::read_dir(dir).expect("a directory") {
         let path = entry.expect("an entry").path();
@@ -142,6 +152,15 @@ fn every_text_box_and_button_is_set_in_the_one_size() {
 
 /// What a size written in a `.slint` file comes to, in points, where it is a
 /// length written out: `16px` or `12pt`.
+///
+/// # Arguments
+///
+/// * `size` - The size as written, a number followed by `px` or `pt`.
+///
+/// # Returns
+///
+/// The size in points, or `None` where it is not a length written out,
+/// such as `Fonts.window`.
 fn points(size: &str) -> Option<f32> {
     if let Some(px) = size.strip_suffix("px") {
         // Slint's logical pixel is a 96th of an inch, a point a 72nd.

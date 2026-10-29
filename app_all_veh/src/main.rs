@@ -23,6 +23,14 @@ use std::thread;
 
 use tcsapp::app::{complain, AppAllVeh, Errors};
 
+/// Carries payload data from the first interface to the second and MOC data
+/// from the second to the first, one thread per stream, until both end.
+///
+/// # Returns
+///
+/// Success when both streams ended as they should, failure when the
+/// interfaces are not this kind's, cannot be held twice, or either stream
+/// stopped on an error.
 fn main() -> ExitCode {
     let app = match AppAllVeh::inherited() {
         Ok(app) => app,
@@ -96,10 +104,20 @@ fn main() -> ExitCode {
     }
 }
 
-/// Carry one stream through, saying whether it ended the way it should.
+/// Carries one stream through, saying whether it ended the way it should.
 ///
-/// `what` is what the stream is called, for the complaint: a program with two
-/// of these has to say which of them stopped.
+/// # Arguments
+///
+/// * `what`   - What the stream is called, for the complaint: a program with
+///              two of these has to say which of them stopped.
+/// * `read`   - Reads the next packet, or `None` when the interface has ended.
+/// * `write`  - Writes a packet on to the other interface.
+/// * `errors` - Where a complaint is written.
+///
+/// # Returns
+///
+/// `true` when the interface ended, `false` when a packet could not be read
+/// or passed on (the complaint has then been made).
 fn carry(
     what: &str,
     mut read: impl FnMut() -> io::Result<Option<Vec<u8>>>,

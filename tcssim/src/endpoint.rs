@@ -52,6 +52,22 @@ pub fn payload_config_from(
 /// Apart from the function above so that every test of the pacing, the
 /// faults and the addresses goes on saying nothing about thermal masses:
 /// what they are about has not changed.
+///
+/// # Arguments
+///
+/// * `dh`      - The data handler, from the tcspecial configuration.
+/// * `sim`     - Its settings as the simulator file settled them.
+/// * `thermal` - The thermal mass it is attached to, if any.
+///
+/// # Returns
+///
+/// The configuration the simulated payload runs on.
+///
+/// # Errors
+///
+/// A message naming the handler if it is of a kind the simulator cannot
+/// stand in for (see `tcslibgs::simulable`), or its packet size does not
+/// fit in 32 bits.
 pub fn payload_config_attached(
     dh: &DHConfig,
     sim: &ResolvedSim,
@@ -228,7 +244,15 @@ pub fn payload_config_attached(
     })
 }
 
-/// How a data handler's endpoint reads in its panel.
+/// Describes a data handler's endpoint as it reads in its panel.
+///
+/// # Arguments
+///
+/// * `endpoint` - The handler's endpoint.
+///
+/// # Returns
+///
+/// One line: the kind of endpoint and where it is.
 pub fn endpoint_description(endpoint: &EndpointConfig) -> String {
     match endpoint {
         EndpointConfig::Network(net) => {
@@ -294,6 +318,17 @@ mod tests {
         StopBits,
     };
 
+    /// Makes simulator settings attached to nothing, with no faults.
+    ///
+    /// # Arguments
+    ///
+    /// * `packet_interval_ms`  - The time between packets, in ms.
+    /// * `segment_interval_ms` - The time between segments, in ms.
+    /// * `segment_size`        - The bytes in a segment.
+    ///
+    /// # Returns
+    ///
+    /// The settings.
     fn sim(
         packet_interval_ms: u32,
         segment_interval_ms: u32,

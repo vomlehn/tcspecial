@@ -40,6 +40,13 @@ members = [
 # code and not of the 27,000 lines it generated from the XTCE schema.
 exclude = ["vendor/tcs-xtce/rust"]
 
+# Each argument's description in a doc comment, continuation lines and all,
+# starts in one column, as the TCS projects' documentation rule has it.
+# That is deeper than the two spaces this lint asks of a list item's
+# continuation, so it is allowed. Every member takes these lints.
+[workspace.lints.clippy]
+doc_overindented_list_items = "allow"
+
 [workspace.package]
 version = "0.1.0"
 edition = "2021"

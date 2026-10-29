@@ -85,7 +85,17 @@ pub struct ThermalMass {
 }
 
 impl ThermalMass {
-    /// A mass as its file states it, at the environment with nothing on.
+    /// Makes a mass as its file states it, at the environment with nothing
+    /// on.
+    ///
+    /// # Arguments
+    ///
+    /// * `mass` - The mass the simulator file declares.
+    /// * `now`  - The time its temperature is at.
+    ///
+    /// # Returns
+    ///
+    /// The mass.
     pub fn new(mass: &ResolvedMass, now: Instant) -> ThermalMass {
         ThermalMass {
             name: mass.name.clone(),
@@ -110,11 +120,17 @@ impl ThermalMass {
         state.temperature
     }
 
-    /// Tell it that this heater is on, or off.
+    /// Tells it that a heater is on, or off.
     ///
     /// The mass is stepped first, so the rate that was in force applies up to
     /// this moment and the new one from here: a heater switched on halfway
     /// through a second warms the mass for half of it.
+    ///
+    /// # Arguments
+    ///
+    /// * `which` - The heater's name; the same name twice is one heater.
+    /// * `rate`  - How hard it warms the mass while on, in kelvin a second.
+    /// * `on`    - Whether it is now on.
     pub fn heater(&self, which: &str, rate: f64, on: bool) {
         let mut state = self.held();
         self.step(&mut state, Instant::now());
@@ -144,11 +160,17 @@ impl ThermalMass {
         self.state.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    /// Bring the temperature up to `now`.
+    /// Brings the temperature up to a time.
     ///
     /// The closed form of the module comment, which is exact for the heat
     /// that was in force over the interval -- and it was in force over all of
     /// it, because every change of it steps the mass first.
+    ///
+    /// # Arguments
+    ///
+    /// * `state` - The mass's state, held locked by the caller.
+    /// * `now`   - The time to bring it to; one no later than its own
+    ///             changes nothing.
     fn step(&self, state: &mut State, now: Instant) {
         let seconds = now.saturating_duration_since(state.at).as_secs_f64();
         state.at = now;
@@ -182,7 +204,7 @@ pub enum Thermal {
     Heats { mass: Arc<ThermalMass>, rate: f64 },
 }
 
-/// Tell the mass what the vehicle just drove this heater to, if it is one.
+/// Tells the mass what the vehicle just drove this heater to, if it is one.
 ///
 /// What arrives at a heater is the thermostat's decision, which a hysteresis
 /// node sends as the text `1` or `0`: the value to drive a set of discrete
@@ -193,6 +215,13 @@ pub enum Thermal {
 ///
 /// Nothing at all for a payload that heats nothing, which is every payload
 /// but a heater: the caller does not have to ask first.
+///
+/// # Arguments
+///
+/// * `thermal` - What the payload is to a thermal mass, if anything.
+/// * `which`   - The payload's name, which names the heater.
+/// * `data`    - What the vehicle sent it: `1` for on, `0` for off,
+///               surrounding white space ignored.
 pub fn driven(thermal: &Option<Thermal>, which: &str, data: &[u8]) {
     let Some(Thermal::Heats { mass, rate }) = thermal else {
         return;
@@ -209,7 +238,8 @@ pub fn driven(thermal: &Option<Thermal>, which: &str, data: &[u8]) {
     }
 }
 
-/// A temperature as the bytes a sensor of this encoding would send.
+/// Encodes a temperature as the bytes a sensor of this encoding would
+/// send.
 ///
 /// The inverse of what `to_kelvin` does: it reads counts and answers
 /// `counts * scale + offset`, so this takes the temperature back to counts
@@ -225,6 +255,16 @@ pub fn driven(thermal: &Option<Thermal>, which: &str, data: &[u8]) {
 /// the other end of its range, which is a reading an operator would act on; a
 /// clamped one is a sensor at the end of its range, which is what a real part
 /// does.
+///
+/// # Arguments
+///
+/// * `reading` - The conversion the readings go to, which gives the
+///               format, scale and offset.
+/// * `kelvin`  - The temperature, in kelvin.
+///
+/// # Returns
+///
+/// The sensor's bytes, two or three of them as the format says.
 pub fn encode(reading: &ToKelvinParams, kelvin: f64) -> Vec<u8> {
     let counts = ((kelvin - reading.offset) / reading.scale).round();
     match reading.format {
@@ -256,6 +296,10 @@ mod tests {
 
     /// The example's mass: ten kelvin below a setpoint of 293.15, losing the
     /// difference with a fifty second constant.
+    ///
+    /// # Returns
+    ///
+    /// The mass, named `cabin`.
     fn cabin() -> ResolvedMass {
         ResolvedMass {
             name: "cabin".to_string(),
@@ -444,6 +488,14 @@ mod tests {
     /// the vehicle drives is the end that has to be findable, so the test has
     /// to name one that is free rather than take whatever a socket of its own
     /// was given.
+    ///
+    /// # Returns
+    ///
+    /// A loopback UDP port that was free a moment ago.
+    ///
+    /// # Panics
+    ///
+    /// If no socket can be bound.
     fn a_free_port() -> u16 {
         let socket =
             std::net::UdpSocket::bind("127.0.0.1:0").expect("a socket");
@@ -452,11 +504,22 @@ mod tests {
         port
     }
 
-    /// One simulated payload of the thermostat example, attached to the mass.
+    /// Configures a simulated payload of the thermostat example, attached to
+    /// the mass.
     ///
-    /// `every` is the packet interval: for a sensor how often it reports, and
-    /// for a heater -- which sends nothing -- how often it looks for what the
-    /// vehicle decided.
+    /// # Arguments
+    ///
+    /// * `name`    - The payload's name.
+    /// * `at`      - The loopback UDP port it uses.
+    /// * `bytes`   - Its packet size, and its segment size too.
+    /// * `every`   - The packet interval in ms: for a sensor how often it
+    ///               reports, and for a heater -- which sends nothing -- how
+    ///               often it looks for what the vehicle decided.
+    /// * `thermal` - What it is to the mass.
+    ///
+    /// # Returns
+    ///
+    /// Its configuration, sending from the start.
     fn attached(
         name: &str,
         at: u16,
@@ -494,6 +557,16 @@ mod tests {
     /// tcspecial's and this is the other program: counts times the scale,
     /// plus the offset. Its agreement with [`encode`] is what
     /// `a_temperature_encodes_as_the_bytes_the_vehicle_reads_back` holds.
+    ///
+    /// # Arguments
+    ///
+    /// * `reading` - The sensor's conversion.
+    /// * `bytes`   - What it sent.
+    ///
+    /// # Returns
+    ///
+    /// The temperature in kelvin, or `None` if there are too few bytes for
+    /// the format or the format is not one the example's sensors use.
     fn kelvin_of(reading: &ToKelvinParams, bytes: &[u8]) -> Option<f64> {
         let counts = match reading.format {
             Format::I16Be if bytes.len() >= 2 => {
@@ -514,6 +587,20 @@ mod tests {
     /// arithmetic is tested where it lives. Here they stand in for the
     /// vehicle, so that what is tested is the loop: the mass, the encoding,
     /// the two links and the heaters.
+    ///
+    /// # Arguments
+    ///
+    /// * `readings` - The sensors' latest temperatures, in kelvin.
+    /// * `heating`  - Whether the heaters are on now, which is kept inside
+    ///                the band.
+    ///
+    /// # Returns
+    ///
+    /// Whether the heaters are to be on.
+    ///
+    /// # Panics
+    ///
+    /// If a reading is NaN, or there are none.
     fn decide(readings: &[f64], heating: bool) -> bool {
         let mut sorted = readings.to_vec();
         sorted.sort_by(|a, b| a.partial_cmp(b).expect("no NaN temperatures"));

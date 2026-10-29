@@ -37,6 +37,12 @@ use crate::payload::{
 /// is not there is reported: a send to a port nothing is bound to comes back
 /// refused instead of being quietly dropped, and the failed sends are what
 /// the window shows as nothing moving.
+///
+/// # Arguments
+///
+/// * `config`  - The payload's configuration.
+/// * `running` - Cleared to stop it; the function returns soon after.
+/// * `stats`   - Where it counts what it sends and receives.
 pub fn run_udp_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
@@ -181,13 +187,20 @@ pub fn run_udp_node(
     }
 }
 
-/// Stand in for a payload the vehicle drives and never reads.
+/// Stands in for a payload the vehicle drives and never reads.
 ///
 /// The loop is the ordinary one with the sending taken out: whatever the
 /// vehicle writes is counted and acted on, and nothing goes the other way.
 /// The pacing is still the file's, and for a device that sends nothing it
 /// means the one thing left -- how often it looks for what the vehicle
 /// decided.
+///
+/// # Arguments
+///
+/// * `config`  - The payload's configuration.
+/// * `running` - Cleared to stop it; the function returns soon after.
+/// * `stats`   - Where it counts what it sends and receives.
+/// * `at`      - The address to bind, which the vehicle's end sends to.
 fn run_driven_udp_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
@@ -405,7 +418,20 @@ mod tests {
         answering_from(at, faults, None, None)
     }
 
-    /// A device at the handler's address, answering from the socket given.
+    /// Makes a device at the handler's address, answering from the socket
+    /// given, sending twelve-byte packets every 20 ms.
+    ///
+    /// # Arguments
+    ///
+    /// * `at`          - The handler's address.
+    /// * `faults`      - The faults it is to inject.
+    /// * `own_address` - The address it sends from, if not one of its own
+    ///                   choosing.
+    /// * `own_port`    - The port it sends from, likewise.
+    ///
+    /// # Returns
+    ///
+    /// The device, not yet started.
     fn answering_from(
         at: std::net::SocketAddr,
         faults: Faults,
@@ -436,7 +462,19 @@ mod tests {
         })
     }
 
-    /// A handler's end of the link, waiting with a deadline.
+    /// Makes a handler's end of the link, waiting with a deadline.
+    ///
+    /// # Arguments
+    ///
+    /// * `wait` - How long a read waits before it fails.
+    ///
+    /// # Returns
+    ///
+    /// The socket, bound on loopback, and its address.
+    ///
+    /// # Panics
+    ///
+    /// If it cannot be bound or given the timeout.
     fn handler_end(wait: Duration) -> (UdpSocket, std::net::SocketAddr) {
         let handler =
             UdpSocket::bind("127.0.0.1:0").expect("a socket for the handler");

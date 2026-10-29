@@ -37,11 +37,17 @@ use crate::payload::{
 };
 use crate::pty::SimulatedNode;
 
-/// Run a simulated device that is a sensor's sample buffer.
+/// Runs a simulated device that is a sensor's sample buffer.
 ///
 /// The ordinary loop with the reading taken out: a sample set every packet
 /// interval, in as many segments as the file asked for, for as long as the
 /// device is running.
+///
+/// # Arguments
+///
+/// * `config`  - The payload's configuration.
+/// * `running` - Cleared to stop it; the function returns soon after.
+/// * `stats`   - Where it counts what it sends and receives.
 pub fn run_iio_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
@@ -138,7 +144,16 @@ mod tests {
     use std::time::Duration;
     use tcslibgs::Faults;
 
-    /// A sensor whose buffer the handler would open at `path`.
+    /// Configures a sensor whose buffer the handler would open at a path,
+    /// sending eight bytes every 20 ms.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Where the handler opens it.
+    ///
+    /// # Returns
+    ///
+    /// Its configuration.
     fn sensor_at(path: &str) -> PayloadConfig {
         PayloadConfig {
             thermal: None,

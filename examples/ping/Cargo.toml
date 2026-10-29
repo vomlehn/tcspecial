@@ -14,3 +14,6 @@ Python to the Rust it is written after"""
 [dev-dependencies]
 tcslibgs = { path = "../../tcslibgs" }
 tempfile = "3"
+
+[lints]
+workspace = true

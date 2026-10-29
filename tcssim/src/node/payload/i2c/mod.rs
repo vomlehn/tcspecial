@@ -82,10 +82,26 @@ struct SimulatedBus {
 }
 
 impl SimulatedBus {
-    /// Find a stub bus, point `path` at it, and address the chip.
+    /// Finds a stub bus, points the configured path at it, addresses the
+    /// chip and proves the chip answers.
     ///
-    /// `what` is the device's name, so that what the stand-in says of itself
-    /// says which device it belongs to.
+    /// # Arguments
+    ///
+    /// * `what`    - The device's name, so that what the stand-in says of
+    ///               itself says which device it belongs to.
+    /// * `path`    - The bus a handler was told to open; the stub itself
+    ///               needs no link.
+    /// * `address` - The chip's address on the bus.
+    ///
+    /// # Returns
+    ///
+    /// The bus, open and addressed to the chip.
+    ///
+    /// # Errors
+    ///
+    /// A message saying what to do if no stub is loaded, the path cannot be
+    /// made to lead to it, it cannot be opened, or it has no chip at
+    /// `address`.
     fn open(what: &str, path: &str, address: u16) -> Result<Self, String> {
         let stub = find_stub(Path::new(I2C_ADAPTERS))?;
         let named = PathBuf::from(path);
@@ -138,12 +154,22 @@ impl SimulatedBus {
         Ok(simulated)
     }
 
-    /// Write one byte to the data register and require it to be taken.
+    /// Writes one byte to the data register and requires it to be taken.
     ///
     /// `ENXIO` here means the stub has no chip at this address: it was loaded
     /// with others, or with none. The remedy is in the message, because
     /// "no such device or address" on a bus that is plainly there explains
     /// nothing by itself.
+    ///
+    /// # Arguments
+    ///
+    /// * `stub`    - The stub's device node, for the message.
+    /// * `address` - The chip's address, for the message.
+    ///
+    /// # Errors
+    ///
+    /// A message giving the `modprobe` that loads the stub with this chip, if
+    /// the write is refused.
     fn prove_a_chip_answers(
         &self,
         stub: &str,
@@ -175,11 +201,26 @@ impl Drop for SimulatedBus {
     }
 }
 
-/// The stub adapter's device node, or how to make one.
+/// Finds the stub adapter's device node, or says how to make one.
 ///
 /// Found by name rather than by number: the kernel numbers adapters as it
 /// finds them, so the stub is `/dev/i2c-13` on one machine and `/dev/i2c-3`
 /// on the next, and a tcspecial configuration cannot know which.
+///
+/// # Arguments
+///
+/// * `adapters` - Where the kernel lists its I2C adapters, each a directory
+///                with a `name` file; given so that a test can hand over a
+///                tree of its own.
+///
+/// # Returns
+///
+/// The lowest-numbered stub's node, such as `/dev/i2c-13`.
+///
+/// # Errors
+///
+/// A message if `adapters` cannot be read, or saying how to load the stub
+/// if none is there.
 fn find_stub(adapters: &Path) -> Result<String, String> {
     let entries = std::fs::read_dir(adapters)
         .map_err(|e| format!("{} cannot be read: {e}", adapters.display()))?;
@@ -216,7 +257,16 @@ fn find_stub(adapters: &Path) -> Result<String, String> {
     }
 }
 
-/// One SMBus block write to the data register.
+/// Makes one SMBus block write to the data register.
+///
+/// # Arguments
+///
+/// * `fd`    - The bus, addressed to the chip.
+/// * `bytes` - The block: its first byte the length, then the data.
+///
+/// # Errors
+///
+/// The system's error if the transfer fails.
 fn block_write(fd: RawFd, bytes: &mut SmbusData) -> std::io::Result<()> {
     let mut transfer = SmbusTransfer {
         read_write: I2C_SMBUS_WRITE,
@@ -233,8 +283,18 @@ fn block_write(fd: RawFd, bytes: &mut SmbusData) -> std::io::Result<()> {
     Ok(())
 }
 
-/// One SMBus block read of the data register's bank: what is in it now,
-/// `I2C_SMBUS_BLOCK_MAX` bytes of it.
+/// Makes one SMBus block read of the data register's bank: what is in it
+/// now, `I2C_SMBUS_BLOCK_MAX` bytes of it.
+///
+/// # Arguments
+///
+/// * `fd`    - The bus, addressed to the chip.
+/// * `bytes` - Filled with the block: its first byte the length, then the
+///             data.
+///
+/// # Errors
+///
+/// The system's error if the transfer fails.
 fn block_read(fd: RawFd, bytes: &mut SmbusData) -> std::io::Result<()> {
     bytes.block[0] = I2C_SMBUS_BLOCK_MAX as u8;
     let mut transfer = SmbusTransfer {
@@ -264,6 +324,11 @@ struct Watched {
 }
 
 impl Watched {
+    /// Starts watching a bank not yet looked at.
+    ///
+    /// # Returns
+    ///
+    /// The watch, knowing nothing of the bank.
     fn new() -> Watched {
         Watched {
             held: SmbusData {
@@ -273,8 +338,18 @@ impl Watched {
         }
     }
 
-    /// Look at the bank: what it holds now, and whether that is a change
+    /// Looks at the bank: what it holds now, and whether that is a change
     /// this end did not make.
+    ///
+    /// # Arguments
+    ///
+    /// * `fd` - The bus, addressed to the chip.
+    ///
+    /// # Returns
+    ///
+    /// What the bank holds, if it changed since this end last looked or
+    /// wrote; `None` if it did not, on the first look, or if it cannot be
+    /// read.
     fn changed(&mut self, fd: RawFd) -> Option<SmbusData> {
         let mut now = SmbusData {
             block: [0u8; I2C_SMBUS_BLOCK_MAX + 2],
@@ -292,7 +367,7 @@ impl Watched {
     }
 }
 
-/// Run a simulated device on an I2C bus.
+/// Runs a simulated device on an I2C bus.
 ///
 /// As every other kind: a packet every packet interval, in segments, from
 /// Start until Stop. A segment here is one SMBus block transfer into the
@@ -300,6 +375,12 @@ impl Watched {
 /// [`I2C_SMBUS_BLOCK_MAX`] and the segment size is capped at it rather than
 /// refused -- a packet size is a property of the device, and a bus that
 /// carries thirty-two bytes at a time is a property of SMBus.
+///
+/// # Arguments
+///
+/// * `config`  - The payload's configuration.
+/// * `running` - Cleared to stop it; the function returns soon after.
+/// * `stats`   - Where it counts what it sends and receives.
 pub fn run_i2c_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
@@ -396,8 +477,21 @@ pub fn run_i2c_node(
 mod tests {
     use super::*;
 
-    /// A tree of adapters as the kernel lays them out, for the part of this
-    /// that can be tested without the module loaded.
+    /// Makes a tree of adapters as the kernel lays them out, for the part of
+    /// this that can be tested without the module loaded.
+    ///
+    /// # Arguments
+    ///
+    /// * `named` - Each adapter's directory name and what its `name` file
+    ///             holds.
+    ///
+    /// # Returns
+    ///
+    /// The temporary directory holding them, removed when dropped.
+    ///
+    /// # Panics
+    ///
+    /// If the tree cannot be made.
     fn adapters(named: &[(&str, &str)]) -> tempfile::TempDir {
         let root = tempfile::tempdir().expect("a directory");
         for (adapter, name) in named {

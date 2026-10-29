@@ -45,7 +45,12 @@ impl Standing {
         );
     }
 
-    /// It could not be made, or it has stopped, and why.
+    /// Records that the stand-in could not be made, or has stopped, and why.
+    ///
+    /// # Arguments
+    ///
+    /// * `why` - Why, as the harness is to be told it; only the first
+    ///           failure's reason is kept.
     pub fn failed(&self, why: &str) {
         if let Ok(mut reason) = self.reason.lock() {
             if reason.is_none() {
@@ -59,6 +64,12 @@ impl Standing {
         self.state.load(Ordering::SeqCst)
     }
 
+    /// Returns why the stand-in failed.
+    ///
+    /// # Returns
+    ///
+    /// The reason recorded by [`Standing::failed`], or `Reason::EMPTY` if
+    /// there is none or the lock is poisoned.
     fn reason(&self) -> Reason {
         self.reason
             .lock()
@@ -75,8 +86,13 @@ pub struct Readiness {
 }
 
 impl Readiness {
-    /// The state now: failed if any stand-in failed, ready if every one is
-    /// made, and starting otherwise.
+    /// Works out the state now: failed if any stand-in failed, ready if
+    /// every one is made, and starting otherwise.
+    ///
+    /// # Returns
+    ///
+    /// The state, and the first failed stand-in's reason, or
+    /// `Reason::EMPTY` if none failed.
     fn now(&self) -> (State, Reason) {
         if let Some(failed) = self.payloads.iter().find(|p| p.state() == FAILED)
         {
@@ -90,8 +106,20 @@ impl Readiness {
     }
 }
 
-/// Bind the readiness socket at `at`, or say why it cannot be: an address
+/// Binds the readiness socket, or says why it cannot be: an address
 /// already taken is most likely a simulator already running.
+///
+/// # Arguments
+///
+/// * `at` - The address to bind, the simulator file's `tcssim.ready`.
+///
+/// # Returns
+///
+/// The bound socket.
+///
+/// # Errors
+///
+/// A message for the user if the address is taken or cannot be bound.
 pub fn bind(at: SocketAddr) -> Result<UdpSocket, String> {
     UdpSocket::bind(at).map_err(|e| {
         if e.kind() == std::io::ErrorKind::AddrInUse {
@@ -106,12 +134,21 @@ pub fn bind(at: SocketAddr) -> Result<UdpSocket, String> {
     })
 }
 
-/// Answer every request on `socket` with the state now, for as long as the
-/// process runs.
+/// Answers every request on a socket with the state now, for as long as
+/// the process runs, from a thread of its own.
 ///
 /// The loop allocates nothing: the request and the answer are read and
 /// written in buffers made before it, and the state is copied out of fixed
 /// storage.
+///
+/// # Arguments
+///
+/// * `socket`    - The readiness socket, from [`bind`].
+/// * `readiness` - The payloads' standing and the set-up it answers with.
+///
+/// # Panics
+///
+/// If the thread cannot be started.
 pub fn serve(socket: UdpSocket, readiness: Arc<Readiness>) {
     std::thread::Builder::new()
         .name("readiness".to_string())
@@ -145,6 +182,15 @@ mod tests {
     use tcslibgs::config_digest::ConfigDigest;
     use tcslibgs::simulate::Mode;
 
+    /// Makes a readiness for payloads none of which is made yet.
+    ///
+    /// # Arguments
+    ///
+    /// * `n` - How many payloads.
+    ///
+    /// # Returns
+    ///
+    /// The readiness, set up for all-zero digests and `Mode::All`.
     fn readiness(n: usize) -> Readiness {
         Readiness {
             payloads: (0..n).map(|_| Arc::new(Standing::default())).collect(),

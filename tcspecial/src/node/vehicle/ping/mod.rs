@@ -51,12 +51,27 @@ impl Answers {
         self.give_at(what, data, now)
     }
 
-    /// Answer what arrived, with this time: [`Answers::give`] with the clock
-    /// stated, so that what an answer says can be tested.
+    /// Answers what arrived, with this time: [`Answers::give`] with the
+    /// clock stated, so that what an answer says can be tested.
     ///
     /// What is not a ping is refused and nothing is answered: an answer to it
     /// would be a message the ground could not read as one, which tells it
     /// less than the refusal, which is logged aboard.
+    ///
+    /// # Arguments
+    ///
+    /// * `what` - The node's name, for the complaint about what is not a
+    ///            ping.
+    /// * `data` - What arrived.
+    /// * `now`  - The time to answer with, since the Unix epoch.
+    ///
+    /// # Returns
+    ///
+    /// Nothing, once the answer is queued.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the node if `data` is not a ping.
     pub fn give_at(
         &mut self,
         what: &str,
@@ -74,10 +89,24 @@ impl Answers {
         !self.waiting.is_empty()
     }
 
-    /// Hand on the oldest answer, or nothing where there is none.
+    /// Hands on the oldest answer, or nothing where there is none.
     ///
     /// An answer that will not fit is reported and kept, as a `null` node
     /// keeps a datum: part of an answer is not a shorter answer.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`   - The node's name, for the complaint.
+    /// * `buffer` - Where the answer is copied.
+    ///
+    /// # Returns
+    ///
+    /// The answer's length in bytes, or 0 if none was waiting.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the node if the answer is longer than `buffer`;
+    /// the answer is kept.
     pub fn take(
         &mut self,
         what: &str,

@@ -136,7 +136,24 @@ pub struct HdlcEndpoint {
 }
 
 impl HdlcEndpoint {
-    /// Set the line up and bind a socket for its frames.
+    /// Sets the line up and binds a socket for its frames.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`   - The handler this endpoint belongs to, as the
+    ///              configuration names it, for what a complaint says.
+    /// * `config` - The interface and the wiring and framing to put on it.
+    ///
+    /// # Returns
+    ///
+    /// The endpoint, its socket bound to the interface.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Config` if there is no such interface or its name is
+    /// not one an interface can have; `TcsError::Endpoint` if a socket
+    /// cannot be opened or bound, if the card refuses the wiring or the
+    /// framing, or if what it reads back is not what it was given.
     pub fn new(what: &str, config: &HdlcConfig) -> TcsResult<Self> {
         let index = interface_index(what, &config.interface)?;
 
@@ -199,6 +216,14 @@ impl HdlcEndpoint {
     /// The descriptor is duplicated rather than the socket opened again: the
     /// line is set up once, and setting it up twice would be two programs
     /// configuring one port.
+    ///
+    /// # Returns
+    ///
+    /// The second endpoint, on a duplicate of this one's descriptor.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Io` if the descriptor cannot be duplicated.
     pub fn try_clone(&self) -> TcsResult<Self> {
         Ok(HdlcEndpoint {
             what: self.what.clone(),
@@ -209,7 +234,21 @@ impl HdlcEndpoint {
     }
 }
 
-/// Which interface this is, or why there is none.
+/// Finds which interface this is, or why there is none.
+///
+/// # Arguments
+///
+/// * `what`      - The handler, for what a complaint says.
+/// * `interface` - The interface's name, such as `hdlc0`.
+///
+/// # Returns
+///
+/// The interface's index.
+///
+/// # Errors
+///
+/// `TcsError::Config` if the name holds a NUL or this host has no
+/// interface by that name.
 fn interface_index(what: &str, interface: &str) -> TcsResult<libc::c_uint> {
     let name = std::ffi::CString::new(interface).map_err(|_| {
         TcsError::Config(format!(
@@ -232,7 +271,25 @@ fn interface_index(what: &str, interface: &str) -> TcsResult<libc::c_uint> {
     Ok(index)
 }
 
-/// The request for one of the four calls, with the name filled in.
+/// Builds the request for one of the four calls, with the name filled in.
+///
+/// # Arguments
+///
+/// * `what`      - The handler, for what a complaint says.
+/// * `interface` - The interface's name, copied into the request.
+/// * `type_`     - The `IF_*` value saying what `settings` points at.
+/// * `settings`  - The structure the kernel reads or fills, which must
+///                 outlive every call made with the request.
+/// * `size`      - That structure's size in bytes.
+///
+/// # Returns
+///
+/// The request, its name NUL terminated.
+///
+/// # Errors
+///
+/// `TcsError::Config` if the name does not fit in `IF_NAMESIZE` bytes
+/// with its terminator.
 fn request_for(
     what: &str,
     interface: &str,
@@ -261,7 +318,15 @@ fn request_for(
     Ok(request)
 }
 
-/// Which `IF_IFACE_*` this standard is.
+/// Says which `IF_IFACE_*` this standard is.
+///
+/// # Arguments
+///
+/// * `standard` - The line's electrical standard.
+///
+/// # Returns
+///
+/// The `IF_IFACE_*` value naming it.
 fn iface_of(standard: Standard) -> libc::c_uint {
     match standard {
         Standard::V35 => IF_IFACE_V35,
@@ -271,7 +336,16 @@ fn iface_of(standard: Standard) -> libc::c_uint {
     }
 }
 
-/// The port's wiring, as the kernel numbers it.
+/// Gives the port's wiring, as the kernel numbers it.
+///
+/// # Arguments
+///
+/// * `config` - The line's configuration.
+///
+/// # Returns
+///
+/// The clock type, its rate (nought where the far end drives it) and
+/// the loopback, as `sync_serial_settings` holds them.
 fn wiring_of(config: &HdlcConfig) -> SyncSerialSettings {
     SyncSerialSettings {
         // Nought where the far end drives the clock, which is what the kernel
@@ -288,7 +362,15 @@ fn wiring_of(config: &HdlcConfig) -> SyncSerialSettings {
     }
 }
 
-/// What the bits mean, as the kernel numbers it.
+/// Gives what the bits mean, as the kernel numbers it.
+///
+/// # Arguments
+///
+/// * `config` - The line's configuration.
+///
+/// # Returns
+///
+/// The encoding and the frame check, as `raw_hdlc_proto` holds them.
 fn framing_of(config: &HdlcConfig) -> RawHdlcProto {
     RawHdlcProto {
         encoding: match config.encoding {
@@ -313,7 +395,18 @@ fn framing_of(config: &HdlcConfig) -> RawHdlcProto {
     }
 }
 
-/// Set the port's wiring.
+/// Sets the port's wiring.
+///
+/// # Arguments
+///
+/// * `what`   - The handler, for what a complaint says.
+/// * `asking` - Any socket, through which the ioctl is made.
+/// * `config` - The interface, its standard and the wiring to set.
+///
+/// # Errors
+///
+/// `TcsError::Config` if the interface's name is too long;
+/// `TcsError::Endpoint` if the card refuses the wiring.
 fn set_interface(
     what: &str,
     asking: RawFd,
@@ -344,7 +437,18 @@ fn set_interface(
     Ok(())
 }
 
-/// Set what the bits mean.
+/// Sets what the bits mean.
+///
+/// # Arguments
+///
+/// * `what`   - The handler, for what a complaint says.
+/// * `asking` - Any socket, through which the ioctl is made.
+/// * `config` - The interface and the encoding and frame check to set.
+///
+/// # Errors
+///
+/// `TcsError::Config` if the interface's name is too long;
+/// `TcsError::Endpoint` if the card refuses the framing.
 fn set_protocol(
     what: &str,
     asking: RawFd,
@@ -373,12 +477,25 @@ fn set_protocol(
     Ok(())
 }
 
-/// Read both halves back, and refuse a line that kept less than it was given.
+/// Reads both halves back, and refuses a line that kept less than it was
+/// given.
 ///
 /// The rule a serial line already follows, for the same reason: a port may
 /// take the call and keep something else, and a line whose frame check is not
 /// the one the file asked for is a line checking nothing while the
 /// configuration says it checks every frame.
+///
+/// # Arguments
+///
+/// * `what`   - The handler, for what a complaint says.
+/// * `asking` - Any socket, through which the ioctls are made.
+/// * `config` - The interface and the wiring and framing it should have.
+///
+/// # Errors
+///
+/// `TcsError::Config` if the interface's name is too long;
+/// `TcsError::Endpoint` if either half cannot be read back or differs
+/// from what the configuration asked for.
 fn read_back(what: &str, asking: RawFd, config: &HdlcConfig) -> TcsResult<()> {
     let mut wiring = SyncSerialSettings::default();
     let mut request = request_for(
@@ -436,7 +553,18 @@ fn read_back(what: &str, asking: RawFd, config: &HdlcConfig) -> TcsResult<()> {
     Ok(())
 }
 
-/// Bind the packet socket to the one interface.
+/// Binds the packet socket to the one interface.
+///
+/// # Arguments
+///
+/// * `what`      - The handler, for what a complaint says.
+/// * `socket`    - The `AF_PACKET` socket to bind.
+/// * `interface` - The interface's name, for what a complaint says.
+/// * `index`     - The interface's index, which the address carries.
+///
+/// # Errors
+///
+/// `TcsError::Endpoint` if the bind fails.
 fn bind_to_interface(
     what: &str,
     socket: RawFd,
@@ -552,6 +680,12 @@ impl EndpointWritable for HdlcEndpoint {
 mod tests {
     use super::*;
 
+    /// Gives a configuration for `hdlc0` with every setting at its
+    /// simplest.
+    ///
+    /// # Returns
+    ///
+    /// A V.35 line, clocked from the far end, NRZ, with no frame check.
     fn config() -> HdlcConfig {
         HdlcConfig {
             interface: "hdlc0".to_string(),

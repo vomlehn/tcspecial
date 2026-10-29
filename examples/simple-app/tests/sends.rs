@@ -23,7 +23,12 @@ fn app() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("lorem_pl.py")
 }
 
-/// Whether there is a Python 3 to run it with.
+/// Whether there is a Python 3 to run it with, saying so on stderr where
+/// there is not.
+///
+/// # Returns
+///
+/// `true` if `python3` can be run.
 fn python3() -> bool {
     let there = Command::new("python3").arg("--version").output().is_ok();
     if !there {

@@ -83,13 +83,26 @@ enum Transfers {
 }
 
 impl Transfers {
-    /// What an adapter advertising `funcs` can do, or why it is of no use.
-    ///
-    /// `on` is the handler and its bus, as [`I2cEndpoint::new`] builds it, and
-    /// is only ever said back in the complaint.
+    /// Says what an adapter advertising `funcs` can do, or why it is of no
+    /// use.
     ///
     /// Raw is preferred where it is offered: it is what a real device expects,
     /// and it carries a packet of any length in one transfer.
+    ///
+    /// # Arguments
+    ///
+    /// * `funcs` - What the adapter answered to `I2C_FUNCS`.
+    /// * `on`    - The handler and its bus, as [`I2cEndpoint::new`] builds
+    ///             it, only ever said back in the complaint.
+    ///
+    /// # Returns
+    ///
+    /// How transfers to the device are to be made.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Endpoint` if the adapter can do neither raw I2C nor SMBus
+    /// block transfers.
     fn of(funcs: libc::c_ulong, on: &str) -> TcsResult<Self> {
         if funcs & I2C_FUNC_I2C != 0 {
             return Ok(Transfers::Raw);
@@ -137,13 +150,30 @@ pub struct I2cEndpoint {
 }
 
 impl I2cEndpoint {
-    /// Open the bus and point it at the device.
+    /// Opens the bus and points it at the device.
     ///
     /// The order matters: ten-bit addressing is set before the address, since
     /// whether an address is in range at all depends on it. The address the
     /// configuration carries has already been checked against what the
     /// specification reserves -- see `node::payload::i2c` -- so what can
     /// still go wrong here is the bus, not the number.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`   - The node's name, for the complaints.
+    /// * `config` - The node's settings: the bus, the device's address, and
+    ///              whether it takes ten-bit addressing and the packet error
+    ///              check.
+    ///
+    /// # Returns
+    ///
+    /// The endpoint, the bus open and addressed to the device.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Endpoint`, naming the node and the bus, if the bus cannot
+    /// be opened, will not take one of the settings, will not say what it
+    /// can do, or can do no transfer a device link can use.
     pub fn new(what: &str, config: &I2cConfig) -> TcsResult<Self> {
         // The handler's name and its bus together, because every complaint
         // below is about both: which device could not be reached, and the
@@ -195,10 +225,24 @@ impl I2cEndpoint {
         })
     }
 
-    /// One SMBus block transfer to or from [`DATA_REGISTER`].
+    /// Makes one SMBus block transfer to or from [`DATA_REGISTER`].
     ///
-    /// Returns the bytes moved. A block carries its own length, so a read says
-    /// how much there was and a write says how much to take.
+    /// A block carries its own length, so a read says how much there was
+    /// and a write says how much to take.
+    ///
+    /// # Arguments
+    ///
+    /// * `read_write` - `I2C_SMBUS_READ` or `I2C_SMBUS_WRITE`.
+    /// * `bytes`      - The block: its first byte is the length, the data
+    ///                  follow. Filled by a read, taken from by a write.
+    ///
+    /// # Returns
+    ///
+    /// The bytes moved, which is the block's first byte after the transfer.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Io` if the transfer fails.
     fn block(
         &mut self,
         read_write: u8,
@@ -223,12 +267,20 @@ impl I2cEndpoint {
         Ok(bytes.block[0] as usize)
     }
 
-    /// A second endpoint on the same open bus.
+    /// Makes a second endpoint on the same open bus.
     ///
     /// The addressing is a property of this description, so the duplicate
     /// carries it: a conduit pair reading and writing one device must both be
     /// pointed at that device, and a second open would have to be addressed
     /// again.
+    ///
+    /// # Returns
+    ///
+    /// The second endpoint.
+    ///
+    /// # Errors
+    ///
+    /// The I/O error if the descriptor cannot be duplicated.
     pub fn try_clone(&self) -> TcsResult<Self> {
         Ok(Self {
             bus: self.bus.try_clone()?,
@@ -239,12 +291,29 @@ impl I2cEndpoint {
     }
 }
 
-/// Make one request of the open bus, saying what was being asked for if it
+/// Makes one request of the open bus, saying what was being asked for if it
 /// fails.
 ///
 /// A file that is not an I2C bus answers `ENOTTY`, which on its own says
 /// nothing about what was attempted; a handler that opened the wrong node is
 /// better told that it is not a bus than left talking to it.
+///
+/// # Arguments
+///
+/// * `fd`      - The open bus.
+/// * `request` - The `ioctl` request, such as `I2C_SLAVE`.
+/// * `value`   - The integer it takes.
+/// * `on`      - The handler and its bus, for the complaint.
+/// * `wanted`  - What was being asked for, for the complaint.
+///
+/// # Returns
+///
+/// Nothing, once the bus has taken the request.
+///
+/// # Errors
+///
+/// `TcsError::Endpoint`, saying what was wanted and why, if the bus
+/// refuses it.
 fn request(
     fd: RawFd,
     request: libc::c_ulong,

@@ -36,6 +36,13 @@ use tcsapp::app::{complain, AppPl};
 /// program with nothing else to do is not spinning.
 const REPORTS_EVERY: Duration = Duration::from_millis(100);
 
+/// Writes its payload argument and a count as payload data, one packet every
+/// `REPORTS_EVERY`, until nobody is reading.
+///
+/// # Returns
+///
+/// Success when the vehicle stops reading, failure when the interfaces are
+/// not this kind's or a packet cannot be written for another reason.
 fn main() -> ExitCode {
     let app = match AppPl::inherited() {
         Ok(app) => app,

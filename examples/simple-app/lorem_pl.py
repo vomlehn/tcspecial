@@ -90,7 +90,15 @@ def packet(data):
 
 
 def write_all(fd, data):
-    """Write every byte, however many writes that takes."""
+    """Write every byte, however many writes that takes.
+
+    Args:
+        fd:   The descriptor to write to.
+        data: The bytes to write.
+
+    Raises:
+        OSError: A write failed.
+    """
     view = memoryview(data)
     while view:
         written = os.write(fd, view)
@@ -104,6 +112,9 @@ def complain(message):
     read as a packet's length, and tcspecial would wait for bytes that are not
     coming. Where the error interface is not open there is nowhere to say it,
     and nothing is said.
+
+    Args:
+        message: What went wrong, as text.
     """
     try:
         write_all(ERROR_INTERFACE, packet(message.encode("utf-8")))
@@ -116,6 +127,12 @@ def is_handed_over(fd):
 
     Asked of what the descriptor is rather than whether it is open, because an
     interface that is read and written cannot be a pipe or a terminal.
+
+    Args:
+        fd: The descriptor.
+
+    Returns:
+        ``True`` if it is an open socket.
     """
     try:
         return stat.S_ISSOCK(os.fstat(fd).st_mode)
@@ -124,6 +141,17 @@ def is_handed_over(fd):
 
 
 def main(argv):
+    """Send the line of the paragraph the node asks for, a word to a packet,
+    on the MOC interface, then wait to be stopped.
+
+    Args:
+        argv: The command line: the program, the node's name and
+              app-payload-arg, the number of the line to send.
+
+    Returns:
+        The exit status: nought once nobody is reading any more, one for a
+        failure, which has been said on the error interface.
+    """
     # Run the way an app_pl is run: the MOC interface handed over, the payload
     # interface not. Said at once rather than discovered as a write that goes
     # wherever the descriptor happens to go.

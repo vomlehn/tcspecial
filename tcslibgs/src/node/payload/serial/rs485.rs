@@ -70,17 +70,32 @@ pub struct Rs485Params {
 /// failed.
 pub const LONGEST_DELAY: Duration = Duration::from_millis(1_000);
 
-/// What a serial device said about RS-485, and what it must say to say
+/// Reads what a serial device said about RS-485, and what it must say to say
 /// anything at all.
-///
-/// `None` when the line is not an RS-485 bus, which is a line stating nothing
-/// here or stating `rs485: false`.
 ///
 /// The details are refused without `rs485: true`, rather than kept against
 /// the day it is turned on: a file that set a turnaround delay and left the
 /// mode off has described a bus whose driver is never released, and reading
 /// it as a plain line would be reading a different file from the one that was
 /// written.
+///
+/// # Arguments
+///
+/// * `name`         - The node's name, for the messages.
+/// * `g`            - The line's terms as the file states them.
+/// * `asynchronous` - Whether the line is start-stop rather than clocked.
+///
+/// # Returns
+///
+/// The line's RS-485 settings, or `None` when the line is not an RS-485 bus,
+/// which is a line stating nothing here or stating `rs485: false`.
+///
+/// # Errors
+///
+/// Any RS-485 term on a synchronous line; a detail without `rs485: true`;
+/// an RS-485 line without `rs485_rts_on_send`; a flag that is not a boolean;
+/// and a delay that does not read as an interval or is longer than
+/// `LONGEST_DELAY`.
 pub(crate) fn rs485_of(
     name: &str,
     g: &LinkTerms,
@@ -189,7 +204,19 @@ mod tests {
     use super::*;
     use crate::endpoint_config::Scalar;
 
-    /// Terms as a file states them, with everything else absent.
+    /// Makes terms as a file states them, with everything else absent.
+    ///
+    /// # Arguments
+    ///
+    /// * `stated` - Each RS-485 term stated, with its value as written.
+    ///
+    /// # Returns
+    ///
+    /// The terms.
+    ///
+    /// # Panics
+    ///
+    /// If a term is not one of the four RS-485 terms.
     fn terms(stated: &[(&str, &str)]) -> LinkTerms {
         let mut g = LinkTerms::default();
         for (field, value) in stated {

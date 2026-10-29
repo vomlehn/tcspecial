@@ -49,7 +49,16 @@ const SER_RS485_RTS_ON_SEND: u32 = 1 << 1;
 /// `RTS_ON_SEND` is the other.
 const SER_RS485_RTS_AFTER_SEND: u32 = 1 << 2;
 
-/// What this asks a port for, as the kernel's flags.
+/// Says what this asks a port for, as the kernel's flags.
+///
+/// # Arguments
+///
+/// * `terms` - The RS-485 terms the configuration gave.
+///
+/// # Returns
+///
+/// `SER_RS485_ENABLED` with `SER_RS485_RTS_ON_SEND` if RTS is to be high
+/// while sending, or `SER_RS485_RTS_AFTER_SEND` if it is to be high after.
 fn flags_of(terms: &Rs485Params) -> u32 {
     let during = if terms.rts_on_send {
         SER_RS485_RTS_ON_SEND
@@ -60,7 +69,17 @@ fn flags_of(terms: &Rs485Params) -> u32 {
     SER_RS485_ENABLED | during
 }
 
-/// What the port should hold once it has been told, from what was asked.
+/// Says what the port should hold once it has been told, from what was
+/// asked.
+///
+/// # Arguments
+///
+/// * `terms` - The RS-485 terms the configuration gave.
+///
+/// # Returns
+///
+/// The kernel's structure: the flags of [`flags_of`], the two delays in
+/// milliseconds, and the union zeroed.
 fn asked_for(terms: &Rs485Params) -> SerialRs485 {
     SerialRs485 {
         flags: flags_of(terms),
@@ -70,11 +89,20 @@ fn asked_for(terms: &Rs485Params) -> SerialRs485 {
     }
 }
 
-/// Whether a port that was told `asked` has taken it.
+/// Says whether a port that was told `asked` has taken it.
 ///
 /// The flags this module sets and the two delays, and nothing else: a driver
 /// may add flags of its own -- bus termination, full duplex -- and a port
 /// that has done so has not failed to do what it was told.
+///
+/// # Arguments
+///
+/// * `asked` - What the port was told.
+/// * `got`   - What the port says it holds, read back.
+///
+/// # Returns
+///
+/// True if `got` has every flag of `asked` and the same two delays.
 fn took_it(asked: &SerialRs485, got: &SerialRs485) -> bool {
     let wanted = asked.flags;
 
@@ -83,7 +111,7 @@ fn took_it(asked: &SerialRs485, got: &SerialRs485) -> bool {
         && got.delay_rts_after_send == asked.delay_rts_after_send
 }
 
-/// Put the line open on `fd` into RS-485 mode, as `terms` asks.
+/// Puts the line open on `fd` into RS-485 mode, as `terms` asks.
 ///
 /// `what` is the handler's name, so a failure says which device's line it
 /// was; see the endpoint factories, which pass it down for exactly this.
@@ -94,6 +122,17 @@ fn took_it(asked: &SerialRs485, got: &SerialRs485) -> bool {
 /// this handler is trying to read. The error says the mode was asked for and
 /// not taken, which is the fact that tells a wrong port from a wrong
 /// configuration.
+///
+/// # Arguments
+///
+/// * `fd`    - The open serial port, which this neither owns nor closes.
+/// * `what`  - The handler's name, for the errors.
+/// * `terms` - The RS-485 terms the configuration gave.
+///
+/// # Errors
+///
+/// `TcsError::Config` if the port refuses the mode, will not say what mode
+/// it is in, or holds something other than what it was told.
 pub(crate) fn apply(
     fd: RawFd,
     what: &str,

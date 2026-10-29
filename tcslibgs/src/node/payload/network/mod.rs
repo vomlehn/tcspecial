@@ -14,7 +14,7 @@ use crate::types::{NetworkConfig, NetworkProtocol};
 const TO_STAND_IN: &str =
     "give address as a loopback address, such as 127.0.0.1";
 
-/// Whether the far end of a network payload is on this host. See
+/// Judges whether the far end of a network payload is on this host. See
 /// [`crate::simulate`].
 ///
 /// The weakest of the judgements, and said to be: an address on this host
@@ -23,6 +23,16 @@ const TO_STAND_IN: &str =
 /// the node states, which is the one the vehicle binds where the payload
 /// speaks first, so under `all` it must be a loopback address and nothing off
 /// the host can be the one that answers.
+///
+/// # Arguments
+///
+/// * `at` - The network node's protocol and address.
+///
+/// # Returns
+///
+/// The judgement: a stand-in for a Unix-domain path, a loopback address or
+/// `localhost`; cannot-tell for the unspecified address or a host name;
+/// hardware otherwise.
 pub fn judged(at: &NetworkConfig) -> crate::simulate::Judged {
     use crate::simulate::Judged;
     let address = at.address.as_str();
@@ -90,6 +100,16 @@ mod tests {
     use super::*;
     use crate::simulate::Verdict;
 
+    /// Judges a network node on port 7000.
+    ///
+    /// # Arguments
+    ///
+    /// * `protocol` - The node's protocol.
+    /// * `address`  - The node's address.
+    ///
+    /// # Returns
+    ///
+    /// The verdict [`judged`] gives it.
     fn at(protocol: NetworkProtocol, address: &str) -> Verdict {
         judged(&NetworkConfig {
             protocol,

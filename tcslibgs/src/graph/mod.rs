@@ -246,7 +246,11 @@ pub enum Section {
 }
 
 impl Section {
-    /// What the section is called in a file.
+    /// Names the section as a file does.
+    ///
+    /// # Returns
+    ///
+    /// `moc`, `vehicle` or `payloads`.
     pub fn name(self) -> &'static str {
         match self {
             Section::Moc => "moc",
@@ -256,7 +260,7 @@ impl Section {
     }
 }
 
-/// Which section a node of this type belongs in.
+/// Says which section a node of this type belongs in.
 ///
 /// The one statement of the rule, read by the file reader and by the editor's
 /// panes: a payload is something the vehicle carries, `moc` is the ground link,
@@ -264,6 +268,14 @@ impl Section {
 /// own -- is the vehicle's own. A type this build does not know is the
 /// vehicle's: it is refused by name elsewhere, and the vehicle pane is the one
 /// a reader looks at first.
+///
+/// # Arguments
+///
+/// * `node_type` - The node's type, as a file spells it.
+///
+/// # Returns
+///
+/// The section.
 pub fn section_of(node_type: &str) -> Section {
     if Node::is_payload_type(node_type) {
         Section::Payloads
@@ -289,7 +301,7 @@ const VEHICLE_TYPES: &[&str] = &[
     "ping",
 ];
 
-/// Every node type a section may hold, as a file spells them.
+/// Lists every node type a section may hold, as a file spells them.
 ///
 /// The one statement of which types there are. Each section's list is made
 /// from where its types are defined -- the interfaces from
@@ -297,6 +309,15 @@ const VEHICLE_TYPES: &[&str] = &[
 /// so a type added there is a type here. The checking refuses a node whose
 /// type is in none of them, and the schemas beside tcsgui are tested against
 /// them, so a file an editor accepts is one this reader knows.
+///
+/// # Arguments
+///
+/// * `section` - The section.
+///
+/// # Returns
+///
+/// The types, as a file spells them; for `moc`, only the gateway kinds this
+/// build has.
 pub fn types_in(section: Section) -> Vec<&'static str> {
     use crate::node::app::Kind;
     let apps = |payload: bool| {
@@ -339,7 +360,16 @@ pub fn is_node_type(node_type: &str) -> bool {
 /// The one list: the reader and both of the editor's writers ask it.
 pub const LISTED: &[&str] = &["terminators"];
 
-/// Each entry of a listed attribute, as the model holds it: see [`LISTED`].
+/// Splits a listed attribute, as the model holds it, into its entries: see
+/// [`LISTED`].
+///
+/// # Arguments
+///
+/// * `joined` - The attribute's value, its entries joined.
+///
+/// # Returns
+///
+/// Each entry, trimmed.
 pub fn entries(joined: &str) -> Vec<&str> {
     crate::trigger::split_sequences(joined)
         .into_iter()
@@ -347,7 +377,7 @@ pub fn entries(joined: &str) -> Vec<&str> {
         .collect()
 }
 
-/// What to tell a file that wrote an attribute with hyphens where it has
+/// Says what to tell a file that wrote an attribute with hyphens where it has
 /// underscores, or the other way round, if that is what it did.
 ///
 /// An attribute has the one spelling. Two would be twice the words for the
@@ -355,12 +385,20 @@ pub fn entries(joined: &str) -> Vec<&str> {
 /// would say one thing twice with nothing to choose between them. So
 /// `max-length` is refused like any word nothing reads -- but a reader who
 /// wrote it meant something real, and is told its spelling rather than left
-/// to find it. `known` is whether a name is an attribute where `said` was
-/// written; the answer is `it is spelled max_length`, or `None` when the
-/// other spelling is not one either.
+/// to find it.
 ///
 /// The one statement of the hint, for every node type's refusal of a word it
 /// does not know.
+///
+/// # Arguments
+///
+/// * `said`  - The attribute as the file wrote it.
+/// * `known` - Whether a name is an attribute where `said` was written.
+///
+/// # Returns
+///
+/// The hint, such as `it is spelled max_length`, or `None` when the other
+/// spelling is not an attribute either.
 pub fn spelled(said: &str, known: impl Fn(&str) -> bool) -> Option<String> {
     [said.replace('-', "_"), said.replace('_', "-")]
         .into_iter()
@@ -412,11 +450,15 @@ pub struct NodeFile {
 }
 
 impl NodeFile {
-    /// The links this node's sources make.
+    /// Makes the links this node's sources make.
     ///
     /// One per destination, each `from` naming the node and the data source it
     /// leaves by -- `k_1.payload-out` -- which is what every rule about a link
     /// already reads: see [`Link::origin`].
+    ///
+    /// # Returns
+    ///
+    /// One link for each data source with destinations, `payload-out` first.
     pub fn links(&self) -> Vec<Link> {
         let mut links = Vec::new();
         for (terminal, destinations) in [
@@ -943,7 +985,7 @@ impl<'de> Deserialize<'de> for Listed {
     }
 }
 
-/// Whether a node's entry says a line arrives at one of its sinks.
+/// Reads whether a node's entry says a line arrives at one of its sinks.
 ///
 /// `payload-in: true`, and `false` for a node saying none does. Read through
 /// [`Scalar`] rather than as a `bool` because XML has no booleans: the text of
@@ -954,6 +996,20 @@ impl<'de> Deserialize<'de> for Listed {
 /// data came from for a while, which read as "and nothing else" the moment a
 /// second line arrived -- so a file written against that is refused rather
 /// than half understood.
+///
+/// # Arguments
+///
+/// * `sink` - The sink's name, for the message.
+/// * `map`  - The entry being read, its next value the sink's.
+///
+/// # Returns
+///
+/// Whether a line arrives there.
+///
+/// # Errors
+///
+/// What the map's next value fails with, and a custom error for a value
+/// that is neither `true` nor `false`.
 fn said_so<'de, A: serde::de::MapAccess<'de>>(
     sink: &str,
     map: &mut A,
@@ -972,7 +1028,7 @@ fn said_so<'de, A: serde::de::MapAccess<'de>>(
     }
 }
 
-/// The destination a mapping names, however the mapping got there.
+/// Reads the destination a mapping names, however the mapping got there.
 ///
 /// Two shapes arrive here. An entry -- `{ target: cabin_temp, input: in0 }` --
 /// which is what the editor writes and what a person writing a link by hand
@@ -985,6 +1041,21 @@ fn said_so<'de, A: serde::de::MapAccess<'de>>(
 /// neither `target` nor exactly one entry is refused rather than guessed at,
 /// and so is a word in an entry that is not `target` or `input`: a misspelled
 /// `targte` silently ignored is a link that quietly goes nowhere.
+///
+/// # Arguments
+///
+/// * `map` - The mapping.
+///
+/// # Returns
+///
+/// The destination as a file would write it inline: `node` or
+/// `node.input`.
+///
+/// # Errors
+///
+/// What the map fails with, and a custom error for a word that is not
+/// `target` or `input`, an `input` with no `target`, and a mapping with
+/// neither a target nor text.
 fn written_as<'de, A: serde::de::MapAccess<'de>>(
     mut map: A,
 ) -> Result<String, A::Error> {
@@ -1060,7 +1131,18 @@ pub struct Destination {
 }
 
 impl Destination {
-    /// Read a destination as a file wrote it.
+    /// Reads a destination as a file wrote it.
+    ///
+    /// Total: what is wrong with a destination is the checking's to say.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The destination: `node` or `node.input`.
+    ///
+    /// # Returns
+    ///
+    /// The node and the input named after the dot, where there is one with
+    /// something either side of it; otherwise the whole text as the node.
     pub fn parse(text: &str) -> Destination {
         match text.split_once('.') {
             Some((node, input)) if !node.is_empty() && !input.is_empty() => {
@@ -1139,11 +1221,27 @@ pub struct Graph {
 }
 
 impl Graph {
-    /// Read a configuration, following its includes.
+    /// Reads a configuration, following its includes.
     ///
     /// The top file first, then each file it names, each in the top file's
     /// format and beside it. An include that names a file twice, or a cycle of
     /// includes, is refused rather than read twice.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The top file.
+    ///
+    /// # Returns
+    ///
+    /// The configuration, every file's nodes, links, groups and commands in
+    /// one.
+    ///
+    /// # Errors
+    ///
+    /// [`TcsError::Config`], naming the file, for a file that does not read,
+    /// an include named twice, an included file with a `tcspecial` section or
+    /// includes of its own, a node in the wrong section, and data sinks whose
+    /// flags disagree with the links.
     pub fn load<P: AsRef<Path>>(path: P) -> TcsResult<Graph> {
         let path = path.as_ref();
         let mut graph = Graph {
@@ -1207,13 +1305,30 @@ impl Graph {
         Ok(graph)
     }
 
-    /// Take in one file: its nodes, the links they carry, and the rest.
+    /// Takes in one file: its nodes, the links they carry, and the rest.
     ///
     /// The three sections are one list of nodes once they are read, because
     /// every rule about a node is about nodes and not about sections. What the
     /// sections are for is that a reader of the file can see at a glance what
     /// the vehicle carries this flight -- so a node in the wrong one is
     /// refused here, where the complaint can name the file.
+    ///
+    /// # Arguments
+    ///
+    /// * `from`   - The file's path, for the complaints and for its nodes'
+    ///              order.
+    /// * `file`   - The file as read.
+    /// * `mirror` - Where what its data sinks say is recorded, to be checked
+    ///              once every file is in.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` once the file is taken in.
+    ///
+    /// # Errors
+    ///
+    /// [`TcsError::Config`] for a node written under the wrong section, or a
+    /// file whose order of declaration cannot be read.
     fn absorb(
         &mut self,
         from: &Path,
@@ -1289,11 +1404,25 @@ impl Graph {
     }
 }
 
-/// Read one file of a configuration.
+/// Reads one file of a configuration.
 ///
 /// The sections of an older spelling are named before the file is read as a
 /// graph: a file still written in them is not a graph with problems in it,
 /// and every complaint the graph reader made about it would be noise.
+///
+/// # Arguments
+///
+/// * `path` - The file.
+///
+/// # Returns
+///
+/// The file as read.
+///
+/// # Errors
+///
+/// [`TcsError::Config`], naming the file, for an extension that is no
+/// format, a file that cannot be read or parsed, and a section of an older
+/// spelling.
 fn read_one(path: &Path) -> TcsResult<GraphFile> {
     let format = ConfigFormat::of_file(path)?;
     let text = std::fs::read_to_string(path)
@@ -1344,8 +1473,17 @@ fn read_one(path: &Path) -> TcsResult<GraphFile> {
     Ok(file)
 }
 
-/// Where an included file sits: beside the file that named it, in the same
-/// format.
+/// Says where an included file sits: beside the file that named it, in the
+/// same format.
+///
+/// # Arguments
+///
+/// * `top`  - The file that named it.
+/// * `name` - The name it was included by, without an extension.
+///
+/// # Returns
+///
+/// The included file's path.
 fn beside(top: &Path, name: &str) -> PathBuf {
     let extension = top
         .extension()
@@ -1357,7 +1495,7 @@ fn beside(top: &Path, name: &str) -> PathBuf {
     path
 }
 
-/// A length of time: a number, a space, and a unit.
+/// Reads a length of time: a number, a space, and a unit.
 ///
 /// `500 ms`, `1.5 s`, `15 min`, `6 h`, `1 w`. The space is required, and it is
 /// what makes the two halves two things rather than one string a reader has to
@@ -1429,6 +1567,20 @@ fn beside(top: &Path, name: &str) -> PathBuf {
 /// This is the one reader of a length of time in a configuration, a payload's
 /// `timeout` included: see `crate::endpoint_config::parse_timeout`, which is
 /// this with the units it may use narrowed.
+///
+/// # Arguments
+///
+/// * `text` - The length of time as the file wrote it.
+///
+/// # Returns
+///
+/// The length of time, to the nearest microsecond.
+///
+/// # Errors
+///
+/// A message quoting `text` for anything the grammar above does not take,
+/// naming what to write instead where that is known, and for nought or a
+/// length too long to hold.
 pub fn parse_interval(text: &str) -> Result<Duration, String> {
     const SECOND: f64 = 1_000_000.0;
     // In order of size rather than of spelling: the unit is a word of its
@@ -1520,11 +1672,21 @@ pub fn parse_interval(text: &str) -> Result<Duration, String> {
     Ok(interval)
 }
 
-/// What to say to a value whose number and unit are written together.
+/// Says what to tell a value whose number and unit are written together.
 ///
 /// The commonest thing a file will have wrong while the space is new, and the
 /// one worth naming exactly: a message about a unit that is not a unit would
 /// send somebody looking at the unit, which is not what is wrong.
+///
+/// # Arguments
+///
+/// * `text` - The value as the file wrote it.
+/// * `said` - The value, trimmed.
+///
+/// # Returns
+///
+/// The message: the value with the space put in, or what a length of time
+/// is where it cannot be split into a number and a unit.
 fn no_space(text: &str, said: &str) -> String {
     let number: String = said
         .chars()
@@ -1543,13 +1705,29 @@ fn no_space(text: &str, said: &str) -> String {
     )
 }
 
-/// `digits` of `unit`, in whole microseconds.
+/// Reads `digits` of `unit` as whole microseconds.
 ///
 /// A whole number or a decimal fraction, underscores ignored, read exactly and
 /// rounded to the nearest microsecond. In microseconds throughout, so that a
 /// week and a microsecond are the same arithmetic -- and checked, because
 /// seven hundred thousand weeks overflows the count rather than being an
 /// interval anybody meant.
+///
+/// # Arguments
+///
+/// * `text`   - The value as the file wrote it, for the messages.
+/// * `digits` - The number.
+/// * `unit`   - The unit's name, for the messages.
+/// * `micros` - How many microseconds one of the unit is.
+///
+/// # Returns
+///
+/// The length of time in microseconds, rounded to the nearest.
+///
+/// # Errors
+///
+/// A message for a number that is not digits with at most one point, and
+/// for a length too long to keep track of.
 fn whole_micros(
     text: &str,
     digits: &str,

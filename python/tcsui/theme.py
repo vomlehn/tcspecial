@@ -43,8 +43,14 @@ BETWEEN = 12
 
 def use_in(window):
     """Draw this window, and every window the application opens after it, in
-    :data:`THEME`. Called once, on the root window, before anything is put in
-    it, as :func:`tcsui.fonts.use_in` is."""
+    :data:`THEME`.
+
+    Called once, on the root window, before anything is put in it, as
+    :func:`tcsui.fonts.use_in` is.
+
+    Args:
+        window: The root window.
+    """
     style = ttk.Style(window)
     style.theme_use(THEME)
     style.configure(".", background=BACKGROUND)

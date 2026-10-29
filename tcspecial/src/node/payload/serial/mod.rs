@@ -33,7 +33,7 @@ use crate::endpoint::{
     WaitResult,
 };
 
-/// The flags that ask a port for this parity.
+/// Gives the flags that ask a port for this parity.
 ///
 /// Mark and space are the two that need CMSPAR: they send a constant bit
 /// rather than one computed from the data, which is a protocol marking a
@@ -43,6 +43,14 @@ use crate::endpoint::{
 /// Paired with [`parity_of`], which reads the same flags back: no port
 /// available to a test will take a parity at all -- a pseudo-terminal is the
 /// only line a test has -- so the two being inverses is what can be checked.
+///
+/// # Arguments
+///
+/// * `parity` - The parity the line is to have.
+///
+/// # Returns
+///
+/// The `c_cflag` bits that ask for it, nought for none.
 fn parity_flags(parity: Parity) -> libc::tcflag_t {
     match parity {
         Parity::None => 0,
@@ -53,7 +61,15 @@ fn parity_flags(parity: Parity) -> libc::tcflag_t {
     }
 }
 
-/// Which parity a port's flags say it has.
+/// Says which parity a port's flags say it has.
+///
+/// # Arguments
+///
+/// * `flags` - The port's `c_cflag`.
+///
+/// # Returns
+///
+/// The parity those flags give, the inverse of [`parity_flags`].
 fn parity_of(flags: libc::tcflag_t) -> Parity {
     if flags & libc::PARENB == 0 {
         return Parity::None;
@@ -73,7 +89,21 @@ pub struct SerialEndpoint {
 }
 
 impl SerialEndpoint {
-    /// Open the line and set it to what the configuration says.
+    /// Opens the line and sets it to what the configuration says.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`   - The handler's name, for what a complaint says.
+    /// * `config` - The line's path and the terms to set it to.
+    ///
+    /// # Returns
+    ///
+    /// The endpoint, its line set to those terms.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Io` if the line cannot be opened; otherwise as
+    /// `apply_line_terms`.
     pub fn new(what: &str, config: &SerialConfig) -> TcsResult<Self> {
         let file = OpenOptions::new()
             .read(true)
@@ -101,6 +131,14 @@ impl SerialEndpoint {
     /// conduit writing it see one set of terms: the port's settings belong to
     /// the port, and setting them twice from two descriptions would be two
     /// chances to disagree.
+    ///
+    /// # Returns
+    ///
+    /// The second endpoint, on a duplicate of this one's descriptor.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Io` if the descriptor cannot be duplicated.
     pub fn try_clone(&self) -> TcsResult<Self> {
         Ok(Self {
             file: self.file.try_clone()?,
@@ -109,16 +147,30 @@ impl SerialEndpoint {
     }
 }
 
-/// Set the line's data rate, byte length and stop bits.
+/// Sets the line's data rate, byte length, stop bits and parity, and its
+/// RS-485 mode where the configuration gives one.
 ///
 /// Raw rather than canonical: a device link carries bytes, and the line
-/// discipline's editing, echo and newline translation would corrupt them. No
-/// parity, because the configuration language has none to give -- a serial
-/// group states the rate, the stop bits and the byte length, and nothing about
-/// parity -- so the line is set to none rather than to whatever it had.
+/// discipline's editing, echo and newline translation would corrupt them. The
+/// parity is read back once set, because a port may take the call and keep
+/// less than it was given.
 ///
 /// A rate the platform cannot express is reported with the rate in hand,
 /// because the alternative is a line running at a rate nobody chose.
+///
+/// # Arguments
+///
+/// * `what`   - The handler's name, for what a complaint says.
+/// * `file`   - The open line.
+/// * `config` - The line's path, for what a complaint says, and its terms.
+///
+/// # Errors
+///
+/// `TcsError::Config` if the rate or byte length is not one a port
+/// offers, or the line will not take its RS-485 mode;
+/// `TcsError::Endpoint` if the line is not a serial port, will not take
+/// the terms, keeps a parity other than the one asked for, or is asked
+/// for one and a half stop bits.
 fn apply_line_terms(
     what: &str,
     file: &File,
@@ -238,11 +290,21 @@ fn apply_line_terms(
     Ok(())
 }
 
-/// One and a half stop bits is the one term a termios line cannot hold.
+/// Says that one and a half stop bits is the one term a termios line cannot
+/// hold.
 ///
 /// A UART that offers it does so for five-bit bytes, and `termios` has one
 /// bit for stop bits: one, or two. A configuration asking for it is told so
 /// rather than quietly given two.
+///
+/// # Arguments
+///
+/// * `what` - The handler's name.
+/// * `path` - The line's path.
+///
+/// # Returns
+///
+/// A `TcsError::Endpoint` saying so.
 fn stop_bits_unsupported(what: &str, path: &str) -> TcsError {
     not_a_line(
         what,
@@ -252,7 +314,20 @@ fn stop_bits_unsupported(what: &str, path: &str) -> TcsError {
     )
 }
 
-/// The `termios` constant for a data rate, or an error naming the rate.
+/// Gives the `termios` constant for a data rate, or an error naming the
+/// rate.
+///
+/// # Arguments
+///
+/// * `datarate` - The rate in bits per second.
+///
+/// # Returns
+///
+/// The `B*` constant for that rate.
+///
+/// # Errors
+///
+/// `TcsError::Config` if the rate is not one `termios` has a constant for.
 fn baud_of(datarate: u32) -> TcsResult<libc::speed_t> {
     let speed = match datarate {
         50 => libc::B50,
@@ -294,7 +369,19 @@ fn baud_of(datarate: u32) -> TcsResult<libc::speed_t> {
     Ok(speed)
 }
 
-/// The `termios` flag for a byte length.
+/// Gives the `termios` flag for a byte length.
+///
+/// # Arguments
+///
+/// * `bits` - The byte length in bits.
+///
+/// # Returns
+///
+/// The `CS*` flag for that length.
+///
+/// # Errors
+///
+/// `TcsError::Config` if the length is not 5 to 8.
 fn byte_length_of(bits: u8) -> TcsResult<libc::tcflag_t> {
     match bits {
         5 => Ok(libc::CS5),

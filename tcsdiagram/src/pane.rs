@@ -45,6 +45,14 @@ pub fn on_grid(v: i32) -> i32 {
 }
 
 /// The lowest grid point at or above `v`.
+///
+/// # Arguments
+///
+/// * `v` - A position, in pixels.
+///
+/// # Returns
+///
+/// The grid point, in pixels.
 pub fn grid_ceil(v: i32) -> i32 {
     let mut mm = (v as f64 / PX_PER_MM).floor() as i32;
     while grid_point(mm) < v {
@@ -54,6 +62,14 @@ pub fn grid_ceil(v: i32) -> i32 {
 }
 
 /// The highest grid point at or below `v`.
+///
+/// # Arguments
+///
+/// * `v` - A position, in pixels.
+///
+/// # Returns
+///
+/// The grid point, in pixels.
 pub fn grid_floor(v: i32) -> i32 {
     let mut mm = (v as f64 / PX_PER_MM).ceil() as i32;
     while grid_point(mm) > v {
@@ -105,6 +121,15 @@ fn mm_of(v: i32) -> i32 {
 }
 
 /// The place a node may be that is nearest `v`.
+///
+/// # Arguments
+///
+/// * `v` - A position, in pixels; the lower of two equally near places
+///         wins.
+///
+/// # Returns
+///
+/// The place, in pixels.
 pub fn on_node_grid(v: i32) -> i32 {
     let mm = mm_of(v);
     let below = mm - (mm - NODE_OFFSET_MM).rem_euclid(NODE_STEP_MM);
@@ -118,6 +143,14 @@ pub fn on_node_grid(v: i32) -> i32 {
 }
 
 /// The lowest place a node may be at or above `v`.
+///
+/// # Arguments
+///
+/// * `v` - A position, in pixels.
+///
+/// # Returns
+///
+/// The place, in pixels.
 pub fn node_ceil(v: i32) -> i32 {
     let mut mm = mm_of(grid_ceil(v));
     while !is_node_mm(mm) {
@@ -127,6 +160,14 @@ pub fn node_ceil(v: i32) -> i32 {
 }
 
 /// The highest place a node may be at or below `v`.
+///
+/// # Arguments
+///
+/// * `v` - A position, in pixels.
+///
+/// # Returns
+///
+/// The place, in pixels.
 pub fn node_floor(v: i32) -> i32 {
     let mut mm = mm_of(grid_floor(v));
     while !is_node_mm(mm) {
@@ -147,6 +188,14 @@ pub fn node_before(v: i32) -> i32 {
 
 /// The lowest point on one of the lines terminals are on -- every
 /// [`NODE_STEP_MM`] millimetres -- at or after `v`.
+///
+/// # Arguments
+///
+/// * `v` - A position, in pixels.
+///
+/// # Returns
+///
+/// The point on the line, in pixels.
 pub fn line_ceil(v: i32) -> i32 {
     let mut mm = (v as f64 / PX_PER_MM).floor() as i32;
     while mm.rem_euclid(NODE_STEP_MM) != 0 || grid_point(mm) < v {
@@ -156,6 +205,14 @@ pub fn line_ceil(v: i32) -> i32 {
 }
 
 /// And the highest at or before it.
+///
+/// # Arguments
+///
+/// * `v` - A position, in pixels.
+///
+/// # Returns
+///
+/// The point on the line, in pixels.
 pub fn line_floor(v: i32) -> i32 {
     let mut mm = (v as f64 / PX_PER_MM).ceil() as i32;
     while mm.rem_euclid(NODE_STEP_MM) != 0 || grid_point(mm) > v {
@@ -227,6 +284,17 @@ pub struct Dividers {
 /// Snapped to the grid, which is not decoration: a node held against a divider
 /// is a node whose position is that divider, and a divider off the grid would
 /// put it off the grid too.
+///
+/// # Arguments
+///
+/// * `moc_percent`     - The moc pane's share of the working width, in
+///                       per cent; brought inside the limits
+///                       `settings::shares` keeps.
+/// * `vehicle_percent` - The vehicle pane's share, likewise.
+///
+/// # Returns
+///
+/// The two dividers, on the grid.
 pub fn dividers_for(moc_percent: i32, vehicle_percent: i32) -> Dividers {
     let (moc_percent, vehicle_percent) =
         settings::shares(moc_percent, vehicle_percent);
@@ -257,6 +325,15 @@ fn at_percent(percent: i32) -> i32 {
 /// stable -- a percent is a little over a grid step, so dividers snapped to
 /// the grid come back to themselves -- and `tests::the_dividers_survive_being
 /// _written_down` is what says so.
+///
+/// # Arguments
+///
+/// * `dividers` - Where the panes meet.
+///
+/// # Returns
+///
+/// The moc and vehicle panes' shares of the working width, in whole per
+/// cent, brought inside the limits `settings::shares` keeps.
 pub fn percents_for(dividers: Dividers) -> (i32, i32) {
     let whole =
         |x: i32| (x as f32 * 100.0 / WORKING_WIDTH as f32).round() as i32;
@@ -272,6 +349,15 @@ pub fn percents_for(dividers: Dividers) -> (i32, i32) {
 /// working pane, which is the largest of the three and the one a reader looks
 /// at first -- and a node whose type nothing recognises is a node somebody has
 /// to look at.
+///
+/// # Arguments
+///
+/// * `node_type` - The node type's spelling, as in a configuration's
+///                 `type:`.
+///
+/// # Returns
+///
+/// Whether the type is a known payload type.
 pub fn is_payload(node_type: &str) -> bool {
     NodeType::ALL
         .iter()
@@ -284,6 +370,16 @@ pub fn is_payload(node_type: &str) -> bool {
 /// The one type in its pane. It is there because it is not part of the vehicle
 /// at all: it is the other end of the link, and a drawing that puts it in the
 /// vehicle's own column says the vehicle contains the ground station.
+///
+/// # Arguments
+///
+/// * `node_type` - The node type's spelling, as in a configuration's
+///                 `type:`.
+///
+/// # Returns
+///
+/// Whether the type is `moc` or `gateway_fprime`, the known ground link
+/// types.
 pub fn is_moc(node_type: &str) -> bool {
     NodeType::ALL
         .iter()
@@ -308,6 +404,10 @@ impl Pane {
     /// The label in the pane's top left corner is in the markup, that being
     /// window text; these are the same words, for what the tests say when a
     /// pane rule is broken.
+    ///
+    /// # Returns
+    ///
+    /// The pane's name: `MOC`, `Vehicle` or `Payloads`.
     pub fn label(self) -> &'static str {
         match self {
             Pane::Moc => "MOC",
@@ -318,6 +418,15 @@ impl Pane {
 }
 
 /// Which pane this type belongs in.
+///
+/// # Arguments
+///
+/// * `node_type` - The node type's spelling, as in a configuration's
+///                 `type:`.
+///
+/// # Returns
+///
+/// The pane; [`Pane::Vehicle`] for a type this build does not know.
 pub fn pane_of(node_type: &str) -> Pane {
     if is_payload(node_type) {
         Pane::Payloads
@@ -362,6 +471,15 @@ pub const NAMES: (i32, i32) = (0, 30);
 /// They abut at the dividers, so what the placing keeps off is the same row
 /// either way; three is what says the row is three panes' heads rather than
 /// one strip laid over them, and it is what the window draws.
+///
+/// # Arguments
+///
+/// * `dividers` - Where the panes meet.
+///
+/// # Returns
+///
+/// Each band's left, top, width and height, in pixels, for the payload,
+/// vehicle and moc panes in that order.
 fn names_bands(dividers: Dividers) -> [(i32, i32, u32, u32); 3] {
     let (top, height) = NAMES;
     [Pane::Payloads, Pane::Vehicle, Pane::Moc].map(|pane| {
@@ -376,6 +494,18 @@ fn names_bands(dividers: Dividers) -> [(i32, i32, u32, u32); 3] {
 /// a pane is drawn inside it rather than hanging over its edge. Both bounds
 /// are grid points, inside the pane: a node held against an edge is on the
 /// grid as well as in its pane.
+///
+/// # Arguments
+///
+/// * `node_type` - The node type's spelling, which gives its pane and
+///                 its width.
+/// * `dividers`  - Where the panes meet.
+///
+/// # Returns
+///
+/// The leftmost and rightmost x the node's upper left corner may have,
+/// in pixels. The right may be left of the left when the pane is
+/// narrower than the node.
 pub fn pane_for(node_type: &str, dividers: Dividers) -> (i32, i32) {
     let (width, _) = size_of(node_type);
     let width = width as i32;
@@ -387,6 +517,15 @@ pub fn pane_for(node_type: &str, dividers: Dividers) -> (i32, i32) {
 ///
 /// For the window, which draws the labels and the dividers from it, and for
 /// placing a new node at the top of its own pane.
+///
+/// # Arguments
+///
+/// * `pane`     - The pane.
+/// * `dividers` - Where the panes meet.
+///
+/// # Returns
+///
+/// The pane's left and right edges, in pixels.
 pub fn edges_of(pane: Pane, dividers: Dividers) -> (i32, i32) {
     match pane {
         Pane::Payloads => (0, dividers.payloads),
@@ -404,6 +543,19 @@ pub fn edges_of(pane: Pane, dividers: Dividers) -> (i32, i32) {
 /// them on opening would be an editor that changed a file by being pointed at
 /// it. A node read in from the wrong side stays where the file put it until
 /// somebody drags it, and then it comes home.
+///
+/// # Arguments
+///
+/// * `node_type` - The node type's spelling, which gives its pane and
+///                 its width.
+/// * `dividers`  - Where the panes meet.
+/// * `(x, y)`    - Where the node's upper left corner is asked to be, in
+///                 pixels.
+///
+/// # Returns
+///
+/// The nearest place a node may be that is inside its pane and not above
+/// the top of the sheet.
 pub fn confine(
     node_type: &str,
     dividers: Dividers,
@@ -449,6 +601,20 @@ pub fn confine(
 /// Where nothing fits anywhere -- a full sheet -- the top of the pane, which
 /// is a node drawn over another and visibly so. The alternative is a press
 /// that does nothing.
+///
+/// # Arguments
+///
+/// * `taken`     - Every box already on the sheet: left, top, width and
+///                 height, in pixels.
+/// * `node_type` - The new node's type spelling, which gives its pane and
+///                 its size.
+/// * `dividers`  - Where the panes meet.
+/// * `visible`   - The top of the part of the sheet the window shows, and
+///                 its height, in pixels.
+///
+/// # Returns
+///
+/// Where the new node's upper left corner goes, in pixels.
 pub fn place_in(
     taken: &[(i32, i32, u32, u32)],
     node_type: &str,
@@ -520,6 +686,16 @@ pub fn place_in(
 }
 
 /// The nominal size of a type, for placing a link's ends.
+///
+/// # Arguments
+///
+/// * `node_type` - The node type's spelling, as in a configuration's
+///                 `type:`.
+///
+/// # Returns
+///
+/// Its width and height in pixels; 104 by 40 for a type this build does
+/// not know.
 pub fn size_of(node_type: &str) -> (u32, u32) {
     NodeType::ALL
         .iter()
@@ -535,7 +711,7 @@ pub struct Placing<'a> {
     pub at: (i32, i32),
 }
 
-/// Put every node inside the pane its type belongs to, and on the grid.
+/// Puts every node inside the pane its type belongs to, and on the grid.
 ///
 /// What a configuration is drawn from when it is read: a file written before
 /// the canvas was divided, or by hand, or with the divider somewhere else, has
@@ -550,8 +726,18 @@ pub struct Placing<'a> {
 /// Every node is checked against every other, whichever pane it is in, because
 /// a node of the other pane overlapping this one is just as unreadable.
 ///
-/// Returns how many were moved. One rule for the editor, which settles what it
-/// opens, and for tcspecial's visual window, which draws what the editor would.
+/// One rule for the editor, which settles what it opens, and for tcspecial's
+/// visual window, which draws what the editor would.
+///
+/// # Arguments
+///
+/// * `nodes`    - The nodes' types and positions; each position is moved
+///                in place.
+/// * `dividers` - Where the panes meet.
+///
+/// # Returns
+///
+/// How many nodes were moved.
 pub fn settle(nodes: &mut [Placing], dividers: Dividers) -> usize {
     let mut moved = 0;
 

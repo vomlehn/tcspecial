@@ -10,6 +10,16 @@ use std::path::Path;
 use std::process::Command;
 
 /// Run one suite of `unittest` tests and fail with what it said.
+///
+/// # Arguments
+///
+/// * `directory` - Where the tests are, from the repository's root.
+/// * `pattern`   - Which files in it are tests, as a glob.
+/// * `top`       - The top of the package tree the tests import from.
+///
+/// # Panics
+///
+/// python3 cannot be run, or the suite does not pass.
 fn suite(directory: &str, pattern: &str, top: &str) {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let ran = Command::new("python3")

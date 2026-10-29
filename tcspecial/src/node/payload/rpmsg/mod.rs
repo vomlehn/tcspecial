@@ -56,8 +56,24 @@ pub struct RpmsgEndpoint {
 }
 
 impl RpmsgEndpoint {
-    /// Open the channel the configuration names, and hold it to the service
-    /// it was supposed to be.
+    /// Opens the channel the configuration names, and holds it to the
+    /// service it was supposed to be.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`   - The handler's name, as the device configuration gives
+    ///              it, for the endpoint's messages.
+    /// * `config` - The rpmsg configuration: the node's path, the service
+    ///              it should be and the greatest message size, if given.
+    ///
+    /// # Returns
+    ///
+    /// The endpoint, with the channel open for reading and writing.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Endpoint` if the node cannot be opened;
+    /// `TcsError::Config` if the kernel says it is another service.
     pub fn new(what: &str, config: &RpmsgConfig) -> TcsResult<Self> {
         let file = OpenOptions::new()
             .read(true)
@@ -87,7 +103,15 @@ impl RpmsgEndpoint {
         })
     }
 
-    /// A second endpoint on the same open channel.
+    /// Makes a second endpoint on the same open channel.
+    ///
+    /// # Returns
+    ///
+    /// The new endpoint, sharing this one's open file.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Io` if the file descriptor cannot be duplicated.
     pub fn try_clone(&self) -> TcsResult<Self> {
         Ok(Self {
             what: self.what.clone(),
@@ -97,11 +121,23 @@ impl RpmsgEndpoint {
     }
 }
 
-/// Hold a node against the service the file said it would be.
+/// Holds a node against the service the file said it would be.
 ///
 /// `class` is where the kernel publishes it, given so that a test can hand
 /// over a tree of its own. Nothing is refused where the entry is absent; see
 /// the module's own note for why.
+///
+/// # Arguments
+///
+/// * `what`    - The handler's name, for the error.
+/// * `class`   - The directory holding a `<node>/name` file for each node.
+/// * `path`    - The node's path, whose last component is the node.
+/// * `service` - The service name the configuration says the node has.
+///
+/// # Errors
+///
+/// `TcsError::Config` if the node's `name` file can be read and holds,
+/// trimmed, a name other than `service`.
 fn is_that_service(
     what: &str,
     class: &Path,

@@ -100,7 +100,11 @@ pub fn node_lost_contact(info: &mut DHInfo) {
     info.status = SharedString::from(STALE_STATUS);
 }
 
-/// Tell every node in the window that contact with the spacecraft is lost.
+/// Tells every node in the window that contact with the spacecraft is lost.
+///
+/// # Arguments
+///
+/// * `model` - The panels' model, each of whose rows is made stale.
 pub fn every_node_lost_contact(model: &ModelRc<DHInfo>) {
     for row in 0..model.row_count() {
         if let Some(mut info) = model.row_data(row) {
@@ -120,6 +124,16 @@ fn declined_for(rows: usize) -> crate::Declined {
 
 /// Whether the operator's last word about the node of panel `row` was to
 /// stop it.
+///
+/// # Arguments
+///
+/// * `declined` - The flags Disable sets and Enable clears.
+/// * `row`      - The panel's row.
+///
+/// # Returns
+///
+/// The panel's flag; false for a row with none, or where the lock is
+/// poisoned.
 fn was_declined(declined: &crate::Declined, row: usize) -> bool {
     declined
         .lock()
@@ -159,6 +173,14 @@ fn may_command_nodes(agreed: &Agreed) -> bool {
 /// written in the file both ends read, which is the whole point of writing it
 /// there. A binding that names no attribute is left out -- the checking
 /// refuses a configuration for one, and this is not the place to guess.
+///
+/// # Arguments
+///
+/// * `graph` - The configuration.
+///
+/// # Returns
+///
+/// Each node's settable attributes by the node's name, each attribute once.
 pub fn settable_of(graph: &Graph) -> BTreeMap<String, Vec<String>> {
     let mut settable: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for binding in &graph.commands {
@@ -180,6 +202,15 @@ pub fn settable_of(graph: &Graph) -> BTreeMap<String, Vec<String>> {
 ///
 /// `settable` is what [`settable_of`] found, so that each panel offers what
 /// the configuration says may be set on its node and nothing else.
+///
+/// # Arguments
+///
+/// * `links`    - Each source's link to the ground.
+/// * `settable` - Each node's settable attributes, by the node's name.
+///
+/// # Returns
+///
+/// The panels, in device id order, with nothing yet received.
 pub fn panels(
     links: &[Telemetered],
     settable: &BTreeMap<String, Vec<String>>,
@@ -236,6 +267,16 @@ pub fn panels(
 ///
 /// `None` is a payload set with no simulator file beside it, which simulates
 /// nothing: there is no file to read, and no simulator to start.
+///
+/// # Arguments
+///
+/// * `graph`    - The configuration.
+/// * `sim_path` - The simulator file's path, if the set has one.
+///
+/// # Returns
+///
+/// True if the simulator file reads and names at least one handler to
+/// simulate; false otherwise, including where it cannot be read.
 fn anything_simulated(graph: &Graph, sim_path: Option<&str>) -> bool {
     sim_path
         .and_then(|path| SimConfigFile::load(path).ok())
@@ -252,7 +293,7 @@ const ASK_FIRST: std::time::Duration = std::time::Duration::from_secs(1);
 const WAIT_FOR_SIMULATOR: std::time::Duration =
     std::time::Duration::from_secs(120);
 
-/// Have a simulator ready for this run, where it has anything to simulate.
+/// Has a simulator ready for this run, where it has anything to simulate.
 ///
 /// Under the flight setting, none: a run that is like a flight then looks
 /// like one, with no simulator present to answer for a device that is
@@ -261,6 +302,22 @@ const WAIT_FOR_SIMULATOR: std::time::Duration =
 /// exits, since this did not start it; one set up for another is refused,
 /// saying what differs; and where nothing answers, tcssim is started and
 /// waited for. See "Waiting for the Simulator" in docs/design.rst.
+///
+/// # Arguments
+///
+/// * `graph`        - The configuration.
+/// * `payload_path` - The configuration's path, for tcssim and for messages.
+/// * `sim_path`     - The simulator file's path, if the set has one.
+/// * `mode`         - The run's simulation mode.
+/// * `pm_tcssim`    - What starts tcssim, and is asked whether it has
+///                    exited.
+///
+/// # Errors
+///
+/// A message naming the file at fault where the simulator file or the
+/// configuration's digest cannot be read; where the simulator answering is
+/// set up for another run, saying what differs; where tcssim stops before
+/// it is ready; and where none is ready within `WAIT_FOR_SIMULATOR`.
 fn simulator_for(
     graph: &Graph,
     payload_path: &str,
@@ -366,6 +423,20 @@ fn simulator_for(
 ///
 /// `None` for a configuration with no section, which takes no commands, as it
 /// sends no beacons: the section is where the ports are written down.
+///
+/// # Arguments
+///
+/// * `graph` - The configuration.
+///
+/// # Returns
+///
+/// Where the spacecraft link sends from, where the interpreter takes
+/// commands, and the node link; `None` where there is no `tcspecial`
+/// section.
+///
+/// # Errors
+///
+/// What `tcslib::command_links_of` says is wrong with the section.
 fn command_links_of(
     graph: &Graph,
 ) -> Result<Option<(String, String, Commanded)>, String> {
@@ -382,11 +453,24 @@ fn command_links_of(
     )))
 }
 
-/// Say what the vehicle answered a CONNECT with, and whether it agrees.
+/// Says what the vehicle answered a CONNECT with, and whether it agrees.
 ///
 /// What it read, said the way a beacon says it, so the two can be read
 /// against each other, and the verdict kept: a node id means nothing until
 /// the two ends have agreed which configuration they are talking about.
+///
+/// # Arguments
+///
+/// * `ui`      - The window, whose Last Response says how it went.
+/// * `link`    - The link the CONNECT goes on.
+/// * `agreed`  - Where the verdict is kept: whether the digests matched, or
+///               `None` where the CONNECT did not get through.
+/// * `version` - The configuration version this window read.
+/// * `digest`  - The digest of the configuration this window read.
+///
+/// # Panics
+///
+/// If the lock on the link is poisoned.
 fn hear_what_the_vehicle_read(
     ui: &MainWindow,
     link: &Mutex<CiLink>,
@@ -470,7 +554,7 @@ fn query_every_node(
     ask_nodes(ui, link, agreed, model, None);
 }
 
-/// Ask the spacecraft what each node is doing, because contact has just been
+/// Asks the spacecraft what each node is doing, because contact has just been
 /// made: on the first beacon, and at the end of an outage.
 ///
 /// Not a poll: nothing is asked while contact simply holds. A node whose last
@@ -479,6 +563,16 @@ fn query_every_node(
 /// down, or the vehicle has not agreed which configuration it is flying --
 /// nothing is, and nothing is said: the panels keep what they show until
 /// contact is next made or somebody presses Query all.
+///
+/// # Arguments
+///
+/// * `ui`       - The window, whose Last Response says what was found.
+/// * `link`     - The link the queries go on.
+/// * `agreed`   - Whether the vehicle has agreed which configuration it is
+///                flying.
+/// * `model`    - The panels, whose statuses are updated.
+/// * `declined` - Which panels' nodes the operator has stopped, which are
+///                not asked about.
 fn contact_made(
     ui: &MainWindow,
     link: &Arc<Mutex<CiLink>>,
@@ -495,7 +589,7 @@ fn contact_made(
     }
 }
 
-/// After a Connect, ask what [`contact_made`] would have asked, where contact
+/// After a Connect, asks what [`contact_made`] would have asked, where contact
 /// was made before the link was up.
 ///
 /// The first beacon usually arrives before anybody has pressed Connect, and
@@ -504,6 +598,17 @@ fn contact_made(
 /// the spacecraft being heard from, is the moment the asking was owed. What
 /// the Connect said stays in Last Response, with what the asking found after
 /// it.
+///
+/// # Arguments
+///
+/// * `ui`       - The window, whose Last Response says what was found.
+/// * `link`     - The link the queries go on.
+/// * `agreed`   - Whether the vehicle has agreed which configuration it is
+///                flying.
+/// * `model`    - The panels, whose statuses are updated.
+/// * `declined` - Which panels' nodes the operator has stopped, which are
+///                not asked about.
+/// * `contact`  - Whether the spacecraft is being heard from.
 fn connected_in_contact(
     ui: &MainWindow,
     link: &Arc<Mutex<CiLink>>,
@@ -527,8 +632,26 @@ fn connected_in_contact(
     }
 }
 
-/// Ask each panel's node what it is doing and has moved, and show it: every
-/// node, or with `declined`, every node the operator has not stopped.
+/// Asks each panel's node what it is doing and has moved, and shows it:
+/// every node, or with `declined`, every node the operator has not stopped.
+///
+/// Nothing is asked where the vehicle has not agreed which configuration it
+/// is flying, and the asking stops where the link is down; Last Response
+/// says so, or what each node answered.
+///
+/// # Arguments
+///
+/// * `ui`       - The window, whose Last Response says what was found.
+/// * `link`     - The link the queries go on.
+/// * `agreed`   - Whether the vehicle has agreed which configuration it is
+///                flying.
+/// * `model`    - The panels, whose statuses and popups are updated.
+/// * `declined` - Which panels' nodes the operator has stopped, to leave
+///                them out; `None` asks every node.
+///
+/// # Panics
+///
+/// If the lock on the link is poisoned.
 fn ask_nodes(
     ui: &MainWindow,
     link: &Arc<Mutex<CiLink>>,
@@ -610,6 +733,14 @@ fn describes(info: &DHInfo) -> String {
 /// A column of name and value, in a font of one width, as every other
 /// parameter line in this popup is: the lines only line up that way, and what
 /// they are read for is the comparison between them.
+///
+/// # Arguments
+///
+/// * `counts` - What the vehicle said the node has moved.
+///
+/// # Returns
+///
+/// The popup's lines, one count to a line.
 fn counted(counts: &tcslibgs::NodeCounts) -> String {
     let moved = match counts.last_moved {
         Some(at) => at.time_of_day(),
@@ -639,13 +770,29 @@ fn counted(counts: &tcslibgs::NodeCounts) -> String {
     )
 }
 
-/// Set an attribute of the node a panel is for, and say how it went.
+/// Sets an attribute of the node a panel is for, and says how it went.
 ///
 /// `attribute` and `value` are as they were typed. Neither is checked here:
 /// the vehicle refuses an attribute no binding mentions and a value the node
 /// will not take, and it is the end that has the configuration it is flying.
 /// What is checked here is that there is something to send -- an empty field
 /// is a press nobody meant.
+///
+/// # Arguments
+///
+/// * `ui`        - The window, whose Last Response says how it went.
+/// * `link`      - The link the command goes on.
+/// * `agreed`    - Whether the vehicle has agreed which configuration it is
+///                 flying; nothing is sent until it has.
+/// * `model`     - The panels.
+/// * `row`       - The panel whose node is set; a row with none sends
+///                 nothing.
+/// * `attribute` - The attribute's name, as typed.
+/// * `value`     - The value, as typed, sent as its bytes.
+///
+/// # Panics
+///
+/// If the lock on the link is poisoned.
 fn set_a_nodes_attribute(
     ui: &MainWindow,
     link: &Arc<Mutex<CiLink>>,
@@ -722,7 +869,8 @@ fn set_a_nodes_attribute(
     ui.set_last_response(SharedString::from(said));
 }
 
-/// Send one node command about the node a panel is for, and say how it went.
+/// Sends one node command about the node a panel is for, and says how it
+/// went.
 ///
 /// `row` is the panel, and the id is the `dev_id` the panel shows -- the
 /// node's position in the configuration, which is the number a command
@@ -733,6 +881,23 @@ fn set_a_nodes_attribute(
 /// panel's status takes it, and `declined` keeps the operator's word: Disable
 /// leaves the node out of the asking done when contact is made, and Enable
 /// puts it back.
+///
+/// # Arguments
+///
+/// * `ui`       - The window, whose Last Response says how it went.
+/// * `link`     - The link the command goes on.
+/// * `agreed`   - Whether the vehicle has agreed which configuration it is
+///                flying; nothing is sent until it has.
+/// * `model`    - The panels, whose status takes a successful answer.
+/// * `declined` - The operator's last word about each panel's node.
+/// * `row`      - The panel whose node is commanded; a row with none sends
+///                nothing.
+/// * `enable`   - True for START_NODE (Enable), false for STOP_NODE
+///                (Disable).
+///
+/// # Panics
+///
+/// If the lock on the link is poisoned.
 fn command_a_node(
     ui: &MainWindow,
     link: &Mutex<CiLink>,
@@ -806,7 +971,7 @@ fn command_a_node(
     ui.set_last_response(SharedString::from(said));
 }
 
-/// Wire every control that sends a command.
+/// Wires every control that sends a command.
 ///
 /// Apart from `run` so that it can be driven in a test: a button is pressed
 /// through Slint's testing backend, and what is being checked is that the
@@ -821,6 +986,17 @@ fn command_a_node(
 ///
 /// `contact` is the beacon thread's reading of whether the spacecraft is
 /// being heard from, which a Connect reads: see [`connected_in_contact`].
+///
+/// # Arguments
+///
+/// * `ui`       - The window whose controls are wired.
+/// * `link`     - The link every command goes on.
+/// * `agreed`   - Whether the vehicle has agreed which configuration it is
+///                flying, which a Connect's answer sets.
+/// * `digest`   - This end's configuration digest, or `None`.
+/// * `model`    - The panels.
+/// * `declined` - The operator's last word about each panel's node.
+/// * `contact`  - Whether the spacecraft is being heard from.
 pub(crate) fn command_buttons(
     ui: &MainWindow,
     link: &Arc<Mutex<CiLink>>,
@@ -1050,11 +1226,15 @@ pub(crate) fn command_buttons(
     }
 }
 
-/// Say, from every control, that this configuration names no command link.
+/// Says, from every control, that this configuration names no command link.
 ///
 /// A configuration with no `tcspecial` section states no ports, so there is
 /// nowhere to send a command: the controls say that rather than doing
 /// nothing, which an operator reads as a window that has stopped working.
+///
+/// # Arguments
+///
+/// * `ui` - The window whose controls are wired.
 fn no_command_link(ui: &MainWindow) {
     const NO_LINK: &str =
         "This configuration states no tcspecial section, so it says where \
@@ -1129,8 +1309,14 @@ struct PingFeed {
     fresh: Arc<AtomicBool>,
 }
 
-/// Hand what the ping node sent down to the pinger, and say the window has
+/// Hands what the ping node sent down to the pinger, and says the window has
 /// something to show. Allocates nothing: see `tcslib::ping::Pinger`.
+///
+/// # Arguments
+///
+/// * `feed` - The pinger, and the flag that says something is fresh.
+/// * `data` - What the ping node sent.
+/// * `at`   - When it arrived, by the ground's clock.
 fn take_answer(feed: &PingFeed, data: &[u8], at: std::time::Duration) {
     // A poisoned lock is a pinger nobody can use, and this answer goes with
     // it.
@@ -1146,12 +1332,21 @@ fn take_answer(feed: &PingFeed, data: &[u8], at: std::time::Duration) {
 const PING_REFRESH_INTERVAL: std::time::Duration =
     std::time::Duration::from_millis(100);
 
-/// Show the ping window what the pinger keeps, whenever something new has
+/// Shows the ping window what the pinger keeps, whenever something new has
 /// arrived, from a timer on the window's thread.
 ///
 /// Allocates, for each answer shown: a window shows text, and what it is
 /// shown is made on its thread. The receiver, which is the loop that runs for
 /// as long as the MOC does, makes none of it.
+///
+/// # Arguments
+///
+/// * `feed` - The pinger, the window, and the flag that says something is
+///            fresh.
+///
+/// # Returns
+///
+/// The running timer, which stops when it is dropped.
 fn show_answers(feed: PingFeed) -> slint::Timer {
     let timer = slint::Timer::default();
     timer.start(
@@ -1172,7 +1367,12 @@ fn show_answers(feed: PingFeed) -> slint::Timer {
     timer
 }
 
-/// Put what the pinger keeps into the ping window.
+/// Puts what the pinger keeps into the ping window.
+///
+/// # Arguments
+///
+/// * `window` - The ping window.
+/// * `shown`  - What its rows are to say.
 fn show_ping(window: &PingWindow, shown: &PingShown) {
     window.set_sent(shown.sent.clone().into());
     window.set_sent_time(shown.sent_time.clone().into());
@@ -1183,9 +1383,19 @@ fn show_ping(window: &PingWindow, shown: &PingShown) {
     window.set_down(shown.down.clone().into());
 }
 
-/// Keep what arrives at one `moc` node, in the panel of the source it came
-/// from -- and hand the ping node's answers to the pinger, where this is the
-/// `moc` node they come down through.
+/// Keeps what arrives at one `moc` node, in the panel of the source it came
+/// from -- and hands the ping node's answers to the pinger, where this is the
+/// `moc` node they come down through. Runs for as long as the MOC does.
+///
+/// # Arguments
+///
+/// * `moc`          - The `moc` node's receiver.
+/// * `rows`         - Each source's panel row, by the source's name.
+/// * `sends_values` - The sources that send values, shown as readings rather
+///                    than as bytes.
+/// * `arrivals`     - Where the last arrival for each panel is left, by row.
+/// * `pings`        - The pinger to hand the ping node's answers to, where
+///                    they come down through this `moc` node.
 fn serve(
     mut moc: Moc,
     rows: Arc<BTreeMap<String, usize>>,
@@ -1260,13 +1470,25 @@ fn serve(
     }
 }
 
-/// Set the ping window up, where the configuration has a ping node the
+/// Sets the ping window up, where the configuration has a ping node the
 /// ground can reach both ways: the Ping node button that opens it, and its
 /// Send ping, which pings the node through its `moc` node's uplink.
 ///
-/// The `moc` node the answers come down through, and what its receiver hands
-/// them on to; `None` where there is nothing to ping, and an error where there
-/// is a ping node and no way to send to it.
+/// # Arguments
+///
+/// * `ui`          - The main window, whose Ping node button opens it.
+/// * `ping_window` - The ping window.
+/// * `graph`       - The configuration.
+///
+/// # Returns
+///
+/// The `moc` node the answers come down through, and what its receiver
+/// hands them on to; `None` where there is nothing to ping.
+///
+/// # Errors
+///
+/// Where there is a ping node and no way to send to it: its `moc` node's
+/// uplink cannot be opened.
 fn ping_node(
     ui: &MainWindow,
     ping_window: &PingWindow,
@@ -1325,7 +1547,21 @@ fn ping_node(
     )))
 }
 
-/// Run the MOC on a configuration. Does not return.
+/// Runs the MOC on a configuration. Does not return.
+///
+/// What is wrong with the configuration is shown with the rest of what was
+/// found at startup, and stops the MOC where it is fatal.
+///
+/// # Arguments
+///
+/// * `payload_path` - The tcspecial configuration's path.
+/// * `sim_path`     - The simulator file's path, if the set has one.
+/// * `mode`         - The run's simulation mode, given to what this starts.
+/// * `startup`      - What has been found so far, to which this adds.
+///
+/// # Panics
+///
+/// If the main window cannot be made.
 pub fn run(
     payload_path: &str,
     sim_path: Option<&str>,

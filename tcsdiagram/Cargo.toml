@@ -11,3 +11,6 @@ visual window"""
 [dependencies]
 # The configuration's own words: node types, terminals, streams.
 tcslibgs = { path = "../tcslibgs" }
+
+[lints]
+workspace = true

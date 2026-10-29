@@ -81,6 +81,14 @@ pub struct Simulator {
 
 impl Simulator {
     /// An empty simulator configuration for this file.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The file the configuration is to be written to.
+    ///
+    /// # Returns
+    ///
+    /// A configuration that says nothing, for `path`.
     pub fn new(path: &Path) -> Self {
         Simulator {
             path: path.to_path_buf(),
@@ -94,6 +102,15 @@ impl Simulator {
     /// from. None of them is required: a payload that says nothing takes
     /// everything from its group, and a group that says nothing is a group
     /// nothing is settled by -- which the simulator's own checking reports.
+    ///
+    /// # Arguments
+    ///
+    /// * `payload` - Whether the fields are a payload's, which adds `group`,
+    ///               rather than a group's.
+    ///
+    /// # Returns
+    ///
+    /// The names of the fields, in the order a window shows them.
     pub fn fields(payload: bool) -> Vec<&'static str> {
         let mut fields = Vec::new();
         if payload {
@@ -148,6 +165,14 @@ struct File {
 ///
 /// The case is not part of it, as it is not anywhere else a configuration's
 /// extension is read.
+///
+/// # Arguments
+///
+/// * `path` - The file name to check.
+///
+/// # Errors
+///
+/// A message naming the file and saying it must end in `.yaml`.
 pub fn must_be_yaml(path: &Path) -> Result<(), String> {
     let yaml = path
         .extension()
@@ -196,13 +221,27 @@ impl Trouble {
     }
 }
 
-/// Read the simulator configuration at `path`.
+/// Reads the simulator configuration at `path`.
 ///
 /// A file that is not there is not an error: a name that does not exist yet is
 /// how a new one is begun, and an empty simulator configuration is what that
 /// is. A name that is not YAML is an error whether or not the file exists --
 /// see [`must_be_yaml`] -- because it is the name this would be written back
 /// to.
+///
+/// # Arguments
+///
+/// * `path` - The simulator configuration file, which must be named `.yaml`.
+///
+/// # Returns
+///
+/// The configuration read, or an empty one for a file that is not there.
+///
+/// # Errors
+///
+/// [`Trouble::Unreadable`] for a name that is not YAML or a file that cannot be
+/// read or parsed; [`Trouble::Unusable`] for a file with two entries of one
+/// name in a list.
 pub fn read(path: &Path) -> Result<Simulator, Trouble> {
     must_be_yaml(path).map_err(Trouble::Unreadable)?;
 
@@ -285,6 +324,16 @@ pub fn read(path: &Path) -> Result<Simulator, Trouble> {
 /// a name that is not among them is written out too, after them: it is
 /// somebody's typing, and `tcsverify` is what says a simulated payload names
 /// no payload.
+///
+/// # Arguments
+///
+/// * `simulator` - The simulator configuration to write.
+/// * `payloads`  - The configuration's payload nodes, in its order; each gets
+///                 an entry.
+///
+/// # Returns
+///
+/// The file's text.
 pub fn to_yaml(simulator: &Simulator, payloads: &[String]) -> String {
     let mut out = String::new();
 
@@ -430,6 +479,15 @@ pub fn to_yaml(simulator: &Simulator, payloads: &[String]) -> String {
 /// a list would be a third statement of the schema, and the one thing it would
 /// buy -- writing `protocol: "1"` quoted -- is a value the simulator refuses
 /// whichever way it is spelled.
+///
+/// # Arguments
+///
+/// * `value` - A setting's value as typed.
+///
+/// # Returns
+///
+/// The value as YAML: bare if it is all digits, otherwise double-quoted with
+/// backslashes and quotes escaped.
 fn quoted(value: &str) -> String {
     if !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()) {
         return value.to_string();

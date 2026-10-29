@@ -35,7 +35,13 @@ use crate::payload::{
 };
 use crate::pty::SimulatedNode;
 
-/// Run a simulated device on an rpmsg channel.
+/// Runs a simulated device on an rpmsg channel.
+///
+/// # Arguments
+///
+/// * `config`  - The payload's configuration.
+/// * `running` - Cleared to stop it; the function returns soon after.
+/// * `stats`   - Where it counts what it sends and receives.
 pub fn run_rpmsg_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
@@ -117,7 +123,19 @@ mod tests {
     use std::time::Duration;
     use tcslibgs::Faults;
 
-    /// A channel the handler would open at `path`.
+    /// Configures a channel the handler would open at a path, sending
+    /// eight-byte messages.
+    ///
+    /// # Arguments
+    ///
+    /// * `path`        - Where the handler opens it.
+    /// * `triggered`   - Whether it answers requests rather than sending on
+    ///                   its own.
+    /// * `interval_ms` - Its packet interval, in ms.
+    ///
+    /// # Returns
+    ///
+    /// Its configuration.
     fn channel_at(
         path: &str,
         triggered: bool,
@@ -237,6 +255,12 @@ mod tests {
     /// handler's end: a pty read blocks until something arrives, and what the
     /// test is checking is that nothing does.
     trait NonBlockingForTest {
+        /// Makes reads of the file return at once when there is nothing to
+        /// read.
+        ///
+        /// # Errors
+        ///
+        /// The system's error if the file's flags cannot be read or set.
         fn set_nonblocking_for_test(&self) -> std::io::Result<()>;
     }
 

@@ -35,11 +35,24 @@ impl InterfaceDigest {
         InterfaceDigest(INTERFACE_DIGEST)
     }
 
-    /// The interface the XTCE documents at `paths` state, as one set.
+    /// Digests the interface a set of XTCE documents state.
     ///
     /// The order they are given in does not matter. Reading and digesting
     /// them allocates, so a program does this as it starts and not in its
     /// main loop.
+    ///
+    /// # Arguments
+    ///
+    /// * `paths` - The XTCE documents, taken as one set.
+    ///
+    /// # Returns
+    ///
+    /// The interface they state.
+    ///
+    /// # Errors
+    ///
+    /// [`TcsError::Config`], naming the documents, if they cannot be read or
+    /// digested.
     pub fn of_files<P: AsRef<Path>>(paths: &[P]) -> TcsResult<InterfaceDigest> {
         tcs_xtce::digest::digest_files_bytes(paths)
             .map(InterfaceDigest)
@@ -56,8 +69,16 @@ impl InterfaceDigest {
             })
     }
 
-    /// Why `theirs`, the interface the vehicle speaks, is not `ours`, or
-    /// `None` when it is.
+    /// Says why the interface the vehicle speaks is not this station's.
+    ///
+    /// # Arguments
+    ///
+    /// * `theirs` - The interface the vehicle speaks.
+    /// * `ours`   - The interface this station read.
+    ///
+    /// # Returns
+    ///
+    /// A message saying what to do, or `None` when the two are the same.
     pub fn differs(
         theirs: InterfaceDigest,
         ours: InterfaceDigest,
@@ -85,8 +106,16 @@ impl fmt::Display for InterfaceDigest {
 mod tests {
     use super::*;
 
-    /// The documents this build's interface is stated in: every XTCE
+    /// Lists the documents this build's interface is stated in: every XTCE
     /// document in `tcslibgs/xtce/`, as `make interface-digest` takes them.
+    ///
+    /// # Returns
+    ///
+    /// Their paths, sorted.
+    ///
+    /// # Panics
+    ///
+    /// If the directory cannot be read.
     fn documents() -> Vec<std::path::PathBuf> {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("xtce");
         let mut found: Vec<_> = std::fs::read_dir(&dir)

@@ -75,7 +75,11 @@ pub enum Standard {
 }
 
 impl Standard {
-    /// How this value is spelled in a configuration file.
+    /// Spells the standard as a configuration file does.
+    ///
+    /// # Returns
+    ///
+    /// Its spelling, such as `v35`.
     pub fn as_str(&self) -> &'static str {
         match self {
             Standard::V35 => "v35",
@@ -120,6 +124,11 @@ pub enum ClockType {
 }
 
 impl ClockType {
+    /// Spells the clock type as a configuration file does.
+    ///
+    /// # Returns
+    ///
+    /// Its spelling, such as `external`.
     pub fn as_str(&self) -> &'static str {
         match self {
             ClockType::External => "external",
@@ -129,6 +138,15 @@ impl ClockType {
         }
     }
 
+    /// Reads the clock type a file's word names, if it names one.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The word, in lower case.
+    ///
+    /// # Returns
+    ///
+    /// The clock type, or `None` when the word names none.
     pub fn from_spelling(text: &str) -> Option<ClockType> {
         [
             ClockType::External,
@@ -170,6 +188,11 @@ pub enum Encoding {
 }
 
 impl Encoding {
+    /// Spells the encoding as a configuration file does.
+    ///
+    /// # Returns
+    ///
+    /// Its spelling, such as `nrz`.
     pub fn as_str(&self) -> &'static str {
         match self {
             Encoding::Nrz => "nrz",
@@ -180,6 +203,15 @@ impl Encoding {
         }
     }
 
+    /// Reads the encoding a file's word names, if it names one.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The word, in lower case.
+    ///
+    /// # Returns
+    ///
+    /// The encoding, or `None` when the word names none.
     pub fn from_spelling(text: &str) -> Option<Encoding> {
         [
             Encoding::Nrz,
@@ -217,6 +249,11 @@ pub enum FrameCheck {
 }
 
 impl FrameCheck {
+    /// Spells the frame check as a configuration file does.
+    ///
+    /// # Returns
+    ///
+    /// Its spelling, such as `crc16_pr0`.
     pub fn as_str(&self) -> &'static str {
         match self {
             FrameCheck::None => "none",
@@ -229,6 +266,15 @@ impl FrameCheck {
         }
     }
 
+    /// Reads the frame check a file's word names, if it names one.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The word, in lower case.
+    ///
+    /// # Returns
+    ///
+    /// The frame check, or `None` when the word names none.
     pub fn from_spelling(text: &str) -> Option<FrameCheck> {
         [
             FrameCheck::None,
@@ -272,13 +318,29 @@ pub struct HdlcParams {
     pub frame_check: FrameCheck,
 }
 
-/// What an HDLC node says about its line, and what it must say.
+/// Reads what an HDLC node says about its line, and what it must say.
 ///
 /// A line carries no negotiation, so both ends must be told the same thing:
 /// the standard and the clock are required, and a line read with the wrong one
 /// of either delivers noise rather than nothing. The encoding and the frame
 /// check have the plain defaults the kernel's own are, since a short cable
 /// commonly wants neither clock recovery nor a CRC.
+///
+/// # Arguments
+///
+/// * `name` - The node's name, for the messages.
+/// * `g`    - The node's terms as the file states them.
+///
+/// # Returns
+///
+/// The line's standard, clock, loopback, encoding and frame check.
+///
+/// # Errors
+///
+/// A term that does not belong to HDLC, a `stream`, a missing `standard` or
+/// `clock_type`, a word none of them knows, a `clock_rate` missing where
+/// this end drives the clock or given where it does not, a rate of nought,
+/// and a `loopback` that is not a boolean.
 pub(crate) fn group_kind_of(
     name: &str,
     g: LinkTerms,
@@ -417,9 +479,17 @@ pub(crate) fn group_kind_of(
     }))
 }
 
-/// Whether `interface` is a stand-in, which a synchronous line never is:
-/// there is no virtual HDLC interface, so such a payload needs a card. See
-/// [`crate::simulate`].
+/// Judges whether an HDLC interface is a stand-in, which a synchronous line
+/// never is: there is no virtual HDLC interface, so such a payload needs a
+/// card. See [`crate::simulate`].
+///
+/// # Arguments
+///
+/// * `interface` - The interface's name, for the message.
+///
+/// # Returns
+///
+/// A judgement of hardware, always.
 pub fn judged(interface: &str) -> crate::simulate::Judged {
     crate::simulate::Judged::hardware(
         format!(
@@ -435,6 +505,19 @@ mod tests {
     use super::*;
     use crate::endpoint_config::Scalar;
 
+    /// Makes terms as a file states them, with everything else absent.
+    ///
+    /// # Arguments
+    ///
+    /// * `stated` - Each term stated, with its value as written.
+    ///
+    /// # Returns
+    ///
+    /// The terms.
+    ///
+    /// # Panics
+    ///
+    /// If a term is not one of HDLC's or `datarate`.
     fn terms(stated: &[(&str, &str)]) -> LinkTerms {
         let mut g = LinkTerms::default();
         for (field, value) in stated {
@@ -453,6 +536,19 @@ mod tests {
         g
     }
 
+    /// Reads the line a node named `link` states.
+    ///
+    /// # Arguments
+    ///
+    /// * `stated` - Each term stated, with its value as written.
+    ///
+    /// # Returns
+    ///
+    /// The line's parameters.
+    ///
+    /// # Panics
+    ///
+    /// If the terms are refused, or are not an HDLC line.
     fn params(stated: &[(&str, &str)]) -> HdlcParams {
         match group_kind_of("link", terms(stated)).expect("a line") {
             GroupKind::Hdlc(hdlc) => hdlc,

@@ -16,6 +16,18 @@ use slint::ComponentHandle;
 use beacon_example::{notice_exit, wire, Vehicle, WatchWindow, START, STOP};
 
 /// The window, shown, with its button joined to this vehicle.
+///
+/// # Arguments
+///
+/// * `vehicle` - The vehicle the button is to start and stop.
+///
+/// # Returns
+///
+/// The window, on Slint's testing backend.
+///
+/// # Panics
+///
+/// The window cannot be made or shown.
 fn window_for(vehicle: &Rc<RefCell<Vehicle>>) -> WatchWindow {
     i_slint_backend_testing::init_no_event_loop();
     let window = WatchWindow::new().expect("the window opens");
@@ -25,6 +37,14 @@ fn window_for(vehicle: &Rc<RefCell<Vehicle>>) -> WatchWindow {
 }
 
 /// Press the button.
+///
+/// # Arguments
+///
+/// * `window` - The window whose button is pressed.
+///
+/// # Panics
+///
+/// The window has no button.
 fn press(window: &WatchWindow) {
     ElementHandle::find_by_element_id(window, "WatchWindow::tcspecial-button")
         .next()

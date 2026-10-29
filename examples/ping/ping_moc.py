@@ -76,6 +76,18 @@ REFRESH_MS = 50
 
 
 def arguments(argv):
+    """Read the command line, and choose the configuration it means.
+
+    Args:
+        argv: The command line's arguments, without the program's name.
+
+    Returns:
+        The options, as ``argparse`` gives them, with ``configuration`` the
+        path of the file to read.
+
+    Raises:
+        SystemExit: The command line is wrong; argparse has said why.
+    """
     parser = argparse.ArgumentParser(
         description="Ping the vehicle's ping node and time the answer, beside "
         "the beacon panel."
@@ -151,7 +163,19 @@ def arguments(argv):
 
 def the_one(nodes, kind, named):
     """The node of this kind the program uses: the one named, or the only
-    one."""
+    one.
+
+    Args:
+        nodes: The configuration's nodes.
+        kind:  The node type wanted, as ``moc`` or ``ping``.
+        named: The node named on the command line, or ``None``.
+
+    Returns:
+        The node's name.
+
+    Raises:
+        ValueError: None was named and there is not exactly one of the kind.
+    """
     if named is not None:
         return named
     names = [node.name for node in nodes if node.node_type == kind]
@@ -175,6 +199,9 @@ def die_with_this_program(parent):
     no ground station. So the kernel is asked to send SIGKILL when this
     program goes -- and if it has gone already, between the fork and here, the
     child goes now rather than never being told.
+
+    Args:
+        parent: This program's process id, taken before the fork.
     """
     libc = ctypes.CDLL(None, use_errno=True)
     if libc.prctl(PR_SET_PDEATHSIG, signal.SIGKILL, 0, 0, 0) != 0:
@@ -189,6 +216,10 @@ class Vehicle:
     Run itself and not through ``cargo run``: the kill is ``kill()``, and
     killing cargo would leave the tcspecial it started running, holding the
     example's ports, with nothing left that knows it is there.
+
+    Args:
+        program: The tcspecial program to run.
+        args:    Its arguments.
     """
 
     def __init__(self, program, args):
@@ -203,7 +234,20 @@ class Vehicle:
 
         Told ``--quiet`` unless ``verbose``, so that the console is this
         program's: tcspecial's startup summary is for somebody watching the
-        vehicle start, and what stops it starting it says either way."""
+        vehicle start, and what stops it starting it says either way.
+
+        Args:
+            path:    The configuration file.
+            program: The tcspecial to run, or ``None`` for the build's.
+            verbose: Whether to let tcspecial print its startup summary.
+
+        Returns:
+            The :class:`Vehicle`, not yet started.
+
+        Raises:
+            ValueError: No program was named and none is built or on the
+                        PATH.
+        """
         program = program or find_built("tcspecial")
         if program is None:
             raise ValueError(
@@ -223,6 +267,7 @@ class Vehicle:
         threading.Thread(target=self._watch, daemon=True).start()
 
     def _watch(self):
+        """Wait for tcspecial to exit, and say so if nobody stopped it."""
         code = self.process.wait()
         if not self._stopping:
             status(f"tcspecial stopped by itself: exit status {code}")
@@ -240,7 +285,15 @@ class Vehicle:
 
 
 class Setup:
-    """What the program read out of the configuration."""
+    """What the program read out of the configuration.
+
+    Args:
+        options: The command line's options, from :func:`arguments`.
+
+    Raises:
+        ValueError: The configuration is wrong for this program.
+        OSError: The configuration cannot be read.
+    """
 
     def __init__(self, options):
         self.config = configuration.load(options.configuration)
@@ -255,7 +308,12 @@ class Setup:
         )
 
     def describe(self):
-        """The facts, one per line, as the agreement test reads them."""
+        """The facts, one per line, as the agreement test reads them.
+
+        Returns:
+            The beacon link, its interval, the uplink, the downlink and the
+            digest, each on a line of its own as ``name value``.
+        """
         return "\n".join([
             f"beacon.send {self.beacon.send}",
             f"beacon.recv {self.beacon.recv}",
@@ -283,10 +341,20 @@ def run_without_a_window(setup, beacons, pinger, count):
     Each ping is given two seconds to be answered, which is long enough for
     any link this example runs over and short enough that a vehicle that never
     answers is a run that ends rather than one that hangs.
+
+    Args:
+        setup:   What the program read out of the configuration.
+        beacons: The beacon socket, listened to on a thread of its own.
+        pinger:  The ping link.
+        count:   How many pings to send.
+
+    Returns:
+        The exit status: nought if every ping was answered, one if not.
     """
     heard = threading.Event()
 
     def listen():
+        """Print what the beacon link says until the first beacon arrives."""
         while not heard.is_set():
             beacon_pass = beacons.next_pass()
             for remark in beacon_pass.remarks:
@@ -326,7 +394,16 @@ def run_without_a_window(setup, beacons, pinger, count):
 
 
 def run_the_window(setup, beacons, pinger):
-    """The window, and the two loops that feed it."""
+    """The window, and the two loops that feed it.
+
+    Args:
+        setup:   What the program read out of the configuration.
+        beacons: The beacon socket, which a loop of its own listens to.
+        pinger:  The ping link, whose answers a loop of its own receives.
+
+    Returns:
+        The exit status, nought, once the window is closed.
+    """
     import tkinter as tk
 
     from tkinter import ttk
@@ -339,6 +416,7 @@ def run_the_window(setup, beacons, pinger):
     # Each loop on a thread of its own, reporting to the window rather than
     # touching it: tkinter is not to be used from any thread but its own.
     def beacon_loop():
+        """Report each pass of the beacon loop to the window, for ever."""
         while True:
             beacon_pass = beacons.next_pass()
             for remark in beacon_pass.remarks:
@@ -349,6 +427,7 @@ def run_the_window(setup, beacons, pinger):
             reports.put(("beacon", Shown.of(beacon_pass)))
 
     def answer_loop():
+        """Report each answer to the window, until the socket closes."""
         while True:
             try:
                 if pinger.receive(timeout=0.5):
@@ -388,6 +467,16 @@ def run_the_window(setup, beacons, pinger):
         )
 
     def value(number, column, width=None):
+        """Put a label for a value on the ping panel.
+
+        Args:
+            number: The row it goes on.
+            column: The column it goes in.
+            width:  Its width in characters, or ``None`` to fit its text.
+
+        Returns:
+            The label.
+        """
         label = ttk.Label(panel, style="Value.TLabel", width=width)
         label.grid(
             row=number, column=column, sticky="w", padx=(between, 0), pady=2
@@ -419,6 +508,7 @@ def run_the_window(setup, beacons, pinger):
     down = value(4, 1)
 
     def show():
+        """Show the ping link's latest exchange on the panel."""
         exchange = pinger.exchange()
         sent.configure(text=exchange.sent or NO_MESSAGE)
         sent_time.configure(text=precise_time(exchange.sent_at))
@@ -466,6 +556,8 @@ def run_the_window(setup, beacons, pinger):
     show()
 
     def take_in():
+        """Show what the loops have reported, and come back in
+        ``REFRESH_MS``."""
         while True:
             try:
                 kind, report = reports.get_nowait()
@@ -485,6 +577,16 @@ def run_the_window(setup, beacons, pinger):
 
 
 def main(argv):
+    """Run the example: read the configuration, listen, start the vehicle,
+    and ping it, with a window or without.
+
+    Args:
+        argv: The command line's arguments, without the program's name.
+
+    Returns:
+        The exit status: nought for success, one for a failure, which has
+        been said on stderr.
+    """
     global VERBOSE
     options = arguments(argv)
     VERBOSE = options.verbose

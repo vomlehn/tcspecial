@@ -18,7 +18,21 @@ use crate::format::ConfigFormat;
 /// The sections a node is written under.
 const SECTIONS: &[&str] = &["moc", "vehicle", "payloads"];
 
-/// The names of the nodes this file declares, in the order it declares them.
+/// Lists the names of the nodes a file declares, in the order it declares
+/// them.
+///
+/// # Arguments
+///
+/// * `path` - The configuration file, YAML or XML by its extension.
+///
+/// # Returns
+///
+/// The nodes' names.
+///
+/// # Errors
+///
+/// [`TcsError::Config`], naming the file, if it cannot be read, its
+/// extension is neither format's, or it does not parse.
 pub fn declared(path: &Path) -> TcsResult<Vec<String>> {
     let text = std::fs::read_to_string(path)
         .map_err(|e| TcsError::Config(format!("{}: {e}", path.display())))?;
@@ -29,8 +43,22 @@ pub fn declared(path: &Path) -> TcsResult<Vec<String>> {
     .map_err(|why| TcsError::Config(format!("{}: {why}", path.display())))
 }
 
+/// Lists the names of the nodes a YAML file declares.
+///
 /// In YAML each section is a key once, so the order is the keys' order and
 /// then each section's entries'.
+///
+/// # Arguments
+///
+/// * `text` - The file's text.
+///
+/// # Returns
+///
+/// The nodes' names, in the order the file declares them.
+///
+/// # Errors
+///
+/// The parser's message if the text is not YAML.
 fn yaml(text: &str) -> Result<Vec<String>, String> {
     let file: serde_norway::Value =
         serde_norway::from_str(text).map_err(|e| e.to_string())?;
@@ -51,8 +79,22 @@ fn yaml(text: &str) -> Result<Vec<String>, String> {
     Ok(names)
 }
 
+/// Lists the names of the nodes an XML file declares.
+///
 /// In XML each node is an element under the root, named for its section, with
 /// the node's name in a `name` element of its own.
+///
+/// # Arguments
+///
+/// * `text` - The file's text.
+///
+/// # Returns
+///
+/// The nodes' names, in the order the file declares them.
+///
+/// # Errors
+///
+/// The parser's message if the text is not well-formed XML.
 fn xml(text: &str) -> Result<Vec<String>, String> {
     let mut reader = quick_xml::Reader::from_str(text);
     reader.config_mut().trim_text(true);
@@ -96,6 +138,21 @@ fn xml(text: &str) -> Result<Vec<String>, String> {
 mod tests {
     use super::*;
 
+    /// Writes a file into a directory of its own.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The file's name.
+    /// * `text` - What it holds.
+    ///
+    /// # Returns
+    ///
+    /// The directory, which removes the file when dropped, and the file's
+    /// path.
+    ///
+    /// # Panics
+    ///
+    /// If the directory or the file cannot be made.
     fn written(
         name: &str,
         text: &str,

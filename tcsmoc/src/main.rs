@@ -98,7 +98,20 @@ impl Sizes {
     ///
     /// Read before the window is sized, which works because a preferred size
     /// is a layout question: what a panel wants is known without laying the
-    /// window out, where what it got is not.
+    /// window out, where what it got is not. Also tells the window the
+    /// panel size, which it lays the grid out by.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui` - The window, which reports its own spacing and chrome.
+    ///
+    /// # Returns
+    ///
+    /// The panel size, the grid's spacing and the window's chrome.
+    ///
+    /// # Panics
+    ///
+    /// If the window a panel is measured in cannot be made.
     fn of(ui: &MainWindow) -> Self {
         // A panel's size comes from a window of its own -- see PanelProbe in
         // ui/main.slint -- built, read and dropped here and never shown. The
@@ -134,6 +147,10 @@ impl Sizes {
     /// that rule needs numbers rather than the numbers.
     /// `the_markup_reports_the_sizes_the_tests_assume` keeps these from
     /// drifting away from the markup they were read off.
+    ///
+    /// # Returns
+    ///
+    /// The sizes the shipped markup reports.
     #[cfg(test)]
     fn for_tests() -> Self {
         Self {
@@ -146,6 +163,14 @@ impl Sizes {
     }
 
     /// How wide a window holding `columns` columns of panels is, gaps and all.
+    ///
+    /// # Arguments
+    ///
+    /// * `columns` - How many columns of panels; none is taken as one.
+    ///
+    /// # Returns
+    ///
+    /// The window's width, in logical pixels.
     fn width_for_columns(&self, columns: usize) -> f32 {
         let columns = columns.max(1);
         columns as f32 * self.panel_width
@@ -178,6 +203,15 @@ fn rows_of_room(rows: usize, panels: usize) -> usize {
 /// One row of them is the window's `min-height`, the least it is ever opened
 /// at; `rows_of_room` says how many rows a particular tcspecial configuration
 /// opens with.
+///
+/// # Arguments
+///
+/// * `sizes` - What the window says a panel, a gap and its chrome come to.
+/// * `rows`  - How many rows of panels; none is taken as one.
+///
+/// # Returns
+///
+/// The window's height, in logical pixels.
 fn height_for_rows(sizes: &Sizes, rows: usize) -> f32 {
     let rows = rows.max(1);
     rows as f32 * sizes.panel_height
@@ -186,6 +220,17 @@ fn height_for_rows(sizes: &Sizes, rows: usize) -> f32 {
 }
 
 /// The size the window opens at for a grid of `shape` holding `panels`.
+///
+/// # Arguments
+///
+/// * `sizes`  - What the window says a panel, a gap and its chrome come to.
+/// * `shape`  - The grid the panels are laid out in.
+/// * `panels` - How many panels there are.
+///
+/// # Returns
+///
+/// The grid's width, and the height of the rows `rows_of_room` keeps room
+/// for.
 fn window_size(sizes: &Sizes, shape: &GridShape, panels: usize) -> LogicalSize {
     LogicalSize::new(
         shape.width,
@@ -272,6 +317,16 @@ fn columns_for(panels: usize) -> usize {
 /// The window is no longer always wider than it is tall: ten panels or more
 /// are four rows of a three-wide grid, which is taller than 960. They scroll,
 /// as too many panels always have.
+///
+/// # Arguments
+///
+/// * `sizes`  - What the window says a panel, a gap and its chrome come to.
+/// * `panels` - How many data handler panels there are; none is taken as
+///              one.
+///
+/// # Returns
+///
+/// The grid's columns and rows, and the window size they ask for.
 fn grid_shape(sizes: &Sizes, panels: usize) -> GridShape {
     // An empty configuration still has to produce a window.
     let panels = panels.max(1);
@@ -310,6 +365,14 @@ fn grid_shape(sizes: &Sizes, panels: usize) -> GridShape {
 /// payloads it had never heard of, and the window opened complaining about
 /// four handlers nobody had mentioned. A set that simulates nothing says so
 /// and starts no simulator.
+///
+/// # Arguments
+///
+/// * `payload_path` - The tcspecial configuration's path.
+///
+/// # Returns
+///
+/// The simulator file's path, or `None` where the set has none.
 fn sim_path_for(payload_path: &str) -> Option<String> {
     match env::var(SIM_CONFIG_PATH_VAR) {
         Ok(named) => Some(named),
@@ -317,13 +380,18 @@ fn sim_path_for(payload_path: &str) -> Option<String> {
     }
 }
 
-/// Say what was found as tcsmoc started, in a window of its own, and wait for
-/// it to be closed.
+/// Says what was found as tcsmoc started, in a window of its own, and waits
+/// for it to be closed.
 ///
 /// Before the main window is shown, so that nobody is commanding payloads
 /// from panels for a set with something wrong with it without having been
 /// told -- and on stderr as well, for a run from a terminal and for one with
 /// no display to open a window on.
+///
+/// # Arguments
+///
+/// * `startup` - What was found: each problem and remark, and whether any
+///               of it stops tcsmoc.
 fn present(startup: &Startup) {
     startup.eprint("tcsmoc");
 
@@ -382,7 +450,26 @@ fn stop(startup: &Startup) -> ! {
     exit(1);
 }
 
-/// Put what the ground received into the panels.
+/// A time as the window shows it, or the placeholder if there is none.
+///
+/// The same placeholder every other time in the window uses, so a reading
+/// that has not happened looks the same wherever it is.
+///
+/// # Arguments
+///
+/// * `at` - The time, or `None` for a reading that has not happened.
+///
+/// # Returns
+///
+/// The time of day, or the placeholder.
+pub(crate) fn shown_time(at: Option<tcslibgs::Timestamp>) -> String {
+    match at {
+        Some(at) => at.time_of_day(),
+        None => NO_TRANSFER_TIME.to_string(),
+    }
+}
+
+/// Puts what the ground received into the panels.
 ///
 /// What no command asked for: the listeners in [`oc_link`] put it where this
 /// can pick it up, on the panel refresh timer. Read every pass rather than
@@ -393,17 +480,12 @@ fn stop(startup: &Startup) -> ! {
 /// the point of them coming from one place: when the data arrived, what it
 /// was, and how much of it there has been are one account, kept by the end
 /// that received it.
-/// A time as the window shows it, or the placeholder if there is none.
 ///
-/// The same placeholder every other time in the window uses, so a reading
-/// that has not happened looks the same wherever it is.
-pub(crate) fn shown_time(at: Option<tcslibgs::Timestamp>) -> String {
-    match at {
-        Some(at) => at.time_of_day(),
-        None => NO_TRANSFER_TIME.to_string(),
-    }
-}
-
+/// # Arguments
+///
+/// * `dh_model` - The panels' model, one row per data handler.
+/// * `arrivals` - What arrived last for each panel, by row; a row with
+///                nothing yet is left alone.
 fn show_arrivals(dh_model: &Rc<VecModel<DHInfo>>, arrivals: &Arrivals) {
     let Ok(slots) = arrivals.lock() else { return };
 
@@ -420,10 +502,16 @@ fn show_arrivals(dh_model: &Rc<VecModel<DHInfo>>, arrivals: &Arrivals) {
     }
 }
 
-/// Change one panel's contents, leaving the rest of it alone.
+/// Changes one panel's contents, leaving the rest of it alone.
 ///
 /// A Slint model row is a value rather than a place, so a field is changed by
 /// reading the row, changing it, and putting it back.
+///
+/// # Arguments
+///
+/// * `model` - The panels' model.
+/// * `row`   - The panel's row; one past the end changes nothing.
+/// * `f`     - Changes the row's contents in place.
 fn update_row(
     model: &Rc<VecModel<DHInfo>>,
     row: usize,
@@ -459,6 +547,16 @@ fn update_row(
 ///
 /// With the MOC's own simulation mode, so that the two cannot disagree in a
 /// run the MOC started: see `tcslibgs::simulate`.
+///
+/// # Arguments
+///
+/// * `name`         - The binary to run, `tcspecial` or `tcssim`.
+/// * `payload_path` - The tcspecial configuration the child is to read.
+/// * `mode`         - The run's simulation mode, passed on as the flag.
+///
+/// # Returns
+///
+/// A `cargo run` of that binary, not yet started.
 fn child_command(name: &str, payload_path: &str, mode: Mode) -> Command {
     let mut command = Command::new("cargo");
     command.args([
@@ -479,6 +577,11 @@ struct ProcessManager {
 }
 
 impl ProcessManager {
+    /// Makes a manager that has started nothing yet.
+    ///
+    /// # Returns
+    ///
+    /// The manager, with no child and no name.
     fn new() -> Self {
         Self {
             child: Arc::new(Mutex::new(None)),
@@ -494,6 +597,16 @@ impl ProcessManager {
     /// next MOC on that configuration then fails to bind. Asking is what a
     /// signal does, so the timer that notices a signal stops what the MOC
     /// started, the one that ended included, and exits: see `stop_if_asked`.
+    ///
+    /// # Arguments
+    ///
+    /// * `name`         - The binary to start, `tcspecial` or `tcssim`.
+    /// * `payload_path` - The tcspecial configuration the child is to read.
+    /// * `mode`         - The run's simulation mode, passed on to it.
+    ///
+    /// # Panics
+    ///
+    /// If the child cannot be started, or a lock on it is poisoned.
     fn start_child(&self, name: &str, payload_path: &str, mode: Mode) {
         let child = child_command(name, payload_path, mode)
             .spawn()
@@ -539,6 +652,12 @@ impl ProcessManager {
 
     /// Whether the child this started has ended. False where it started
     /// none.
+    ///
+    /// # Returns
+    ///
+    /// True if the child has exited, or asking whether it has failed;
+    /// false while it runs, where none was started, or where the lock on it
+    /// is poisoned.
     fn has_exited(&self) -> bool {
         match self.child.lock() {
             Ok(mut guard) => match guard.as_mut() {
@@ -549,6 +668,11 @@ impl ProcessManager {
         }
     }
 
+    /// Kills the child this started, if any, and waits for it to end.
+    ///
+    /// # Panics
+    ///
+    /// If a lock on the child or its name is poisoned.
     fn kill(&self) {
         let name = self.name.lock().unwrap();
         eprintln!("Kill child {}", *name);
@@ -564,6 +688,12 @@ impl ProcessManager {
     }
 }
 
+/// Reads the simulation mode and the tcspecial configuration from the
+/// command line, says what is wrong with the configuration, and runs the
+/// window.
+///
+/// Exits with status 1 on a bad command line or a configuration that stops
+/// the MOC.
 fn main() {
     eprintln!("TcsMoc running");
 
@@ -622,7 +752,7 @@ fn main() {
     vehicle::run(&payload_path, sim_path.as_deref(), mode, startup);
 }
 
-/// Ask for this window to be put against one edge of the display.
+/// Asks for this window to be put against one edge of the display.
 ///
 /// Asked once the event loop is running, because that is when the window has
 /// a size: before it is shown, what it reports is what was requested rather
@@ -630,6 +760,11 @@ fn main() {
 /// height less the window's.
 ///
 /// A request, and not a thing to report on: see `tcslibgs::display`.
+///
+/// # Arguments
+///
+/// * `ui`   - The window.
+/// * `edge` - The display's edge to put it against.
 fn ask_for_the_edge(ui: &MainWindow, edge: Edge) {
     let ui_weak = ui.as_weak();
     let timer = slint::Timer::default();
@@ -678,7 +813,15 @@ fn handle_quit(
     });
 }
 
-// Window close handler (close box)
+/// Stops what the MOC started, and exits, when the window's close box is
+/// pressed.
+///
+/// # Arguments
+///
+/// * `ui`           - The window.
+/// * `pm_tcssim`    - The tcssim the MOC started.
+/// * `pm_tcspecial` - The tcspecial the MOC started, or `None` where it
+///                    attached to one already running.
 fn handle_close(
     ui: &MainWindow,
     pm_tcssim: Arc<ProcessManager>,
@@ -690,13 +833,6 @@ fn handle_close(
     });
 }
 
-/// Stop what the MOC started, and exit.
-///
-/// `pm_tcspecial` is `None` when a tcspecial was already running and the MOC
-/// attached to it instead of starting one. The MOC does not kill that one:
-/// something else started it, something else may still be using it, and
-/// shutting down a spacecraft's command interpreter because a ground display
-/// was closed is not the MOC's decision to make.
 /// What to do when tcspecial's beacons announce a configuration other than
 /// the one this MOC read: ask the operator whether to continue anyway.
 ///
@@ -705,6 +841,16 @@ fn handle_close(
 /// button does. Asked inside the main window, in front of its panels, so it
 /// cannot be lost behind them: see DiffersPanel in the markup. Asked from the
 /// beacon thread, so the window is touched on the event loop.
+///
+/// # Arguments
+///
+/// * `pm_tcssim`    - The tcssim the MOC started.
+/// * `pm_tcspecial` - The tcspecial the MOC started, or `None` where it
+///                    attached to one already running.
+///
+/// # Returns
+///
+/// The question, to be asked with what differs.
 fn ask_whether_to_continue(
     pm_tcssim: Arc<ProcessManager>,
     pm_tcspecial: Option<Arc<ProcessManager>>,
@@ -755,6 +901,22 @@ fn main_window() -> Option<MainWindow> {
         .with(|main| main.borrow().as_ref().and_then(|weak| weak.upgrade()))
 }
 
+/// Stops what the MOC started, and exits.
+///
+/// `pm_tcspecial` is `None` when a tcspecial was already running and the MOC
+/// attached to it instead of starting one. The MOC does not kill that one:
+/// something else started it, something else may still be using it, and
+/// shutting down a spacecraft's command interpreter because a ground display
+/// was closed is not the MOC's decision to make.
+///
+/// # Arguments
+///
+/// * `pm_tcssim`    - The tcssim the MOC started.
+/// * `pm_tcspecial` - The tcspecial the MOC started, or `None`.
+///
+/// # Panics
+///
+/// If a lock on a child is poisoned.
 fn kill_and_exit_all(
     pm_tcssim: &Arc<ProcessManager>,
     pm_tcspecial: Option<&Arc<ProcessManager>>,
@@ -808,12 +970,18 @@ fn ask_to_stop() {
     STOPPING.store(true, std::sync::atomic::Ordering::Relaxed);
 }
 
-/// Stop what the MOC started, if a signal has asked for it.
+/// Stops what the MOC started, and exits, if a signal has asked for it.
 ///
 /// Called from the timer that repaints the panels, which is the one thing
 /// that keeps running on the event loop whatever else the window is doing. A
 /// second is late enough to be unnoticed by a person and soon enough that
 /// nothing else is waiting on the ports.
+///
+/// # Arguments
+///
+/// * `pm_tcssim`    - The tcssim the MOC started.
+/// * `pm_tcspecial` - The tcspecial the MOC started, or `None` where it
+///                    attached to one already running.
 pub(crate) fn stop_if_asked(
     pm_tcssim: &Arc<ProcessManager>,
     pm_tcspecial: Option<&Arc<ProcessManager>>,
@@ -838,6 +1006,15 @@ mod tests {
     /// about the window: where a panel lands, how wide it is, what text it
     /// shows. What a panel is made *of* is `vehicle::panels`' business and
     /// is tested there, against the shipped examples.
+    ///
+    /// # Arguments
+    ///
+    /// * `row`  - The panel's row, which is also its device id.
+    /// * `name` - The source's name.
+    ///
+    /// # Returns
+    ///
+    /// The panel, with nothing yet received.
     fn a_panel(row: usize, name: &str) -> DHInfo {
         DHInfo {
             name: SharedString::from(name),
@@ -1704,6 +1881,14 @@ mod tests {
     ///
     /// Not a test of its own: the Slint backend belongs to one thread, so the
     /// checks that need a window run from the one that starts it.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui` - The window, opened on the testing backend.
+    ///
+    /// # Panics
+    ///
+    /// If the window reports other sizes than `Sizes::for_tests`.
     fn the_markup_reports_the_sizes_the_tests_assume(ui: &MainWindow) {
         assert_eq!(
             Sizes::of(ui),

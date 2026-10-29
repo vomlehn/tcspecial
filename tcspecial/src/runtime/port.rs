@@ -95,7 +95,7 @@ pub enum Use {
 }
 
 impl Use {
-    /// How this configuration uses the node, or why it does not.
+    /// Says how this configuration uses the node, or why it does not.
     ///
     /// A node no link touches is refused rather than held as a port that does
     /// nothing. A device opened and never read is a line held, a bus address
@@ -105,6 +105,20 @@ impl Use {
     /// `Graph::check` refuses such a configuration at load, where the
     /// complaint can name the file and the line. This is the backstop, for
     /// the running software reached by any other road.
+    ///
+    /// # Arguments
+    ///
+    /// * `routes` - The configuration's links, as the routing found them.
+    /// * `node`   - The node's name.
+    ///
+    /// # Returns
+    ///
+    /// How the node is used: read where something leaves it or a command
+    /// binding reaches it, driven where something arrives at it.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the node, where no link touches it.
     pub fn of(routes: &Routes, node: &str) -> Result<Use, String> {
         // Commands count as something read, and they are the case a table of
         // links alone gets wrong: a thermostat commanded from the ground has
@@ -137,7 +151,11 @@ impl Use {
         matches!(self, Use::Driven | Use::Both)
     }
 
-    /// How to say this in a complaint.
+    /// Says how to put this in a complaint.
+    ///
+    /// # Returns
+    ///
+    /// The words, such as "read and not written".
     fn said(self) -> &'static str {
         match self {
             Use::Read => "read and not written",
@@ -187,7 +205,7 @@ pub struct EndpointPort {
 }
 
 impl EndpointPort {
-    /// Open what this configuration describes and hold it as one node.
+    /// Opens what this configuration describes and holds it as one node.
     ///
     /// For a device: this end reaches out to it. See [`EndpointPort::bind`]
     /// for the end something else reaches, which is what a MOC link is.
@@ -213,7 +231,7 @@ impl EndpointPort {
         Ok(EndpointPort::of(what, reader, writer, uses))
     }
 
-    /// Reach out to a payload that is spoken to first, as one node.
+    /// Reaches out to a payload that is spoken to first, as one node.
     ///
     /// For a heater or a valve, and for a payload that is asked: see
     /// [`crate::endpoint::reaching_endpoint_pair`] for why the ends swap roles
@@ -227,7 +245,7 @@ impl EndpointPort {
         Ok(EndpointPort::of(what, reader, writer, uses))
     }
 
-    /// Wait at the address this configuration describes, as one node.
+    /// Waits at the address this configuration describes, as one node.
     ///
     /// For a link to the MOC, which sends to an address it was told, so this
     /// end binds it.
@@ -240,7 +258,7 @@ impl EndpointPort {
         Ok(EndpointPort::of(what, reader, writer, uses))
     }
 
-    /// Hold halves that are already open.
+    /// Holds halves that are already open.
     ///
     /// Both halves are kept whichever way the node is used, rather than the
     /// unused one dropped. They are not independent: a UDP writer learns
@@ -250,6 +268,18 @@ impl EndpointPort {
     /// tomorrow, which is a configuration change and should not be a code
     /// change. What [`Use`] decides is which half is *used*, not which is
     /// held.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`   - The node's name, which every complaint names.
+    /// * `reader` - The half a read goes to.
+    /// * `writer` - The half a write and a trigger go to.
+    /// * `uses`   - Which way the graph uses the node.
+    ///
+    /// # Returns
+    ///
+    /// The port, with no trigger, delay, read size or stream rule, nothing
+    /// to abandon a wait for, and not a device.
     pub fn of(
         what: &str,
         reader: Box<dyn EndpointReadable + Send>,
@@ -270,7 +300,7 @@ impl EndpointPort {
         }
     }
 
-    /// Say that this port is a device, which a re-asserted decision is sent
+    /// Says that this port is a device, which a re-asserted decision is sent
     /// to again.
     ///
     /// Set where the node type is known, which is [`EndpointPort::open`]: a
@@ -282,7 +312,7 @@ impl EndpointPort {
         self
     }
 
-    /// Open the node a configuration describes.
+    /// Opens the node a configuration describes.
     ///
     /// Everything the node says about reaching it comes from
     /// [`tcslibgs::graph::reach`], and which way it is used from the links --
@@ -293,6 +323,25 @@ impl EndpointPort {
     /// follows from which end exists first: the ground sends to an address it
     /// was told, so the vehicle waits at it, where a device is something the
     /// vehicle opens.
+    ///
+    /// Where the node gives an `init`, it is written before anything else.
+    ///
+    /// # Arguments
+    ///
+    /// * `node`    - The node, as the configuration gives it.
+    /// * `routes`  - The configuration's links, which say how it is used.
+    /// * `abandon` - What a wait inside one of its operations is abandoned
+    ///               for: the node's own, so a disable ends it.
+    ///
+    /// # Returns
+    ///
+    /// The opened port, with everything the node says about reading it.
+    ///
+    /// # Errors
+    ///
+    /// Why it could not be opened, as a message: no link touching it, a
+    /// node that does not say how to reach it, an endpoint that will not
+    /// open, or an `init` that could not be written.
     pub fn open(
         node: &Node,
         routes: &Routes,
@@ -362,7 +411,7 @@ impl EndpointPort {
         Ok(port)
     }
 
-    /// Ask for no more than this many bytes at a time.
+    /// Asks for no more than this many bytes at a time.
     ///
     /// What a read asks for is a property of the part on the other end: a bus
     /// master clocks exactly as many bytes as it asks for, so a sensor that
@@ -375,7 +424,7 @@ impl EndpointPort {
         self
     }
 
-    /// End each read of this line where the node's stream rule says.
+    /// Ends each read of this line where the node's stream rule says.
     ///
     /// A line delivers bytes with no frame boundaries of its own, so what one
     /// read of it is -- a sentence ended by a newline, a fixed record of
@@ -390,7 +439,7 @@ impl EndpointPort {
         self
     }
 
-    /// Ask this device before reading it.
+    /// Asks this device before reading it.
     ///
     /// Some devices answer when they are asked and not before: a sensor whose
     /// reading is a register read, a payload that sends a frame when it gets
@@ -409,7 +458,7 @@ impl EndpointPort {
         self
     }
 
-    /// How long to wait between asking and reading.
+    /// Says how long to wait between asking and reading.
     ///
     /// What turns read-then-ask into ask-wait-read. With a delay, a pass
     /// writes the trigger, waits the time the part's interface document says
@@ -426,7 +475,8 @@ impl EndpointPort {
         self
     }
 
-    /// What ends the wait between asking and reading, besides the clock.
+    /// Says what ends the wait between asking and reading, besides the
+    /// clock.
     ///
     /// The node's own, so that disabling the node abandons an exchange it is
     /// in the middle of rather than letting the delay run out first. A port
@@ -448,7 +498,8 @@ impl EndpointPort {
         self.reader.io_fd()
     }
 
-    /// Wait until there is something to read, a command, or the time is up.
+    /// Waits until there is something to read, a command, or the time is
+    /// up.
     pub fn wait_for_event(
         &self,
         cmd_fd: RawFd,
@@ -457,30 +508,29 @@ impl EndpointPort {
         self.reader.wait_for_event(cmd_fd, timeout_ms)
     }
 
-    /// Whether there is something to read, without waiting to find out.
-    ///
-    /// A poll with no timeout. An error is the poll's own and is reported: a
-    /// descriptor that cannot be asked is a node that cannot be read, and
-    /// quietly reporting no bytes would make a broken endpoint look like an
-    /// idle one.
-    /// Read what is there, and nothing if nothing is: never waiting.
-    ///
-    /// Asked before read, and this is not an optimisation. Some endpoints
-    /// are opened blocking -- a device file is opened as a file -- so a read
-    /// of one with nothing in it does not return. A pass that blocked there
-    /// would be a pass that never ends: the group that was due is never
-    /// finished, every other group starves, and a stop is not noticed because
-    /// a stop is noticed between passes. So the descriptor is asked whether
-    /// there is anything, with no waiting at all, and a node with nothing to
-    /// say is a read of no bytes -- which is the ordinary answer from a device
-    /// that is not due.
-    /// One read of this node, as far as `want` bytes: what is there, or for a
-    /// line, the next read its stream rule has ended.
+    /// Makes one read of this node, as far as `want` bytes: what is there,
+    /// or for a line, the next read its stream rule has ended.
     ///
     /// A read already ended is handed over before anything more is asked of
     /// the line, and no more is asked than would fill the read under way:
     /// see [`crate::runtime::frame`]. Nought bytes is a read still under way,
     /// which a pass treats as a node with nothing to say yet.
+    ///
+    /// # Arguments
+    ///
+    /// * `buffer` - Where the read goes; for a line, at least as long as
+    ///              the read under way can grow.
+    /// * `want`   - The most to ask the endpoint for, no more than
+    ///              `buffer` holds.
+    ///
+    /// # Returns
+    ///
+    /// How many bytes of `buffer` the read filled; nought for nothing yet.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the node, where the descriptor cannot be asked or
+    /// the read failed.
     fn read_one(
         &mut self,
         buffer: &mut [u8],
@@ -494,6 +544,25 @@ impl EndpointPort {
         read
     }
 
+    /// Makes one read of a line through its framer: a read the framer has
+    /// already ended, or as much as the line has, asked for in up to two
+    /// pieces so that a prefixed frame's prefix and body come in one pass.
+    ///
+    /// # Arguments
+    ///
+    /// * `framer` - The line's framer, holding the read under way.
+    /// * `buffer` - Where an ended read is put.
+    /// * `want`   - The most to ask the endpoint for at once.
+    ///
+    /// # Returns
+    ///
+    /// How many bytes of `buffer` an ended read filled; nought where the
+    /// read is still under way.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the node, where the descriptor cannot be asked or
+    /// the read failed.
     fn read_framed(
         &mut self,
         framer: &mut Framer,
@@ -524,11 +593,16 @@ impl EndpointPort {
         Ok(ended.unwrap_or(0))
     }
 
-    /// Say that prefixed frames were let go, which is a line out of step or
-    /// a payload sending what its configuration does not expect: either way
-    /// readings that never reach the ground, and nothing else would say so.
-    /// At most a frame's worth of warnings a timeout or a max_length apart,
-    /// so a line that is wrong is heard without drowning the log.
+    /// Warns that prefixed frames were let go, which is a line out of step
+    /// or a payload sending what its configuration does not expect: either
+    /// way readings that never reach the ground, and nothing else would say
+    /// so. At most a frame's worth of warnings a timeout or a max_length
+    /// apart, so a line that is wrong is heard without drowning the log.
+    ///
+    /// # Arguments
+    ///
+    /// * `framer` - The line's framer, whose count of frames let go is
+    ///              taken.
     fn say_what_was_let_go(&self, framer: &mut Framer) {
         let let_go = framer.let_go();
         if let_go.too_long > 0 {
@@ -550,6 +624,30 @@ impl EndpointPort {
         }
     }
 
+    /// Reads what is there, and nothing if nothing is: never waiting.
+    ///
+    /// Asked before read, and this is not an optimisation. Some endpoints
+    /// are opened blocking -- a device file is opened as a file -- so a read
+    /// of one with nothing in it does not return. A pass that blocked there
+    /// would be a pass that never ends: the group that was due is never
+    /// finished, every other group starves, and a stop is not noticed because
+    /// a stop is noticed between passes. So the descriptor is asked whether
+    /// there is anything, with no waiting at all, and a node with nothing to
+    /// say is a read of no bytes -- which is the ordinary answer from a device
+    /// that is not due.
+    ///
+    /// # Arguments
+    ///
+    /// * `buffer` - Where the read goes; its length is the most asked for.
+    ///
+    /// # Returns
+    ///
+    /// How many bytes were read; nought where nothing was there.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the node, where the descriptor cannot be asked or
+    /// the read failed.
     fn read_what_is_there(
         &mut self,
         buffer: &mut [u8],
@@ -563,6 +661,22 @@ impl EndpointPort {
         }
     }
 
+    /// Says whether there is something to read, without waiting to find
+    /// out.
+    ///
+    /// A poll with no timeout. An error is the poll's own and is reported: a
+    /// descriptor that cannot be asked is a node that cannot be read, and
+    /// quietly reporting no bytes would make a broken endpoint look like an
+    /// idle one.
+    ///
+    /// # Returns
+    ///
+    /// `true` where the descriptor is readable, at its end or in error,
+    /// each of which a read finds out about.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the node, where the poll failed.
     fn ready_to_read(&self) -> Result<bool, String> {
         // SAFETY: a descriptor the reader owns, borrowed for the call and not
         // kept.
@@ -595,7 +709,22 @@ impl EndpointPort {
         format!("{e}").replacen(&format!("{}: ", self.what), "", 1)
     }
 
-    /// Write the whole of `data`, or say what happened instead.
+    /// Writes the whole of `data`, or says what happened instead.
+    ///
+    /// # Arguments
+    ///
+    /// * `data`  - The datum.
+    /// * `doing` - What the write is, for the complaint: "write", "trigger"
+    ///             or "init".
+    ///
+    /// # Returns
+    ///
+    /// Nothing, once every byte has moved.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the node and how many bytes moved, where none or
+    /// only some did or the write failed.
     fn write_all(&mut self, data: &[u8], doing: &str) -> Result<(), String> {
         match self.writer.write(data) {
             Ok(n) if n == data.len() => Ok(()),
@@ -764,6 +893,11 @@ impl Port for EndpointPort {
     }
 }
 
+/// How many results a computation's queue has room for before it would grow:
+/// normally one is waiting at most -- see `ComputePort::ready` -- so this is
+/// room to spare.
+const RESULTS_AT_ONCE: usize = 4;
+
 /// A computation, as a node of the graph.
 ///
 /// The whole of what this adds to a [`Function`] is somewhere to put a result
@@ -771,11 +905,6 @@ impl Port for EndpointPort {
 /// says for itself when it has enough -- a mean over three sensors answers on
 /// the third -- so the result appears as a consequence of a delivery and not
 /// of a schedule, which is what [`Port::ready`] is for.
-/// How many results a computation's queue has room for before it would grow:
-/// normally one is waiting at most -- see `ComputePort::ready` -- so this is
-/// room to spare.
-const RESULTS_AT_ONCE: usize = 4;
-
 pub struct ComputePort {
     /// The node's name in the configuration, which every complaint names.
     what: String,
@@ -801,7 +930,16 @@ pub struct ComputePort {
 }
 
 impl ComputePort {
-    /// Hold a computation that is already built.
+    /// Holds a computation that is already built.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`     - The node's name, which every complaint names.
+    /// * `function` - What it computes.
+    ///
+    /// # Returns
+    ///
+    /// The port, with no results waiting.
     pub fn of(what: &str, function: Box<dyn Function>) -> ComputePort {
         ComputePort {
             what: what.to_string(),
@@ -810,11 +948,25 @@ impl ComputePort {
         }
     }
 
-    /// Build what this node's configuration asks for.
+    /// Builds what this node's configuration asks for.
     ///
-    /// `inputs` is what the routing found bound to the node, which a
-    /// computation over several of them needs: a mean cannot know it is
-    /// waiting for three until something tells it how many links arrive.
+    /// # Arguments
+    ///
+    /// * `node`    - The node, as the configuration gives it.
+    /// * `inputs`  - What the routing found bound to the node, which a
+    ///               computation over several of them needs: a mean cannot
+    ///               know it is waiting for three until something tells it
+    ///               how many links arrive.
+    /// * `abandon` - What a wait inside the computation, such as a
+    ///               `process` computation's, is abandoned for.
+    ///
+    /// # Returns
+    ///
+    /// The port, holding the computation.
+    ///
+    /// # Errors
+    ///
+    /// Why the computation could not be built, as a message.
     pub fn make(
         node: &Node,
         inputs: &[&str],
@@ -917,12 +1069,12 @@ impl Port for ComputePort {
 pub struct LogPort(LogNode);
 
 impl LogPort {
-    /// Hold a log that is already open.
+    /// Holds a log that is already open.
     pub fn of(log: LogNode) -> LogPort {
         LogPort(log)
     }
 
-    /// Open the log this node describes.
+    /// Opens the log this node describes.
     pub fn open(
         node: &Node,
         segsend: &crate::segsend::SegSend,
@@ -1020,7 +1172,15 @@ pub struct TeePort {
 }
 
 impl TeePort {
-    /// A tee for this node.
+    /// Makes a tee for this node.
+    ///
+    /// # Arguments
+    ///
+    /// * `what` - The node's name, which every complaint names.
+    ///
+    /// # Returns
+    ///
+    /// The tee, holding nothing.
     pub fn of(what: &str) -> TeePort {
         TeePort {
             what: what.to_string(),
@@ -1071,7 +1231,15 @@ pub struct PingPort {
 }
 
 impl PingPort {
-    /// A ping node that has answered nothing yet.
+    /// Makes a ping node that has answered nothing yet.
+    ///
+    /// # Arguments
+    ///
+    /// * `what` - The node's name, which every complaint names.
+    ///
+    /// # Returns
+    ///
+    /// The node, with no answers waiting.
     pub fn of(what: &str) -> PingPort {
         PingPort {
             what: what.to_string(),
@@ -1149,11 +1317,25 @@ enum Program {
 }
 
 impl AppPort {
-    /// Start this node's program and hold it.
+    /// Starts this node's program and holds it.
     ///
     /// Started here, as the configuration is opened, so a program that cannot
     /// be executed is a fault found before the vehicle is doing anything --
     /// the rule a `process` computation is held to as well.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The app node, whose type says which kind of app it is.
+    ///
+    /// # Returns
+    ///
+    /// The port, holding the running program.
+    ///
+    /// # Errors
+    ///
+    /// Why it could not start, as a message: attributes that do not
+    /// describe an app of the node's type, or a program that cannot be
+    /// started.
     pub fn open(node: &Node) -> Result<AppPort, String> {
         let params =
             app::params_of(&node.name, &node.node_type, &node.attributes)?;
@@ -1174,10 +1356,25 @@ impl AppPort {
         })
     }
 
-    /// Whatever has arrived on this stream's interface, without waiting.
+    /// Reads whatever has arrived on this stream's interface, without
+    /// waiting.
     ///
     /// Read straight into `buffer`, so that a packet reaches the fabric with
     /// nothing allocated on the way: see `tcsapp::parent::ReadInto`.
+    ///
+    /// # Arguments
+    ///
+    /// * `stream` - The stream to read from.
+    /// * `buffer` - Where a packet is read to.
+    ///
+    /// # Returns
+    ///
+    /// What was read, or `ReadInto::Nothing` for a stream this kind of app
+    /// does not produce on.
+    ///
+    /// # Errors
+    ///
+    /// Why the interface could not be read, as a message.
     fn asked(
         &mut self,
         stream: Stream,
@@ -1213,7 +1410,12 @@ impl AppPort {
         }
     }
 
-    /// Which streams to ask, in the order to ask them.
+    /// Says which streams to ask, in the order to ask them.
+    ///
+    /// # Returns
+    ///
+    /// The streams this kind produces on; for an app with two, the one not
+    /// taken from last comes first.
     fn to_ask(&self) -> &'static [Stream] {
         match (&self.program, self.last) {
             (Program::Payload(_), _) => &[Stream::Vehicleward],
@@ -1398,6 +1600,19 @@ mod tests {
     struct Half(Arc<Mutex<Script>>, std::fs::File);
 
     impl Half {
+        /// Makes one half over a script.
+        ///
+        /// # Arguments
+        ///
+        /// * `script` - The script, shared with the other half.
+        ///
+        /// # Returns
+        ///
+        /// The half, with `/dev/null` open as its descriptor.
+        ///
+        /// # Panics
+        ///
+        /// If `/dev/null` cannot be opened.
         fn of(script: &Arc<Mutex<Script>>) -> Half {
             Half(
                 Arc::clone(script),
@@ -1451,7 +1666,17 @@ mod tests {
         }
     }
 
-    /// A port over a stand-in endpoint, and the script both halves share.
+    /// Makes a port over a stand-in endpoint, and the script both halves
+    /// share.
+    ///
+    /// # Arguments
+    ///
+    /// * `what` - The node's name.
+    /// * `uses` - Which way the graph uses it.
+    ///
+    /// # Returns
+    ///
+    /// The script, empty, and the port.
     fn port(what: &str, uses: Use) -> (Arc<Mutex<Script>>, EndpointPort) {
         let script = Arc::new(Mutex::new(Script::default()));
         let port = EndpointPort::of(
@@ -1463,7 +1688,17 @@ mod tests {
         (script, port)
     }
 
-    /// A port whose stand-in is already scripted.
+    /// Makes a port whose stand-in is already scripted.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`    - The node's name.
+    /// * `uses`    - Which way the graph uses it.
+    /// * `to_read` - What the stand-in's reads answer, in order.
+    ///
+    /// # Returns
+    ///
+    /// The script and the port.
     fn port_of_script(
         what: &str,
         uses: Use,
@@ -1474,7 +1709,15 @@ mod tests {
         (script, port)
     }
 
-    /// The shipped example, as the routing sees it.
+    /// Reads the shipped example, as the routing sees it.
+    ///
+    /// # Returns
+    ///
+    /// The routes of `tests/manual/thermostat.yaml`.
+    ///
+    /// # Panics
+    ///
+    /// If the example cannot be read.
     fn thermostat() -> Routes {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         Routes::of(
@@ -2783,6 +3026,19 @@ mod tests {
         /// `app_moc_veh` and `app_all_veh` crates, which have tests of their
         /// own. What is tested here is this port and the fabric's streams, and
         /// five lines of shell keep that test about those.
+        ///
+        /// # Arguments
+        ///
+        /// * `where_`   - The directory to write the program in.
+        /// * `redirect` - The shell redirections `cat` is run with.
+        ///
+        /// # Returns
+        ///
+        /// The program's path.
+        ///
+        /// # Panics
+        ///
+        /// If the program cannot be written or made executable.
         fn stands_in(where_: &Path, redirect: &str) -> std::path::PathBuf {
             let path = where_.join("stands_in");
             let mut file = std::fs::File::create(&path).expect("a program");
@@ -2796,12 +3052,26 @@ mod tests {
             path
         }
 
-        /// A node of this type, running that program.
+        /// Makes a node of this type, running that program.
         ///
         /// With the argument its kind is run with for each stream it handles,
         /// those being required of a node: asked of `app::Kind` rather than
         /// listed per type here, so a kind that gains an argument gains it in
         /// these tests too.
+        ///
+        /// # Arguments
+        ///
+        /// * `name`      - The node's name.
+        /// * `node_type` - Its type, one of the app kinds.
+        /// * `program`   - The executable it runs.
+        ///
+        /// # Returns
+        ///
+        /// The node, in no group.
+        ///
+        /// # Panics
+        ///
+        /// If `node_type` is not a kind of app.
         fn node(
             name: &str,
             node_type: &str,
@@ -2835,11 +3105,24 @@ mod tests {
             }
         }
 
-        /// What the port has, once the program has answered.
+        /// Takes what the port has, once the program has answered.
         ///
         /// Polled, because that is what the pass does: an app is another
         /// process and answers when it answers. The bound is so that a
         /// program which never answers fails the test instead of hanging it.
+        ///
+        /// # Arguments
+        ///
+        /// * `port`   - The app node's port.
+        /// * `buffer` - Where the datum is taken to.
+        ///
+        /// # Returns
+        ///
+        /// The first datum of more than nought bytes.
+        ///
+        /// # Panics
+        ///
+        /// If a take fails or nothing comes within five seconds.
         fn taken_soon(port: &mut AppPort, buffer: &mut [u8]) -> Taken {
             let until =
                 std::time::Instant::now() + std::time::Duration::from_secs(5);

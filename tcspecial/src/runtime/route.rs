@@ -71,7 +71,7 @@ pub struct Delivery {
     pub line: Option<usize>,
 }
 
-/// Which stream a link carries, where the configuration settles it.
+/// Says which stream a link carries, where the configuration settles it.
 ///
 /// Three places to look, in the order a reader of the file would:
 ///
@@ -88,6 +88,15 @@ pub struct Delivery {
 /// choice and whose file named neither: `Graph::check` refuses that as a
 /// `BadTerminal`, so nothing downstream depends on it -- a `None` is carried
 /// as "wherever its links go", which is what every delivery was before.
+///
+/// # Arguments
+///
+/// * `graph` - The configuration the link is in, for the types of its ends.
+/// * `link`  - The link.
+///
+/// # Returns
+///
+/// The stream it carries, or `None` where nothing settles it.
 fn stream_of(graph: &Graph, link: &Link) -> Option<Stream> {
     let named = |terminal: Option<&str>| {
         terminal
@@ -152,13 +161,23 @@ pub struct Routes {
 }
 
 impl Routes {
-    /// Work out the table for this configuration.
+    /// Works out the table for this configuration.
     ///
     /// The graph is assumed checked: `Graph::check` has already said that
     /// every name is a node and no input is bound twice, so nothing here
     /// reports anything. Building a table from an unchecked graph would give
     /// a table with holes in it, which is why the order matters and is
     /// written down here.
+    ///
+    /// # Arguments
+    ///
+    /// * `graph` - The configuration, already checked.
+    ///
+    /// # Returns
+    ///
+    /// The table: each node's deliveries, the node filling each named
+    /// input, what the commands on each MOC link set, and the links to the
+    /// ground.
     pub fn of(graph: &Graph) -> Routes {
         // The links to the ground first, because a line into a moc node is
         // delivered to one of them. A configuration whose links to the ground
@@ -273,10 +292,18 @@ impl Routes {
         self.deliveries.get(node).map_or(&[], Vec::as_slice)
     }
 
-    /// How many links lead into this node, from anywhere.
+    /// Counts the links that lead into this node, from anywhere.
     ///
     /// The most a wave of deliveries gives it, where every node produces at
     /// most once a wave: what its thread's mailbox is made with room for.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The node's name.
+    ///
+    /// # Returns
+    ///
+    /// How many deliveries, of every node's output, go to `node`.
     pub fn into_count(&self, node: &str) -> usize {
         self.deliveries
             .values()
@@ -292,13 +319,21 @@ impl Routes {
             .map(String::as_str)
     }
 
-    /// Every named input of this node that something fills, in order.
+    /// Lists every named input of this node that something fills, in order.
     ///
     /// In order because a computation over several inputs is written with
     /// them named in0, in1, in2, and a reader of the telemetry expects the
     /// third number to be the third sensor. Sorted by name rather than by the
     /// order the links happen to be written in, which is the file's business
     /// and not the computation's.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The node's name.
+    ///
+    /// # Returns
+    ///
+    /// The inputs' names, sorted; empty where nothing fills a named input.
     pub fn inputs_of(&self, node: &str) -> Vec<&str> {
         self.sources
             .keys()
@@ -336,7 +371,7 @@ impl Routes {
         })
     }
 
-    /// Every node whose output arrives here, in order and once each.
+    /// Lists every node whose output arrives here, in order and once each.
     ///
     /// The question a node asks about itself: is anything delivered to me.
     /// A device that nothing delivers to is one that is only read, and that
@@ -344,6 +379,14 @@ impl Routes {
     /// [`crate::runtime::port::Use`]. Walked rather than tabulated because it
     /// is asked once per node at startup, where [`Routes::from`] is asked once
     /// per datum.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The node's name.
+    ///
+    /// # Returns
+    ///
+    /// The names of the nodes delivering to it, sorted; empty where none do.
     pub fn arriving_at(&self, node: &str) -> Vec<&str> {
         // Each source once, which the table gives for nothing: it is keyed by
         // the node the output leaves, so a node delivering here twice -- two

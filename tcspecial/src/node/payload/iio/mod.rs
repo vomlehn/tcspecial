@@ -47,13 +47,27 @@ pub struct IioEndpoint {
 }
 
 impl IioEndpoint {
-    /// Open the device the configuration names.
+    /// Opens the device the configuration names.
     ///
     /// Nothing is set here: how many channels are enabled and how fast they
     /// are sampled belong to whoever brought the sensor up, which is why the
     /// configuration records them rather than applying them. What this can
     /// say is whether the device is there and readable, which is the failure
     /// a device set gets wrong.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`   - The handler's name, as the device configuration gives
+    ///              it, for the endpoint's messages.
+    /// * `config` - The IIO configuration: the path of the sample buffer.
+    ///
+    /// # Returns
+    ///
+    /// The endpoint, with the buffer open read-only.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Endpoint` if the buffer cannot be opened.
     pub fn new(what: &str, config: &IioConfig) -> TcsResult<Self> {
         let file =
             OpenOptions::new()
@@ -77,11 +91,19 @@ impl IioEndpoint {
         })
     }
 
-    /// A second endpoint on the same open buffer.
+    /// Makes a second endpoint on the same open buffer.
     ///
     /// One open description, as a device file node has: the conduit that reads
     /// the buffer and the conduit that would write it share it, and the
     /// second one has nothing to write.
+    ///
+    /// # Returns
+    ///
+    /// The new endpoint, sharing this one's open file.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Io` if the file descriptor cannot be duplicated.
     pub fn try_clone(&self) -> TcsResult<Self> {
         Ok(Self {
             what: self.what.clone(),

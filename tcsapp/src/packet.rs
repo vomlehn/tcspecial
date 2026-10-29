@@ -27,11 +27,21 @@ use std::io::{self, Read, Write};
 /// How many bytes a packet's length is written in.
 pub const LENGTH: usize = std::mem::size_of::<u32>();
 
-/// Write one packet.
+/// Writes one packet: its length, in native byte order, then its bytes.
 ///
 /// Flushed before it returns, because a packet held in a buffer is a packet
 /// the other end is waiting for: an app that answered and then waited for the
 /// next question would deadlock against a parent waiting for the answer.
+///
+/// # Arguments
+///
+/// * `to`   - The interface written to.
+/// * `data` - The packet's bytes.
+///
+/// # Errors
+///
+/// `InvalidInput` if `data` is longer than a `u32` can say, or whatever
+/// writing or flushing `to` fails with.
 pub fn write<W: Write>(to: &mut W, data: &[u8]) -> io::Result<()> {
     let length = u32::try_from(data.len()).map_err(|_| {
         io::Error::new(
@@ -50,12 +60,26 @@ pub fn write<W: Write>(to: &mut W, data: &[u8]) -> io::Result<()> {
     to.flush()
 }
 
-/// Read one packet, or `None` where the interface has ended.
+/// Reads one packet, or `None` where the interface has ended.
 ///
 /// An interface that ends part way through a packet is an error and not an
 /// end: a program killed between writing a length and writing its bytes has
 /// left half a datum behind, and passing that on as a short packet would pass
 /// on something nobody wrote.
+///
+/// # Arguments
+///
+/// * `from` - The interface read from.
+///
+/// # Returns
+///
+/// The packet's bytes, or `None` if the interface ended before a packet
+/// began.
+///
+/// # Errors
+///
+/// `UnexpectedEof` if the interface ends part way through a packet, or
+/// whatever reading `from` fails with.
 pub fn read<R: Read>(from: &mut R) -> io::Result<Option<Vec<u8>>> {
     let mut said = [0u8; LENGTH];
     match fill(from, &mut said)? {
@@ -100,11 +124,24 @@ enum Filled {
     All,
 }
 
-/// Fill `into` from `from`, saying how far it got.
+/// Fills `into` from `from`, saying how far it got.
 ///
 /// `Read::read_exact` would do this but cannot tell "ended cleanly" from
 /// "ended half way through", and the difference is the difference between an
 /// app that has finished and an app that has died.
+///
+/// # Arguments
+///
+/// * `from` - The interface read from; an interrupted read is retried.
+/// * `into` - The buffer to fill, all of it.
+///
+/// # Returns
+///
+/// Whether nothing, part or all of `into` was filled before `from` ended.
+///
+/// # Errors
+///
+/// Whatever reading `from` fails with, other than `Interrupted`.
 fn fill<R: Read>(from: &mut R, into: &mut [u8]) -> io::Result<Filled> {
     let mut got = 0;
     while got < into.len() {

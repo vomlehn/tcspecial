@@ -34,7 +34,7 @@ pub use node::payload::serial::*;
 pub use node::payload::spi::*;
 pub use telemetry_log::*;
 
-/// Start something, waiting out a program that is still being written.
+/// Starts something, waiting out a program that is still being written.
 ///
 /// `Text file busy` -- `os error 26` -- is what `exec` answers while anything
 /// holds the program open for writing, and in a test binary that includes this
@@ -48,6 +48,21 @@ pub use telemetry_log::*;
 /// has just written. Nothing in flight does that: a mission's app is installed
 /// before the vehicle is powered, and `Text file busy` there would be a real
 /// fault worth reporting rather than waiting out.
+///
+/// # Arguments
+///
+/// * `start` - What starts the program, tried again after 5 ms each time it
+///             fails with `os error 26`, up to 200 times and once more.
+///
+/// # Returns
+///
+/// What `start` returned the first time it did not fail as busy, or on the
+/// last try.
+///
+/// # Errors
+///
+/// Whatever `start` failed with, busy included if it was still busy on the
+/// last try.
 #[cfg(test)]
 pub(crate) fn when_not_busy<T>(
     mut start: impl FnMut() -> Result<T, String>,

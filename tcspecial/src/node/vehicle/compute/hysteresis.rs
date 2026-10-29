@@ -49,11 +49,15 @@ pub enum Decision {
 }
 
 impl Decision {
-    /// What goes along the link.
+    /// Gives what goes along the link for this decision.
     ///
     /// `1` and `0`, which is what a set of discrete lines takes: the value to
     /// drive them to. Text, like every other value on a link, so a telemetry
     /// log shows the decision rather than a byte.
+    ///
+    /// # Returns
+    ///
+    /// The one byte `1` for `On` and `0` for `Off`.
     fn as_value(self) -> Out {
         // Constants, so that a decision made or held allocates nothing.
         const ON: Out = Out::byte(b'1');
@@ -80,12 +84,20 @@ pub struct Hysteresis {
 }
 
 impl Hysteresis {
-    /// The thermostat these settled parameters describe.
+    /// Makes the thermostat these settled parameters describe.
     ///
     /// Nothing to refuse: that a band must be more than nought is
     /// `tcslibgs::node::vehicle::compute`'s rule, where the ground tool applies
     /// it. What is refused here is a *command* that would break it -- see
     /// [`Hysteresis::set`] -- because a command arrives after the checking.
+    ///
+    /// # Arguments
+    ///
+    /// * `params` - The setpoint and half the band's width, both in kelvin.
+    ///
+    /// # Returns
+    ///
+    /// The thermostat, with no decision made yet.
     pub fn of(params: HysteresisParams) -> Hysteresis {
         Hysteresis {
             setpoint: params.setpoint,
@@ -108,7 +120,16 @@ impl Hysteresis {
         self.setpoint
     }
 
-    /// What this temperature calls for, whatever was decided before.
+    /// Decides what a temperature calls for, whatever was decided before.
+    ///
+    /// # Arguments
+    ///
+    /// * `temperature` - The temperature, in kelvin.
+    ///
+    /// # Returns
+    ///
+    /// `Off` above the band, `On` below it, and `None` inside it, where
+    /// whatever is being done goes on being done.
     fn decide(&self, temperature: f64) -> Option<Decision> {
         if temperature > self.setpoint + self.half_band {
             Some(Decision::Off)
@@ -226,6 +247,11 @@ mod tests {
         as_value(number).expect("a temperature a value carries")
     }
 
+    /// Makes the thermostat the tests use.
+    ///
+    /// # Returns
+    ///
+    /// A thermostat set to 293.15 K, two kelvin either side.
     fn thermostat() -> Hysteresis {
         Hysteresis::of(HysteresisParams {
             setpoint: 293.15,

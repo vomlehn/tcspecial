@@ -112,6 +112,18 @@ impl Default for Settings {
 /// Three shares and a floor, which is the same arithmetic whichever way the
 /// panes are divided: the working panes across and the selection lists down
 /// both come through here.
+///
+/// # Arguments
+///
+/// * `moc_percent`     - The share asked for the moc pane or list, in per
+///                       cent.
+/// * `vehicle_percent` - The share asked for the vehicle pane or list, in
+///                       per cent.
+///
+/// # Returns
+///
+/// The moc and vehicle shares, in per cent, each at least [`LEAST`] and
+/// leaving the payload pane at least [`LEAST`].
 pub fn shares(moc_percent: i32, vehicle_percent: i32) -> (i32, i32) {
     let moc = moc_percent.clamp(LEAST, MOST);
     let vehicle = vehicle_percent.clamp(LEAST, MOST - moc + LEAST);
@@ -130,6 +142,10 @@ pub fn shares(moc_percent: i32, vehicle_percent: i32) -> (i32, i32) {
 /// Not made here, because this is read by tcspecial's visual window as well,
 /// which has no business leaving a directory in somebody's home: the editor
 /// makes it on the way in. See tcsgui's own settings.
+///
+/// # Returns
+///
+/// `$HOME/.tcsgui`, or `None` if `HOME` is unset or empty.
 pub fn home() -> Option<PathBuf> {
     let home = std::env::var_os("HOME")?;
     if home.is_empty() {
@@ -167,12 +183,16 @@ pub struct Read {
     pub missing: bool,
 }
 
-/// Read the settings, or the defaults, and write nothing.
+/// Reads the settings, or the defaults, and writes nothing.
 ///
 /// Every way of failing ends in the defaults: no `HOME`, no file yet, a file
 /// that is not XML, a percentage that is not a number or is outside what is
 /// allowed. A preference is not worth a refusal, and a file somebody has
 /// edited by hand into something unreadable should leave the editor working.
+///
+/// # Returns
+///
+/// The settings, and whether the file was missing.
 pub fn read() -> Read {
     let read = |settings| Read {
         settings,
@@ -210,6 +230,16 @@ pub fn read() -> Read {
 /// before there was one. The default share is then taken out of the vehicle's
 /// rather than out of the payloads': the column somebody arranged was the
 /// payload column, and the vehicle pane is the one with room to give.
+///
+/// # Arguments
+///
+/// * `text`  - The settings file's text.
+/// * `whose` - What to call the file in a message on the error output.
+///
+/// # Returns
+///
+/// The settings, brought inside what [`shares`] allows; defaults for
+/// whatever the text does not state usably.
 fn settings_in(text: &str, whose: &str) -> Settings {
     let vehicle =
         percent_in(text, whose, "vehicle_pane_percent", DEFAULT_VEHICLE);
@@ -250,6 +280,18 @@ fn settings_in(text: &str, whose: &str) -> Settings {
 }
 
 /// One share, as this text states it, or `default`.
+///
+/// # Arguments
+///
+/// * `text`    - The settings file's text.
+/// * `whose`   - What to call the file in a message on the error output.
+/// * `name`    - The element the share is in.
+/// * `default` - The share to use when the element is missing, is not a
+///               number, or is outside [`LEAST`] to [`MOST`].
+///
+/// # Returns
+///
+/// The share, in per cent.
 fn percent_in(text: &str, whose: &str, name: &str, default: i32) -> i32 {
     let said = element(text, name);
     match said.and_then(|said| said.parse::<i32>().ok()) {
@@ -279,6 +321,17 @@ fn percent_in(text: &str, whose: &str, name: &str, default: i32) -> i32 {
 /// element, never an attribute -- so that a person who has read one file has
 /// read both. With a comment saying what the number means, because a bare 75
 /// in a file is a number somebody will guess at.
+///
+/// # Arguments
+///
+/// * `moc`          - The moc working pane's share, in per cent.
+/// * `vehicle`      - The vehicle working pane's share, in per cent.
+/// * `list_moc`     - The moc selection list's share, in per cent.
+/// * `list_vehicle` - The vehicle selection list's share, in per cent.
+///
+/// # Returns
+///
+/// The file's text, XML with comments.
 pub fn written(
     moc: i32,
     vehicle: i32,
@@ -326,6 +379,16 @@ pub fn written(
 /// and a deserialiser to it would be more code than the thing it reads -- and
 /// this file has to survive being edited by hand, which means being forgiving
 /// about whatever else is in it.
+///
+/// # Arguments
+///
+/// * `text` - The text to search.
+/// * `name` - The element's name.
+///
+/// # Returns
+///
+/// The element's text with surrounding white space trimmed, or `None` if
+/// there is no such element.
 fn element<'a>(text: &'a str, name: &str) -> Option<&'a str> {
     let opening = format!("<{name}>");
     let closing = format!("</{name}>");

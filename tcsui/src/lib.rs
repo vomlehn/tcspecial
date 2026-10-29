@@ -103,6 +103,16 @@ pub mod palette {
 /// No red for the stages in between, and no green for the last: red is for a
 /// condition somebody must act on, and an indicator that is red whenever a
 /// datagram is late is an indicator nobody reads.
+///
+/// # Arguments
+///
+/// * `showing` - The stage of staleness the beacon is at, and whether the
+///               indicator is lit or in the dark half of a blink.
+/// * `heard`   - Whether a beacon has ever arrived.
+///
+/// # Returns
+///
+/// The indicator's colour.
 pub fn indicator(showing: &Showing, heard: bool) -> Color {
     let dark = if heard {
         palette::off()
@@ -142,6 +152,15 @@ pub struct Shown {
 
 impl Shown {
     /// What to show for a pass of the beacon loop.
+    ///
+    /// # Arguments
+    ///
+    /// * `pass` - What the pass read: the stage, when the last beacon
+    ///            arrived, and what it said.
+    ///
+    /// # Returns
+    ///
+    /// The panel's properties for that pass.
     pub fn of(pass: &Pass) -> Shown {
         Shown {
             indicator: indicator(&pass.showing, pass.at.is_some()),
@@ -156,6 +175,16 @@ impl Shown {
     ///
     /// For a window that keeps the three itself -- a test, or a program that
     /// shows a beacon it did not receive on this pass.
+    ///
+    /// # Arguments
+    ///
+    /// * `showing` - The stage the indicator is at, and whether it is lit.
+    /// * `at`      - When the last beacon arrived, or `None` if none has.
+    /// * `said`    - What that beacon said.
+    ///
+    /// # Returns
+    ///
+    /// The panel's properties for that beacon.
     pub fn at(showing: &Showing, at: Option<SystemTime>, said: &str) -> Shown {
         Shown {
             indicator: indicator(showing, at.is_some()),
@@ -185,6 +214,15 @@ pub struct PingShown {
 
 impl PingShown {
     /// What to show for this exchange.
+    ///
+    /// # Arguments
+    ///
+    /// * `exchange` - The last ping sent and its answer, with their times.
+    ///
+    /// # Returns
+    ///
+    /// The rows' text, with the placeholder for a message not sent or not
+    /// answered.
     pub fn of(exchange: &tcslib::ping::Exchange) -> PingShown {
         use tcslib::ping::{interval, precise_time, NO_MESSAGE};
         PingShown {
@@ -213,6 +251,15 @@ mod tests {
 
     /// The contrast between two colours, by WCAG's relative luminance:
     /// one for the same light, twenty-one for black against white.
+    ///
+    /// # Arguments
+    ///
+    /// * `a` - One colour.
+    /// * `b` - The other; the order does not matter.
+    ///
+    /// # Returns
+    ///
+    /// The contrast ratio, from 1 to 21.
     fn contrast(a: Color, b: Color) -> f64 {
         let luminance = |c: Color| {
             let linear = |u: u8| {

@@ -77,7 +77,11 @@ pub enum CommandLink {
 }
 
 impl CommandLink {
-    /// The word a message uses for this link.
+    /// Names this link in the words a message uses.
+    ///
+    /// # Returns
+    ///
+    /// "spacecraft command" or "payload command".
     pub fn spelling(&self) -> &'static str {
         match self {
             CommandLink::Spacecraft => "spacecraft command",
@@ -87,7 +91,7 @@ impl CommandLink {
 }
 
 impl CommandType {
-    /// Which link this command is sent on and taken on.
+    /// Says which link this command is sent on and taken on.
     ///
     /// One table, read by the ground when it sends and by the spacecraft when
     /// it answers, so that the two cannot come to disagree about where a
@@ -103,6 +107,10 @@ impl CommandType {
     /// up -- and a ground station with no connection has nothing to ask a
     /// payload. A CONNECT that arrives on a payload's link is refused like any
     /// other command on the wrong one.
+    ///
+    /// # Returns
+    ///
+    /// The link a command of this kind belongs to.
     pub fn link(&self) -> CommandLink {
         match self {
             CommandType::Ping
@@ -130,8 +138,8 @@ impl CommandType {
         self.link() == link
     }
 
-    /// Whether a command of this kind is taken whatever generation it was
-    /// sent for, and however old it is.
+    /// Tells whether a command of this kind is taken whatever generation it
+    /// was sent for, and however old it is.
     ///
     /// PING and CONNECT, and nothing else: they are how a ground station that
     /// has heard no beacon finds out what is flying, and where one whose count
@@ -143,6 +151,10 @@ impl CommandType {
     /// light-seconds long -- is refused rather than read with definitions it
     /// was not written for; and one older than a command already taken is
     /// not acted on, because the later one is what the ground meant last.
+    ///
+    /// # Returns
+    ///
+    /// `true` for PING and CONNECT, `false` for every other kind.
     pub fn always_taken(&self) -> bool {
         match self {
             CommandType::Ping | CommandType::Connect => true,
@@ -158,9 +170,13 @@ impl CommandType {
         }
     }
 
-    /// The opcode a command of this kind carries. What goes on the link is
-    /// stated in `xtce/link.xml`, and a test in [`crate::link`] holds this to
-    /// it, so the two cannot come to differ.
+    /// Gives the opcode a command of this kind carries. What goes on the link
+    /// is stated in `xtce/link.xml`, and a test in [`crate::link`] holds this
+    /// to it, so the two cannot come to differ.
+    ///
+    /// # Returns
+    ///
+    /// The opcode.
     pub fn to_u8(&self) -> u8 {
         match self {
             CommandType::Ping => 0x01,
@@ -176,6 +192,16 @@ impl CommandType {
         }
     }
 
+    /// Reads the kind of command an opcode names: the inverse of
+    /// [`CommandType::to_u8`].
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The opcode from the link.
+    ///
+    /// # Returns
+    ///
+    /// The kind, or `None` for an opcode no command has.
     pub fn from_u8(value: u8) -> Option<Self> {
         match value {
             0x01 => Some(CommandType::Ping),
@@ -200,6 +226,15 @@ pub struct PingCommand {
 }
 
 impl PingCommand {
+    /// Makes a PING, its generation not yet stamped.
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence` - The command's sequence number.
+    ///
+    /// # Returns
+    ///
+    /// The command.
     pub fn new(sequence: u32) -> Self {
         Self {
             header: CommandHeader {
@@ -232,6 +267,16 @@ pub struct RestartArmCommand {
 }
 
 impl RestartArmCommand {
+    /// Makes a RESTART_ARM, its generation not yet stamped.
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence` - The command's sequence number.
+    /// * `arm_key`  - The key the RESTART that follows must carry.
+    ///
+    /// # Returns
+    ///
+    /// The command.
     pub fn new(sequence: u32, arm_key: ArmKey) -> Self {
         Self {
             header: CommandHeader {
@@ -252,6 +297,16 @@ pub struct RestartCommand {
 }
 
 impl RestartCommand {
+    /// Makes a RESTART, its generation not yet stamped.
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence` - The command's sequence number.
+    /// * `arm_key`  - The key the RESTART_ARM before it carried.
+    ///
+    /// # Returns
+    ///
+    /// The command.
     pub fn new(sequence: u32, arm_key: ArmKey) -> Self {
         Self {
             header: CommandHeader {
@@ -280,6 +335,17 @@ pub struct ConnectCommand {
 }
 
 impl ConnectCommand {
+    /// Makes a CONNECT, its generation not yet stamped.
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence` - The command's sequence number.
+    /// * `version`  - The version of the ground end's build.
+    /// * `digest`   - The digest of the configuration the ground end read.
+    ///
+    /// # Returns
+    ///
+    /// The command.
     pub fn new(
         sequence: u32,
         version: ConfigVersion,
@@ -339,6 +405,18 @@ impl NodeCommand {
         Self::of(sequence, CommandType::QueryNodeSample, node)
     }
 
+    /// Makes a node command of any of the four kinds, its generation not yet
+    /// stamped.
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence` - The command's sequence number.
+    /// * `cmd_type` - Which of the node commands it is.
+    /// * `node`     - The node it is about.
+    ///
+    /// # Returns
+    ///
+    /// The command.
     fn of(sequence: u32, cmd_type: CommandType, node: NodeId) -> Self {
         Self {
             header: CommandHeader {
@@ -389,9 +467,24 @@ pub struct SetNodeCommand {
 }
 
 impl SetNodeCommand {
-    /// A SET_NODE, or why there cannot be one: an attribute longer than
-    /// [`ATTRIBUTE_BYTES`] or a value longer than [`VALUE_BYTES`] is refused
-    /// here, on the ground, rather than sent to a vehicle that would refuse it.
+    /// Makes a SET_NODE, its generation not yet stamped.
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence`  - The command's sequence number.
+    /// * `node`      - The node whose attribute is set.
+    /// * `attribute` - The attribute's name.
+    /// * `value`     - The value it is set to.
+    ///
+    /// # Returns
+    ///
+    /// The command.
+    ///
+    /// # Errors
+    ///
+    /// An attribute longer than [`ATTRIBUTE_BYTES`] or a value longer than
+    /// [`VALUE_BYTES`] is refused here, on the ground, rather than sent to a
+    /// vehicle that would refuse it.
     pub fn new(
         sequence: u32,
         node: NodeId,
@@ -435,7 +528,19 @@ pub struct Attribute {
 }
 
 impl Attribute {
-    /// This name, or why it cannot be one.
+    /// Makes an attribute name of the text given.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The attribute's name.
+    ///
+    /// # Returns
+    ///
+    /// The name.
+    ///
+    /// # Errors
+    ///
+    /// A message when it is longer than [`ATTRIBUTE_BYTES`].
     pub fn of(name: &str) -> Result<Attribute, String> {
         if name.len() > ATTRIBUTE_BYTES {
             return Err(format!(
@@ -501,7 +606,19 @@ pub struct Value {
 }
 
 impl Value {
-    /// These bytes, or why they cannot be one.
+    /// Makes a value of the bytes given.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The bytes.
+    ///
+    /// # Returns
+    ///
+    /// The value.
+    ///
+    /// # Errors
+    ///
+    /// A message when there are more than [`VALUE_BYTES`] of them.
     pub fn of(value: &[u8]) -> Result<Value, String> {
         if value.len() > VALUE_BYTES {
             return Err(format!(
@@ -544,6 +661,16 @@ pub struct ConfigCommand {
 }
 
 impl ConfigCommand {
+    /// Makes a CONFIG, its generation not yet stamped.
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence`        - The command's sequence number.
+    /// * `beacon_interval` - The beacon interval it sets.
+    ///
+    /// # Returns
+    ///
+    /// The command.
     pub fn new(sequence: u32, beacon_interval: BeaconInterval) -> Self {
         Self {
             header: CommandHeader {
@@ -600,6 +727,11 @@ impl Command {
         self
     }
 
+    /// Gives this command's header, whichever kind it is.
+    ///
+    /// # Returns
+    ///
+    /// The header.
     fn header(&self) -> &CommandHeader {
         match self {
             Command::Ping(cmd) => &cmd.header,
@@ -615,6 +747,11 @@ impl Command {
         }
     }
 
+    /// Gives this command's header to change, whichever kind it is.
+    ///
+    /// # Returns
+    ///
+    /// The header.
     fn header_mut(&mut self) -> &mut CommandHeader {
         match self {
             Command::Ping(cmd) => &mut cmd.header,
@@ -630,6 +767,11 @@ impl Command {
         }
     }
 
+    /// Gives this command's sequence number.
+    ///
+    /// # Returns
+    ///
+    /// The sequence number from its header.
     pub fn sequence(&self) -> u32 {
         match self {
             Command::Ping(cmd) => cmd.header.sequence,
@@ -645,11 +787,13 @@ impl Command {
         }
     }
 
-    /// Which node this command is about, where it is about one.
+    /// Says which node this command is about, where it is about one.
     ///
-    /// `None` for every command that names no node, each of them named in
-    /// the match, so that a command added later is placed by someone who had
-    /// to decide.
+    /// # Returns
+    ///
+    /// The node's id, or `None` for every command that names no node, each
+    /// of them named in the match, so that a command added later is placed
+    /// by someone who had to decide.
     pub fn node_id(&self) -> Option<NodeId> {
         match self {
             Command::StartNode(cmd)
@@ -670,7 +814,7 @@ impl Command {
         self.cmd_type().link()
     }
 
-    /// Which payload this command is about, where it is about one.
+    /// Says which payload this command is about, where it is about one.
     ///
     /// Every payload command carries the name of its payload, and nothing
     /// else does: that is what makes a payload command one. Both ends ask
@@ -679,8 +823,11 @@ impl Command {
     /// another payload's -- so neither can come to disagree about which
     /// payload a command is for.
     ///
-    /// `None` for a spacecraft command, and for CONNECT, which is about the
-    /// configuration the far end read rather than about any payload.
+    /// # Returns
+    ///
+    /// The payload's name, or `None` for a spacecraft command, and for
+    /// CONNECT, which is about the configuration the far end read rather than
+    /// about any payload.
     pub fn payload_name(&self) -> Option<&DHName> {
         match self {
             Command::Ping(_)
@@ -698,6 +845,11 @@ impl Command {
         }
     }
 
+    /// Gives this command's kind.
+    ///
+    /// # Returns
+    ///
+    /// The kind from its header.
     pub fn cmd_type(&self) -> CommandType {
         match self {
             Command::Ping(cmd) => cmd.header.cmd_type,

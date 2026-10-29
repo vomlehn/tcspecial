@@ -63,12 +63,24 @@ fn not_built(what: &str, node_type: &str) -> TcsError {
     TcsError::Config(tcslibgs::graph::built::not_built_message(what, node_type))
 }
 
-/// Say what could not be bound, and what that usually means.
+/// Says what could not be bound, and what that usually means.
 ///
 /// A bare io::Error carries the kind and nothing else, so the whole of what a
 /// reader got was "Address already in use (os error 98)" -- not which address,
 /// and no hint that the usual cause is a second copy of the program. Both ends
 /// of a data handler bind an address too, so this is used for all of them.
+///
+/// # Arguments
+///
+/// * `what` - What the address was to be listened on for, as it is named to
+///            the reader.
+/// * `addr` - The address that could not be bound.
+/// * `e`    - What binding it failed with.
+///
+/// # Returns
+///
+/// A `TcsError::Config` naming `what` and `addr`, which for an address in
+/// use says what most often holds it.
 pub fn bind_failed(what: &str, addr: &str, e: std::io::Error) -> TcsError {
     if e.kind() == std::io::ErrorKind::AddrInUse {
         TcsError::Config(format!(
@@ -83,10 +95,27 @@ pub fn bind_failed(what: &str, addr: &str, e: std::io::Error) -> TcsError {
 
 /// Trait for endpoints that can wait for events
 pub trait EndpointWaitable {
-    /// Get the I/O file descriptor
+    /// Gets the I/O file descriptor.
+    ///
+    /// # Returns
+    ///
+    /// The descriptor the endpoint's I/O is done on, which it still owns.
     fn io_fd(&self) -> RawFd;
 
-    /// Wait for an event on this endpoint
+    /// Waits for an event on this endpoint or on the command pipe.
+    ///
+    /// # Arguments
+    ///
+    /// * `cmd_fd`     - The command pipe's read end.
+    /// * `timeout_ms` - How long to wait, in milliseconds; negative for ever.
+    ///
+    /// # Returns
+    ///
+    /// Which of the two is ready, or that the wait timed out.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Io` where the wait itself fails.
     fn wait_for_event(
         &self,
         cmd_fd: RawFd,
@@ -111,7 +140,19 @@ pub enum WaitResult {
 
 /// Trait for readable endpoints
 pub trait EndpointReadable: EndpointWaitable {
-    /// Read data from the endpoint
+    /// Reads data from the endpoint.
+    ///
+    /// # Arguments
+    ///
+    /// * `buffer` - Where the data is put.
+    ///
+    /// # Returns
+    ///
+    /// How many bytes were put in `buffer`.
+    ///
+    /// # Errors
+    ///
+    /// What the endpoint failed with.
     fn read(&mut self, buffer: &mut [u8]) -> TcsResult<usize>;
 
     /// How many datagrams were turned away as a stranger's since this was
@@ -140,14 +181,45 @@ pub(crate) const STRANGERS_PER_READ: usize = 16;
 
 /// Trait for writable endpoints
 pub trait EndpointWritable: EndpointWaitable {
-    /// Write data to the endpoint
+    /// Writes data to the endpoint.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The data to write.
+    ///
+    /// # Returns
+    ///
+    /// How many bytes of `data` were written.
+    ///
+    /// # Errors
+    ///
+    /// What the endpoint failed with.
     fn write(&mut self, data: &[u8]) -> TcsResult<usize>;
 }
 
-/// Wait for either the endpoint or the command pipe to have something.
+/// Waits for either the endpoint or the command pipe to have something.
 ///
 /// Shared by every kind of endpoint: what differs between them is what
 /// the descriptor refers to, not how it is waited on.
+///
+/// # Arguments
+///
+/// * `io_fd`      - The endpoint's descriptor, which must stay open for the
+///                  call.
+/// * `cmd_fd`     - The command pipe's read end, waited on for input; it too
+///                  must stay open.
+/// * `io_events`  - What to wait for on `io_fd`.
+/// * `timeout_ms` - How long to wait, in milliseconds; negative for ever.
+///
+/// # Returns
+///
+/// Which of the two is ready; `WaitResult::Timeout` where neither became
+/// ready in time, and `WaitResult::Error` where `poll` woke for something
+/// that was neither, such as a hang-up or an error on `io_fd`.
+///
+/// # Errors
+///
+/// `TcsError::Io` where `poll` fails.
 pub(crate) fn wait_for_fds(
     io_fd: RawFd,
     cmd_fd: RawFd,
@@ -183,19 +255,7 @@ pub(crate) fn wait_for_fds(
     }
 }
 
-/// A reader and a writer that wait at one endpoint, opened once.
-///
-/// For the OC side of a data handler, which the ground sends to at an address
-/// it was told, so this end binds. See [`connect_endpoint_pair`] for the
-/// payload side, which reaches out instead.
-///
-/// A conduit pair needs both ends of the same endpoint: one conduit reads it
-/// and the other writes it. Calling the two single factories for one
-/// configuration opens it twice, which a network address does not allow --
-/// `UdpSocket::bind` and `TcpListener::bind` both fail with `AddrInUse` the
-/// second time -- so the endpoint is opened once here and the second handle is
-/// a duplicate of the first.
-/// Open a payload's ground link: bound here, sending where the file says.
+/// Opens a payload's ground link: bound here, sending where the file says.
 ///
 /// The one link in tcspecial whose far end is written down -- `ground` is
 /// `payload_telemetry.dest_base` counted on by the payload's id, which is what
@@ -208,6 +268,22 @@ pub(crate) fn wait_for_fds(
 /// section to count from; such a handler cannot be started, and this is here
 /// rather than refusing so that the one place that says so is
 /// `start_handler`.
+///
+/// # Arguments
+///
+/// * `what`   - What the link is for, as errors name it.
+/// * `oc`     - The address to bind, this end of the link.
+/// * `ground` - Where the ground is, which is sent to; `None` for a payload
+///              with no `tcspecial` section to count it from.
+///
+/// # Returns
+///
+/// The reader and the writer, the writer a duplicate of the reader.
+///
+/// # Errors
+///
+/// What opening or duplicating the socket failed with: see
+/// [`bind_failed`] for an address that cannot be bound.
 pub fn bind_oc_pair(
     what: &str,
     oc: &NetworkConfig,
@@ -224,6 +300,33 @@ pub fn bind_oc_pair(
     Ok((Box::new(reader), Box::new(writer)))
 }
 
+/// Opens a reader and a writer that wait at one endpoint, opened once.
+///
+/// For the OC side of a data handler, which the ground sends to at an address
+/// it was told, so this end binds. See [`connect_endpoint_pair`] for the
+/// payload side, which reaches out instead.
+///
+/// A conduit pair needs both ends of the same endpoint: one conduit reads it
+/// and the other writes it. Calling the two single factories for one
+/// configuration opens it twice, which a network address does not allow --
+/// `UdpSocket::bind` and `TcpListener::bind` both fail with `AddrInUse` the
+/// second time -- so the endpoint is opened once here and the second handle is
+/// a duplicate of the first.
+///
+/// # Arguments
+///
+/// * `what`   - What the endpoint is for, as errors name it.
+/// * `config` - The endpoint to open.
+///
+/// # Returns
+///
+/// The reader and the writer, the writer a duplicate of the reader.
+///
+/// # Errors
+///
+/// What opening or duplicating the endpoint failed with, and
+/// `TcsError::Config` for a network protocol this cannot bind or a type
+/// this build does not contain.
 pub fn bind_endpoint_pair(
     what: &str,
     config: &EndpointConfig,
@@ -338,7 +441,7 @@ pub fn bind_endpoint_pair(
     }
 }
 
-/// A reader and a writer for a payload that is spoken to first, opened once.
+/// Opens a reader and a writer for a payload that is spoken to first, once.
 ///
 /// For what the arrangement below cannot serve. A UDP payload that speaks
 /// first is reached by binding its address and waiting to hear from it, and
@@ -360,6 +463,20 @@ pub fn bind_endpoint_pair(
 /// Nothing else differs. A TCP or Unix stream payload is connected to
 /// whichever way it is used, a device is opened, and both work as well
 /// written as read, so for anything else this is [`connect_endpoint_pair`].
+///
+/// # Arguments
+///
+/// * `what`   - What the endpoint is for, as errors name it.
+/// * `config` - The endpoint to open.
+///
+/// # Returns
+///
+/// The reader and the writer, the writer a duplicate of the reader.
+///
+/// # Errors
+///
+/// What opening or duplicating the endpoint failed with, as for
+/// [`connect_endpoint_pair`].
 pub fn reaching_endpoint_pair(
     what: &str,
     config: &EndpointConfig,
@@ -386,7 +503,7 @@ pub fn reaching_endpoint_pair(
     }
 }
 
-/// A reader and a writer for the payload side of a data handler, opened once.
+/// Opens a reader and a writer for the payload side of a data handler, once.
 ///
 /// Which end waits at the configured address depends on the protocol, and it
 /// follows from which end can speak first.
@@ -408,6 +525,19 @@ pub fn reaching_endpoint_pair(
 /// those this is [`bind_endpoint_pair`] by another name. Two opens of a device
 /// are fine where two binds of a socket are not, which is why the device
 /// handler was the only one that ever worked.
+///
+/// # Arguments
+///
+/// * `what`   - What the endpoint is for, as errors name it.
+/// * `config` - The endpoint to open.
+///
+/// # Returns
+///
+/// The reader and the writer, the writer a duplicate of the reader.
+///
+/// # Errors
+///
+/// As for [`hearing_endpoint_pair`].
 pub fn connect_endpoint_pair(
     what: &str,
     config: &EndpointConfig,
@@ -418,14 +548,31 @@ pub fn connect_endpoint_pair(
     hearing_endpoint_pair(what, config, None)
 }
 
-/// [`connect_endpoint_pair`], for a payload whose node may say where it
-/// sends from.
+/// Opens what [`connect_endpoint_pair`] does, for a payload whose node may
+/// say where it sends from.
 ///
 /// A datagram payload that speaks first is learnt from what arrives, so the
 /// first sender heard would otherwise be taken for it, whoever that was.
 /// Where its node states `sends_from`, its datagrams are read from there and
 /// nowhere else, as a payload reached at a stated address is read: see
 /// [`EndpointReadable::strangers`]. Nothing changes for anything else.
+///
+/// # Arguments
+///
+/// * `what`       - What the endpoint is for, as errors name it.
+/// * `config`     - The endpoint to open.
+/// * `sends_from` - Where a datagram payload's datagrams are read from, and
+///                  nowhere else; `None` to learn it from the first to
+///                  arrive. Ignored for anything but a datagram payload.
+///
+/// # Returns
+///
+/// The reader and the writer, the writer a duplicate of the reader.
+///
+/// # Errors
+///
+/// What opening, restricting or duplicating the endpoint failed with, and
+/// `TcsError::Config` for a type this build does not contain.
 pub fn hearing_endpoint_pair(
     what: &str,
     config: &EndpointConfig,

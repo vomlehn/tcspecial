@@ -2200,10 +2200,13 @@ impl Document {
             let any = self.links.iter().filter(|l| l.to == ours).any(|link| {
                 // Which sink of this node the line arrives at, which needs the
                 // terminal it left by: the two are one stream read from either
-                // end.
-                let Some(from) =
-                    self.nodes.iter().find(|n| n.name == link.from)
-                else {
+                // end. The node it left is found by its whole name, which is
+                // what the link holds -- `cabin/temp_1` for a node in a
+                // subdiagram, where the node's own name is `temp_1` -- and
+                // which is what tells two nodes of one name apart.
+                let Some(from) = self.nodes.iter().find(|n| {
+                    Qualified::of(&n.name, &n.home).absolute() == link.from
+                }) else {
                     return false;
                 };
                 let left_by = crate::style::terminal_for(
@@ -4944,6 +4947,95 @@ mod tests {
             )),
             "a crossing link was taken for a broken one: {:?}",
             document.faults()
+        );
+    }
+
+    /// A line from a node in a subdiagram is recorded where it arrives.
+    ///
+    /// The link holds its source's whole name, `cabin/temp_1`, and the node
+    /// its own, `temp_1`: compared as they stand they never matched, and the
+    /// node the line reached said nothing about it.
+    #[test]
+    fn a_line_from_a_subdiagram_is_recorded_where_it_arrives() {
+        use std::path::Path;
+
+        let mut document = Document::new();
+        document.apply(&Edit::AddNode {
+            name: "cabin".into(),
+            node_type: "subdiagram".into(),
+            home: None,
+        });
+        document.apply(&Edit::AddNode {
+            name: "moc".into(),
+            node_type: "moc".into(),
+            home: None,
+        });
+        document.apply(&Edit::AddNode {
+            name: "temp_1".into(),
+            node_type: "i2c".into(),
+            home: Some("cabin".into()),
+        });
+        document.apply(&Edit::AddLink {
+            link: Link::new("cabin/temp_1", "moc", None),
+        });
+
+        let files = document
+            .files(Path::new("/tmp/vehicle.yaml"))
+            .expect("files");
+        let (_, top) = &files[0];
+        assert!(
+            top.contains("payload-in: true"),
+            "the ground does not say a line arrives: {top}"
+        );
+    }
+
+    /// A line is recorded at the sink its own source's stream arrives at,
+    /// whatever else shares the source's name.
+    ///
+    /// A node in a subdiagram may have the name of one in the top diagram.
+    /// Found by the bare name, the line from the top diagram's `p` was taken
+    /// for one from `cabin/p`, of another type with another source, and the
+    /// ground was written as fed at the wrong sink -- a file that reading it
+    /// back refuses, the record disagreeing with the link.
+    #[test]
+    fn a_line_is_recorded_at_its_own_sources_sink() {
+        use std::path::Path;
+
+        let mut document = Document::new();
+        document.apply(&Edit::AddNode {
+            name: "cabin".into(),
+            node_type: "subdiagram".into(),
+            home: None,
+        });
+        // First, so that a search by the bare name finds it before the
+        // node the line leaves.
+        document.apply(&Edit::AddNode {
+            name: "p".into(),
+            node_type: "app_payload_veh".into(),
+            home: Some("cabin".into()),
+        });
+        document.apply(&Edit::AddNode {
+            name: "p".into(),
+            node_type: "i2c".into(),
+            home: None,
+        });
+        document.apply(&Edit::AddNode {
+            name: "moc".into(),
+            node_type: "moc".into(),
+            home: None,
+        });
+        document.apply(&Edit::AddLink {
+            link: Link::new("p", "moc", None),
+        });
+
+        let files = document
+            .files(Path::new("/tmp/vehicle.yaml"))
+            .expect("files");
+        let (_, top) = &files[0];
+        assert!(top.contains("payload-in: true"), "{top}");
+        assert!(
+            !top.contains("moc-in"),
+            "the line was recorded at the sink of cabin/p's stream: {top}"
         );
     }
 

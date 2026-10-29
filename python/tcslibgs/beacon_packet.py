@@ -67,8 +67,19 @@ class Beacon(pk.Packet):
 
     @classmethod
     def decode_prefix(cls, data) -> tuple[Beacon, int]:
-        """Decode a packet that starts at the first byte of ``data``; return
-        it and the number of bytes it takes."""
+        """Decodes a ``/TcsBeacon/Beacon`` packet that starts at the first byte
+        of ``data``.
+
+        Args:
+            data: The packet's bytes, and any after it.
+
+        Returns:
+            The packet and the number of bytes it takes.
+
+        Raises:
+            pk.PacketError: The bytes aren't such a packet, or it can't be
+                decoded; its ``kind`` says why.
+        """
         r = pk.BitReader(data)
         v1 = pk.read_string(r, (80, 80, b'\x00', 0, 'US-ASCII'), "Name")
         v2 = r.uint_order(8, False, "Major")
@@ -95,6 +106,16 @@ class Beacon(pk.Packet):
                 r.used())
 
     def encode_into(self, w: pk.BitWriter) -> None:
+        """Encodes this ``/TcsBeacon/Beacon`` packet with a writer, after what
+        it has written.
+
+        Args:
+            w: The writer.
+
+        Raises:
+            pk.PacketError: A field's value can't be encoded; its ``kind`` says
+                why.
+        """
         pk.write_string(w, (80, 80, b"\x00", 0, "US-ASCII"), "tcspecial ",
                         "Name")
         w.uint_order(8, False,
@@ -115,26 +136,48 @@ class Beacon(pk.Packet):
         pk.write_binary(w, self.interface, 16, "Interface")
 
     def alarms(self) -> list:
-        """(field, alarm level) for each field with an alarm; the level is None
-        when the field is absent.  Alarms that depend on earlier samples count
-        only this one (see ``monitor``)."""
+        """Evaluates the alarms of this ``/TcsBeacon/Beacon`` packet's fields.
+        Alarms that depend on earlier samples count only this one (see
+        ``monitor``).
+
+        Returns:
+            (field, alarm level) for each field with an alarm; the level is None
+            when the field is absent.
+        """
         return []
 
     def monitor(self, m: AlarmMonitor, t: float = 0.0) -> list:
-        """Like ``alarms()``, counting the earlier samples whose state ``m``
-        keeps,
-        for change ranges, minViolations and minConformance; ``t`` is this
-        sample's time in seconds."""
+        """Evaluates the alarms of this ``/TcsBeacon/Beacon`` packet's fields
+        like ``alarms()``, counting the earlier samples for change ranges,
+        minViolations and minConformance.
+
+        Args:
+            m: The state of the alarms that depend on earlier samples, which the
+               method reads and updates.
+            t: This sample's time, in seconds.
+
+        Returns:
+            (field, alarm level) for each field with an alarm; the level is None
+            when the field is absent.
+        """
         return []
 
     def algorithms(self) -> list:
-        """(output, value) for each MathAlgorithm this packet triggers; the
-        value
-        is None when an input is absent."""
+        """Evaluates the MathAlgorithms that a ``/TcsBeacon/Beacon`` packet
+        triggers, from this one's values.
+
+        Returns:
+            (output, value) for each; the value is None when an input is absent
+            or a custom algorithm's function isn't set or fails.
+        """
         return []
 
     def describe(self) -> str:
-        """Canonical text form, identical in every generated language."""
+        """Describes this ``/TcsBeacon/Beacon`` packet.
+
+        Returns:
+            Its canonical text form, identical in every generated language.
+        """
         return "Beacon{" + ", ".join(
             ("major=" + str(self.major), "minor=" + str(self.minor),
              "patch=" + str(self.patch),
@@ -154,9 +197,21 @@ class BeaconLayoutKind(pk.PacketKind):
 
     @staticmethod
     def decode_prefix(data) -> tuple[Union[Beacon], int]:
-        """Decode the root's entries, then pick the first child (in
-        document order) whose criteria match, recursively; return it and
-        the number of bytes it takes."""
+        """Decodes a packet derived from ``/TcsBeacon/BeaconLayout`` that starts
+        at the first byte of ``data``: reads the root's entries, then picks the
+        first child (in document order) whose criteria match, recursively.
+
+        Args:
+            data: The packet's bytes, and any after it.
+
+        Returns:
+            The packet, an instance of the member that matched, and the number
+            of bytes it takes.
+
+        Raises:
+            pk.PacketError: ``NoMatch`` if no member matches, or another
+                ``kind`` if the packet can't be decoded.
+        """
         r = pk.BitReader(data)
         v1 = pk.read_string(r, (80, 80, b'\x00', 0, 'US-ASCII'), "Name")
         v2 = r.uint_order(8, False, "Major")

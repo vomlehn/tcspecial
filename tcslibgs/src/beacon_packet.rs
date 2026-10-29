@@ -64,17 +64,32 @@ impl Beacon {
     /// The number of fields with an alarm.
     pub const ALARMS: usize = 0;
 
-    /// The alarm level of each field with an alarm (`None` when the
-    /// field is absent).  Alarms that depend on earlier samples count only
-    /// this one (see `monitor`).
+    /// Evaluates the alarms of this `/TcsBeacon/Beacon` packet's fields. Alarms
+    /// that depend on earlier samples count only this one (see `monitor`).
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn alarms(&self) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
     }
 
-    /// Like `alarms()`, counting the earlier samples whose state `m` keeps,
-    /// for change ranges, minViolations and minConformance; `t` is this
-    /// sample's time in seconds.
+    /// Evaluates the alarms of this `/TcsBeacon/Beacon` packet's fields like
+    /// `alarms()`, counting the earlier samples for change ranges,
+    /// minViolations and minConformance.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
@@ -83,8 +98,13 @@ impl Beacon {
     /// The number of MathAlgorithms this packet triggers.
     pub const ALGORITHMS: usize = 0;
 
-    /// The output of each MathAlgorithm this packet triggers (`None` when
-    /// an input is absent).
+    /// Evaluates the MathAlgorithms that a `/TcsBeacon/Beacon` packet triggers,
+    /// from this one's values.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when an input is absent or a custom
+    /// algorithm's function isn't set or fails.
     pub fn algorithms(&self) -> pk::Outputs<0> {
         let mut o = pk::Outputs::new();
         o
@@ -326,8 +346,13 @@ impl BeaconLayoutKind {
     /// The most fields with an alarm that a member has.
     pub const ALARMS: usize = 0;
 
-    /// The alarm level of each field with an alarm (`None` when the
-    /// field is absent).
+    /// Evaluates the alarms of the fields of this packet derived from
+    /// `/TcsBeacon/BeaconLayout`, as its own `alarms()` does.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn alarms(&self) -> pk::Alarms<0> {
         let mut out = pk::Alarms::new();
         match self {
@@ -343,7 +368,12 @@ impl BeaconLayoutKind {
     /// The most MathAlgorithms that a member triggers.
     pub const ALGORITHMS: usize = 0;
 
-    /// The output of each MathAlgorithm the packet triggers.
+    /// Evaluates the MathAlgorithms that this packet derived from
+    /// `/TcsBeacon/BeaconLayout` triggers, as its own `algorithms()` does.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when it can't be computed.
     pub fn algorithms(&self) -> pk::Outputs<0> {
         let mut out = pk::Outputs::new();
         match self {
@@ -356,7 +386,19 @@ impl BeaconLayoutKind {
         out
     }
 
-    /// Like `alarms()`, counting the earlier samples whose state `m` keeps.
+    /// Evaluates the alarms of the fields of this packet derived from
+    /// `/TcsBeacon/BeaconLayout`, as its own `monitor()` does.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
         let mut out = pk::Alarms::new();
         match self {

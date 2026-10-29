@@ -327,8 +327,10 @@ fn every_operation_reaches_the_spacecraft_and_comes_back() {
         CommandStatus::Success
     );
 
-    // Nothing may follow a RESTART until a beacon says it is done: refused
-    // here, unsent, so the stand-in is not asked it.
+    // Nothing but a CONNECT, an arm and a restart may follow a RESTART
+    // until a beacon says it is done: the rest are refused here, unsent, so
+    // the stand-in is not asked them. A PING among them, which goes
+    // regardless of the generation but not during the wait.
     let configure = |client: &mut tcslib::TcsClient| {
         client.configure(BeaconInterval::of(Duration::from_secs(1)))
     };
@@ -338,12 +340,26 @@ fn every_operation_reaches_the_spacecraft_and_comes_back() {
         "{refused:?}"
     );
     assert!(refused.to_string().contains("starts again"));
+    assert!(matches!(client.ping(), Err(TcsError::AwaitingRestart(_))));
+    // The three that go, none of them ending the wait: the CONNECT is
+    // answered by the start the RESTART went to, and the second RESTART
+    // says nothing of whether the first was taken.
+    assert_eq!(client.connect(version, digest).unwrap(), (version, digest));
+    assert_eq!(
+        client.restart_arm(ArmKey(0x5678)).unwrap(),
+        CommandStatus::Success
+    );
+    assert_eq!(
+        client.restart(ArmKey(0x5678)).unwrap(),
+        CommandStatus::Success
+    );
+    assert!(client.restart_wait().is_some());
     // Not by the old start's beacons, though they carry the bit.
     assert_eq!(client.beacon_heard(false, true), None);
     assert!(client.restart_wait().is_some());
     // By the next start, which says it was the one commanded.
     let ended = client.beacon_heard(true, true).expect("it ends the wait");
-    assert!(ended.commanded);
+    assert_eq!(ended.commanded, Some(true));
     assert!(client.restart_wait().is_none());
     // And then a CONNECT, before anything but a PING.
     assert!(matches!(

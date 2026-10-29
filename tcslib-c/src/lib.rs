@@ -1249,8 +1249,9 @@ pub unsafe extern "C" fn tcs_client_restart(
 /// # Returns
 ///
 /// 1 when this ended a wait with the start the RESTART commanded, 2 when it
-/// ended one with a start nobody commanded, 0 when it did not end one, -1 on
-/// an error.
+/// ended one with a start nobody commanded, 3 when it ended one with a start
+/// the beacon cannot say of, because a Connect during the wait reached it and
+/// cleared its flag; 0 when it did not end one, -1 on an error.
 ///
 /// # Safety
 ///
@@ -1268,8 +1269,11 @@ pub unsafe extern "C" fn tcs_client_beacon_heard(
             return Ok(0);
         };
         Ok(match link.client.beacon_heard(restarted, commanded) {
-            Some(ended) if ended.commanded => 1,
-            Some(_) => 2,
+            Some(ended) => match ended.commanded {
+                Some(true) => 1,
+                Some(false) => 2,
+                None => 3,
+            },
             None => 0,
         })
     })

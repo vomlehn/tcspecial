@@ -33,6 +33,18 @@ _E_BasisType = {m.value.strip(): m for m in BasisType}
 
 
 def _p_BasisType(s: str) -> BasisType:
+    """Parses the XML lexical value of a ``BasisType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``perSecond`` and
+                    ``perContainerUpdate``.
+    """
     try:
         return _E_BasisType[s.strip()]
     except KeyError:
@@ -51,6 +63,18 @@ _E_BitOrderType = {m.value.strip(): m for m in BitOrderType}
 
 
 def _p_BitOrderType(s: str) -> BitOrderType:
+    """Parses the XML lexical value of a ``BitOrderType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``leastSignificantBitFirst`` and
+                    ``mostSignificantBitFirst``.
+    """
     try:
         return _E_BitOrderType[s.strip()]
     except KeyError:
@@ -69,6 +93,18 @@ _E_ByteOrderCommonType = {m.value.strip(): m for m in ByteOrderCommonType}
 
 
 def _p_ByteOrderCommonType(s: str) -> ByteOrderCommonType:
+    """Parses the XML lexical value of a ``ByteOrderCommonType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``mostSignificantByteFirst`` and
+                    ``leastSignificantByteFirst``.
+    """
     try:
         return _E_ByteOrderCommonType[s.strip()]
     except KeyError:
@@ -87,6 +123,18 @@ _E_ChangeBasisType = {m.value.strip(): m for m in ChangeBasisType}
 
 
 def _p_ChangeBasisType(s: str) -> ChangeBasisType:
+    """Parses the XML lexical value of a ``ChangeBasisType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``absoluteChange`` and
+                    ``percentageChange``.
+    """
     try:
         return _E_ChangeBasisType[s.strip()]
     except KeyError:
@@ -105,6 +153,18 @@ _E_ChangeSpanType = {m.value.strip(): m for m in ChangeSpanType}
 
 
 def _p_ChangeSpanType(s: str) -> ChangeSpanType:
+    """Parses the XML lexical value of a ``ChangeSpanType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``changePerSecond`` and
+                    ``changePerSample``.
+    """
     try:
         return _E_ChangeSpanType[s.strip()]
     except KeyError:
@@ -123,6 +183,17 @@ _E_CharacterWidthType = {m.value.strip(): m for m in CharacterWidthType}
 
 
 def _p_CharacterWidthType(s: str) -> CharacterWidthType:
+    """Parses the XML lexical value of a ``CharacterWidthType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``8``, ``16`` and ``32``.
+    """
     try:
         return _E_CharacterWidthType[s.strip()]
     except KeyError:
@@ -152,6 +223,20 @@ _E_ChecksumnameType = {m.value.strip(): m for m in ChecksumnameType}
 
 
 def _p_ChecksumnameType(s: str) -> ChecksumnameType:
+    """Parses the XML lexical value of a ``ChecksumnameType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``unix_sum``, ``sum8``, ``sum16``,
+                    ``sum24``, ``sum32``, ``fletcher4``, ``fletcher8``,
+                    ``fletcher16``, ``fletcher32``, ``adler32``, ``luhn``,
+                    ``verhoeff``, ``damm`` and ``custom``.
+    """
     try:
         return _E_ChecksumnameType[s.strip()]
     except KeyError:
@@ -174,6 +259,18 @@ _E_ComparisonOperatorsType = {m.value.strip(): m
 
 
 def _p_ComparisonOperatorsType(s: str) -> ComparisonOperatorsType:
+    """Parses the XML lexical value of a ``ComparisonOperatorsType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``==``, ``!=``, ``<``, ``<=``, ``>`` and
+                    ``>=``.
+    """
     try:
         return _E_ComparisonOperatorsType[s.strip()]
     except KeyError:
@@ -202,6 +299,18 @@ _E_ConcernLevelsType = {m.value.strip(): m for m in ConcernLevelsType}
 
 
 def _p_ConcernLevelsType(s: str) -> ConcernLevelsType:
+    """Parses the XML lexical value of a ``ConcernLevelsType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``normal``, ``watch``, ``warning``,
+                    ``distress``, ``critical`` and ``severe``.
+    """
     try:
         return _E_ConcernLevelsType[s.strip()]
     except KeyError:
@@ -224,6 +333,18 @@ _E_ConsequenceLevelType = {m.value.strip(): m for m in ConsequenceLevelType}
 
 
 def _p_ConsequenceLevelType(s: str) -> ConsequenceLevelType:
+    """Parses the XML lexical value of a ``ConsequenceLevelType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``normal``, ``vital``, ``critical``,
+                    ``forbidden``, ``user1`` and ``user2``.
+    """
     try:
         return _E_ConsequenceLevelType[s.strip()]
     except KeyError:
@@ -243,6 +364,18 @@ _E_EpochTimeEnumsType = {m.value.strip(): m for m in EpochTimeEnumsType}
 
 
 def _p_EpochTimeEnumsType(s: str) -> EpochTimeEnumsType:
+    """Parses the XML lexical value of a ``EpochTimeEnumsType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``TAI``, ``J2000``, ``UNIX`` and
+                    ``GPS``.
+    """
     try:
         return _E_EpochTimeEnumsType[s.strip()]
     except KeyError:
@@ -260,6 +393,17 @@ _E_FlagBitType = {m.value.strip(): m for m in FlagBitType}
 
 
 def _p_FlagBitType(s: str) -> FlagBitType:
+    """Parses the XML lexical value of a ``FlagBitType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``zeros`` and ``ones``.
+    """
     try:
         return _E_FlagBitType[s.strip()]
     except KeyError:
@@ -283,6 +427,18 @@ _E_FloatEncodingSizeInBitsType = {m.value.strip(): m
 
 
 def _p_FloatEncodingSizeInBitsType(s: str) -> FloatEncodingSizeInBitsType:
+    """Parses the XML lexical value of a ``FloatEncodingSizeInBitsType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``16``, ``32``, ``40``, ``48``, ``64``,
+                    ``80`` and ``128``.
+    """
     try:
         return _E_FloatEncodingSizeInBitsType[s.strip()]
     except KeyError:
@@ -304,6 +460,18 @@ _E_FloatEncodingType = {m.value.strip(): m for m in FloatEncodingType}
 
 
 def _p_FloatEncodingType(s: str) -> FloatEncodingType:
+    """Parses the XML lexical value of a ``FloatEncodingType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``IEEE754_1985``, ``IEEE754``,
+                    ``MILSTD_1750A``, ``DEC``, ``IBM`` and ``TI``.
+    """
     try:
         return _E_FloatEncodingType[s.strip()]
     except KeyError:
@@ -322,6 +490,17 @@ _E_FloatSizeInBitsType = {m.value.strip(): m for m in FloatSizeInBitsType}
 
 
 def _p_FloatSizeInBitsType(s: str) -> FloatSizeInBitsType:
+    """Parses the XML lexical value of a ``FloatSizeInBitsType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``32``, ``64`` and ``128``.
+    """
     try:
         return _E_FloatSizeInBitsType[s.strip()]
     except KeyError:
@@ -341,6 +520,18 @@ _E_FloatingPointNotationType = {m.value.strip(): m
 
 
 def _p_FloatingPointNotationType(s: str) -> FloatingPointNotationType:
+    """Parses the XML lexical value of a ``FloatingPointNotationType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``normal``, ``scientific`` and
+                    ``engineering``.
+    """
     try:
         return _E_FloatingPointNotationType[s.strip()]
     except KeyError:
@@ -362,6 +553,19 @@ _E_IntegerEncodingType = {m.value.strip(): m for m in IntegerEncodingType}
 
 
 def _p_IntegerEncodingType(s: str) -> IntegerEncodingType:
+    """Parses the XML lexical value of a ``IntegerEncodingType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``unsigned``, ``signMagnitude``,
+                    ``twosComplement``, ``onesComplement``, ``BCD`` and
+                    ``packedBCD``.
+    """
     try:
         return _E_IntegerEncodingType[s.strip()]
     except KeyError:
@@ -429,6 +633,24 @@ _E_MathOperatorsType = {m.value.strip(): m for m in MathOperatorsType}
 
 
 def _p_MathOperatorsType(s: str) -> MathOperatorsType:
+    """Parses the XML lexical value of a ``MathOperatorsType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``+``, ``-``, ``*``, ``/``, ``%``,
+                    ``^``, ``y^x``, ``ln``, ``log``, ``e^x``, ``1/x``, ``x!``,
+                    ``tan``, ``cos``, ``sin``, ``atan``, ``atan2``, ``acos``,
+                    ``asin``, ``tanh``, ``cosh``, ``sinh``, ``atanh``,
+                    ``acosh``, ``asinh``, ``swap``, ``drop``, ``dup``, ``over``,
+                    ``<<``, ``>>``, ``&``, ``|``, ``&&``, ``||``, ``!``,
+                    ``abs``, ``div``, ``int``, ``>``, ``>=``, ``<``, ``<=``,
+                    ``==``, ``!=``, ``min``, ``max``, ``xor`` and ``~``.
+    """
     try:
         return _E_MathOperatorsType[s.strip()]
     except KeyError:
@@ -450,6 +672,18 @@ _E_PCMType = {m.value.strip(): m for m in PCMType}
 
 
 def _p_PCMType(s: str) -> PCMType:
+    """Parses the XML lexical value of a ``PCMType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``NRZL``, ``NRZM``, ``NRZS``,
+                    ``BiPhaseL``, ``BiPhaseM`` and ``BiPhaseS``.
+    """
     try:
         return _E_PCMType[s.strip()]
     except KeyError:
@@ -467,6 +701,17 @@ _E_ParityFormType = {m.value.strip(): m for m in ParityFormType}
 
 
 def _p_ParityFormType(s: str) -> ParityFormType:
+    """Parses the XML lexical value of a ``ParityFormType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``Even`` and ``Odd``.
+    """
     try:
         return _E_ParityFormType[s.strip()]
     except KeyError:
@@ -486,6 +731,18 @@ _E_RadixType = {m.value.strip(): m for m in RadixType}
 
 
 def _p_RadixType(s: str) -> RadixType:
+    """Parses the XML lexical value of a ``RadixType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``Decimal``, ``Hexadecimal``, ``Octal``
+                    and ``Binary``.
+    """
     try:
         return _E_RadixType[s.strip()]
     except KeyError:
@@ -508,6 +765,17 @@ _E_RangeFormType = {m.value.strip(): m for m in RangeFormType}
 
 
 def _p_RangeFormType(s: str) -> RangeFormType:
+    """Parses the XML lexical value of a ``RangeFormType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``outside`` and ``inside``.
+    """
     try:
         return _E_RangeFormType[s.strip()]
     except KeyError:
@@ -533,6 +801,18 @@ _E_ReferenceLocationType = {m.value.strip(): m for m in ReferenceLocationType}
 
 
 def _p_ReferenceLocationType(s: str) -> ReferenceLocationType:
+    """Parses the XML lexical value of a ``ReferenceLocationType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``containerStart``, ``containerEnd``,
+                    ``previousEntry`` and ``nextEntry``.
+    """
     try:
         return _E_ReferenceLocationType[s.strip()]
     except KeyError:
@@ -550,6 +830,17 @@ _E_ReferencePointType = {m.value.strip(): m for m in ReferencePointType}
 
 
 def _p_ReferencePointType(s: str) -> ReferencePointType:
+    """Parses the XML lexical value of a ``ReferencePointType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``start`` and ``end``.
+    """
     try:
         return _E_ReferencePointType[s.strip()]
     except KeyError:
@@ -578,6 +869,19 @@ _E_StringEncodingType = {m.value.strip(): m for m in StringEncodingType}
 
 
 def _p_StringEncodingType(s: str) -> StringEncodingType:
+    """Parses the XML lexical value of a ``StringEncodingType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``US-ASCII``, ``ISO-8859-1``,
+                    ``Windows-1252``, ``UTF-8``, ``UTF-16``, ``UTF-16LE``,
+                    ``UTF-16BE``, ``UTF-32``, ``UTF-32LE`` and ``UTF-32BE``.
+    """
     try:
         return _E_StringEncodingType[s.strip()]
     except KeyError:
@@ -600,6 +904,18 @@ _E_SystemTypeType = {m.value.strip(): m for m in SystemTypeType}
 
 
 def _p_SystemTypeType(s: str) -> SystemTypeType:
+    """Parses the XML lexical value of a ``SystemTypeType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``asset``, ``assetGroup``,
+                    ``assetComponent`` and ``unknown``.
+    """
     try:
         return _E_SystemTypeType[s.strip()]
     except KeyError:
@@ -626,6 +942,18 @@ _E_TelemetryDataSourceType = {m.value.strip(): m
 
 
 def _p_TelemetryDataSourceType(s: str) -> TelemetryDataSourceType:
+    """Parses the XML lexical value of a ``TelemetryDataSourceType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``telemetered``, ``derived``,
+                    ``constant``, ``local`` and ``ground``.
+    """
     try:
         return _E_TelemetryDataSourceType[s.strip()]
     except KeyError:
@@ -652,6 +980,19 @@ _E_TimeAssociationUnitType = {m.value.strip(): m
 
 
 def _p_TimeAssociationUnitType(s: str) -> TimeAssociationUnitType:
+    """Parses the XML lexical value of a ``TimeAssociationUnitType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``seconds``, ``milliseconds``,
+                    ``microseconds``, ``nanoseconds``, ``picoseconds``,
+                    ``minutes``, ``hours``, ``days``, ``months`` and ``years``.
+    """
     try:
         return _E_TimeAssociationUnitType[s.strip()]
     except KeyError:
@@ -679,6 +1020,19 @@ _E_TimeUnitsType = {m.value.strip(): m for m in TimeUnitsType}
 
 
 def _p_TimeUnitsType(s: str) -> TimeUnitsType:
+    """Parses the XML lexical value of a ``TimeUnitsType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``seconds``, ``milliseconds``,
+                    ``microseconds``, ``nanoseconds``, ``picoseconds``,
+                    ``minutes``, ``hours``, ``days``, ``months`` and ``years``.
+    """
     try:
         return _E_TimeUnitsType[s.strip()]
     except KeyError:
@@ -697,6 +1051,18 @@ _E_TimeWindowIsRelativeToType = {m.value.strip(): m
 
 
 def _p_TimeWindowIsRelativeToType(s: str) -> TimeWindowIsRelativeToType:
+    """Parses the XML lexical value of a ``TimeWindowIsRelativeToType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``commandRelease`` and
+                    ``timeLastVerifierPassed``.
+    """
     try:
         return _E_TimeWindowIsRelativeToType[s.strip()]
     except KeyError:
@@ -719,6 +1085,18 @@ _E_UnitFormType = {m.value.strip(): m for m in UnitFormType}
 
 
 def _p_UnitFormType(s: str) -> UnitFormType:
+    """Parses the XML lexical value of a ``UnitFormType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``calibrated``, ``uncalibrated`` and
+                    ``raw``.
+    """
     try:
         return _E_UnitFormType[s.strip()]
     except KeyError:
@@ -741,6 +1119,18 @@ _E_ValidationStatusType = {m.value.strip(): m for m in ValidationStatusType}
 
 
 def _p_ValidationStatusType(s: str) -> ValidationStatusType:
+    """Parses the XML lexical value of a ``ValidationStatusType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``Unknown``, ``Working``, ``Draft``,
+                    ``Test``, ``Validated``, ``Released`` and ``Withdrawn``.
+    """
     try:
         return _E_ValidationStatusType[s.strip()]
     except KeyError:
@@ -766,6 +1156,19 @@ _E_VerifierEnumerationType = {m.value.strip(): m
 
 
 def _p_VerifierEnumerationType(s: str) -> VerifierEnumerationType:
+    """Parses the XML lexical value of a ``VerifierEnumerationType``.
+
+    Args:
+        s: The text; leading and trailing whitespace is ignored.
+
+    Returns:
+        The member whose value is ``s``.
+
+    Raises:
+        ValueError: If ``s`` is none of ``release``, ``transferredToRange``,
+                    ``sentFromRange``, ``received``, ``accepted``, ``queued``,
+                    ``executing``, ``complete`` and ``failed``.
+    """
     try:
         return _E_VerifierEnumerationType[s.strip()]
     except KeyError:
@@ -5368,13 +5771,13 @@ class ANDedConditionsChoice:
 
     @classmethod
     def condition(cls, value: ComparisonCheckType) -> ANDedConditionsChoice:
-        """Build the ``Condition`` alternative."""
+        """Builds the ``Condition`` alternative."""
         return cls('Condition', value)
 
     @classmethod
     def o_red_conditions(cls,
                          value: ORedConditionsType) -> ANDedConditionsChoice:
-        """Build the ``ORedConditions`` alternative."""
+        """Builds the ``ORedConditions`` alternative."""
         return cls('ORedConditions', value)
 
 
@@ -5395,35 +5798,35 @@ class AcceptedVerifierChoice1:
     @classmethod
     def comparison_list(cls,
                         value: ComparisonListType) -> AcceptedVerifierChoice1:
-        """Build the ``ComparisonList`` alternative."""
+        """Builds the ``ComparisonList`` alternative."""
         return cls('ComparisonList', value)
 
     @classmethod
     def container_ref(cls, value: ContainerRefType) -> AcceptedVerifierChoice1:
-        """Build the ``ContainerRef`` alternative."""
+        """Builds the ``ContainerRef`` alternative."""
         return cls('ContainerRef', value)
 
     @classmethod
     def parameter_value_change(
             cls, value: ParameterValueChangeType) -> AcceptedVerifierChoice1:
-        """Build the ``ParameterValueChange`` alternative."""
+        """Builds the ``ParameterValueChange`` alternative."""
         return cls('ParameterValueChange', value)
 
     @classmethod
     def custom_algorithm(cls,
                          value: InputAlgorithmType) -> AcceptedVerifierChoice1:
-        """Build the ``CustomAlgorithm`` alternative."""
+        """Builds the ``CustomAlgorithm`` alternative."""
         return cls('CustomAlgorithm', value)
 
     @classmethod
     def boolean_expression(
             cls, value: BooleanExpressionType) -> AcceptedVerifierChoice1:
-        """Build the ``BooleanExpression`` alternative."""
+        """Builds the ``BooleanExpression`` alternative."""
         return cls('BooleanExpression', value)
 
     @classmethod
     def comparison(cls, value: ComparisonType) -> AcceptedVerifierChoice1:
-        """Build the ``Comparison`` alternative."""
+        """Builds the ``Comparison`` alternative."""
         return cls('Comparison', value)
 
 
@@ -5442,13 +5845,13 @@ class AcceptedVerifierChoice2:
 
     @classmethod
     def check_window(cls, value: CheckWindowType) -> AcceptedVerifierChoice2:
-        """Build the ``CheckWindow`` alternative."""
+        """Builds the ``CheckWindow`` alternative."""
         return cls('CheckWindow', value)
 
     @classmethod
     def check_window_algorithms(
             cls, value: CheckWindowAlgorithmsType) -> AcceptedVerifierChoice2:
-        """Build the ``CheckWindowAlgorithms`` alternative."""
+        """Builds the ``CheckWindowAlgorithms`` alternative."""
         return cls('CheckWindowAlgorithms', value)
 
 
@@ -5467,12 +5870,12 @@ class AlarmChoice:
 
     @classmethod
     def alarm_conditions(cls, value: AlarmConditionsType) -> AlarmChoice:
-        """Build the ``AlarmConditions`` alternative."""
+        """Builds the ``AlarmConditions`` alternative."""
         return cls('AlarmConditions', value)
 
     @classmethod
     def custom_alarm(cls, value: CustomAlarmType) -> AlarmChoice:
-        """Build the ``CustomAlarm`` alternative."""
+        """Builds the ``CustomAlarm`` alternative."""
         return cls('CustomAlarm', value)
 
 
@@ -5493,12 +5896,12 @@ class AlgorithmSetChoice:
     @classmethod
     def custom_algorithm(
             cls, value: InputOutputTriggerAlgorithmType) -> AlgorithmSetChoice:
-        """Build the ``CustomAlgorithm`` alternative."""
+        """Builds the ``CustomAlgorithm`` alternative."""
         return cls('CustomAlgorithm', value)
 
     @classmethod
     def math_algorithm(cls, value: MathAlgorithmType) -> AlgorithmSetChoice:
-        """Build the ``MathAlgorithm`` alternative."""
+        """Builds the ``MathAlgorithm`` alternative."""
         return cls('MathAlgorithm', value)
 
 
@@ -5519,14 +5922,14 @@ class ArgumentANDedConditionsChoice:
     def condition(cls,
             value: ArgumentComparisonCheckType
             ) -> ArgumentANDedConditionsChoice:
-        """Build the ``Condition`` alternative."""
+        """Builds the ``Condition`` alternative."""
         return cls('Condition', value)
 
     @classmethod
     def o_red_conditions(
             cls,
             value: ArgumentORedConditionsType) -> ArgumentANDedConditionsChoice:
-        """Build the ``ORedConditions`` alternative."""
+        """Builds the ``ORedConditions`` alternative."""
         return cls('ORedConditions', value)
 
 
@@ -5548,26 +5951,26 @@ class ArgumentBaseDataChoice:
     def binary_data_encoding(
             cls,
             value: ArgumentBinaryDataEncodingType) -> ArgumentBaseDataChoice:
-        """Build the ``BinaryDataEncoding`` alternative."""
+        """Builds the ``BinaryDataEncoding`` alternative."""
         return cls('BinaryDataEncoding', value)
 
     @classmethod
     def float_data_encoding(
             cls, value: FloatDataEncodingType) -> ArgumentBaseDataChoice:
-        """Build the ``FloatDataEncoding`` alternative."""
+        """Builds the ``FloatDataEncoding`` alternative."""
         return cls('FloatDataEncoding', value)
 
     @classmethod
     def integer_data_encoding(
             cls, value: IntegerDataEncodingType) -> ArgumentBaseDataChoice:
-        """Build the ``IntegerDataEncoding`` alternative."""
+        """Builds the ``IntegerDataEncoding`` alternative."""
         return cls('IntegerDataEncoding', value)
 
     @classmethod
     def string_data_encoding(
             cls,
             value: ArgumentStringDataEncodingType) -> ArgumentBaseDataChoice:
-        """Build the ``StringDataEncoding`` alternative."""
+        """Builds the ``StringDataEncoding`` alternative."""
         return cls('StringDataEncoding', value)
 
 
@@ -5589,26 +5992,26 @@ class ArgumentBinaryDataChoice:
     def binary_data_encoding(
             cls,
             value: ArgumentBinaryDataEncodingType) -> ArgumentBinaryDataChoice:
-        """Build the ``BinaryDataEncoding`` alternative."""
+        """Builds the ``BinaryDataEncoding`` alternative."""
         return cls('BinaryDataEncoding', value)
 
     @classmethod
     def float_data_encoding(
             cls, value: FloatDataEncodingType) -> ArgumentBinaryDataChoice:
-        """Build the ``FloatDataEncoding`` alternative."""
+        """Builds the ``FloatDataEncoding`` alternative."""
         return cls('FloatDataEncoding', value)
 
     @classmethod
     def integer_data_encoding(
             cls, value: IntegerDataEncodingType) -> ArgumentBinaryDataChoice:
-        """Build the ``IntegerDataEncoding`` alternative."""
+        """Builds the ``IntegerDataEncoding`` alternative."""
         return cls('IntegerDataEncoding', value)
 
     @classmethod
     def string_data_encoding(
             cls,
             value: ArgumentStringDataEncodingType) -> ArgumentBinaryDataChoice:
-        """Build the ``StringDataEncoding`` alternative."""
+        """Builds the ``StringDataEncoding`` alternative."""
         return cls('StringDataEncoding', value)
 
 
@@ -5630,26 +6033,26 @@ class ArgumentBooleanDataChoice:
     def binary_data_encoding(
             cls,
             value: ArgumentBinaryDataEncodingType) -> ArgumentBooleanDataChoice:
-        """Build the ``BinaryDataEncoding`` alternative."""
+        """Builds the ``BinaryDataEncoding`` alternative."""
         return cls('BinaryDataEncoding', value)
 
     @classmethod
     def float_data_encoding(
             cls, value: FloatDataEncodingType) -> ArgumentBooleanDataChoice:
-        """Build the ``FloatDataEncoding`` alternative."""
+        """Builds the ``FloatDataEncoding`` alternative."""
         return cls('FloatDataEncoding', value)
 
     @classmethod
     def integer_data_encoding(
             cls, value: IntegerDataEncodingType) -> ArgumentBooleanDataChoice:
-        """Build the ``IntegerDataEncoding`` alternative."""
+        """Builds the ``IntegerDataEncoding`` alternative."""
         return cls('IntegerDataEncoding', value)
 
     @classmethod
     def string_data_encoding(
             cls,
             value: ArgumentStringDataEncodingType) -> ArgumentBooleanDataChoice:
-        """Build the ``StringDataEncoding`` alternative."""
+        """Builds the ``StringDataEncoding`` alternative."""
         return cls('StringDataEncoding', value)
 
 
@@ -5671,21 +6074,21 @@ class ArgumentBooleanExpressionChoice:
     def condition(cls,
             value: ArgumentComparisonCheckType
             ) -> ArgumentBooleanExpressionChoice:
-        """Build the ``Condition`` alternative."""
+        """Builds the ``Condition`` alternative."""
         return cls('Condition', value)
 
     @classmethod
     def an_ded_conditions(cls,
             value: ArgumentANDedConditionsType
             ) -> ArgumentBooleanExpressionChoice:
-        """Build the ``ANDedConditions`` alternative."""
+        """Builds the ``ANDedConditions`` alternative."""
         return cls('ANDedConditions', value)
 
     @classmethod
     def o_red_conditions(cls,
             value: ArgumentORedConditionsType
             ) -> ArgumentBooleanExpressionChoice:
-        """Build the ``ORedConditions`` alternative."""
+        """Builds the ``ORedConditions`` alternative."""
         return cls('ORedConditions', value)
 
 
@@ -5707,14 +6110,14 @@ class ArgumentComparisonCheckChoice1:
     def parameter_instance_ref(
             cls,
             value: ParameterInstanceRefType) -> ArgumentComparisonCheckChoice1:
-        """Build the ``ParameterInstanceRef`` alternative."""
+        """Builds the ``ParameterInstanceRef`` alternative."""
         return cls('ParameterInstanceRef', value)
 
     @classmethod
     def argument_instance_ref(
             cls,
             value: ArgumentInstanceRefType) -> ArgumentComparisonCheckChoice1:
-        """Build the ``ArgumentInstanceRef`` alternative."""
+        """Builds the ``ArgumentInstanceRef`` alternative."""
         return cls('ArgumentInstanceRef', value)
 
 
@@ -5736,19 +6139,19 @@ class ArgumentComparisonCheckChoice2:
     def parameter_instance_ref(
             cls,
             value: ParameterInstanceRefType) -> ArgumentComparisonCheckChoice2:
-        """Build the ``ParameterInstanceRef`` alternative."""
+        """Builds the ``ParameterInstanceRef`` alternative."""
         return cls('ParameterInstanceRef', value)
 
     @classmethod
     def argument_instance_ref(
             cls,
             value: ArgumentInstanceRefType) -> ArgumentComparisonCheckChoice2:
-        """Build the ``ArgumentInstanceRef`` alternative."""
+        """Builds the ``ArgumentInstanceRef`` alternative."""
         return cls('ArgumentInstanceRef', value)
 
     @classmethod
     def value_(cls, value: str) -> ArgumentComparisonCheckChoice2:
-        """Build the ``Value`` alternative."""
+        """Builds the ``Value`` alternative."""
         return cls('Value', value)
 
 
@@ -5768,13 +6171,13 @@ class ArgumentComparisonChoice:
     @classmethod
     def parameter_instance_ref(
             cls, value: ParameterInstanceRefType) -> ArgumentComparisonChoice:
-        """Build the ``ParameterInstanceRef`` alternative."""
+        """Builds the ``ParameterInstanceRef`` alternative."""
         return cls('ParameterInstanceRef', value)
 
     @classmethod
     def argument_instance_ref(
             cls, value: ArgumentInstanceRefType) -> ArgumentComparisonChoice:
-        """Build the ``ArgumentInstanceRef`` alternative."""
+        """Builds the ``ArgumentInstanceRef`` alternative."""
         return cls('ArgumentInstanceRef', value)
 
 
@@ -5795,28 +6198,28 @@ class ArgumentDiscreteLookupChoice:
     @classmethod
     def comparison(
             cls, value: ArgumentComparisonType) -> ArgumentDiscreteLookupChoice:
-        """Build the ``Comparison`` alternative."""
+        """Builds the ``Comparison`` alternative."""
         return cls('Comparison', value)
 
     @classmethod
     def comparison_list(
             cls,
             value: ArgumentComparisonListType) -> ArgumentDiscreteLookupChoice:
-        """Build the ``ComparisonList`` alternative."""
+        """Builds the ``ComparisonList`` alternative."""
         return cls('ComparisonList', value)
 
     @classmethod
     def boolean_expression(cls,
             value: ArgumentBooleanExpressionType
             ) -> ArgumentDiscreteLookupChoice:
-        """Build the ``BooleanExpression`` alternative."""
+        """Builds the ``BooleanExpression`` alternative."""
         return cls('BooleanExpression', value)
 
     @classmethod
     def custom_algorithm(
             cls,
             value: ArgumentInputAlgorithmType) -> ArgumentDiscreteLookupChoice:
-        """Build the ``CustomAlgorithm`` alternative."""
+        """Builds the ``CustomAlgorithm`` alternative."""
         return cls('CustomAlgorithm', value)
 
 
@@ -5836,13 +6239,13 @@ class ArgumentDynamicValueChoice:
     @classmethod
     def argument_instance_ref(
             cls, value: ArgumentInstanceRefType) -> ArgumentDynamicValueChoice:
-        """Build the ``ArgumentInstanceRef`` alternative."""
+        """Builds the ``ArgumentInstanceRef`` alternative."""
         return cls('ArgumentInstanceRef', value)
 
     @classmethod
     def parameter_instance_ref(
             cls, value: ParameterInstanceRefType) -> ArgumentDynamicValueChoice:
-        """Build the ``ParameterInstanceRef`` alternative."""
+        """Builds the ``ParameterInstanceRef`` alternative."""
         return cls('ParameterInstanceRef', value)
 
 
@@ -5864,27 +6267,27 @@ class ArgumentEnumeratedDataChoice:
     def binary_data_encoding(cls,
             value: ArgumentBinaryDataEncodingType
             ) -> ArgumentEnumeratedDataChoice:
-        """Build the ``BinaryDataEncoding`` alternative."""
+        """Builds the ``BinaryDataEncoding`` alternative."""
         return cls('BinaryDataEncoding', value)
 
     @classmethod
     def float_data_encoding(
             cls, value: FloatDataEncodingType) -> ArgumentEnumeratedDataChoice:
-        """Build the ``FloatDataEncoding`` alternative."""
+        """Builds the ``FloatDataEncoding`` alternative."""
         return cls('FloatDataEncoding', value)
 
     @classmethod
     def integer_data_encoding(
             cls,
             value: IntegerDataEncodingType) -> ArgumentEnumeratedDataChoice:
-        """Build the ``IntegerDataEncoding`` alternative."""
+        """Builds the ``IntegerDataEncoding`` alternative."""
         return cls('IntegerDataEncoding', value)
 
     @classmethod
     def string_data_encoding(cls,
             value: ArgumentStringDataEncodingType
             ) -> ArgumentEnumeratedDataChoice:
-        """Build the ``StringDataEncoding`` alternative."""
+        """Builds the ``StringDataEncoding`` alternative."""
         return cls('StringDataEncoding', value)
 
 
@@ -5906,26 +6309,26 @@ class ArgumentFloatDataChoice:
     def binary_data_encoding(
             cls,
             value: ArgumentBinaryDataEncodingType) -> ArgumentFloatDataChoice:
-        """Build the ``BinaryDataEncoding`` alternative."""
+        """Builds the ``BinaryDataEncoding`` alternative."""
         return cls('BinaryDataEncoding', value)
 
     @classmethod
     def float_data_encoding(
             cls, value: FloatDataEncodingType) -> ArgumentFloatDataChoice:
-        """Build the ``FloatDataEncoding`` alternative."""
+        """Builds the ``FloatDataEncoding`` alternative."""
         return cls('FloatDataEncoding', value)
 
     @classmethod
     def integer_data_encoding(
             cls, value: IntegerDataEncodingType) -> ArgumentFloatDataChoice:
-        """Build the ``IntegerDataEncoding`` alternative."""
+        """Builds the ``IntegerDataEncoding`` alternative."""
         return cls('IntegerDataEncoding', value)
 
     @classmethod
     def string_data_encoding(
             cls,
             value: ArgumentStringDataEncodingType) -> ArgumentFloatDataChoice:
-        """Build the ``StringDataEncoding`` alternative."""
+        """Builds the ``StringDataEncoding`` alternative."""
         return cls('StringDataEncoding', value)
 
 
@@ -5946,18 +6349,18 @@ class ArgumentInputSetChoice:
     def input_parameter_instance_ref(
             cls,
             value: InputParameterInstanceRefType) -> ArgumentInputSetChoice:
-        """Build the ``InputParameterInstanceRef`` alternative."""
+        """Builds the ``InputParameterInstanceRef`` alternative."""
         return cls('InputParameterInstanceRef', value)
 
     @classmethod
     def input_argument_instance_ref(
             cls, value: ArgumentInstanceRefType) -> ArgumentInputSetChoice:
-        """Build the ``InputArgumentInstanceRef`` alternative."""
+        """Builds the ``InputArgumentInstanceRef`` alternative."""
         return cls('InputArgumentInstanceRef', value)
 
     @classmethod
     def constant(cls, value: ConstantType) -> ArgumentInputSetChoice:
-        """Build the ``Constant`` alternative."""
+        """Builds the ``Constant`` alternative."""
         return cls('Constant', value)
 
 
@@ -5979,26 +6382,26 @@ class ArgumentIntegerDataChoice:
     def binary_data_encoding(
             cls,
             value: ArgumentBinaryDataEncodingType) -> ArgumentIntegerDataChoice:
-        """Build the ``BinaryDataEncoding`` alternative."""
+        """Builds the ``BinaryDataEncoding`` alternative."""
         return cls('BinaryDataEncoding', value)
 
     @classmethod
     def float_data_encoding(
             cls, value: FloatDataEncodingType) -> ArgumentIntegerDataChoice:
-        """Build the ``FloatDataEncoding`` alternative."""
+        """Builds the ``FloatDataEncoding`` alternative."""
         return cls('FloatDataEncoding', value)
 
     @classmethod
     def integer_data_encoding(
             cls, value: IntegerDataEncodingType) -> ArgumentIntegerDataChoice:
-        """Build the ``IntegerDataEncoding`` alternative."""
+        """Builds the ``IntegerDataEncoding`` alternative."""
         return cls('IntegerDataEncoding', value)
 
     @classmethod
     def string_data_encoding(
             cls,
             value: ArgumentStringDataEncodingType) -> ArgumentIntegerDataChoice:
-        """Build the ``StringDataEncoding`` alternative."""
+        """Builds the ``StringDataEncoding`` alternative."""
         return cls('StringDataEncoding', value)
 
 
@@ -6017,20 +6420,20 @@ class ArgumentIntegerValueChoice:
 
     @classmethod
     def fixed_value(cls, value: int) -> ArgumentIntegerValueChoice:
-        """Build the ``FixedValue`` alternative."""
+        """Builds the ``FixedValue`` alternative."""
         return cls('FixedValue', value)
 
     @classmethod
     def dynamic_value(
             cls, value: ArgumentDynamicValueType) -> ArgumentIntegerValueChoice:
-        """Build the ``DynamicValue`` alternative."""
+        """Builds the ``DynamicValue`` alternative."""
         return cls('DynamicValue', value)
 
     @classmethod
     def discrete_lookup_list(cls,
             value: ArgumentDiscreteLookupListType
             ) -> ArgumentIntegerValueChoice:
-        """Build the ``DiscreteLookupList`` alternative."""
+        """Builds the ``DiscreteLookupList`` alternative."""
         return cls('DiscreteLookupList', value)
 
 
@@ -6050,21 +6453,21 @@ class ArgumentLocationInContainerInBitsChoice:
 
     @classmethod
     def fixed_value(cls, value: int) -> ArgumentLocationInContainerInBitsChoice:
-        """Build the ``FixedValue`` alternative."""
+        """Builds the ``FixedValue`` alternative."""
         return cls('FixedValue', value)
 
     @classmethod
     def dynamic_value(cls,
             value: ArgumentDynamicValueType
             ) -> ArgumentLocationInContainerInBitsChoice:
-        """Build the ``DynamicValue`` alternative."""
+        """Builds the ``DynamicValue`` alternative."""
         return cls('DynamicValue', value)
 
     @classmethod
     def discrete_lookup_list(cls,
             value: ArgumentDiscreteLookupListType
             ) -> ArgumentLocationInContainerInBitsChoice:
-        """Build the ``DiscreteLookupList`` alternative."""
+        """Builds the ``DiscreteLookupList`` alternative."""
         return cls('DiscreteLookupList', value)
 
 
@@ -6085,28 +6488,28 @@ class ArgumentMatchCriteriaChoice:
     @classmethod
     def comparison(
             cls, value: ArgumentComparisonType) -> ArgumentMatchCriteriaChoice:
-        """Build the ``Comparison`` alternative."""
+        """Builds the ``Comparison`` alternative."""
         return cls('Comparison', value)
 
     @classmethod
     def comparison_list(
             cls,
             value: ArgumentComparisonListType) -> ArgumentMatchCriteriaChoice:
-        """Build the ``ComparisonList`` alternative."""
+        """Builds the ``ComparisonList`` alternative."""
         return cls('ComparisonList', value)
 
     @classmethod
     def boolean_expression(cls,
             value: ArgumentBooleanExpressionType
             ) -> ArgumentMatchCriteriaChoice:
-        """Build the ``BooleanExpression`` alternative."""
+        """Builds the ``BooleanExpression`` alternative."""
         return cls('BooleanExpression', value)
 
     @classmethod
     def custom_algorithm(
             cls,
             value: ArgumentInputAlgorithmType) -> ArgumentMatchCriteriaChoice:
-        """Build the ``CustomAlgorithm`` alternative."""
+        """Builds the ``CustomAlgorithm`` alternative."""
         return cls('CustomAlgorithm', value)
 
 
@@ -6126,30 +6529,30 @@ class ArgumentMathOperationChoice:
 
     @classmethod
     def value_operand(cls, value: str) -> ArgumentMathOperationChoice:
-        """Build the ``ValueOperand`` alternative."""
+        """Builds the ``ValueOperand`` alternative."""
         return cls('ValueOperand', value)
 
     @classmethod
     def this_parameter_operand(cls, value: str) -> ArgumentMathOperationChoice:
-        """Build the ``ThisParameterOperand`` alternative."""
+        """Builds the ``ThisParameterOperand`` alternative."""
         return cls('ThisParameterOperand', value)
 
     @classmethod
     def operator(cls, value: MathOperatorsType) -> ArgumentMathOperationChoice:
-        """Build the ``Operator`` alternative."""
+        """Builds the ``Operator`` alternative."""
         return cls('Operator', value)
 
     @classmethod
     def parameter_instance_ref_operand(
             cls,
             value: ParameterInstanceRefType) -> ArgumentMathOperationChoice:
-        """Build the ``ParameterInstanceRefOperand`` alternative."""
+        """Builds the ``ParameterInstanceRefOperand`` alternative."""
         return cls('ParameterInstanceRefOperand', value)
 
     @classmethod
     def argument_instance_ref_operand(
             cls, value: ArgumentInstanceRefType) -> ArgumentMathOperationChoice:
-        """Build the ``ArgumentInstanceRefOperand`` alternative."""
+        """Builds the ``ArgumentInstanceRefOperand`` alternative."""
         return cls('ArgumentInstanceRefOperand', value)
 
 
@@ -6170,14 +6573,14 @@ class ArgumentORedConditionsChoice:
     def condition(
             cls,
             value: ArgumentComparisonCheckType) -> ArgumentORedConditionsChoice:
-        """Build the ``Condition`` alternative."""
+        """Builds the ``Condition`` alternative."""
         return cls('Condition', value)
 
     @classmethod
     def an_ded_conditions(
             cls,
             value: ArgumentANDedConditionsType) -> ArgumentORedConditionsChoice:
-        """Build the ``ANDedConditions`` alternative."""
+        """Builds the ``ANDedConditions`` alternative."""
         return cls('ANDedConditions', value)
 
 
@@ -6199,26 +6602,26 @@ class ArgumentStringDataChoice:
     def binary_data_encoding(
             cls,
             value: ArgumentBinaryDataEncodingType) -> ArgumentStringDataChoice:
-        """Build the ``BinaryDataEncoding`` alternative."""
+        """Builds the ``BinaryDataEncoding`` alternative."""
         return cls('BinaryDataEncoding', value)
 
     @classmethod
     def float_data_encoding(
             cls, value: FloatDataEncodingType) -> ArgumentStringDataChoice:
-        """Build the ``FloatDataEncoding`` alternative."""
+        """Builds the ``FloatDataEncoding`` alternative."""
         return cls('FloatDataEncoding', value)
 
     @classmethod
     def integer_data_encoding(
             cls, value: IntegerDataEncodingType) -> ArgumentStringDataChoice:
-        """Build the ``IntegerDataEncoding`` alternative."""
+        """Builds the ``IntegerDataEncoding`` alternative."""
         return cls('IntegerDataEncoding', value)
 
     @classmethod
     def string_data_encoding(
             cls,
             value: ArgumentStringDataEncodingType) -> ArgumentStringDataChoice:
-        """Build the ``StringDataEncoding`` alternative."""
+        """Builds the ``StringDataEncoding`` alternative."""
         return cls('StringDataEncoding', value)
 
 
@@ -6238,14 +6641,14 @@ class ArgumentStringDataEncodingChoice:
     @classmethod
     def size_in_bits(cls,
                      value: SizeInBitsType) -> ArgumentStringDataEncodingChoice:
-        """Build the ``SizeInBits`` alternative."""
+        """Builds the ``SizeInBits`` alternative."""
         return cls('SizeInBits', value)
 
     @classmethod
     def variable(cls,
             value: ArgumentVariableStringType
             ) -> ArgumentStringDataEncodingChoice:
-        """Build the ``Variable`` alternative."""
+        """Builds the ``Variable`` alternative."""
         return cls('Variable', value)
 
 
@@ -6268,61 +6671,61 @@ class ArgumentTypeSetChoice:
     @classmethod
     def string_argument_type(
             cls, value: StringArgumentType) -> ArgumentTypeSetChoice:
-        """Build the ``StringArgumentType`` alternative."""
+        """Builds the ``StringArgumentType`` alternative."""
         return cls('StringArgumentType', value)
 
     @classmethod
     def enumerated_argument_type(
             cls, value: EnumeratedArgumentType) -> ArgumentTypeSetChoice:
-        """Build the ``EnumeratedArgumentType`` alternative."""
+        """Builds the ``EnumeratedArgumentType`` alternative."""
         return cls('EnumeratedArgumentType', value)
 
     @classmethod
     def integer_argument_type(
             cls, value: IntegerArgumentType) -> ArgumentTypeSetChoice:
-        """Build the ``IntegerArgumentType`` alternative."""
+        """Builds the ``IntegerArgumentType`` alternative."""
         return cls('IntegerArgumentType', value)
 
     @classmethod
     def binary_argument_type(
             cls, value: BinaryArgumentType) -> ArgumentTypeSetChoice:
-        """Build the ``BinaryArgumentType`` alternative."""
+        """Builds the ``BinaryArgumentType`` alternative."""
         return cls('BinaryArgumentType', value)
 
     @classmethod
     def float_argument_type(cls,
                             value: FloatArgumentType) -> ArgumentTypeSetChoice:
-        """Build the ``FloatArgumentType`` alternative."""
+        """Builds the ``FloatArgumentType`` alternative."""
         return cls('FloatArgumentType', value)
 
     @classmethod
     def boolean_argument_type(
             cls, value: BooleanArgumentType) -> ArgumentTypeSetChoice:
-        """Build the ``BooleanArgumentType`` alternative."""
+        """Builds the ``BooleanArgumentType`` alternative."""
         return cls('BooleanArgumentType', value)
 
     @classmethod
     def relative_time_argument_type(
             cls, value: RelativeTimeArgumentType) -> ArgumentTypeSetChoice:
-        """Build the ``RelativeTimeArgumentType`` alternative."""
+        """Builds the ``RelativeTimeArgumentType`` alternative."""
         return cls('RelativeTimeArgumentType', value)
 
     @classmethod
     def absolute_time_argument_type(
             cls, value: AbsoluteTimeArgumentType) -> ArgumentTypeSetChoice:
-        """Build the ``AbsoluteTimeArgumentType`` alternative."""
+        """Builds the ``AbsoluteTimeArgumentType`` alternative."""
         return cls('AbsoluteTimeArgumentType', value)
 
     @classmethod
     def array_argument_type(cls,
                             value: ArrayArgumentType) -> ArgumentTypeSetChoice:
-        """Build the ``ArrayArgumentType`` alternative."""
+        """Builds the ``ArrayArgumentType`` alternative."""
         return cls('ArrayArgumentType', value)
 
     @classmethod
     def aggregate_argument_type(
             cls, value: AggregateArgumentType) -> ArgumentTypeSetChoice:
-        """Build the ``AggregateArgumentType`` alternative."""
+        """Builds the ``AggregateArgumentType`` alternative."""
         return cls('AggregateArgumentType', value)
 
 
@@ -6343,14 +6746,14 @@ class ArgumentVariableStringChoice1:
     def dynamic_value(
             cls,
             value: ArgumentDynamicValueType) -> ArgumentVariableStringChoice1:
-        """Build the ``DynamicValue`` alternative."""
+        """Builds the ``DynamicValue`` alternative."""
         return cls('DynamicValue', value)
 
     @classmethod
     def discrete_lookup_list(cls,
             value: ArgumentDiscreteLookupListType
             ) -> ArgumentVariableStringChoice1:
-        """Build the ``DiscreteLookupList`` alternative."""
+        """Builds the ``DiscreteLookupList`` alternative."""
         return cls('DiscreteLookupList', value)
 
 
@@ -6370,12 +6773,12 @@ class ArgumentVariableStringChoice2:
     @classmethod
     def leading_size(cls,
                      value: LeadingSizeType) -> ArgumentVariableStringChoice2:
-        """Build the ``LeadingSize`` alternative."""
+        """Builds the ``LeadingSize`` alternative."""
         return cls('LeadingSize', value)
 
     @classmethod
     def termination_char(cls, value: str) -> ArgumentVariableStringChoice2:
-        """Build the ``TerminationChar`` alternative."""
+        """Builds the ``TerminationChar`` alternative."""
         return cls('TerminationChar', value)
 
 
@@ -6396,25 +6799,25 @@ class BaseDataChoice:
     @classmethod
     def binary_data_encoding(cls,
                              value: BinaryDataEncodingType) -> BaseDataChoice:
-        """Build the ``BinaryDataEncoding`` alternative."""
+        """Builds the ``BinaryDataEncoding`` alternative."""
         return cls('BinaryDataEncoding', value)
 
     @classmethod
     def float_data_encoding(cls,
                             value: FloatDataEncodingType) -> BaseDataChoice:
-        """Build the ``FloatDataEncoding`` alternative."""
+        """Builds the ``FloatDataEncoding`` alternative."""
         return cls('FloatDataEncoding', value)
 
     @classmethod
     def integer_data_encoding(cls,
                               value: IntegerDataEncodingType) -> BaseDataChoice:
-        """Build the ``IntegerDataEncoding`` alternative."""
+        """Builds the ``IntegerDataEncoding`` alternative."""
         return cls('IntegerDataEncoding', value)
 
     @classmethod
     def string_data_encoding(cls,
                              value: StringDataEncodingType) -> BaseDataChoice:
-        """Build the ``StringDataEncoding`` alternative."""
+        """Builds the ``StringDataEncoding`` alternative."""
         return cls('StringDataEncoding', value)
 
 
@@ -6433,12 +6836,12 @@ class BinaryAlarmChoice:
 
     @classmethod
     def alarm_conditions(cls, value: AlarmConditionsType) -> BinaryAlarmChoice:
-        """Build the ``AlarmConditions`` alternative."""
+        """Builds the ``AlarmConditions`` alternative."""
         return cls('AlarmConditions', value)
 
     @classmethod
     def custom_alarm(cls, value: CustomAlarmType) -> BinaryAlarmChoice:
-        """Build the ``CustomAlarm`` alternative."""
+        """Builds the ``CustomAlarm`` alternative."""
         return cls('CustomAlarm', value)
 
 
@@ -6459,25 +6862,25 @@ class BinaryArgumentChoice:
     @classmethod
     def binary_data_encoding(
             cls, value: ArgumentBinaryDataEncodingType) -> BinaryArgumentChoice:
-        """Build the ``BinaryDataEncoding`` alternative."""
+        """Builds the ``BinaryDataEncoding`` alternative."""
         return cls('BinaryDataEncoding', value)
 
     @classmethod
     def float_data_encoding(
             cls, value: FloatDataEncodingType) -> BinaryArgumentChoice:
-        """Build the ``FloatDataEncoding`` alternative."""
+        """Builds the ``FloatDataEncoding`` alternative."""
         return cls('FloatDataEncoding', value)
 
     @classmethod
     def integer_data_encoding(
             cls, value: IntegerDataEncodingType) -> BinaryArgumentChoice:
-        """Build the ``IntegerDataEncoding`` alternative."""
+        """Builds the ``IntegerDataEncoding`` alternative."""
         return cls('IntegerDataEncoding', value)
 
     @classmethod
     def string_data_encoding(
             cls, value: ArgumentStringDataEncodingType) -> BinaryArgumentChoice:
-        """Build the ``StringDataEncoding`` alternative."""
+        """Builds the ``StringDataEncoding`` alternative."""
         return cls('StringDataEncoding', value)
 
 
@@ -6497,12 +6900,12 @@ class BinaryContextAlarmChoice:
     @classmethod
     def alarm_conditions(
             cls, value: AlarmConditionsType) -> BinaryContextAlarmChoice:
-        """Build the ``AlarmConditions`` alternative."""
+        """Builds the ``AlarmConditions`` alternative."""
         return cls('AlarmConditions', value)
 
     @classmethod
     def custom_alarm(cls, value: CustomAlarmType) -> BinaryContextAlarmChoice:
-        """Build the ``CustomAlarm`` alternative."""
+        """Builds the ``CustomAlarm`` alternative."""
         return cls('CustomAlarm', value)
 
 
@@ -6523,25 +6926,25 @@ class BinaryDataChoice:
     @classmethod
     def binary_data_encoding(cls,
                              value: BinaryDataEncodingType) -> BinaryDataChoice:
-        """Build the ``BinaryDataEncoding`` alternative."""
+        """Builds the ``BinaryDataEncoding`` alternative."""
         return cls('BinaryDataEncoding', value)
 
     @classmethod
     def float_data_encoding(cls,
                             value: FloatDataEncodingType) -> BinaryDataChoice:
-        """Build the ``FloatDataEncoding`` alternative."""
+        """Builds the ``FloatDataEncoding`` alternative."""
         return cls('FloatDataEncoding', value)
 
     @classmethod
     def integer_data_encoding(
             cls, value: IntegerDataEncodingType) -> BinaryDataChoice:
-        """Build the ``IntegerDataEncoding`` alternative."""
+        """Builds the ``IntegerDataEncoding`` alternative."""
         return cls('IntegerDataEncoding', value)
 
     @classmethod
     def string_data_encoding(cls,
                              value: StringDataEncodingType) -> BinaryDataChoice:
-        """Build the ``StringDataEncoding`` alternative."""
+        """Builds the ``StringDataEncoding`` alternative."""
         return cls('StringDataEncoding', value)
 
 
@@ -6562,25 +6965,25 @@ class BinaryParameterChoice:
     @classmethod
     def binary_data_encoding(
             cls, value: BinaryDataEncodingType) -> BinaryParameterChoice:
-        """Build the ``BinaryDataEncoding`` alternative."""
+        """Builds the ``BinaryDataEncoding`` alternative."""
         return cls('BinaryDataEncoding', value)
 
     @classmethod
     def float_data_encoding(
             cls, value: FloatDataEncodingType) -> BinaryParameterChoice:
-        """Build the ``FloatDataEncoding`` alternative."""
+        """Builds the ``FloatDataEncoding`` alternative."""
         return cls('FloatDataEncoding', value)
 
     @classmethod
     def integer_data_encoding(
             cls, value: IntegerDataEncodingType) -> BinaryParameterChoice:
-        """Build the ``IntegerDataEncoding`` alternative."""
+        """Builds the ``IntegerDataEncoding`` alternative."""
         return cls('IntegerDataEncoding', value)
 
     @classmethod
     def string_data_encoding(
             cls, value: StringDataEncodingType) -> BinaryParameterChoice:
-        """Build the ``StringDataEncoding`` alternative."""
+        """Builds the ``StringDataEncoding`` alternative."""
         return cls('StringDataEncoding', value)
 
 
@@ -6599,12 +7002,12 @@ class BooleanAlarmChoice:
 
     @classmethod
     def alarm_conditions(cls, value: AlarmConditionsType) -> BooleanAlarmChoice:
-        """Build the ``AlarmConditions`` alternative."""
+        """Builds the ``AlarmConditions`` alternative."""
         return cls('AlarmConditions', value)
 
     @classmethod
     def custom_alarm(cls, value: CustomAlarmType) -> BooleanAlarmChoice:
-        """Build the ``CustomAlarm`` alternative."""
+        """Builds the ``CustomAlarm`` alternative."""
         return cls('CustomAlarm', value)
 
 
@@ -6626,26 +7029,26 @@ class BooleanArgumentChoice:
     def binary_data_encoding(
             cls,
             value: ArgumentBinaryDataEncodingType) -> BooleanArgumentChoice:
-        """Build the ``BinaryDataEncoding`` alternative."""
+        """Builds the ``BinaryDataEncoding`` alternative."""
         return cls('BinaryDataEncoding', value)
 
     @classmethod
     def float_data_encoding(
             cls, value: FloatDataEncodingType) -> BooleanArgumentChoice:
-        """Build the ``FloatDataEncoding`` alternative."""
+        """Builds the ``FloatDataEncoding`` alternative."""
         return cls('FloatDataEncoding', value)
 
     @classmethod
     def integer_data_encoding(
             cls, value: IntegerDataEncodingType) -> BooleanArgumentChoice:
-        """Build the ``IntegerDataEncoding`` alternative."""
+        """Builds the ``IntegerDataEncoding`` alternative."""
         return cls('IntegerDataEncoding', value)
 
     @classmethod
     def string_data_encoding(
             cls,
             value: ArgumentStringDataEncodingType) -> BooleanArgumentChoice:
-        """Build the ``StringDataEncoding`` alternative."""
+        """Builds the ``StringDataEncoding`` alternative."""
         return cls('StringDataEncoding', value)
 
 
@@ -6665,12 +7068,12 @@ class BooleanContextAlarmChoice:
     @classmethod
     def alarm_conditions(
             cls, value: AlarmConditionsType) -> BooleanContextAlarmChoice:
-        """Build the ``AlarmConditions`` alternative."""
+        """Builds the ``AlarmConditions`` alternative."""
         return cls('AlarmConditions', value)
 
     @classmethod
     def custom_alarm(cls, value: CustomAlarmType) -> BooleanContextAlarmChoice:
-        """Build the ``CustomAlarm`` alternative."""
+        """Builds the ``CustomAlarm`` alternative."""
         return cls('CustomAlarm', value)
 
 
@@ -6691,25 +7094,25 @@ class BooleanDataChoice:
     @classmethod
     def binary_data_encoding(
             cls, value: BinaryDataEncodingType) -> BooleanDataChoice:
-        """Build the ``BinaryDataEncoding`` alternative."""
+        """Builds the ``BinaryDataEncoding`` alternative."""
         return cls('BinaryDataEncoding', value)
 
     @classmethod
     def float_data_encoding(cls,
                             value: FloatDataEncodingType) -> BooleanDataChoice:
-        """Build the ``FloatDataEncoding`` alternative."""
+        """Builds the ``FloatDataEncoding`` alternative."""
         return cls('FloatDataEncoding', value)
 
     @classmethod
     def integer_data_encoding(
             cls, value: IntegerDataEncodingType) -> BooleanDataChoice:
-        """Build the ``IntegerDataEncoding`` alternative."""
+        """Builds the ``IntegerDataEncoding`` alternative."""
         return cls('IntegerDataEncoding', value)
 
     @classmethod
     def string_data_encoding(
             cls, value: StringDataEncodingType) -> BooleanDataChoice:
-        """Build the ``StringDataEncoding`` alternative."""
+        """Builds the ``StringDataEncoding`` alternative."""
         return cls('StringDataEncoding', value)
 
 
@@ -6728,19 +7131,19 @@ class BooleanExpressionChoice:
 
     @classmethod
     def condition(cls, value: ComparisonCheckType) -> BooleanExpressionChoice:
-        """Build the ``Condition`` alternative."""
+        """Builds the ``Condition`` alternative."""
         return cls('Condition', value)
 
     @classmethod
     def an_ded_conditions(
             cls, value: ANDedConditionsType) -> BooleanExpressionChoice:
-        """Build the ``ANDedConditions`` alternative."""
+        """Builds the ``ANDedConditions`` alternative."""
         return cls('ANDedConditions', value)
 
     @classmethod
     def o_red_conditions(cls,
                          value: ORedConditionsType) -> BooleanExpressionChoice:
-        """Build the ``ORedConditions`` alternative."""
+        """Builds the ``ORedConditions`` alternative."""
         return cls('ORedConditions', value)
 
 
@@ -6761,25 +7164,25 @@ class BooleanParameterChoice:
     @classmethod
     def binary_data_encoding(
             cls, value: BinaryDataEncodingType) -> BooleanParameterChoice:
-        """Build the ``BinaryDataEncoding`` alternative."""
+        """Builds the ``BinaryDataEncoding`` alternative."""
         return cls('BinaryDataEncoding', value)
 
     @classmethod
     def float_data_encoding(
             cls, value: FloatDataEncodingType) -> BooleanParameterChoice:
-        """Build the ``FloatDataEncoding`` alternative."""
+        """Builds the ``FloatDataEncoding`` alternative."""
         return cls('FloatDataEncoding', value)
 
     @classmethod
     def integer_data_encoding(
             cls, value: IntegerDataEncodingType) -> BooleanParameterChoice:
-        """Build the ``IntegerDataEncoding`` alternative."""
+        """Builds the ``IntegerDataEncoding`` alternative."""
         return cls('IntegerDataEncoding', value)
 
     @classmethod
     def string_data_encoding(
             cls, value: StringDataEncodingType) -> BooleanParameterChoice:
-        """Build the ``StringDataEncoding`` alternative."""
+        """Builds the ``StringDataEncoding`` alternative."""
         return cls('StringDataEncoding', value)
 
 
@@ -6798,19 +7201,19 @@ class CalibratorChoice:
 
     @classmethod
     def spline_calibrator(cls, value: SplineCalibratorType) -> CalibratorChoice:
-        """Build the ``SplineCalibrator`` alternative."""
+        """Builds the ``SplineCalibrator`` alternative."""
         return cls('SplineCalibrator', value)
 
     @classmethod
     def polynomial_calibrator(
             cls, value: PolynomialCalibratorType) -> CalibratorChoice:
-        """Build the ``PolynomialCalibrator`` alternative."""
+        """Builds the ``PolynomialCalibrator`` alternative."""
         return cls('PolynomialCalibrator', value)
 
     @classmethod
     def math_operation_calibrator(
             cls, value: MathOperationCalibratorType) -> CalibratorChoice:
-        """Build the ``MathOperationCalibrator`` alternative."""
+        """Builds the ``MathOperationCalibrator`` alternative."""
         return cls('MathOperationCalibrator', value)
 
 
@@ -6835,70 +7238,70 @@ class CommandContainerEntryListChoice:
     def parameter_ref_entry(cls,
             value: ArgumentParameterRefEntryType
             ) -> CommandContainerEntryListChoice:
-        """Build the ``ParameterRefEntry`` alternative."""
+        """Builds the ``ParameterRefEntry`` alternative."""
         return cls('ParameterRefEntry', value)
 
     @classmethod
     def parameter_segment_ref_entry(cls,
             value: ArgumentParameterSegmentRefEntryType
             ) -> CommandContainerEntryListChoice:
-        """Build the ``ParameterSegmentRefEntry`` alternative."""
+        """Builds the ``ParameterSegmentRefEntry`` alternative."""
         return cls('ParameterSegmentRefEntry', value)
 
     @classmethod
     def container_ref_entry(cls,
             value: ArgumentContainerRefEntryType
             ) -> CommandContainerEntryListChoice:
-        """Build the ``ContainerRefEntry`` alternative."""
+        """Builds the ``ContainerRefEntry`` alternative."""
         return cls('ContainerRefEntry', value)
 
     @classmethod
     def container_segment_ref_entry(cls,
             value: ArgumentContainerSegmentRefEntryType
             ) -> CommandContainerEntryListChoice:
-        """Build the ``ContainerSegmentRefEntry`` alternative."""
+        """Builds the ``ContainerSegmentRefEntry`` alternative."""
         return cls('ContainerSegmentRefEntry', value)
 
     @classmethod
     def stream_segment_entry(cls,
             value: ArgumentStreamSegmentEntryType
             ) -> CommandContainerEntryListChoice:
-        """Build the ``StreamSegmentEntry`` alternative."""
+        """Builds the ``StreamSegmentEntry`` alternative."""
         return cls('StreamSegmentEntry', value)
 
     @classmethod
     def indirect_parameter_ref_entry(cls,
             value: ArgumentIndirectParameterRefEntryType
             ) -> CommandContainerEntryListChoice:
-        """Build the ``IndirectParameterRefEntry`` alternative."""
+        """Builds the ``IndirectParameterRefEntry`` alternative."""
         return cls('IndirectParameterRefEntry', value)
 
     @classmethod
     def array_parameter_ref_entry(cls,
             value: ArgumentArrayParameterRefEntryType
             ) -> CommandContainerEntryListChoice:
-        """Build the ``ArrayParameterRefEntry`` alternative."""
+        """Builds the ``ArrayParameterRefEntry`` alternative."""
         return cls('ArrayParameterRefEntry', value)
 
     @classmethod
     def argument_ref_entry(cls,
             value: ArgumentArgumentRefEntryType
             ) -> CommandContainerEntryListChoice:
-        """Build the ``ArgumentRefEntry`` alternative."""
+        """Builds the ``ArgumentRefEntry`` alternative."""
         return cls('ArgumentRefEntry', value)
 
     @classmethod
     def array_argument_ref_entry(cls,
             value: ArgumentArrayArgumentRefEntryType
             ) -> CommandContainerEntryListChoice:
-        """Build the ``ArrayArgumentRefEntry`` alternative."""
+        """Builds the ``ArrayArgumentRefEntry`` alternative."""
         return cls('ArrayArgumentRefEntry', value)
 
     @classmethod
     def fixed_value_entry(cls,
             value: ArgumentFixedValueEntryType
             ) -> CommandContainerEntryListChoice:
-        """Build the ``FixedValueEntry`` alternative."""
+        """Builds the ``FixedValueEntry`` alternative."""
         return cls('FixedValueEntry', value)
 
 
@@ -6919,35 +7322,35 @@ class CommandVerifierChoice1:
     @classmethod
     def comparison_list(cls,
                         value: ComparisonListType) -> CommandVerifierChoice1:
-        """Build the ``ComparisonList`` alternative."""
+        """Builds the ``ComparisonList`` alternative."""
         return cls('ComparisonList', value)
 
     @classmethod
     def container_ref(cls, value: ContainerRefType) -> CommandVerifierChoice1:
-        """Build the ``ContainerRef`` alternative."""
+        """Builds the ``ContainerRef`` alternative."""
         return cls('ContainerRef', value)
 
     @classmethod
     def parameter_value_change(
             cls, value: ParameterValueChangeType) -> CommandVerifierChoice1:
-        """Build the ``ParameterValueChange`` alternative."""
+        """Builds the ``ParameterValueChange`` alternative."""
         return cls('ParameterValueChange', value)
 
     @classmethod
     def custom_algorithm(cls,
                          value: InputAlgorithmType) -> CommandVerifierChoice1:
-        """Build the ``CustomAlgorithm`` alternative."""
+        """Builds the ``CustomAlgorithm`` alternative."""
         return cls('CustomAlgorithm', value)
 
     @classmethod
     def boolean_expression(
             cls, value: BooleanExpressionType) -> CommandVerifierChoice1:
-        """Build the ``BooleanExpression`` alternative."""
+        """Builds the ``BooleanExpression`` alternative."""
         return cls('BooleanExpression', value)
 
     @classmethod
     def comparison(cls, value: ComparisonType) -> CommandVerifierChoice1:
-        """Build the ``Comparison`` alternative."""
+        """Builds the ``Comparison`` alternative."""
         return cls('Comparison', value)
 
 
@@ -6966,13 +7369,13 @@ class CommandVerifierChoice2:
 
     @classmethod
     def check_window(cls, value: CheckWindowType) -> CommandVerifierChoice2:
-        """Build the ``CheckWindow`` alternative."""
+        """Builds the ``CheckWindow`` alternative."""
         return cls('CheckWindow', value)
 
     @classmethod
     def check_window_algorithms(
             cls, value: CheckWindowAlgorithmsType) -> CommandVerifierChoice2:
-        """Build the ``CheckWindowAlgorithms`` alternative."""
+        """Builds the ``CheckWindowAlgorithms`` alternative."""
         return cls('CheckWindowAlgorithms', value)
 
 
@@ -6992,12 +7395,12 @@ class ComparisonCheckChoice:
     @classmethod
     def parameter_instance_ref(
             cls, value: ParameterInstanceRefType) -> ComparisonCheckChoice:
-        """Build the ``ParameterInstanceRef`` alternative."""
+        """Builds the ``ParameterInstanceRef`` alternative."""
         return cls('ParameterInstanceRef', value)
 
     @classmethod
     def value_(cls, value: str) -> ComparisonCheckChoice:
-        """Build the ``Value`` alternative."""
+        """Builds the ``Value`` alternative."""
         return cls('Value', value)
 
 
@@ -7018,35 +7421,35 @@ class CompleteVerifierChoice1:
     @classmethod
     def comparison_list(cls,
                         value: ComparisonListType) -> CompleteVerifierChoice1:
-        """Build the ``ComparisonList`` alternative."""
+        """Builds the ``ComparisonList`` alternative."""
         return cls('ComparisonList', value)
 
     @classmethod
     def container_ref(cls, value: ContainerRefType) -> CompleteVerifierChoice1:
-        """Build the ``ContainerRef`` alternative."""
+        """Builds the ``ContainerRef`` alternative."""
         return cls('ContainerRef', value)
 
     @classmethod
     def parameter_value_change(
             cls, value: ParameterValueChangeType) -> CompleteVerifierChoice1:
-        """Build the ``ParameterValueChange`` alternative."""
+        """Builds the ``ParameterValueChange`` alternative."""
         return cls('ParameterValueChange', value)
 
     @classmethod
     def custom_algorithm(cls,
                          value: InputAlgorithmType) -> CompleteVerifierChoice1:
-        """Build the ``CustomAlgorithm`` alternative."""
+        """Builds the ``CustomAlgorithm`` alternative."""
         return cls('CustomAlgorithm', value)
 
     @classmethod
     def boolean_expression(
             cls, value: BooleanExpressionType) -> CompleteVerifierChoice1:
-        """Build the ``BooleanExpression`` alternative."""
+        """Builds the ``BooleanExpression`` alternative."""
         return cls('BooleanExpression', value)
 
     @classmethod
     def comparison(cls, value: ComparisonType) -> CompleteVerifierChoice1:
-        """Build the ``Comparison`` alternative."""
+        """Builds the ``Comparison`` alternative."""
         return cls('Comparison', value)
 
 
@@ -7065,13 +7468,13 @@ class CompleteVerifierChoice2:
 
     @classmethod
     def check_window(cls, value: CheckWindowType) -> CompleteVerifierChoice2:
-        """Build the ``CheckWindow`` alternative."""
+        """Builds the ``CheckWindow`` alternative."""
         return cls('CheckWindow', value)
 
     @classmethod
     def check_window_algorithms(
             cls, value: CheckWindowAlgorithmsType) -> CompleteVerifierChoice2:
-        """Build the ``CheckWindowAlgorithms`` alternative."""
+        """Builds the ``CheckWindowAlgorithms`` alternative."""
         return cls('CheckWindowAlgorithms', value)
 
 
@@ -7091,23 +7494,23 @@ class ContextMatchChoice:
 
     @classmethod
     def comparison(cls, value: ComparisonType) -> ContextMatchChoice:
-        """Build the ``Comparison`` alternative."""
+        """Builds the ``Comparison`` alternative."""
         return cls('Comparison', value)
 
     @classmethod
     def comparison_list(cls, value: ComparisonListType) -> ContextMatchChoice:
-        """Build the ``ComparisonList`` alternative."""
+        """Builds the ``ComparisonList`` alternative."""
         return cls('ComparisonList', value)
 
     @classmethod
     def boolean_expression(cls,
                            value: BooleanExpressionType) -> ContextMatchChoice:
-        """Build the ``BooleanExpression`` alternative."""
+        """Builds the ``BooleanExpression`` alternative."""
         return cls('BooleanExpression', value)
 
     @classmethod
     def custom_algorithm(cls, value: InputAlgorithmType) -> ContextMatchChoice:
-        """Build the ``CustomAlgorithm`` alternative."""
+        """Builds the ``CustomAlgorithm`` alternative."""
         return cls('CustomAlgorithm', value)
 
 
@@ -7127,24 +7530,24 @@ class DiscreteLookupChoice:
 
     @classmethod
     def comparison(cls, value: ComparisonType) -> DiscreteLookupChoice:
-        """Build the ``Comparison`` alternative."""
+        """Builds the ``Comparison`` alternative."""
         return cls('Comparison', value)
 
     @classmethod
     def comparison_list(cls, value: ComparisonListType) -> DiscreteLookupChoice:
-        """Build the ``ComparisonList`` alternative."""
+        """Builds the ``ComparisonList`` alternative."""
         return cls('ComparisonList', value)
 
     @classmethod
     def boolean_expression(
             cls, value: BooleanExpressionType) -> DiscreteLookupChoice:
-        """Build the ``BooleanExpression`` alternative."""
+        """Builds the ``BooleanExpression`` alternative."""
         return cls('BooleanExpression', value)
 
     @classmethod
     def custom_algorithm(cls,
                          value: InputAlgorithmType) -> DiscreteLookupChoice:
-        """Build the ``CustomAlgorithm`` alternative."""
+        """Builds the ``CustomAlgorithm`` alternative."""
         return cls('CustomAlgorithm', value)
 
 
@@ -7165,25 +7568,25 @@ class EncodingChoice:
     @classmethod
     def binary_data_encoding(cls,
                              value: BinaryDataEncodingType) -> EncodingChoice:
-        """Build the ``BinaryDataEncoding`` alternative."""
+        """Builds the ``BinaryDataEncoding`` alternative."""
         return cls('BinaryDataEncoding', value)
 
     @classmethod
     def float_data_encoding(cls,
                             value: FloatDataEncodingType) -> EncodingChoice:
-        """Build the ``FloatDataEncoding`` alternative."""
+        """Builds the ``FloatDataEncoding`` alternative."""
         return cls('FloatDataEncoding', value)
 
     @classmethod
     def integer_data_encoding(cls,
                               value: IntegerDataEncodingType) -> EncodingChoice:
-        """Build the ``IntegerDataEncoding`` alternative."""
+        """Builds the ``IntegerDataEncoding`` alternative."""
         return cls('IntegerDataEncoding', value)
 
     @classmethod
     def string_data_encoding(cls,
                              value: StringDataEncodingType) -> EncodingChoice:
-        """Build the ``StringDataEncoding`` alternative."""
+        """Builds the ``StringDataEncoding`` alternative."""
         return cls('StringDataEncoding', value)
 
 
@@ -7205,43 +7608,43 @@ class EntryListChoice:
     @classmethod
     def parameter_ref_entry(cls,
                             value: ParameterRefEntryType) -> EntryListChoice:
-        """Build the ``ParameterRefEntry`` alternative."""
+        """Builds the ``ParameterRefEntry`` alternative."""
         return cls('ParameterRefEntry', value)
 
     @classmethod
     def parameter_segment_ref_entry(
             cls, value: ParameterSegmentRefEntryType) -> EntryListChoice:
-        """Build the ``ParameterSegmentRefEntry`` alternative."""
+        """Builds the ``ParameterSegmentRefEntry`` alternative."""
         return cls('ParameterSegmentRefEntry', value)
 
     @classmethod
     def container_ref_entry(cls,
                             value: ContainerRefEntryType) -> EntryListChoice:
-        """Build the ``ContainerRefEntry`` alternative."""
+        """Builds the ``ContainerRefEntry`` alternative."""
         return cls('ContainerRefEntry', value)
 
     @classmethod
     def container_segment_ref_entry(
             cls, value: ContainerSegmentRefEntryType) -> EntryListChoice:
-        """Build the ``ContainerSegmentRefEntry`` alternative."""
+        """Builds the ``ContainerSegmentRefEntry`` alternative."""
         return cls('ContainerSegmentRefEntry', value)
 
     @classmethod
     def stream_segment_entry(cls,
                              value: StreamSegmentEntryType) -> EntryListChoice:
-        """Build the ``StreamSegmentEntry`` alternative."""
+        """Builds the ``StreamSegmentEntry`` alternative."""
         return cls('StreamSegmentEntry', value)
 
     @classmethod
     def indirect_parameter_ref_entry(
             cls, value: IndirectParameterRefEntryType) -> EntryListChoice:
-        """Build the ``IndirectParameterRefEntry`` alternative."""
+        """Builds the ``IndirectParameterRefEntry`` alternative."""
         return cls('IndirectParameterRefEntry', value)
 
     @classmethod
     def array_parameter_ref_entry(
             cls, value: ArrayParameterRefEntryType) -> EntryListChoice:
-        """Build the ``ArrayParameterRefEntry`` alternative."""
+        """Builds the ``ArrayParameterRefEntry`` alternative."""
         return cls('ArrayParameterRefEntry', value)
 
 
@@ -7263,26 +7666,26 @@ class EnumeratedArgumentChoice:
     def binary_data_encoding(
             cls,
             value: ArgumentBinaryDataEncodingType) -> EnumeratedArgumentChoice:
-        """Build the ``BinaryDataEncoding`` alternative."""
+        """Builds the ``BinaryDataEncoding`` alternative."""
         return cls('BinaryDataEncoding', value)
 
     @classmethod
     def float_data_encoding(
             cls, value: FloatDataEncodingType) -> EnumeratedArgumentChoice:
-        """Build the ``FloatDataEncoding`` alternative."""
+        """Builds the ``FloatDataEncoding`` alternative."""
         return cls('FloatDataEncoding', value)
 
     @classmethod
     def integer_data_encoding(
             cls, value: IntegerDataEncodingType) -> EnumeratedArgumentChoice:
-        """Build the ``IntegerDataEncoding`` alternative."""
+        """Builds the ``IntegerDataEncoding`` alternative."""
         return cls('IntegerDataEncoding', value)
 
     @classmethod
     def string_data_encoding(
             cls,
             value: ArgumentStringDataEncodingType) -> EnumeratedArgumentChoice:
-        """Build the ``StringDataEncoding`` alternative."""
+        """Builds the ``StringDataEncoding`` alternative."""
         return cls('StringDataEncoding', value)
 
 
@@ -7303,25 +7706,25 @@ class EnumeratedDataChoice:
     @classmethod
     def binary_data_encoding(
             cls, value: BinaryDataEncodingType) -> EnumeratedDataChoice:
-        """Build the ``BinaryDataEncoding`` alternative."""
+        """Builds the ``BinaryDataEncoding`` alternative."""
         return cls('BinaryDataEncoding', value)
 
     @classmethod
     def float_data_encoding(
             cls, value: FloatDataEncodingType) -> EnumeratedDataChoice:
-        """Build the ``FloatDataEncoding`` alternative."""
+        """Builds the ``FloatDataEncoding`` alternative."""
         return cls('FloatDataEncoding', value)
 
     @classmethod
     def integer_data_encoding(
             cls, value: IntegerDataEncodingType) -> EnumeratedDataChoice:
-        """Build the ``IntegerDataEncoding`` alternative."""
+        """Builds the ``IntegerDataEncoding`` alternative."""
         return cls('IntegerDataEncoding', value)
 
     @classmethod
     def string_data_encoding(
             cls, value: StringDataEncodingType) -> EnumeratedDataChoice:
-        """Build the ``StringDataEncoding`` alternative."""
+        """Builds the ``StringDataEncoding`` alternative."""
         return cls('StringDataEncoding', value)
 
 
@@ -7342,25 +7745,25 @@ class EnumeratedParameterChoice:
     @classmethod
     def binary_data_encoding(
             cls, value: BinaryDataEncodingType) -> EnumeratedParameterChoice:
-        """Build the ``BinaryDataEncoding`` alternative."""
+        """Builds the ``BinaryDataEncoding`` alternative."""
         return cls('BinaryDataEncoding', value)
 
     @classmethod
     def float_data_encoding(
             cls, value: FloatDataEncodingType) -> EnumeratedParameterChoice:
-        """Build the ``FloatDataEncoding`` alternative."""
+        """Builds the ``FloatDataEncoding`` alternative."""
         return cls('FloatDataEncoding', value)
 
     @classmethod
     def integer_data_encoding(
             cls, value: IntegerDataEncodingType) -> EnumeratedParameterChoice:
-        """Build the ``IntegerDataEncoding`` alternative."""
+        """Builds the ``IntegerDataEncoding`` alternative."""
         return cls('IntegerDataEncoding', value)
 
     @classmethod
     def string_data_encoding(
             cls, value: StringDataEncodingType) -> EnumeratedParameterChoice:
-        """Build the ``StringDataEncoding`` alternative."""
+        """Builds the ``StringDataEncoding`` alternative."""
         return cls('StringDataEncoding', value)
 
 
@@ -7380,12 +7783,12 @@ class EnumerationAlarmChoice:
     @classmethod
     def alarm_conditions(cls,
                          value: AlarmConditionsType) -> EnumerationAlarmChoice:
-        """Build the ``AlarmConditions`` alternative."""
+        """Builds the ``AlarmConditions`` alternative."""
         return cls('AlarmConditions', value)
 
     @classmethod
     def custom_alarm(cls, value: CustomAlarmType) -> EnumerationAlarmChoice:
-        """Build the ``CustomAlarm`` alternative."""
+        """Builds the ``CustomAlarm`` alternative."""
         return cls('CustomAlarm', value)
 
 
@@ -7406,13 +7809,13 @@ class EnumerationContextAlarmChoice:
     @classmethod
     def alarm_conditions(
             cls, value: AlarmConditionsType) -> EnumerationContextAlarmChoice:
-        """Build the ``AlarmConditions`` alternative."""
+        """Builds the ``AlarmConditions`` alternative."""
         return cls('AlarmConditions', value)
 
     @classmethod
     def custom_alarm(cls,
                      value: CustomAlarmType) -> EnumerationContextAlarmChoice:
-        """Build the ``CustomAlarm`` alternative."""
+        """Builds the ``CustomAlarm`` alternative."""
         return cls('CustomAlarm', value)
 
 
@@ -7431,22 +7834,22 @@ class ErrorDetectCorrectChoice:
 
     @classmethod
     def checksum(cls, value: ChecksumType) -> ErrorDetectCorrectChoice:
-        """Build the ``Checksum`` alternative."""
+        """Builds the ``Checksum`` alternative."""
         return cls('Checksum', value)
 
     @classmethod
     def crc(cls, value: CRCType) -> ErrorDetectCorrectChoice:
-        """Build the ``CRC`` alternative."""
+        """Builds the ``CRC`` alternative."""
         return cls('CRC', value)
 
     @classmethod
     def xor(cls, value: XORType) -> ErrorDetectCorrectChoice:
-        """Build the ``XOR`` alternative."""
+        """Builds the ``XOR`` alternative."""
         return cls('XOR', value)
 
     @classmethod
     def parity(cls, value: ParityType) -> ErrorDetectCorrectChoice:
-        """Build the ``Parity`` alternative."""
+        """Builds the ``Parity`` alternative."""
         return cls('Parity', value)
 
 
@@ -7467,35 +7870,35 @@ class ExecutionVerifierChoice1:
     @classmethod
     def comparison_list(cls,
                         value: ComparisonListType) -> ExecutionVerifierChoice1:
-        """Build the ``ComparisonList`` alternative."""
+        """Builds the ``ComparisonList`` alternative."""
         return cls('ComparisonList', value)
 
     @classmethod
     def container_ref(cls, value: ContainerRefType) -> ExecutionVerifierChoice1:
-        """Build the ``ContainerRef`` alternative."""
+        """Builds the ``ContainerRef`` alternative."""
         return cls('ContainerRef', value)
 
     @classmethod
     def parameter_value_change(
             cls, value: ParameterValueChangeType) -> ExecutionVerifierChoice1:
-        """Build the ``ParameterValueChange`` alternative."""
+        """Builds the ``ParameterValueChange`` alternative."""
         return cls('ParameterValueChange', value)
 
     @classmethod
     def custom_algorithm(cls,
                          value: InputAlgorithmType) -> ExecutionVerifierChoice1:
-        """Build the ``CustomAlgorithm`` alternative."""
+        """Builds the ``CustomAlgorithm`` alternative."""
         return cls('CustomAlgorithm', value)
 
     @classmethod
     def boolean_expression(
             cls, value: BooleanExpressionType) -> ExecutionVerifierChoice1:
-        """Build the ``BooleanExpression`` alternative."""
+        """Builds the ``BooleanExpression`` alternative."""
         return cls('BooleanExpression', value)
 
     @classmethod
     def comparison(cls, value: ComparisonType) -> ExecutionVerifierChoice1:
-        """Build the ``Comparison`` alternative."""
+        """Builds the ``Comparison`` alternative."""
         return cls('Comparison', value)
 
 
@@ -7514,13 +7917,13 @@ class ExecutionVerifierChoice2:
 
     @classmethod
     def check_window(cls, value: CheckWindowType) -> ExecutionVerifierChoice2:
-        """Build the ``CheckWindow`` alternative."""
+        """Builds the ``CheckWindow`` alternative."""
         return cls('CheckWindow', value)
 
     @classmethod
     def check_window_algorithms(
             cls, value: CheckWindowAlgorithmsType) -> ExecutionVerifierChoice2:
-        """Build the ``CheckWindowAlgorithms`` alternative."""
+        """Builds the ``CheckWindowAlgorithms`` alternative."""
         return cls('CheckWindowAlgorithms', value)
 
 
@@ -7541,35 +7944,35 @@ class FailedVerifierChoice1:
     @classmethod
     def comparison_list(cls,
                         value: ComparisonListType) -> FailedVerifierChoice1:
-        """Build the ``ComparisonList`` alternative."""
+        """Builds the ``ComparisonList`` alternative."""
         return cls('ComparisonList', value)
 
     @classmethod
     def container_ref(cls, value: ContainerRefType) -> FailedVerifierChoice1:
-        """Build the ``ContainerRef`` alternative."""
+        """Builds the ``ContainerRef`` alternative."""
         return cls('ContainerRef', value)
 
     @classmethod
     def parameter_value_change(
             cls, value: ParameterValueChangeType) -> FailedVerifierChoice1:
-        """Build the ``ParameterValueChange`` alternative."""
+        """Builds the ``ParameterValueChange`` alternative."""
         return cls('ParameterValueChange', value)
 
     @classmethod
     def custom_algorithm(cls,
                          value: InputAlgorithmType) -> FailedVerifierChoice1:
-        """Build the ``CustomAlgorithm`` alternative."""
+        """Builds the ``CustomAlgorithm`` alternative."""
         return cls('CustomAlgorithm', value)
 
     @classmethod
     def boolean_expression(
             cls, value: BooleanExpressionType) -> FailedVerifierChoice1:
-        """Build the ``BooleanExpression`` alternative."""
+        """Builds the ``BooleanExpression`` alternative."""
         return cls('BooleanExpression', value)
 
     @classmethod
     def comparison(cls, value: ComparisonType) -> FailedVerifierChoice1:
-        """Build the ``Comparison`` alternative."""
+        """Builds the ``Comparison`` alternative."""
         return cls('Comparison', value)
 
 
@@ -7588,13 +7991,13 @@ class FailedVerifierChoice2:
 
     @classmethod
     def check_window(cls, value: CheckWindowType) -> FailedVerifierChoice2:
-        """Build the ``CheckWindow`` alternative."""
+        """Builds the ``CheckWindow`` alternative."""
         return cls('CheckWindow', value)
 
     @classmethod
     def check_window_algorithms(
             cls, value: CheckWindowAlgorithmsType) -> FailedVerifierChoice2:
-        """Build the ``CheckWindowAlgorithms`` alternative."""
+        """Builds the ``CheckWindowAlgorithms`` alternative."""
         return cls('CheckWindowAlgorithms', value)
 
 
@@ -7612,12 +8015,12 @@ class FixedFrameStreamChoice:
 
     @classmethod
     def container_ref(cls, value: ContainerRefType) -> FixedFrameStreamChoice:
-        """Build the ``ContainerRef`` alternative."""
+        """Builds the ``ContainerRef`` alternative."""
         return cls('ContainerRef', value)
 
     @classmethod
     def service_ref(cls, value: ServiceRefType) -> FixedFrameStreamChoice:
-        """Build the ``ServiceRef`` alternative."""
+        """Builds the ``ServiceRef`` alternative."""
         return cls('ServiceRef', value)
 
 
@@ -7638,25 +8041,25 @@ class FloatArgumentChoice:
     @classmethod
     def binary_data_encoding(
             cls, value: ArgumentBinaryDataEncodingType) -> FloatArgumentChoice:
-        """Build the ``BinaryDataEncoding`` alternative."""
+        """Builds the ``BinaryDataEncoding`` alternative."""
         return cls('BinaryDataEncoding', value)
 
     @classmethod
     def float_data_encoding(
             cls, value: FloatDataEncodingType) -> FloatArgumentChoice:
-        """Build the ``FloatDataEncoding`` alternative."""
+        """Builds the ``FloatDataEncoding`` alternative."""
         return cls('FloatDataEncoding', value)
 
     @classmethod
     def integer_data_encoding(
             cls, value: IntegerDataEncodingType) -> FloatArgumentChoice:
-        """Build the ``IntegerDataEncoding`` alternative."""
+        """Builds the ``IntegerDataEncoding`` alternative."""
         return cls('IntegerDataEncoding', value)
 
     @classmethod
     def string_data_encoding(
             cls, value: ArgumentStringDataEncodingType) -> FloatArgumentChoice:
-        """Build the ``StringDataEncoding`` alternative."""
+        """Builds the ``StringDataEncoding`` alternative."""
         return cls('StringDataEncoding', value)
 
 
@@ -7677,25 +8080,25 @@ class FloatDataChoice:
     @classmethod
     def binary_data_encoding(cls,
                              value: BinaryDataEncodingType) -> FloatDataChoice:
-        """Build the ``BinaryDataEncoding`` alternative."""
+        """Builds the ``BinaryDataEncoding`` alternative."""
         return cls('BinaryDataEncoding', value)
 
     @classmethod
     def float_data_encoding(cls,
                             value: FloatDataEncodingType) -> FloatDataChoice:
-        """Build the ``FloatDataEncoding`` alternative."""
+        """Builds the ``FloatDataEncoding`` alternative."""
         return cls('FloatDataEncoding', value)
 
     @classmethod
     def integer_data_encoding(
             cls, value: IntegerDataEncodingType) -> FloatDataChoice:
-        """Build the ``IntegerDataEncoding`` alternative."""
+        """Builds the ``IntegerDataEncoding`` alternative."""
         return cls('IntegerDataEncoding', value)
 
     @classmethod
     def string_data_encoding(cls,
                              value: StringDataEncodingType) -> FloatDataChoice:
-        """Build the ``StringDataEncoding`` alternative."""
+        """Builds the ``StringDataEncoding`` alternative."""
         return cls('StringDataEncoding', value)
 
 
@@ -7716,25 +8119,25 @@ class FloatParameterChoice:
     @classmethod
     def binary_data_encoding(
             cls, value: BinaryDataEncodingType) -> FloatParameterChoice:
-        """Build the ``BinaryDataEncoding`` alternative."""
+        """Builds the ``BinaryDataEncoding`` alternative."""
         return cls('BinaryDataEncoding', value)
 
     @classmethod
     def float_data_encoding(
             cls, value: FloatDataEncodingType) -> FloatParameterChoice:
-        """Build the ``FloatDataEncoding`` alternative."""
+        """Builds the ``FloatDataEncoding`` alternative."""
         return cls('FloatDataEncoding', value)
 
     @classmethod
     def integer_data_encoding(
             cls, value: IntegerDataEncodingType) -> FloatParameterChoice:
-        """Build the ``IntegerDataEncoding`` alternative."""
+        """Builds the ``IntegerDataEncoding`` alternative."""
         return cls('IntegerDataEncoding', value)
 
     @classmethod
     def string_data_encoding(
             cls, value: StringDataEncodingType) -> FloatParameterChoice:
-        """Build the ``StringDataEncoding`` alternative."""
+        """Builds the ``StringDataEncoding`` alternative."""
         return cls('StringDataEncoding', value)
 
 
@@ -7752,12 +8155,12 @@ class FrameStreamChoice:
 
     @classmethod
     def container_ref(cls, value: ContainerRefType) -> FrameStreamChoice:
-        """Build the ``ContainerRef`` alternative."""
+        """Builds the ``ContainerRef`` alternative."""
         return cls('ContainerRef', value)
 
     @classmethod
     def service_ref(cls, value: ServiceRefType) -> FrameStreamChoice:
-        """Build the ``ServiceRef`` alternative."""
+        """Builds the ``ServiceRef`` alternative."""
         return cls('ServiceRef', value)
 
 
@@ -7777,12 +8180,12 @@ class InputSetChoice:
     @classmethod
     def input_parameter_instance_ref(
             cls, value: InputParameterInstanceRefType) -> InputSetChoice:
-        """Build the ``InputParameterInstanceRef`` alternative."""
+        """Builds the ``InputParameterInstanceRef`` alternative."""
         return cls('InputParameterInstanceRef', value)
 
     @classmethod
     def constant(cls, value: ConstantType) -> InputSetChoice:
-        """Build the ``Constant`` alternative."""
+        """Builds the ``Constant`` alternative."""
         return cls('Constant', value)
 
 
@@ -7804,26 +8207,26 @@ class IntegerArgumentChoice:
     def binary_data_encoding(
             cls,
             value: ArgumentBinaryDataEncodingType) -> IntegerArgumentChoice:
-        """Build the ``BinaryDataEncoding`` alternative."""
+        """Builds the ``BinaryDataEncoding`` alternative."""
         return cls('BinaryDataEncoding', value)
 
     @classmethod
     def float_data_encoding(
             cls, value: FloatDataEncodingType) -> IntegerArgumentChoice:
-        """Build the ``FloatDataEncoding`` alternative."""
+        """Builds the ``FloatDataEncoding`` alternative."""
         return cls('FloatDataEncoding', value)
 
     @classmethod
     def integer_data_encoding(
             cls, value: IntegerDataEncodingType) -> IntegerArgumentChoice:
-        """Build the ``IntegerDataEncoding`` alternative."""
+        """Builds the ``IntegerDataEncoding`` alternative."""
         return cls('IntegerDataEncoding', value)
 
     @classmethod
     def string_data_encoding(
             cls,
             value: ArgumentStringDataEncodingType) -> IntegerArgumentChoice:
-        """Build the ``StringDataEncoding`` alternative."""
+        """Builds the ``StringDataEncoding`` alternative."""
         return cls('StringDataEncoding', value)
 
 
@@ -7844,25 +8247,25 @@ class IntegerDataChoice:
     @classmethod
     def binary_data_encoding(
             cls, value: BinaryDataEncodingType) -> IntegerDataChoice:
-        """Build the ``BinaryDataEncoding`` alternative."""
+        """Builds the ``BinaryDataEncoding`` alternative."""
         return cls('BinaryDataEncoding', value)
 
     @classmethod
     def float_data_encoding(cls,
                             value: FloatDataEncodingType) -> IntegerDataChoice:
-        """Build the ``FloatDataEncoding`` alternative."""
+        """Builds the ``FloatDataEncoding`` alternative."""
         return cls('FloatDataEncoding', value)
 
     @classmethod
     def integer_data_encoding(
             cls, value: IntegerDataEncodingType) -> IntegerDataChoice:
-        """Build the ``IntegerDataEncoding`` alternative."""
+        """Builds the ``IntegerDataEncoding`` alternative."""
         return cls('IntegerDataEncoding', value)
 
     @classmethod
     def string_data_encoding(
             cls, value: StringDataEncodingType) -> IntegerDataChoice:
-        """Build the ``StringDataEncoding`` alternative."""
+        """Builds the ``StringDataEncoding`` alternative."""
         return cls('StringDataEncoding', value)
 
 
@@ -7883,25 +8286,25 @@ class IntegerParameterChoice:
     @classmethod
     def binary_data_encoding(
             cls, value: BinaryDataEncodingType) -> IntegerParameterChoice:
-        """Build the ``BinaryDataEncoding`` alternative."""
+        """Builds the ``BinaryDataEncoding`` alternative."""
         return cls('BinaryDataEncoding', value)
 
     @classmethod
     def float_data_encoding(
             cls, value: FloatDataEncodingType) -> IntegerParameterChoice:
-        """Build the ``FloatDataEncoding`` alternative."""
+        """Builds the ``FloatDataEncoding`` alternative."""
         return cls('FloatDataEncoding', value)
 
     @classmethod
     def integer_data_encoding(
             cls, value: IntegerDataEncodingType) -> IntegerParameterChoice:
-        """Build the ``IntegerDataEncoding`` alternative."""
+        """Builds the ``IntegerDataEncoding`` alternative."""
         return cls('IntegerDataEncoding', value)
 
     @classmethod
     def string_data_encoding(
             cls, value: StringDataEncodingType) -> IntegerParameterChoice:
-        """Build the ``StringDataEncoding`` alternative."""
+        """Builds the ``StringDataEncoding`` alternative."""
         return cls('StringDataEncoding', value)
 
 
@@ -7920,18 +8323,18 @@ class IntegerValueChoice:
 
     @classmethod
     def fixed_value(cls, value: int) -> IntegerValueChoice:
-        """Build the ``FixedValue`` alternative."""
+        """Builds the ``FixedValue`` alternative."""
         return cls('FixedValue', value)
 
     @classmethod
     def dynamic_value(cls, value: DynamicValueType) -> IntegerValueChoice:
-        """Build the ``DynamicValue`` alternative."""
+        """Builds the ``DynamicValue`` alternative."""
         return cls('DynamicValue', value)
 
     @classmethod
     def discrete_lookup_list(
             cls, value: DiscreteLookupListType) -> IntegerValueChoice:
-        """Build the ``DiscreteLookupList`` alternative."""
+        """Builds the ``DiscreteLookupList`` alternative."""
         return cls('DiscreteLookupList', value)
 
 
@@ -7951,20 +8354,20 @@ class LocationInContainerInBitsChoice:
 
     @classmethod
     def fixed_value(cls, value: int) -> LocationInContainerInBitsChoice:
-        """Build the ``FixedValue`` alternative."""
+        """Builds the ``FixedValue`` alternative."""
         return cls('FixedValue', value)
 
     @classmethod
     def dynamic_value(
             cls, value: DynamicValueType) -> LocationInContainerInBitsChoice:
-        """Build the ``DynamicValue`` alternative."""
+        """Builds the ``DynamicValue`` alternative."""
         return cls('DynamicValue', value)
 
     @classmethod
     def discrete_lookup_list(
             cls,
             value: DiscreteLookupListType) -> LocationInContainerInBitsChoice:
-        """Build the ``DiscreteLookupList`` alternative."""
+        """Builds the ``DiscreteLookupList`` alternative."""
         return cls('DiscreteLookupList', value)
 
 
@@ -7984,23 +8387,23 @@ class MatchCriteriaChoice:
 
     @classmethod
     def comparison(cls, value: ComparisonType) -> MatchCriteriaChoice:
-        """Build the ``Comparison`` alternative."""
+        """Builds the ``Comparison`` alternative."""
         return cls('Comparison', value)
 
     @classmethod
     def comparison_list(cls, value: ComparisonListType) -> MatchCriteriaChoice:
-        """Build the ``ComparisonList`` alternative."""
+        """Builds the ``ComparisonList`` alternative."""
         return cls('ComparisonList', value)
 
     @classmethod
     def boolean_expression(cls,
                            value: BooleanExpressionType) -> MatchCriteriaChoice:
-        """Build the ``BooleanExpression`` alternative."""
+        """Builds the ``BooleanExpression`` alternative."""
         return cls('BooleanExpression', value)
 
     @classmethod
     def custom_algorithm(cls, value: InputAlgorithmType) -> MatchCriteriaChoice:
-        """Build the ``CustomAlgorithm`` alternative."""
+        """Builds the ``CustomAlgorithm`` alternative."""
         return cls('CustomAlgorithm', value)
 
 
@@ -8021,26 +8424,26 @@ class MathOperationCalibratorChoice:
 
     @classmethod
     def value_operand(cls, value: str) -> MathOperationCalibratorChoice:
-        """Build the ``ValueOperand`` alternative."""
+        """Builds the ``ValueOperand`` alternative."""
         return cls('ValueOperand', value)
 
     @classmethod
     def this_parameter_operand(cls,
                                value: str) -> MathOperationCalibratorChoice:
-        """Build the ``ThisParameterOperand`` alternative."""
+        """Builds the ``ThisParameterOperand`` alternative."""
         return cls('ThisParameterOperand', value)
 
     @classmethod
     def operator(cls,
                  value: MathOperatorsType) -> MathOperationCalibratorChoice:
-        """Build the ``Operator`` alternative."""
+        """Builds the ``Operator`` alternative."""
         return cls('Operator', value)
 
     @classmethod
     def parameter_instance_ref_operand(
             cls,
             value: ParameterInstanceRefType) -> MathOperationCalibratorChoice:
-        """Build the ``ParameterInstanceRefOperand`` alternative."""
+        """Builds the ``ParameterInstanceRefOperand`` alternative."""
         return cls('ParameterInstanceRefOperand', value)
 
 
@@ -8060,23 +8463,23 @@ class MathOperationChoice:
 
     @classmethod
     def value_operand(cls, value: str) -> MathOperationChoice:
-        """Build the ``ValueOperand`` alternative."""
+        """Builds the ``ValueOperand`` alternative."""
         return cls('ValueOperand', value)
 
     @classmethod
     def this_parameter_operand(cls, value: str) -> MathOperationChoice:
-        """Build the ``ThisParameterOperand`` alternative."""
+        """Builds the ``ThisParameterOperand`` alternative."""
         return cls('ThisParameterOperand', value)
 
     @classmethod
     def operator(cls, value: MathOperatorsType) -> MathOperationChoice:
-        """Build the ``Operator`` alternative."""
+        """Builds the ``Operator`` alternative."""
         return cls('Operator', value)
 
     @classmethod
     def parameter_instance_ref_operand(
             cls, value: ParameterInstanceRefType) -> MathOperationChoice:
-        """Build the ``ParameterInstanceRefOperand`` alternative."""
+        """Builds the ``ParameterInstanceRefOperand`` alternative."""
         return cls('ParameterInstanceRefOperand', value)
 
 
@@ -8095,18 +8498,18 @@ class MetaCommandSetChoice:
 
     @classmethod
     def meta_command(cls, value: MetaCommandType) -> MetaCommandSetChoice:
-        """Build the ``MetaCommand`` alternative."""
+        """Builds the ``MetaCommand`` alternative."""
         return cls('MetaCommand', value)
 
     @classmethod
     def meta_command_ref(cls, value: str) -> MetaCommandSetChoice:
-        """Build the ``MetaCommandRef`` alternative."""
+        """Builds the ``MetaCommandRef`` alternative."""
         return cls('MetaCommandRef', value)
 
     @classmethod
     def block_meta_command(cls,
                            value: BlockMetaCommandType) -> MetaCommandSetChoice:
-        """Build the ``BlockMetaCommand`` alternative."""
+        """Builds the ``BlockMetaCommand`` alternative."""
         return cls('BlockMetaCommand', value)
 
 
@@ -8125,12 +8528,12 @@ class NumericAlarmChoice:
 
     @classmethod
     def alarm_conditions(cls, value: AlarmConditionsType) -> NumericAlarmChoice:
-        """Build the ``AlarmConditions`` alternative."""
+        """Builds the ``AlarmConditions`` alternative."""
         return cls('AlarmConditions', value)
 
     @classmethod
     def custom_alarm(cls, value: CustomAlarmType) -> NumericAlarmChoice:
-        """Build the ``CustomAlarm`` alternative."""
+        """Builds the ``CustomAlarm`` alternative."""
         return cls('CustomAlarm', value)
 
 
@@ -8150,12 +8553,12 @@ class NumericContextAlarmChoice:
     @classmethod
     def alarm_conditions(
             cls, value: AlarmConditionsType) -> NumericContextAlarmChoice:
-        """Build the ``AlarmConditions`` alternative."""
+        """Builds the ``AlarmConditions`` alternative."""
         return cls('AlarmConditions', value)
 
     @classmethod
     def custom_alarm(cls, value: CustomAlarmType) -> NumericContextAlarmChoice:
-        """Build the ``CustomAlarm`` alternative."""
+        """Builds the ``CustomAlarm`` alternative."""
         return cls('CustomAlarm', value)
 
 
@@ -8174,13 +8577,13 @@ class ORedConditionsChoice:
 
     @classmethod
     def condition(cls, value: ComparisonCheckType) -> ORedConditionsChoice:
-        """Build the ``Condition`` alternative."""
+        """Builds the ``Condition`` alternative."""
         return cls('Condition', value)
 
     @classmethod
     def an_ded_conditions(cls,
                           value: ANDedConditionsType) -> ORedConditionsChoice:
-        """Build the ``ANDedConditions`` alternative."""
+        """Builds the ``ANDedConditions`` alternative."""
         return cls('ANDedConditions', value)
 
 
@@ -8198,12 +8601,12 @@ class ParameterSetChoice:
 
     @classmethod
     def parameter(cls, value: ParameterType) -> ParameterSetChoice:
-        """Build the ``Parameter`` alternative."""
+        """Builds the ``Parameter`` alternative."""
         return cls('Parameter', value)
 
     @classmethod
     def parameter_ref(cls, value: ParameterRefType) -> ParameterSetChoice:
-        """Build the ``ParameterRef`` alternative."""
+        """Builds the ``ParameterRef`` alternative."""
         return cls('ParameterRef', value)
 
 
@@ -8222,12 +8625,12 @@ class ParameterToSetChoice:
     @classmethod
     def derivation(cls,
                    value: ArgumentMathOperationType) -> ParameterToSetChoice:
-        """Build the ``Derivation`` alternative."""
+        """Builds the ``Derivation`` alternative."""
         return cls('Derivation', value)
 
     @classmethod
     def new_value(cls, value: str) -> ParameterToSetChoice:
-        """Build the ``NewValue`` alternative."""
+        """Builds the ``NewValue`` alternative."""
         return cls('NewValue', value)
 
 
@@ -8251,61 +8654,61 @@ class ParameterTypeSetChoice:
     @classmethod
     def string_parameter_type(
             cls, value: StringParameterType) -> ParameterTypeSetChoice:
-        """Build the ``StringParameterType`` alternative."""
+        """Builds the ``StringParameterType`` alternative."""
         return cls('StringParameterType', value)
 
     @classmethod
     def enumerated_parameter_type(
             cls, value: EnumeratedParameterType) -> ParameterTypeSetChoice:
-        """Build the ``EnumeratedParameterType`` alternative."""
+        """Builds the ``EnumeratedParameterType`` alternative."""
         return cls('EnumeratedParameterType', value)
 
     @classmethod
     def integer_parameter_type(
             cls, value: IntegerParameterType) -> ParameterTypeSetChoice:
-        """Build the ``IntegerParameterType`` alternative."""
+        """Builds the ``IntegerParameterType`` alternative."""
         return cls('IntegerParameterType', value)
 
     @classmethod
     def binary_parameter_type(
             cls, value: BinaryParameterType) -> ParameterTypeSetChoice:
-        """Build the ``BinaryParameterType`` alternative."""
+        """Builds the ``BinaryParameterType`` alternative."""
         return cls('BinaryParameterType', value)
 
     @classmethod
     def float_parameter_type(
             cls, value: FloatParameterType) -> ParameterTypeSetChoice:
-        """Build the ``FloatParameterType`` alternative."""
+        """Builds the ``FloatParameterType`` alternative."""
         return cls('FloatParameterType', value)
 
     @classmethod
     def boolean_parameter_type(
             cls, value: BooleanParameterType) -> ParameterTypeSetChoice:
-        """Build the ``BooleanParameterType`` alternative."""
+        """Builds the ``BooleanParameterType`` alternative."""
         return cls('BooleanParameterType', value)
 
     @classmethod
     def relative_time_parameter_type(
             cls, value: RelativeTimeParameterType) -> ParameterTypeSetChoice:
-        """Build the ``RelativeTimeParameterType`` alternative."""
+        """Builds the ``RelativeTimeParameterType`` alternative."""
         return cls('RelativeTimeParameterType', value)
 
     @classmethod
     def absolute_time_parameter_type(
             cls, value: AbsoluteTimeParameterType) -> ParameterTypeSetChoice:
-        """Build the ``AbsoluteTimeParameterType`` alternative."""
+        """Builds the ``AbsoluteTimeParameterType`` alternative."""
         return cls('AbsoluteTimeParameterType', value)
 
     @classmethod
     def array_parameter_type(
             cls, value: ArrayParameterType) -> ParameterTypeSetChoice:
-        """Build the ``ArrayParameterType`` alternative."""
+        """Builds the ``ArrayParameterType`` alternative."""
         return cls('ArrayParameterType', value)
 
     @classmethod
     def aggregate_parameter_type(
             cls, value: AggregateParameterType) -> ParameterTypeSetChoice:
-        """Build the ``AggregateParameterType`` alternative."""
+        """Builds the ``AggregateParameterType`` alternative."""
         return cls('AggregateParameterType', value)
 
 
@@ -8323,12 +8726,12 @@ class PercentCompleteChoice:
 
     @classmethod
     def fixed_value(cls, value: float) -> PercentCompleteChoice:
-        """Build the ``FixedValue`` alternative."""
+        """Builds the ``FixedValue`` alternative."""
         return cls('FixedValue', value)
 
     @classmethod
     def dynamic_value(cls, value: DynamicValueType) -> PercentCompleteChoice:
-        """Build the ``DynamicValue`` alternative."""
+        """Builds the ``DynamicValue`` alternative."""
         return cls('DynamicValue', value)
 
 
@@ -8349,35 +8752,35 @@ class QueuedVerifierChoice1:
     @classmethod
     def comparison_list(cls,
                         value: ComparisonListType) -> QueuedVerifierChoice1:
-        """Build the ``ComparisonList`` alternative."""
+        """Builds the ``ComparisonList`` alternative."""
         return cls('ComparisonList', value)
 
     @classmethod
     def container_ref(cls, value: ContainerRefType) -> QueuedVerifierChoice1:
-        """Build the ``ContainerRef`` alternative."""
+        """Builds the ``ContainerRef`` alternative."""
         return cls('ContainerRef', value)
 
     @classmethod
     def parameter_value_change(
             cls, value: ParameterValueChangeType) -> QueuedVerifierChoice1:
-        """Build the ``ParameterValueChange`` alternative."""
+        """Builds the ``ParameterValueChange`` alternative."""
         return cls('ParameterValueChange', value)
 
     @classmethod
     def custom_algorithm(cls,
                          value: InputAlgorithmType) -> QueuedVerifierChoice1:
-        """Build the ``CustomAlgorithm`` alternative."""
+        """Builds the ``CustomAlgorithm`` alternative."""
         return cls('CustomAlgorithm', value)
 
     @classmethod
     def boolean_expression(
             cls, value: BooleanExpressionType) -> QueuedVerifierChoice1:
-        """Build the ``BooleanExpression`` alternative."""
+        """Builds the ``BooleanExpression`` alternative."""
         return cls('BooleanExpression', value)
 
     @classmethod
     def comparison(cls, value: ComparisonType) -> QueuedVerifierChoice1:
-        """Build the ``Comparison`` alternative."""
+        """Builds the ``Comparison`` alternative."""
         return cls('Comparison', value)
 
 
@@ -8396,13 +8799,13 @@ class QueuedVerifierChoice2:
 
     @classmethod
     def check_window(cls, value: CheckWindowType) -> QueuedVerifierChoice2:
-        """Build the ``CheckWindow`` alternative."""
+        """Builds the ``CheckWindow`` alternative."""
         return cls('CheckWindow', value)
 
     @classmethod
     def check_window_algorithms(
             cls, value: CheckWindowAlgorithmsType) -> QueuedVerifierChoice2:
-        """Build the ``CheckWindowAlgorithms`` alternative."""
+        """Builds the ``CheckWindowAlgorithms`` alternative."""
         return cls('CheckWindowAlgorithms', value)
 
 
@@ -8423,35 +8826,35 @@ class ReceivedVerifierChoice1:
     @classmethod
     def comparison_list(cls,
                         value: ComparisonListType) -> ReceivedVerifierChoice1:
-        """Build the ``ComparisonList`` alternative."""
+        """Builds the ``ComparisonList`` alternative."""
         return cls('ComparisonList', value)
 
     @classmethod
     def container_ref(cls, value: ContainerRefType) -> ReceivedVerifierChoice1:
-        """Build the ``ContainerRef`` alternative."""
+        """Builds the ``ContainerRef`` alternative."""
         return cls('ContainerRef', value)
 
     @classmethod
     def parameter_value_change(
             cls, value: ParameterValueChangeType) -> ReceivedVerifierChoice1:
-        """Build the ``ParameterValueChange`` alternative."""
+        """Builds the ``ParameterValueChange`` alternative."""
         return cls('ParameterValueChange', value)
 
     @classmethod
     def custom_algorithm(cls,
                          value: InputAlgorithmType) -> ReceivedVerifierChoice1:
-        """Build the ``CustomAlgorithm`` alternative."""
+        """Builds the ``CustomAlgorithm`` alternative."""
         return cls('CustomAlgorithm', value)
 
     @classmethod
     def boolean_expression(
             cls, value: BooleanExpressionType) -> ReceivedVerifierChoice1:
-        """Build the ``BooleanExpression`` alternative."""
+        """Builds the ``BooleanExpression`` alternative."""
         return cls('BooleanExpression', value)
 
     @classmethod
     def comparison(cls, value: ComparisonType) -> ReceivedVerifierChoice1:
-        """Build the ``Comparison`` alternative."""
+        """Builds the ``Comparison`` alternative."""
         return cls('Comparison', value)
 
 
@@ -8470,13 +8873,13 @@ class ReceivedVerifierChoice2:
 
     @classmethod
     def check_window(cls, value: CheckWindowType) -> ReceivedVerifierChoice2:
-        """Build the ``CheckWindow`` alternative."""
+        """Builds the ``CheckWindow`` alternative."""
         return cls('CheckWindow', value)
 
     @classmethod
     def check_window_algorithms(
             cls, value: CheckWindowAlgorithmsType) -> ReceivedVerifierChoice2:
-        """Build the ``CheckWindowAlgorithms`` alternative."""
+        """Builds the ``CheckWindowAlgorithms`` alternative."""
         return cls('CheckWindowAlgorithms', value)
 
 
@@ -8495,12 +8898,12 @@ class ReferenceTimeChoice:
     @classmethod
     def offset_from(cls,
                     value: ParameterInstanceRefType) -> ReferenceTimeChoice:
-        """Build the ``OffsetFrom`` alternative."""
+        """Builds the ``OffsetFrom`` alternative."""
         return cls('OffsetFrom', value)
 
     @classmethod
     def epoch(cls, value: str) -> ReferenceTimeChoice:
-        """Build the ``Epoch`` alternative."""
+        """Builds the ``Epoch`` alternative."""
         return cls('Epoch', value)
 
 
@@ -8520,25 +8923,25 @@ class RestrictionCriteriaChoice:
 
     @classmethod
     def comparison(cls, value: ComparisonType) -> RestrictionCriteriaChoice:
-        """Build the ``Comparison`` alternative."""
+        """Builds the ``Comparison`` alternative."""
         return cls('Comparison', value)
 
     @classmethod
     def comparison_list(cls,
                         value: ComparisonListType) -> RestrictionCriteriaChoice:
-        """Build the ``ComparisonList`` alternative."""
+        """Builds the ``ComparisonList`` alternative."""
         return cls('ComparisonList', value)
 
     @classmethod
     def boolean_expression(
             cls, value: BooleanExpressionType) -> RestrictionCriteriaChoice:
-        """Build the ``BooleanExpression`` alternative."""
+        """Builds the ``BooleanExpression`` alternative."""
         return cls('BooleanExpression', value)
 
     @classmethod
     def custom_algorithm(
             cls, value: InputAlgorithmType) -> RestrictionCriteriaChoice:
-        """Build the ``CustomAlgorithm`` alternative."""
+        """Builds the ``CustomAlgorithm`` alternative."""
         return cls('CustomAlgorithm', value)
 
 
@@ -8559,37 +8962,37 @@ class SentFromRangeVerifierChoice1:
     @classmethod
     def comparison_list(
             cls, value: ComparisonListType) -> SentFromRangeVerifierChoice1:
-        """Build the ``ComparisonList`` alternative."""
+        """Builds the ``ComparisonList`` alternative."""
         return cls('ComparisonList', value)
 
     @classmethod
     def container_ref(cls,
                       value: ContainerRefType) -> SentFromRangeVerifierChoice1:
-        """Build the ``ContainerRef`` alternative."""
+        """Builds the ``ContainerRef`` alternative."""
         return cls('ContainerRef', value)
 
     @classmethod
     def parameter_value_change(
             cls,
             value: ParameterValueChangeType) -> SentFromRangeVerifierChoice1:
-        """Build the ``ParameterValueChange`` alternative."""
+        """Builds the ``ParameterValueChange`` alternative."""
         return cls('ParameterValueChange', value)
 
     @classmethod
     def custom_algorithm(
             cls, value: InputAlgorithmType) -> SentFromRangeVerifierChoice1:
-        """Build the ``CustomAlgorithm`` alternative."""
+        """Builds the ``CustomAlgorithm`` alternative."""
         return cls('CustomAlgorithm', value)
 
     @classmethod
     def boolean_expression(
             cls, value: BooleanExpressionType) -> SentFromRangeVerifierChoice1:
-        """Build the ``BooleanExpression`` alternative."""
+        """Builds the ``BooleanExpression`` alternative."""
         return cls('BooleanExpression', value)
 
     @classmethod
     def comparison(cls, value: ComparisonType) -> SentFromRangeVerifierChoice1:
-        """Build the ``Comparison`` alternative."""
+        """Builds the ``Comparison`` alternative."""
         return cls('Comparison', value)
 
 
@@ -8609,14 +9012,14 @@ class SentFromRangeVerifierChoice2:
     @classmethod
     def check_window(cls,
                      value: CheckWindowType) -> SentFromRangeVerifierChoice2:
-        """Build the ``CheckWindow`` alternative."""
+        """Builds the ``CheckWindow`` alternative."""
         return cls('CheckWindow', value)
 
     @classmethod
     def check_window_algorithms(
             cls,
             value: CheckWindowAlgorithmsType) -> SentFromRangeVerifierChoice2:
-        """Build the ``CheckWindowAlgorithms`` alternative."""
+        """Builds the ``CheckWindowAlgorithms`` alternative."""
         return cls('CheckWindowAlgorithms', value)
 
 
@@ -8635,12 +9038,12 @@ class ServiceChoice:
 
     @classmethod
     def message_ref_set(cls, value: MessageRefSetType) -> ServiceChoice:
-        """Build the ``MessageRefSet`` alternative."""
+        """Builds the ``MessageRefSet`` alternative."""
         return cls('MessageRefSet', value)
 
     @classmethod
     def container_ref_set(cls, value: ContainerRefSetType) -> ServiceChoice:
-        """Build the ``ContainerRefSet`` alternative."""
+        """Builds the ``ContainerRefSet`` alternative."""
         return cls('ContainerRefSet', value)
 
 
@@ -8659,18 +9062,18 @@ class StreamSetChoice:
 
     @classmethod
     def fixed_frame_stream(cls, value: FixedFrameStreamType) -> StreamSetChoice:
-        """Build the ``FixedFrameStream`` alternative."""
+        """Builds the ``FixedFrameStream`` alternative."""
         return cls('FixedFrameStream', value)
 
     @classmethod
     def variable_frame_stream(
             cls, value: VariableFrameStreamType) -> StreamSetChoice:
-        """Build the ``VariableFrameStream`` alternative."""
+        """Builds the ``VariableFrameStream`` alternative."""
         return cls('VariableFrameStream', value)
 
     @classmethod
     def custom_stream(cls, value: CustomStreamType) -> StreamSetChoice:
-        """Build the ``CustomStream`` alternative."""
+        """Builds the ``CustomStream`` alternative."""
         return cls('CustomStream', value)
 
 
@@ -8689,12 +9092,12 @@ class StringAlarmChoice:
 
     @classmethod
     def alarm_conditions(cls, value: AlarmConditionsType) -> StringAlarmChoice:
-        """Build the ``AlarmConditions`` alternative."""
+        """Builds the ``AlarmConditions`` alternative."""
         return cls('AlarmConditions', value)
 
     @classmethod
     def custom_alarm(cls, value: CustomAlarmType) -> StringAlarmChoice:
-        """Build the ``CustomAlarm`` alternative."""
+        """Builds the ``CustomAlarm`` alternative."""
         return cls('CustomAlarm', value)
 
 
@@ -8715,25 +9118,25 @@ class StringArgumentChoice:
     @classmethod
     def binary_data_encoding(
             cls, value: ArgumentBinaryDataEncodingType) -> StringArgumentChoice:
-        """Build the ``BinaryDataEncoding`` alternative."""
+        """Builds the ``BinaryDataEncoding`` alternative."""
         return cls('BinaryDataEncoding', value)
 
     @classmethod
     def float_data_encoding(
             cls, value: FloatDataEncodingType) -> StringArgumentChoice:
-        """Build the ``FloatDataEncoding`` alternative."""
+        """Builds the ``FloatDataEncoding`` alternative."""
         return cls('FloatDataEncoding', value)
 
     @classmethod
     def integer_data_encoding(
             cls, value: IntegerDataEncodingType) -> StringArgumentChoice:
-        """Build the ``IntegerDataEncoding`` alternative."""
+        """Builds the ``IntegerDataEncoding`` alternative."""
         return cls('IntegerDataEncoding', value)
 
     @classmethod
     def string_data_encoding(
             cls, value: ArgumentStringDataEncodingType) -> StringArgumentChoice:
-        """Build the ``StringDataEncoding`` alternative."""
+        """Builds the ``StringDataEncoding`` alternative."""
         return cls('StringDataEncoding', value)
 
 
@@ -8753,12 +9156,12 @@ class StringContextAlarmChoice:
     @classmethod
     def alarm_conditions(
             cls, value: AlarmConditionsType) -> StringContextAlarmChoice:
-        """Build the ``AlarmConditions`` alternative."""
+        """Builds the ``AlarmConditions`` alternative."""
         return cls('AlarmConditions', value)
 
     @classmethod
     def custom_alarm(cls, value: CustomAlarmType) -> StringContextAlarmChoice:
-        """Build the ``CustomAlarm`` alternative."""
+        """Builds the ``CustomAlarm`` alternative."""
         return cls('CustomAlarm', value)
 
 
@@ -8779,25 +9182,25 @@ class StringDataChoice:
     @classmethod
     def binary_data_encoding(cls,
                              value: BinaryDataEncodingType) -> StringDataChoice:
-        """Build the ``BinaryDataEncoding`` alternative."""
+        """Builds the ``BinaryDataEncoding`` alternative."""
         return cls('BinaryDataEncoding', value)
 
     @classmethod
     def float_data_encoding(cls,
                             value: FloatDataEncodingType) -> StringDataChoice:
-        """Build the ``FloatDataEncoding`` alternative."""
+        """Builds the ``FloatDataEncoding`` alternative."""
         return cls('FloatDataEncoding', value)
 
     @classmethod
     def integer_data_encoding(
             cls, value: IntegerDataEncodingType) -> StringDataChoice:
-        """Build the ``IntegerDataEncoding`` alternative."""
+        """Builds the ``IntegerDataEncoding`` alternative."""
         return cls('IntegerDataEncoding', value)
 
     @classmethod
     def string_data_encoding(cls,
                              value: StringDataEncodingType) -> StringDataChoice:
-        """Build the ``StringDataEncoding`` alternative."""
+        """Builds the ``StringDataEncoding`` alternative."""
         return cls('StringDataEncoding', value)
 
 
@@ -8815,12 +9218,12 @@ class StringDataEncodingChoice:
 
     @classmethod
     def size_in_bits(cls, value: SizeInBitsType) -> StringDataEncodingChoice:
-        """Build the ``SizeInBits`` alternative."""
+        """Builds the ``SizeInBits`` alternative."""
         return cls('SizeInBits', value)
 
     @classmethod
     def variable(cls, value: VariableStringType) -> StringDataEncodingChoice:
-        """Build the ``Variable`` alternative."""
+        """Builds the ``Variable`` alternative."""
         return cls('Variable', value)
 
 
@@ -8841,25 +9244,25 @@ class StringParameterChoice:
     @classmethod
     def binary_data_encoding(
             cls, value: BinaryDataEncodingType) -> StringParameterChoice:
-        """Build the ``BinaryDataEncoding`` alternative."""
+        """Builds the ``BinaryDataEncoding`` alternative."""
         return cls('BinaryDataEncoding', value)
 
     @classmethod
     def float_data_encoding(
             cls, value: FloatDataEncodingType) -> StringParameterChoice:
-        """Build the ``FloatDataEncoding`` alternative."""
+        """Builds the ``FloatDataEncoding`` alternative."""
         return cls('FloatDataEncoding', value)
 
     @classmethod
     def integer_data_encoding(
             cls, value: IntegerDataEncodingType) -> StringParameterChoice:
-        """Build the ``IntegerDataEncoding`` alternative."""
+        """Builds the ``IntegerDataEncoding`` alternative."""
         return cls('IntegerDataEncoding', value)
 
     @classmethod
     def string_data_encoding(
             cls, value: StringDataEncodingType) -> StringParameterChoice:
-        """Build the ``StringDataEncoding`` alternative."""
+        """Builds the ``StringDataEncoding`` alternative."""
         return cls('StringDataEncoding', value)
 
 
@@ -8878,12 +9281,12 @@ class TimeAlarmChoice:
 
     @classmethod
     def alarm_conditions(cls, value: AlarmConditionsType) -> TimeAlarmChoice:
-        """Build the ``AlarmConditions`` alternative."""
+        """Builds the ``AlarmConditions`` alternative."""
         return cls('AlarmConditions', value)
 
     @classmethod
     def custom_alarm(cls, value: CustomAlarmType) -> TimeAlarmChoice:
-        """Build the ``CustomAlarm`` alternative."""
+        """Builds the ``CustomAlarm`` alternative."""
         return cls('CustomAlarm', value)
 
 
@@ -8903,12 +9306,12 @@ class TimeContextAlarmChoice:
     @classmethod
     def alarm_conditions(cls,
                          value: AlarmConditionsType) -> TimeContextAlarmChoice:
-        """Build the ``AlarmConditions`` alternative."""
+        """Builds the ``AlarmConditions`` alternative."""
         return cls('AlarmConditions', value)
 
     @classmethod
     def custom_alarm(cls, value: CustomAlarmType) -> TimeContextAlarmChoice:
-        """Build the ``CustomAlarm`` alternative."""
+        """Builds the ``CustomAlarm`` alternative."""
         return cls('CustomAlarm', value)
 
 
@@ -8931,40 +9334,40 @@ class TransferredToRangeVerifierChoice1:
     def comparison_list(
             cls,
             value: ComparisonListType) -> TransferredToRangeVerifierChoice1:
-        """Build the ``ComparisonList`` alternative."""
+        """Builds the ``ComparisonList`` alternative."""
         return cls('ComparisonList', value)
 
     @classmethod
     def container_ref(
             cls, value: ContainerRefType) -> TransferredToRangeVerifierChoice1:
-        """Build the ``ContainerRef`` alternative."""
+        """Builds the ``ContainerRef`` alternative."""
         return cls('ContainerRef', value)
 
     @classmethod
     def parameter_value_change(cls,
             value: ParameterValueChangeType
             ) -> TransferredToRangeVerifierChoice1:
-        """Build the ``ParameterValueChange`` alternative."""
+        """Builds the ``ParameterValueChange`` alternative."""
         return cls('ParameterValueChange', value)
 
     @classmethod
     def custom_algorithm(
             cls,
             value: InputAlgorithmType) -> TransferredToRangeVerifierChoice1:
-        """Build the ``CustomAlgorithm`` alternative."""
+        """Builds the ``CustomAlgorithm`` alternative."""
         return cls('CustomAlgorithm', value)
 
     @classmethod
     def boolean_expression(
             cls,
             value: BooleanExpressionType) -> TransferredToRangeVerifierChoice1:
-        """Build the ``BooleanExpression`` alternative."""
+        """Builds the ``BooleanExpression`` alternative."""
         return cls('BooleanExpression', value)
 
     @classmethod
     def comparison(cls,
                    value: ComparisonType) -> TransferredToRangeVerifierChoice1:
-        """Build the ``Comparison`` alternative."""
+        """Builds the ``Comparison`` alternative."""
         return cls('Comparison', value)
 
 
@@ -8985,14 +9388,14 @@ class TransferredToRangeVerifierChoice2:
     @classmethod
     def check_window(
             cls, value: CheckWindowType) -> TransferredToRangeVerifierChoice2:
-        """Build the ``CheckWindow`` alternative."""
+        """Builds the ``CheckWindow`` alternative."""
         return cls('CheckWindow', value)
 
     @classmethod
     def check_window_algorithms(cls,
             value: CheckWindowAlgorithmsType
             ) -> TransferredToRangeVerifierChoice2:
-        """Build the ``CheckWindowAlgorithms`` alternative."""
+        """Builds the ``CheckWindowAlgorithms`` alternative."""
         return cls('CheckWindowAlgorithms', value)
 
 
@@ -9012,25 +9415,25 @@ class TransmissionConstraintChoice:
 
     @classmethod
     def comparison(cls, value: ComparisonType) -> TransmissionConstraintChoice:
-        """Build the ``Comparison`` alternative."""
+        """Builds the ``Comparison`` alternative."""
         return cls('Comparison', value)
 
     @classmethod
     def comparison_list(
             cls, value: ComparisonListType) -> TransmissionConstraintChoice:
-        """Build the ``ComparisonList`` alternative."""
+        """Builds the ``ComparisonList`` alternative."""
         return cls('ComparisonList', value)
 
     @classmethod
     def boolean_expression(
             cls, value: BooleanExpressionType) -> TransmissionConstraintChoice:
-        """Build the ``BooleanExpression`` alternative."""
+        """Builds the ``BooleanExpression`` alternative."""
         return cls('BooleanExpression', value)
 
     @classmethod
     def custom_algorithm(
             cls, value: InputAlgorithmType) -> TransmissionConstraintChoice:
-        """Build the ``CustomAlgorithm`` alternative."""
+        """Builds the ``CustomAlgorithm`` alternative."""
         return cls('CustomAlgorithm', value)
 
 
@@ -9051,19 +9454,19 @@ class TriggerSetChoice:
     @classmethod
     def on_parameter_update_trigger(
             cls, value: OnParameterUpdateTriggerType) -> TriggerSetChoice:
-        """Build the ``OnParameterUpdateTrigger`` alternative."""
+        """Builds the ``OnParameterUpdateTrigger`` alternative."""
         return cls('OnParameterUpdateTrigger', value)
 
     @classmethod
     def on_container_update_trigger(
             cls, value: OnContainerUpdateTriggerType) -> TriggerSetChoice:
-        """Build the ``OnContainerUpdateTrigger`` alternative."""
+        """Builds the ``OnContainerUpdateTrigger`` alternative."""
         return cls('OnContainerUpdateTrigger', value)
 
     @classmethod
     def on_periodic_rate_trigger(
             cls, value: OnPeriodicRateTriggerType) -> TriggerSetChoice:
-        """Build the ``OnPeriodicRateTrigger`` alternative."""
+        """Builds the ``OnPeriodicRateTrigger`` alternative."""
         return cls('OnPeriodicRateTrigger', value)
 
 
@@ -9083,24 +9486,24 @@ class TriggeredMathOperationChoice:
 
     @classmethod
     def value_operand(cls, value: str) -> TriggeredMathOperationChoice:
-        """Build the ``ValueOperand`` alternative."""
+        """Builds the ``ValueOperand`` alternative."""
         return cls('ValueOperand', value)
 
     @classmethod
     def this_parameter_operand(cls, value: str) -> TriggeredMathOperationChoice:
-        """Build the ``ThisParameterOperand`` alternative."""
+        """Builds the ``ThisParameterOperand`` alternative."""
         return cls('ThisParameterOperand', value)
 
     @classmethod
     def operator(cls, value: MathOperatorsType) -> TriggeredMathOperationChoice:
-        """Build the ``Operator`` alternative."""
+        """Builds the ``Operator`` alternative."""
         return cls('Operator', value)
 
     @classmethod
     def parameter_instance_ref_operand(
             cls,
             value: ParameterInstanceRefType) -> TriggeredMathOperationChoice:
-        """Build the ``ParameterInstanceRefOperand`` alternative."""
+        """Builds the ``ParameterInstanceRefOperand`` alternative."""
         return cls('ParameterInstanceRefOperand', value)
 
 
@@ -9119,12 +9522,12 @@ class VariableFrameStreamChoice:
     @classmethod
     def container_ref(cls,
                       value: ContainerRefType) -> VariableFrameStreamChoice:
-        """Build the ``ContainerRef`` alternative."""
+        """Builds the ``ContainerRef`` alternative."""
         return cls('ContainerRef', value)
 
     @classmethod
     def service_ref(cls, value: ServiceRefType) -> VariableFrameStreamChoice:
-        """Build the ``ServiceRef`` alternative."""
+        """Builds the ``ServiceRef`` alternative."""
         return cls('ServiceRef', value)
 
 
@@ -9143,13 +9546,13 @@ class VariableStringChoice1:
 
     @classmethod
     def dynamic_value(cls, value: DynamicValueType) -> VariableStringChoice1:
-        """Build the ``DynamicValue`` alternative."""
+        """Builds the ``DynamicValue`` alternative."""
         return cls('DynamicValue', value)
 
     @classmethod
     def discrete_lookup_list(
             cls, value: DiscreteLookupListType) -> VariableStringChoice1:
-        """Build the ``DiscreteLookupList`` alternative."""
+        """Builds the ``DiscreteLookupList`` alternative."""
         return cls('DiscreteLookupList', value)
 
 
@@ -9168,12 +9571,12 @@ class VariableStringChoice2:
 
     @classmethod
     def leading_size(cls, value: LeadingSizeType) -> VariableStringChoice2:
-        """Build the ``LeadingSize`` alternative."""
+        """Builds the ``LeadingSize`` alternative."""
         return cls('LeadingSize', value)
 
     @classmethod
     def termination_char(cls, value: str) -> VariableStringChoice2:
-        """Build the ``TerminationChar`` alternative."""
+        """Builds the ``TerminationChar`` alternative."""
         return cls('TerminationChar', value)
 
 # -- deserialization ----------------------------------------------------------
@@ -9183,6 +9586,21 @@ _A_ANDedConditionsType = frozenset({})
 
 
 def _r_ANDedConditionsType(n: X.Node) -> ANDedConditionsType:
+    """Reads an XML element of the XTCE type ``ANDedConditionsType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ANDedConditionsType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (alternatives of ``ANDedConditionsChoice``, in that order
+                     and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_ANDedConditionsType)
     v = ANDedConditionsType.__new__(ANDedConditionsType)
     c = X.Cursor(n)
@@ -9201,6 +9619,23 @@ _A_AbsoluteTimeArgumentType = frozenset({"shortDescription", "name", "baseType",
 
 
 def _r_AbsoluteTimeArgumentType(n: X.Node) -> AbsoluteTimeArgumentType:
+    """Reads an XML element of the XTCE type ``AbsoluteTimeArgumentType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``AbsoluteTimeArgumentType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``Encoding``, ``ReferenceTime``, in
+                     that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_AbsoluteTimeArgumentType)
     v = AbsoluteTimeArgumentType.__new__(AbsoluteTimeArgumentType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -9225,6 +9660,24 @@ _A_AbsoluteTimeDataType = frozenset({"shortDescription", "name", "baseType",
 
 
 def _r_AbsoluteTimeDataType(n: X.Node) -> AbsoluteTimeDataType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``AbsoluteTimeDataType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``AbsoluteTimeDataType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``Encoding``, ``ReferenceTime``, in
+                     that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_AbsoluteTimeDataType)
     v = AbsoluteTimeDataType.__new__(AbsoluteTimeDataType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -9249,6 +9702,23 @@ _A_AbsoluteTimeParameterType = frozenset({"shortDescription", "name",
 
 
 def _r_AbsoluteTimeParameterType(n: X.Node) -> AbsoluteTimeParameterType:
+    """Reads an XML element of the XTCE type ``AbsoluteTimeParameterType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``AbsoluteTimeParameterType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``Encoding``, ``ReferenceTime``, in
+                     that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_AbsoluteTimeParameterType)
     v = AbsoluteTimeParameterType.__new__(AbsoluteTimeParameterType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -9272,6 +9742,24 @@ _A_AcceptedVerifierType = frozenset({'shortDescription', 'name'})
 
 
 def _r_AcceptedVerifierType(n: X.Node) -> AcceptedVerifierType:
+    """Reads an XML element of the XTCE type ``AcceptedVerifierType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``AcceptedVerifierType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``LongDescription``,
+                     ``AliasSet``, ``AncillaryDataSet``, an alternative of
+                     ``AcceptedVerifierChoice1``, an alternative of
+                     ``AcceptedVerifierChoice2``, ``ArgumentRestrictionList``,
+                     in that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_AcceptedVerifierType)
     v = AcceptedVerifierType.__new__(AcceptedVerifierType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -9296,6 +9784,23 @@ _A_AggregateArgumentType = frozenset({"shortDescription", "name",
 
 
 def _r_AggregateArgumentType(n: X.Node) -> AggregateArgumentType:
+    """Reads an XML element of the XTCE type ``AggregateArgumentType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``AggregateArgumentType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``MemberList``, in that order and in
+                     the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_AggregateArgumentType)
     v = AggregateArgumentType.__new__(AggregateArgumentType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -9318,6 +9823,24 @@ _A_AggregateDataType = frozenset({'shortDescription', 'name', 'initialValue'})
 
 
 def _r_AggregateDataType(n: X.Node) -> AggregateDataType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``AggregateDataType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``AggregateDataType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``MemberList``, in that order and in
+                     the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_AggregateDataType)
     v = AggregateDataType.__new__(AggregateDataType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -9341,6 +9864,23 @@ _A_AggregateParameterType = frozenset({"shortDescription", "name",
 
 
 def _r_AggregateParameterType(n: X.Node) -> AggregateParameterType:
+    """Reads an XML element of the XTCE type ``AggregateParameterType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``AggregateParameterType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``MemberList``, in that order and in
+                     the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_AggregateParameterType)
     v = AggregateParameterType.__new__(AggregateParameterType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -9363,6 +9903,22 @@ _A_AlarmConditionsType = frozenset({})
 
 
 def _r_AlarmConditionsType(n: X.Node) -> AlarmConditionsType:
+    """Reads an XML element of the XTCE type ``AlarmConditionsType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``AlarmConditionsType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``WatchAlarm``, ``WarningAlarm``, ``DistressAlarm``,
+                     ``CriticalAlarm``, ``SevereAlarm``, in that order and in
+                     the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_AlarmConditionsType)
     v = AlarmConditionsType.__new__(AlarmConditionsType)
     c = X.Cursor(n)
@@ -9384,6 +9940,21 @@ _A_AlarmMultiRangesType = frozenset({'name', 'shortDescription'})
 
 
 def _r_AlarmMultiRangesType(n: X.Node) -> AlarmMultiRangesType:
+    """Reads an XML element of the XTCE type ``AlarmMultiRangesType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``AlarmMultiRangesType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AncillaryDataSet``,
+                     ``Range``, in that order and in the numbers the schema
+                     allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_AlarmMultiRangesType)
     v = AlarmMultiRangesType.__new__(AlarmMultiRangesType)
     v.name = X.opt_attr(n, 'name', X.p_str)
@@ -9405,6 +9976,23 @@ _A_AlarmRangesType = frozenset({'name', 'shortDescription', 'rangeForm'})
 
 
 def _r_AlarmRangesType(n: X.Node) -> AlarmRangesType:
+    """Reads an XML element of the XTCE type ``AlarmRangesType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``AlarmRangesType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AncillaryDataSet``,
+                     ``WatchRange``, ``WarningRange``, ``DistressRange``,
+                     ``CriticalRange``, ``SevereRange``, in that order and in
+                     the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_AlarmRangesType)
     v = AlarmRangesType.__new__(AlarmRangesType)
     v.name = X.opt_attr(n, 'name', X.p_str)
@@ -9432,6 +10020,22 @@ _A_AlarmType = frozenset({"name", "shortDescription", "minViolations",
 
 
 def _r_AlarmType(n: X.Node) -> AlarmType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``AlarmType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``AlarmType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AncillaryDataSet``,
+                     an alternative of ``AlarmChoice``, in that order and in the
+                     numbers the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_AlarmType)
     v = AlarmType.__new__(AlarmType)
     v.name = X.opt_attr(n, 'name', X.p_str)
@@ -9451,6 +10055,21 @@ _A_AlgorithmSetType = frozenset({})
 
 
 def _r_AlgorithmSetType(n: X.Node) -> AlgorithmSetType:
+    """Reads an XML element of the XTCE type ``AlgorithmSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``AlgorithmSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (alternatives of ``AlgorithmSetChoice``, in that order and
+                     in the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_AlgorithmSetType)
     v = AlgorithmSetType.__new__(AlgorithmSetType)
     c = X.Cursor(n)
@@ -9468,6 +10087,19 @@ _A_AlgorithmTextType = frozenset({'language'})
 
 
 def _r_AlgorithmTextType(n: X.Node) -> AlgorithmTextType:
+    """Reads an XML element of the XTCE type ``AlgorithmTextType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``AlgorithmTextType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value or text that doesn't parse or has
+                     child elements.
+    """
     X.check_attrs(n, _A_AlgorithmTextType)
     v = AlgorithmTextType.__new__(AlgorithmTextType)
     v.language = X.opt_attr(n, 'language', X.p_str)
@@ -9479,6 +10111,20 @@ _A_AliasSetType = frozenset({})
 
 
 def _r_AliasSetType(n: X.Node) -> AliasSetType:
+    """Reads an XML element of the XTCE type ``AliasSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``AliasSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``Alias``, in that order and in the numbers the schema
+                     allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_AliasSetType)
     v = AliasSetType.__new__(AliasSetType)
     c = X.Cursor(n)
@@ -9496,6 +10142,20 @@ _A_AliasType = frozenset({'nameSpace', 'alias'})
 
 
 def _r_AliasType(n: X.Node) -> AliasType:
+    """Reads an XML element of the XTCE type ``AliasType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``AliasType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attributes ``nameSpace`` and ``alias``,
+                     has an attribute value that doesn't parse or has children
+                     or text.
+    """
     X.check_attrs(n, _A_AliasType)
     v = AliasType.__new__(AliasType)
     v.name_space = X.req_attr(n, 'nameSpace', X.p_str)
@@ -9509,6 +10169,20 @@ _A_AncillaryDataSetType = frozenset({})
 
 
 def _r_AncillaryDataSetType(n: X.Node) -> AncillaryDataSetType:
+    """Reads an XML element of the XTCE type ``AncillaryDataSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``AncillaryDataSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``AncillaryData``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_AncillaryDataSetType)
     v = AncillaryDataSetType.__new__(AncillaryDataSetType)
     c = X.Cursor(n)
@@ -9526,6 +10200,19 @@ _A_AncillaryDataType = frozenset({'name', 'mimeType', 'href'})
 
 
 def _r_AncillaryDataType(n: X.Node) -> AncillaryDataType:
+    """Reads an XML element of the XTCE type ``AncillaryDataType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``AncillaryDataType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value or text that doesn't parse or has child elements.
+    """
     X.check_attrs(n, _A_AncillaryDataType)
     v = AncillaryDataType.__new__(AncillaryDataType)
     v.name = X.req_attr(n, 'name', X.p_str)
@@ -9539,6 +10226,21 @@ _A_ArgumentANDedConditionsType = frozenset({})
 
 
 def _r_ArgumentANDedConditionsType(n: X.Node) -> ArgumentANDedConditionsType:
+    """Reads an XML element of the XTCE type ``ArgumentANDedConditionsType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentANDedConditionsType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (alternatives of ``ArgumentANDedConditionsChoice``, in that
+                     order and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentANDedConditionsType)
     v = ArgumentANDedConditionsType.__new__(ArgumentANDedConditionsType)
     c = X.Cursor(n)
@@ -9557,6 +10259,24 @@ _A_ArgumentAbsoluteTimeDataType = frozenset({"shortDescription", "name",
 
 
 def _r_ArgumentAbsoluteTimeDataType(n: X.Node) -> ArgumentAbsoluteTimeDataType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``ArgumentAbsoluteTimeDataType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentAbsoluteTimeDataType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``Encoding``, ``ReferenceTime``, in
+                     that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentAbsoluteTimeDataType)
     v = ArgumentAbsoluteTimeDataType.__new__(ArgumentAbsoluteTimeDataType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -9580,6 +10300,24 @@ _A_ArgumentArgumentRefEntryType = frozenset({'shortDescription', 'argumentRef'})
 
 
 def _r_ArgumentArgumentRefEntryType(n: X.Node) -> ArgumentArgumentRefEntryType:
+    """Reads an XML element of the XTCE type ``ArgumentArgumentRefEntryType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentArgumentRefEntryType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``argumentRef``, has an
+                     attribute value that doesn't parse or has children that
+                     don't follow its content model
+                     (``LocationInContainerInBits``, ``RepeatEntry``,
+                     ``IncludeCondition``, ``AncillaryDataSet``, in that order
+                     and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentArgumentRefEntryType)
     v = ArgumentArgumentRefEntryType.__new__(ArgumentArgumentRefEntryType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -9603,6 +10341,25 @@ _A_ArgumentArrayArgumentRefEntryType = frozenset(
 
 def _r_ArgumentArrayArgumentRefEntryType(
         n: X.Node) -> ArgumentArrayArgumentRefEntryType:
+    """Reads an XML element of the XTCE type
+    ``ArgumentArrayArgumentRefEntryType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentArrayArgumentRefEntryType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``argumentRef``, has an
+                     attribute value that doesn't parse or has children that
+                     don't follow its content model
+                     (``LocationInContainerInBits``, ``RepeatEntry``,
+                     ``IncludeCondition``, ``AncillaryDataSet``,
+                     ``DimensionList``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentArrayArgumentRefEntryType)
     v = ArgumentArrayArgumentRefEntryType.__new__(
         ArgumentArrayArgumentRefEntryType)
@@ -9631,6 +10388,25 @@ _A_ArgumentArrayParameterRefEntryType = frozenset(
 
 def _r_ArgumentArrayParameterRefEntryType(
         n: X.Node) -> ArgumentArrayParameterRefEntryType:
+    """Reads an XML element of the XTCE type
+    ``ArgumentArrayParameterRefEntryType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentArrayParameterRefEntryType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``parameterRef``, has an
+                     attribute value that doesn't parse or has children that
+                     don't follow its content model
+                     (``LocationInContainerInBits``, ``RepeatEntry``,
+                     ``IncludeCondition``, ``AncillaryDataSet``,
+                     ``DimensionList``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentArrayParameterRefEntryType)
     v = ArgumentArrayParameterRefEntryType.__new__(
         ArgumentArrayParameterRefEntryType)
@@ -9657,6 +10433,20 @@ _A_ArgumentAssignmentListType = frozenset({})
 
 
 def _r_ArgumentAssignmentListType(n: X.Node) -> ArgumentAssignmentListType:
+    """Reads an XML element of the XTCE type ``ArgumentAssignmentListType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentAssignmentListType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``ArgumentAssignment``, in that order and in the numbers
+                     the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentAssignmentListType)
     v = ArgumentAssignmentListType.__new__(ArgumentAssignmentListType)
     c = X.Cursor(n)
@@ -9674,6 +10464,20 @@ _A_ArgumentAssignmentType = frozenset({'argumentName', 'argumentValue'})
 
 
 def _r_ArgumentAssignmentType(n: X.Node) -> ArgumentAssignmentType:
+    """Reads an XML element of the XTCE type ``ArgumentAssignmentType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentAssignmentType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attributes ``argumentName`` and
+                     ``argumentValue``, has an attribute value that doesn't
+                     parse or has children or text.
+    """
     X.check_attrs(n, _A_ArgumentAssignmentType)
     v = ArgumentAssignmentType.__new__(ArgumentAssignmentType)
     v.argument_name = X.req_attr(n, 'argumentName', X.p_str)
@@ -9687,6 +10491,24 @@ _A_ArgumentBaseDataType = frozenset({'shortDescription', 'name', 'baseType'})
 
 
 def _r_ArgumentBaseDataType(n: X.Node) -> ArgumentBaseDataType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``ArgumentBaseDataType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentBaseDataType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``UnitSet``, an alternative of
+                     ``ArgumentBaseDataChoice``, in that order and in the
+                     numbers the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentBaseDataType)
     v = ArgumentBaseDataType.__new__(ArgumentBaseDataType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -9710,6 +10532,24 @@ _A_ArgumentBaseTimeDataType = frozenset({"shortDescription", "name",
 
 
 def _r_ArgumentBaseTimeDataType(n: X.Node) -> ArgumentBaseTimeDataType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``ArgumentBaseTimeDataType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentBaseTimeDataType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``Encoding``, ``ReferenceTime``, in
+                     that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentBaseTimeDataType)
     v = ArgumentBaseTimeDataType.__new__(ArgumentBaseTimeDataType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -9733,6 +10573,23 @@ _A_ArgumentBinaryDataEncodingType = frozenset({'bitOrder', 'byteOrder'})
 
 def _r_ArgumentBinaryDataEncodingType(
         n: X.Node) -> ArgumentBinaryDataEncodingType:
+    """Reads an XML element of the XTCE type ``ArgumentBinaryDataEncodingType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentBinaryDataEncodingType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model
+                     (``ErrorDetectCorrect``, ``SizeInBits``,
+                     ``FromBinaryTransformAlgorithm``,
+                     ``ToBinaryTransformAlgorithm``, in that order and in the
+                     numbers the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentBinaryDataEncodingType)
     v = ArgumentBinaryDataEncodingType.__new__(ArgumentBinaryDataEncodingType)
     v.bit_order = X.opt_attr(n, 'bitOrder', _p_BitOrderType)
@@ -9756,6 +10613,24 @@ _A_ArgumentBinaryDataType = frozenset({"shortDescription", "name", "baseType",
 
 
 def _r_ArgumentBinaryDataType(n: X.Node) -> ArgumentBinaryDataType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``ArgumentBinaryDataType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentBinaryDataType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``UnitSet``, an alternative of
+                     ``ArgumentBinaryDataChoice``, in that order and in the
+                     numbers the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentBinaryDataType)
     v = ArgumentBinaryDataType.__new__(ArgumentBinaryDataType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -9781,6 +10656,24 @@ _A_ArgumentBooleanDataType = frozenset({"shortDescription", "name", "baseType",
 
 
 def _r_ArgumentBooleanDataType(n: X.Node) -> ArgumentBooleanDataType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``ArgumentBooleanDataType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentBooleanDataType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``UnitSet``, an alternative of
+                     ``ArgumentBooleanDataChoice``, in that order and in the
+                     numbers the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentBooleanDataType)
     v = ArgumentBooleanDataType.__new__(ArgumentBooleanDataType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -9807,6 +10700,21 @@ _A_ArgumentBooleanExpressionType = frozenset({})
 
 def _r_ArgumentBooleanExpressionType(
         n: X.Node) -> ArgumentBooleanExpressionType:
+    """Reads an XML element of the XTCE type ``ArgumentBooleanExpressionType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentBooleanExpressionType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model (an
+                     alternative of ``ArgumentBooleanExpressionChoice``, in that
+                     order and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentBooleanExpressionType)
     v = ArgumentBooleanExpressionType.__new__(ArgumentBooleanExpressionType)
     c = X.Cursor(n)
@@ -9819,6 +10727,23 @@ _A_ArgumentComparisonCheckType = frozenset({})
 
 
 def _r_ArgumentComparisonCheckType(n: X.Node) -> ArgumentComparisonCheckType:
+    """Reads an XML element of the XTCE type ``ArgumentComparisonCheckType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentComparisonCheckType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model (an
+                     alternative of ``ArgumentComparisonCheckChoice1``,
+                     ``ComparisonOperator``, an alternative of
+                     ``ArgumentComparisonCheckChoice2``, in that order and in
+                     the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_ArgumentComparisonCheckType)
     v = ArgumentComparisonCheckType.__new__(ArgumentComparisonCheckType)
     c = X.Cursor(n)
@@ -9835,6 +10760,20 @@ _A_ArgumentComparisonListType = frozenset({})
 
 
 def _r_ArgumentComparisonListType(n: X.Node) -> ArgumentComparisonListType:
+    """Reads an XML element of the XTCE type ``ArgumentComparisonListType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentComparisonListType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``Comparison``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentComparisonListType)
     v = ArgumentComparisonListType.__new__(ArgumentComparisonListType)
     c = X.Cursor(n)
@@ -9852,6 +10791,22 @@ _A_ArgumentComparisonType = frozenset({'comparisonOperator', 'value'})
 
 
 def _r_ArgumentComparisonType(n: X.Node) -> ArgumentComparisonType:
+    """Reads an XML element of the XTCE type ``ArgumentComparisonType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentComparisonType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``value``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (an alternative of
+                     ``ArgumentComparisonChoice``, in that order and in the
+                     numbers the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentComparisonType)
     v = ArgumentComparisonType.__new__(ArgumentComparisonType)
     v.comparison_operator = X.opt_attr(n, "comparisonOperator",
@@ -9869,6 +10824,24 @@ _A_ArgumentContainerRefEntryType = frozenset({"shortDescription",
 
 def _r_ArgumentContainerRefEntryType(
         n: X.Node) -> ArgumentContainerRefEntryType:
+    """Reads an XML element of the XTCE type ``ArgumentContainerRefEntryType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentContainerRefEntryType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``containerRef``, has an
+                     attribute value that doesn't parse or has children that
+                     don't follow its content model
+                     (``LocationInContainerInBits``, ``RepeatEntry``,
+                     ``IncludeCondition``, ``AncillaryDataSet``, in that order
+                     and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentContainerRefEntryType)
     v = ArgumentContainerRefEntryType.__new__(ArgumentContainerRefEntryType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -9892,6 +10865,25 @@ _A_ArgumentContainerSegmentRefEntryType = frozenset(
 
 def _r_ArgumentContainerSegmentRefEntryType(
         n: X.Node) -> ArgumentContainerSegmentRefEntryType:
+    """Reads an XML element of the XTCE type
+    ``ArgumentContainerSegmentRefEntryType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentContainerSegmentRefEntryType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attributes ``containerRef`` and
+                     ``sizeInBits``, has an attribute value that doesn't parse
+                     or has children that don't follow its content model
+                     (``LocationInContainerInBits``, ``RepeatEntry``,
+                     ``IncludeCondition``, ``AncillaryDataSet``, in that order
+                     and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentContainerSegmentRefEntryType)
     v = ArgumentContainerSegmentRefEntryType.__new__(
         ArgumentContainerSegmentRefEntryType)
@@ -9916,6 +10908,20 @@ _A_ArgumentDimensionListType = frozenset({})
 
 
 def _r_ArgumentDimensionListType(n: X.Node) -> ArgumentDimensionListType:
+    """Reads an XML element of the XTCE type ``ArgumentDimensionListType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentDimensionListType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``Dimension``, in that order and in the numbers the schema
+                     allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentDimensionListType)
     v = ArgumentDimensionListType.__new__(ArgumentDimensionListType)
     c = X.Cursor(n)
@@ -9933,6 +10939,21 @@ _A_ArgumentDimensionType = frozenset({})
 
 
 def _r_ArgumentDimensionType(n: X.Node) -> ArgumentDimensionType:
+    """Reads an XML element of the XTCE type ``ArgumentDimensionType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentDimensionType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``StartingIndex``, ``EndingIndex``, in that order and in
+                     the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_ArgumentDimensionType)
     v = ArgumentDimensionType.__new__(ArgumentDimensionType)
     c = X.Cursor(n)
@@ -9951,6 +10972,22 @@ _A_ArgumentDiscreteLookupListType = frozenset({'defaultValue'})
 
 def _r_ArgumentDiscreteLookupListType(
         n: X.Node) -> ArgumentDiscreteLookupListType:
+    """Reads an XML element of the XTCE type ``ArgumentDiscreteLookupListType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentDiscreteLookupListType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``defaultValue``, has an
+                     attribute value that doesn't parse or has children that
+                     don't follow its content model (``DiscreteLookup``, in that
+                     order and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentDiscreteLookupListType)
     v = ArgumentDiscreteLookupListType.__new__(ArgumentDiscreteLookupListType)
     v.default_value = X.req_attr(n, 'defaultValue', X.p_i64)
@@ -9969,6 +11006,22 @@ _A_ArgumentDiscreteLookupType = frozenset({'value'})
 
 
 def _r_ArgumentDiscreteLookupType(n: X.Node) -> ArgumentDiscreteLookupType:
+    """Reads an XML element of the XTCE type ``ArgumentDiscreteLookupType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentDiscreteLookupType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``value``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (an alternative of
+                     ``ArgumentDiscreteLookupChoice``, in that order and in the
+                     numbers the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentDiscreteLookupType)
     v = ArgumentDiscreteLookupType.__new__(ArgumentDiscreteLookupType)
     v.value = X.req_attr(n, 'value', X.p_i64)
@@ -9982,6 +11035,21 @@ _A_ArgumentDynamicValueType = frozenset({})
 
 
 def _r_ArgumentDynamicValueType(n: X.Node) -> ArgumentDynamicValueType:
+    """Reads an XML element of the XTCE type ``ArgumentDynamicValueType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentDynamicValueType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model (an
+                     alternative of ``ArgumentDynamicValueChoice``,
+                     ``LinearAdjustment``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentDynamicValueType)
     v = ArgumentDynamicValueType.__new__(ArgumentDynamicValueType)
     c = X.Cursor(n)
@@ -9997,6 +11065,25 @@ _A_ArgumentEnumeratedDataType = frozenset({"shortDescription", "name",
 
 
 def _r_ArgumentEnumeratedDataType(n: X.Node) -> ArgumentEnumeratedDataType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``ArgumentEnumeratedDataType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentEnumeratedDataType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``UnitSet``, an alternative of
+                     ``ArgumentEnumeratedDataChoice``, ``EnumerationList``, in
+                     that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentEnumeratedDataType)
     v = ArgumentEnumeratedDataType.__new__(ArgumentEnumeratedDataType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -10024,6 +11111,24 @@ _A_ArgumentFixedValueEntryType = frozenset({"shortDescription", "name",
 
 
 def _r_ArgumentFixedValueEntryType(n: X.Node) -> ArgumentFixedValueEntryType:
+    """Reads an XML element of the XTCE type ``ArgumentFixedValueEntryType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentFixedValueEntryType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attributes ``binaryValue`` and
+                     ``sizeInBits``, has an attribute value that doesn't parse
+                     or has children that don't follow its content model
+                     (``LocationInContainerInBits``, ``RepeatEntry``,
+                     ``IncludeCondition``, ``AncillaryDataSet``, in that order
+                     and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentFixedValueEntryType)
     v = ArgumentFixedValueEntryType.__new__(ArgumentFixedValueEntryType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -10048,6 +11153,25 @@ _A_ArgumentFloatDataType = frozenset({"shortDescription", "name", "baseType",
 
 
 def _r_ArgumentFloatDataType(n: X.Node) -> ArgumentFloatDataType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``ArgumentFloatDataType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentFloatDataType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``UnitSet``, an alternative of
+                     ``ArgumentFloatDataChoice``, ``ToString``, in that order
+                     and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentFloatDataType)
     v = ArgumentFloatDataType.__new__(ArgumentFloatDataType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -10075,6 +11199,24 @@ _A_ArgumentIndirectParameterRefEntryType = frozenset({"shortDescription",
 
 def _r_ArgumentIndirectParameterRefEntryType(
         n: X.Node) -> ArgumentIndirectParameterRefEntryType:
+    """Reads an XML element of the XTCE type
+    ``ArgumentIndirectParameterRefEntryType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentIndirectParameterRefEntryType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model
+                     (``LocationInContainerInBits``, ``RepeatEntry``,
+                     ``IncludeCondition``, ``AncillaryDataSet``,
+                     ``ParameterInstance``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentIndirectParameterRefEntryType)
     v = ArgumentIndirectParameterRefEntryType.__new__(
         ArgumentIndirectParameterRefEntryType)
@@ -10100,6 +11242,24 @@ _A_ArgumentInputAlgorithmType = frozenset({'shortDescription', 'name'})
 
 
 def _r_ArgumentInputAlgorithmType(n: X.Node) -> ArgumentInputAlgorithmType:
+    """Reads an XML element of the XTCE type ``ArgumentInputAlgorithmType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentInputAlgorithmType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``AlgorithmText``,
+                     ``ExternalAlgorithmSet``, ``InputSet``, in that order and
+                     in the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_ArgumentInputAlgorithmType)
     v = ArgumentInputAlgorithmType.__new__(ArgumentInputAlgorithmType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -10124,6 +11284,21 @@ _A_ArgumentInputSetType = frozenset({})
 
 
 def _r_ArgumentInputSetType(n: X.Node) -> ArgumentInputSetType:
+    """Reads an XML element of the XTCE type ``ArgumentInputSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentInputSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (alternatives of ``ArgumentInputSetChoice``, in that order
+                     and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentInputSetType)
     v = ArgumentInputSetType.__new__(ArgumentInputSetType)
     c = X.Cursor(n)
@@ -10142,6 +11317,19 @@ _A_ArgumentInstanceRefType = frozenset({'argumentRef', 'useCalibratedValue'})
 
 
 def _r_ArgumentInstanceRefType(n: X.Node) -> ArgumentInstanceRefType:
+    """Reads an XML element of the XTCE type ``ArgumentInstanceRefType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentInstanceRefType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``argumentRef``, has an
+                     attribute value that doesn't parse or has children or text.
+    """
     X.check_attrs(n, _A_ArgumentInstanceRefType)
     v = ArgumentInstanceRefType.__new__(ArgumentInstanceRefType)
     v.argument_ref = X.req_attr(n, 'argumentRef', X.p_str)
@@ -10156,6 +11344,25 @@ _A_ArgumentIntegerDataType = frozenset({"shortDescription", "name", "baseType",
 
 
 def _r_ArgumentIntegerDataType(n: X.Node) -> ArgumentIntegerDataType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``ArgumentIntegerDataType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentIntegerDataType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``UnitSet``, an alternative of
+                     ``ArgumentIntegerDataChoice``, ``ToString``, in that order
+                     and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentIntegerDataType)
     v = ArgumentIntegerDataType.__new__(ArgumentIntegerDataType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -10182,6 +11389,21 @@ _A_ArgumentIntegerValueType = frozenset({})
 
 
 def _r_ArgumentIntegerValueType(n: X.Node) -> ArgumentIntegerValueType:
+    """Reads an XML element of the XTCE type ``ArgumentIntegerValueType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentIntegerValueType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model (an
+                     alternative of ``ArgumentIntegerValueChoice``, in that
+                     order and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentIntegerValueType)
     v = ArgumentIntegerValueType.__new__(ArgumentIntegerValueType)
     c = X.Cursor(n)
@@ -10194,6 +11416,20 @@ _A_ArgumentListType = frozenset({})
 
 
 def _r_ArgumentListType(n: X.Node) -> ArgumentListType:
+    """Reads an XML element of the XTCE type ``ArgumentListType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentListType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``Argument``, in that order and in the numbers the schema
+                     allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentListType)
     v = ArgumentListType.__new__(ArgumentListType)
     c = X.Cursor(n)
@@ -10212,6 +11448,23 @@ _A_ArgumentLocationInContainerInBitsType = frozenset({'referenceLocation'})
 
 def _r_ArgumentLocationInContainerInBitsType(
         n: X.Node) -> ArgumentLocationInContainerInBitsType:
+    """Reads an XML element of the XTCE type
+    ``ArgumentLocationInContainerInBitsType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentLocationInContainerInBitsType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (an alternative of
+                     ``ArgumentLocationInContainerInBitsChoice``, in that order
+                     and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentLocationInContainerInBitsType)
     v = ArgumentLocationInContainerInBitsType.__new__(
         ArgumentLocationInContainerInBitsType)
@@ -10227,6 +11480,21 @@ _A_ArgumentMatchCriteriaType = frozenset({})
 
 
 def _r_ArgumentMatchCriteriaType(n: X.Node) -> ArgumentMatchCriteriaType:
+    """Reads an XML element of the XTCE type ``ArgumentMatchCriteriaType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentMatchCriteriaType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model (an
+                     alternative of ``ArgumentMatchCriteriaChoice``, in that
+                     order and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentMatchCriteriaType)
     v = ArgumentMatchCriteriaType.__new__(ArgumentMatchCriteriaType)
     c = X.Cursor(n)
@@ -10239,6 +11507,21 @@ _A_ArgumentMathOperationType = frozenset({})
 
 
 def _r_ArgumentMathOperationType(n: X.Node) -> ArgumentMathOperationType:
+    """Reads an XML element of the XTCE type ``ArgumentMathOperationType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentMathOperationType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (alternatives of ``ArgumentMathOperationChoice``, in that
+                     order and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentMathOperationType)
     v = ArgumentMathOperationType.__new__(ArgumentMathOperationType)
     c = X.Cursor(n)
@@ -10258,6 +11541,21 @@ _A_ArgumentORedConditionsType = frozenset({})
 
 
 def _r_ArgumentORedConditionsType(n: X.Node) -> ArgumentORedConditionsType:
+    """Reads an XML element of the XTCE type ``ArgumentORedConditionsType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentORedConditionsType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (alternatives of ``ArgumentORedConditionsChoice``, in that
+                     order and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentORedConditionsType)
     v = ArgumentORedConditionsType.__new__(ArgumentORedConditionsType)
     c = X.Cursor(n)
@@ -10277,6 +11575,24 @@ _A_ArgumentParameterRefEntryType = frozenset({"shortDescription",
 
 def _r_ArgumentParameterRefEntryType(
         n: X.Node) -> ArgumentParameterRefEntryType:
+    """Reads an XML element of the XTCE type ``ArgumentParameterRefEntryType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentParameterRefEntryType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``parameterRef``, has an
+                     attribute value that doesn't parse or has children that
+                     don't follow its content model
+                     (``LocationInContainerInBits``, ``RepeatEntry``,
+                     ``IncludeCondition``, ``AncillaryDataSet``, in that order
+                     and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentParameterRefEntryType)
     v = ArgumentParameterRefEntryType.__new__(ArgumentParameterRefEntryType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -10300,6 +11616,25 @@ _A_ArgumentParameterSegmentRefEntryType = frozenset(
 
 def _r_ArgumentParameterSegmentRefEntryType(
         n: X.Node) -> ArgumentParameterSegmentRefEntryType:
+    """Reads an XML element of the XTCE type
+    ``ArgumentParameterSegmentRefEntryType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentParameterSegmentRefEntryType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attributes ``parameterRef`` and
+                     ``sizeInBits``, has an attribute value that doesn't parse
+                     or has children that don't follow its content model
+                     (``LocationInContainerInBits``, ``RepeatEntry``,
+                     ``IncludeCondition``, ``AncillaryDataSet``, in that order
+                     and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentParameterSegmentRefEntryType)
     v = ArgumentParameterSegmentRefEntryType.__new__(
         ArgumentParameterSegmentRefEntryType)
@@ -10325,6 +11660,24 @@ _A_ArgumentRelativeTimeDataType = frozenset({"shortDescription", "name",
 
 
 def _r_ArgumentRelativeTimeDataType(n: X.Node) -> ArgumentRelativeTimeDataType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``ArgumentRelativeTimeDataType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentRelativeTimeDataType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``Encoding``, ``ReferenceTime``, in
+                     that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentRelativeTimeDataType)
     v = ArgumentRelativeTimeDataType.__new__(ArgumentRelativeTimeDataType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -10348,6 +11701,20 @@ _A_ArgumentRepeatType = frozenset({})
 
 
 def _r_ArgumentRepeatType(n: X.Node) -> ArgumentRepeatType:
+    """Reads an XML element of the XTCE type ``ArgumentRepeatType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentRepeatType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``Count``, ``Offset``, in that order and in the numbers
+                     the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentRepeatType)
     v = ArgumentRepeatType.__new__(ArgumentRepeatType)
     c = X.Cursor(n)
@@ -10364,6 +11731,20 @@ _A_ArgumentRestrictionListType = frozenset({})
 
 
 def _r_ArgumentRestrictionListType(n: X.Node) -> ArgumentRestrictionListType:
+    """Reads an XML element of the XTCE type ``ArgumentRestrictionListType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentRestrictionListType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``ArgumentRestriction``, in that order and in the numbers
+                     the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentRestrictionListType)
     v = ArgumentRestrictionListType.__new__(ArgumentRestrictionListType)
     c = X.Cursor(n)
@@ -10381,6 +11762,24 @@ _A_ArgumentSequenceEntryType = frozenset({'shortDescription'})
 
 
 def _r_ArgumentSequenceEntryType(n: X.Node) -> ArgumentSequenceEntryType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``ArgumentSequenceEntryType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentSequenceEntryType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model
+                     (``LocationInContainerInBits``, ``RepeatEntry``,
+                     ``IncludeCondition``, ``AncillaryDataSet``, in that order
+                     and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentSequenceEntryType)
     v = ArgumentSequenceEntryType.__new__(ArgumentSequenceEntryType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -10403,6 +11802,24 @@ _A_ArgumentStreamSegmentEntryType = frozenset({"shortDescription", "streamRef",
 
 def _r_ArgumentStreamSegmentEntryType(
         n: X.Node) -> ArgumentStreamSegmentEntryType:
+    """Reads an XML element of the XTCE type ``ArgumentStreamSegmentEntryType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentStreamSegmentEntryType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attributes ``streamRef`` and
+                     ``sizeInBits``, has an attribute value that doesn't parse
+                     or has children that don't follow its content model
+                     (``LocationInContainerInBits``, ``RepeatEntry``,
+                     ``IncludeCondition``, ``AncillaryDataSet``, in that order
+                     and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentStreamSegmentEntryType)
     v = ArgumentStreamSegmentEntryType.__new__(ArgumentStreamSegmentEntryType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -10428,6 +11845,23 @@ _A_ArgumentStringDataEncodingType = frozenset({"bitOrder", "byteOrder",
 
 def _r_ArgumentStringDataEncodingType(
         n: X.Node) -> ArgumentStringDataEncodingType:
+    """Reads an XML element of the XTCE type ``ArgumentStringDataEncodingType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentStringDataEncodingType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model
+                     (``ErrorDetectCorrect``, an alternative of
+                     ``ArgumentStringDataEncodingChoice``, in that order and in
+                     the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_ArgumentStringDataEncodingType)
     v = ArgumentStringDataEncodingType.__new__(ArgumentStringDataEncodingType)
     v.bit_order = X.opt_attr(n, 'bitOrder', _p_BitOrderType)
@@ -10447,6 +11881,25 @@ _A_ArgumentStringDataType = frozenset({"shortDescription", "name", "baseType",
 
 
 def _r_ArgumentStringDataType(n: X.Node) -> ArgumentStringDataType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``ArgumentStringDataType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentStringDataType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``UnitSet``, an alternative of
+                     ``ArgumentStringDataChoice``, ``SizeRangeInCharacters``, in
+                     that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentStringDataType)
     v = ArgumentStringDataType.__new__(ArgumentStringDataType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -10476,6 +11929,23 @@ _A_ArgumentType = frozenset({"shortDescription", "name", "argumentTypeRef",
 
 
 def _r_ArgumentType(n: X.Node) -> ArgumentType:
+    """Reads an XML element of the XTCE type ``ArgumentType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attributes ``name`` and
+                     ``argumentTypeRef``, has an attribute value that doesn't
+                     parse or has children that don't follow its content model
+                     (``LongDescription``, ``AliasSet``, ``AncillaryDataSet``,
+                     in that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentType)
     v = ArgumentType.__new__(ArgumentType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -10496,6 +11966,21 @@ _A_ArgumentTypeSetType = frozenset({})
 
 
 def _r_ArgumentTypeSetType(n: X.Node) -> ArgumentTypeSetType:
+    """Reads an XML element of the XTCE type ``ArgumentTypeSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentTypeSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (alternatives of ``ArgumentTypeSetChoice``, in that order
+                     and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentTypeSetType)
     v = ArgumentTypeSetType.__new__(ArgumentTypeSetType)
     c = X.Cursor(n)
@@ -10517,6 +12002,23 @@ _A_ArgumentVariableStringType = frozenset({'maxSizeInBits'})
 
 
 def _r_ArgumentVariableStringType(n: X.Node) -> ArgumentVariableStringType:
+    """Reads an XML element of the XTCE type ``ArgumentVariableStringType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArgumentVariableStringType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``maxSizeInBits``, has an
+                     attribute value that doesn't parse or has children that
+                     don't follow its content model (an alternative of
+                     ``ArgumentVariableStringChoice1``, an alternative of
+                     ``ArgumentVariableStringChoice2``, in that order and in the
+                     numbers the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ArgumentVariableStringType)
     v = ArgumentVariableStringType.__new__(ArgumentVariableStringType)
     v.max_size_in_bits = X.req_attr(n, 'maxSizeInBits', X.p_i64)
@@ -10533,6 +12035,23 @@ _A_ArrayArgumentType = frozenset({"shortDescription", "name", "arrayTypeRef",
 
 
 def _r_ArrayArgumentType(n: X.Node) -> ArrayArgumentType:
+    """Reads an XML element of the XTCE type ``ArrayArgumentType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArrayArgumentType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attributes ``name`` and
+                     ``arrayTypeRef``, has an attribute value that doesn't parse
+                     or has children that don't follow its content model
+                     (``LongDescription``, ``AliasSet``, ``AncillaryDataSet``,
+                     ``DimensionList``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ArrayArgumentType)
     v = ArrayArgumentType.__new__(ArrayArgumentType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -10557,6 +12076,24 @@ _A_ArrayDataTypeType = frozenset({"shortDescription", "name", "arrayTypeRef",
 
 
 def _r_ArrayDataTypeType(n: X.Node) -> ArrayDataTypeType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``ArrayDataTypeType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArrayDataTypeType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attributes ``name`` and
+                     ``arrayTypeRef``, has an attribute value that doesn't parse
+                     or has children that don't follow its content model
+                     (``LongDescription``, ``AliasSet``, ``AncillaryDataSet``,
+                     in that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_ArrayDataTypeType)
     v = ArrayDataTypeType.__new__(ArrayDataTypeType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -10577,6 +12114,25 @@ _A_ArrayParameterRefEntryType = frozenset({'shortDescription', 'parameterRef'})
 
 
 def _r_ArrayParameterRefEntryType(n: X.Node) -> ArrayParameterRefEntryType:
+    """Reads an XML element of the XTCE type ``ArrayParameterRefEntryType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArrayParameterRefEntryType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``parameterRef``, has an
+                     attribute value that doesn't parse or has children that
+                     don't follow its content model
+                     (``LocationInContainerInBits``, ``RepeatEntry``,
+                     ``IncludeCondition``, ``TimeAssociation``,
+                     ``AncillaryDataSet``, ``DimensionList``, in that order and
+                     in the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_ArrayParameterRefEntryType)
     v = ArrayParameterRefEntryType.__new__(ArrayParameterRefEntryType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -10603,6 +12159,23 @@ _A_ArrayParameterType = frozenset({"shortDescription", "name", "arrayTypeRef",
 
 
 def _r_ArrayParameterType(n: X.Node) -> ArrayParameterType:
+    """Reads an XML element of the XTCE type ``ArrayParameterType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ArrayParameterType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attributes ``name`` and
+                     ``arrayTypeRef``, has an attribute value that doesn't parse
+                     or has children that don't follow its content model
+                     (``LongDescription``, ``AliasSet``, ``AncillaryDataSet``,
+                     ``DimensionList``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ArrayParameterType)
     v = ArrayParameterType.__new__(ArrayParameterType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -10626,6 +12199,20 @@ _A_AuthorSetType = frozenset({})
 
 
 def _r_AuthorSetType(n: X.Node) -> AuthorSetType:
+    """Reads an XML element of the XTCE type ``AuthorSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``AuthorSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``Author``, in that order and in the numbers the schema
+                     allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_AuthorSetType)
     v = AuthorSetType.__new__(AuthorSetType)
     c = X.Cursor(n)
@@ -10641,6 +12228,21 @@ _A_AutoInvertType = frozenset({'badFramesToAutoInvert'})
 
 
 def _r_AutoInvertType(n: X.Node) -> AutoInvertType:
+    """Reads an XML element of the XTCE type ``AutoInvertType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``AutoInvertType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``InvertAlgorithm``,
+                     in that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_AutoInvertType)
     v = AutoInvertType.__new__(AutoInvertType)
     v.bad_frames_to_auto_invert = X.opt_attr(n, "badFramesToAutoInvert",
@@ -10656,6 +12258,22 @@ _A_BaseAlarmType = frozenset({'name', 'shortDescription'})
 
 
 def _r_BaseAlarmType(n: X.Node) -> BaseAlarmType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``BaseAlarmType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``BaseAlarmType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AncillaryDataSet``,
+                     in that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_BaseAlarmType)
     v = BaseAlarmType.__new__(BaseAlarmType)
     v.name = X.opt_attr(n, 'name', X.p_str)
@@ -10671,6 +12289,22 @@ _A_BaseCalibratorType = frozenset({'name', 'shortDescription'})
 
 
 def _r_BaseCalibratorType(n: X.Node) -> BaseCalibratorType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``BaseCalibratorType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``BaseCalibratorType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AncillaryDataSet``,
+                     in that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_BaseCalibratorType)
     v = BaseCalibratorType.__new__(BaseCalibratorType)
     v.name = X.opt_attr(n, 'name', X.p_str)
@@ -10686,6 +12320,19 @@ _A_BaseComparisonType = frozenset({})
 
 
 def _r_BaseComparisonType(n: X.Node) -> BaseComparisonType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``BaseComparisonType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``BaseComparisonType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children or text.
+    """
     X.check_attrs(n, _A_BaseComparisonType)
     v = BaseComparisonType.__new__(BaseComparisonType)
     c = X.Cursor(n)
@@ -10697,6 +12344,19 @@ _A_BaseConditionsType = frozenset({})
 
 
 def _r_BaseConditionsType(n: X.Node) -> BaseConditionsType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``BaseConditionsType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``BaseConditionsType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children or text.
+    """
     X.check_attrs(n, _A_BaseConditionsType)
     v = BaseConditionsType.__new__(BaseConditionsType)
     c = X.Cursor(n)
@@ -10708,6 +12368,22 @@ _A_BaseContainerType = frozenset({'containerRef'})
 
 
 def _r_BaseContainerType(n: X.Node) -> BaseContainerType:
+    """Reads an XML element of the XTCE type ``BaseContainerType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``BaseContainerType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``containerRef``, has an
+                     attribute value that doesn't parse or has children that
+                     don't follow its content model (``RestrictionCriteria``, in
+                     that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_BaseContainerType)
     v = BaseContainerType.__new__(BaseContainerType)
     v.container_ref = X.req_attr(n, 'containerRef', X.p_str)
@@ -10722,6 +12398,24 @@ _A_BaseDataType = frozenset({'shortDescription', 'name', 'baseType'})
 
 
 def _r_BaseDataType(n: X.Node) -> BaseDataType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``BaseDataType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``BaseDataType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``UnitSet``, an alternative of
+                     ``BaseDataChoice``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_BaseDataType)
     v = BaseDataType.__new__(BaseDataType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -10744,6 +12438,22 @@ _A_BaseMetaCommandType = frozenset({'metaCommandRef'})
 
 
 def _r_BaseMetaCommandType(n: X.Node) -> BaseMetaCommandType:
+    """Reads an XML element of the XTCE type ``BaseMetaCommandType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``BaseMetaCommandType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``metaCommandRef``, has an
+                     attribute value that doesn't parse or has children that
+                     don't follow its content model (``ArgumentAssignmentList``,
+                     in that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_BaseMetaCommandType)
     v = BaseMetaCommandType.__new__(BaseMetaCommandType)
     v.meta_command_ref = X.req_attr(n, 'metaCommandRef', X.p_str)
@@ -10759,6 +12469,24 @@ _A_BaseTimeDataType = frozenset({'shortDescription', 'name', 'baseType'})
 
 
 def _r_BaseTimeDataType(n: X.Node) -> BaseTimeDataType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``BaseTimeDataType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``BaseTimeDataType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``Encoding``, ``ReferenceTime``, in
+                     that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_BaseTimeDataType)
     v = BaseTimeDataType.__new__(BaseTimeDataType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -10781,6 +12509,19 @@ _A_BaseTriggerType = frozenset({})
 
 
 def _r_BaseTriggerType(n: X.Node) -> BaseTriggerType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``BaseTriggerType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``BaseTriggerType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children or text.
+    """
     X.check_attrs(n, _A_BaseTriggerType)
     v = BaseTriggerType.__new__(BaseTriggerType)
     c = X.Cursor(n)
@@ -10793,6 +12534,22 @@ _A_BinaryAlarmType = frozenset({"name", "shortDescription", "minViolations",
 
 
 def _r_BinaryAlarmType(n: X.Node) -> BinaryAlarmType:
+    """Reads an XML element of the XTCE type ``BinaryAlarmType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``BinaryAlarmType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AncillaryDataSet``,
+                     an alternative of ``BinaryAlarmChoice``, in that order and
+                     in the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_BinaryAlarmType)
     v = BinaryAlarmType.__new__(BinaryAlarmType)
     v.name = X.opt_attr(n, 'name', X.p_str)
@@ -10814,6 +12571,23 @@ _A_BinaryArgumentType = frozenset({"shortDescription", "name", "baseType",
 
 
 def _r_BinaryArgumentType(n: X.Node) -> BinaryArgumentType:
+    """Reads an XML element of the XTCE type ``BinaryArgumentType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``BinaryArgumentType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``UnitSet``, an alternative of
+                     ``BinaryArgumentChoice``, in that order and in the numbers
+                     the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_BinaryArgumentType)
     v = BinaryArgumentType.__new__(BinaryArgumentType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -10837,6 +12611,20 @@ _A_BinaryContextAlarmListType = frozenset({})
 
 
 def _r_BinaryContextAlarmListType(n: X.Node) -> BinaryContextAlarmListType:
+    """Reads an XML element of the XTCE type ``BinaryContextAlarmListType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``BinaryContextAlarmListType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``ContextAlarm``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_BinaryContextAlarmListType)
     v = BinaryContextAlarmListType.__new__(BinaryContextAlarmListType)
     c = X.Cursor(n)
@@ -10855,6 +12643,22 @@ _A_BinaryContextAlarmType = frozenset(
 
 
 def _r_BinaryContextAlarmType(n: X.Node) -> BinaryContextAlarmType:
+    """Reads an XML element of the XTCE type ``BinaryContextAlarmType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``BinaryContextAlarmType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AncillaryDataSet``,
+                     an alternative of ``BinaryContextAlarmChoice``,
+                     ``ContextMatch``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_BinaryContextAlarmType)
     v = BinaryContextAlarmType.__new__(BinaryContextAlarmType)
     v.name = X.opt_attr(n, 'name', X.p_str)
@@ -10878,6 +12682,23 @@ _A_BinaryDataEncodingType = frozenset({'bitOrder', 'byteOrder'})
 
 
 def _r_BinaryDataEncodingType(n: X.Node) -> BinaryDataEncodingType:
+    """Reads an XML element of the XTCE type ``BinaryDataEncodingType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``BinaryDataEncodingType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model
+                     (``ErrorDetectCorrect``, ``SizeInBits``,
+                     ``FromBinaryTransformAlgorithm``,
+                     ``ToBinaryTransformAlgorithm``, in that order and in the
+                     numbers the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_BinaryDataEncodingType)
     v = BinaryDataEncodingType.__new__(BinaryDataEncodingType)
     v.bit_order = X.opt_attr(n, 'bitOrder', _p_BitOrderType)
@@ -10901,6 +12722,24 @@ _A_BinaryDataType = frozenset({"shortDescription", "name", "baseType",
 
 
 def _r_BinaryDataType(n: X.Node) -> BinaryDataType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``BinaryDataType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``BinaryDataType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``UnitSet``, an alternative of
+                     ``BinaryDataChoice``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_BinaryDataType)
     v = BinaryDataType.__new__(BinaryDataType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -10925,6 +12764,24 @@ _A_BinaryParameterType = frozenset({"shortDescription", "name", "baseType",
 
 
 def _r_BinaryParameterType(n: X.Node) -> BinaryParameterType:
+    """Reads an XML element of the XTCE type ``BinaryParameterType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``BinaryParameterType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``UnitSet``, an alternative of
+                     ``BinaryParameterChoice``, ``DefaultAlarm``,
+                     ``ContextAlarmList``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_BinaryParameterType)
     v = BinaryParameterType.__new__(BinaryParameterType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -10952,6 +12809,23 @@ _A_BlockMetaCommandType = frozenset({'shortDescription', 'name'})
 
 
 def _r_BlockMetaCommandType(n: X.Node) -> BlockMetaCommandType:
+    """Reads an XML element of the XTCE type ``BlockMetaCommandType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``BlockMetaCommandType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``MetaCommandStepList``, in that
+                     order and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_BlockMetaCommandType)
     v = BlockMetaCommandType.__new__(BlockMetaCommandType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -10974,6 +12848,22 @@ _A_BooleanAlarmType = frozenset({"name", "shortDescription", "minViolations",
 
 
 def _r_BooleanAlarmType(n: X.Node) -> BooleanAlarmType:
+    """Reads an XML element of the XTCE type ``BooleanAlarmType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``BooleanAlarmType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AncillaryDataSet``,
+                     an alternative of ``BooleanAlarmChoice``, in that order and
+                     in the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_BooleanAlarmType)
     v = BooleanAlarmType.__new__(BooleanAlarmType)
     v.name = X.opt_attr(n, 'name', X.p_str)
@@ -10996,6 +12886,23 @@ _A_BooleanArgumentType = frozenset({"shortDescription", "name", "baseType",
 
 
 def _r_BooleanArgumentType(n: X.Node) -> BooleanArgumentType:
+    """Reads an XML element of the XTCE type ``BooleanArgumentType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``BooleanArgumentType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``UnitSet``, an alternative of
+                     ``BooleanArgumentChoice``, in that order and in the numbers
+                     the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_BooleanArgumentType)
     v = BooleanArgumentType.__new__(BooleanArgumentType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -11021,6 +12928,20 @@ _A_BooleanContextAlarmListType = frozenset({})
 
 
 def _r_BooleanContextAlarmListType(n: X.Node) -> BooleanContextAlarmListType:
+    """Reads an XML element of the XTCE type ``BooleanContextAlarmListType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``BooleanContextAlarmListType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``ContextAlarm``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_BooleanContextAlarmListType)
     v = BooleanContextAlarmListType.__new__(BooleanContextAlarmListType)
     c = X.Cursor(n)
@@ -11039,6 +12960,22 @@ _A_BooleanContextAlarmType = frozenset(
 
 
 def _r_BooleanContextAlarmType(n: X.Node) -> BooleanContextAlarmType:
+    """Reads an XML element of the XTCE type ``BooleanContextAlarmType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``BooleanContextAlarmType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AncillaryDataSet``,
+                     an alternative of ``BooleanContextAlarmChoice``,
+                     ``ContextMatch``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_BooleanContextAlarmType)
     v = BooleanContextAlarmType.__new__(BooleanContextAlarmType)
     v.name = X.opt_attr(n, 'name', X.p_str)
@@ -11064,6 +13001,24 @@ _A_BooleanDataType = frozenset({"shortDescription", "name", "baseType",
 
 
 def _r_BooleanDataType(n: X.Node) -> BooleanDataType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``BooleanDataType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``BooleanDataType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``UnitSet``, an alternative of
+                     ``BooleanDataChoice``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_BooleanDataType)
     v = BooleanDataType.__new__(BooleanDataType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -11089,6 +13044,21 @@ _A_BooleanExpressionType = frozenset({})
 
 
 def _r_BooleanExpressionType(n: X.Node) -> BooleanExpressionType:
+    """Reads an XML element of the XTCE type ``BooleanExpressionType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``BooleanExpressionType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model (an
+                     alternative of ``BooleanExpressionChoice``, in that order
+                     and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_BooleanExpressionType)
     v = BooleanExpressionType.__new__(BooleanExpressionType)
     c = X.Cursor(n)
@@ -11103,6 +13073,24 @@ _A_BooleanParameterType = frozenset({"shortDescription", "name", "baseType",
 
 
 def _r_BooleanParameterType(n: X.Node) -> BooleanParameterType:
+    """Reads an XML element of the XTCE type ``BooleanParameterType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``BooleanParameterType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``UnitSet``, an alternative of
+                     ``BooleanParameterChoice``, ``DefaultAlarm``,
+                     ``ContextAlarmList``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_BooleanParameterType)
     v = BooleanParameterType.__new__(BooleanParameterType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -11132,6 +13120,19 @@ _A_ByteType = frozenset({'byteSignificance'})
 
 
 def _r_ByteType(n: X.Node) -> ByteType:
+    """Reads an XML element of the XTCE type ``ByteType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ByteType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``byteSignificance``, has an
+                     attribute value that doesn't parse or has children or text.
+    """
     X.check_attrs(n, _A_ByteType)
     v = ByteType.__new__(ByteType)
     v.byte_significance = X.req_attr(n, 'byteSignificance', X.p_i64)
@@ -11145,6 +13146,22 @@ _A_CRCType = frozenset({"width", "reflectData", "reflectRemainder", "direction",
 
 
 def _r_CRCType(n: X.Node) -> CRCType:
+    """Reads an XML element of the XTCE type ``CRCType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``CRCType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``width``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``Polynomial``, ``InitRemainder``,
+                     ``FinalXOR``, in that order and in the numbers the schema
+                     allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_CRCType)
     v = CRCType.__new__(CRCType)
     v.width = X.req_attr(n, 'width', X.p_i64)
@@ -11169,6 +13186,22 @@ _A_CalibratorType = frozenset({'name', 'shortDescription'})
 
 
 def _r_CalibratorType(n: X.Node) -> CalibratorType:
+    """Reads an XML element of the XTCE type ``CalibratorType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``CalibratorType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AncillaryDataSet``,
+                     an alternative of ``CalibratorChoice``, in that order and
+                     in the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_CalibratorType)
     v = CalibratorType.__new__(CalibratorType)
     v.name = X.opt_attr(n, 'name', X.p_str)
@@ -11187,6 +13220,23 @@ _A_ChangeAlarmRangesType = frozenset(
 
 
 def _r_ChangeAlarmRangesType(n: X.Node) -> ChangeAlarmRangesType:
+    """Reads an XML element of the XTCE type ``ChangeAlarmRangesType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ChangeAlarmRangesType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AncillaryDataSet``,
+                     ``WatchRange``, ``WarningRange``, ``DistressRange``,
+                     ``CriticalRange``, ``SevereRange``, in that order and in
+                     the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_ChangeAlarmRangesType)
     v = ChangeAlarmRangesType.__new__(ChangeAlarmRangesType)
     v.name = X.opt_attr(n, 'name', X.p_str)
@@ -11219,6 +13269,19 @@ _A_ChangeValueType = frozenset({'value'})
 
 
 def _r_ChangeValueType(n: X.Node) -> ChangeValueType:
+    """Reads an XML element of the XTCE type ``ChangeValueType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ChangeValueType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``value``, has an attribute
+                     value that doesn't parse or has children or text.
+    """
     X.check_attrs(n, _A_ChangeValueType)
     v = ChangeValueType.__new__(ChangeValueType)
     v.value = X.req_attr(n, 'value', X.p_double)
@@ -11231,6 +13294,20 @@ _A_CheckWindowAlgorithmsType = frozenset({})
 
 
 def _r_CheckWindowAlgorithmsType(n: X.Node) -> CheckWindowAlgorithmsType:
+    """Reads an XML element of the XTCE type ``CheckWindowAlgorithmsType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``CheckWindowAlgorithmsType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``StartCheck``, ``StopTime``, in that order and in the
+                     numbers the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_CheckWindowAlgorithmsType)
     v = CheckWindowAlgorithmsType.__new__(CheckWindowAlgorithmsType)
     c = X.Cursor(n)
@@ -11249,6 +13326,19 @@ _A_CheckWindowType = frozenset({"timeToStartChecking", "timeToStopChecking",
 
 
 def _r_CheckWindowType(n: X.Node) -> CheckWindowType:
+    """Reads an XML element of the XTCE type ``CheckWindowType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``CheckWindowType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``timeToStopChecking``, has an
+                     attribute value that doesn't parse or has children or text.
+    """
     X.check_attrs(n, _A_CheckWindowType)
     v = CheckWindowType.__new__(CheckWindowType)
     v.time_to_start_checking = X.opt_attr(n, 'timeToStartChecking', X.p_str)
@@ -11265,6 +13355,22 @@ _A_ChecksumType = frozenset({"bitsFromReference", "reference", "name",
 
 
 def _r_ChecksumType(n: X.Node) -> ChecksumType:
+    """Reads an XML element of the XTCE type ``ChecksumType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ChecksumType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``InputAlgorithm``, in that order and in
+                     the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_ChecksumType)
     v = ChecksumType.__new__(ChecksumType)
     v.bits_from_reference = X.opt_attr(n, 'bitsFromReference', X.p_i64)
@@ -11284,6 +13390,21 @@ _A_CommandContainerEntryListType = frozenset({})
 
 def _r_CommandContainerEntryListType(
         n: X.Node) -> CommandContainerEntryListType:
+    """Reads an XML element of the XTCE type ``CommandContainerEntryListType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``CommandContainerEntryListType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (alternatives of ``CommandContainerEntryListChoice``, in
+                     that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_CommandContainerEntryListType)
     v = CommandContainerEntryListType.__new__(CommandContainerEntryListType)
     c = X.Cursor(n)
@@ -11299,6 +13420,20 @@ _A_CommandContainerSetType = frozenset({})
 
 
 def _r_CommandContainerSetType(n: X.Node) -> CommandContainerSetType:
+    """Reads an XML element of the XTCE type ``CommandContainerSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``CommandContainerSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``CommandContainer``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_CommandContainerSetType)
     v = CommandContainerSetType.__new__(CommandContainerSetType)
     c = X.Cursor(n)
@@ -11316,6 +13451,24 @@ _A_CommandContainerType = frozenset({'shortDescription', 'name'})
 
 
 def _r_CommandContainerType(n: X.Node) -> CommandContainerType:
+    """Reads an XML element of the XTCE type ``CommandContainerType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``CommandContainerType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``DefaultRateInStream``,
+                     ``RateInStreamSet``, ``BinaryEncoding``, ``EntryList``,
+                     ``BaseContainer``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_CommandContainerType)
     v = CommandContainerType.__new__(CommandContainerType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -11345,6 +13498,23 @@ _A_CommandMetaDataType = frozenset({})
 
 
 def _r_CommandMetaDataType(n: X.Node) -> CommandMetaDataType:
+    """Reads an XML element of the XTCE type ``CommandMetaDataType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``CommandMetaDataType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``ParameterTypeSet``, ``ParameterSet``,
+                     ``ArgumentTypeSet``, ``MetaCommandSet``,
+                     ``CommandContainerSet``, ``StreamSet``, ``AlgorithmSet``,
+                     in that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_CommandMetaDataType)
     v = CommandMetaDataType.__new__(CommandMetaDataType)
     c = X.Cursor(n)
@@ -11370,6 +13540,25 @@ _A_CommandVerifierType = frozenset({'shortDescription', 'name'})
 
 
 def _r_CommandVerifierType(n: X.Node) -> CommandVerifierType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``CommandVerifierType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``CommandVerifierType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``LongDescription``,
+                     ``AliasSet``, ``AncillaryDataSet``, an alternative of
+                     ``CommandVerifierChoice1``, an alternative of
+                     ``CommandVerifierChoice2``, ``ArgumentRestrictionList``, in
+                     that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_CommandVerifierType)
     v = CommandVerifierType.__new__(CommandVerifierType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -11393,6 +13582,22 @@ _A_ComparisonCheckType = frozenset({})
 
 
 def _r_ComparisonCheckType(n: X.Node) -> ComparisonCheckType:
+    """Reads an XML element of the XTCE type ``ComparisonCheckType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ComparisonCheckType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``ParameterInstanceRef``, ``ComparisonOperator``, an
+                     alternative of ``ComparisonCheckChoice``, in that order and
+                     in the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_ComparisonCheckType)
     v = ComparisonCheckType.__new__(ComparisonCheckType)
     c = X.Cursor(n)
@@ -11411,6 +13616,20 @@ _A_ComparisonListType = frozenset({})
 
 
 def _r_ComparisonListType(n: X.Node) -> ComparisonListType:
+    """Reads an XML element of the XTCE type ``ComparisonListType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ComparisonListType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``Comparison``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ComparisonListType)
     v = ComparisonListType.__new__(ComparisonListType)
     c = X.Cursor(n)
@@ -11429,6 +13648,20 @@ _A_ComparisonType = frozenset({"parameterRef", "instance", "useCalibratedValue",
 
 
 def _r_ComparisonType(n: X.Node) -> ComparisonType:
+    """Reads an XML element of the XTCE type ``ComparisonType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ComparisonType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attributes ``parameterRef`` and
+                     ``value``, has an attribute value that doesn't parse or has
+                     children or text.
+    """
     X.check_attrs(n, _A_ComparisonType)
     v = ComparisonType.__new__(ComparisonType)
     v.parameter_ref = X.req_attr(n, 'parameterRef', X.p_str)
@@ -11446,6 +13679,24 @@ _A_CompleteVerifierType = frozenset({'shortDescription', 'name'})
 
 
 def _r_CompleteVerifierType(n: X.Node) -> CompleteVerifierType:
+    """Reads an XML element of the XTCE type ``CompleteVerifierType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``CompleteVerifierType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``LongDescription``,
+                     ``AliasSet``, ``AncillaryDataSet``, an alternative of
+                     ``CompleteVerifierChoice1``, an alternative of
+                     ``CompleteVerifierChoice2``, ``ArgumentRestrictionList``,
+                     ``ReturnParmRef``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_CompleteVerifierType)
     v = CompleteVerifierType.__new__(CompleteVerifierType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -11471,6 +13722,20 @@ _A_ConstantType = frozenset({'constantName', 'value'})
 
 
 def _r_ConstantType(n: X.Node) -> ConstantType:
+    """Reads an XML element of the XTCE type ``ConstantType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ConstantType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attributes ``constantName`` and
+                     ``value``, has an attribute value that doesn't parse or has
+                     children or text.
+    """
     X.check_attrs(n, _A_ConstantType)
     v = ConstantType.__new__(ConstantType)
     v.constant_name = X.req_attr(n, 'constantName', X.p_str)
@@ -11485,6 +13750,23 @@ _A_ContainerBinaryDataEncodingType = frozenset({})
 
 def _r_ContainerBinaryDataEncodingType(
         n: X.Node) -> ContainerBinaryDataEncodingType:
+    """Reads an XML element of the XTCE type
+    ``ContainerBinaryDataEncodingType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ContainerBinaryDataEncodingType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``ErrorDetectCorrect``, ``SizeInBits``,
+                     ``FromBinaryTransformAlgorithm``,
+                     ``ToBinaryTransformAlgorithm``, in that order and in the
+                     numbers the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ContainerBinaryDataEncodingType)
     v = ContainerBinaryDataEncodingType.__new__(ContainerBinaryDataEncodingType)
     c = X.Cursor(n)
@@ -11504,6 +13786,24 @@ _A_ContainerRefEntryType = frozenset({'shortDescription', 'containerRef'})
 
 
 def _r_ContainerRefEntryType(n: X.Node) -> ContainerRefEntryType:
+    """Reads an XML element of the XTCE type ``ContainerRefEntryType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ContainerRefEntryType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``containerRef``, has an
+                     attribute value that doesn't parse or has children that
+                     don't follow its content model
+                     (``LocationInContainerInBits``, ``RepeatEntry``,
+                     ``IncludeCondition``, ``TimeAssociation``,
+                     ``AncillaryDataSet``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ContainerRefEntryType)
     v = ContainerRefEntryType.__new__(ContainerRefEntryType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -11527,6 +13827,20 @@ _A_ContainerRefSetType = frozenset({})
 
 
 def _r_ContainerRefSetType(n: X.Node) -> ContainerRefSetType:
+    """Reads an XML element of the XTCE type ``ContainerRefSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ContainerRefSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``ContainerRef``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ContainerRefSetType)
     v = ContainerRefSetType.__new__(ContainerRefSetType)
     c = X.Cursor(n)
@@ -11544,6 +13858,19 @@ _A_ContainerRefType = frozenset({'containerRef'})
 
 
 def _r_ContainerRefType(n: X.Node) -> ContainerRefType:
+    """Reads an XML element of the XTCE type ``ContainerRefType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ContainerRefType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``containerRef``, has an
+                     attribute value that doesn't parse or has children or text.
+    """
     X.check_attrs(n, _A_ContainerRefType)
     v = ContainerRefType.__new__(ContainerRefType)
     v.container_ref = X.req_attr(n, 'containerRef', X.p_str)
@@ -11557,6 +13884,24 @@ _A_ContainerSegmentRefEntryType = frozenset({"shortDescription", "containerRef",
 
 
 def _r_ContainerSegmentRefEntryType(n: X.Node) -> ContainerSegmentRefEntryType:
+    """Reads an XML element of the XTCE type ``ContainerSegmentRefEntryType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ContainerSegmentRefEntryType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attributes ``containerRef`` and
+                     ``sizeInBits``, has an attribute value that doesn't parse
+                     or has children that don't follow its content model
+                     (``LocationInContainerInBits``, ``RepeatEntry``,
+                     ``IncludeCondition``, ``TimeAssociation``,
+                     ``AncillaryDataSet``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ContainerSegmentRefEntryType)
     v = ContainerSegmentRefEntryType.__new__(ContainerSegmentRefEntryType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -11582,6 +13927,20 @@ _A_ContainerSetType = frozenset({})
 
 
 def _r_ContainerSetType(n: X.Node) -> ContainerSetType:
+    """Reads an XML element of the XTCE type ``ContainerSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ContainerSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``SequenceContainer``, in that order and in the numbers
+                     the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ContainerSetType)
     v = ContainerSetType.__new__(ContainerSetType)
     c = X.Cursor(n)
@@ -11599,6 +13958,25 @@ _A_ContainerType = frozenset({'shortDescription', 'name'})
 
 
 def _r_ContainerType(n: X.Node) -> ContainerType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``ContainerType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ContainerType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``DefaultRateInStream``,
+                     ``RateInStreamSet``, ``BinaryEncoding``, in that order and
+                     in the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_ContainerType)
     v = ContainerType.__new__(ContainerType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -11623,6 +14001,20 @@ _A_ContextCalibratorListType = frozenset({})
 
 
 def _r_ContextCalibratorListType(n: X.Node) -> ContextCalibratorListType:
+    """Reads an XML element of the XTCE type ``ContextCalibratorListType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ContextCalibratorListType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``ContextCalibrator``, in that order and in the numbers
+                     the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ContextCalibratorListType)
     v = ContextCalibratorListType.__new__(ContextCalibratorListType)
     c = X.Cursor(n)
@@ -11640,6 +14032,20 @@ _A_ContextCalibratorType = frozenset({})
 
 
 def _r_ContextCalibratorType(n: X.Node) -> ContextCalibratorType:
+    """Reads an XML element of the XTCE type ``ContextCalibratorType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ContextCalibratorType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``ContextMatch``, ``Calibrator``, in that order and in the
+                     numbers the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ContextCalibratorType)
     v = ContextCalibratorType.__new__(ContextCalibratorType)
     c = X.Cursor(n)
@@ -11657,6 +14063,21 @@ _A_ContextMatchType = frozenset({})
 
 
 def _r_ContextMatchType(n: X.Node) -> ContextMatchType:
+    """Reads an XML element of the XTCE type ``ContextMatchType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ContextMatchType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model (an
+                     alternative of ``ContextMatchChoice``, in that order and in
+                     the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_ContextMatchType)
     v = ContextMatchType.__new__(ContextMatchType)
     c = X.Cursor(n)
@@ -11669,6 +14090,20 @@ _A_ContextSignificanceListType = frozenset({})
 
 
 def _r_ContextSignificanceListType(n: X.Node) -> ContextSignificanceListType:
+    """Reads an XML element of the XTCE type ``ContextSignificanceListType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ContextSignificanceListType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``ContextSignificance``, in that order and in the numbers
+                     the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ContextSignificanceListType)
     v = ContextSignificanceListType.__new__(ContextSignificanceListType)
     c = X.Cursor(n)
@@ -11686,6 +14121,21 @@ _A_ContextSignificanceType = frozenset({})
 
 
 def _r_ContextSignificanceType(n: X.Node) -> ContextSignificanceType:
+    """Reads an XML element of the XTCE type ``ContextSignificanceType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ContextSignificanceType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``ContextMatch``, ``Significance``, in that order and in
+                     the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_ContextSignificanceType)
     v = ContextSignificanceType.__new__(ContextSignificanceType)
     c = X.Cursor(n)
@@ -11703,6 +14153,21 @@ _A_CustomAlarmType = frozenset({'name', 'shortDescription'})
 
 
 def _r_CustomAlarmType(n: X.Node) -> CustomAlarmType:
+    """Reads an XML element of the XTCE type ``CustomAlarmType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``CustomAlarmType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AncillaryDataSet``,
+                     ``InputAlgorithm``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_CustomAlarmType)
     v = CustomAlarmType.__new__(CustomAlarmType)
     v.name = X.opt_attr(n, 'name', X.p_str)
@@ -11723,6 +14188,24 @@ _A_CustomStreamType = frozenset({"shortDescription", "name", "bitRateInBPS",
 
 
 def _r_CustomStreamType(n: X.Node) -> CustomStreamType:
+    """Reads an XML element of the XTCE type ``CustomStreamType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``CustomStreamType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attributes ``name``,
+                     ``encodedStreamRef`` and ``decodedStreamRef``, has an
+                     attribute value that doesn't parse or has children that
+                     don't follow its content model (``LongDescription``,
+                     ``AliasSet``, ``AncillaryDataSet``, ``EncodingAlgorithm``,
+                     ``DecodingAlgorithm``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_CustomStreamType)
     v = CustomStreamType.__new__(CustomStreamType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -11752,6 +14235,22 @@ _A_DataEncodingType = frozenset({'bitOrder', 'byteOrder'})
 
 
 def _r_DataEncodingType(n: X.Node) -> DataEncodingType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``DataEncodingType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``DataEncodingType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model
+                     (``ErrorDetectCorrect``, in that order and in the numbers
+                     the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_DataEncodingType)
     v = DataEncodingType.__new__(DataEncodingType)
     v.bit_order = X.opt_attr(n, 'bitOrder', _p_BitOrderType)
@@ -11767,6 +14266,23 @@ _A_DescriptionType = frozenset({'shortDescription'})
 
 
 def _r_DescriptionType(n: X.Node) -> DescriptionType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``DescriptionType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``DescriptionType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``LongDescription``,
+                     ``AliasSet``, ``AncillaryDataSet``, in that order and in
+                     the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_DescriptionType)
     v = DescriptionType.__new__(DescriptionType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -11784,6 +14300,20 @@ _A_DimensionListType = frozenset({})
 
 
 def _r_DimensionListType(n: X.Node) -> DimensionListType:
+    """Reads an XML element of the XTCE type ``DimensionListType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``DimensionListType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``Dimension``, in that order and in the numbers the schema
+                     allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_DimensionListType)
     v = DimensionListType.__new__(DimensionListType)
     c = X.Cursor(n)
@@ -11801,6 +14331,21 @@ _A_DimensionType = frozenset({})
 
 
 def _r_DimensionType(n: X.Node) -> DimensionType:
+    """Reads an XML element of the XTCE type ``DimensionType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``DimensionType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``StartingIndex``, ``EndingIndex``, in that order and in
+                     the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_DimensionType)
     v = DimensionType.__new__(DimensionType)
     c = X.Cursor(n)
@@ -11818,6 +14363,22 @@ _A_DiscreteLookupListType = frozenset({'defaultValue'})
 
 
 def _r_DiscreteLookupListType(n: X.Node) -> DiscreteLookupListType:
+    """Reads an XML element of the XTCE type ``DiscreteLookupListType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``DiscreteLookupListType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``defaultValue``, has an
+                     attribute value that doesn't parse or has children that
+                     don't follow its content model (``DiscreteLookup``, in that
+                     order and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_DiscreteLookupListType)
     v = DiscreteLookupListType.__new__(DiscreteLookupListType)
     v.default_value = X.req_attr(n, 'defaultValue', X.p_i64)
@@ -11836,6 +14397,22 @@ _A_DiscreteLookupType = frozenset({'value'})
 
 
 def _r_DiscreteLookupType(n: X.Node) -> DiscreteLookupType:
+    """Reads an XML element of the XTCE type ``DiscreteLookupType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``DiscreteLookupType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``value``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (an alternative of
+                     ``DiscreteLookupChoice``, in that order and in the numbers
+                     the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_DiscreteLookupType)
     v = DiscreteLookupType.__new__(DiscreteLookupType)
     v.value = X.req_attr(n, 'value', X.p_i64)
@@ -11849,6 +14426,21 @@ _A_DynamicValueType = frozenset({})
 
 
 def _r_DynamicValueType(n: X.Node) -> DynamicValueType:
+    """Reads an XML element of the XTCE type ``DynamicValueType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``DynamicValueType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``ParameterInstanceRef``, ``LinearAdjustment``, in that
+                     order and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_DynamicValueType)
     v = DynamicValueType.__new__(DynamicValueType)
     c = X.Cursor(n)
@@ -11865,6 +14457,21 @@ _A_EncodingType = frozenset({'units', 'scale', 'offset'})
 
 
 def _r_EncodingType(n: X.Node) -> EncodingType:
+    """Reads an XML element of the XTCE type ``EncodingType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``EncodingType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (an alternative of
+                     ``EncodingChoice``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_EncodingType)
     v = EncodingType.__new__(EncodingType)
     v.units = X.opt_attr(n, 'units', _p_TimeUnitsType)
@@ -11880,6 +14487,21 @@ _A_EntryListType = frozenset({})
 
 
 def _r_EntryListType(n: X.Node) -> EntryListType:
+    """Reads an XML element of the XTCE type ``EntryListType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``EntryListType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (alternatives of ``EntryListChoice``, in that order and in
+                     the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_EntryListType)
     v = EntryListType.__new__(EntryListType)
     c = X.Cursor(n)
@@ -11896,6 +14518,24 @@ _A_EnumeratedArgumentType = frozenset({"shortDescription", "name", "baseType",
 
 
 def _r_EnumeratedArgumentType(n: X.Node) -> EnumeratedArgumentType:
+    """Reads an XML element of the XTCE type ``EnumeratedArgumentType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``EnumeratedArgumentType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``UnitSet``, an alternative of
+                     ``EnumeratedArgumentChoice``, ``EnumerationList``, in that
+                     order and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_EnumeratedArgumentType)
     v = EnumeratedArgumentType.__new__(EnumeratedArgumentType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -11923,6 +14563,25 @@ _A_EnumeratedDataType = frozenset({"shortDescription", "name", "baseType",
 
 
 def _r_EnumeratedDataType(n: X.Node) -> EnumeratedDataType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``EnumeratedDataType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``EnumeratedDataType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``UnitSet``, an alternative of
+                     ``EnumeratedDataChoice``, ``EnumerationList``, in that
+                     order and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_EnumeratedDataType)
     v = EnumeratedDataType.__new__(EnumeratedDataType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -11950,6 +14609,25 @@ _A_EnumeratedParameterType = frozenset({"shortDescription", "name", "baseType",
 
 
 def _r_EnumeratedParameterType(n: X.Node) -> EnumeratedParameterType:
+    """Reads an XML element of the XTCE type ``EnumeratedParameterType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``EnumeratedParameterType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``UnitSet``, an alternative of
+                     ``EnumeratedParameterChoice``, ``EnumerationList``,
+                     ``DefaultAlarm``, ``ContextAlarmList``, in that order and
+                     in the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_EnumeratedParameterType)
     v = EnumeratedParameterType.__new__(EnumeratedParameterType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -11980,6 +14658,20 @@ _A_EnumerationAlarmLevelType = frozenset({'alarmLevel', 'enumerationLabel'})
 
 
 def _r_EnumerationAlarmLevelType(n: X.Node) -> EnumerationAlarmLevelType:
+    """Reads an XML element of the XTCE type ``EnumerationAlarmLevelType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``EnumerationAlarmLevelType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attributes ``alarmLevel`` and
+                     ``enumerationLabel``, has an attribute value that doesn't
+                     parse or has children or text.
+    """
     X.check_attrs(n, _A_EnumerationAlarmLevelType)
     v = EnumerationAlarmLevelType.__new__(EnumerationAlarmLevelType)
     v.alarm_level = X.req_attr(n, 'alarmLevel', _p_ConcernLevelsType)
@@ -11993,6 +14685,20 @@ _A_EnumerationAlarmListType = frozenset({})
 
 
 def _r_EnumerationAlarmListType(n: X.Node) -> EnumerationAlarmListType:
+    """Reads an XML element of the XTCE type ``EnumerationAlarmListType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``EnumerationAlarmListType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``EnumerationAlarm``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_EnumerationAlarmListType)
     v = EnumerationAlarmListType.__new__(EnumerationAlarmListType)
     c = X.Cursor(n)
@@ -12012,6 +14718,22 @@ _A_EnumerationAlarmType = frozenset({"name", "shortDescription",
 
 
 def _r_EnumerationAlarmType(n: X.Node) -> EnumerationAlarmType:
+    """Reads an XML element of the XTCE type ``EnumerationAlarmType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``EnumerationAlarmType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AncillaryDataSet``,
+                     an alternative of ``EnumerationAlarmChoice``,
+                     ``EnumerationAlarmList``, in that order and in the numbers
+                     the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_EnumerationAlarmType)
     v = EnumerationAlarmType.__new__(EnumerationAlarmType)
     v.name = X.opt_attr(n, 'name', X.p_str)
@@ -12037,6 +14759,21 @@ _A_EnumerationContextAlarmListType = frozenset({})
 
 def _r_EnumerationContextAlarmListType(
         n: X.Node) -> EnumerationContextAlarmListType:
+    """Reads an XML element of the XTCE type
+    ``EnumerationContextAlarmListType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``EnumerationContextAlarmListType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``ContextAlarm``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_EnumerationContextAlarmListType)
     v = EnumerationContextAlarmListType.__new__(EnumerationContextAlarmListType)
     c = X.Cursor(n)
@@ -12056,6 +14793,23 @@ _A_EnumerationContextAlarmType = frozenset({"name", "shortDescription",
 
 
 def _r_EnumerationContextAlarmType(n: X.Node) -> EnumerationContextAlarmType:
+    """Reads an XML element of the XTCE type ``EnumerationContextAlarmType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``EnumerationContextAlarmType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AncillaryDataSet``,
+                     an alternative of ``EnumerationContextAlarmChoice``,
+                     ``EnumerationAlarmList``, ``ContextMatch``, in that order
+                     and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_EnumerationContextAlarmType)
     v = EnumerationContextAlarmType.__new__(EnumerationContextAlarmType)
     v.name = X.opt_attr(n, 'name', X.p_str)
@@ -12083,6 +14837,20 @@ _A_EnumerationListType = frozenset({})
 
 
 def _r_EnumerationListType(n: X.Node) -> EnumerationListType:
+    """Reads an XML element of the XTCE type ``EnumerationListType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``EnumerationListType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``Enumeration``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_EnumerationListType)
     v = EnumerationListType.__new__(EnumerationListType)
     c = X.Cursor(n)
@@ -12100,6 +14868,21 @@ _A_ErrorDetectCorrectType = frozenset({})
 
 
 def _r_ErrorDetectCorrectType(n: X.Node) -> ErrorDetectCorrectType:
+    """Reads an XML element of the XTCE type ``ErrorDetectCorrectType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ErrorDetectCorrectType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (alternatives of ``ErrorDetectCorrectChoice``, in that
+                     order and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_ErrorDetectCorrectType)
     v = ErrorDetectCorrectType.__new__(ErrorDetectCorrectType)
     c = X.Cursor(n)
@@ -12117,6 +14900,24 @@ _A_ExecutionVerifierType = frozenset({'shortDescription', 'name'})
 
 
 def _r_ExecutionVerifierType(n: X.Node) -> ExecutionVerifierType:
+    """Reads an XML element of the XTCE type ``ExecutionVerifierType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ExecutionVerifierType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``LongDescription``,
+                     ``AliasSet``, ``AncillaryDataSet``, an alternative of
+                     ``ExecutionVerifierChoice1``, an alternative of
+                     ``ExecutionVerifierChoice2``, ``ArgumentRestrictionList``,
+                     ``PercentComplete``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ExecutionVerifierType)
     v = ExecutionVerifierType.__new__(ExecutionVerifierType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -12142,6 +14943,20 @@ _A_ExternalAlgorithmSetType = frozenset({})
 
 
 def _r_ExternalAlgorithmSetType(n: X.Node) -> ExternalAlgorithmSetType:
+    """Reads an XML element of the XTCE type ``ExternalAlgorithmSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ExternalAlgorithmSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``ExternalAlgorithm``, in that order and in the numbers
+                     the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ExternalAlgorithmSetType)
     v = ExternalAlgorithmSetType.__new__(ExternalAlgorithmSetType)
     c = X.Cursor(n)
@@ -12160,6 +14975,20 @@ _A_ExternalAlgorithmType = frozenset({"implementationName",
 
 
 def _r_ExternalAlgorithmType(n: X.Node) -> ExternalAlgorithmType:
+    """Reads an XML element of the XTCE type ``ExternalAlgorithmType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ExternalAlgorithmType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attributes ``implementationName`` and
+                     ``algorithmLocation``, has an attribute value that doesn't
+                     parse or has children or text.
+    """
     X.check_attrs(n, _A_ExternalAlgorithmType)
     v = ExternalAlgorithmType.__new__(ExternalAlgorithmType)
     v.implementation_name = X.req_attr(n, 'implementationName', X.p_str)
@@ -12173,6 +15002,24 @@ _A_FailedVerifierType = frozenset({'shortDescription', 'name'})
 
 
 def _r_FailedVerifierType(n: X.Node) -> FailedVerifierType:
+    """Reads an XML element of the XTCE type ``FailedVerifierType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``FailedVerifierType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``LongDescription``,
+                     ``AliasSet``, ``AncillaryDataSet``, an alternative of
+                     ``FailedVerifierChoice1``, an alternative of
+                     ``FailedVerifierChoice2``, ``ArgumentRestrictionList``,
+                     ``ReturnParmRef``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_FailedVerifierType)
     v = FailedVerifierType.__new__(FailedVerifierType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -12200,6 +15047,24 @@ _A_FixedFrameStreamType = frozenset({"shortDescription", "name", "bitRateInBPS",
 
 
 def _r_FixedFrameStreamType(n: X.Node) -> FixedFrameStreamType:
+    """Reads an XML element of the XTCE type ``FixedFrameStreamType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``FixedFrameStreamType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attributes ``name`` and
+                     ``frameLengthInBits``, has an attribute value that doesn't
+                     parse or has children that don't follow its content model
+                     (``LongDescription``, ``AliasSet``, ``AncillaryDataSet``,
+                     an alternative of ``FixedFrameStreamChoice``,
+                     ``StreamRef``, ``SyncStrategy``, in that order and in the
+                     numbers the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_FixedFrameStreamType)
     v = FixedFrameStreamType.__new__(FixedFrameStreamType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -12231,6 +15096,21 @@ _A_FixedFrameSyncStrategyType = frozenset({"verifyToLockGoodFrames",
 
 
 def _r_FixedFrameSyncStrategyType(n: X.Node) -> FixedFrameSyncStrategyType:
+    """Reads an XML element of the XTCE type ``FixedFrameSyncStrategyType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``FixedFrameSyncStrategyType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AutoInvert``,
+                     ``SyncPattern``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_FixedFrameSyncStrategyType)
     v = FixedFrameSyncStrategyType.__new__(FixedFrameSyncStrategyType)
     v.verify_to_lock_good_frames = X.opt_attr(n, "verifyToLockGoodFrames",
@@ -12253,6 +15133,19 @@ _A_FlagType = frozenset({'flagSizeInBits', 'flagBitType'})
 
 
 def _r_FlagType(n: X.Node) -> FlagType:
+    """Reads an XML element of the XTCE type ``FlagType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``FlagType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     or text.
+    """
     X.check_attrs(n, _A_FlagType)
     v = FlagType.__new__(FlagType)
     v.flag_size_in_bits = X.opt_attr(n, 'flagSizeInBits', X.p_i64)
@@ -12267,6 +15160,24 @@ _A_FloatArgumentType = frozenset({"shortDescription", "name", "baseType",
 
 
 def _r_FloatArgumentType(n: X.Node) -> FloatArgumentType:
+    """Reads an XML element of the XTCE type ``FloatArgumentType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``FloatArgumentType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``UnitSet``, an alternative of
+                     ``FloatArgumentChoice``, ``ToString``, ``ValidRangeSet``,
+                     in that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_FloatArgumentType)
     v = FloatArgumentType.__new__(FloatArgumentType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -12295,6 +15206,22 @@ _A_FloatDataEncodingType = frozenset({"bitOrder", "byteOrder", "encoding",
 
 
 def _r_FloatDataEncodingType(n: X.Node) -> FloatDataEncodingType:
+    """Reads an XML element of the XTCE type ``FloatDataEncodingType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``FloatDataEncodingType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model
+                     (``ErrorDetectCorrect``, ``DefaultCalibrator``,
+                     ``ContextCalibratorList``, in that order and in the numbers
+                     the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_FloatDataEncodingType)
     v = FloatDataEncodingType.__new__(FloatDataEncodingType)
     v.bit_order = X.opt_attr(n, 'bitOrder', _p_BitOrderType)
@@ -12319,6 +15246,25 @@ _A_FloatDataType = frozenset({"shortDescription", "name", "baseType",
 
 
 def _r_FloatDataType(n: X.Node) -> FloatDataType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``FloatDataType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``FloatDataType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``UnitSet``, an alternative of
+                     ``FloatDataChoice``, ``ToString``, ``ValidRange``, in that
+                     order and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_FloatDataType)
     v = FloatDataType.__new__(FloatDataType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -12348,6 +15294,19 @@ _A_FloatDataValidRangeType = frozenset({"minInclusive", "minExclusive",
 
 
 def _r_FloatDataValidRangeType(n: X.Node) -> FloatDataValidRangeType:
+    """Reads an XML element of an XTCE ``ValidRange`` element.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``FloatDataValidRangeType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     or text.
+    """
     X.check_attrs(n, _A_FloatDataValidRangeType)
     v = FloatDataValidRangeType.__new__(FloatDataValidRangeType)
     v.min_inclusive = X.opt_attr(n, 'minInclusive', X.p_double)
@@ -12366,6 +15325,25 @@ _A_FloatParameterType = frozenset({"shortDescription", "name", "baseType",
 
 
 def _r_FloatParameterType(n: X.Node) -> FloatParameterType:
+    """Reads an XML element of the XTCE type ``FloatParameterType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``FloatParameterType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``UnitSet``, an alternative of
+                     ``FloatParameterChoice``, ``ToString``, ``ValidRange``,
+                     ``DefaultAlarm``, ``ContextAlarmList``, in that order and
+                     in the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_FloatParameterType)
     v = FloatParameterType.__new__(FloatParameterType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -12398,6 +15376,19 @@ _A_FloatRangeType = frozenset({"minInclusive", "minExclusive", "maxInclusive",
 
 
 def _r_FloatRangeType(n: X.Node) -> FloatRangeType:
+    """Reads an XML element of the XTCE type ``FloatRangeType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``FloatRangeType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     or text.
+    """
     X.check_attrs(n, _A_FloatRangeType)
     v = FloatRangeType.__new__(FloatRangeType)
     v.min_inclusive = X.opt_attr(n, 'minInclusive', X.p_double)
@@ -12414,6 +15405,24 @@ _A_FrameStreamType = frozenset({"shortDescription", "name", "bitRateInBPS",
 
 
 def _r_FrameStreamType(n: X.Node) -> FrameStreamType:
+    """Reads an XML element of the XTCE type ``FrameStreamType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``FrameStreamType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, an alternative of
+                     ``FrameStreamChoice``, ``StreamRef``, in that order and in
+                     the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_FrameStreamType)
     v = FrameStreamType.__new__(FrameStreamType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -12439,6 +15448,22 @@ _A_HeaderType = frozenset({"version", "date", "classification",
 
 
 def _r_HeaderType(n: X.Node) -> HeaderType:
+    """Reads an XML element of the XTCE type ``HeaderType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``HeaderType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``validationStatus``, has an
+                     attribute value that doesn't parse or has children that
+                     don't follow its content model (``AuthorSet``, ``NoteSet``,
+                     ``HistorySet``, in that order and in the numbers the schema
+                     allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_HeaderType)
     v = HeaderType.__new__(HeaderType)
     v.version = X.opt_attr(n, 'version', X.p_str)
@@ -12462,6 +15487,20 @@ _A_HistorySetType = frozenset({})
 
 
 def _r_HistorySetType(n: X.Node) -> HistorySetType:
+    """Reads an XML element of the XTCE type ``HistorySetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``HistorySetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``History``, in that order and in the numbers the schema
+                     allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_HistorySetType)
     v = HistorySetType.__new__(HistorySetType)
     c = X.Cursor(n)
@@ -12479,6 +15518,24 @@ _A_IndirectParameterRefEntryType = frozenset({"shortDescription",
 
 def _r_IndirectParameterRefEntryType(
         n: X.Node) -> IndirectParameterRefEntryType:
+    """Reads an XML element of the XTCE type ``IndirectParameterRefEntryType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``IndirectParameterRefEntryType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model
+                     (``LocationInContainerInBits``, ``RepeatEntry``,
+                     ``IncludeCondition``, ``TimeAssociation``,
+                     ``AncillaryDataSet``, ``ParameterInstance``, in that order
+                     and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_IndirectParameterRefEntryType)
     v = IndirectParameterRefEntryType.__new__(IndirectParameterRefEntryType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -12505,6 +15562,24 @@ _A_InputAlgorithmType = frozenset({'shortDescription', 'name'})
 
 
 def _r_InputAlgorithmType(n: X.Node) -> InputAlgorithmType:
+    """Reads an XML element of the XTCE type ``InputAlgorithmType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``InputAlgorithmType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``AlgorithmText``,
+                     ``ExternalAlgorithmSet``, ``InputSet``, in that order and
+                     in the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_InputAlgorithmType)
     v = InputAlgorithmType.__new__(InputAlgorithmType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -12528,6 +15603,24 @@ _A_InputOutputAlgorithmType = frozenset({'shortDescription', 'name', 'thread'})
 
 
 def _r_InputOutputAlgorithmType(n: X.Node) -> InputOutputAlgorithmType:
+    """Reads an XML element of the XTCE type ``InputOutputAlgorithmType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``InputOutputAlgorithmType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``AlgorithmText``,
+                     ``ExternalAlgorithmSet``, ``InputSet``, ``OutputSet``, in
+                     that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_InputOutputAlgorithmType)
     v = InputOutputAlgorithmType.__new__(InputOutputAlgorithmType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -12556,6 +15649,25 @@ _A_InputOutputTriggerAlgorithmType = frozenset(
 
 def _r_InputOutputTriggerAlgorithmType(
         n: X.Node) -> InputOutputTriggerAlgorithmType:
+    """Reads an XML element of the XTCE type
+    ``InputOutputTriggerAlgorithmType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``InputOutputTriggerAlgorithmType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``AlgorithmText``,
+                     ``ExternalAlgorithmSet``, ``InputSet``, ``OutputSet``,
+                     ``TriggerSet``, in that order and in the numbers the schema
+                     allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_InputOutputTriggerAlgorithmType)
     v = InputOutputTriggerAlgorithmType.__new__(InputOutputTriggerAlgorithmType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -12588,6 +15700,19 @@ _A_InputParameterInstanceRefType = frozenset(
 
 def _r_InputParameterInstanceRefType(
         n: X.Node) -> InputParameterInstanceRefType:
+    """Reads an XML element of the XTCE type ``InputParameterInstanceRefType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``InputParameterInstanceRefType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``parameterRef``, has an
+                     attribute value that doesn't parse or has children or text.
+    """
     X.check_attrs(n, _A_InputParameterInstanceRefType)
     v = InputParameterInstanceRefType.__new__(InputParameterInstanceRefType)
     v.parameter_ref = X.req_attr(n, 'parameterRef', X.p_str)
@@ -12603,6 +15728,21 @@ _A_InputSetType = frozenset({})
 
 
 def _r_InputSetType(n: X.Node) -> InputSetType:
+    """Reads an XML element of the XTCE type ``InputSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``InputSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (alternatives of ``InputSetChoice``, in that order and in
+                     the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_InputSetType)
     v = InputSetType.__new__(InputSetType)
     c = X.Cursor(n)
@@ -12621,6 +15761,24 @@ _A_IntegerArgumentType = frozenset({"shortDescription", "name", "baseType",
 
 
 def _r_IntegerArgumentType(n: X.Node) -> IntegerArgumentType:
+    """Reads an XML element of the XTCE type ``IntegerArgumentType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``IntegerArgumentType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``UnitSet``, an alternative of
+                     ``IntegerArgumentChoice``, ``ToString``, ``ValidRangeSet``,
+                     in that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_IntegerArgumentType)
     v = IntegerArgumentType.__new__(IntegerArgumentType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -12650,6 +15808,22 @@ _A_IntegerDataEncodingType = frozenset({"bitOrder", "byteOrder", "encoding",
 
 
 def _r_IntegerDataEncodingType(n: X.Node) -> IntegerDataEncodingType:
+    """Reads an XML element of the XTCE type ``IntegerDataEncodingType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``IntegerDataEncodingType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model
+                     (``ErrorDetectCorrect``, ``DefaultCalibrator``,
+                     ``ContextCalibratorList``, in that order and in the numbers
+                     the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_IntegerDataEncodingType)
     v = IntegerDataEncodingType.__new__(IntegerDataEncodingType)
     v.bit_order = X.opt_attr(n, 'bitOrder', _p_BitOrderType)
@@ -12674,6 +15848,25 @@ _A_IntegerDataType = frozenset({"shortDescription", "name", "baseType",
 
 
 def _r_IntegerDataType(n: X.Node) -> IntegerDataType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``IntegerDataType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``IntegerDataType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``UnitSet``, an alternative of
+                     ``IntegerDataChoice``, ``ToString``, ``ValidRange``, in
+                     that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_IntegerDataType)
     v = IntegerDataType.__new__(IntegerDataType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -12703,6 +15896,19 @@ _A_IntegerDataValidRangeType = frozenset({"minInclusive", "maxInclusive",
 
 
 def _r_IntegerDataValidRangeType(n: X.Node) -> IntegerDataValidRangeType:
+    """Reads an XML element of an XTCE ``ValidRange`` element.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``IntegerDataValidRangeType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     or text.
+    """
     X.check_attrs(n, _A_IntegerDataValidRangeType)
     v = IntegerDataValidRangeType.__new__(IntegerDataValidRangeType)
     v.min_inclusive = X.opt_attr(n, 'minInclusive', X.p_i64)
@@ -12719,6 +15925,25 @@ _A_IntegerParameterType = frozenset({"shortDescription", "name", "baseType",
 
 
 def _r_IntegerParameterType(n: X.Node) -> IntegerParameterType:
+    """Reads an XML element of the XTCE type ``IntegerParameterType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``IntegerParameterType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``UnitSet``, an alternative of
+                     ``IntegerParameterChoice``, ``ToString``, ``ValidRange``,
+                     ``DefaultAlarm``, ``ContextAlarmList``, in that order and
+                     in the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_IntegerParameterType)
     v = IntegerParameterType.__new__(IntegerParameterType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -12751,6 +15976,19 @@ _A_IntegerRangeType = frozenset({'minInclusive', 'maxInclusive'})
 
 
 def _r_IntegerRangeType(n: X.Node) -> IntegerRangeType:
+    """Reads an XML element of the XTCE type ``IntegerRangeType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``IntegerRangeType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     or text.
+    """
     X.check_attrs(n, _A_IntegerRangeType)
     v = IntegerRangeType.__new__(IntegerRangeType)
     v.min_inclusive = X.opt_attr(n, 'minInclusive', X.p_i64)
@@ -12764,6 +16002,21 @@ _A_IntegerValueType = frozenset({})
 
 
 def _r_IntegerValueType(n: X.Node) -> IntegerValueType:
+    """Reads an XML element of the XTCE type ``IntegerValueType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``IntegerValueType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model (an
+                     alternative of ``IntegerValueChoice``, in that order and in
+                     the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_IntegerValueType)
     v = IntegerValueType.__new__(IntegerValueType)
     c = X.Cursor(n)
@@ -12777,6 +16030,19 @@ _A_InterlockType = frozenset({"scopeToSpaceSystem", "verificationToWaitFor",
 
 
 def _r_InterlockType(n: X.Node) -> InterlockType:
+    """Reads an XML element of the XTCE type ``InterlockType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``InterlockType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     or text.
+    """
     X.check_attrs(n, _A_InterlockType)
     v = InterlockType.__new__(InterlockType)
     v.scope_to_space_system = X.opt_attr(n, 'scopeToSpaceSystem', X.p_str)
@@ -12794,6 +16060,19 @@ _A_LeadingSizeType = frozenset({'sizeInBitsOfSizeTag'})
 
 
 def _r_LeadingSizeType(n: X.Node) -> LeadingSizeType:
+    """Reads an XML element of the XTCE type ``LeadingSizeType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``LeadingSizeType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     or text.
+    """
     X.check_attrs(n, _A_LeadingSizeType)
     v = LeadingSizeType.__new__(LeadingSizeType)
     v.size_in_bits_of_size_tag = X.opt_attr(n, 'sizeInBitsOfSizeTag', X.p_i64)
@@ -12806,6 +16085,19 @@ _A_LinearAdjustmentType = frozenset({'slope', 'intercept'})
 
 
 def _r_LinearAdjustmentType(n: X.Node) -> LinearAdjustmentType:
+    """Reads an XML element of the XTCE type ``LinearAdjustmentType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``LinearAdjustmentType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     or text.
+    """
     X.check_attrs(n, _A_LinearAdjustmentType)
     v = LinearAdjustmentType.__new__(LinearAdjustmentType)
     v.slope = X.opt_attr(n, 'slope', X.p_double)
@@ -12820,6 +16112,22 @@ _A_LocationInContainerInBitsType = frozenset({'referenceLocation'})
 
 def _r_LocationInContainerInBitsType(
         n: X.Node) -> LocationInContainerInBitsType:
+    """Reads an XML element of the XTCE type ``LocationInContainerInBitsType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``LocationInContainerInBitsType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (an alternative of
+                     ``LocationInContainerInBitsChoice``, in that order and in
+                     the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_LocationInContainerInBitsType)
     v = LocationInContainerInBitsType.__new__(LocationInContainerInBitsType)
     v.reference_location = X.opt_attr(n, "referenceLocation",
@@ -12834,6 +16142,21 @@ _A_MatchCriteriaType = frozenset({})
 
 
 def _r_MatchCriteriaType(n: X.Node) -> MatchCriteriaType:
+    """Reads an XML element of the XTCE type ``MatchCriteriaType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``MatchCriteriaType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model (an
+                     alternative of ``MatchCriteriaChoice``, in that order and
+                     in the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_MatchCriteriaType)
     v = MatchCriteriaType.__new__(MatchCriteriaType)
     c = X.Cursor(n)
@@ -12846,6 +16169,23 @@ _A_MathAlgorithmType = frozenset({'shortDescription', 'name'})
 
 
 def _r_MathAlgorithmType(n: X.Node) -> MathAlgorithmType:
+    """Reads an XML element of the XTCE type ``MathAlgorithmType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``MathAlgorithmType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``MathOperation``, in that order and
+                     in the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_MathAlgorithmType)
     v = MathAlgorithmType.__new__(MathAlgorithmType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -12867,6 +16207,22 @@ _A_MathOperationCalibratorType = frozenset({'name', 'shortDescription'})
 
 
 def _r_MathOperationCalibratorType(n: X.Node) -> MathOperationCalibratorType:
+    """Reads an XML element of the XTCE type ``MathOperationCalibratorType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``MathOperationCalibratorType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AncillaryDataSet``,
+                     alternatives of ``MathOperationCalibratorChoice``, in that
+                     order and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_MathOperationCalibratorType)
     v = MathOperationCalibratorType.__new__(MathOperationCalibratorType)
     v.name = X.opt_attr(n, 'name', X.p_str)
@@ -12889,6 +16245,23 @@ _A_MathOperationType = frozenset({'name', 'shortDescription'})
 
 
 def _r_MathOperationType(n: X.Node) -> MathOperationType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``MathOperationType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``MathOperationType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AncillaryDataSet``,
+                     alternatives of ``MathOperationChoice``, in that order and
+                     in the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_MathOperationType)
     v = MathOperationType.__new__(MathOperationType)
     v.name = X.opt_attr(n, 'name', X.p_str)
@@ -12911,6 +16284,20 @@ _A_MemberListType = frozenset({})
 
 
 def _r_MemberListType(n: X.Node) -> MemberListType:
+    """Reads an XML element of the XTCE type ``MemberListType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``MemberListType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``Member``, in that order and in the numbers the schema
+                     allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_MemberListType)
     v = MemberListType.__new__(MemberListType)
     c = X.Cursor(n)
@@ -12929,6 +16316,23 @@ _A_MemberType = frozenset({"shortDescription", "name", "typeRef",
 
 
 def _r_MemberType(n: X.Node) -> MemberType:
+    """Reads an XML element of the XTCE type ``MemberType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``MemberType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attributes ``name`` and ``typeRef``, has
+                     an attribute value that doesn't parse or has children that
+                     don't follow its content model (``LongDescription``,
+                     ``AliasSet``, ``AncillaryDataSet``, in that order and in
+                     the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_MemberType)
     v = MemberType.__new__(MemberType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -12949,6 +16353,20 @@ _A_MessageRefSetType = frozenset({})
 
 
 def _r_MessageRefSetType(n: X.Node) -> MessageRefSetType:
+    """Reads an XML element of the XTCE type ``MessageRefSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``MessageRefSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``MessageRef``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_MessageRefSetType)
     v = MessageRefSetType.__new__(MessageRefSetType)
     c = X.Cursor(n)
@@ -12966,6 +16384,19 @@ _A_MessageRefType = frozenset({'messageRef'})
 
 
 def _r_MessageRefType(n: X.Node) -> MessageRefType:
+    """Reads an XML element of the XTCE type ``MessageRefType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``MessageRefType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``messageRef``, has an
+                     attribute value that doesn't parse or has children or text.
+    """
     X.check_attrs(n, _A_MessageRefType)
     v = MessageRefType.__new__(MessageRefType)
     v.message_ref = X.req_attr(n, 'messageRef', X.p_str)
@@ -12978,6 +16409,22 @@ _A_MessageSetType = frozenset({'shortDescription', 'name'})
 
 
 def _r_MessageSetType(n: X.Node) -> MessageSetType:
+    """Reads an XML element of the XTCE type ``MessageSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``MessageSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``LongDescription``,
+                     ``AliasSet``, ``AncillaryDataSet``, ``Message``, in that
+                     order and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_MessageSetType)
     v = MessageSetType.__new__(MessageSetType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -13002,6 +16449,23 @@ _A_MessageType = frozenset({'shortDescription', 'name'})
 
 
 def _r_MessageType(n: X.Node) -> MessageType:
+    """Reads an XML element of the XTCE type ``MessageType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``MessageType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``MatchCriteria``, ``ContainerRef``,
+                     in that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_MessageType)
     v = MessageType.__new__(MessageType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -13026,6 +16490,21 @@ _A_MetaCommandSetType = frozenset({})
 
 
 def _r_MetaCommandSetType(n: X.Node) -> MetaCommandSetType:
+    """Reads an XML element of the XTCE type ``MetaCommandSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``MetaCommandSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (alternatives of ``MetaCommandSetChoice``, in that order
+                     and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_MetaCommandSetType)
     v = MetaCommandSetType.__new__(MetaCommandSetType)
     c = X.Cursor(n)
@@ -13044,6 +16523,20 @@ _A_MetaCommandStepListType = frozenset({})
 
 
 def _r_MetaCommandStepListType(n: X.Node) -> MetaCommandStepListType:
+    """Reads an XML element of the XTCE type ``MetaCommandStepListType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``MetaCommandStepListType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``MetaCommandStep``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_MetaCommandStepListType)
     v = MetaCommandStepListType.__new__(MetaCommandStepListType)
     c = X.Cursor(n)
@@ -13061,6 +16554,22 @@ _A_MetaCommandStepType = frozenset({'metaCommandRef'})
 
 
 def _r_MetaCommandStepType(n: X.Node) -> MetaCommandStepType:
+    """Reads an XML element of the XTCE type ``MetaCommandStepType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``MetaCommandStepType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``metaCommandRef``, has an
+                     attribute value that doesn't parse or has children that
+                     don't follow its content model (``ArgumentAssignmentList``,
+                     in that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_MetaCommandStepType)
     v = MetaCommandStepType.__new__(MetaCommandStepType)
     v.meta_command_ref = X.req_attr(n, 'metaCommandRef', X.p_str)
@@ -13076,6 +16585,28 @@ _A_MetaCommandType = frozenset({'shortDescription', 'name', 'abstract'})
 
 
 def _r_MetaCommandType(n: X.Node) -> MetaCommandType:
+    """Reads an XML element of the XTCE type ``MetaCommandType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``MetaCommandType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``BaseMetaCommand``, ``SystemName``,
+                     ``ArgumentList``, ``CommandContainer``,
+                     ``TransmissionConstraintList``, ``DefaultSignificance``,
+                     ``ContextSignificanceList``, ``Interlock``,
+                     ``VerifierSet``, ``ParameterToSetList``,
+                     ``ParametersToSuspendAlarmsOnSet``, in that order and in
+                     the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_MetaCommandType)
     v = MetaCommandType.__new__(MetaCommandType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -13120,6 +16651,19 @@ _A_MultiRangeType = frozenset({"minInclusive", "minExclusive", "maxInclusive",
 
 
 def _r_MultiRangeType(n: X.Node) -> MultiRangeType:
+    """Reads an XML element of the XTCE type ``MultiRangeType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``MultiRangeType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     or text.
+    """
     X.check_attrs(n, _A_MultiRangeType)
     v = MultiRangeType.__new__(MultiRangeType)
     v.min_inclusive = X.opt_attr(n, 'minInclusive', X.p_double)
@@ -13137,6 +16681,22 @@ _A_NameDescriptionType = frozenset({'shortDescription', 'name'})
 
 
 def _r_NameDescriptionType(n: X.Node) -> NameDescriptionType:
+    """Reads an XML element of the XTCE type ``NameDescriptionType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``NameDescriptionType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_NameDescriptionType)
     v = NameDescriptionType.__new__(NameDescriptionType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -13155,6 +16715,20 @@ _A_NoteSetType = frozenset({})
 
 
 def _r_NoteSetType(n: X.Node) -> NoteSetType:
+    """Reads an XML element of the XTCE type ``NoteSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``NoteSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model (``Note``,
+                     in that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_NoteSetType)
     v = NoteSetType.__new__(NoteSetType)
     c = X.Cursor(n)
@@ -13174,6 +16748,19 @@ _A_NumberFormatType = frozenset(
 
 
 def _r_NumberFormatType(n: X.Node) -> NumberFormatType:
+    """Reads an XML element of the XTCE type ``NumberFormatType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``NumberFormatType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     or text.
+    """
     X.check_attrs(n, _A_NumberFormatType)
     v = NumberFormatType.__new__(NumberFormatType)
     v.number_base = X.opt_attr(n, 'numberBase', _p_RadixType)
@@ -13197,6 +16784,23 @@ _A_NumericAlarmType = frozenset({"name", "shortDescription", "minViolations",
 
 
 def _r_NumericAlarmType(n: X.Node) -> NumericAlarmType:
+    """Reads an XML element of the XTCE type ``NumericAlarmType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``NumericAlarmType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AncillaryDataSet``,
+                     an alternative of ``NumericAlarmChoice``,
+                     ``StaticAlarmRanges``, ``ChangeAlarmRanges``,
+                     ``AlarmMultiRanges``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_NumericAlarmType)
     v = NumericAlarmType.__new__(NumericAlarmType)
     v.name = X.opt_attr(n, 'name', X.p_str)
@@ -13223,6 +16827,20 @@ _A_NumericContextAlarmListType = frozenset({})
 
 
 def _r_NumericContextAlarmListType(n: X.Node) -> NumericContextAlarmListType:
+    """Reads an XML element of the XTCE type ``NumericContextAlarmListType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``NumericContextAlarmListType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``ContextAlarm``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_NumericContextAlarmListType)
     v = NumericContextAlarmListType.__new__(NumericContextAlarmListType)
     c = X.Cursor(n)
@@ -13241,6 +16859,24 @@ _A_NumericContextAlarmType = frozenset(
 
 
 def _r_NumericContextAlarmType(n: X.Node) -> NumericContextAlarmType:
+    """Reads an XML element of the XTCE type ``NumericContextAlarmType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``NumericContextAlarmType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AncillaryDataSet``,
+                     an alternative of ``NumericContextAlarmChoice``,
+                     ``StaticAlarmRanges``, ``ChangeAlarmRanges``,
+                     ``AlarmMultiRanges``, ``ContextMatch``, in that order and
+                     in the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_NumericContextAlarmType)
     v = NumericContextAlarmType.__new__(NumericContextAlarmType)
     v.name = X.opt_attr(n, 'name', X.p_str)
@@ -13270,6 +16906,21 @@ _A_ORedConditionsType = frozenset({})
 
 
 def _r_ORedConditionsType(n: X.Node) -> ORedConditionsType:
+    """Reads an XML element of the XTCE type ``ORedConditionsType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ORedConditionsType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (alternatives of ``ORedConditionsChoice``, in that order
+                     and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_ORedConditionsType)
     v = ORedConditionsType.__new__(ORedConditionsType)
     c = X.Cursor(n)
@@ -13287,6 +16938,19 @@ _A_OnContainerUpdateTriggerType = frozenset({'containerRef'})
 
 
 def _r_OnContainerUpdateTriggerType(n: X.Node) -> OnContainerUpdateTriggerType:
+    """Reads an XML element of the XTCE type ``OnContainerUpdateTriggerType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``OnContainerUpdateTriggerType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``containerRef``, has an
+                     attribute value that doesn't parse or has children or text.
+    """
     X.check_attrs(n, _A_OnContainerUpdateTriggerType)
     v = OnContainerUpdateTriggerType.__new__(OnContainerUpdateTriggerType)
     v.container_ref = X.req_attr(n, 'containerRef', X.p_str)
@@ -13299,6 +16963,19 @@ _A_OnParameterUpdateTriggerType = frozenset({'parameterRef'})
 
 
 def _r_OnParameterUpdateTriggerType(n: X.Node) -> OnParameterUpdateTriggerType:
+    """Reads an XML element of the XTCE type ``OnParameterUpdateTriggerType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``OnParameterUpdateTriggerType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``parameterRef``, has an
+                     attribute value that doesn't parse or has children or text.
+    """
     X.check_attrs(n, _A_OnParameterUpdateTriggerType)
     v = OnParameterUpdateTriggerType.__new__(OnParameterUpdateTriggerType)
     v.parameter_ref = X.req_attr(n, 'parameterRef', X.p_str)
@@ -13311,6 +16988,19 @@ _A_OnPeriodicRateTriggerType = frozenset({'fireRateInSeconds'})
 
 
 def _r_OnPeriodicRateTriggerType(n: X.Node) -> OnPeriodicRateTriggerType:
+    """Reads an XML element of the XTCE type ``OnPeriodicRateTriggerType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``OnPeriodicRateTriggerType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``fireRateInSeconds``, has an
+                     attribute value that doesn't parse or has children or text.
+    """
     X.check_attrs(n, _A_OnPeriodicRateTriggerType)
     v = OnPeriodicRateTriggerType.__new__(OnPeriodicRateTriggerType)
     v.fire_rate_in_seconds = X.req_attr(n, 'fireRateInSeconds', X.p_double)
@@ -13323,6 +17013,22 @@ _A_OptionalNameDescriptionType = frozenset({'shortDescription', 'name'})
 
 
 def _r_OptionalNameDescriptionType(n: X.Node) -> OptionalNameDescriptionType:
+    """Reads an XML element of the XTCE type ``OptionalNameDescriptionType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``OptionalNameDescriptionType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``LongDescription``,
+                     ``AliasSet``, ``AncillaryDataSet``, in that order and in
+                     the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_OptionalNameDescriptionType)
     v = OptionalNameDescriptionType.__new__(OptionalNameDescriptionType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -13341,6 +17047,19 @@ _A_OutputParameterRefType = frozenset({'parameterRef', 'outputName'})
 
 
 def _r_OutputParameterRefType(n: X.Node) -> OutputParameterRefType:
+    """Reads an XML element of the XTCE type ``OutputParameterRefType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``OutputParameterRefType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``parameterRef``, has an
+                     attribute value that doesn't parse or has children or text.
+    """
     X.check_attrs(n, _A_OutputParameterRefType)
     v = OutputParameterRefType.__new__(OutputParameterRefType)
     v.parameter_ref = X.req_attr(n, 'parameterRef', X.p_str)
@@ -13354,6 +17073,20 @@ _A_OutputSetType = frozenset({})
 
 
 def _r_OutputSetType(n: X.Node) -> OutputSetType:
+    """Reads an XML element of the XTCE type ``OutputSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``OutputSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``OutputParameterRef``, in that order and in the numbers
+                     the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_OutputSetType)
     v = OutputSetType.__new__(OutputSetType)
     c = X.Cursor(n)
@@ -13372,6 +17105,23 @@ _A_PCMStreamType = frozenset({"shortDescription", "name", "bitRateInBPS",
 
 
 def _r_PCMStreamType(n: X.Node) -> PCMStreamType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``PCMStreamType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``PCMStreamType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_PCMStreamType)
     v = PCMStreamType.__new__(PCMStreamType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -13394,6 +17144,19 @@ _A_ParameterInstanceRefType = frozenset({"parameterRef", "instance",
 
 
 def _r_ParameterInstanceRefType(n: X.Node) -> ParameterInstanceRefType:
+    """Reads an XML element of the XTCE type ``ParameterInstanceRefType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ParameterInstanceRefType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``parameterRef``, has an
+                     attribute value that doesn't parse or has children or text.
+    """
     X.check_attrs(n, _A_ParameterInstanceRefType)
     v = ParameterInstanceRefType.__new__(ParameterInstanceRefType)
     v.parameter_ref = X.req_attr(n, 'parameterRef', X.p_str)
@@ -13409,6 +17172,22 @@ _A_ParameterPropertiesType = frozenset({"dataSource", "readOnly",
 
 
 def _r_ParameterPropertiesType(n: X.Node) -> ParameterPropertiesType:
+    """Reads an XML element of the XTCE type ``ParameterPropertiesType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ParameterPropertiesType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``SystemName``,
+                     ``ValidityCondition``, ``PhysicalAddressSet``,
+                     ``TimeAssociation``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ParameterPropertiesType)
     v = ParameterPropertiesType.__new__(ParameterPropertiesType)
     v.data_source = X.opt_attr(n, 'dataSource', _p_TelemetryDataSourceType)
@@ -13431,6 +17210,24 @@ _A_ParameterRefEntryType = frozenset({'shortDescription', 'parameterRef'})
 
 
 def _r_ParameterRefEntryType(n: X.Node) -> ParameterRefEntryType:
+    """Reads an XML element of the XTCE type ``ParameterRefEntryType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ParameterRefEntryType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``parameterRef``, has an
+                     attribute value that doesn't parse or has children that
+                     don't follow its content model
+                     (``LocationInContainerInBits``, ``RepeatEntry``,
+                     ``IncludeCondition``, ``TimeAssociation``,
+                     ``AncillaryDataSet``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ParameterRefEntryType)
     v = ParameterRefEntryType.__new__(ParameterRefEntryType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -13454,6 +17251,19 @@ _A_ParameterRefType = frozenset({'parameterRef'})
 
 
 def _r_ParameterRefType(n: X.Node) -> ParameterRefType:
+    """Reads an XML element of the XTCE type ``ParameterRefType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ParameterRefType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``parameterRef``, has an
+                     attribute value that doesn't parse or has children or text.
+    """
     X.check_attrs(n, _A_ParameterRefType)
     v = ParameterRefType.__new__(ParameterRefType)
     v.parameter_ref = X.req_attr(n, 'parameterRef', X.p_str)
@@ -13467,6 +17277,24 @@ _A_ParameterSegmentRefEntryType = frozenset({"shortDescription", "parameterRef",
 
 
 def _r_ParameterSegmentRefEntryType(n: X.Node) -> ParameterSegmentRefEntryType:
+    """Reads an XML element of the XTCE type ``ParameterSegmentRefEntryType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ParameterSegmentRefEntryType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attributes ``parameterRef`` and
+                     ``sizeInBits``, has an attribute value that doesn't parse
+                     or has children that don't follow its content model
+                     (``LocationInContainerInBits``, ``RepeatEntry``,
+                     ``IncludeCondition``, ``TimeAssociation``,
+                     ``AncillaryDataSet``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ParameterSegmentRefEntryType)
     v = ParameterSegmentRefEntryType.__new__(ParameterSegmentRefEntryType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -13492,6 +17320,21 @@ _A_ParameterSetType = frozenset({})
 
 
 def _r_ParameterSetType(n: X.Node) -> ParameterSetType:
+    """Reads an XML element of the XTCE type ``ParameterSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ParameterSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (alternatives of ``ParameterSetChoice``, in that order and
+                     in the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_ParameterSetType)
     v = ParameterSetType.__new__(ParameterSetType)
     c = X.Cursor(n)
@@ -13509,6 +17352,20 @@ _A_ParameterToSetListType = frozenset({})
 
 
 def _r_ParameterToSetListType(n: X.Node) -> ParameterToSetListType:
+    """Reads an XML element of the XTCE type ``ParameterToSetListType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ParameterToSetListType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``ParameterToSet``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ParameterToSetListType)
     v = ParameterToSetListType.__new__(ParameterToSetListType)
     c = X.Cursor(n)
@@ -13526,6 +17383,22 @@ _A_ParameterToSetType = frozenset({'parameterRef', 'setOnVerification'})
 
 
 def _r_ParameterToSetType(n: X.Node) -> ParameterToSetType:
+    """Reads an XML element of the XTCE type ``ParameterToSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ParameterToSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``parameterRef``, has an
+                     attribute value that doesn't parse or has children that
+                     don't follow its content model (an alternative of
+                     ``ParameterToSetChoice``, in that order and in the numbers
+                     the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ParameterToSetType)
     v = ParameterToSetType.__new__(ParameterToSetType)
     v.parameter_ref = X.req_attr(n, 'parameterRef', X.p_str)
@@ -13543,6 +17416,20 @@ _A_ParameterToSuspendAlarmsOnType = frozenset({"parameterRef", "suspenseTime",
 
 def _r_ParameterToSuspendAlarmsOnType(
         n: X.Node) -> ParameterToSuspendAlarmsOnType:
+    """Reads an XML element of the XTCE type ``ParameterToSuspendAlarmsOnType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ParameterToSuspendAlarmsOnType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attributes ``parameterRef`` and
+                     ``suspenseTime``, has an attribute value that doesn't parse
+                     or has children or text.
+    """
     X.check_attrs(n, _A_ParameterToSuspendAlarmsOnType)
     v = ParameterToSuspendAlarmsOnType.__new__(ParameterToSuspendAlarmsOnType)
     v.parameter_ref = X.req_attr(n, 'parameterRef', X.p_str)
@@ -13559,6 +17446,23 @@ _A_ParameterType = frozenset({"shortDescription", "name", "parameterTypeRef",
 
 
 def _r_ParameterType(n: X.Node) -> ParameterType:
+    """Reads an XML element of the XTCE type ``ParameterType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ParameterType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attributes ``name`` and
+                     ``parameterTypeRef``, has an attribute value that doesn't
+                     parse or has children that don't follow its content model
+                     (``LongDescription``, ``AliasSet``, ``AncillaryDataSet``,
+                     ``ParameterProperties``, in that order and in the numbers
+                     the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ParameterType)
     v = ParameterType.__new__(ParameterType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -13581,6 +17485,21 @@ _A_ParameterTypeSetType = frozenset({})
 
 
 def _r_ParameterTypeSetType(n: X.Node) -> ParameterTypeSetType:
+    """Reads an XML element of the XTCE type ``ParameterTypeSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ParameterTypeSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (alternatives of ``ParameterTypeSetChoice``, in that order
+                     and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_ParameterTypeSetType)
     v = ParameterTypeSetType.__new__(ParameterTypeSetType)
     c = X.Cursor(n)
@@ -13602,6 +17521,20 @@ _A_ParameterValueChangeType = frozenset({})
 
 
 def _r_ParameterValueChangeType(n: X.Node) -> ParameterValueChangeType:
+    """Reads an XML element of the XTCE type ``ParameterValueChangeType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ParameterValueChangeType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``ParameterRef``, ``Change``, in that order and in the
+                     numbers the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ParameterValueChangeType)
     v = ParameterValueChangeType.__new__(ParameterValueChangeType)
     c = X.Cursor(n)
@@ -13620,6 +17553,21 @@ _A_ParametersToSuspendAlarmsOnSetType = frozenset({})
 
 def _r_ParametersToSuspendAlarmsOnSetType(
         n: X.Node) -> ParametersToSuspendAlarmsOnSetType:
+    """Reads an XML element of the XTCE type
+    ``ParametersToSuspendAlarmsOnSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ParametersToSuspendAlarmsOnSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``ParameterToSuspendAlarmsOn``, in that order and in the
+                     numbers the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ParametersToSuspendAlarmsOnSetType)
     v = ParametersToSuspendAlarmsOnSetType.__new__(
         ParametersToSuspendAlarmsOnSetType)
@@ -13639,6 +17587,19 @@ _A_ParityType = frozenset({"type", "bitsFromReference", "reference",
 
 
 def _r_ParityType(n: X.Node) -> ParityType:
+    """Reads an XML element of the XTCE type ``ParityType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ParityType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``type``, has an attribute
+                     value that doesn't parse or has children or text.
+    """
     X.check_attrs(n, _A_ParityType)
     v = ParityType.__new__(ParityType)
     v.type = X.req_attr(n, 'type', _p_ParityFormType)
@@ -13654,6 +17615,21 @@ _A_PercentCompleteType = frozenset({})
 
 
 def _r_PercentCompleteType(n: X.Node) -> PercentCompleteType:
+    """Reads an XML element of the XTCE type ``PercentCompleteType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``PercentCompleteType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model (an
+                     alternative of ``PercentCompleteChoice``, in that order and
+                     in the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_PercentCompleteType)
     v = PercentCompleteType.__new__(PercentCompleteType)
     c = X.Cursor(n)
@@ -13666,6 +17642,20 @@ _A_PhysicalAddressSetType = frozenset({})
 
 
 def _r_PhysicalAddressSetType(n: X.Node) -> PhysicalAddressSetType:
+    """Reads an XML element of the XTCE type ``PhysicalAddressSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``PhysicalAddressSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``PhysicalAddress``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_PhysicalAddressSetType)
     v = PhysicalAddressSetType.__new__(PhysicalAddressSetType)
     c = X.Cursor(n)
@@ -13681,6 +17671,21 @@ _A_PhysicalAddressType = frozenset({'sourceName', 'sourceAddress'})
 
 
 def _r_PhysicalAddressType(n: X.Node) -> PhysicalAddressType:
+    """Reads an XML element of the XTCE type ``PhysicalAddressType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``PhysicalAddressType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``SubAddress``, in
+                     that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_PhysicalAddressType)
     v = PhysicalAddressType.__new__(PhysicalAddressType)
     v.source_name = X.opt_attr(n, 'sourceName', X.p_str)
@@ -13696,6 +17701,21 @@ _A_PolynomialCalibratorType = frozenset({'name', 'shortDescription'})
 
 
 def _r_PolynomialCalibratorType(n: X.Node) -> PolynomialCalibratorType:
+    """Reads an XML element of the XTCE type ``PolynomialCalibratorType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``PolynomialCalibratorType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AncillaryDataSet``,
+                     ``Term``, in that order and in the numbers the schema
+                     allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_PolynomialCalibratorType)
     v = PolynomialCalibratorType.__new__(PolynomialCalibratorType)
     v.name = X.opt_attr(n, 'name', X.p_str)
@@ -13717,6 +17737,24 @@ _A_QueuedVerifierType = frozenset({'shortDescription', 'name'})
 
 
 def _r_QueuedVerifierType(n: X.Node) -> QueuedVerifierType:
+    """Reads an XML element of the XTCE type ``QueuedVerifierType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``QueuedVerifierType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``LongDescription``,
+                     ``AliasSet``, ``AncillaryDataSet``, an alternative of
+                     ``QueuedVerifierChoice1``, an alternative of
+                     ``QueuedVerifierChoice2``, ``ArgumentRestrictionList``, in
+                     that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_QueuedVerifierType)
     v = QueuedVerifierType.__new__(QueuedVerifierType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -13740,6 +17778,20 @@ _A_RateInStreamSetType = frozenset({})
 
 
 def _r_RateInStreamSetType(n: X.Node) -> RateInStreamSetType:
+    """Reads an XML element of the XTCE type ``RateInStreamSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``RateInStreamSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``RateInStream``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_RateInStreamSetType)
     v = RateInStreamSetType.__new__(RateInStreamSetType)
     c = X.Cursor(n)
@@ -13757,6 +17809,19 @@ _A_RateInStreamType = frozenset({'basis', 'minimumValue', 'maximumValue'})
 
 
 def _r_RateInStreamType(n: X.Node) -> RateInStreamType:
+    """Reads an XML element of the XTCE type ``RateInStreamType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``RateInStreamType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     or text.
+    """
     X.check_attrs(n, _A_RateInStreamType)
     v = RateInStreamType.__new__(RateInStreamType)
     v.basis = X.opt_attr(n, 'basis', _p_BasisType)
@@ -13773,6 +17838,19 @@ _A_RateInStreamWithStreamNameType = frozenset({"basis", "minimumValue",
 
 def _r_RateInStreamWithStreamNameType(
         n: X.Node) -> RateInStreamWithStreamNameType:
+    """Reads an XML element of the XTCE type ``RateInStreamWithStreamNameType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``RateInStreamWithStreamNameType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``streamRef``, has an
+                     attribute value that doesn't parse or has children or text.
+    """
     X.check_attrs(n, _A_RateInStreamWithStreamNameType)
     v = RateInStreamWithStreamNameType.__new__(RateInStreamWithStreamNameType)
     v.basis = X.opt_attr(n, 'basis', _p_BasisType)
@@ -13788,6 +17866,24 @@ _A_ReceivedVerifierType = frozenset({'shortDescription', 'name'})
 
 
 def _r_ReceivedVerifierType(n: X.Node) -> ReceivedVerifierType:
+    """Reads an XML element of the XTCE type ``ReceivedVerifierType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ReceivedVerifierType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``LongDescription``,
+                     ``AliasSet``, ``AncillaryDataSet``, an alternative of
+                     ``ReceivedVerifierChoice1``, an alternative of
+                     ``ReceivedVerifierChoice2``, ``ArgumentRestrictionList``,
+                     in that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_ReceivedVerifierType)
     v = ReceivedVerifierType.__new__(ReceivedVerifierType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -13811,6 +17907,21 @@ _A_ReferenceTimeType = frozenset({})
 
 
 def _r_ReferenceTimeType(n: X.Node) -> ReferenceTimeType:
+    """Reads an XML element of the XTCE type ``ReferenceTimeType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ReferenceTimeType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model (an
+                     alternative of ``ReferenceTimeChoice``, in that order and
+                     in the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_ReferenceTimeType)
     v = ReferenceTimeType.__new__(ReferenceTimeType)
     c = X.Cursor(n)
@@ -13824,6 +17935,23 @@ _A_RelativeTimeArgumentType = frozenset({"shortDescription", "name", "baseType",
 
 
 def _r_RelativeTimeArgumentType(n: X.Node) -> RelativeTimeArgumentType:
+    """Reads an XML element of the XTCE type ``RelativeTimeArgumentType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``RelativeTimeArgumentType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``Encoding``, ``ReferenceTime``, in
+                     that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_RelativeTimeArgumentType)
     v = RelativeTimeArgumentType.__new__(RelativeTimeArgumentType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -13848,6 +17976,24 @@ _A_RelativeTimeDataType = frozenset({"shortDescription", "name", "baseType",
 
 
 def _r_RelativeTimeDataType(n: X.Node) -> RelativeTimeDataType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``RelativeTimeDataType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``RelativeTimeDataType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``Encoding``, ``ReferenceTime``, in
+                     that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_RelativeTimeDataType)
     v = RelativeTimeDataType.__new__(RelativeTimeDataType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -13872,6 +18018,24 @@ _A_RelativeTimeParameterType = frozenset({"shortDescription", "name",
 
 
 def _r_RelativeTimeParameterType(n: X.Node) -> RelativeTimeParameterType:
+    """Reads an XML element of the XTCE type ``RelativeTimeParameterType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``RelativeTimeParameterType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``Encoding``, ``ReferenceTime``,
+                     ``DefaultAlarm``, ``ContextAlarmList``, in that order and
+                     in the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_RelativeTimeParameterType)
     v = RelativeTimeParameterType.__new__(RelativeTimeParameterType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -13899,6 +18063,20 @@ _A_RepeatType = frozenset({})
 
 
 def _r_RepeatType(n: X.Node) -> RepeatType:
+    """Reads an XML element of the XTCE type ``RepeatType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``RepeatType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``Count``, ``Offset``, in that order and in the numbers
+                     the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_RepeatType)
     v = RepeatType.__new__(RepeatType)
     c = X.Cursor(n)
@@ -13914,6 +18092,21 @@ _A_RestrictionCriteriaType = frozenset({})
 
 
 def _r_RestrictionCriteriaType(n: X.Node) -> RestrictionCriteriaType:
+    """Reads an XML element of the XTCE type ``RestrictionCriteriaType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``RestrictionCriteriaType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model (an
+                     alternative of ``RestrictionCriteriaChoice``,
+                     ``NextContainer``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_RestrictionCriteriaType)
     v = RestrictionCriteriaType.__new__(RestrictionCriteriaType)
     c = X.Cursor(n)
@@ -13928,6 +18121,24 @@ _A_SentFromRangeVerifierType = frozenset({'shortDescription', 'name'})
 
 
 def _r_SentFromRangeVerifierType(n: X.Node) -> SentFromRangeVerifierType:
+    """Reads an XML element of the XTCE type ``SentFromRangeVerifierType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``SentFromRangeVerifierType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``LongDescription``,
+                     ``AliasSet``, ``AncillaryDataSet``, an alternative of
+                     ``SentFromRangeVerifierChoice1``, an alternative of
+                     ``SentFromRangeVerifierChoice2``,
+                     ``ArgumentRestrictionList``, in that order and in the
+                     numbers the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_SentFromRangeVerifierType)
     v = SentFromRangeVerifierType.__new__(SentFromRangeVerifierType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -13952,6 +18163,24 @@ _A_SequenceContainerType = frozenset({"shortDescription", "name", "abstract",
 
 
 def _r_SequenceContainerType(n: X.Node) -> SequenceContainerType:
+    """Reads an XML element of the XTCE type ``SequenceContainerType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``SequenceContainerType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``DefaultRateInStream``,
+                     ``RateInStreamSet``, ``BinaryEncoding``, ``EntryList``,
+                     ``BaseContainer``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_SequenceContainerType)
     v = SequenceContainerType.__new__(SequenceContainerType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -13983,6 +18212,24 @@ _A_SequenceEntryType = frozenset({'shortDescription'})
 
 
 def _r_SequenceEntryType(n: X.Node) -> SequenceEntryType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``SequenceEntryType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``SequenceEntryType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model
+                     (``LocationInContainerInBits``, ``RepeatEntry``,
+                     ``IncludeCondition``, ``TimeAssociation``,
+                     ``AncillaryDataSet``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_SequenceEntryType)
     v = SequenceEntryType.__new__(SequenceEntryType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -14005,6 +18252,19 @@ _A_ServiceRefType = frozenset({'serviceRef'})
 
 
 def _r_ServiceRefType(n: X.Node) -> ServiceRefType:
+    """Reads an XML element of the XTCE type ``ServiceRefType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ServiceRefType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``serviceRef``, has an
+                     attribute value that doesn't parse or has children or text.
+    """
     X.check_attrs(n, _A_ServiceRefType)
     v = ServiceRefType.__new__(ServiceRefType)
     v.service_ref = X.req_attr(n, 'serviceRef', X.p_str)
@@ -14017,6 +18277,20 @@ _A_ServiceSetType = frozenset({})
 
 
 def _r_ServiceSetType(n: X.Node) -> ServiceSetType:
+    """Reads an XML element of the XTCE type ``ServiceSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ServiceSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``Service``, in that order and in the numbers the schema
+                     allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ServiceSetType)
     v = ServiceSetType.__new__(ServiceSetType)
     c = X.Cursor(n)
@@ -14034,6 +18308,23 @@ _A_ServiceType = frozenset({'shortDescription', 'name'})
 
 
 def _r_ServiceType(n: X.Node) -> ServiceType:
+    """Reads an XML element of the XTCE type ``ServiceType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ServiceType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, an alternative of ``ServiceChoice``,
+                     in that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_ServiceType)
     v = ServiceType.__new__(ServiceType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -14054,6 +18345,19 @@ _A_SignificanceType = frozenset({"spaceSystemAtRisk", "reasonForWarning",
 
 
 def _r_SignificanceType(n: X.Node) -> SignificanceType:
+    """Reads an XML element of the XTCE type ``SignificanceType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``SignificanceType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     or text.
+    """
     X.check_attrs(n, _A_SignificanceType)
     v = SignificanceType.__new__(SignificanceType)
     v.space_system_at_risk = X.opt_attr(n, 'spaceSystemAtRisk', X.p_str)
@@ -14069,6 +18373,24 @@ _A_SimpleAlgorithmType = frozenset({'shortDescription', 'name'})
 
 
 def _r_SimpleAlgorithmType(n: X.Node) -> SimpleAlgorithmType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``SimpleAlgorithmType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``SimpleAlgorithmType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``AlgorithmText``,
+                     ``ExternalAlgorithmSet``, in that order and in the numbers
+                     the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_SimpleAlgorithmType)
     v = SimpleAlgorithmType.__new__(SimpleAlgorithmType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -14091,6 +18413,20 @@ _A_SizeInBitsFixedType = frozenset({})
 
 
 def _r_SizeInBitsFixedType(n: X.Node) -> SizeInBitsFixedType:
+    """Reads an XML element of an XTCE ``Fixed`` element.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``SizeInBitsFixedType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``FixedValue``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_SizeInBitsFixedType)
     v = SizeInBitsFixedType.__new__(SizeInBitsFixedType)
     c = X.Cursor(n)
@@ -14105,6 +18441,21 @@ _A_SizeInBitsType = frozenset({})
 
 
 def _r_SizeInBitsType(n: X.Node) -> SizeInBitsType:
+    """Reads an XML element of the XTCE type ``SizeInBitsType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``SizeInBitsType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``Fixed``, ``TerminationChar``, ``LeadingSize``, in that
+                     order and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_SizeInBitsType)
     v = SizeInBitsType.__new__(SizeInBitsType)
     c = X.Cursor(n)
@@ -14124,6 +18475,24 @@ _A_SpaceSystemType = frozenset({"shortDescription", "name", "systemType",
 
 
 def _r_SpaceSystemType(n: X.Node) -> SpaceSystemType:
+    """Reads an XML element of the XTCE type ``SpaceSystemType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``SpaceSystemType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``Header``, ``TelemetryMetaData``,
+                     ``CommandMetaData``, ``ServiceSet``, ``SpaceSystem``, in
+                     that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_SpaceSystemType)
     v = SpaceSystemType.__new__(SpaceSystemType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -14158,6 +18527,21 @@ _A_SplineCalibratorType = frozenset({"name", "shortDescription", "order",
 
 
 def _r_SplineCalibratorType(n: X.Node) -> SplineCalibratorType:
+    """Reads an XML element of the XTCE type ``SplineCalibratorType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``SplineCalibratorType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AncillaryDataSet``,
+                     ``SplinePoint``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_SplineCalibratorType)
     v = SplineCalibratorType.__new__(SplineCalibratorType)
     v.name = X.opt_attr(n, 'name', X.p_str)
@@ -14181,6 +18565,20 @@ _A_SplinePointType = frozenset({'order', 'raw', 'calibrated'})
 
 
 def _r_SplinePointType(n: X.Node) -> SplinePointType:
+    """Reads an XML element of the XTCE type ``SplinePointType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``SplinePointType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attributes ``raw`` and ``calibrated``,
+                     has an attribute value that doesn't parse or has children
+                     or text.
+    """
     X.check_attrs(n, _A_SplinePointType)
     v = SplinePointType.__new__(SplinePointType)
     v.order = X.opt_attr(n, 'order', X.p_i64)
@@ -14195,6 +18593,19 @@ _A_StreamRefType = frozenset({'streamRef'})
 
 
 def _r_StreamRefType(n: X.Node) -> StreamRefType:
+    """Reads an XML element of the XTCE type ``StreamRefType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``StreamRefType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``streamRef``, has an
+                     attribute value that doesn't parse or has children or text.
+    """
     X.check_attrs(n, _A_StreamRefType)
     v = StreamRefType.__new__(StreamRefType)
     v.stream_ref = X.req_attr(n, 'streamRef', X.p_str)
@@ -14208,6 +18619,24 @@ _A_StreamSegmentEntryType = frozenset({"shortDescription", "streamRef", "order",
 
 
 def _r_StreamSegmentEntryType(n: X.Node) -> StreamSegmentEntryType:
+    """Reads an XML element of the XTCE type ``StreamSegmentEntryType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``StreamSegmentEntryType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attributes ``streamRef`` and
+                     ``sizeInBits``, has an attribute value that doesn't parse
+                     or has children that don't follow its content model
+                     (``LocationInContainerInBits``, ``RepeatEntry``,
+                     ``IncludeCondition``, ``TimeAssociation``,
+                     ``AncillaryDataSet``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_StreamSegmentEntryType)
     v = StreamSegmentEntryType.__new__(StreamSegmentEntryType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -14233,6 +18662,21 @@ _A_StreamSetType = frozenset({})
 
 
 def _r_StreamSetType(n: X.Node) -> StreamSetType:
+    """Reads an XML element of the XTCE type ``StreamSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``StreamSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (alternatives of ``StreamSetChoice``, in that order and in
+                     the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_StreamSetType)
     v = StreamSetType.__new__(StreamSetType)
     c = X.Cursor(n)
@@ -14251,6 +18695,20 @@ _A_StringAlarmLevelType = frozenset({'alarmLevel', 'matchPattern'})
 
 
 def _r_StringAlarmLevelType(n: X.Node) -> StringAlarmLevelType:
+    """Reads an XML element of the XTCE type ``StringAlarmLevelType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``StringAlarmLevelType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attributes ``alarmLevel`` and
+                     ``matchPattern``, has an attribute value that doesn't parse
+                     or has children or text.
+    """
     X.check_attrs(n, _A_StringAlarmLevelType)
     v = StringAlarmLevelType.__new__(StringAlarmLevelType)
     v.alarm_level = X.req_attr(n, 'alarmLevel', _p_ConcernLevelsType)
@@ -14264,6 +18722,20 @@ _A_StringAlarmListType = frozenset({})
 
 
 def _r_StringAlarmListType(n: X.Node) -> StringAlarmListType:
+    """Reads an XML element of the XTCE type ``StringAlarmListType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``StringAlarmListType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``StringAlarm``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_StringAlarmListType)
     v = StringAlarmListType.__new__(StringAlarmListType)
     c = X.Cursor(n)
@@ -14283,6 +18755,22 @@ _A_StringAlarmType = frozenset({"name", "shortDescription", "minViolations",
 
 
 def _r_StringAlarmType(n: X.Node) -> StringAlarmType:
+    """Reads an XML element of the XTCE type ``StringAlarmType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``StringAlarmType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AncillaryDataSet``,
+                     an alternative of ``StringAlarmChoice``,
+                     ``StringAlarmList``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_StringAlarmType)
     v = StringAlarmType.__new__(StringAlarmType)
     v.name = X.opt_attr(n, 'name', X.p_str)
@@ -14309,6 +18797,24 @@ _A_StringArgumentType = frozenset({"shortDescription", "name", "baseType",
 
 
 def _r_StringArgumentType(n: X.Node) -> StringArgumentType:
+    """Reads an XML element of the XTCE type ``StringArgumentType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``StringArgumentType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``UnitSet``, an alternative of
+                     ``StringArgumentChoice``, ``SizeRangeInCharacters``, in
+                     that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_StringArgumentType)
     v = StringArgumentType.__new__(StringArgumentType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -14337,6 +18843,20 @@ _A_StringContextAlarmListType = frozenset({})
 
 
 def _r_StringContextAlarmListType(n: X.Node) -> StringContextAlarmListType:
+    """Reads an XML element of the XTCE type ``StringContextAlarmListType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``StringContextAlarmListType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``ContextAlarm``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_StringContextAlarmListType)
     v = StringContextAlarmListType.__new__(StringContextAlarmListType)
     c = X.Cursor(n)
@@ -14356,6 +18876,23 @@ _A_StringContextAlarmType = frozenset({"name", "shortDescription",
 
 
 def _r_StringContextAlarmType(n: X.Node) -> StringContextAlarmType:
+    """Reads an XML element of the XTCE type ``StringContextAlarmType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``StringContextAlarmType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AncillaryDataSet``,
+                     an alternative of ``StringContextAlarmChoice``,
+                     ``StringAlarmList``, ``ContextMatch``, in that order and in
+                     the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_StringContextAlarmType)
     v = StringContextAlarmType.__new__(StringContextAlarmType)
     v.name = X.opt_attr(n, 'name', X.p_str)
@@ -14383,6 +18920,22 @@ _A_StringDataEncodingType = frozenset({'bitOrder', 'byteOrder', 'encoding'})
 
 
 def _r_StringDataEncodingType(n: X.Node) -> StringDataEncodingType:
+    """Reads an XML element of the XTCE type ``StringDataEncodingType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``StringDataEncodingType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model
+                     (``ErrorDetectCorrect``, an alternative of
+                     ``StringDataEncodingChoice``, in that order and in the
+                     numbers the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_StringDataEncodingType)
     v = StringDataEncodingType.__new__(StringDataEncodingType)
     v.bit_order = X.opt_attr(n, 'bitOrder', _p_BitOrderType)
@@ -14402,6 +18955,25 @@ _A_StringDataType = frozenset({"shortDescription", "name", "baseType",
 
 
 def _r_StringDataType(n: X.Node) -> StringDataType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``StringDataType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``StringDataType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``UnitSet``, an alternative of
+                     ``StringDataChoice``, ``SizeRangeInCharacters``, in that
+                     order and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_StringDataType)
     v = StringDataType.__new__(StringDataType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -14432,6 +19004,25 @@ _A_StringParameterType = frozenset({"shortDescription", "name", "baseType",
 
 
 def _r_StringParameterType(n: X.Node) -> StringParameterType:
+    """Reads an XML element of the XTCE type ``StringParameterType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``StringParameterType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, ``UnitSet``, an alternative of
+                     ``StringParameterChoice``, ``SizeRangeInCharacters``,
+                     ``DefaultAlarm``, ``ContextAlarmList``, in that order and
+                     in the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_StringParameterType)
     v = StringParameterType.__new__(StringParameterType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -14466,6 +19057,20 @@ _A_SyncPatternType = frozenset({"pattern", "bitLocationFromStartOfContainer",
 
 
 def _r_SyncPatternType(n: X.Node) -> SyncPatternType:
+    """Reads an XML element of the XTCE type ``SyncPatternType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``SyncPatternType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attributes ``pattern`` and
+                     ``patternLengthInBits``, has an attribute value that
+                     doesn't parse or has children or text.
+    """
     X.check_attrs(n, _A_SyncPatternType)
     v = SyncPatternType.__new__(SyncPatternType)
     v.pattern = X.req_attr(n, 'pattern', X.p_str)
@@ -14485,6 +19090,22 @@ _A_SyncStrategyType = frozenset({"verifyToLockGoodFrames",
 
 
 def _r_SyncStrategyType(n: X.Node) -> SyncStrategyType:
+    """Reads an XML element of a type derived from the abstract XTCE type
+    ``SyncStrategyType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``SyncStrategyType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AutoInvert``, in
+                     that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_SyncStrategyType)
     v = SyncStrategyType.__new__(SyncStrategyType)
     v.verify_to_lock_good_frames = X.opt_attr(n, "verifyToLockGoodFrames",
@@ -14504,6 +19125,22 @@ _A_TelemetryMetaDataType = frozenset({})
 
 
 def _r_TelemetryMetaDataType(n: X.Node) -> TelemetryMetaDataType:
+    """Reads an XML element of the XTCE type ``TelemetryMetaDataType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``TelemetryMetaDataType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``ParameterTypeSet``, ``ParameterSet``, ``ContainerSet``,
+                     ``MessageSet``, ``StreamSet``, ``AlgorithmSet``, in that
+                     order and in the numbers the schema allows) or that are
+                     themselves invalid.
+    """
     X.check_attrs(n, _A_TelemetryMetaDataType)
     v = TelemetryMetaDataType.__new__(TelemetryMetaDataType)
     c = X.Cursor(n)
@@ -14527,6 +19164,20 @@ _A_TermType = frozenset({'coefficient', 'exponent'})
 
 
 def _r_TermType(n: X.Node) -> TermType:
+    """Reads an XML element of the XTCE type ``TermType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``TermType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attributes ``coefficient`` and
+                     ``exponent``, has an attribute value that doesn't parse or
+                     has children or text.
+    """
     X.check_attrs(n, _A_TermType)
     v = TermType.__new__(TermType)
     v.coefficient = X.req_attr(n, 'coefficient', X.p_double)
@@ -14541,6 +19192,23 @@ _A_TimeAlarmRangesType = frozenset({"name", "shortDescription", "rangeForm",
 
 
 def _r_TimeAlarmRangesType(n: X.Node) -> TimeAlarmRangesType:
+    """Reads an XML element of the XTCE type ``TimeAlarmRangesType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``TimeAlarmRangesType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AncillaryDataSet``,
+                     ``WatchRange``, ``WarningRange``, ``DistressRange``,
+                     ``CriticalRange``, ``SevereRange``, in that order and in
+                     the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_TimeAlarmRangesType)
     v = TimeAlarmRangesType.__new__(TimeAlarmRangesType)
     v.name = X.opt_attr(n, 'name', X.p_str)
@@ -14569,6 +19237,23 @@ _A_TimeAlarmType = frozenset({"name", "shortDescription", "minViolations",
 
 
 def _r_TimeAlarmType(n: X.Node) -> TimeAlarmType:
+    """Reads an XML element of the XTCE type ``TimeAlarmType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``TimeAlarmType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AncillaryDataSet``,
+                     an alternative of ``TimeAlarmChoice``,
+                     ``StaticAlarmRanges``, ``ChangePerSecondAlarmRanges``, in
+                     that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_TimeAlarmType)
     v = TimeAlarmType.__new__(TimeAlarmType)
     v.name = X.opt_attr(n, 'name', X.p_str)
@@ -14595,6 +19280,19 @@ _A_TimeAssociationType = frozenset({"parameterRef", "instance",
 
 
 def _r_TimeAssociationType(n: X.Node) -> TimeAssociationType:
+    """Reads an XML element of the XTCE type ``TimeAssociationType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``TimeAssociationType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``parameterRef``, has an
+                     attribute value that doesn't parse or has children or text.
+    """
     X.check_attrs(n, _A_TimeAssociationType)
     v = TimeAssociationType.__new__(TimeAssociationType)
     v.parameter_ref = X.req_attr(n, 'parameterRef', X.p_str)
@@ -14612,6 +19310,20 @@ _A_TimeContextAlarmListType = frozenset({})
 
 
 def _r_TimeContextAlarmListType(n: X.Node) -> TimeContextAlarmListType:
+    """Reads an XML element of the XTCE type ``TimeContextAlarmListType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``TimeContextAlarmListType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``ContextAlarm``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_TimeContextAlarmListType)
     v = TimeContextAlarmListType.__new__(TimeContextAlarmListType)
     c = X.Cursor(n)
@@ -14630,6 +19342,23 @@ _A_TimeContextAlarmType = frozenset(
 
 
 def _r_TimeContextAlarmType(n: X.Node) -> TimeContextAlarmType:
+    """Reads an XML element of the XTCE type ``TimeContextAlarmType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``TimeContextAlarmType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AncillaryDataSet``,
+                     an alternative of ``TimeContextAlarmChoice``,
+                     ``StaticAlarmRanges``, ``ChangePerSecondAlarmRanges``,
+                     ``ContextMatch``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_TimeContextAlarmType)
     v = TimeContextAlarmType.__new__(TimeContextAlarmType)
     v.name = X.opt_attr(n, 'name', X.p_str)
@@ -14657,6 +19386,20 @@ _A_ToStringType = frozenset({})
 
 
 def _r_ToStringType(n: X.Node) -> ToStringType:
+    """Reads an XML element of the XTCE type ``ToStringType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ToStringType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``NumberFormat``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_ToStringType)
     v = ToStringType.__new__(ToStringType)
     c = X.Cursor(n)
@@ -14672,6 +19415,24 @@ _A_TransferredToRangeVerifierType = frozenset({'shortDescription', 'name'})
 
 def _r_TransferredToRangeVerifierType(
         n: X.Node) -> TransferredToRangeVerifierType:
+    """Reads an XML element of the XTCE type ``TransferredToRangeVerifierType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``TransferredToRangeVerifierType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``LongDescription``,
+                     ``AliasSet``, ``AncillaryDataSet``, an alternative of
+                     ``TransferredToRangeVerifierChoice1``, an alternative of
+                     ``TransferredToRangeVerifierChoice2``,
+                     ``ArgumentRestrictionList``, in that order and in the
+                     numbers the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_TransferredToRangeVerifierType)
     v = TransferredToRangeVerifierType.__new__(TransferredToRangeVerifierType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -14696,6 +19457,20 @@ _A_TransmissionConstraintListType = frozenset({})
 
 def _r_TransmissionConstraintListType(
         n: X.Node) -> TransmissionConstraintListType:
+    """Reads an XML element of the XTCE type ``TransmissionConstraintListType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``TransmissionConstraintListType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``TransmissionConstraint``, in that order and in the
+                     numbers the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_TransmissionConstraintListType)
     v = TransmissionConstraintListType.__new__(TransmissionConstraintListType)
     c = X.Cursor(n)
@@ -14713,6 +19488,22 @@ _A_TransmissionConstraintType = frozenset({'timeOut', 'suspendable'})
 
 
 def _r_TransmissionConstraintType(n: X.Node) -> TransmissionConstraintType:
+    """Reads an XML element of the XTCE type ``TransmissionConstraintType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``TransmissionConstraintType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (an alternative of
+                     ``TransmissionConstraintChoice``,
+                     ``ArgumentRestrictionList``, in that order and in the
+                     numbers the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_TransmissionConstraintType)
     v = TransmissionConstraintType.__new__(TransmissionConstraintType)
     v.time_out = X.opt_attr(n, 'timeOut', X.p_str)
@@ -14730,6 +19521,21 @@ _A_TriggerSetType = frozenset({'name', 'triggerRate'})
 
 
 def _r_TriggerSetType(n: X.Node) -> TriggerSetType:
+    """Reads an XML element of the XTCE type ``TriggerSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``TriggerSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (alternatives of
+                     ``TriggerSetChoice``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_TriggerSetType)
     v = TriggerSetType.__new__(TriggerSetType)
     v.name = X.opt_attr(n, 'name', X.p_str)
@@ -14751,6 +19557,23 @@ _A_TriggeredMathOperationType = frozenset({"name", "shortDescription",
 
 
 def _r_TriggeredMathOperationType(n: X.Node) -> TriggeredMathOperationType:
+    """Reads an XML element of the XTCE type ``TriggeredMathOperationType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``TriggeredMathOperationType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``outputParameterRef``, has an
+                     attribute value that doesn't parse or has children that
+                     don't follow its content model (``AncillaryDataSet``,
+                     alternatives of ``TriggeredMathOperationChoice``,
+                     ``TriggerSet``, in that order and in the numbers the schema
+                     allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_TriggeredMathOperationType)
     v = TriggeredMathOperationType.__new__(TriggeredMathOperationType)
     v.name = X.opt_attr(n, 'name', X.p_str)
@@ -14777,6 +19600,20 @@ _A_UnitSetType = frozenset({})
 
 
 def _r_UnitSetType(n: X.Node) -> UnitSetType:
+    """Reads an XML element of the XTCE type ``UnitSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``UnitSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model (``Unit``,
+                     in that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_UnitSetType)
     v = UnitSetType.__new__(UnitSetType)
     c = X.Cursor(n)
@@ -14792,6 +19629,19 @@ _A_UnitType = frozenset({'power', 'factor', 'description', 'form'})
 
 
 def _r_UnitType(n: X.Node) -> UnitType:
+    """Reads an XML element of the XTCE type ``UnitType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``UnitType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value or text that doesn't parse or has
+                     child elements.
+    """
     X.check_attrs(n, _A_UnitType)
     v = UnitType.__new__(UnitType)
     v.power = X.opt_attr(n, 'power', X.p_double)
@@ -14806,6 +19656,21 @@ _A_ValidFloatRangeSetType = frozenset({'validRangeAppliesToCalibrated'})
 
 
 def _r_ValidFloatRangeSetType(n: X.Node) -> ValidFloatRangeSetType:
+    """Reads an XML element of the XTCE type ``ValidFloatRangeSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ValidFloatRangeSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``ValidRange``, in
+                     that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_ValidFloatRangeSetType)
     v = ValidFloatRangeSetType.__new__(ValidFloatRangeSetType)
     v.valid_range_applies_to_calibrated = X.opt_attr(
@@ -14825,6 +19690,21 @@ _A_ValidIntegerRangeSetType = frozenset({'validRangeAppliesToCalibrated'})
 
 
 def _r_ValidIntegerRangeSetType(n: X.Node) -> ValidIntegerRangeSetType:
+    """Reads an XML element of the XTCE type ``ValidIntegerRangeSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ValidIntegerRangeSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``ValidRange``, in
+                     that order and in the numbers the schema allows) or that
+                     are themselves invalid.
+    """
     X.check_attrs(n, _A_ValidIntegerRangeSetType)
     v = ValidIntegerRangeSetType.__new__(ValidIntegerRangeSetType)
     v.valid_range_applies_to_calibrated = X.opt_attr(
@@ -14845,6 +19725,20 @@ _A_ValueEnumerationType = frozenset({"value", "maxValue", "label",
 
 
 def _r_ValueEnumerationType(n: X.Node) -> ValueEnumerationType:
+    """Reads an XML element of the XTCE type ``ValueEnumerationType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``ValueEnumerationType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attributes ``value`` and ``label``, has
+                     an attribute value that doesn't parse or has children or
+                     text.
+    """
     X.check_attrs(n, _A_ValueEnumerationType)
     v = ValueEnumerationType.__new__(ValueEnumerationType)
     v.value = X.req_attr(n, 'value', X.p_i64)
@@ -14861,6 +19755,24 @@ _A_VariableFrameStreamType = frozenset({"shortDescription", "name",
 
 
 def _r_VariableFrameStreamType(n: X.Node) -> VariableFrameStreamType:
+    """Reads an XML element of the XTCE type ``VariableFrameStreamType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``VariableFrameStreamType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``name``, has an attribute
+                     value that doesn't parse or has children that don't follow
+                     its content model (``LongDescription``, ``AliasSet``,
+                     ``AncillaryDataSet``, an alternative of
+                     ``VariableFrameStreamChoice``, ``StreamRef``,
+                     ``SyncStrategy``, in that order and in the numbers the
+                     schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_VariableFrameStreamType)
     v = VariableFrameStreamType.__new__(VariableFrameStreamType)
     v.short_description = X.opt_attr(n, 'shortDescription', X.p_str)
@@ -14891,6 +19803,21 @@ _A_VariableFrameSyncStrategyType = frozenset({"verifyToLockGoodFrames",
 
 def _r_VariableFrameSyncStrategyType(
         n: X.Node) -> VariableFrameSyncStrategyType:
+    """Reads an XML element of the XTCE type ``VariableFrameSyncStrategyType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``VariableFrameSyncStrategyType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     that don't follow its content model (``AutoInvert``,
+                     ``Flag``, in that order and in the numbers the schema
+                     allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_VariableFrameSyncStrategyType)
     v = VariableFrameSyncStrategyType.__new__(VariableFrameSyncStrategyType)
     v.verify_to_lock_good_frames = X.opt_attr(n, "verifyToLockGoodFrames",
@@ -14913,6 +19840,23 @@ _A_VariableStringType = frozenset({'maxSizeInBits'})
 
 
 def _r_VariableStringType(n: X.Node) -> VariableStringType:
+    """Reads an XML element of the XTCE type ``VariableStringType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``VariableStringType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     lacks the required attribute ``maxSizeInBits``, has an
+                     attribute value that doesn't parse or has children that
+                     don't follow its content model (an alternative of
+                     ``VariableStringChoice1``, an alternative of
+                     ``VariableStringChoice2``, in that order and in the numbers
+                     the schema allows) or that are themselves invalid.
+    """
     X.check_attrs(n, _A_VariableStringType)
     v = VariableStringType.__new__(VariableStringType)
     v.max_size_in_bits = X.req_attr(n, 'maxSizeInBits', X.p_i64)
@@ -14928,6 +19872,24 @@ _A_VerifierSetType = frozenset({})
 
 
 def _r_VerifierSetType(n: X.Node) -> VerifierSetType:
+    """Reads an XML element of the XTCE type ``VerifierSetType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``VerifierSetType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare or
+                     has children that don't follow its content model
+                     (``TransferredToRangeVerifier``, ``SentFromRangeVerifier``,
+                     ``ReceivedVerifier``, ``AcceptedVerifier``,
+                     ``QueuedVerifier``, ``ExecutionVerifier``,
+                     ``CompleteVerifier``, ``FailedVerifier``, in that order and
+                     in the numbers the schema allows) or that are themselves
+                     invalid.
+    """
     X.check_attrs(n, _A_VerifierSetType)
     v = VerifierSetType.__new__(VerifierSetType)
     c = X.Cursor(n)
@@ -14960,6 +19922,19 @@ _A_XORType = frozenset({'bitsFromReference', 'reference', 'parameterRef'})
 
 
 def _r_XORType(n: X.Node) -> XORType:
+    """Reads an XML element of the XTCE type ``XORType``.
+
+    Args:
+        n: The element's parsed node.
+
+    Returns:
+        The element's value, a new ``XORType``.
+
+    Raises:
+        X.XtceError: If the element has an attribute its type doesn't declare,
+                     has an attribute value that doesn't parse or has children
+                     or text.
+    """
     X.check_attrs(n, _A_XORType)
     v = XORType.__new__(XORType)
     v.bits_from_reference = X.opt_attr(n, 'bitsFromReference', X.p_i64)
@@ -14975,6 +19950,21 @@ _RC_ANDedConditionsChoice = {"Condition": _r_ComparisonCheckType,
 
 
 def _r_ANDedConditionsChoice(c: X.Cursor) -> ANDedConditionsChoice:
+    """Reads the alternative of the ``<choice>`` in ``ANDedConditionsType`` that
+    the cursor's next child element starts, which must be ``Condition`` or
+    ``ORedConditions``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ANDedConditionsChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``Condition``
+                     and ``ORedConditions``, or if the alternative's element is
+                     invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_ANDedConditionsChoice.get(k)
     if fn is None:
@@ -14992,6 +19982,25 @@ _RC_AcceptedVerifierChoice1 = {
 
 
 def _r_AcceptedVerifierChoice1(c: X.Cursor) -> AcceptedVerifierChoice1:
+    """Reads the alternative of the ``<choice>`` in ``AcceptedVerifierType``
+    that the cursor's next child element starts, which must be
+    ``ComparisonList``, ``ContainerRef``, ``ParameterValueChange``,
+    ``CustomAlgorithm``, ``BooleanExpression`` or ``Comparison``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``AcceptedVerifierChoice1``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``ComparisonList``, ``ContainerRef``,
+                     ``ParameterValueChange``, ``CustomAlgorithm``,
+                     ``BooleanExpression`` and ``Comparison``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_AcceptedVerifierChoice1.get(k)
     if fn is None:
@@ -15006,6 +20015,21 @@ _RC_AcceptedVerifierChoice2 = {
 
 
 def _r_AcceptedVerifierChoice2(c: X.Cursor) -> AcceptedVerifierChoice2:
+    """Reads the alternative of the ``<choice>`` in ``AcceptedVerifierType``
+    that the cursor's next child element starts, which must be
+    ``CheckWindow`` or ``CheckWindowAlgorithms``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``AcceptedVerifierChoice2``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``CheckWindow``
+                     and ``CheckWindowAlgorithms``, or if the alternative's
+                     element is invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_AcceptedVerifierChoice2.get(k)
     if fn is None:
@@ -15018,6 +20042,22 @@ _RC_AlarmChoice = {"AlarmConditions": _r_AlarmConditionsType,
 
 
 def _r_AlarmChoice(c: X.Cursor) -> AlarmChoice:
+    """Reads the alternative of the ``<choice>`` in ``AlarmType`` that the
+    cursor's next child element starts, which must be ``AlarmConditions`` or
+    ``CustomAlarm``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``AlarmChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``AlarmConditions`` and ``CustomAlarm``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_AlarmChoice.get(k)
     if fn is None:
@@ -15030,6 +20070,22 @@ _RC_AlgorithmSetChoice = {"CustomAlgorithm": _r_InputOutputTriggerAlgorithmType,
 
 
 def _r_AlgorithmSetChoice(c: X.Cursor) -> AlgorithmSetChoice:
+    """Reads the alternative of the ``<choice>`` in ``AlgorithmSetType`` that
+    the cursor's next child element starts, which must be ``CustomAlgorithm``
+    or ``MathAlgorithm``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``AlgorithmSetChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``CustomAlgorithm`` and ``MathAlgorithm``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_AlgorithmSetChoice.get(k)
     if fn is None:
@@ -15044,6 +20100,21 @@ _RC_ArgumentANDedConditionsChoice = {
 
 def _r_ArgumentANDedConditionsChoice(
         c: X.Cursor) -> ArgumentANDedConditionsChoice:
+    """Reads the alternative of the ``<choice>`` in
+    ``ArgumentANDedConditionsType`` that the cursor's next child element
+    starts, which must be ``Condition`` or ``ORedConditions``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ArgumentANDedConditionsChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``Condition``
+                     and ``ORedConditions``, or if the alternative's element is
+                     invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_ArgumentANDedConditionsChoice.get(k)
     if fn is None:
@@ -15059,6 +20130,24 @@ _RC_ArgumentBaseDataChoice = {
 
 
 def _r_ArgumentBaseDataChoice(c: X.Cursor) -> ArgumentBaseDataChoice:
+    """Reads the alternative of the ``<choice>`` in ``ArgumentBaseDataType``
+    that the cursor's next child element starts, which must be
+    ``BinaryDataEncoding``, ``FloatDataEncoding``, ``IntegerDataEncoding`` or
+    ``StringDataEncoding``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ArgumentBaseDataChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``BinaryDataEncoding``, ``FloatDataEncoding``,
+                     ``IntegerDataEncoding`` and ``StringDataEncoding``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_ArgumentBaseDataChoice.get(k)
     if fn is None:
@@ -15075,6 +20164,24 @@ _RC_ArgumentBinaryDataChoice = {
 
 
 def _r_ArgumentBinaryDataChoice(c: X.Cursor) -> ArgumentBinaryDataChoice:
+    """Reads the alternative of the ``<choice>`` in ``ArgumentBinaryDataType``
+    that the cursor's next child element starts, which must be
+    ``BinaryDataEncoding``, ``FloatDataEncoding``, ``IntegerDataEncoding`` or
+    ``StringDataEncoding``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ArgumentBinaryDataChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``BinaryDataEncoding``, ``FloatDataEncoding``,
+                     ``IntegerDataEncoding`` and ``StringDataEncoding``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_ArgumentBinaryDataChoice.get(k)
     if fn is None:
@@ -15091,6 +20198,24 @@ _RC_ArgumentBooleanDataChoice = {
 
 
 def _r_ArgumentBooleanDataChoice(c: X.Cursor) -> ArgumentBooleanDataChoice:
+    """Reads the alternative of the ``<choice>`` in ``ArgumentBooleanDataType``
+    that the cursor's next child element starts, which must be
+    ``BinaryDataEncoding``, ``FloatDataEncoding``, ``IntegerDataEncoding`` or
+    ``StringDataEncoding``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ArgumentBooleanDataChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``BinaryDataEncoding``, ``FloatDataEncoding``,
+                     ``IntegerDataEncoding`` and ``StringDataEncoding``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_ArgumentBooleanDataChoice.get(k)
     if fn is None:
@@ -15107,6 +20232,23 @@ _RC_ArgumentBooleanExpressionChoice = {
 
 def _r_ArgumentBooleanExpressionChoice(
         c: X.Cursor) -> ArgumentBooleanExpressionChoice:
+    """Reads the alternative of the ``<choice>`` in
+    ``ArgumentBooleanExpressionType`` that the cursor's next child element
+    starts, which must be ``Condition``, ``ANDedConditions`` or
+    ``ORedConditions``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ArgumentBooleanExpressionChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``Condition``,
+                     ``ANDedConditions`` and ``ORedConditions``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_ArgumentBooleanExpressionChoice.get(k)
     if fn is None:
@@ -15121,6 +20263,23 @@ _RC_ArgumentComparisonCheckChoice1 = {
 
 def _r_ArgumentComparisonCheckChoice1(
         c: X.Cursor) -> ArgumentComparisonCheckChoice1:
+    """Reads the alternative of the ``<choice>`` in
+    ``ArgumentComparisonCheckType`` that the cursor's next child element
+    starts, which must be ``ParameterInstanceRef`` or
+    ``ArgumentInstanceRef``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ArgumentComparisonCheckChoice1``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``ParameterInstanceRef`` and ``ArgumentInstanceRef``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_ArgumentComparisonCheckChoice1.get(k)
     if fn is None:
@@ -15136,6 +20295,23 @@ _RC_ArgumentComparisonCheckChoice2 = {
 
 def _r_ArgumentComparisonCheckChoice2(
         c: X.Cursor) -> ArgumentComparisonCheckChoice2:
+    """Reads the alternative of the ``<choice>`` in
+    ``ArgumentComparisonCheckType`` that the cursor's next child element
+    starts, which must be ``ParameterInstanceRef``, ``ArgumentInstanceRef``
+    or ``Value``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ArgumentComparisonCheckChoice2``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``ParameterInstanceRef``, ``ArgumentInstanceRef`` and
+                     ``Value``, or if the alternative's element is invalid (see
+                     the reader of its type).
+    """
     k = c.peek()
     fn = _RC_ArgumentComparisonCheckChoice2.get(k)
     if fn is None:
@@ -15149,6 +20325,22 @@ _RC_ArgumentComparisonChoice = {
 
 
 def _r_ArgumentComparisonChoice(c: X.Cursor) -> ArgumentComparisonChoice:
+    """Reads the alternative of the ``<choice>`` in ``ArgumentComparisonType``
+    that the cursor's next child element starts, which must be
+    ``ParameterInstanceRef`` or ``ArgumentInstanceRef``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ArgumentComparisonChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``ParameterInstanceRef`` and ``ArgumentInstanceRef``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_ArgumentComparisonChoice.get(k)
     if fn is None:
@@ -15165,6 +20357,23 @@ _RC_ArgumentDiscreteLookupChoice = {
 
 def _r_ArgumentDiscreteLookupChoice(
         c: X.Cursor) -> ArgumentDiscreteLookupChoice:
+    """Reads the alternative of the ``<choice>`` in
+    ``ArgumentDiscreteLookupType`` that the cursor's next child element
+    starts, which must be ``Comparison``, ``ComparisonList``,
+    ``BooleanExpression`` or ``CustomAlgorithm``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ArgumentDiscreteLookupChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``Comparison``,
+                     ``ComparisonList``, ``BooleanExpression`` and
+                     ``CustomAlgorithm``, or if the alternative's element is
+                     invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_ArgumentDiscreteLookupChoice.get(k)
     if fn is None:
@@ -15179,6 +20388,22 @@ _RC_ArgumentDynamicValueChoice = {
 
 
 def _r_ArgumentDynamicValueChoice(c: X.Cursor) -> ArgumentDynamicValueChoice:
+    """Reads the alternative of the ``<choice>`` in ``ArgumentDynamicValueType``
+    that the cursor's next child element starts, which must be
+    ``ArgumentInstanceRef`` or ``ParameterInstanceRef``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ArgumentDynamicValueChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``ArgumentInstanceRef`` and ``ParameterInstanceRef``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_ArgumentDynamicValueChoice.get(k)
     if fn is None:
@@ -15195,6 +20420,24 @@ _RC_ArgumentEnumeratedDataChoice = {
 
 def _r_ArgumentEnumeratedDataChoice(
         c: X.Cursor) -> ArgumentEnumeratedDataChoice:
+    """Reads the alternative of the ``<choice>`` in
+    ``ArgumentEnumeratedDataType`` that the cursor's next child element
+    starts, which must be ``BinaryDataEncoding``, ``FloatDataEncoding``,
+    ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ArgumentEnumeratedDataChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``BinaryDataEncoding``, ``FloatDataEncoding``,
+                     ``IntegerDataEncoding`` and ``StringDataEncoding``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_ArgumentEnumeratedDataChoice.get(k)
     if fn is None:
@@ -15211,6 +20454,24 @@ _RC_ArgumentFloatDataChoice = {
 
 
 def _r_ArgumentFloatDataChoice(c: X.Cursor) -> ArgumentFloatDataChoice:
+    """Reads the alternative of the ``<choice>`` in ``ArgumentFloatDataType``
+    that the cursor's next child element starts, which must be
+    ``BinaryDataEncoding``, ``FloatDataEncoding``, ``IntegerDataEncoding`` or
+    ``StringDataEncoding``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ArgumentFloatDataChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``BinaryDataEncoding``, ``FloatDataEncoding``,
+                     ``IntegerDataEncoding`` and ``StringDataEncoding``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_ArgumentFloatDataChoice.get(k)
     if fn is None:
@@ -15226,6 +20487,23 @@ _RC_ArgumentInputSetChoice = {
 
 
 def _r_ArgumentInputSetChoice(c: X.Cursor) -> ArgumentInputSetChoice:
+    """Reads the alternative of the ``<choice>`` in ``ArgumentInputSetType``
+    that the cursor's next child element starts, which must be
+    ``InputParameterInstanceRef``, ``InputArgumentInstanceRef`` or
+    ``Constant``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ArgumentInputSetChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``InputParameterInstanceRef``, ``InputArgumentInstanceRef``
+                     and ``Constant``, or if the alternative's element is
+                     invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_ArgumentInputSetChoice.get(k)
     if fn is None:
@@ -15242,6 +20520,24 @@ _RC_ArgumentIntegerDataChoice = {
 
 
 def _r_ArgumentIntegerDataChoice(c: X.Cursor) -> ArgumentIntegerDataChoice:
+    """Reads the alternative of the ``<choice>`` in ``ArgumentIntegerDataType``
+    that the cursor's next child element starts, which must be
+    ``BinaryDataEncoding``, ``FloatDataEncoding``, ``IntegerDataEncoding`` or
+    ``StringDataEncoding``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ArgumentIntegerDataChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``BinaryDataEncoding``, ``FloatDataEncoding``,
+                     ``IntegerDataEncoding`` and ``StringDataEncoding``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_ArgumentIntegerDataChoice.get(k)
     if fn is None:
@@ -15257,6 +20553,22 @@ _RC_ArgumentIntegerValueChoice = {
 
 
 def _r_ArgumentIntegerValueChoice(c: X.Cursor) -> ArgumentIntegerValueChoice:
+    """Reads the alternative of the ``<choice>`` in ``ArgumentIntegerValueType``
+    that the cursor's next child element starts, which must be
+    ``FixedValue``, ``DynamicValue`` or ``DiscreteLookupList``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ArgumentIntegerValueChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``FixedValue``,
+                     ``DynamicValue`` and ``DiscreteLookupList``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_ArgumentIntegerValueChoice.get(k)
     if fn is None:
@@ -15272,6 +20584,23 @@ _RC_ArgumentLocationInContainerInBitsChoice = {
 
 def _r_ArgumentLocationInContainerInBitsChoice(
         c: X.Cursor) -> ArgumentLocationInContainerInBitsChoice:
+    """Reads the alternative of the ``<choice>`` in
+    ``ArgumentLocationInContainerInBitsType`` that the cursor's next child
+    element starts, which must be ``FixedValue``, ``DynamicValue`` or
+    ``DiscreteLookupList``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ArgumentLocationInContainerInBitsChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``FixedValue``,
+                     ``DynamicValue`` and ``DiscreteLookupList``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_ArgumentLocationInContainerInBitsChoice.get(k)
     if fn is None:
@@ -15287,6 +20616,23 @@ _RC_ArgumentMatchCriteriaChoice = {
 
 
 def _r_ArgumentMatchCriteriaChoice(c: X.Cursor) -> ArgumentMatchCriteriaChoice:
+    """Reads the alternative of the ``<choice>`` in
+    ``ArgumentMatchCriteriaType`` that the cursor's next child element
+    starts, which must be ``Comparison``, ``ComparisonList``,
+    ``BooleanExpression`` or ``CustomAlgorithm``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ArgumentMatchCriteriaChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``Comparison``,
+                     ``ComparisonList``, ``BooleanExpression`` and
+                     ``CustomAlgorithm``, or if the alternative's element is
+                     invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_ArgumentMatchCriteriaChoice.get(k)
     if fn is None:
@@ -15304,6 +20650,25 @@ _RC_ArgumentMathOperationChoice = {
 
 
 def _r_ArgumentMathOperationChoice(c: X.Cursor) -> ArgumentMathOperationChoice:
+    """Reads the alternative of the ``<choice>`` in
+    ``ArgumentMathOperationType`` that the cursor's next child element
+    starts, which must be ``ValueOperand``, ``ThisParameterOperand``,
+    ``Operator``, ``ParameterInstanceRefOperand`` or
+    ``ArgumentInstanceRefOperand``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ArgumentMathOperationChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``ValueOperand``, ``ThisParameterOperand``, ``Operator``,
+                     ``ParameterInstanceRefOperand`` and
+                     ``ArgumentInstanceRefOperand``, or if the alternative's
+                     element is invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_ArgumentMathOperationChoice.get(k)
     if fn is None:
@@ -15320,6 +20685,21 @@ _RC_ArgumentORedConditionsChoice = {
 
 def _r_ArgumentORedConditionsChoice(
         c: X.Cursor) -> ArgumentORedConditionsChoice:
+    """Reads the alternative of the ``<choice>`` in
+    ``ArgumentORedConditionsType`` that the cursor's next child element
+    starts, which must be ``Condition`` or ``ANDedConditions``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ArgumentORedConditionsChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``Condition``
+                     and ``ANDedConditions``, or if the alternative's element is
+                     invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_ArgumentORedConditionsChoice.get(k)
     if fn is None:
@@ -15335,6 +20715,24 @@ _RC_ArgumentStringDataChoice = {
 
 
 def _r_ArgumentStringDataChoice(c: X.Cursor) -> ArgumentStringDataChoice:
+    """Reads the alternative of the ``<choice>`` in ``ArgumentStringDataType``
+    that the cursor's next child element starts, which must be
+    ``BinaryDataEncoding``, ``FloatDataEncoding``, ``IntegerDataEncoding`` or
+    ``StringDataEncoding``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ArgumentStringDataChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``BinaryDataEncoding``, ``FloatDataEncoding``,
+                     ``IntegerDataEncoding`` and ``StringDataEncoding``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_ArgumentStringDataChoice.get(k)
     if fn is None:
@@ -15349,6 +20747,21 @@ _RC_ArgumentStringDataEncodingChoice = {
 
 def _r_ArgumentStringDataEncodingChoice(
         c: X.Cursor) -> ArgumentStringDataEncodingChoice:
+    """Reads the alternative of the ``<choice>`` in
+    ``ArgumentStringDataEncodingType`` that the cursor's next child element
+    starts, which must be ``SizeInBits`` or ``Variable``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ArgumentStringDataEncodingChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``SizeInBits``
+                     and ``Variable``, or if the alternative's element is
+                     invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_ArgumentStringDataEncodingChoice.get(k)
     if fn is None:
@@ -15370,6 +20783,30 @@ _RC_ArgumentTypeSetChoice = {
 
 
 def _r_ArgumentTypeSetChoice(c: X.Cursor) -> ArgumentTypeSetChoice:
+    """Reads the alternative of the ``<choice>`` in ``ArgumentTypeSetType`` that
+    the cursor's next child element starts, which must be
+    ``StringArgumentType``, ``EnumeratedArgumentType``,
+    ``IntegerArgumentType``, ``BinaryArgumentType``, ``FloatArgumentType``,
+    ``BooleanArgumentType``, ``RelativeTimeArgumentType``,
+    ``AbsoluteTimeArgumentType``, ``ArrayArgumentType`` or
+    ``AggregateArgumentType``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ArgumentTypeSetChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``StringArgumentType``, ``EnumeratedArgumentType``,
+                     ``IntegerArgumentType``, ``BinaryArgumentType``,
+                     ``FloatArgumentType``, ``BooleanArgumentType``,
+                     ``RelativeTimeArgumentType``, ``AbsoluteTimeArgumentType``,
+                     ``ArrayArgumentType`` and ``AggregateArgumentType``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_ArgumentTypeSetChoice.get(k)
     if fn is None:
@@ -15388,6 +20825,21 @@ _RC_ArgumentVariableStringChoice1 = {
 
 def _r_ArgumentVariableStringChoice1(
         c: X.Cursor) -> ArgumentVariableStringChoice1:
+    """Reads the alternative of the ``<choice>`` in
+    ``ArgumentVariableStringType`` that the cursor's next child element
+    starts, which must be ``DynamicValue`` or ``DiscreteLookupList``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ArgumentVariableStringChoice1``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``DynamicValue``
+                     and ``DiscreteLookupList``, or if the alternative's element
+                     is invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_ArgumentVariableStringChoice1.get(k)
     if fn is None:
@@ -15402,6 +20854,21 @@ _RC_ArgumentVariableStringChoice2 = {
 
 def _r_ArgumentVariableStringChoice2(
         c: X.Cursor) -> ArgumentVariableStringChoice2:
+    """Reads the alternative of the ``<choice>`` in
+    ``ArgumentVariableStringType`` that the cursor's next child element
+    starts, which must be ``LeadingSize`` or ``TerminationChar``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ArgumentVariableStringChoice2``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``LeadingSize``
+                     and ``TerminationChar``, or if the alternative's element is
+                     invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_ArgumentVariableStringChoice2.get(k)
     if fn is None:
@@ -15416,6 +20883,23 @@ _RC_BaseDataChoice = {"BinaryDataEncoding": _r_BinaryDataEncodingType,
 
 
 def _r_BaseDataChoice(c: X.Cursor) -> BaseDataChoice:
+    """Reads the alternative of the ``<choice>`` in ``BaseDataType`` that the
+    cursor's next child element starts, which must be ``BinaryDataEncoding``,
+    ``FloatDataEncoding``, ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``BaseDataChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``BinaryDataEncoding``, ``FloatDataEncoding``,
+                     ``IntegerDataEncoding`` and ``StringDataEncoding``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_BaseDataChoice.get(k)
     if fn is None:
@@ -15429,6 +20913,22 @@ _RC_BinaryAlarmChoice = {"AlarmConditions": _r_AlarmConditionsType,
 
 
 def _r_BinaryAlarmChoice(c: X.Cursor) -> BinaryAlarmChoice:
+    """Reads the alternative of the ``<choice>`` in ``BinaryAlarmType`` that the
+    cursor's next child element starts, which must be ``AlarmConditions`` or
+    ``CustomAlarm``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``BinaryAlarmChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``AlarmConditions`` and ``CustomAlarm``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_BinaryAlarmChoice.get(k)
     if fn is None:
@@ -15444,6 +20944,24 @@ _RC_BinaryArgumentChoice = {
 
 
 def _r_BinaryArgumentChoice(c: X.Cursor) -> BinaryArgumentChoice:
+    """Reads the alternative of the ``<choice>`` in ``BinaryArgumentType`` that
+    the cursor's next child element starts, which must be
+    ``BinaryDataEncoding``, ``FloatDataEncoding``, ``IntegerDataEncoding`` or
+    ``StringDataEncoding``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``BinaryArgumentChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``BinaryDataEncoding``, ``FloatDataEncoding``,
+                     ``IntegerDataEncoding`` and ``StringDataEncoding``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_BinaryArgumentChoice.get(k)
     if fn is None:
@@ -15457,6 +20975,22 @@ _RC_BinaryContextAlarmChoice = {"AlarmConditions": _r_AlarmConditionsType,
 
 
 def _r_BinaryContextAlarmChoice(c: X.Cursor) -> BinaryContextAlarmChoice:
+    """Reads the alternative of the ``<choice>`` in ``BinaryContextAlarmType``
+    that the cursor's next child element starts, which must be
+    ``AlarmConditions`` or ``CustomAlarm``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``BinaryContextAlarmChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``AlarmConditions`` and ``CustomAlarm``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_BinaryContextAlarmChoice.get(k)
     if fn is None:
@@ -15471,6 +21005,23 @@ _RC_BinaryDataChoice = {"BinaryDataEncoding": _r_BinaryDataEncodingType,
 
 
 def _r_BinaryDataChoice(c: X.Cursor) -> BinaryDataChoice:
+    """Reads the alternative of the ``<choice>`` in ``BinaryDataType`` that the
+    cursor's next child element starts, which must be ``BinaryDataEncoding``,
+    ``FloatDataEncoding``, ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``BinaryDataChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``BinaryDataEncoding``, ``FloatDataEncoding``,
+                     ``IntegerDataEncoding`` and ``StringDataEncoding``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_BinaryDataChoice.get(k)
     if fn is None:
@@ -15486,6 +21037,24 @@ _RC_BinaryParameterChoice = {"BinaryDataEncoding": _r_BinaryDataEncodingType,
 
 
 def _r_BinaryParameterChoice(c: X.Cursor) -> BinaryParameterChoice:
+    """Reads the alternative of the ``<choice>`` in ``BinaryParameterType`` that
+    the cursor's next child element starts, which must be
+    ``BinaryDataEncoding``, ``FloatDataEncoding``, ``IntegerDataEncoding`` or
+    ``StringDataEncoding``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``BinaryParameterChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``BinaryDataEncoding``, ``FloatDataEncoding``,
+                     ``IntegerDataEncoding`` and ``StringDataEncoding``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_BinaryParameterChoice.get(k)
     if fn is None:
@@ -15499,6 +21068,22 @@ _RC_BooleanAlarmChoice = {"AlarmConditions": _r_AlarmConditionsType,
 
 
 def _r_BooleanAlarmChoice(c: X.Cursor) -> BooleanAlarmChoice:
+    """Reads the alternative of the ``<choice>`` in ``BooleanAlarmType`` that
+    the cursor's next child element starts, which must be ``AlarmConditions``
+    or ``CustomAlarm``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``BooleanAlarmChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``AlarmConditions`` and ``CustomAlarm``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_BooleanAlarmChoice.get(k)
     if fn is None:
@@ -15514,6 +21099,24 @@ _RC_BooleanArgumentChoice = {
 
 
 def _r_BooleanArgumentChoice(c: X.Cursor) -> BooleanArgumentChoice:
+    """Reads the alternative of the ``<choice>`` in ``BooleanArgumentType`` that
+    the cursor's next child element starts, which must be
+    ``BinaryDataEncoding``, ``FloatDataEncoding``, ``IntegerDataEncoding`` or
+    ``StringDataEncoding``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``BooleanArgumentChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``BinaryDataEncoding``, ``FloatDataEncoding``,
+                     ``IntegerDataEncoding`` and ``StringDataEncoding``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_BooleanArgumentChoice.get(k)
     if fn is None:
@@ -15527,6 +21130,22 @@ _RC_BooleanContextAlarmChoice = {"AlarmConditions": _r_AlarmConditionsType,
 
 
 def _r_BooleanContextAlarmChoice(c: X.Cursor) -> BooleanContextAlarmChoice:
+    """Reads the alternative of the ``<choice>`` in ``BooleanContextAlarmType``
+    that the cursor's next child element starts, which must be
+    ``AlarmConditions`` or ``CustomAlarm``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``BooleanContextAlarmChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``AlarmConditions`` and ``CustomAlarm``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_BooleanContextAlarmChoice.get(k)
     if fn is None:
@@ -15541,6 +21160,23 @@ _RC_BooleanDataChoice = {"BinaryDataEncoding": _r_BinaryDataEncodingType,
 
 
 def _r_BooleanDataChoice(c: X.Cursor) -> BooleanDataChoice:
+    """Reads the alternative of the ``<choice>`` in ``BooleanDataType`` that the
+    cursor's next child element starts, which must be ``BinaryDataEncoding``,
+    ``FloatDataEncoding``, ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``BooleanDataChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``BinaryDataEncoding``, ``FloatDataEncoding``,
+                     ``IntegerDataEncoding`` and ``StringDataEncoding``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_BooleanDataChoice.get(k)
     if fn is None:
@@ -15555,6 +21191,22 @@ _RC_BooleanExpressionChoice = {"Condition": _r_ComparisonCheckType,
 
 
 def _r_BooleanExpressionChoice(c: X.Cursor) -> BooleanExpressionChoice:
+    """Reads the alternative of the ``<choice>`` in ``BooleanExpressionType``
+    that the cursor's next child element starts, which must be ``Condition``,
+    ``ANDedConditions`` or ``ORedConditions``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``BooleanExpressionChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``Condition``,
+                     ``ANDedConditions`` and ``ORedConditions``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_BooleanExpressionChoice.get(k)
     if fn is None:
@@ -15569,6 +21221,24 @@ _RC_BooleanParameterChoice = {"BinaryDataEncoding": _r_BinaryDataEncodingType,
 
 
 def _r_BooleanParameterChoice(c: X.Cursor) -> BooleanParameterChoice:
+    """Reads the alternative of the ``<choice>`` in ``BooleanParameterType``
+    that the cursor's next child element starts, which must be
+    ``BinaryDataEncoding``, ``FloatDataEncoding``, ``IntegerDataEncoding`` or
+    ``StringDataEncoding``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``BooleanParameterChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``BinaryDataEncoding``, ``FloatDataEncoding``,
+                     ``IntegerDataEncoding`` and ``StringDataEncoding``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_BooleanParameterChoice.get(k)
     if fn is None:
@@ -15584,6 +21254,22 @@ _RC_CalibratorChoice = {
 
 
 def _r_CalibratorChoice(c: X.Cursor) -> CalibratorChoice:
+    """Reads the alternative of the ``<choice>`` in ``CalibratorType`` that the
+    cursor's next child element starts, which must be ``SplineCalibrator``,
+    ``PolynomialCalibrator`` or ``MathOperationCalibrator``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``CalibratorChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``SplineCalibrator``, ``PolynomialCalibrator`` and
+                     ``MathOperationCalibrator``, or if the alternative's
+                     element is invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_CalibratorChoice.get(k)
     if fn is None:
@@ -15607,6 +21293,30 @@ _RC_CommandContainerEntryListChoice = {
 
 def _r_CommandContainerEntryListChoice(
         c: X.Cursor) -> CommandContainerEntryListChoice:
+    """Reads the alternative of the ``<choice>`` in
+    ``CommandContainerEntryListType`` that the cursor's next child element
+    starts, which must be ``ParameterRefEntry``,
+    ``ParameterSegmentRefEntry``, ``ContainerRefEntry``,
+    ``ContainerSegmentRefEntry``, ``StreamSegmentEntry``,
+    ``IndirectParameterRefEntry``, ``ArrayParameterRefEntry``,
+    ``ArgumentRefEntry``, ``ArrayArgumentRefEntry`` or ``FixedValueEntry``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``CommandContainerEntryListChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``ParameterRefEntry``, ``ParameterSegmentRefEntry``,
+                     ``ContainerRefEntry``, ``ContainerSegmentRefEntry``,
+                     ``StreamSegmentEntry``, ``IndirectParameterRefEntry``,
+                     ``ArrayParameterRefEntry``, ``ArgumentRefEntry``,
+                     ``ArrayArgumentRefEntry`` and ``FixedValueEntry``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_CommandContainerEntryListChoice.get(k)
     if fn is None:
@@ -15628,6 +21338,25 @@ _RC_CommandVerifierChoice1 = {
 
 
 def _r_CommandVerifierChoice1(c: X.Cursor) -> CommandVerifierChoice1:
+    """Reads the alternative of the ``<choice>`` in ``CommandVerifierType`` that
+    the cursor's next child element starts, which must be ``ComparisonList``,
+    ``ContainerRef``, ``ParameterValueChange``, ``CustomAlgorithm``,
+    ``BooleanExpression`` or ``Comparison``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``CommandVerifierChoice1``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``ComparisonList``, ``ContainerRef``,
+                     ``ParameterValueChange``, ``CustomAlgorithm``,
+                     ``BooleanExpression`` and ``Comparison``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_CommandVerifierChoice1.get(k)
     if fn is None:
@@ -15642,6 +21371,21 @@ _RC_CommandVerifierChoice2 = {
 
 
 def _r_CommandVerifierChoice2(c: X.Cursor) -> CommandVerifierChoice2:
+    """Reads the alternative of the ``<choice>`` in ``CommandVerifierType`` that
+    the cursor's next child element starts, which must be ``CheckWindow`` or
+    ``CheckWindowAlgorithms``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``CommandVerifierChoice2``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``CheckWindow``
+                     and ``CheckWindowAlgorithms``, or if the alternative's
+                     element is invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_CommandVerifierChoice2.get(k)
     if fn is None:
@@ -15655,6 +21399,22 @@ _RC_ComparisonCheckChoice = {
 
 
 def _r_ComparisonCheckChoice(c: X.Cursor) -> ComparisonCheckChoice:
+    """Reads the alternative of the ``<choice>`` in ``ComparisonCheckType`` that
+    the cursor's next child element starts, which must be
+    ``ParameterInstanceRef`` or ``Value``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ComparisonCheckChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``ParameterInstanceRef`` and ``Value``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_ComparisonCheckChoice.get(k)
     if fn is None:
@@ -15672,6 +21432,25 @@ _RC_CompleteVerifierChoice1 = {
 
 
 def _r_CompleteVerifierChoice1(c: X.Cursor) -> CompleteVerifierChoice1:
+    """Reads the alternative of the ``<choice>`` in ``CompleteVerifierType``
+    that the cursor's next child element starts, which must be
+    ``ComparisonList``, ``ContainerRef``, ``ParameterValueChange``,
+    ``CustomAlgorithm``, ``BooleanExpression`` or ``Comparison``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``CompleteVerifierChoice1``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``ComparisonList``, ``ContainerRef``,
+                     ``ParameterValueChange``, ``CustomAlgorithm``,
+                     ``BooleanExpression`` and ``Comparison``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_CompleteVerifierChoice1.get(k)
     if fn is None:
@@ -15686,6 +21465,21 @@ _RC_CompleteVerifierChoice2 = {
 
 
 def _r_CompleteVerifierChoice2(c: X.Cursor) -> CompleteVerifierChoice2:
+    """Reads the alternative of the ``<choice>`` in ``CompleteVerifierType``
+    that the cursor's next child element starts, which must be
+    ``CheckWindow`` or ``CheckWindowAlgorithms``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``CompleteVerifierChoice2``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``CheckWindow``
+                     and ``CheckWindowAlgorithms``, or if the alternative's
+                     element is invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_CompleteVerifierChoice2.get(k)
     if fn is None:
@@ -15700,6 +21494,22 @@ _RC_ContextMatchChoice = {"Comparison": _r_ComparisonType,
 
 
 def _r_ContextMatchChoice(c: X.Cursor) -> ContextMatchChoice:
+    """Reads the alternative of the ``<choice>`` in ``ContextMatchType`` that
+    the cursor's next child element starts, which must be ``Comparison``,
+    ``ComparisonList``, ``BooleanExpression`` or ``CustomAlgorithm``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ContextMatchChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``Comparison``,
+                     ``ComparisonList``, ``BooleanExpression`` and
+                     ``CustomAlgorithm``, or if the alternative's element is
+                     invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_ContextMatchChoice.get(k)
     if fn is None:
@@ -15715,6 +21525,22 @@ _RC_DiscreteLookupChoice = {"Comparison": _r_ComparisonType,
 
 
 def _r_DiscreteLookupChoice(c: X.Cursor) -> DiscreteLookupChoice:
+    """Reads the alternative of the ``<choice>`` in ``DiscreteLookupType`` that
+    the cursor's next child element starts, which must be ``Comparison``,
+    ``ComparisonList``, ``BooleanExpression`` or ``CustomAlgorithm``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``DiscreteLookupChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``Comparison``,
+                     ``ComparisonList``, ``BooleanExpression`` and
+                     ``CustomAlgorithm``, or if the alternative's element is
+                     invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_DiscreteLookupChoice.get(k)
     if fn is None:
@@ -15730,6 +21556,23 @@ _RC_EncodingChoice = {"BinaryDataEncoding": _r_BinaryDataEncodingType,
 
 
 def _r_EncodingChoice(c: X.Cursor) -> EncodingChoice:
+    """Reads the alternative of the ``<choice>`` in ``EncodingType`` that the
+    cursor's next child element starts, which must be ``BinaryDataEncoding``,
+    ``FloatDataEncoding``, ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``EncodingChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``BinaryDataEncoding``, ``FloatDataEncoding``,
+                     ``IntegerDataEncoding`` and ``StringDataEncoding``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_EncodingChoice.get(k)
     if fn is None:
@@ -15749,6 +21592,26 @@ _RC_EntryListChoice = {
 
 
 def _r_EntryListChoice(c: X.Cursor) -> EntryListChoice:
+    """Reads the alternative of the ``<choice>`` in ``EntryListType`` that the
+    cursor's next child element starts, which must be ``ParameterRefEntry``,
+    ``ParameterSegmentRefEntry``, ``ContainerRefEntry``,
+    ``ContainerSegmentRefEntry``, ``StreamSegmentEntry``,
+    ``IndirectParameterRefEntry`` or ``ArrayParameterRefEntry``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``EntryListChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``ParameterRefEntry``, ``ParameterSegmentRefEntry``,
+                     ``ContainerRefEntry``, ``ContainerSegmentRefEntry``,
+                     ``StreamSegmentEntry``, ``IndirectParameterRefEntry`` and
+                     ``ArrayParameterRefEntry``, or if the alternative's element
+                     is invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_EntryListChoice.get(k)
     if fn is None:
@@ -15767,6 +21630,24 @@ _RC_EnumeratedArgumentChoice = {
 
 
 def _r_EnumeratedArgumentChoice(c: X.Cursor) -> EnumeratedArgumentChoice:
+    """Reads the alternative of the ``<choice>`` in ``EnumeratedArgumentType``
+    that the cursor's next child element starts, which must be
+    ``BinaryDataEncoding``, ``FloatDataEncoding``, ``IntegerDataEncoding`` or
+    ``StringDataEncoding``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``EnumeratedArgumentChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``BinaryDataEncoding``, ``FloatDataEncoding``,
+                     ``IntegerDataEncoding`` and ``StringDataEncoding``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_EnumeratedArgumentChoice.get(k)
     if fn is None:
@@ -15782,6 +21663,24 @@ _RC_EnumeratedDataChoice = {"BinaryDataEncoding": _r_BinaryDataEncodingType,
 
 
 def _r_EnumeratedDataChoice(c: X.Cursor) -> EnumeratedDataChoice:
+    """Reads the alternative of the ``<choice>`` in ``EnumeratedDataType`` that
+    the cursor's next child element starts, which must be
+    ``BinaryDataEncoding``, ``FloatDataEncoding``, ``IntegerDataEncoding`` or
+    ``StringDataEncoding``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``EnumeratedDataChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``BinaryDataEncoding``, ``FloatDataEncoding``,
+                     ``IntegerDataEncoding`` and ``StringDataEncoding``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_EnumeratedDataChoice.get(k)
     if fn is None:
@@ -15798,6 +21697,24 @@ _RC_EnumeratedParameterChoice = {
 
 
 def _r_EnumeratedParameterChoice(c: X.Cursor) -> EnumeratedParameterChoice:
+    """Reads the alternative of the ``<choice>`` in ``EnumeratedParameterType``
+    that the cursor's next child element starts, which must be
+    ``BinaryDataEncoding``, ``FloatDataEncoding``, ``IntegerDataEncoding`` or
+    ``StringDataEncoding``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``EnumeratedParameterChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``BinaryDataEncoding``, ``FloatDataEncoding``,
+                     ``IntegerDataEncoding`` and ``StringDataEncoding``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_EnumeratedParameterChoice.get(k)
     if fn is None:
@@ -15811,6 +21728,22 @@ _RC_EnumerationAlarmChoice = {"AlarmConditions": _r_AlarmConditionsType,
 
 
 def _r_EnumerationAlarmChoice(c: X.Cursor) -> EnumerationAlarmChoice:
+    """Reads the alternative of the ``<choice>`` in ``EnumerationAlarmType``
+    that the cursor's next child element starts, which must be
+    ``AlarmConditions`` or ``CustomAlarm``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``EnumerationAlarmChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``AlarmConditions`` and ``CustomAlarm``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_EnumerationAlarmChoice.get(k)
     if fn is None:
@@ -15824,6 +21757,22 @@ _RC_EnumerationContextAlarmChoice = {"AlarmConditions": _r_AlarmConditionsType,
 
 def _r_EnumerationContextAlarmChoice(
         c: X.Cursor) -> EnumerationContextAlarmChoice:
+    """Reads the alternative of the ``<choice>`` in
+    ``EnumerationContextAlarmType`` that the cursor's next child element
+    starts, which must be ``AlarmConditions`` or ``CustomAlarm``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``EnumerationContextAlarmChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``AlarmConditions`` and ``CustomAlarm``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_EnumerationContextAlarmChoice.get(k)
     if fn is None:
@@ -15836,6 +21785,21 @@ _RC_ErrorDetectCorrectChoice = {"Checksum": _r_ChecksumType, "CRC": _r_CRCType,
 
 
 def _r_ErrorDetectCorrectChoice(c: X.Cursor) -> ErrorDetectCorrectChoice:
+    """Reads the alternative of the ``<choice>`` in ``ErrorDetectCorrectType``
+    that the cursor's next child element starts, which must be ``Checksum``,
+    ``CRC``, ``XOR`` or ``Parity``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ErrorDetectCorrectChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``Checksum``,
+                     ``CRC``, ``XOR`` and ``Parity``, or if the alternative's
+                     element is invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_ErrorDetectCorrectChoice.get(k)
     if fn is None:
@@ -15853,6 +21817,25 @@ _RC_ExecutionVerifierChoice1 = {
 
 
 def _r_ExecutionVerifierChoice1(c: X.Cursor) -> ExecutionVerifierChoice1:
+    """Reads the alternative of the ``<choice>`` in ``ExecutionVerifierType``
+    that the cursor's next child element starts, which must be
+    ``ComparisonList``, ``ContainerRef``, ``ParameterValueChange``,
+    ``CustomAlgorithm``, ``BooleanExpression`` or ``Comparison``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ExecutionVerifierChoice1``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``ComparisonList``, ``ContainerRef``,
+                     ``ParameterValueChange``, ``CustomAlgorithm``,
+                     ``BooleanExpression`` and ``Comparison``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_ExecutionVerifierChoice1.get(k)
     if fn is None:
@@ -15867,6 +21850,21 @@ _RC_ExecutionVerifierChoice2 = {
 
 
 def _r_ExecutionVerifierChoice2(c: X.Cursor) -> ExecutionVerifierChoice2:
+    """Reads the alternative of the ``<choice>`` in ``ExecutionVerifierType``
+    that the cursor's next child element starts, which must be
+    ``CheckWindow`` or ``CheckWindowAlgorithms``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ExecutionVerifierChoice2``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``CheckWindow``
+                     and ``CheckWindowAlgorithms``, or if the alternative's
+                     element is invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_ExecutionVerifierChoice2.get(k)
     if fn is None:
@@ -15884,6 +21882,25 @@ _RC_FailedVerifierChoice1 = {
 
 
 def _r_FailedVerifierChoice1(c: X.Cursor) -> FailedVerifierChoice1:
+    """Reads the alternative of the ``<choice>`` in ``FailedVerifierType`` that
+    the cursor's next child element starts, which must be ``ComparisonList``,
+    ``ContainerRef``, ``ParameterValueChange``, ``CustomAlgorithm``,
+    ``BooleanExpression`` or ``Comparison``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``FailedVerifierChoice1``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``ComparisonList``, ``ContainerRef``,
+                     ``ParameterValueChange``, ``CustomAlgorithm``,
+                     ``BooleanExpression`` and ``Comparison``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_FailedVerifierChoice1.get(k)
     if fn is None:
@@ -15898,6 +21915,21 @@ _RC_FailedVerifierChoice2 = {
 
 
 def _r_FailedVerifierChoice2(c: X.Cursor) -> FailedVerifierChoice2:
+    """Reads the alternative of the ``<choice>`` in ``FailedVerifierType`` that
+    the cursor's next child element starts, which must be ``CheckWindow`` or
+    ``CheckWindowAlgorithms``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``FailedVerifierChoice2``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``CheckWindow``
+                     and ``CheckWindowAlgorithms``, or if the alternative's
+                     element is invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_FailedVerifierChoice2.get(k)
     if fn is None:
@@ -15910,6 +21942,21 @@ _RC_FixedFrameStreamChoice = {"ContainerRef": _r_ContainerRefType,
 
 
 def _r_FixedFrameStreamChoice(c: X.Cursor) -> FixedFrameStreamChoice:
+    """Reads the alternative of the ``<choice>`` in ``FixedFrameStreamType``
+    that the cursor's next child element starts, which must be
+    ``ContainerRef`` or ``ServiceRef``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``FixedFrameStreamChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``ContainerRef``
+                     and ``ServiceRef``, or if the alternative's element is
+                     invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_FixedFrameStreamChoice.get(k)
     if fn is None:
@@ -15925,6 +21972,24 @@ _RC_FloatArgumentChoice = {
 
 
 def _r_FloatArgumentChoice(c: X.Cursor) -> FloatArgumentChoice:
+    """Reads the alternative of the ``<choice>`` in ``FloatArgumentType`` that
+    the cursor's next child element starts, which must be
+    ``BinaryDataEncoding``, ``FloatDataEncoding``, ``IntegerDataEncoding`` or
+    ``StringDataEncoding``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``FloatArgumentChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``BinaryDataEncoding``, ``FloatDataEncoding``,
+                     ``IntegerDataEncoding`` and ``StringDataEncoding``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_FloatArgumentChoice.get(k)
     if fn is None:
@@ -15940,6 +22005,23 @@ _RC_FloatDataChoice = {"BinaryDataEncoding": _r_BinaryDataEncodingType,
 
 
 def _r_FloatDataChoice(c: X.Cursor) -> FloatDataChoice:
+    """Reads the alternative of the ``<choice>`` in ``FloatDataType`` that the
+    cursor's next child element starts, which must be ``BinaryDataEncoding``,
+    ``FloatDataEncoding``, ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``FloatDataChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``BinaryDataEncoding``, ``FloatDataEncoding``,
+                     ``IntegerDataEncoding`` and ``StringDataEncoding``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_FloatDataChoice.get(k)
     if fn is None:
@@ -15955,6 +22037,24 @@ _RC_FloatParameterChoice = {"BinaryDataEncoding": _r_BinaryDataEncodingType,
 
 
 def _r_FloatParameterChoice(c: X.Cursor) -> FloatParameterChoice:
+    """Reads the alternative of the ``<choice>`` in ``FloatParameterType`` that
+    the cursor's next child element starts, which must be
+    ``BinaryDataEncoding``, ``FloatDataEncoding``, ``IntegerDataEncoding`` or
+    ``StringDataEncoding``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``FloatParameterChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``BinaryDataEncoding``, ``FloatDataEncoding``,
+                     ``IntegerDataEncoding`` and ``StringDataEncoding``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_FloatParameterChoice.get(k)
     if fn is None:
@@ -15968,6 +22068,21 @@ _RC_FrameStreamChoice = {"ContainerRef": _r_ContainerRefType,
 
 
 def _r_FrameStreamChoice(c: X.Cursor) -> FrameStreamChoice:
+    """Reads the alternative of the ``<choice>`` in ``FrameStreamType`` that the
+    cursor's next child element starts, which must be ``ContainerRef`` or
+    ``ServiceRef``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``FrameStreamChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``ContainerRef``
+                     and ``ServiceRef``, or if the alternative's element is
+                     invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_FrameStreamChoice.get(k)
     if fn is None:
@@ -15981,6 +22096,22 @@ _RC_InputSetChoice = {
 
 
 def _r_InputSetChoice(c: X.Cursor) -> InputSetChoice:
+    """Reads the alternative of the ``<choice>`` in ``InputSetType`` that the
+    cursor's next child element starts, which must be
+    ``InputParameterInstanceRef`` or ``Constant``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``InputSetChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``InputParameterInstanceRef`` and ``Constant``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_InputSetChoice.get(k)
     if fn is None:
@@ -15996,6 +22127,24 @@ _RC_IntegerArgumentChoice = {
 
 
 def _r_IntegerArgumentChoice(c: X.Cursor) -> IntegerArgumentChoice:
+    """Reads the alternative of the ``<choice>`` in ``IntegerArgumentType`` that
+    the cursor's next child element starts, which must be
+    ``BinaryDataEncoding``, ``FloatDataEncoding``, ``IntegerDataEncoding`` or
+    ``StringDataEncoding``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``IntegerArgumentChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``BinaryDataEncoding``, ``FloatDataEncoding``,
+                     ``IntegerDataEncoding`` and ``StringDataEncoding``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_IntegerArgumentChoice.get(k)
     if fn is None:
@@ -16011,6 +22160,23 @@ _RC_IntegerDataChoice = {"BinaryDataEncoding": _r_BinaryDataEncodingType,
 
 
 def _r_IntegerDataChoice(c: X.Cursor) -> IntegerDataChoice:
+    """Reads the alternative of the ``<choice>`` in ``IntegerDataType`` that the
+    cursor's next child element starts, which must be ``BinaryDataEncoding``,
+    ``FloatDataEncoding``, ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``IntegerDataChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``BinaryDataEncoding``, ``FloatDataEncoding``,
+                     ``IntegerDataEncoding`` and ``StringDataEncoding``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_IntegerDataChoice.get(k)
     if fn is None:
@@ -16026,6 +22192,24 @@ _RC_IntegerParameterChoice = {"BinaryDataEncoding": _r_BinaryDataEncodingType,
 
 
 def _r_IntegerParameterChoice(c: X.Cursor) -> IntegerParameterChoice:
+    """Reads the alternative of the ``<choice>`` in ``IntegerParameterType``
+    that the cursor's next child element starts, which must be
+    ``BinaryDataEncoding``, ``FloatDataEncoding``, ``IntegerDataEncoding`` or
+    ``StringDataEncoding``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``IntegerParameterChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``BinaryDataEncoding``, ``FloatDataEncoding``,
+                     ``IntegerDataEncoding`` and ``StringDataEncoding``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_IntegerParameterChoice.get(k)
     if fn is None:
@@ -16040,6 +22224,22 @@ _RC_IntegerValueChoice = {"FixedValue": lambda n: X.leaf(n, X.p_i64),
 
 
 def _r_IntegerValueChoice(c: X.Cursor) -> IntegerValueChoice:
+    """Reads the alternative of the ``<choice>`` in ``IntegerValueType`` that
+    the cursor's next child element starts, which must be ``FixedValue``,
+    ``DynamicValue`` or ``DiscreteLookupList``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``IntegerValueChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``FixedValue``,
+                     ``DynamicValue`` and ``DiscreteLookupList``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_IntegerValueChoice.get(k)
     if fn is None:
@@ -16055,6 +22255,23 @@ _RC_LocationInContainerInBitsChoice = {
 
 def _r_LocationInContainerInBitsChoice(
         c: X.Cursor) -> LocationInContainerInBitsChoice:
+    """Reads the alternative of the ``<choice>`` in
+    ``LocationInContainerInBitsType`` that the cursor's next child element
+    starts, which must be ``FixedValue``, ``DynamicValue`` or
+    ``DiscreteLookupList``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``LocationInContainerInBitsChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``FixedValue``,
+                     ``DynamicValue`` and ``DiscreteLookupList``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_LocationInContainerInBitsChoice.get(k)
     if fn is None:
@@ -16069,6 +22286,22 @@ _RC_MatchCriteriaChoice = {"Comparison": _r_ComparisonType,
 
 
 def _r_MatchCriteriaChoice(c: X.Cursor) -> MatchCriteriaChoice:
+    """Reads the alternative of the ``<choice>`` in ``MatchCriteriaType`` that
+    the cursor's next child element starts, which must be ``Comparison``,
+    ``ComparisonList``, ``BooleanExpression`` or ``CustomAlgorithm``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``MatchCriteriaChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``Comparison``,
+                     ``ComparisonList``, ``BooleanExpression`` and
+                     ``CustomAlgorithm``, or if the alternative's element is
+                     invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_MatchCriteriaChoice.get(k)
     if fn is None:
@@ -16086,6 +22319,24 @@ _RC_MathOperationCalibratorChoice = {
 
 def _r_MathOperationCalibratorChoice(
         c: X.Cursor) -> MathOperationCalibratorChoice:
+    """Reads the alternative of the ``<choice>`` in
+    ``MathOperationCalibratorType`` that the cursor's next child element
+    starts, which must be ``ValueOperand``, ``ThisParameterOperand``,
+    ``Operator`` or ``ParameterInstanceRefOperand``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``MathOperationCalibratorChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``ValueOperand``, ``ThisParameterOperand``, ``Operator``
+                     and ``ParameterInstanceRefOperand``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_MathOperationCalibratorChoice.get(k)
     if fn is None:
@@ -16102,6 +22353,24 @@ _RC_MathOperationChoice = {
 
 
 def _r_MathOperationChoice(c: X.Cursor) -> MathOperationChoice:
+    """Reads the alternative of the ``<choice>`` in ``MathOperationType`` that
+    the cursor's next child element starts, which must be ``ValueOperand``,
+    ``ThisParameterOperand``, ``Operator`` or
+    ``ParameterInstanceRefOperand``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``MathOperationChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``ValueOperand``, ``ThisParameterOperand``, ``Operator``
+                     and ``ParameterInstanceRefOperand``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_MathOperationChoice.get(k)
     if fn is None:
@@ -16116,6 +22385,22 @@ _RC_MetaCommandSetChoice = {"MetaCommand": _r_MetaCommandType,
 
 
 def _r_MetaCommandSetChoice(c: X.Cursor) -> MetaCommandSetChoice:
+    """Reads the alternative of the ``<choice>`` in ``MetaCommandSetType`` that
+    the cursor's next child element starts, which must be ``MetaCommand``,
+    ``MetaCommandRef`` or ``BlockMetaCommand``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``MetaCommandSetChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``MetaCommand``,
+                     ``MetaCommandRef`` and ``BlockMetaCommand``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_MetaCommandSetChoice.get(k)
     if fn is None:
@@ -16128,6 +22413,22 @@ _RC_NumericAlarmChoice = {"AlarmConditions": _r_AlarmConditionsType,
 
 
 def _r_NumericAlarmChoice(c: X.Cursor) -> NumericAlarmChoice:
+    """Reads the alternative of the ``<choice>`` in ``NumericAlarmType`` that
+    the cursor's next child element starts, which must be ``AlarmConditions``
+    or ``CustomAlarm``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``NumericAlarmChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``AlarmConditions`` and ``CustomAlarm``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_NumericAlarmChoice.get(k)
     if fn is None:
@@ -16140,6 +22441,22 @@ _RC_NumericContextAlarmChoice = {"AlarmConditions": _r_AlarmConditionsType,
 
 
 def _r_NumericContextAlarmChoice(c: X.Cursor) -> NumericContextAlarmChoice:
+    """Reads the alternative of the ``<choice>`` in ``NumericContextAlarmType``
+    that the cursor's next child element starts, which must be
+    ``AlarmConditions`` or ``CustomAlarm``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``NumericContextAlarmChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``AlarmConditions`` and ``CustomAlarm``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_NumericContextAlarmChoice.get(k)
     if fn is None:
@@ -16152,6 +22469,21 @@ _RC_ORedConditionsChoice = {"Condition": _r_ComparisonCheckType,
 
 
 def _r_ORedConditionsChoice(c: X.Cursor) -> ORedConditionsChoice:
+    """Reads the alternative of the ``<choice>`` in ``ORedConditionsType`` that
+    the cursor's next child element starts, which must be ``Condition`` or
+    ``ANDedConditions``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ORedConditionsChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``Condition``
+                     and ``ANDedConditions``, or if the alternative's element is
+                     invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_ORedConditionsChoice.get(k)
     if fn is None:
@@ -16164,6 +22496,21 @@ _RC_ParameterSetChoice = {"Parameter": _r_ParameterType,
 
 
 def _r_ParameterSetChoice(c: X.Cursor) -> ParameterSetChoice:
+    """Reads the alternative of the ``<choice>`` in ``ParameterSetType`` that
+    the cursor's next child element starts, which must be ``Parameter`` or
+    ``ParameterRef``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ParameterSetChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``Parameter``
+                     and ``ParameterRef``, or if the alternative's element is
+                     invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_ParameterSetChoice.get(k)
     if fn is None:
@@ -16176,6 +22523,21 @@ _RC_ParameterToSetChoice = {"Derivation": _r_ArgumentMathOperationType,
 
 
 def _r_ParameterToSetChoice(c: X.Cursor) -> ParameterToSetChoice:
+    """Reads the alternative of the ``<choice>`` in ``ParameterToSetType`` that
+    the cursor's next child element starts, which must be ``Derivation`` or
+    ``NewValue``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ParameterToSetChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``Derivation``
+                     and ``NewValue``, or if the alternative's element is
+                     invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_ParameterToSetChoice.get(k)
     if fn is None:
@@ -16197,6 +22559,30 @@ _RC_ParameterTypeSetChoice = {
 
 
 def _r_ParameterTypeSetChoice(c: X.Cursor) -> ParameterTypeSetChoice:
+    """Reads the alternative of the ``<choice>`` in ``ParameterTypeSetType``
+    that the cursor's next child element starts, which must be
+    ``StringParameterType``, ``EnumeratedParameterType``,
+    ``IntegerParameterType``, ``BinaryParameterType``,
+    ``FloatParameterType``, ``BooleanParameterType``,
+    ``RelativeTimeParameterType``, ``AbsoluteTimeParameterType``,
+    ``ArrayParameterType`` or ``AggregateParameterType``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ParameterTypeSetChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``StringParameterType``, ``EnumeratedParameterType``,
+                     ``IntegerParameterType``, ``BinaryParameterType``,
+                     ``FloatParameterType``, ``BooleanParameterType``,
+                     ``RelativeTimeParameterType``,
+                     ``AbsoluteTimeParameterType``, ``ArrayParameterType`` and
+                     ``AggregateParameterType``, or if the alternative's element
+                     is invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_ParameterTypeSetChoice.get(k)
     if fn is None:
@@ -16213,6 +22599,21 @@ _RC_PercentCompleteChoice = {"FixedValue": lambda n: X.leaf(n, X.p_double),
 
 
 def _r_PercentCompleteChoice(c: X.Cursor) -> PercentCompleteChoice:
+    """Reads the alternative of the ``<choice>`` in ``PercentCompleteType`` that
+    the cursor's next child element starts, which must be ``FixedValue`` or
+    ``DynamicValue``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``PercentCompleteChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``FixedValue``
+                     and ``DynamicValue``, or if the alternative's element is
+                     invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_PercentCompleteChoice.get(k)
     if fn is None:
@@ -16230,6 +22631,25 @@ _RC_QueuedVerifierChoice1 = {
 
 
 def _r_QueuedVerifierChoice1(c: X.Cursor) -> QueuedVerifierChoice1:
+    """Reads the alternative of the ``<choice>`` in ``QueuedVerifierType`` that
+    the cursor's next child element starts, which must be ``ComparisonList``,
+    ``ContainerRef``, ``ParameterValueChange``, ``CustomAlgorithm``,
+    ``BooleanExpression`` or ``Comparison``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``QueuedVerifierChoice1``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``ComparisonList``, ``ContainerRef``,
+                     ``ParameterValueChange``, ``CustomAlgorithm``,
+                     ``BooleanExpression`` and ``Comparison``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_QueuedVerifierChoice1.get(k)
     if fn is None:
@@ -16244,6 +22664,21 @@ _RC_QueuedVerifierChoice2 = {
 
 
 def _r_QueuedVerifierChoice2(c: X.Cursor) -> QueuedVerifierChoice2:
+    """Reads the alternative of the ``<choice>`` in ``QueuedVerifierType`` that
+    the cursor's next child element starts, which must be ``CheckWindow`` or
+    ``CheckWindowAlgorithms``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``QueuedVerifierChoice2``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``CheckWindow``
+                     and ``CheckWindowAlgorithms``, or if the alternative's
+                     element is invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_QueuedVerifierChoice2.get(k)
     if fn is None:
@@ -16261,6 +22696,25 @@ _RC_ReceivedVerifierChoice1 = {
 
 
 def _r_ReceivedVerifierChoice1(c: X.Cursor) -> ReceivedVerifierChoice1:
+    """Reads the alternative of the ``<choice>`` in ``ReceivedVerifierType``
+    that the cursor's next child element starts, which must be
+    ``ComparisonList``, ``ContainerRef``, ``ParameterValueChange``,
+    ``CustomAlgorithm``, ``BooleanExpression`` or ``Comparison``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ReceivedVerifierChoice1``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``ComparisonList``, ``ContainerRef``,
+                     ``ParameterValueChange``, ``CustomAlgorithm``,
+                     ``BooleanExpression`` and ``Comparison``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_ReceivedVerifierChoice1.get(k)
     if fn is None:
@@ -16275,6 +22729,21 @@ _RC_ReceivedVerifierChoice2 = {
 
 
 def _r_ReceivedVerifierChoice2(c: X.Cursor) -> ReceivedVerifierChoice2:
+    """Reads the alternative of the ``<choice>`` in ``ReceivedVerifierType``
+    that the cursor's next child element starts, which must be
+    ``CheckWindow`` or ``CheckWindowAlgorithms``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ReceivedVerifierChoice2``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``CheckWindow``
+                     and ``CheckWindowAlgorithms``, or if the alternative's
+                     element is invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_ReceivedVerifierChoice2.get(k)
     if fn is None:
@@ -16287,6 +22756,21 @@ _RC_ReferenceTimeChoice = {"OffsetFrom": _r_ParameterInstanceRefType,
 
 
 def _r_ReferenceTimeChoice(c: X.Cursor) -> ReferenceTimeChoice:
+    """Reads the alternative of the ``<choice>`` in ``ReferenceTimeType`` that
+    the cursor's next child element starts, which must be ``OffsetFrom`` or
+    ``Epoch``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ReferenceTimeChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``OffsetFrom``
+                     and ``Epoch``, or if the alternative's element is invalid
+                     (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_ReferenceTimeChoice.get(k)
     if fn is None:
@@ -16301,6 +22785,23 @@ _RC_RestrictionCriteriaChoice = {"Comparison": _r_ComparisonType,
 
 
 def _r_RestrictionCriteriaChoice(c: X.Cursor) -> RestrictionCriteriaChoice:
+    """Reads the alternative of the ``<choice>`` in ``RestrictionCriteriaType``
+    that the cursor's next child element starts, which must be
+    ``Comparison``, ``ComparisonList``, ``BooleanExpression`` or
+    ``CustomAlgorithm``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``RestrictionCriteriaChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``Comparison``,
+                     ``ComparisonList``, ``BooleanExpression`` and
+                     ``CustomAlgorithm``, or if the alternative's element is
+                     invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_RestrictionCriteriaChoice.get(k)
     if fn is None:
@@ -16320,6 +22821,26 @@ _RC_SentFromRangeVerifierChoice1 = {
 
 def _r_SentFromRangeVerifierChoice1(
         c: X.Cursor) -> SentFromRangeVerifierChoice1:
+    """Reads the alternative of the ``<choice>`` in
+    ``SentFromRangeVerifierType`` that the cursor's next child element
+    starts, which must be ``ComparisonList``, ``ContainerRef``,
+    ``ParameterValueChange``, ``CustomAlgorithm``, ``BooleanExpression`` or
+    ``Comparison``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``SentFromRangeVerifierChoice1``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``ComparisonList``, ``ContainerRef``,
+                     ``ParameterValueChange``, ``CustomAlgorithm``,
+                     ``BooleanExpression`` and ``Comparison``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_SentFromRangeVerifierChoice1.get(k)
     if fn is None:
@@ -16335,6 +22856,21 @@ _RC_SentFromRangeVerifierChoice2 = {
 
 def _r_SentFromRangeVerifierChoice2(
         c: X.Cursor) -> SentFromRangeVerifierChoice2:
+    """Reads the alternative of the ``<choice>`` in
+    ``SentFromRangeVerifierType`` that the cursor's next child element
+    starts, which must be ``CheckWindow`` or ``CheckWindowAlgorithms``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``SentFromRangeVerifierChoice2``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``CheckWindow``
+                     and ``CheckWindowAlgorithms``, or if the alternative's
+                     element is invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_SentFromRangeVerifierChoice2.get(k)
     if fn is None:
@@ -16347,6 +22883,22 @@ _RC_ServiceChoice = {"MessageRefSet": _r_MessageRefSetType,
 
 
 def _r_ServiceChoice(c: X.Cursor) -> ServiceChoice:
+    """Reads the alternative of the ``<choice>`` in ``ServiceType`` that the
+    cursor's next child element starts, which must be ``MessageRefSet`` or
+    ``ContainerRefSet``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``ServiceChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``MessageRefSet`` and ``ContainerRefSet``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_ServiceChoice.get(k)
     if fn is None:
@@ -16360,6 +22912,22 @@ _RC_StreamSetChoice = {"FixedFrameStream": _r_FixedFrameStreamType,
 
 
 def _r_StreamSetChoice(c: X.Cursor) -> StreamSetChoice:
+    """Reads the alternative of the ``<choice>`` in ``StreamSetType`` that the
+    cursor's next child element starts, which must be ``FixedFrameStream``,
+    ``VariableFrameStream`` or ``CustomStream``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``StreamSetChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``FixedFrameStream``, ``VariableFrameStream`` and
+                     ``CustomStream``, or if the alternative's element is
+                     invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_StreamSetChoice.get(k)
     if fn is None:
@@ -16372,6 +22940,22 @@ _RC_StringAlarmChoice = {"AlarmConditions": _r_AlarmConditionsType,
 
 
 def _r_StringAlarmChoice(c: X.Cursor) -> StringAlarmChoice:
+    """Reads the alternative of the ``<choice>`` in ``StringAlarmType`` that the
+    cursor's next child element starts, which must be ``AlarmConditions`` or
+    ``CustomAlarm``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``StringAlarmChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``AlarmConditions`` and ``CustomAlarm``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_StringAlarmChoice.get(k)
     if fn is None:
@@ -16387,6 +22971,24 @@ _RC_StringArgumentChoice = {
 
 
 def _r_StringArgumentChoice(c: X.Cursor) -> StringArgumentChoice:
+    """Reads the alternative of the ``<choice>`` in ``StringArgumentType`` that
+    the cursor's next child element starts, which must be
+    ``BinaryDataEncoding``, ``FloatDataEncoding``, ``IntegerDataEncoding`` or
+    ``StringDataEncoding``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``StringArgumentChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``BinaryDataEncoding``, ``FloatDataEncoding``,
+                     ``IntegerDataEncoding`` and ``StringDataEncoding``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_StringArgumentChoice.get(k)
     if fn is None:
@@ -16400,6 +23002,22 @@ _RC_StringContextAlarmChoice = {"AlarmConditions": _r_AlarmConditionsType,
 
 
 def _r_StringContextAlarmChoice(c: X.Cursor) -> StringContextAlarmChoice:
+    """Reads the alternative of the ``<choice>`` in ``StringContextAlarmType``
+    that the cursor's next child element starts, which must be
+    ``AlarmConditions`` or ``CustomAlarm``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``StringContextAlarmChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``AlarmConditions`` and ``CustomAlarm``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_StringContextAlarmChoice.get(k)
     if fn is None:
@@ -16414,6 +23032,23 @@ _RC_StringDataChoice = {"BinaryDataEncoding": _r_BinaryDataEncodingType,
 
 
 def _r_StringDataChoice(c: X.Cursor) -> StringDataChoice:
+    """Reads the alternative of the ``<choice>`` in ``StringDataType`` that the
+    cursor's next child element starts, which must be ``BinaryDataEncoding``,
+    ``FloatDataEncoding``, ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``StringDataChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``BinaryDataEncoding``, ``FloatDataEncoding``,
+                     ``IntegerDataEncoding`` and ``StringDataEncoding``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_StringDataChoice.get(k)
     if fn is None:
@@ -16427,6 +23062,21 @@ _RC_StringDataEncodingChoice = {"SizeInBits": _r_SizeInBitsType,
 
 
 def _r_StringDataEncodingChoice(c: X.Cursor) -> StringDataEncodingChoice:
+    """Reads the alternative of the ``<choice>`` in ``StringDataEncodingType``
+    that the cursor's next child element starts, which must be ``SizeInBits``
+    or ``Variable``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``StringDataEncodingChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``SizeInBits``
+                     and ``Variable``, or if the alternative's element is
+                     invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_StringDataEncodingChoice.get(k)
     if fn is None:
@@ -16441,6 +23091,24 @@ _RC_StringParameterChoice = {"BinaryDataEncoding": _r_BinaryDataEncodingType,
 
 
 def _r_StringParameterChoice(c: X.Cursor) -> StringParameterChoice:
+    """Reads the alternative of the ``<choice>`` in ``StringParameterType`` that
+    the cursor's next child element starts, which must be
+    ``BinaryDataEncoding``, ``FloatDataEncoding``, ``IntegerDataEncoding`` or
+    ``StringDataEncoding``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``StringParameterChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``BinaryDataEncoding``, ``FloatDataEncoding``,
+                     ``IntegerDataEncoding`` and ``StringDataEncoding``, or if
+                     the alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_StringParameterChoice.get(k)
     if fn is None:
@@ -16454,6 +23122,22 @@ _RC_TimeAlarmChoice = {"AlarmConditions": _r_AlarmConditionsType,
 
 
 def _r_TimeAlarmChoice(c: X.Cursor) -> TimeAlarmChoice:
+    """Reads the alternative of the ``<choice>`` in ``TimeAlarmType`` that the
+    cursor's next child element starts, which must be ``AlarmConditions`` or
+    ``CustomAlarm``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``TimeAlarmChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``AlarmConditions`` and ``CustomAlarm``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_TimeAlarmChoice.get(k)
     if fn is None:
@@ -16466,6 +23150,22 @@ _RC_TimeContextAlarmChoice = {"AlarmConditions": _r_AlarmConditionsType,
 
 
 def _r_TimeContextAlarmChoice(c: X.Cursor) -> TimeContextAlarmChoice:
+    """Reads the alternative of the ``<choice>`` in ``TimeContextAlarmType``
+    that the cursor's next child element starts, which must be
+    ``AlarmConditions`` or ``CustomAlarm``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``TimeContextAlarmChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``AlarmConditions`` and ``CustomAlarm``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_TimeContextAlarmChoice.get(k)
     if fn is None:
@@ -16484,6 +23184,26 @@ _RC_TransferredToRangeVerifierChoice1 = {
 
 def _r_TransferredToRangeVerifierChoice1(
         c: X.Cursor) -> TransferredToRangeVerifierChoice1:
+    """Reads the alternative of the ``<choice>`` in
+    ``TransferredToRangeVerifierType`` that the cursor's next child element
+    starts, which must be ``ComparisonList``, ``ContainerRef``,
+    ``ParameterValueChange``, ``CustomAlgorithm``, ``BooleanExpression`` or
+    ``Comparison``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``TransferredToRangeVerifierChoice1``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``ComparisonList``, ``ContainerRef``,
+                     ``ParameterValueChange``, ``CustomAlgorithm``,
+                     ``BooleanExpression`` and ``Comparison``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_TransferredToRangeVerifierChoice1.get(k)
     if fn is None:
@@ -16499,6 +23219,21 @@ _RC_TransferredToRangeVerifierChoice2 = {
 
 def _r_TransferredToRangeVerifierChoice2(
         c: X.Cursor) -> TransferredToRangeVerifierChoice2:
+    """Reads the alternative of the ``<choice>`` in
+    ``TransferredToRangeVerifierType`` that the cursor's next child element
+    starts, which must be ``CheckWindow`` or ``CheckWindowAlgorithms``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``TransferredToRangeVerifierChoice2``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``CheckWindow``
+                     and ``CheckWindowAlgorithms``, or if the alternative's
+                     element is invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_TransferredToRangeVerifierChoice2.get(k)
     if fn is None:
@@ -16514,6 +23249,23 @@ _RC_TransmissionConstraintChoice = {
 
 def _r_TransmissionConstraintChoice(
         c: X.Cursor) -> TransmissionConstraintChoice:
+    """Reads the alternative of the ``<choice>`` in
+    ``TransmissionConstraintType`` that the cursor's next child element
+    starts, which must be ``Comparison``, ``ComparisonList``,
+    ``BooleanExpression`` or ``CustomAlgorithm``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``TransmissionConstraintChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``Comparison``,
+                     ``ComparisonList``, ``BooleanExpression`` and
+                     ``CustomAlgorithm``, or if the alternative's element is
+                     invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_TransmissionConstraintChoice.get(k)
     if fn is None:
@@ -16529,6 +23281,23 @@ _RC_TriggerSetChoice = {
 
 
 def _r_TriggerSetChoice(c: X.Cursor) -> TriggerSetChoice:
+    """Reads the alternative of the ``<choice>`` in ``TriggerSetType`` that the
+    cursor's next child element starts, which must be
+    ``OnParameterUpdateTrigger``, ``OnContainerUpdateTrigger`` or
+    ``OnPeriodicRateTrigger``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``TriggerSetChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``OnParameterUpdateTrigger``, ``OnContainerUpdateTrigger``
+                     and ``OnPeriodicRateTrigger``, or if the alternative's
+                     element is invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_TriggerSetChoice.get(k)
     if fn is None:
@@ -16546,6 +23315,24 @@ _RC_TriggeredMathOperationChoice = {
 
 def _r_TriggeredMathOperationChoice(
         c: X.Cursor) -> TriggeredMathOperationChoice:
+    """Reads the alternative of the ``<choice>`` in
+    ``TriggeredMathOperationType`` that the cursor's next child element
+    starts, which must be ``ValueOperand``, ``ThisParameterOperand``,
+    ``Operator`` or ``ParameterInstanceRefOperand``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``TriggeredMathOperationChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of
+                     ``ValueOperand``, ``ThisParameterOperand``, ``Operator``
+                     and ``ParameterInstanceRefOperand``, or if the
+                     alternative's element is invalid (see the reader of its
+                     type).
+    """
     k = c.peek()
     fn = _RC_TriggeredMathOperationChoice.get(k)
     if fn is None:
@@ -16559,6 +23346,21 @@ _RC_VariableFrameStreamChoice = {"ContainerRef": _r_ContainerRefType,
 
 
 def _r_VariableFrameStreamChoice(c: X.Cursor) -> VariableFrameStreamChoice:
+    """Reads the alternative of the ``<choice>`` in ``VariableFrameStreamType``
+    that the cursor's next child element starts, which must be
+    ``ContainerRef`` or ``ServiceRef``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``VariableFrameStreamChoice``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``ContainerRef``
+                     and ``ServiceRef``, or if the alternative's element is
+                     invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_VariableFrameStreamChoice.get(k)
     if fn is None:
@@ -16571,6 +23373,21 @@ _RC_VariableStringChoice1 = {"DynamicValue": _r_DynamicValueType,
 
 
 def _r_VariableStringChoice1(c: X.Cursor) -> VariableStringChoice1:
+    """Reads the alternative of the ``<choice>`` in ``VariableStringType`` that
+    the cursor's next child element starts, which must be ``DynamicValue`` or
+    ``DiscreteLookupList``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``VariableStringChoice1``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``DynamicValue``
+                     and ``DiscreteLookupList``, or if the alternative's element
+                     is invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_VariableStringChoice1.get(k)
     if fn is None:
@@ -16583,6 +23400,21 @@ _RC_VariableStringChoice2 = {"LeadingSize": _r_LeadingSizeType,
 
 
 def _r_VariableStringChoice2(c: X.Cursor) -> VariableStringChoice2:
+    """Reads the alternative of the ``<choice>`` in ``VariableStringType`` that
+    the cursor's next child element starts, which must be ``LeadingSize`` or
+    ``TerminationChar``.
+
+    Args:
+        c: The cursor over the parent's children; it moves past the child read.
+
+    Returns:
+        The alternative read, a new ``VariableStringChoice2``.
+
+    Raises:
+        X.XtceError: If there is no next child or it is none of ``LeadingSize``
+                     and ``TerminationChar``, or if the alternative's element is
+                     invalid (see the reader of its type).
+    """
     k = c.peek()
     fn = _RC_VariableStringChoice2.get(k)
     if fn is None:
@@ -16594,6 +23426,21 @@ def _r_VariableStringChoice2(c: X.Cursor) -> VariableStringChoice2:
 
 def _w_ANDedConditionsType(w: X.Writer, v: ANDedConditionsType,
                            tag: str) -> None:
+    """Writes a value of the XTCE type ``ANDedConditionsType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ANDedConditions``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.items), 2, -1,
                   "ANDedConditionsType.ANDedConditionsChoice")
@@ -16604,6 +23451,21 @@ def _w_ANDedConditionsType(w: X.Writer, v: ANDedConditionsType,
 
 def _w_AbsoluteTimeArgumentType(w: X.Writer, v: AbsoluteTimeArgumentType,
                                 tag: str) -> None:
+    """Writes a value of the XTCE type ``AbsoluteTimeArgumentType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``AbsoluteTimeArgumentType``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -16627,6 +23489,21 @@ def _w_AbsoluteTimeArgumentType(w: X.Writer, v: AbsoluteTimeArgumentType,
 
 def _w_AbsoluteTimeDataType(w: X.Writer, v: AbsoluteTimeDataType,
                             tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``AbsoluteTimeDataType`` as an XML element: its attributes, then its
+    child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -16650,6 +23527,21 @@ def _w_AbsoluteTimeDataType(w: X.Writer, v: AbsoluteTimeDataType,
 
 def _w_AbsoluteTimeParameterType(w: X.Writer, v: AbsoluteTimeParameterType,
                                  tag: str) -> None:
+    """Writes a value of the XTCE type ``AbsoluteTimeParameterType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``AbsoluteTimeParameterType``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -16673,6 +23565,21 @@ def _w_AbsoluteTimeParameterType(w: X.Writer, v: AbsoluteTimeParameterType,
 
 def _w_AcceptedVerifierType(w: X.Writer, v: AcceptedVerifierType,
                             tag: str) -> None:
+    """Writes a value of the XTCE type ``AcceptedVerifierType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``AcceptedVerifier``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -16694,6 +23601,19 @@ def _w_AcceptedVerifierType(w: X.Writer, v: AcceptedVerifierType,
 
 def _w_AggregateArgumentType(w: X.Writer, v: AggregateArgumentType,
                              tag: str) -> None:
+    """Writes a value of the XTCE type ``AggregateArgumentType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``AggregateArgumentType``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -16711,6 +23631,19 @@ def _w_AggregateArgumentType(w: X.Writer, v: AggregateArgumentType,
 
 
 def _w_AggregateDataType(w: X.Writer, v: AggregateDataType, tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``AggregateDataType`` as an XML element: its attributes, then its child
+    elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -16729,6 +23662,19 @@ def _w_AggregateDataType(w: X.Writer, v: AggregateDataType, tag: str) -> None:
 
 def _w_AggregateParameterType(w: X.Writer, v: AggregateParameterType,
                               tag: str) -> None:
+    """Writes a value of the XTCE type ``AggregateParameterType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``AggregateParameterType``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -16747,6 +23693,21 @@ def _w_AggregateParameterType(w: X.Writer, v: AggregateParameterType,
 
 def _w_AlarmConditionsType(w: X.Writer, v: AlarmConditionsType,
                            tag: str) -> None:
+    """Writes a value of the XTCE type ``AlarmConditionsType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``AlarmConditions``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.watch_alarm is not None:
         _w_MatchCriteriaType(w, v.watch_alarm, 'WatchAlarm')
@@ -16763,6 +23724,19 @@ def _w_AlarmConditionsType(w: X.Writer, v: AlarmConditionsType,
 
 def _w_AlarmMultiRangesType(w: X.Writer, v: AlarmMultiRangesType,
                             tag: str) -> None:
+    """Writes a value of the XTCE type ``AlarmMultiRangesType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``AlarmMultiRanges``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     if v.name is not None:
         w.attr('name', v.name)
@@ -16777,6 +23751,19 @@ def _w_AlarmMultiRangesType(w: X.Writer, v: AlarmMultiRangesType,
 
 
 def _w_AlarmRangesType(w: X.Writer, v: AlarmRangesType, tag: str) -> None:
+    """Writes a value of the XTCE type ``AlarmRangesType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``StaticAlarmRanges``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     if v.name is not None:
         w.attr('name', v.name)
@@ -16800,6 +23787,21 @@ def _w_AlarmRangesType(w: X.Writer, v: AlarmRangesType, tag: str) -> None:
 
 
 def _w_AlarmType(w: X.Writer, v: AlarmType, tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``AlarmType`` as an XML element: its attributes, then its child elements
+    in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.name is not None:
         w.attr('name', v.name)
@@ -16819,6 +23821,21 @@ def _w_AlarmType(w: X.Writer, v: AlarmType, tag: str) -> None:
 
 
 def _w_AlgorithmSetType(w: X.Writer, v: AlgorithmSetType, tag: str) -> None:
+    """Writes a value of the XTCE type ``AlgorithmSetType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``AlgorithmSet``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.items), 1, -1, 'AlgorithmSetType.AlgorithmSetChoice')
     for e in v.items:
@@ -16827,6 +23844,15 @@ def _w_AlgorithmSetType(w: X.Writer, v: AlgorithmSetType, tag: str) -> None:
 
 
 def _w_AlgorithmTextType(w: X.Writer, v: AlgorithmTextType, tag: str) -> None:
+    """Writes a value of the XTCE type ``AlgorithmTextType`` as an XML element:
+    its attributes, then its text.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``AlgorithmText``.
+    """
     w.start(tag)
     if v.language is not None:
         w.attr('language', v.language)
@@ -16835,6 +23861,19 @@ def _w_AlgorithmTextType(w: X.Writer, v: AlgorithmTextType, tag: str) -> None:
 
 
 def _w_AliasSetType(w: X.Writer, v: AliasSetType, tag: str) -> None:
+    """Writes a value of the XTCE type ``AliasSetType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``AliasSet``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     X.check_count(len(v.alias), 1, -1, 'AliasSetType.Alias')
     for e in v.alias:
@@ -16843,6 +23882,15 @@ def _w_AliasSetType(w: X.Writer, v: AliasSetType, tag: str) -> None:
 
 
 def _w_AliasType(w: X.Writer, v: AliasType, tag: str) -> None:
+    """Writes a value of the XTCE type ``AliasType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Alias``.
+    """
     w.start(tag)
     w.attr('nameSpace', v.name_space)
     w.attr('alias', v.alias)
@@ -16851,6 +23899,19 @@ def _w_AliasType(w: X.Writer, v: AliasType, tag: str) -> None:
 
 def _w_AncillaryDataSetType(w: X.Writer, v: AncillaryDataSetType,
                             tag: str) -> None:
+    """Writes a value of the XTCE type ``AncillaryDataSetType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``AncillaryDataSet``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     X.check_count(len(v.ancillary_data), 1, -1,
                   "AncillaryDataSetType.AncillaryData")
@@ -16860,6 +23921,15 @@ def _w_AncillaryDataSetType(w: X.Writer, v: AncillaryDataSetType,
 
 
 def _w_AncillaryDataType(w: X.Writer, v: AncillaryDataType, tag: str) -> None:
+    """Writes a value of the XTCE type ``AncillaryDataType`` as an XML element:
+    its attributes, then its text.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``AncillaryData``.
+    """
     w.start(tag)
     w.attr('name', v.name)
     if v.mime_type is not None:
@@ -16872,6 +23942,21 @@ def _w_AncillaryDataType(w: X.Writer, v: AncillaryDataType, tag: str) -> None:
 
 def _w_ArgumentANDedConditionsType(w: X.Writer, v: ArgumentANDedConditionsType,
                                    tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentANDedConditionsType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ANDedConditions``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.items), 2, -1,
                   "ArgumentANDedConditionsType.ArgumentANDedConditionsChoice")
@@ -16882,6 +23967,21 @@ def _w_ArgumentANDedConditionsType(w: X.Writer, v: ArgumentANDedConditionsType,
 
 def _w_ArgumentAbsoluteTimeDataType(
         w: X.Writer, v: ArgumentAbsoluteTimeDataType, tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``ArgumentAbsoluteTimeDataType`` as an XML element: its attributes, then
+    its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -16905,6 +24005,21 @@ def _w_ArgumentAbsoluteTimeDataType(
 
 def _w_ArgumentArgumentRefEntryType(
         w: X.Writer, v: ArgumentArgumentRefEntryType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentArgumentRefEntryType`` as an
+    XML element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ArgumentRefEntry``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -16923,6 +24038,21 @@ def _w_ArgumentArgumentRefEntryType(
 
 def _w_ArgumentArrayArgumentRefEntryType(
         w: X.Writer, v: ArgumentArrayArgumentRefEntryType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentArrayArgumentRefEntryType`` as
+    an XML element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ArrayArgumentRefEntry``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -16946,6 +24076,21 @@ def _w_ArgumentArrayArgumentRefEntryType(
 
 def _w_ArgumentArrayParameterRefEntryType(
         w: X.Writer, v: ArgumentArrayParameterRefEntryType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentArrayParameterRefEntryType`` as
+    an XML element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ArrayParameterRefEntry``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -16969,6 +24114,19 @@ def _w_ArgumentArrayParameterRefEntryType(
 
 def _w_ArgumentAssignmentListType(w: X.Writer, v: ArgumentAssignmentListType,
                                   tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentAssignmentListType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ArgumentAssignmentList`` or ``ArgumentRestrictionList``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     X.check_count(len(v.argument_assignment), 1, -1,
                   "ArgumentAssignmentListType.ArgumentAssignment")
@@ -16979,6 +24137,15 @@ def _w_ArgumentAssignmentListType(w: X.Writer, v: ArgumentAssignmentListType,
 
 def _w_ArgumentAssignmentType(w: X.Writer, v: ArgumentAssignmentType,
                               tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentAssignmentType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ArgumentAssignment`` or ``ArgumentRestriction``.
+    """
     w.start(tag)
     w.attr('argumentName', v.argument_name)
     w.attr('argumentValue', v.argument_value)
@@ -16987,6 +24154,21 @@ def _w_ArgumentAssignmentType(w: X.Writer, v: ArgumentAssignmentType,
 
 def _w_ArgumentBaseDataType(w: X.Writer, v: ArgumentBaseDataType,
                             tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``ArgumentBaseDataType`` as an XML element: its attributes, then its
+    child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17008,6 +24190,21 @@ def _w_ArgumentBaseDataType(w: X.Writer, v: ArgumentBaseDataType,
 
 def _w_ArgumentBaseTimeDataType(w: X.Writer, v: ArgumentBaseTimeDataType,
                                 tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``ArgumentBaseTimeDataType`` as an XML element: its attributes, then its
+    child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17029,6 +24226,21 @@ def _w_ArgumentBaseTimeDataType(w: X.Writer, v: ArgumentBaseTimeDataType,
 
 def _w_ArgumentBinaryDataEncodingType(
         w: X.Writer, v: ArgumentBinaryDataEncodingType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentBinaryDataEncodingType`` as an
+    XML element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``BinaryDataEncoding``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.bit_order is not None:
         w.attr('bitOrder', v.bit_order.value)
@@ -17049,6 +24261,21 @@ def _w_ArgumentBinaryDataEncodingType(
 
 def _w_ArgumentBinaryDataType(w: X.Writer, v: ArgumentBinaryDataType,
                               tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``ArgumentBinaryDataType`` as an XML element: its attributes, then its
+    child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17072,6 +24299,21 @@ def _w_ArgumentBinaryDataType(w: X.Writer, v: ArgumentBinaryDataType,
 
 def _w_ArgumentBooleanDataType(w: X.Writer, v: ArgumentBooleanDataType,
                                tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``ArgumentBooleanDataType`` as an XML element: its attributes, then its
+    child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17099,6 +24341,21 @@ def _w_ArgumentBooleanDataType(w: X.Writer, v: ArgumentBooleanDataType,
 
 def _w_ArgumentBooleanExpressionType(
         w: X.Writer, v: ArgumentBooleanExpressionType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentBooleanExpressionType`` as an
+    XML element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``BooleanExpression``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     _w_ArgumentBooleanExpressionChoice(w, v.choice)
     w.end(tag)
@@ -17106,6 +24363,19 @@ def _w_ArgumentBooleanExpressionType(
 
 def _w_ArgumentComparisonCheckType(w: X.Writer, v: ArgumentComparisonCheckType,
                                    tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentComparisonCheckType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Condition``.
+
+    Raises:
+        X.XtceError: If a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     _w_ArgumentComparisonCheckChoice1(w, v.choice1)
     w.leaf('ComparisonOperator', v.comparison_operator.value)
@@ -17115,6 +24385,21 @@ def _w_ArgumentComparisonCheckType(w: X.Writer, v: ArgumentComparisonCheckType,
 
 def _w_ArgumentComparisonListType(w: X.Writer, v: ArgumentComparisonListType,
                                   tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentComparisonListType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ComparisonList``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.comparison), 1, -1,
                   "ArgumentComparisonListType.Comparison")
@@ -17125,6 +24410,19 @@ def _w_ArgumentComparisonListType(w: X.Writer, v: ArgumentComparisonListType,
 
 def _w_ArgumentComparisonType(w: X.Writer, v: ArgumentComparisonType,
                               tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentComparisonType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Comparison``.
+
+    Raises:
+        X.XtceError: If a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.comparison_operator is not None:
         w.attr('comparisonOperator', v.comparison_operator.value)
@@ -17135,6 +24433,21 @@ def _w_ArgumentComparisonType(w: X.Writer, v: ArgumentComparisonType,
 
 def _w_ArgumentContainerRefEntryType(
         w: X.Writer, v: ArgumentContainerRefEntryType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentContainerRefEntryType`` as an
+    XML element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ContainerRefEntry``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17153,6 +24466,22 @@ def _w_ArgumentContainerRefEntryType(
 
 def _w_ArgumentContainerSegmentRefEntryType(
         w: X.Writer, v: ArgumentContainerSegmentRefEntryType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentContainerSegmentRefEntryType``
+    as an XML element: its attributes, then its child elements in schema
+    order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ContainerSegmentRefEntry``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17174,6 +24503,21 @@ def _w_ArgumentContainerSegmentRefEntryType(
 
 def _w_ArgumentDimensionListType(w: X.Writer, v: ArgumentDimensionListType,
                                  tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentDimensionListType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``DimensionList``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.dimension), 1, -1,
                   "ArgumentDimensionListType.Dimension")
@@ -17184,6 +24528,21 @@ def _w_ArgumentDimensionListType(w: X.Writer, v: ArgumentDimensionListType,
 
 def _w_ArgumentDimensionType(w: X.Writer, v: ArgumentDimensionType,
                              tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentDimensionType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Dimension``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     _w_ArgumentIntegerValueType(w, v.starting_index, 'StartingIndex')
     _w_ArgumentIntegerValueType(w, v.ending_index, 'EndingIndex')
@@ -17192,6 +24551,21 @@ def _w_ArgumentDimensionType(w: X.Writer, v: ArgumentDimensionType,
 
 def _w_ArgumentDiscreteLookupListType(
         w: X.Writer, v: ArgumentDiscreteLookupListType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentDiscreteLookupListType`` as an
+    XML element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``DiscreteLookupList``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     w.attr('defaultValue', X.f_int(v.default_value))
     X.check_count(len(v.discrete_lookup), 1, -1,
@@ -17203,6 +24577,21 @@ def _w_ArgumentDiscreteLookupListType(
 
 def _w_ArgumentDiscreteLookupType(w: X.Writer, v: ArgumentDiscreteLookupType,
                                   tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentDiscreteLookupType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``DiscreteLookup``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     w.attr('value', X.f_int(v.value))
     _w_ArgumentDiscreteLookupChoice(w, v.choice)
@@ -17211,6 +24600,19 @@ def _w_ArgumentDiscreteLookupType(w: X.Writer, v: ArgumentDiscreteLookupType,
 
 def _w_ArgumentDynamicValueType(w: X.Writer, v: ArgumentDynamicValueType,
                                 tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentDynamicValueType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``DynamicValue``.
+
+    Raises:
+        X.XtceError: If a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     _w_ArgumentDynamicValueChoice(w, v.choice)
     if v.linear_adjustment is not None:
@@ -17220,6 +24622,21 @@ def _w_ArgumentDynamicValueType(w: X.Writer, v: ArgumentDynamicValueType,
 
 def _w_ArgumentEnumeratedDataType(w: X.Writer, v: ArgumentEnumeratedDataType,
                                   tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``ArgumentEnumeratedDataType`` as an XML element: its attributes, then
+    its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17244,6 +24661,21 @@ def _w_ArgumentEnumeratedDataType(w: X.Writer, v: ArgumentEnumeratedDataType,
 
 def _w_ArgumentFixedValueEntryType(w: X.Writer, v: ArgumentFixedValueEntryType,
                                    tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentFixedValueEntryType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``FixedValueEntry``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17265,6 +24697,21 @@ def _w_ArgumentFixedValueEntryType(w: X.Writer, v: ArgumentFixedValueEntryType,
 
 def _w_ArgumentFloatDataType(w: X.Writer, v: ArgumentFloatDataType,
                              tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``ArgumentFloatDataType`` as an XML element: its attributes, then its
+    child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17293,6 +24740,22 @@ def _w_ArgumentFloatDataType(w: X.Writer, v: ArgumentFloatDataType,
 def _w_ArgumentIndirectParameterRefEntryType(
         w: X.Writer, v: ArgumentIndirectParameterRefEntryType,
         tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentIndirectParameterRefEntryType``
+    as an XML element: its attributes, then its child elements in schema
+    order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``IndirectParameterRefEntry``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17313,6 +24776,22 @@ def _w_ArgumentIndirectParameterRefEntryType(
 
 def _w_ArgumentInputAlgorithmType(w: X.Writer, v: ArgumentInputAlgorithmType,
                                   tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentInputAlgorithmType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``CustomAlgorithm``, ``FromBinaryTransformAlgorithm`` or
+             ``ToBinaryTransformAlgorithm``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17335,6 +24814,21 @@ def _w_ArgumentInputAlgorithmType(w: X.Writer, v: ArgumentInputAlgorithmType,
 
 def _w_ArgumentInputSetType(w: X.Writer, v: ArgumentInputSetType,
                             tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentInputSetType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``InputSet``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.items), 1, -1,
                   "ArgumentInputSetType.ArgumentInputSetChoice")
@@ -17345,6 +24839,16 @@ def _w_ArgumentInputSetType(w: X.Writer, v: ArgumentInputSetType,
 
 def _w_ArgumentInstanceRefType(w: X.Writer, v: ArgumentInstanceRefType,
                                tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentInstanceRefType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ArgumentInstanceRef``, ``ArgumentInstanceRefOperand`` or
+             ``InputArgumentInstanceRef``.
+    """
     w.start(tag)
     w.attr('argumentRef', v.argument_ref)
     if v.use_calibrated_value is not None:
@@ -17354,6 +24858,21 @@ def _w_ArgumentInstanceRefType(w: X.Writer, v: ArgumentInstanceRefType,
 
 def _w_ArgumentIntegerDataType(w: X.Writer, v: ArgumentIntegerDataType,
                                tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``ArgumentIntegerDataType`` as an XML element: its attributes, then its
+    child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17383,12 +24902,41 @@ def _w_ArgumentIntegerDataType(w: X.Writer, v: ArgumentIntegerDataType,
 
 def _w_ArgumentIntegerValueType(w: X.Writer, v: ArgumentIntegerValueType,
                                 tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentIntegerValueType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Count``, ``EndingIndex``, ``Offset``, ``SizeInBits`` or
+             ``StartingIndex``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     _w_ArgumentIntegerValueChoice(w, v.choice)
     w.end(tag)
 
 
 def _w_ArgumentListType(w: X.Writer, v: ArgumentListType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentListType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ArgumentList``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     X.check_count(len(v.argument), 1, -1, 'ArgumentListType.Argument')
     for e in v.argument:
@@ -17399,6 +24947,22 @@ def _w_ArgumentListType(w: X.Writer, v: ArgumentListType, tag: str) -> None:
 def _w_ArgumentLocationInContainerInBitsType(
         w: X.Writer, v: ArgumentLocationInContainerInBitsType,
         tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentLocationInContainerInBitsType``
+    as an XML element: its attributes, then its child elements in schema
+    order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``LocationInContainerInBits``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.reference_location is not None:
         w.attr('referenceLocation', v.reference_location.value)
@@ -17408,6 +24972,21 @@ def _w_ArgumentLocationInContainerInBitsType(
 
 def _w_ArgumentMatchCriteriaType(w: X.Writer, v: ArgumentMatchCriteriaType,
                                  tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentMatchCriteriaType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``IncludeCondition``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     _w_ArgumentMatchCriteriaChoice(w, v.choice)
     w.end(tag)
@@ -17415,6 +24994,21 @@ def _w_ArgumentMatchCriteriaType(w: X.Writer, v: ArgumentMatchCriteriaType,
 
 def _w_ArgumentMathOperationType(w: X.Writer, v: ArgumentMathOperationType,
                                  tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentMathOperationType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Derivation``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.items), 1, -1,
                   "ArgumentMathOperationType.ArgumentMathOperationChoice")
@@ -17425,6 +25019,21 @@ def _w_ArgumentMathOperationType(w: X.Writer, v: ArgumentMathOperationType,
 
 def _w_ArgumentORedConditionsType(w: X.Writer, v: ArgumentORedConditionsType,
                                   tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentORedConditionsType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ORedConditions``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.items), 2, -1,
                   "ArgumentORedConditionsType.ArgumentORedConditionsChoice")
@@ -17435,6 +25044,21 @@ def _w_ArgumentORedConditionsType(w: X.Writer, v: ArgumentORedConditionsType,
 
 def _w_ArgumentParameterRefEntryType(
         w: X.Writer, v: ArgumentParameterRefEntryType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentParameterRefEntryType`` as an
+    XML element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ParameterRefEntry``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17453,6 +25077,22 @@ def _w_ArgumentParameterRefEntryType(
 
 def _w_ArgumentParameterSegmentRefEntryType(
         w: X.Writer, v: ArgumentParameterSegmentRefEntryType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentParameterSegmentRefEntryType``
+    as an XML element: its attributes, then its child elements in schema
+    order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ParameterSegmentRefEntry``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17474,6 +25114,21 @@ def _w_ArgumentParameterSegmentRefEntryType(
 
 def _w_ArgumentRelativeTimeDataType(
         w: X.Writer, v: ArgumentRelativeTimeDataType, tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``ArgumentRelativeTimeDataType`` as an XML element: its attributes, then
+    its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17496,6 +25151,21 @@ def _w_ArgumentRelativeTimeDataType(
 
 
 def _w_ArgumentRepeatType(w: X.Writer, v: ArgumentRepeatType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentRepeatType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``RepeatEntry``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     _w_ArgumentIntegerValueType(w, v.count, 'Count')
     if v.offset is not None:
@@ -17505,6 +25175,18 @@ def _w_ArgumentRepeatType(w: X.Writer, v: ArgumentRepeatType, tag: str) -> None:
 
 def _w_ArgumentRestrictionListType(w: X.Writer, v: ArgumentRestrictionListType,
                                    tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentRestrictionListType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     X.check_count(len(v.argument_restriction), 1, -1,
                   "ArgumentRestrictionListType.ArgumentRestriction")
@@ -17515,6 +25197,21 @@ def _w_ArgumentRestrictionListType(w: X.Writer, v: ArgumentRestrictionListType,
 
 def _w_ArgumentSequenceEntryType(w: X.Writer, v: ArgumentSequenceEntryType,
                                  tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``ArgumentSequenceEntryType`` as an XML element: its attributes, then its
+    child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17532,6 +25229,21 @@ def _w_ArgumentSequenceEntryType(w: X.Writer, v: ArgumentSequenceEntryType,
 
 def _w_ArgumentStreamSegmentEntryType(
         w: X.Writer, v: ArgumentStreamSegmentEntryType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentStreamSegmentEntryType`` as an
+    XML element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``StreamSegmentEntry``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17553,6 +25265,21 @@ def _w_ArgumentStreamSegmentEntryType(
 
 def _w_ArgumentStringDataEncodingType(
         w: X.Writer, v: ArgumentStringDataEncodingType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentStringDataEncodingType`` as an
+    XML element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``StringDataEncoding``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.bit_order is not None:
         w.attr('bitOrder', v.bit_order.value)
@@ -17569,6 +25296,21 @@ def _w_ArgumentStringDataEncodingType(
 
 def _w_ArgumentStringDataType(w: X.Writer, v: ArgumentStringDataType,
                               tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``ArgumentStringDataType`` as an XML element: its attributes, then its
+    child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17598,6 +25340,19 @@ def _w_ArgumentStringDataType(w: X.Writer, v: ArgumentStringDataType,
 
 
 def _w_ArgumentType(w: X.Writer, v: ArgumentType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Argument``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17616,6 +25371,21 @@ def _w_ArgumentType(w: X.Writer, v: ArgumentType, tag: str) -> None:
 
 def _w_ArgumentTypeSetType(w: X.Writer, v: ArgumentTypeSetType,
                            tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentTypeSetType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ArgumentTypeSet``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.items), 1, -1,
                   "ArgumentTypeSetType.ArgumentTypeSetChoice")
@@ -17626,6 +25396,21 @@ def _w_ArgumentTypeSetType(w: X.Writer, v: ArgumentTypeSetType,
 
 def _w_ArgumentVariableStringType(w: X.Writer, v: ArgumentVariableStringType,
                                   tag: str) -> None:
+    """Writes a value of the XTCE type ``ArgumentVariableStringType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Variable``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     w.attr('maxSizeInBits', X.f_int(v.max_size_in_bits))
     if v.choice1 is not None:
@@ -17635,6 +25420,21 @@ def _w_ArgumentVariableStringType(w: X.Writer, v: ArgumentVariableStringType,
 
 
 def _w_ArrayArgumentType(w: X.Writer, v: ArrayArgumentType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ArrayArgumentType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ArrayArgumentType``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17653,6 +25453,19 @@ def _w_ArrayArgumentType(w: X.Writer, v: ArrayArgumentType, tag: str) -> None:
 
 
 def _w_ArrayDataTypeType(w: X.Writer, v: ArrayDataTypeType, tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``ArrayDataTypeType`` as an XML element: its attributes, then its child
+    elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17671,6 +25484,21 @@ def _w_ArrayDataTypeType(w: X.Writer, v: ArrayDataTypeType, tag: str) -> None:
 
 def _w_ArrayParameterRefEntryType(w: X.Writer, v: ArrayParameterRefEntryType,
                                   tag: str) -> None:
+    """Writes a value of the XTCE type ``ArrayParameterRefEntryType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ArrayParameterRefEntry``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17692,6 +25520,21 @@ def _w_ArrayParameterRefEntryType(w: X.Writer, v: ArrayParameterRefEntryType,
 
 
 def _w_ArrayParameterType(w: X.Writer, v: ArrayParameterType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ArrayParameterType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ArrayParameterType``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17710,6 +25553,15 @@ def _w_ArrayParameterType(w: X.Writer, v: ArrayParameterType, tag: str) -> None:
 
 
 def _w_AuthorSetType(w: X.Writer, v: AuthorSetType, tag: str) -> None:
+    """Writes a value of the XTCE type ``AuthorSetType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``AuthorSet``.
+    """
     w.start(tag)
     for e in v.author:
         w.leaf('Author', e)
@@ -17717,6 +25569,21 @@ def _w_AuthorSetType(w: X.Writer, v: AuthorSetType, tag: str) -> None:
 
 
 def _w_AutoInvertType(w: X.Writer, v: AutoInvertType, tag: str) -> None:
+    """Writes a value of the XTCE type ``AutoInvertType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``AutoInvert``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.bad_frames_to_auto_invert is not None:
         w.attr('badFramesToAutoInvert', X.f_int(v.bad_frames_to_auto_invert))
@@ -17726,6 +25593,19 @@ def _w_AutoInvertType(w: X.Writer, v: AutoInvertType, tag: str) -> None:
 
 
 def _w_BaseAlarmType(w: X.Writer, v: BaseAlarmType, tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``BaseAlarmType`` as an XML element: its attributes, then its child
+    elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     if v.name is not None:
         w.attr('name', v.name)
@@ -17737,6 +25617,19 @@ def _w_BaseAlarmType(w: X.Writer, v: BaseAlarmType, tag: str) -> None:
 
 
 def _w_BaseCalibratorType(w: X.Writer, v: BaseCalibratorType, tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``BaseCalibratorType`` as an XML element: its attributes, then its child
+    elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     if v.name is not None:
         w.attr('name', v.name)
@@ -17748,16 +25641,49 @@ def _w_BaseCalibratorType(w: X.Writer, v: BaseCalibratorType, tag: str) -> None:
 
 
 def _w_BaseComparisonType(w: X.Writer, v: BaseComparisonType, tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``BaseComparisonType`` as an XML element: its attributes, then its child
+    elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+    """
     w.start(tag)
     w.end(tag)
 
 
 def _w_BaseConditionsType(w: X.Writer, v: BaseConditionsType, tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``BaseConditionsType`` as an XML element: its attributes, then its child
+    elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+    """
     w.start(tag)
     w.end(tag)
 
 
 def _w_BaseContainerType(w: X.Writer, v: BaseContainerType, tag: str) -> None:
+    """Writes a value of the XTCE type ``BaseContainerType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``BaseContainer``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     w.attr('containerRef', v.container_ref)
     if v.restriction_criteria is not None:
@@ -17767,6 +25693,21 @@ def _w_BaseContainerType(w: X.Writer, v: BaseContainerType, tag: str) -> None:
 
 
 def _w_BaseDataType(w: X.Writer, v: BaseDataType, tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``BaseDataType`` as an XML element: its attributes, then its child
+    elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17788,6 +25729,19 @@ def _w_BaseDataType(w: X.Writer, v: BaseDataType, tag: str) -> None:
 
 def _w_BaseMetaCommandType(w: X.Writer, v: BaseMetaCommandType,
                            tag: str) -> None:
+    """Writes a value of the XTCE type ``BaseMetaCommandType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``BaseMetaCommand``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     w.attr('metaCommandRef', v.meta_command_ref)
     if v.argument_assignment_list is not None:
@@ -17797,6 +25751,21 @@ def _w_BaseMetaCommandType(w: X.Writer, v: BaseMetaCommandType,
 
 
 def _w_BaseTimeDataType(w: X.Writer, v: BaseTimeDataType, tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``BaseTimeDataType`` as an XML element: its attributes, then its child
+    elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17817,11 +25786,35 @@ def _w_BaseTimeDataType(w: X.Writer, v: BaseTimeDataType, tag: str) -> None:
 
 
 def _w_BaseTriggerType(w: X.Writer, v: BaseTriggerType, tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``BaseTriggerType`` as an XML element: its attributes, then its child
+    elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+    """
     w.start(tag)
     w.end(tag)
 
 
 def _w_BinaryAlarmType(w: X.Writer, v: BinaryAlarmType, tag: str) -> None:
+    """Writes a value of the XTCE type ``BinaryAlarmType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``DefaultAlarm``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.name is not None:
         w.attr('name', v.name)
@@ -17841,6 +25834,21 @@ def _w_BinaryAlarmType(w: X.Writer, v: BinaryAlarmType, tag: str) -> None:
 
 
 def _w_BinaryArgumentType(w: X.Writer, v: BinaryArgumentType, tag: str) -> None:
+    """Writes a value of the XTCE type ``BinaryArgumentType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``BinaryArgumentType``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17864,6 +25872,21 @@ def _w_BinaryArgumentType(w: X.Writer, v: BinaryArgumentType, tag: str) -> None:
 
 def _w_BinaryContextAlarmListType(w: X.Writer, v: BinaryContextAlarmListType,
                                   tag: str) -> None:
+    """Writes a value of the XTCE type ``BinaryContextAlarmListType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ContextAlarmList``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.context_alarm), 1, -1,
                   "BinaryContextAlarmListType.ContextAlarm")
@@ -17874,6 +25897,21 @@ def _w_BinaryContextAlarmListType(w: X.Writer, v: BinaryContextAlarmListType,
 
 def _w_BinaryContextAlarmType(w: X.Writer, v: BinaryContextAlarmType,
                               tag: str) -> None:
+    """Writes a value of the XTCE type ``BinaryContextAlarmType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ContextAlarm``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.name is not None:
         w.attr('name', v.name)
@@ -17895,6 +25933,21 @@ def _w_BinaryContextAlarmType(w: X.Writer, v: BinaryContextAlarmType,
 
 def _w_BinaryDataEncodingType(w: X.Writer, v: BinaryDataEncodingType,
                               tag: str) -> None:
+    """Writes a value of the XTCE type ``BinaryDataEncodingType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``BinaryDataEncoding``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.bit_order is not None:
         w.attr('bitOrder', v.bit_order.value)
@@ -17914,6 +25967,21 @@ def _w_BinaryDataEncodingType(w: X.Writer, v: BinaryDataEncodingType,
 
 
 def _w_BinaryDataType(w: X.Writer, v: BinaryDataType, tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``BinaryDataType`` as an XML element: its attributes, then its child
+    elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17937,6 +26005,21 @@ def _w_BinaryDataType(w: X.Writer, v: BinaryDataType, tag: str) -> None:
 
 def _w_BinaryParameterType(w: X.Writer, v: BinaryParameterType,
                            tag: str) -> None:
+    """Writes a value of the XTCE type ``BinaryParameterType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``BinaryParameterType``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17965,6 +26048,19 @@ def _w_BinaryParameterType(w: X.Writer, v: BinaryParameterType,
 
 def _w_BlockMetaCommandType(w: X.Writer, v: BlockMetaCommandType,
                             tag: str) -> None:
+    """Writes a value of the XTCE type ``BlockMetaCommandType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``BlockMetaCommand``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -17981,6 +26077,21 @@ def _w_BlockMetaCommandType(w: X.Writer, v: BlockMetaCommandType,
 
 
 def _w_BooleanAlarmType(w: X.Writer, v: BooleanAlarmType, tag: str) -> None:
+    """Writes a value of the XTCE type ``BooleanAlarmType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``DefaultAlarm``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.name is not None:
         w.attr('name', v.name)
@@ -18001,6 +26112,21 @@ def _w_BooleanAlarmType(w: X.Writer, v: BooleanAlarmType, tag: str) -> None:
 
 def _w_BooleanArgumentType(w: X.Writer, v: BooleanArgumentType,
                            tag: str) -> None:
+    """Writes a value of the XTCE type ``BooleanArgumentType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``BooleanArgumentType``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -18028,6 +26154,21 @@ def _w_BooleanArgumentType(w: X.Writer, v: BooleanArgumentType,
 
 def _w_BooleanContextAlarmListType(w: X.Writer, v: BooleanContextAlarmListType,
                                    tag: str) -> None:
+    """Writes a value of the XTCE type ``BooleanContextAlarmListType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ContextAlarmList``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.context_alarm), 1, -1,
                   "BooleanContextAlarmListType.ContextAlarm")
@@ -18038,6 +26179,21 @@ def _w_BooleanContextAlarmListType(w: X.Writer, v: BooleanContextAlarmListType,
 
 def _w_BooleanContextAlarmType(w: X.Writer, v: BooleanContextAlarmType,
                                tag: str) -> None:
+    """Writes a value of the XTCE type ``BooleanContextAlarmType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ContextAlarm``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.name is not None:
         w.attr('name', v.name)
@@ -18058,6 +26214,21 @@ def _w_BooleanContextAlarmType(w: X.Writer, v: BooleanContextAlarmType,
 
 
 def _w_BooleanDataType(w: X.Writer, v: BooleanDataType, tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``BooleanDataType`` as an XML element: its attributes, then its child
+    elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -18085,6 +26256,21 @@ def _w_BooleanDataType(w: X.Writer, v: BooleanDataType, tag: str) -> None:
 
 def _w_BooleanExpressionType(w: X.Writer, v: BooleanExpressionType,
                              tag: str) -> None:
+    """Writes a value of the XTCE type ``BooleanExpressionType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``BooleanExpression``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     _w_BooleanExpressionChoice(w, v.choice)
     w.end(tag)
@@ -18092,6 +26278,21 @@ def _w_BooleanExpressionType(w: X.Writer, v: BooleanExpressionType,
 
 def _w_BooleanParameterType(w: X.Writer, v: BooleanParameterType,
                             tag: str) -> None:
+    """Writes a value of the XTCE type ``BooleanParameterType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``BooleanParameterType``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -18123,12 +26324,28 @@ def _w_BooleanParameterType(w: X.Writer, v: BooleanParameterType,
 
 
 def _w_ByteType(w: X.Writer, v: ByteType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ByteType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+    """
     w.start(tag)
     w.attr('byteSignificance', X.f_int(v.byte_significance))
     w.end(tag)
 
 
 def _w_CRCType(w: X.Writer, v: CRCType, tag: str) -> None:
+    """Writes a value of the XTCE type ``CRCType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type ``CRC``.
+    """
     w.start(tag)
     w.attr('width', X.f_int(v.width))
     if v.reflect_data is not None:
@@ -18152,6 +26369,21 @@ def _w_CRCType(w: X.Writer, v: CRCType, tag: str) -> None:
 
 
 def _w_CalibratorType(w: X.Writer, v: CalibratorType, tag: str) -> None:
+    """Writes a value of the XTCE type ``CalibratorType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Calibrator`` or ``DefaultCalibrator``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.name is not None:
         w.attr('name', v.name)
@@ -18165,6 +26397,19 @@ def _w_CalibratorType(w: X.Writer, v: CalibratorType, tag: str) -> None:
 
 def _w_ChangeAlarmRangesType(w: X.Writer, v: ChangeAlarmRangesType,
                              tag: str) -> None:
+    """Writes a value of the XTCE type ``ChangeAlarmRangesType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ChangeAlarmRanges``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     if v.name is not None:
         w.attr('name', v.name)
@@ -18198,6 +26443,15 @@ def _w_ChangeAlarmRangesType(w: X.Writer, v: ChangeAlarmRangesType,
 
 
 def _w_ChangeValueType(w: X.Writer, v: ChangeValueType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ChangeValueType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Change``.
+    """
     w.start(tag)
     w.attr('value', X.f_double(v.value))
     w.end(tag)
@@ -18205,6 +26459,21 @@ def _w_ChangeValueType(w: X.Writer, v: ChangeValueType, tag: str) -> None:
 
 def _w_CheckWindowAlgorithmsType(w: X.Writer, v: CheckWindowAlgorithmsType,
                                  tag: str) -> None:
+    """Writes a value of the XTCE type ``CheckWindowAlgorithmsType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``CheckWindowAlgorithms``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     _w_InputAlgorithmType(w, v.start_check, 'StartCheck')
     _w_InputAlgorithmType(w, v.stop_time, 'StopTime')
@@ -18212,6 +26481,15 @@ def _w_CheckWindowAlgorithmsType(w: X.Writer, v: CheckWindowAlgorithmsType,
 
 
 def _w_CheckWindowType(w: X.Writer, v: CheckWindowType, tag: str) -> None:
+    """Writes a value of the XTCE type ``CheckWindowType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``CheckWindow``.
+    """
     w.start(tag)
     if v.time_to_start_checking is not None:
         w.attr('timeToStartChecking', v.time_to_start_checking)
@@ -18222,6 +26500,21 @@ def _w_CheckWindowType(w: X.Writer, v: CheckWindowType, tag: str) -> None:
 
 
 def _w_ChecksumType(w: X.Writer, v: ChecksumType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ChecksumType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Checksum``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.bits_from_reference is not None:
         w.attr('bitsFromReference', X.f_int(v.bits_from_reference))
@@ -18239,6 +26532,21 @@ def _w_ChecksumType(w: X.Writer, v: ChecksumType, tag: str) -> None:
 
 def _w_CommandContainerEntryListType(
         w: X.Writer, v: CommandContainerEntryListType, tag: str) -> None:
+    """Writes a value of the XTCE type ``CommandContainerEntryListType`` as an
+    XML element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``EntryList``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     for e in v.items:
         _w_CommandContainerEntryListChoice(w, e)
@@ -18247,6 +26555,21 @@ def _w_CommandContainerEntryListType(
 
 def _w_CommandContainerSetType(w: X.Writer, v: CommandContainerSetType,
                                tag: str) -> None:
+    """Writes a value of the XTCE type ``CommandContainerSetType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``CommandContainerSet``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.command_container), 1, -1,
                   "CommandContainerSetType.CommandContainer")
@@ -18257,6 +26580,21 @@ def _w_CommandContainerSetType(w: X.Writer, v: CommandContainerSetType,
 
 def _w_CommandContainerType(w: X.Writer, v: CommandContainerType,
                             tag: str) -> None:
+    """Writes a value of the XTCE type ``CommandContainerType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``CommandContainer``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -18282,6 +26620,21 @@ def _w_CommandContainerType(w: X.Writer, v: CommandContainerType,
 
 def _w_CommandMetaDataType(w: X.Writer, v: CommandMetaDataType,
                            tag: str) -> None:
+    """Writes a value of the XTCE type ``CommandMetaDataType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``CommandMetaData``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.parameter_type_set is not None:
         _w_ParameterTypeSetType(w, v.parameter_type_set, 'ParameterTypeSet')
@@ -18303,6 +26656,21 @@ def _w_CommandMetaDataType(w: X.Writer, v: CommandMetaDataType,
 
 def _w_CommandVerifierType(w: X.Writer, v: CommandVerifierType,
                            tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``CommandVerifierType`` as an XML element: its attributes, then its child
+    elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -18324,6 +26692,19 @@ def _w_CommandVerifierType(w: X.Writer, v: CommandVerifierType,
 
 def _w_ComparisonCheckType(w: X.Writer, v: ComparisonCheckType,
                            tag: str) -> None:
+    """Writes a value of the XTCE type ``ComparisonCheckType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Condition``.
+
+    Raises:
+        X.XtceError: If a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     _w_ParameterInstanceRefType(w, v.parameter_instance_ref,
                                 "ParameterInstanceRef")
@@ -18333,6 +26714,19 @@ def _w_ComparisonCheckType(w: X.Writer, v: ComparisonCheckType,
 
 
 def _w_ComparisonListType(w: X.Writer, v: ComparisonListType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ComparisonListType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ComparisonList``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     X.check_count(len(v.comparison), 1, -1, 'ComparisonListType.Comparison')
     for e in v.comparison:
@@ -18341,6 +26735,15 @@ def _w_ComparisonListType(w: X.Writer, v: ComparisonListType, tag: str) -> None:
 
 
 def _w_ComparisonType(w: X.Writer, v: ComparisonType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ComparisonType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Comparison``.
+    """
     w.start(tag)
     w.attr('parameterRef', v.parameter_ref)
     if v.instance is not None:
@@ -18355,6 +26758,21 @@ def _w_ComparisonType(w: X.Writer, v: ComparisonType, tag: str) -> None:
 
 def _w_CompleteVerifierType(w: X.Writer, v: CompleteVerifierType,
                             tag: str) -> None:
+    """Writes a value of the XTCE type ``CompleteVerifierType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``CompleteVerifier``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -18377,6 +26795,15 @@ def _w_CompleteVerifierType(w: X.Writer, v: CompleteVerifierType,
 
 
 def _w_ConstantType(w: X.Writer, v: ConstantType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ConstantType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Constant``.
+    """
     w.start(tag)
     w.attr('constantName', v.constant_name)
     w.attr('value', v.value)
@@ -18385,6 +26812,21 @@ def _w_ConstantType(w: X.Writer, v: ConstantType, tag: str) -> None:
 
 def _w_ContainerBinaryDataEncodingType(
         w: X.Writer, v: ContainerBinaryDataEncodingType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ContainerBinaryDataEncodingType`` as an
+    XML element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``BinaryEncoding``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.error_detect_correct is not None:
         _w_ErrorDetectCorrectType(w, v.error_detect_correct,
@@ -18402,6 +26844,21 @@ def _w_ContainerBinaryDataEncodingType(
 
 def _w_ContainerRefEntryType(w: X.Writer, v: ContainerRefEntryType,
                              tag: str) -> None:
+    """Writes a value of the XTCE type ``ContainerRefEntryType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ContainerRefEntry``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -18422,6 +26879,19 @@ def _w_ContainerRefEntryType(w: X.Writer, v: ContainerRefEntryType,
 
 def _w_ContainerRefSetType(w: X.Writer, v: ContainerRefSetType,
                            tag: str) -> None:
+    """Writes a value of the XTCE type ``ContainerRefSetType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ContainerRefSet``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     X.check_count(len(v.container_ref), 1, -1,
                   "ContainerRefSetType.ContainerRef")
@@ -18431,6 +26901,15 @@ def _w_ContainerRefSetType(w: X.Writer, v: ContainerRefSetType,
 
 
 def _w_ContainerRefType(w: X.Writer, v: ContainerRefType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ContainerRefType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ContainerRef`` or ``NextContainer``.
+    """
     w.start(tag)
     w.attr('containerRef', v.container_ref)
     w.end(tag)
@@ -18438,6 +26917,21 @@ def _w_ContainerRefType(w: X.Writer, v: ContainerRefType, tag: str) -> None:
 
 def _w_ContainerSegmentRefEntryType(
         w: X.Writer, v: ContainerSegmentRefEntryType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ContainerSegmentRefEntryType`` as an
+    XML element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ContainerSegmentRefEntry``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -18460,6 +26954,21 @@ def _w_ContainerSegmentRefEntryType(
 
 
 def _w_ContainerSetType(w: X.Writer, v: ContainerSetType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ContainerSetType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ContainerSet``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.sequence_container), 1, -1,
                   "ContainerSetType.SequenceContainer")
@@ -18469,6 +26978,21 @@ def _w_ContainerSetType(w: X.Writer, v: ContainerSetType, tag: str) -> None:
 
 
 def _w_ContainerType(w: X.Writer, v: ContainerType, tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``ContainerType`` as an XML element: its attributes, then its child
+    elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -18491,6 +27015,21 @@ def _w_ContainerType(w: X.Writer, v: ContainerType, tag: str) -> None:
 
 def _w_ContextCalibratorListType(w: X.Writer, v: ContextCalibratorListType,
                                  tag: str) -> None:
+    """Writes a value of the XTCE type ``ContextCalibratorListType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ContextCalibratorList``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.context_calibrator), 1, -1,
                   "ContextCalibratorListType.ContextCalibrator")
@@ -18501,6 +27040,21 @@ def _w_ContextCalibratorListType(w: X.Writer, v: ContextCalibratorListType,
 
 def _w_ContextCalibratorType(w: X.Writer, v: ContextCalibratorType,
                              tag: str) -> None:
+    """Writes a value of the XTCE type ``ContextCalibratorType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ContextCalibrator``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     _w_ContextMatchType(w, v.context_match, 'ContextMatch')
     _w_CalibratorType(w, v.calibrator, 'Calibrator')
@@ -18508,6 +27062,21 @@ def _w_ContextCalibratorType(w: X.Writer, v: ContextCalibratorType,
 
 
 def _w_ContextMatchType(w: X.Writer, v: ContextMatchType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ContextMatchType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ContextMatch``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     _w_ContextMatchChoice(w, v.choice)
     w.end(tag)
@@ -18515,6 +27084,21 @@ def _w_ContextMatchType(w: X.Writer, v: ContextMatchType, tag: str) -> None:
 
 def _w_ContextSignificanceListType(w: X.Writer, v: ContextSignificanceListType,
                                    tag: str) -> None:
+    """Writes a value of the XTCE type ``ContextSignificanceListType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ContextSignificanceList``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.context_significance), 1, -1,
                   "ContextSignificanceListType.ContextSignificance")
@@ -18525,6 +27109,21 @@ def _w_ContextSignificanceListType(w: X.Writer, v: ContextSignificanceListType,
 
 def _w_ContextSignificanceType(w: X.Writer, v: ContextSignificanceType,
                                tag: str) -> None:
+    """Writes a value of the XTCE type ``ContextSignificanceType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ContextSignificance``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     _w_ContextMatchType(w, v.context_match, 'ContextMatch')
     _w_SignificanceType(w, v.significance, 'Significance')
@@ -18532,6 +27131,21 @@ def _w_ContextSignificanceType(w: X.Writer, v: ContextSignificanceType,
 
 
 def _w_CustomAlarmType(w: X.Writer, v: CustomAlarmType, tag: str) -> None:
+    """Writes a value of the XTCE type ``CustomAlarmType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``CustomAlarm``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.name is not None:
         w.attr('name', v.name)
@@ -18544,6 +27158,21 @@ def _w_CustomAlarmType(w: X.Writer, v: CustomAlarmType, tag: str) -> None:
 
 
 def _w_CustomStreamType(w: X.Writer, v: CustomStreamType, tag: str) -> None:
+    """Writes a value of the XTCE type ``CustomStreamType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``CustomStream``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -18568,6 +27197,21 @@ def _w_CustomStreamType(w: X.Writer, v: CustomStreamType, tag: str) -> None:
 
 
 def _w_DataEncodingType(w: X.Writer, v: DataEncodingType, tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``DataEncodingType`` as an XML element: its attributes, then its child
+    elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.bit_order is not None:
         w.attr('bitOrder', v.bit_order.value)
@@ -18580,6 +27224,19 @@ def _w_DataEncodingType(w: X.Writer, v: DataEncodingType, tag: str) -> None:
 
 
 def _w_DescriptionType(w: X.Writer, v: DescriptionType, tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``DescriptionType`` as an XML element: its attributes, then its child
+    elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -18593,6 +27250,21 @@ def _w_DescriptionType(w: X.Writer, v: DescriptionType, tag: str) -> None:
 
 
 def _w_DimensionListType(w: X.Writer, v: DimensionListType, tag: str) -> None:
+    """Writes a value of the XTCE type ``DimensionListType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``DimensionList``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.dimension), 1, -1, 'DimensionListType.Dimension')
     for e in v.dimension:
@@ -18601,6 +27273,21 @@ def _w_DimensionListType(w: X.Writer, v: DimensionListType, tag: str) -> None:
 
 
 def _w_DimensionType(w: X.Writer, v: DimensionType, tag: str) -> None:
+    """Writes a value of the XTCE type ``DimensionType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Dimension``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     _w_IntegerValueType(w, v.starting_index, 'StartingIndex')
     _w_IntegerValueType(w, v.ending_index, 'EndingIndex')
@@ -18609,6 +27296,21 @@ def _w_DimensionType(w: X.Writer, v: DimensionType, tag: str) -> None:
 
 def _w_DiscreteLookupListType(w: X.Writer, v: DiscreteLookupListType,
                               tag: str) -> None:
+    """Writes a value of the XTCE type ``DiscreteLookupListType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``DiscreteLookupList``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     w.attr('defaultValue', X.f_int(v.default_value))
     X.check_count(len(v.discrete_lookup), 1, -1,
@@ -18619,6 +27321,21 @@ def _w_DiscreteLookupListType(w: X.Writer, v: DiscreteLookupListType,
 
 
 def _w_DiscreteLookupType(w: X.Writer, v: DiscreteLookupType, tag: str) -> None:
+    """Writes a value of the XTCE type ``DiscreteLookupType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``DiscreteLookup``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     w.attr('value', X.f_int(v.value))
     _w_DiscreteLookupChoice(w, v.choice)
@@ -18626,6 +27343,15 @@ def _w_DiscreteLookupType(w: X.Writer, v: DiscreteLookupType, tag: str) -> None:
 
 
 def _w_DynamicValueType(w: X.Writer, v: DynamicValueType, tag: str) -> None:
+    """Writes a value of the XTCE type ``DynamicValueType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``DynamicValue``.
+    """
     w.start(tag)
     _w_ParameterInstanceRefType(w, v.parameter_instance_ref,
                                 "ParameterInstanceRef")
@@ -18635,6 +27361,21 @@ def _w_DynamicValueType(w: X.Writer, v: DynamicValueType, tag: str) -> None:
 
 
 def _w_EncodingType(w: X.Writer, v: EncodingType, tag: str) -> None:
+    """Writes a value of the XTCE type ``EncodingType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Encoding``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.units is not None:
         w.attr('units', v.units.value)
@@ -18647,6 +27388,21 @@ def _w_EncodingType(w: X.Writer, v: EncodingType, tag: str) -> None:
 
 
 def _w_EntryListType(w: X.Writer, v: EntryListType, tag: str) -> None:
+    """Writes a value of the XTCE type ``EntryListType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``EntryList``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     for e in v.items:
         _w_EntryListChoice(w, e)
@@ -18655,6 +27411,21 @@ def _w_EntryListType(w: X.Writer, v: EntryListType, tag: str) -> None:
 
 def _w_EnumeratedArgumentType(w: X.Writer, v: EnumeratedArgumentType,
                               tag: str) -> None:
+    """Writes a value of the XTCE type ``EnumeratedArgumentType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``EnumeratedArgumentType``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -18678,6 +27449,21 @@ def _w_EnumeratedArgumentType(w: X.Writer, v: EnumeratedArgumentType,
 
 
 def _w_EnumeratedDataType(w: X.Writer, v: EnumeratedDataType, tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``EnumeratedDataType`` as an XML element: its attributes, then its child
+    elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -18702,6 +27488,21 @@ def _w_EnumeratedDataType(w: X.Writer, v: EnumeratedDataType, tag: str) -> None:
 
 def _w_EnumeratedParameterType(w: X.Writer, v: EnumeratedParameterType,
                                tag: str) -> None:
+    """Writes a value of the XTCE type ``EnumeratedParameterType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``EnumeratedParameterType``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -18731,6 +27532,15 @@ def _w_EnumeratedParameterType(w: X.Writer, v: EnumeratedParameterType,
 
 def _w_EnumerationAlarmLevelType(w: X.Writer, v: EnumerationAlarmLevelType,
                                  tag: str) -> None:
+    """Writes a value of the XTCE type ``EnumerationAlarmLevelType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``EnumerationAlarm``.
+    """
     w.start(tag)
     w.attr('alarmLevel', v.alarm_level.value)
     w.attr('enumerationLabel', v.enumeration_label)
@@ -18739,6 +27549,19 @@ def _w_EnumerationAlarmLevelType(w: X.Writer, v: EnumerationAlarmLevelType,
 
 def _w_EnumerationAlarmListType(w: X.Writer, v: EnumerationAlarmListType,
                                 tag: str) -> None:
+    """Writes a value of the XTCE type ``EnumerationAlarmListType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``EnumerationAlarmList``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     X.check_count(len(v.enumeration_alarm), 1, -1,
                   "EnumerationAlarmListType.EnumerationAlarm")
@@ -18749,6 +27572,21 @@ def _w_EnumerationAlarmListType(w: X.Writer, v: EnumerationAlarmListType,
 
 def _w_EnumerationAlarmType(w: X.Writer, v: EnumerationAlarmType,
                             tag: str) -> None:
+    """Writes a value of the XTCE type ``EnumerationAlarmType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``DefaultAlarm``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.name is not None:
         w.attr('name', v.name)
@@ -18774,6 +27612,21 @@ def _w_EnumerationAlarmType(w: X.Writer, v: EnumerationAlarmType,
 
 def _w_EnumerationContextAlarmListType(
         w: X.Writer, v: EnumerationContextAlarmListType, tag: str) -> None:
+    """Writes a value of the XTCE type ``EnumerationContextAlarmListType`` as an
+    XML element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ContextAlarmList``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.context_alarm), 1, -1,
                   "EnumerationContextAlarmListType.ContextAlarm")
@@ -18784,6 +27637,21 @@ def _w_EnumerationContextAlarmListType(
 
 def _w_EnumerationContextAlarmType(w: X.Writer, v: EnumerationContextAlarmType,
                                    tag: str) -> None:
+    """Writes a value of the XTCE type ``EnumerationContextAlarmType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ContextAlarm``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.name is not None:
         w.attr('name', v.name)
@@ -18810,6 +27678,19 @@ def _w_EnumerationContextAlarmType(w: X.Writer, v: EnumerationContextAlarmType,
 
 def _w_EnumerationListType(w: X.Writer, v: EnumerationListType,
                            tag: str) -> None:
+    """Writes a value of the XTCE type ``EnumerationListType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``EnumerationList``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     X.check_count(len(v.enumeration), 1, -1, 'EnumerationListType.Enumeration')
     for e in v.enumeration:
@@ -18819,6 +27700,21 @@ def _w_EnumerationListType(w: X.Writer, v: EnumerationListType,
 
 def _w_ErrorDetectCorrectType(w: X.Writer, v: ErrorDetectCorrectType,
                               tag: str) -> None:
+    """Writes a value of the XTCE type ``ErrorDetectCorrectType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ErrorDetectCorrect``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.items), 1, -1,
                   "ErrorDetectCorrectType.ErrorDetectCorrectChoice")
@@ -18829,6 +27725,21 @@ def _w_ErrorDetectCorrectType(w: X.Writer, v: ErrorDetectCorrectType,
 
 def _w_ExecutionVerifierType(w: X.Writer, v: ExecutionVerifierType,
                              tag: str) -> None:
+    """Writes a value of the XTCE type ``ExecutionVerifierType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ExecutionVerifier``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -18852,6 +27763,19 @@ def _w_ExecutionVerifierType(w: X.Writer, v: ExecutionVerifierType,
 
 def _w_ExternalAlgorithmSetType(w: X.Writer, v: ExternalAlgorithmSetType,
                                 tag: str) -> None:
+    """Writes a value of the XTCE type ``ExternalAlgorithmSetType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ExternalAlgorithmSet``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     X.check_count(len(v.external_algorithm), 1, -1,
                   "ExternalAlgorithmSetType.ExternalAlgorithm")
@@ -18862,6 +27786,15 @@ def _w_ExternalAlgorithmSetType(w: X.Writer, v: ExternalAlgorithmSetType,
 
 def _w_ExternalAlgorithmType(w: X.Writer, v: ExternalAlgorithmType,
                              tag: str) -> None:
+    """Writes a value of the XTCE type ``ExternalAlgorithmType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ExternalAlgorithm``.
+    """
     w.start(tag)
     w.attr('implementationName', v.implementation_name)
     w.attr('algorithmLocation', v.algorithm_location)
@@ -18869,6 +27802,21 @@ def _w_ExternalAlgorithmType(w: X.Writer, v: ExternalAlgorithmType,
 
 
 def _w_FailedVerifierType(w: X.Writer, v: FailedVerifierType, tag: str) -> None:
+    """Writes a value of the XTCE type ``FailedVerifierType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``FailedVerifier``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -18892,6 +27840,21 @@ def _w_FailedVerifierType(w: X.Writer, v: FailedVerifierType, tag: str) -> None:
 
 def _w_FixedFrameStreamType(w: X.Writer, v: FixedFrameStreamType,
                             tag: str) -> None:
+    """Writes a value of the XTCE type ``FixedFrameStreamType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``FixedFrameStream``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -18920,6 +27883,21 @@ def _w_FixedFrameStreamType(w: X.Writer, v: FixedFrameStreamType,
 
 def _w_FixedFrameSyncStrategyType(w: X.Writer, v: FixedFrameSyncStrategyType,
                                   tag: str) -> None:
+    """Writes a value of the XTCE type ``FixedFrameSyncStrategyType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``SyncStrategy``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.verify_to_lock_good_frames is not None:
         w.attr('verifyToLockGoodFrames', X.f_int(v.verify_to_lock_good_frames))
@@ -18935,6 +27913,15 @@ def _w_FixedFrameSyncStrategyType(w: X.Writer, v: FixedFrameSyncStrategyType,
 
 
 def _w_FlagType(w: X.Writer, v: FlagType, tag: str) -> None:
+    """Writes a value of the XTCE type ``FlagType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Flag``.
+    """
     w.start(tag)
     if v.flag_size_in_bits is not None:
         w.attr('flagSizeInBits', X.f_int(v.flag_size_in_bits))
@@ -18944,6 +27931,21 @@ def _w_FlagType(w: X.Writer, v: FlagType, tag: str) -> None:
 
 
 def _w_FloatArgumentType(w: X.Writer, v: FloatArgumentType, tag: str) -> None:
+    """Writes a value of the XTCE type ``FloatArgumentType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``FloatArgumentType``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -18973,6 +27975,21 @@ def _w_FloatArgumentType(w: X.Writer, v: FloatArgumentType, tag: str) -> None:
 
 def _w_FloatDataEncodingType(w: X.Writer, v: FloatDataEncodingType,
                              tag: str) -> None:
+    """Writes a value of the XTCE type ``FloatDataEncodingType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``FloatDataEncoding``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.bit_order is not None:
         w.attr('bitOrder', v.bit_order.value)
@@ -18996,6 +28013,21 @@ def _w_FloatDataEncodingType(w: X.Writer, v: FloatDataEncodingType,
 
 
 def _w_FloatDataType(w: X.Writer, v: FloatDataType, tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``FloatDataType`` as an XML element: its attributes, then its child
+    elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -19025,6 +28057,15 @@ def _w_FloatDataType(w: X.Writer, v: FloatDataType, tag: str) -> None:
 
 def _w_FloatDataValidRangeType(w: X.Writer, v: FloatDataValidRangeType,
                                tag: str) -> None:
+    """Writes a value of an XTCE ``ValidRange`` element as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ValidRange``.
+    """
     w.start(tag)
     if v.min_inclusive is not None:
         w.attr('minInclusive', X.f_double(v.min_inclusive))
@@ -19041,6 +28082,21 @@ def _w_FloatDataValidRangeType(w: X.Writer, v: FloatDataValidRangeType,
 
 
 def _w_FloatParameterType(w: X.Writer, v: FloatParameterType, tag: str) -> None:
+    """Writes a value of the XTCE type ``FloatParameterType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``FloatParameterType``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -19074,6 +28130,16 @@ def _w_FloatParameterType(w: X.Writer, v: FloatParameterType, tag: str) -> None:
 
 
 def _w_FloatRangeType(w: X.Writer, v: FloatRangeType, tag: str) -> None:
+    """Writes a value of the XTCE type ``FloatRangeType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``CriticalRange``, ``DistressRange``, ``SevereRange``,
+             ``ValidRange``, ``WarningRange`` or ``WatchRange``.
+    """
     w.start(tag)
     if v.min_inclusive is not None:
         w.attr('minInclusive', X.f_double(v.min_inclusive))
@@ -19087,6 +28153,20 @@ def _w_FloatRangeType(w: X.Writer, v: FloatRangeType, tag: str) -> None:
 
 
 def _w_FrameStreamType(w: X.Writer, v: FrameStreamType, tag: str) -> None:
+    """Writes a value of the XTCE type ``FrameStreamType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -19110,6 +28190,15 @@ def _w_FrameStreamType(w: X.Writer, v: FrameStreamType, tag: str) -> None:
 
 
 def _w_HeaderType(w: X.Writer, v: HeaderType, tag: str) -> None:
+    """Writes a value of the XTCE type ``HeaderType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Header``.
+    """
     w.start(tag)
     if v.version is not None:
         w.attr('version', v.version)
@@ -19130,6 +28219,15 @@ def _w_HeaderType(w: X.Writer, v: HeaderType, tag: str) -> None:
 
 
 def _w_HistorySetType(w: X.Writer, v: HistorySetType, tag: str) -> None:
+    """Writes a value of the XTCE type ``HistorySetType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``HistorySet``.
+    """
     w.start(tag)
     for e in v.history:
         w.leaf('History', e)
@@ -19138,6 +28236,21 @@ def _w_HistorySetType(w: X.Writer, v: HistorySetType, tag: str) -> None:
 
 def _w_IndirectParameterRefEntryType(
         w: X.Writer, v: IndirectParameterRefEntryType, tag: str) -> None:
+    """Writes a value of the XTCE type ``IndirectParameterRefEntryType`` as an
+    XML element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``IndirectParameterRefEntry``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -19159,6 +28272,24 @@ def _w_IndirectParameterRefEntryType(
 
 
 def _w_InputAlgorithmType(w: X.Writer, v: InputAlgorithmType, tag: str) -> None:
+    """Writes a value of the XTCE type ``InputAlgorithmType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``CustomAlgorithm``, ``EncodingAlgorithm``,
+             ``FromBinaryTransformAlgorithm``, ``InputAlgorithm``,
+             ``InvertAlgorithm``, ``StartCheck``, ``StopTime`` or
+             ``ToBinaryTransformAlgorithm``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -19181,6 +28312,21 @@ def _w_InputAlgorithmType(w: X.Writer, v: InputAlgorithmType, tag: str) -> None:
 
 def _w_InputOutputAlgorithmType(w: X.Writer, v: InputOutputAlgorithmType,
                                 tag: str) -> None:
+    """Writes a value of the XTCE type ``InputOutputAlgorithmType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``DecodingAlgorithm``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -19207,6 +28353,21 @@ def _w_InputOutputAlgorithmType(w: X.Writer, v: InputOutputAlgorithmType,
 
 def _w_InputOutputTriggerAlgorithmType(
         w: X.Writer, v: InputOutputTriggerAlgorithmType, tag: str) -> None:
+    """Writes a value of the XTCE type ``InputOutputTriggerAlgorithmType`` as an
+    XML element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``CustomAlgorithm``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -19239,6 +28400,15 @@ def _w_InputOutputTriggerAlgorithmType(
 
 def _w_InputParameterInstanceRefType(
         w: X.Writer, v: InputParameterInstanceRefType, tag: str) -> None:
+    """Writes a value of the XTCE type ``InputParameterInstanceRefType`` as an
+    XML element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``InputParameterInstanceRef``.
+    """
     w.start(tag)
     w.attr('parameterRef', v.parameter_ref)
     if v.instance is not None:
@@ -19251,6 +28421,21 @@ def _w_InputParameterInstanceRefType(
 
 
 def _w_InputSetType(w: X.Writer, v: InputSetType, tag: str) -> None:
+    """Writes a value of the XTCE type ``InputSetType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``InputSet``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.items), 1, -1, 'InputSetType.InputSetChoice')
     for e in v.items:
@@ -19260,6 +28445,21 @@ def _w_InputSetType(w: X.Writer, v: InputSetType, tag: str) -> None:
 
 def _w_IntegerArgumentType(w: X.Writer, v: IntegerArgumentType,
                            tag: str) -> None:
+    """Writes a value of the XTCE type ``IntegerArgumentType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``IntegerArgumentType``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -19291,6 +28491,21 @@ def _w_IntegerArgumentType(w: X.Writer, v: IntegerArgumentType,
 
 def _w_IntegerDataEncodingType(w: X.Writer, v: IntegerDataEncodingType,
                                tag: str) -> None:
+    """Writes a value of the XTCE type ``IntegerDataEncodingType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``IntegerDataEncoding``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.bit_order is not None:
         w.attr('bitOrder', v.bit_order.value)
@@ -19314,6 +28529,21 @@ def _w_IntegerDataEncodingType(w: X.Writer, v: IntegerDataEncodingType,
 
 
 def _w_IntegerDataType(w: X.Writer, v: IntegerDataType, tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``IntegerDataType`` as an XML element: its attributes, then its child
+    elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -19345,6 +28575,15 @@ def _w_IntegerDataType(w: X.Writer, v: IntegerDataType, tag: str) -> None:
 
 def _w_IntegerDataValidRangeType(w: X.Writer, v: IntegerDataValidRangeType,
                                  tag: str) -> None:
+    """Writes a value of an XTCE ``ValidRange`` element as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ValidRange``.
+    """
     w.start(tag)
     if v.min_inclusive is not None:
         w.attr('minInclusive', X.f_int(v.min_inclusive))
@@ -19358,6 +28597,21 @@ def _w_IntegerDataValidRangeType(w: X.Writer, v: IntegerDataValidRangeType,
 
 def _w_IntegerParameterType(w: X.Writer, v: IntegerParameterType,
                             tag: str) -> None:
+    """Writes a value of the XTCE type ``IntegerParameterType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``IntegerParameterType``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -19393,6 +28647,15 @@ def _w_IntegerParameterType(w: X.Writer, v: IntegerParameterType,
 
 
 def _w_IntegerRangeType(w: X.Writer, v: IntegerRangeType, tag: str) -> None:
+    """Writes a value of the XTCE type ``IntegerRangeType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``SizeRangeInCharacters`` or ``ValidRange``.
+    """
     w.start(tag)
     if v.min_inclusive is not None:
         w.attr('minInclusive', X.f_int(v.min_inclusive))
@@ -19402,12 +28665,37 @@ def _w_IntegerRangeType(w: X.Writer, v: IntegerRangeType, tag: str) -> None:
 
 
 def _w_IntegerValueType(w: X.Writer, v: IntegerValueType, tag: str) -> None:
+    """Writes a value of the XTCE type ``IntegerValueType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Count``, ``EndingIndex``, ``Offset``, ``SizeInBits`` or
+             ``StartingIndex``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     _w_IntegerValueChoice(w, v.choice)
     w.end(tag)
 
 
 def _w_InterlockType(w: X.Writer, v: InterlockType, tag: str) -> None:
+    """Writes a value of the XTCE type ``InterlockType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Interlock``.
+    """
     w.start(tag)
     if v.scope_to_space_system is not None:
         w.attr('scopeToSpaceSystem', v.scope_to_space_system)
@@ -19422,6 +28710,15 @@ def _w_InterlockType(w: X.Writer, v: InterlockType, tag: str) -> None:
 
 
 def _w_LeadingSizeType(w: X.Writer, v: LeadingSizeType, tag: str) -> None:
+    """Writes a value of the XTCE type ``LeadingSizeType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``LeadingSize``.
+    """
     w.start(tag)
     if v.size_in_bits_of_size_tag is not None:
         w.attr('sizeInBitsOfSizeTag', X.f_int(v.size_in_bits_of_size_tag))
@@ -19430,6 +28727,15 @@ def _w_LeadingSizeType(w: X.Writer, v: LeadingSizeType, tag: str) -> None:
 
 def _w_LinearAdjustmentType(w: X.Writer, v: LinearAdjustmentType,
                             tag: str) -> None:
+    """Writes a value of the XTCE type ``LinearAdjustmentType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``LinearAdjustment``.
+    """
     w.start(tag)
     if v.slope is not None:
         w.attr('slope', X.f_double(v.slope))
@@ -19440,6 +28746,21 @@ def _w_LinearAdjustmentType(w: X.Writer, v: LinearAdjustmentType,
 
 def _w_LocationInContainerInBitsType(
         w: X.Writer, v: LocationInContainerInBitsType, tag: str) -> None:
+    """Writes a value of the XTCE type ``LocationInContainerInBitsType`` as an
+    XML element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``LocationInContainerInBits``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.reference_location is not None:
         w.attr('referenceLocation', v.reference_location.value)
@@ -19448,12 +28769,44 @@ def _w_LocationInContainerInBitsType(
 
 
 def _w_MatchCriteriaType(w: X.Writer, v: MatchCriteriaType, tag: str) -> None:
+    """Writes a value of the XTCE type ``MatchCriteriaType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``CriticalAlarm``, ``DistressAlarm``, ``IncludeCondition``,
+             ``MatchCriteria``, ``SevereAlarm``, ``ValidityCondition``,
+             ``WarningAlarm`` or ``WatchAlarm``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     _w_MatchCriteriaChoice(w, v.choice)
     w.end(tag)
 
 
 def _w_MathAlgorithmType(w: X.Writer, v: MathAlgorithmType, tag: str) -> None:
+    """Writes a value of the XTCE type ``MathAlgorithmType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``MathAlgorithm``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -19470,6 +28823,21 @@ def _w_MathAlgorithmType(w: X.Writer, v: MathAlgorithmType, tag: str) -> None:
 
 def _w_MathOperationCalibratorType(w: X.Writer, v: MathOperationCalibratorType,
                                    tag: str) -> None:
+    """Writes a value of the XTCE type ``MathOperationCalibratorType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``MathOperationCalibrator``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.name is not None:
         w.attr('name', v.name)
@@ -19485,6 +28853,21 @@ def _w_MathOperationCalibratorType(w: X.Writer, v: MathOperationCalibratorType,
 
 
 def _w_MathOperationType(w: X.Writer, v: MathOperationType, tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``MathOperationType`` as an XML element: its attributes, then its child
+    elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.name is not None:
         w.attr('name', v.name)
@@ -19499,6 +28882,19 @@ def _w_MathOperationType(w: X.Writer, v: MathOperationType, tag: str) -> None:
 
 
 def _w_MemberListType(w: X.Writer, v: MemberListType, tag: str) -> None:
+    """Writes a value of the XTCE type ``MemberListType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``MemberList``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     X.check_count(len(v.member), 1, -1, 'MemberListType.Member')
     for e in v.member:
@@ -19507,6 +28903,19 @@ def _w_MemberListType(w: X.Writer, v: MemberListType, tag: str) -> None:
 
 
 def _w_MemberType(w: X.Writer, v: MemberType, tag: str) -> None:
+    """Writes a value of the XTCE type ``MemberType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Member``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -19524,6 +28933,19 @@ def _w_MemberType(w: X.Writer, v: MemberType, tag: str) -> None:
 
 
 def _w_MessageRefSetType(w: X.Writer, v: MessageRefSetType, tag: str) -> None:
+    """Writes a value of the XTCE type ``MessageRefSetType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``MessageRefSet``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     X.check_count(len(v.message_ref), 1, -1, 'MessageRefSetType.MessageRef')
     for e in v.message_ref:
@@ -19532,12 +28954,36 @@ def _w_MessageRefSetType(w: X.Writer, v: MessageRefSetType, tag: str) -> None:
 
 
 def _w_MessageRefType(w: X.Writer, v: MessageRefType, tag: str) -> None:
+    """Writes a value of the XTCE type ``MessageRefType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``MessageRef``.
+    """
     w.start(tag)
     w.attr('messageRef', v.message_ref)
     w.end(tag)
 
 
 def _w_MessageSetType(w: X.Writer, v: MessageSetType, tag: str) -> None:
+    """Writes a value of the XTCE type ``MessageSetType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``MessageSet``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -19556,6 +29002,21 @@ def _w_MessageSetType(w: X.Writer, v: MessageSetType, tag: str) -> None:
 
 
 def _w_MessageType(w: X.Writer, v: MessageType, tag: str) -> None:
+    """Writes a value of the XTCE type ``MessageType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Message``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -19572,6 +29033,21 @@ def _w_MessageType(w: X.Writer, v: MessageType, tag: str) -> None:
 
 
 def _w_MetaCommandSetType(w: X.Writer, v: MetaCommandSetType, tag: str) -> None:
+    """Writes a value of the XTCE type ``MetaCommandSetType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``MetaCommandSet``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.items), 1, -1,
                   "MetaCommandSetType.MetaCommandSetChoice")
@@ -19582,6 +29058,19 @@ def _w_MetaCommandSetType(w: X.Writer, v: MetaCommandSetType, tag: str) -> None:
 
 def _w_MetaCommandStepListType(w: X.Writer, v: MetaCommandStepListType,
                                tag: str) -> None:
+    """Writes a value of the XTCE type ``MetaCommandStepListType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``MetaCommandStepList``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     X.check_count(len(v.meta_command_step), 1, -1,
                   "MetaCommandStepListType.MetaCommandStep")
@@ -19592,6 +29081,19 @@ def _w_MetaCommandStepListType(w: X.Writer, v: MetaCommandStepListType,
 
 def _w_MetaCommandStepType(w: X.Writer, v: MetaCommandStepType,
                            tag: str) -> None:
+    """Writes a value of the XTCE type ``MetaCommandStepType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``MetaCommandStep``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     w.attr('metaCommandRef', v.meta_command_ref)
     if v.argument_assignment_list is not None:
@@ -19601,6 +29103,21 @@ def _w_MetaCommandStepType(w: X.Writer, v: MetaCommandStepType,
 
 
 def _w_MetaCommandType(w: X.Writer, v: MetaCommandType, tag: str) -> None:
+    """Writes a value of the XTCE type ``MetaCommandType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``MetaCommand``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -19644,6 +29161,15 @@ def _w_MetaCommandType(w: X.Writer, v: MetaCommandType, tag: str) -> None:
 
 
 def _w_MultiRangeType(w: X.Writer, v: MultiRangeType, tag: str) -> None:
+    """Writes a value of the XTCE type ``MultiRangeType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Range``.
+    """
     w.start(tag)
     if v.min_inclusive is not None:
         w.attr('minInclusive', X.f_double(v.min_inclusive))
@@ -19662,6 +29188,18 @@ def _w_MultiRangeType(w: X.Writer, v: MultiRangeType, tag: str) -> None:
 
 def _w_NameDescriptionType(w: X.Writer, v: NameDescriptionType,
                            tag: str) -> None:
+    """Writes a value of the XTCE type ``NameDescriptionType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -19676,6 +29214,15 @@ def _w_NameDescriptionType(w: X.Writer, v: NameDescriptionType,
 
 
 def _w_NoteSetType(w: X.Writer, v: NoteSetType, tag: str) -> None:
+    """Writes a value of the XTCE type ``NoteSetType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``NoteSet``.
+    """
     w.start(tag)
     for e in v.note:
         w.leaf('Note', e)
@@ -19683,6 +29230,15 @@ def _w_NoteSetType(w: X.Writer, v: NoteSetType, tag: str) -> None:
 
 
 def _w_NumberFormatType(w: X.Writer, v: NumberFormatType, tag: str) -> None:
+    """Writes a value of the XTCE type ``NumberFormatType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``NumberFormat``.
+    """
     w.start(tag)
     if v.number_base is not None:
         w.attr('numberBase', v.number_base.value)
@@ -19710,6 +29266,21 @@ def _w_NumberFormatType(w: X.Writer, v: NumberFormatType, tag: str) -> None:
 
 
 def _w_NumericAlarmType(w: X.Writer, v: NumericAlarmType, tag: str) -> None:
+    """Writes a value of the XTCE type ``NumericAlarmType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``DefaultAlarm``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.name is not None:
         w.attr('name', v.name)
@@ -19736,6 +29307,21 @@ def _w_NumericAlarmType(w: X.Writer, v: NumericAlarmType, tag: str) -> None:
 
 def _w_NumericContextAlarmListType(w: X.Writer, v: NumericContextAlarmListType,
                                    tag: str) -> None:
+    """Writes a value of the XTCE type ``NumericContextAlarmListType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ContextAlarmList``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.context_alarm), 1, -1,
                   "NumericContextAlarmListType.ContextAlarm")
@@ -19746,6 +29332,21 @@ def _w_NumericContextAlarmListType(w: X.Writer, v: NumericContextAlarmListType,
 
 def _w_NumericContextAlarmType(w: X.Writer, v: NumericContextAlarmType,
                                tag: str) -> None:
+    """Writes a value of the XTCE type ``NumericContextAlarmType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ContextAlarm``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.name is not None:
         w.attr('name', v.name)
@@ -19772,6 +29373,21 @@ def _w_NumericContextAlarmType(w: X.Writer, v: NumericContextAlarmType,
 
 
 def _w_ORedConditionsType(w: X.Writer, v: ORedConditionsType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ORedConditionsType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ORedConditions``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.items), 2, -1,
                   "ORedConditionsType.ORedConditionsChoice")
@@ -19782,6 +29398,15 @@ def _w_ORedConditionsType(w: X.Writer, v: ORedConditionsType, tag: str) -> None:
 
 def _w_OnContainerUpdateTriggerType(
         w: X.Writer, v: OnContainerUpdateTriggerType, tag: str) -> None:
+    """Writes a value of the XTCE type ``OnContainerUpdateTriggerType`` as an
+    XML element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``OnContainerUpdateTrigger``.
+    """
     w.start(tag)
     w.attr('containerRef', v.container_ref)
     w.end(tag)
@@ -19789,6 +29414,15 @@ def _w_OnContainerUpdateTriggerType(
 
 def _w_OnParameterUpdateTriggerType(
         w: X.Writer, v: OnParameterUpdateTriggerType, tag: str) -> None:
+    """Writes a value of the XTCE type ``OnParameterUpdateTriggerType`` as an
+    XML element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``OnParameterUpdateTrigger``.
+    """
     w.start(tag)
     w.attr('parameterRef', v.parameter_ref)
     w.end(tag)
@@ -19796,6 +29430,15 @@ def _w_OnParameterUpdateTriggerType(
 
 def _w_OnPeriodicRateTriggerType(w: X.Writer, v: OnPeriodicRateTriggerType,
                                  tag: str) -> None:
+    """Writes a value of the XTCE type ``OnPeriodicRateTriggerType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``OnPeriodicRateTrigger``.
+    """
     w.start(tag)
     w.attr('fireRateInSeconds', X.f_double(v.fire_rate_in_seconds))
     w.end(tag)
@@ -19803,6 +29446,18 @@ def _w_OnPeriodicRateTriggerType(w: X.Writer, v: OnPeriodicRateTriggerType,
 
 def _w_OptionalNameDescriptionType(w: X.Writer, v: OptionalNameDescriptionType,
                                    tag: str) -> None:
+    """Writes a value of the XTCE type ``OptionalNameDescriptionType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -19819,6 +29474,15 @@ def _w_OptionalNameDescriptionType(w: X.Writer, v: OptionalNameDescriptionType,
 
 def _w_OutputParameterRefType(w: X.Writer, v: OutputParameterRefType,
                               tag: str) -> None:
+    """Writes a value of the XTCE type ``OutputParameterRefType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``OutputParameterRef``.
+    """
     w.start(tag)
     w.attr('parameterRef', v.parameter_ref)
     if v.output_name is not None:
@@ -19827,6 +29491,19 @@ def _w_OutputParameterRefType(w: X.Writer, v: OutputParameterRefType,
 
 
 def _w_OutputSetType(w: X.Writer, v: OutputSetType, tag: str) -> None:
+    """Writes a value of the XTCE type ``OutputSetType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``OutputSet``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     X.check_count(len(v.output_parameter_ref), 1, -1,
                   "OutputSetType.OutputParameterRef")
@@ -19836,6 +29513,19 @@ def _w_OutputSetType(w: X.Writer, v: OutputSetType, tag: str) -> None:
 
 
 def _w_PCMStreamType(w: X.Writer, v: PCMStreamType, tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``PCMStreamType`` as an XML element: its attributes, then its child
+    elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -19857,6 +29547,16 @@ def _w_PCMStreamType(w: X.Writer, v: PCMStreamType, tag: str) -> None:
 
 def _w_ParameterInstanceRefType(w: X.Writer, v: ParameterInstanceRefType,
                                 tag: str) -> None:
+    """Writes a value of the XTCE type ``ParameterInstanceRefType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``OffsetFrom``, ``ParameterInstance``, ``ParameterInstanceRef`` or
+             ``ParameterInstanceRefOperand``.
+    """
     w.start(tag)
     w.attr('parameterRef', v.parameter_ref)
     if v.instance is not None:
@@ -19868,6 +29568,21 @@ def _w_ParameterInstanceRefType(w: X.Writer, v: ParameterInstanceRefType,
 
 def _w_ParameterPropertiesType(w: X.Writer, v: ParameterPropertiesType,
                                tag: str) -> None:
+    """Writes a value of the XTCE type ``ParameterPropertiesType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ParameterProperties``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.data_source is not None:
         w.attr('dataSource', v.data_source.value)
@@ -19889,6 +29604,21 @@ def _w_ParameterPropertiesType(w: X.Writer, v: ParameterPropertiesType,
 
 def _w_ParameterRefEntryType(w: X.Writer, v: ParameterRefEntryType,
                              tag: str) -> None:
+    """Writes a value of the XTCE type ``ParameterRefEntryType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ParameterRefEntry``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -19908,6 +29638,15 @@ def _w_ParameterRefEntryType(w: X.Writer, v: ParameterRefEntryType,
 
 
 def _w_ParameterRefType(w: X.Writer, v: ParameterRefType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ParameterRefType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ParameterRef`` or ``ReturnParmRef``.
+    """
     w.start(tag)
     w.attr('parameterRef', v.parameter_ref)
     w.end(tag)
@@ -19915,6 +29654,21 @@ def _w_ParameterRefType(w: X.Writer, v: ParameterRefType, tag: str) -> None:
 
 def _w_ParameterSegmentRefEntryType(
         w: X.Writer, v: ParameterSegmentRefEntryType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ParameterSegmentRefEntryType`` as an
+    XML element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ParameterSegmentRefEntry``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -19937,6 +29691,21 @@ def _w_ParameterSegmentRefEntryType(
 
 
 def _w_ParameterSetType(w: X.Writer, v: ParameterSetType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ParameterSetType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ParameterSet``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.items), 1, -1, 'ParameterSetType.ParameterSetChoice')
     for e in v.items:
@@ -19946,6 +29715,21 @@ def _w_ParameterSetType(w: X.Writer, v: ParameterSetType, tag: str) -> None:
 
 def _w_ParameterToSetListType(w: X.Writer, v: ParameterToSetListType,
                               tag: str) -> None:
+    """Writes a value of the XTCE type ``ParameterToSetListType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ParameterToSetList``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.parameter_to_set), 1, -1,
                   "ParameterToSetListType.ParameterToSet")
@@ -19955,6 +29739,21 @@ def _w_ParameterToSetListType(w: X.Writer, v: ParameterToSetListType,
 
 
 def _w_ParameterToSetType(w: X.Writer, v: ParameterToSetType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ParameterToSetType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ParameterToSet``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     w.attr('parameterRef', v.parameter_ref)
     if v.set_on_verification is not None:
@@ -19965,6 +29764,15 @@ def _w_ParameterToSetType(w: X.Writer, v: ParameterToSetType, tag: str) -> None:
 
 def _w_ParameterToSuspendAlarmsOnType(
         w: X.Writer, v: ParameterToSuspendAlarmsOnType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ParameterToSuspendAlarmsOnType`` as an
+    XML element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ParameterToSuspendAlarmsOn``.
+    """
     w.start(tag)
     w.attr('parameterRef', v.parameter_ref)
     w.attr('suspenseTime', v.suspense_time)
@@ -19974,6 +29782,21 @@ def _w_ParameterToSuspendAlarmsOnType(
 
 
 def _w_ParameterType(w: X.Writer, v: ParameterType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ParameterType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Parameter``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -19995,6 +29818,21 @@ def _w_ParameterType(w: X.Writer, v: ParameterType, tag: str) -> None:
 
 def _w_ParameterTypeSetType(w: X.Writer, v: ParameterTypeSetType,
                             tag: str) -> None:
+    """Writes a value of the XTCE type ``ParameterTypeSetType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ParameterTypeSet``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.items), 1, -1,
                   "ParameterTypeSetType.ParameterTypeSetChoice")
@@ -20005,6 +29843,15 @@ def _w_ParameterTypeSetType(w: X.Writer, v: ParameterTypeSetType,
 
 def _w_ParameterValueChangeType(w: X.Writer, v: ParameterValueChangeType,
                                 tag: str) -> None:
+    """Writes a value of the XTCE type ``ParameterValueChangeType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ParameterValueChange``.
+    """
     w.start(tag)
     _w_ParameterRefType(w, v.parameter_ref, 'ParameterRef')
     _w_ChangeValueType(w, v.change, 'Change')
@@ -20013,6 +29860,19 @@ def _w_ParameterValueChangeType(w: X.Writer, v: ParameterValueChangeType,
 
 def _w_ParametersToSuspendAlarmsOnSetType(
         w: X.Writer, v: ParametersToSuspendAlarmsOnSetType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ParametersToSuspendAlarmsOnSetType`` as
+    an XML element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ParametersToSuspendAlarmsOnSet``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     X.check_count(
         len(v.parameter_to_suspend_alarms_on), 1, -1,
@@ -20023,6 +29883,15 @@ def _w_ParametersToSuspendAlarmsOnSetType(
 
 
 def _w_ParityType(w: X.Writer, v: ParityType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ParityType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Parity``.
+    """
     w.start(tag)
     w.attr('type', v.type.value)
     if v.bits_from_reference is not None:
@@ -20036,6 +29905,19 @@ def _w_ParityType(w: X.Writer, v: ParityType, tag: str) -> None:
 
 def _w_PercentCompleteType(w: X.Writer, v: PercentCompleteType,
                            tag: str) -> None:
+    """Writes a value of the XTCE type ``PercentCompleteType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``PercentComplete``.
+
+    Raises:
+        X.XtceError: If a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     _w_PercentCompleteChoice(w, v.choice)
     w.end(tag)
@@ -20043,6 +29925,15 @@ def _w_PercentCompleteType(w: X.Writer, v: PercentCompleteType,
 
 def _w_PhysicalAddressSetType(w: X.Writer, v: PhysicalAddressSetType,
                               tag: str) -> None:
+    """Writes a value of the XTCE type ``PhysicalAddressSetType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``PhysicalAddressSet``.
+    """
     w.start(tag)
     for e in v.physical_address:
         _w_PhysicalAddressType(w, e, 'PhysicalAddress')
@@ -20051,6 +29942,15 @@ def _w_PhysicalAddressSetType(w: X.Writer, v: PhysicalAddressSetType,
 
 def _w_PhysicalAddressType(w: X.Writer, v: PhysicalAddressType,
                            tag: str) -> None:
+    """Writes a value of the XTCE type ``PhysicalAddressType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``PhysicalAddress`` or ``SubAddress``.
+    """
     w.start(tag)
     if v.source_name is not None:
         w.attr('sourceName', v.source_name)
@@ -20063,6 +29963,19 @@ def _w_PhysicalAddressType(w: X.Writer, v: PhysicalAddressType,
 
 def _w_PolynomialCalibratorType(w: X.Writer, v: PolynomialCalibratorType,
                                 tag: str) -> None:
+    """Writes a value of the XTCE type ``PolynomialCalibratorType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``PolynomialCalibrator``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     if v.name is not None:
         w.attr('name', v.name)
@@ -20077,6 +29990,21 @@ def _w_PolynomialCalibratorType(w: X.Writer, v: PolynomialCalibratorType,
 
 
 def _w_QueuedVerifierType(w: X.Writer, v: QueuedVerifierType, tag: str) -> None:
+    """Writes a value of the XTCE type ``QueuedVerifierType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``QueuedVerifier``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -20098,6 +30026,19 @@ def _w_QueuedVerifierType(w: X.Writer, v: QueuedVerifierType, tag: str) -> None:
 
 def _w_RateInStreamSetType(w: X.Writer, v: RateInStreamSetType,
                            tag: str) -> None:
+    """Writes a value of the XTCE type ``RateInStreamSetType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``RateInStreamSet``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     X.check_count(len(v.rate_in_stream), 1, -1,
                   "RateInStreamSetType.RateInStream")
@@ -20107,6 +30048,15 @@ def _w_RateInStreamSetType(w: X.Writer, v: RateInStreamSetType,
 
 
 def _w_RateInStreamType(w: X.Writer, v: RateInStreamType, tag: str) -> None:
+    """Writes a value of the XTCE type ``RateInStreamType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``DefaultRateInStream``.
+    """
     w.start(tag)
     if v.basis is not None:
         w.attr('basis', v.basis.value)
@@ -20119,6 +30069,15 @@ def _w_RateInStreamType(w: X.Writer, v: RateInStreamType, tag: str) -> None:
 
 def _w_RateInStreamWithStreamNameType(
         w: X.Writer, v: RateInStreamWithStreamNameType, tag: str) -> None:
+    """Writes a value of the XTCE type ``RateInStreamWithStreamNameType`` as an
+    XML element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``RateInStream``.
+    """
     w.start(tag)
     if v.basis is not None:
         w.attr('basis', v.basis.value)
@@ -20132,6 +30091,21 @@ def _w_RateInStreamWithStreamNameType(
 
 def _w_ReceivedVerifierType(w: X.Writer, v: ReceivedVerifierType,
                             tag: str) -> None:
+    """Writes a value of the XTCE type ``ReceivedVerifierType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ReceivedVerifier``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -20152,6 +30126,19 @@ def _w_ReceivedVerifierType(w: X.Writer, v: ReceivedVerifierType,
 
 
 def _w_ReferenceTimeType(w: X.Writer, v: ReferenceTimeType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ReferenceTimeType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ReferenceTime``.
+
+    Raises:
+        X.XtceError: If a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     _w_ReferenceTimeChoice(w, v.choice)
     w.end(tag)
@@ -20159,6 +30146,21 @@ def _w_ReferenceTimeType(w: X.Writer, v: ReferenceTimeType, tag: str) -> None:
 
 def _w_RelativeTimeArgumentType(w: X.Writer, v: RelativeTimeArgumentType,
                                 tag: str) -> None:
+    """Writes a value of the XTCE type ``RelativeTimeArgumentType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``RelativeTimeArgumentType``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -20182,6 +30184,21 @@ def _w_RelativeTimeArgumentType(w: X.Writer, v: RelativeTimeArgumentType,
 
 def _w_RelativeTimeDataType(w: X.Writer, v: RelativeTimeDataType,
                             tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``RelativeTimeDataType`` as an XML element: its attributes, then its
+    child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -20205,6 +30222,21 @@ def _w_RelativeTimeDataType(w: X.Writer, v: RelativeTimeDataType,
 
 def _w_RelativeTimeParameterType(w: X.Writer, v: RelativeTimeParameterType,
                                  tag: str) -> None:
+    """Writes a value of the XTCE type ``RelativeTimeParameterType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``RelativeTimeParameterType``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -20231,6 +30263,21 @@ def _w_RelativeTimeParameterType(w: X.Writer, v: RelativeTimeParameterType,
 
 
 def _w_RepeatType(w: X.Writer, v: RepeatType, tag: str) -> None:
+    """Writes a value of the XTCE type ``RepeatType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``RepeatEntry``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     _w_IntegerValueType(w, v.count, 'Count')
     if v.offset is not None:
@@ -20240,6 +30287,21 @@ def _w_RepeatType(w: X.Writer, v: RepeatType, tag: str) -> None:
 
 def _w_RestrictionCriteriaType(w: X.Writer, v: RestrictionCriteriaType,
                                tag: str) -> None:
+    """Writes a value of the XTCE type ``RestrictionCriteriaType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``RestrictionCriteria``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     _w_RestrictionCriteriaChoice(w, v.choice)
     if v.next_container is not None:
@@ -20249,6 +30311,21 @@ def _w_RestrictionCriteriaType(w: X.Writer, v: RestrictionCriteriaType,
 
 def _w_SentFromRangeVerifierType(w: X.Writer, v: SentFromRangeVerifierType,
                                  tag: str) -> None:
+    """Writes a value of the XTCE type ``SentFromRangeVerifierType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``SentFromRangeVerifier``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -20270,6 +30347,21 @@ def _w_SentFromRangeVerifierType(w: X.Writer, v: SentFromRangeVerifierType,
 
 def _w_SequenceContainerType(w: X.Writer, v: SequenceContainerType,
                              tag: str) -> None:
+    """Writes a value of the XTCE type ``SequenceContainerType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``CommandContainer`` or ``SequenceContainer``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -20298,6 +30390,21 @@ def _w_SequenceContainerType(w: X.Writer, v: SequenceContainerType,
 
 
 def _w_SequenceEntryType(w: X.Writer, v: SequenceEntryType, tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``SequenceEntryType`` as an XML element: its attributes, then its child
+    elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -20316,12 +30423,36 @@ def _w_SequenceEntryType(w: X.Writer, v: SequenceEntryType, tag: str) -> None:
 
 
 def _w_ServiceRefType(w: X.Writer, v: ServiceRefType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ServiceRefType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ServiceRef``.
+    """
     w.start(tag)
     w.attr('serviceRef', v.service_ref)
     w.end(tag)
 
 
 def _w_ServiceSetType(w: X.Writer, v: ServiceSetType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ServiceSetType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ServiceSet``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.service), 1, -1, 'ServiceSetType.Service')
     for e in v.service:
@@ -20330,6 +30461,21 @@ def _w_ServiceSetType(w: X.Writer, v: ServiceSetType, tag: str) -> None:
 
 
 def _w_ServiceType(w: X.Writer, v: ServiceType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ServiceType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Service``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -20345,6 +30491,15 @@ def _w_ServiceType(w: X.Writer, v: ServiceType, tag: str) -> None:
 
 
 def _w_SignificanceType(w: X.Writer, v: SignificanceType, tag: str) -> None:
+    """Writes a value of the XTCE type ``SignificanceType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``DefaultSignificance`` or ``Significance``.
+    """
     w.start(tag)
     if v.space_system_at_risk is not None:
         w.attr('spaceSystemAtRisk', v.space_system_at_risk)
@@ -20357,6 +30512,19 @@ def _w_SignificanceType(w: X.Writer, v: SignificanceType, tag: str) -> None:
 
 def _w_SimpleAlgorithmType(w: X.Writer, v: SimpleAlgorithmType,
                            tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``SimpleAlgorithmType`` as an XML element: its attributes, then its child
+    elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -20377,12 +30545,30 @@ def _w_SimpleAlgorithmType(w: X.Writer, v: SimpleAlgorithmType,
 
 def _w_SizeInBitsFixedType(w: X.Writer, v: SizeInBitsFixedType,
                            tag: str) -> None:
+    """Writes a value of an XTCE ``Fixed`` element as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Fixed``.
+    """
     w.start(tag)
     w.leaf('FixedValue', X.f_int(v.fixed_value))
     w.end(tag)
 
 
 def _w_SizeInBitsType(w: X.Writer, v: SizeInBitsType, tag: str) -> None:
+    """Writes a value of the XTCE type ``SizeInBitsType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``SizeInBits``.
+    """
     w.start(tag)
     _w_SizeInBitsFixedType(w, v.fixed, 'Fixed')
     if v.termination_char is not None:
@@ -20393,6 +30579,21 @@ def _w_SizeInBitsType(w: X.Writer, v: SizeInBitsType, tag: str) -> None:
 
 
 def _w_SpaceSystemType(w: X.Writer, v: SpaceSystemType, tag: str) -> None:
+    """Writes a value of the XTCE type ``SpaceSystemType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``SpaceSystem``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -20426,6 +30627,19 @@ def _w_SpaceSystemType(w: X.Writer, v: SpaceSystemType, tag: str) -> None:
 
 def _w_SplineCalibratorType(w: X.Writer, v: SplineCalibratorType,
                             tag: str) -> None:
+    """Writes a value of the XTCE type ``SplineCalibratorType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``SplineCalibrator``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     if v.name is not None:
         w.attr('name', v.name)
@@ -20445,6 +30659,15 @@ def _w_SplineCalibratorType(w: X.Writer, v: SplineCalibratorType,
 
 
 def _w_SplinePointType(w: X.Writer, v: SplinePointType, tag: str) -> None:
+    """Writes a value of the XTCE type ``SplinePointType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``SplinePoint``.
+    """
     w.start(tag)
     if v.order is not None:
         w.attr('order', X.f_int(v.order))
@@ -20454,6 +30677,15 @@ def _w_SplinePointType(w: X.Writer, v: SplinePointType, tag: str) -> None:
 
 
 def _w_StreamRefType(w: X.Writer, v: StreamRefType, tag: str) -> None:
+    """Writes a value of the XTCE type ``StreamRefType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``StreamRef``.
+    """
     w.start(tag)
     w.attr('streamRef', v.stream_ref)
     w.end(tag)
@@ -20461,6 +30693,21 @@ def _w_StreamRefType(w: X.Writer, v: StreamRefType, tag: str) -> None:
 
 def _w_StreamSegmentEntryType(w: X.Writer, v: StreamSegmentEntryType,
                               tag: str) -> None:
+    """Writes a value of the XTCE type ``StreamSegmentEntryType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``StreamSegmentEntry``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -20483,6 +30730,21 @@ def _w_StreamSegmentEntryType(w: X.Writer, v: StreamSegmentEntryType,
 
 
 def _w_StreamSetType(w: X.Writer, v: StreamSetType, tag: str) -> None:
+    """Writes a value of the XTCE type ``StreamSetType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``StreamSet``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.items), 1, -1, 'StreamSetType.StreamSetChoice')
     for e in v.items:
@@ -20492,6 +30754,15 @@ def _w_StreamSetType(w: X.Writer, v: StreamSetType, tag: str) -> None:
 
 def _w_StringAlarmLevelType(w: X.Writer, v: StringAlarmLevelType,
                             tag: str) -> None:
+    """Writes a value of the XTCE type ``StringAlarmLevelType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``StringAlarm``.
+    """
     w.start(tag)
     w.attr('alarmLevel', v.alarm_level.value)
     w.attr('matchPattern', v.match_pattern)
@@ -20500,6 +30771,19 @@ def _w_StringAlarmLevelType(w: X.Writer, v: StringAlarmLevelType,
 
 def _w_StringAlarmListType(w: X.Writer, v: StringAlarmListType,
                            tag: str) -> None:
+    """Writes a value of the XTCE type ``StringAlarmListType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``StringAlarmList``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     X.check_count(len(v.string_alarm), 1, -1, 'StringAlarmListType.StringAlarm')
     for e in v.string_alarm:
@@ -20508,6 +30792,21 @@ def _w_StringAlarmListType(w: X.Writer, v: StringAlarmListType,
 
 
 def _w_StringAlarmType(w: X.Writer, v: StringAlarmType, tag: str) -> None:
+    """Writes a value of the XTCE type ``StringAlarmType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``DefaultAlarm``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.name is not None:
         w.attr('name', v.name)
@@ -20531,6 +30830,21 @@ def _w_StringAlarmType(w: X.Writer, v: StringAlarmType, tag: str) -> None:
 
 
 def _w_StringArgumentType(w: X.Writer, v: StringArgumentType, tag: str) -> None:
+    """Writes a value of the XTCE type ``StringArgumentType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``StringArgumentType``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -20561,6 +30875,21 @@ def _w_StringArgumentType(w: X.Writer, v: StringArgumentType, tag: str) -> None:
 
 def _w_StringContextAlarmListType(w: X.Writer, v: StringContextAlarmListType,
                                   tag: str) -> None:
+    """Writes a value of the XTCE type ``StringContextAlarmListType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ContextAlarmList``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.context_alarm), 1, -1,
                   "StringContextAlarmListType.ContextAlarm")
@@ -20571,6 +30900,21 @@ def _w_StringContextAlarmListType(w: X.Writer, v: StringContextAlarmListType,
 
 def _w_StringContextAlarmType(w: X.Writer, v: StringContextAlarmType,
                               tag: str) -> None:
+    """Writes a value of the XTCE type ``StringContextAlarmType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ContextAlarm``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.name is not None:
         w.attr('name', v.name)
@@ -20596,6 +30940,21 @@ def _w_StringContextAlarmType(w: X.Writer, v: StringContextAlarmType,
 
 def _w_StringDataEncodingType(w: X.Writer, v: StringDataEncodingType,
                               tag: str) -> None:
+    """Writes a value of the XTCE type ``StringDataEncodingType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``StringDataEncoding``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.bit_order is not None:
         w.attr('bitOrder', v.bit_order.value)
@@ -20611,6 +30970,21 @@ def _w_StringDataEncodingType(w: X.Writer, v: StringDataEncodingType,
 
 
 def _w_StringDataType(w: X.Writer, v: StringDataType, tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``StringDataType`` as an XML element: its attributes, then its child
+    elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -20641,6 +31015,21 @@ def _w_StringDataType(w: X.Writer, v: StringDataType, tag: str) -> None:
 
 def _w_StringParameterType(w: X.Writer, v: StringParameterType,
                            tag: str) -> None:
+    """Writes a value of the XTCE type ``StringParameterType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``StringParameterType``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -20675,6 +31064,15 @@ def _w_StringParameterType(w: X.Writer, v: StringParameterType,
 
 
 def _w_SyncPatternType(w: X.Writer, v: SyncPatternType, tag: str) -> None:
+    """Writes a value of the XTCE type ``SyncPatternType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``SyncPattern``.
+    """
     w.start(tag)
     w.attr('pattern', v.pattern)
     if v.bit_location_from_start_of_container is not None:
@@ -20689,6 +31087,21 @@ def _w_SyncPatternType(w: X.Writer, v: SyncPatternType, tag: str) -> None:
 
 
 def _w_SyncStrategyType(w: X.Writer, v: SyncStrategyType, tag: str) -> None:
+    """Writes a value of a type derived from the abstract XTCE type
+    ``SyncStrategyType`` as an XML element: its attributes, then its child
+    elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.verify_to_lock_good_frames is not None:
         w.attr('verifyToLockGoodFrames', X.f_int(v.verify_to_lock_good_frames))
@@ -20704,6 +31117,21 @@ def _w_SyncStrategyType(w: X.Writer, v: SyncStrategyType, tag: str) -> None:
 
 def _w_TelemetryMetaDataType(w: X.Writer, v: TelemetryMetaDataType,
                              tag: str) -> None:
+    """Writes a value of the XTCE type ``TelemetryMetaDataType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``TelemetryMetaData``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.parameter_type_set is not None:
         _w_ParameterTypeSetType(w, v.parameter_type_set, 'ParameterTypeSet')
@@ -20721,6 +31149,15 @@ def _w_TelemetryMetaDataType(w: X.Writer, v: TelemetryMetaDataType,
 
 
 def _w_TermType(w: X.Writer, v: TermType, tag: str) -> None:
+    """Writes a value of the XTCE type ``TermType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Term``.
+    """
     w.start(tag)
     w.attr('coefficient', X.f_double(v.coefficient))
     w.attr('exponent', X.f_int(v.exponent))
@@ -20729,6 +31166,19 @@ def _w_TermType(w: X.Writer, v: TermType, tag: str) -> None:
 
 def _w_TimeAlarmRangesType(w: X.Writer, v: TimeAlarmRangesType,
                            tag: str) -> None:
+    """Writes a value of the XTCE type ``TimeAlarmRangesType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ChangePerSecondAlarmRanges`` or ``StaticAlarmRanges``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     if v.name is not None:
         w.attr('name', v.name)
@@ -20754,6 +31204,21 @@ def _w_TimeAlarmRangesType(w: X.Writer, v: TimeAlarmRangesType,
 
 
 def _w_TimeAlarmType(w: X.Writer, v: TimeAlarmType, tag: str) -> None:
+    """Writes a value of the XTCE type ``TimeAlarmType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``DefaultAlarm``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.name is not None:
         w.attr('name', v.name)
@@ -20779,6 +31244,15 @@ def _w_TimeAlarmType(w: X.Writer, v: TimeAlarmType, tag: str) -> None:
 
 def _w_TimeAssociationType(w: X.Writer, v: TimeAssociationType,
                            tag: str) -> None:
+    """Writes a value of the XTCE type ``TimeAssociationType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``TimeAssociation``.
+    """
     w.start(tag)
     w.attr('parameterRef', v.parameter_ref)
     if v.instance is not None:
@@ -20796,6 +31270,21 @@ def _w_TimeAssociationType(w: X.Writer, v: TimeAssociationType,
 
 def _w_TimeContextAlarmListType(w: X.Writer, v: TimeContextAlarmListType,
                                 tag: str) -> None:
+    """Writes a value of the XTCE type ``TimeContextAlarmListType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ContextAlarmList``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.context_alarm), 1, -1,
                   "TimeContextAlarmListType.ContextAlarm")
@@ -20806,6 +31295,21 @@ def _w_TimeContextAlarmListType(w: X.Writer, v: TimeContextAlarmListType,
 
 def _w_TimeContextAlarmType(w: X.Writer, v: TimeContextAlarmType,
                             tag: str) -> None:
+    """Writes a value of the XTCE type ``TimeContextAlarmType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ContextAlarm``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.name is not None:
         w.attr('name', v.name)
@@ -20831,6 +31335,15 @@ def _w_TimeContextAlarmType(w: X.Writer, v: TimeContextAlarmType,
 
 
 def _w_ToStringType(w: X.Writer, v: ToStringType, tag: str) -> None:
+    """Writes a value of the XTCE type ``ToStringType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ToString``.
+    """
     w.start(tag)
     _w_NumberFormatType(w, v.number_format, 'NumberFormat')
     w.end(tag)
@@ -20838,6 +31351,21 @@ def _w_ToStringType(w: X.Writer, v: ToStringType, tag: str) -> None:
 
 def _w_TransferredToRangeVerifierType(
         w: X.Writer, v: TransferredToRangeVerifierType, tag: str) -> None:
+    """Writes a value of the XTCE type ``TransferredToRangeVerifierType`` as an
+    XML element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``TransferredToRangeVerifier``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -20859,6 +31387,21 @@ def _w_TransferredToRangeVerifierType(
 
 def _w_TransmissionConstraintListType(
         w: X.Writer, v: TransmissionConstraintListType, tag: str) -> None:
+    """Writes a value of the XTCE type ``TransmissionConstraintListType`` as an
+    XML element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``TransmissionConstraintList``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     X.check_count(len(v.transmission_constraint), 1, -1,
                   "TransmissionConstraintListType.TransmissionConstraint")
@@ -20869,6 +31412,21 @@ def _w_TransmissionConstraintListType(
 
 def _w_TransmissionConstraintType(w: X.Writer, v: TransmissionConstraintType,
                                   tag: str) -> None:
+    """Writes a value of the XTCE type ``TransmissionConstraintType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``TransmissionConstraint``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.time_out is not None:
         w.attr('timeOut', v.time_out)
@@ -20882,6 +31440,21 @@ def _w_TransmissionConstraintType(w: X.Writer, v: TransmissionConstraintType,
 
 
 def _w_TriggerSetType(w: X.Writer, v: TriggerSetType, tag: str) -> None:
+    """Writes a value of the XTCE type ``TriggerSetType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``TriggerSet``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.name is not None:
         w.attr('name', v.name)
@@ -20895,6 +31468,21 @@ def _w_TriggerSetType(w: X.Writer, v: TriggerSetType, tag: str) -> None:
 
 def _w_TriggeredMathOperationType(w: X.Writer, v: TriggeredMathOperationType,
                                   tag: str) -> None:
+    """Writes a value of the XTCE type ``TriggeredMathOperationType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``MathOperation``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows; or
+                     if a choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.name is not None:
         w.attr('name', v.name)
@@ -20912,6 +31500,15 @@ def _w_TriggeredMathOperationType(w: X.Writer, v: TriggeredMathOperationType,
 
 
 def _w_UnitSetType(w: X.Writer, v: UnitSetType, tag: str) -> None:
+    """Writes a value of the XTCE type ``UnitSetType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``UnitSet``.
+    """
     w.start(tag)
     for e in v.unit:
         _w_UnitType(w, e, 'Unit')
@@ -20919,6 +31516,15 @@ def _w_UnitSetType(w: X.Writer, v: UnitSetType, tag: str) -> None:
 
 
 def _w_UnitType(w: X.Writer, v: UnitType, tag: str) -> None:
+    """Writes a value of the XTCE type ``UnitType`` as an XML element: its
+    attributes, then its text.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Unit``.
+    """
     w.start(tag)
     if v.power is not None:
         w.attr('power', X.f_double(v.power))
@@ -20934,6 +31540,19 @@ def _w_UnitType(w: X.Writer, v: UnitType, tag: str) -> None:
 
 def _w_ValidFloatRangeSetType(w: X.Writer, v: ValidFloatRangeSetType,
                               tag: str) -> None:
+    """Writes a value of the XTCE type ``ValidFloatRangeSetType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ValidRangeSet``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     if v.valid_range_applies_to_calibrated is not None:
         w.attr("validRangeAppliesToCalibrated",
@@ -20947,6 +31566,19 @@ def _w_ValidFloatRangeSetType(w: X.Writer, v: ValidFloatRangeSetType,
 
 def _w_ValidIntegerRangeSetType(w: X.Writer, v: ValidIntegerRangeSetType,
                                 tag: str) -> None:
+    """Writes a value of the XTCE type ``ValidIntegerRangeSetType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``ValidRangeSet``.
+
+    Raises:
+        X.XtceError: If ``v``, or a value nested in it, has a repeated element
+                     that occurs fewer or more times than the schema allows.
+    """
     w.start(tag)
     if v.valid_range_applies_to_calibrated is not None:
         w.attr("validRangeAppliesToCalibrated",
@@ -20960,6 +31592,15 @@ def _w_ValidIntegerRangeSetType(w: X.Writer, v: ValidIntegerRangeSetType,
 
 def _w_ValueEnumerationType(w: X.Writer, v: ValueEnumerationType,
                             tag: str) -> None:
+    """Writes a value of the XTCE type ``ValueEnumerationType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Enumeration``.
+    """
     w.start(tag)
     w.attr('value', X.f_int(v.value))
     if v.max_value is not None:
@@ -20972,6 +31613,21 @@ def _w_ValueEnumerationType(w: X.Writer, v: ValueEnumerationType,
 
 def _w_VariableFrameStreamType(w: X.Writer, v: VariableFrameStreamType,
                                tag: str) -> None:
+    """Writes a value of the XTCE type ``VariableFrameStreamType`` as an XML
+    element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``VariableFrameStream``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.short_description is not None:
         w.attr('shortDescription', v.short_description)
@@ -20997,6 +31653,21 @@ def _w_VariableFrameStreamType(w: X.Writer, v: VariableFrameStreamType,
 
 def _w_VariableFrameSyncStrategyType(
         w: X.Writer, v: VariableFrameSyncStrategyType, tag: str) -> None:
+    """Writes a value of the XTCE type ``VariableFrameSyncStrategyType`` as an
+    XML element: its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``SyncStrategy``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.verify_to_lock_good_frames is not None:
         w.attr('verifyToLockGoodFrames', X.f_int(v.verify_to_lock_good_frames))
@@ -21012,6 +31683,21 @@ def _w_VariableFrameSyncStrategyType(
 
 
 def _w_VariableStringType(w: X.Writer, v: VariableStringType, tag: str) -> None:
+    """Writes a value of the XTCE type ``VariableStringType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``Variable``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     w.attr('maxSizeInBits', X.f_int(v.max_size_in_bits))
     if v.choice1 is not None:
@@ -21021,6 +31707,21 @@ def _w_VariableStringType(w: X.Writer, v: VariableStringType, tag: str) -> None:
 
 
 def _w_VerifierSetType(w: X.Writer, v: VerifierSetType, tag: str) -> None:
+    """Writes a value of the XTCE type ``VerifierSetType`` as an XML element:
+    its attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type
+             ``VerifierSet``.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     w.start(tag)
     if v.transferred_to_range_verifier is not None:
         _w_TransferredToRangeVerifierType(w, v.transferred_to_range_verifier,
@@ -21044,6 +31745,14 @@ def _w_VerifierSetType(w: X.Writer, v: VerifierSetType, tag: str) -> None:
 
 
 def _w_XORType(w: X.Writer, v: XORType, tag: str) -> None:
+    """Writes a value of the XTCE type ``XORType`` as an XML element: its
+    attributes, then its child elements in schema order.
+
+    Args:
+        w:   The writer that receives the XML.
+        v:   The value.
+        tag: The element's name; the schema names elements of this type ``XOR``.
+    """
     w.start(tag)
     if v.bits_from_reference is not None:
         w.attr('bitsFromReference', X.f_int(v.bits_from_reference))
@@ -21059,6 +31768,21 @@ _WC_ANDedConditionsChoice = {"Condition": _w_ComparisonCheckType,
 
 
 def _w_ANDedConditionsChoice(w: X.Writer, v: ANDedConditionsChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ANDedConditionsType`` holds as its element, ``Condition`` or
+    ``ORedConditions``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ANDedConditionsChoice.get(v.name)
     if fn is None:
         raise X.XtceError("ANDedConditionsChoice: unknown alternative "
@@ -21076,6 +31800,22 @@ _WC_AcceptedVerifierChoice1 = {
 
 
 def _w_AcceptedVerifierChoice1(w: X.Writer, v: AcceptedVerifierChoice1) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``AcceptedVerifierType`` holds as its element, ``ComparisonList``,
+    ``ContainerRef``, ``ParameterValueChange``, ``CustomAlgorithm``,
+    ``BooleanExpression`` or ``Comparison``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_AcceptedVerifierChoice1.get(v.name)
     if fn is None:
         raise X.XtceError("AcceptedVerifierChoice1: unknown alternative "
@@ -21089,6 +31829,21 @@ _WC_AcceptedVerifierChoice2 = {
 
 
 def _w_AcceptedVerifierChoice2(w: X.Writer, v: AcceptedVerifierChoice2) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``AcceptedVerifierType`` holds as its element, ``CheckWindow`` or
+    ``CheckWindowAlgorithms``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_AcceptedVerifierChoice2.get(v.name)
     if fn is None:
         raise X.XtceError("AcceptedVerifierChoice2: unknown alternative "
@@ -21101,6 +31856,20 @@ _WC_AlarmChoice = {"AlarmConditions": _w_AlarmConditionsType,
 
 
 def _w_AlarmChoice(w: X.Writer, v: AlarmChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in ``AlarmType`` holds
+    as its element, ``AlarmConditions`` or ``CustomAlarm``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_AlarmChoice.get(v.name)
     if fn is None:
         raise X.XtceError(f"AlarmChoice: unknown alternative {v.name!r}")
@@ -21112,6 +31881,21 @@ _WC_AlgorithmSetChoice = {"CustomAlgorithm": _w_InputOutputTriggerAlgorithmType,
 
 
 def _w_AlgorithmSetChoice(w: X.Writer, v: AlgorithmSetChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``AlgorithmSetType`` holds as its element, ``CustomAlgorithm`` or
+    ``MathAlgorithm``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_AlgorithmSetChoice.get(v.name)
     if fn is None:
         raise X.XtceError(f"AlgorithmSetChoice: unknown alternative {v.name!r}")
@@ -21125,6 +31909,21 @@ _WC_ArgumentANDedConditionsChoice = {
 
 def _w_ArgumentANDedConditionsChoice(w: X.Writer,
                                      v: ArgumentANDedConditionsChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ArgumentANDedConditionsType`` holds as its element, ``Condition`` or
+    ``ORedConditions``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ArgumentANDedConditionsChoice.get(v.name)
     if fn is None:
         raise X.XtceError("ArgumentANDedConditionsChoice: unknown alternative "
@@ -21140,6 +31939,21 @@ _WC_ArgumentBaseDataChoice = {
 
 
 def _w_ArgumentBaseDataChoice(w: X.Writer, v: ArgumentBaseDataChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ArgumentBaseDataType`` holds as its element, ``BinaryDataEncoding``,
+    ``FloatDataEncoding``, ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ArgumentBaseDataChoice.get(v.name)
     if fn is None:
         raise X.XtceError("ArgumentBaseDataChoice: unknown alternative "
@@ -21156,6 +31970,21 @@ _WC_ArgumentBinaryDataChoice = {
 
 def _w_ArgumentBinaryDataChoice(w: X.Writer,
                                 v: ArgumentBinaryDataChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ArgumentBinaryDataType`` holds as its element, ``BinaryDataEncoding``,
+    ``FloatDataEncoding``, ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ArgumentBinaryDataChoice.get(v.name)
     if fn is None:
         raise X.XtceError("ArgumentBinaryDataChoice: unknown alternative "
@@ -21172,6 +32001,21 @@ _WC_ArgumentBooleanDataChoice = {
 
 def _w_ArgumentBooleanDataChoice(w: X.Writer,
                                  v: ArgumentBooleanDataChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ArgumentBooleanDataType`` holds as its element, ``BinaryDataEncoding``,
+    ``FloatDataEncoding``, ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ArgumentBooleanDataChoice.get(v.name)
     if fn is None:
         raise X.XtceError("ArgumentBooleanDataChoice: unknown alternative "
@@ -21187,6 +32031,21 @@ _WC_ArgumentBooleanExpressionChoice = {
 
 def _w_ArgumentBooleanExpressionChoice(
         w: X.Writer, v: ArgumentBooleanExpressionChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ArgumentBooleanExpressionType`` holds as its element, ``Condition``,
+    ``ANDedConditions`` or ``ORedConditions``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ArgumentBooleanExpressionChoice.get(v.name)
     if fn is None:
         raise X.XtceError("ArgumentBooleanExpressionChoice: unknown "
@@ -21201,6 +32060,17 @@ _WC_ArgumentComparisonCheckChoice1 = {
 
 def _w_ArgumentComparisonCheckChoice1(
         w: X.Writer, v: ArgumentComparisonCheckChoice1) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ArgumentComparisonCheckType`` holds as its element,
+    ``ParameterInstanceRef`` or ``ArgumentInstanceRef``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If ``v`` names an alternative the choice doesn't have.
+    """
     fn = _WC_ArgumentComparisonCheckChoice1.get(v.name)
     if fn is None:
         raise X.XtceError("ArgumentComparisonCheckChoice1: unknown "
@@ -21216,6 +32086,17 @@ _WC_ArgumentComparisonCheckChoice2 = {
 
 def _w_ArgumentComparisonCheckChoice2(
         w: X.Writer, v: ArgumentComparisonCheckChoice2) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ArgumentComparisonCheckType`` holds as its element,
+    ``ParameterInstanceRef``, ``ArgumentInstanceRef`` or ``Value``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If ``v`` names an alternative the choice doesn't have.
+    """
     fn = _WC_ArgumentComparisonCheckChoice2.get(v.name)
     if fn is None:
         raise X.XtceError("ArgumentComparisonCheckChoice2: unknown "
@@ -21230,6 +32111,17 @@ _WC_ArgumentComparisonChoice = {
 
 def _w_ArgumentComparisonChoice(w: X.Writer,
                                 v: ArgumentComparisonChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ArgumentComparisonType`` holds as its element, ``ParameterInstanceRef``
+    or ``ArgumentInstanceRef``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If ``v`` names an alternative the choice doesn't have.
+    """
     fn = _WC_ArgumentComparisonChoice.get(v.name)
     if fn is None:
         raise X.XtceError("ArgumentComparisonChoice: unknown alternative "
@@ -21246,6 +32138,21 @@ _WC_ArgumentDiscreteLookupChoice = {
 
 def _w_ArgumentDiscreteLookupChoice(w: X.Writer,
                                     v: ArgumentDiscreteLookupChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ArgumentDiscreteLookupType`` holds as its element, ``Comparison``,
+    ``ComparisonList``, ``BooleanExpression`` or ``CustomAlgorithm``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ArgumentDiscreteLookupChoice.get(v.name)
     if fn is None:
         raise X.XtceError("ArgumentDiscreteLookupChoice: unknown alternative "
@@ -21260,6 +32167,17 @@ _WC_ArgumentDynamicValueChoice = {
 
 def _w_ArgumentDynamicValueChoice(w: X.Writer,
                                   v: ArgumentDynamicValueChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ArgumentDynamicValueType`` holds as its element,
+    ``ArgumentInstanceRef`` or ``ParameterInstanceRef``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If ``v`` names an alternative the choice doesn't have.
+    """
     fn = _WC_ArgumentDynamicValueChoice.get(v.name)
     if fn is None:
         raise X.XtceError("ArgumentDynamicValueChoice: unknown alternative "
@@ -21276,6 +32194,22 @@ _WC_ArgumentEnumeratedDataChoice = {
 
 def _w_ArgumentEnumeratedDataChoice(w: X.Writer,
                                     v: ArgumentEnumeratedDataChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ArgumentEnumeratedDataType`` holds as its element,
+    ``BinaryDataEncoding``, ``FloatDataEncoding``, ``IntegerDataEncoding`` or
+    ``StringDataEncoding``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ArgumentEnumeratedDataChoice.get(v.name)
     if fn is None:
         raise X.XtceError("ArgumentEnumeratedDataChoice: unknown alternative "
@@ -21291,6 +32225,21 @@ _WC_ArgumentFloatDataChoice = {
 
 
 def _w_ArgumentFloatDataChoice(w: X.Writer, v: ArgumentFloatDataChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ArgumentFloatDataType`` holds as its element, ``BinaryDataEncoding``,
+    ``FloatDataEncoding``, ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ArgumentFloatDataChoice.get(v.name)
     if fn is None:
         raise X.XtceError("ArgumentFloatDataChoice: unknown alternative "
@@ -21305,6 +32254,18 @@ _WC_ArgumentInputSetChoice = {
 
 
 def _w_ArgumentInputSetChoice(w: X.Writer, v: ArgumentInputSetChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ArgumentInputSetType`` holds as its element,
+    ``InputParameterInstanceRef``, ``InputArgumentInstanceRef`` or
+    ``Constant``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If ``v`` names an alternative the choice doesn't have.
+    """
     fn = _WC_ArgumentInputSetChoice.get(v.name)
     if fn is None:
         raise X.XtceError("ArgumentInputSetChoice: unknown alternative "
@@ -21321,6 +32282,21 @@ _WC_ArgumentIntegerDataChoice = {
 
 def _w_ArgumentIntegerDataChoice(w: X.Writer,
                                  v: ArgumentIntegerDataChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ArgumentIntegerDataType`` holds as its element, ``BinaryDataEncoding``,
+    ``FloatDataEncoding``, ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ArgumentIntegerDataChoice.get(v.name)
     if fn is None:
         raise X.XtceError("ArgumentIntegerDataChoice: unknown alternative "
@@ -21336,6 +32312,21 @@ _WC_ArgumentIntegerValueChoice = {
 
 def _w_ArgumentIntegerValueChoice(w: X.Writer,
                                   v: ArgumentIntegerValueChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ArgumentIntegerValueType`` holds as its element, ``FixedValue``,
+    ``DynamicValue`` or ``DiscreteLookupList``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ArgumentIntegerValueChoice.get(v.name)
     if fn is None:
         raise X.XtceError("ArgumentIntegerValueChoice: unknown alternative "
@@ -21351,6 +32342,21 @@ _WC_ArgumentLocationInContainerInBitsChoice = {
 
 def _w_ArgumentLocationInContainerInBitsChoice(
         w: X.Writer, v: ArgumentLocationInContainerInBitsChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ArgumentLocationInContainerInBitsType`` holds as its element,
+    ``FixedValue``, ``DynamicValue`` or ``DiscreteLookupList``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ArgumentLocationInContainerInBitsChoice.get(v.name)
     if fn is None:
         raise X.XtceError("ArgumentLocationInContainerInBitsChoice: unknown "
@@ -21367,6 +32373,21 @@ _WC_ArgumentMatchCriteriaChoice = {
 
 def _w_ArgumentMatchCriteriaChoice(w: X.Writer,
                                    v: ArgumentMatchCriteriaChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ArgumentMatchCriteriaType`` holds as its element, ``Comparison``,
+    ``ComparisonList``, ``BooleanExpression`` or ``CustomAlgorithm``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ArgumentMatchCriteriaChoice.get(v.name)
     if fn is None:
         raise X.XtceError("ArgumentMatchCriteriaChoice: unknown alternative "
@@ -21384,6 +32405,18 @@ _WC_ArgumentMathOperationChoice = {
 
 def _w_ArgumentMathOperationChoice(w: X.Writer,
                                    v: ArgumentMathOperationChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ArgumentMathOperationType`` holds as its element, ``ValueOperand``,
+    ``ThisParameterOperand``, ``Operator``, ``ParameterInstanceRefOperand``
+    or ``ArgumentInstanceRefOperand``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If ``v`` names an alternative the choice doesn't have.
+    """
     fn = _WC_ArgumentMathOperationChoice.get(v.name)
     if fn is None:
         raise X.XtceError("ArgumentMathOperationChoice: unknown alternative "
@@ -21398,6 +32431,21 @@ _WC_ArgumentORedConditionsChoice = {
 
 def _w_ArgumentORedConditionsChoice(w: X.Writer,
                                     v: ArgumentORedConditionsChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ArgumentORedConditionsType`` holds as its element, ``Condition`` or
+    ``ANDedConditions``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ArgumentORedConditionsChoice.get(v.name)
     if fn is None:
         raise X.XtceError("ArgumentORedConditionsChoice: unknown alternative "
@@ -21414,6 +32462,21 @@ _WC_ArgumentStringDataChoice = {
 
 def _w_ArgumentStringDataChoice(w: X.Writer,
                                 v: ArgumentStringDataChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ArgumentStringDataType`` holds as its element, ``BinaryDataEncoding``,
+    ``FloatDataEncoding``, ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ArgumentStringDataChoice.get(v.name)
     if fn is None:
         raise X.XtceError("ArgumentStringDataChoice: unknown alternative "
@@ -21427,6 +32490,21 @@ _WC_ArgumentStringDataEncodingChoice = {
 
 def _w_ArgumentStringDataEncodingChoice(
         w: X.Writer, v: ArgumentStringDataEncodingChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ArgumentStringDataEncodingType`` holds as its element, ``SizeInBits``
+    or ``Variable``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ArgumentStringDataEncodingChoice.get(v.name)
     if fn is None:
         raise X.XtceError("ArgumentStringDataEncodingChoice: unknown "
@@ -21448,6 +32526,24 @@ _WC_ArgumentTypeSetChoice = {
 
 
 def _w_ArgumentTypeSetChoice(w: X.Writer, v: ArgumentTypeSetChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ArgumentTypeSetType`` holds as its element, ``StringArgumentType``,
+    ``EnumeratedArgumentType``, ``IntegerArgumentType``,
+    ``BinaryArgumentType``, ``FloatArgumentType``, ``BooleanArgumentType``,
+    ``RelativeTimeArgumentType``, ``AbsoluteTimeArgumentType``,
+    ``ArrayArgumentType`` or ``AggregateArgumentType``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ArgumentTypeSetChoice.get(v.name)
     if fn is None:
         raise X.XtceError("ArgumentTypeSetChoice: unknown alternative "
@@ -21462,6 +32558,21 @@ _WC_ArgumentVariableStringChoice1 = {
 
 def _w_ArgumentVariableStringChoice1(w: X.Writer,
                                      v: ArgumentVariableStringChoice1) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ArgumentVariableStringType`` holds as its element, ``DynamicValue`` or
+    ``DiscreteLookupList``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ArgumentVariableStringChoice1.get(v.name)
     if fn is None:
         raise X.XtceError("ArgumentVariableStringChoice1: unknown alternative "
@@ -21476,6 +32587,17 @@ _WC_ArgumentVariableStringChoice2 = {
 
 def _w_ArgumentVariableStringChoice2(w: X.Writer,
                                      v: ArgumentVariableStringChoice2) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ArgumentVariableStringType`` holds as its element, ``LeadingSize`` or
+    ``TerminationChar``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If ``v`` names an alternative the choice doesn't have.
+    """
     fn = _WC_ArgumentVariableStringChoice2.get(v.name)
     if fn is None:
         raise X.XtceError("ArgumentVariableStringChoice2: unknown alternative "
@@ -21490,6 +32612,21 @@ _WC_BaseDataChoice = {"BinaryDataEncoding": _w_BinaryDataEncodingType,
 
 
 def _w_BaseDataChoice(w: X.Writer, v: BaseDataChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in ``BaseDataType``
+    holds as its element, ``BinaryDataEncoding``, ``FloatDataEncoding``,
+    ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_BaseDataChoice.get(v.name)
     if fn is None:
         raise X.XtceError(f"BaseDataChoice: unknown alternative {v.name!r}")
@@ -21501,6 +32638,20 @@ _WC_BinaryAlarmChoice = {"AlarmConditions": _w_AlarmConditionsType,
 
 
 def _w_BinaryAlarmChoice(w: X.Writer, v: BinaryAlarmChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in ``BinaryAlarmType``
+    holds as its element, ``AlarmConditions`` or ``CustomAlarm``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_BinaryAlarmChoice.get(v.name)
     if fn is None:
         raise X.XtceError(f"BinaryAlarmChoice: unknown alternative {v.name!r}")
@@ -21515,6 +32666,21 @@ _WC_BinaryArgumentChoice = {
 
 
 def _w_BinaryArgumentChoice(w: X.Writer, v: BinaryArgumentChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``BinaryArgumentType`` holds as its element, ``BinaryDataEncoding``,
+    ``FloatDataEncoding``, ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_BinaryArgumentChoice.get(v.name)
     if fn is None:
         raise X.XtceError("BinaryArgumentChoice: unknown alternative "
@@ -21528,6 +32694,21 @@ _WC_BinaryContextAlarmChoice = {"AlarmConditions": _w_AlarmConditionsType,
 
 def _w_BinaryContextAlarmChoice(w: X.Writer,
                                 v: BinaryContextAlarmChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``BinaryContextAlarmType`` holds as its element, ``AlarmConditions`` or
+    ``CustomAlarm``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_BinaryContextAlarmChoice.get(v.name)
     if fn is None:
         raise X.XtceError("BinaryContextAlarmChoice: unknown alternative "
@@ -21542,6 +32723,21 @@ _WC_BinaryDataChoice = {"BinaryDataEncoding": _w_BinaryDataEncodingType,
 
 
 def _w_BinaryDataChoice(w: X.Writer, v: BinaryDataChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in ``BinaryDataType``
+    holds as its element, ``BinaryDataEncoding``, ``FloatDataEncoding``,
+    ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_BinaryDataChoice.get(v.name)
     if fn is None:
         raise X.XtceError(f"BinaryDataChoice: unknown alternative {v.name!r}")
@@ -21555,6 +32751,21 @@ _WC_BinaryParameterChoice = {"BinaryDataEncoding": _w_BinaryDataEncodingType,
 
 
 def _w_BinaryParameterChoice(w: X.Writer, v: BinaryParameterChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``BinaryParameterType`` holds as its element, ``BinaryDataEncoding``,
+    ``FloatDataEncoding``, ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_BinaryParameterChoice.get(v.name)
     if fn is None:
         raise X.XtceError("BinaryParameterChoice: unknown alternative "
@@ -21567,6 +32778,21 @@ _WC_BooleanAlarmChoice = {"AlarmConditions": _w_AlarmConditionsType,
 
 
 def _w_BooleanAlarmChoice(w: X.Writer, v: BooleanAlarmChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``BooleanAlarmType`` holds as its element, ``AlarmConditions`` or
+    ``CustomAlarm``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_BooleanAlarmChoice.get(v.name)
     if fn is None:
         raise X.XtceError(f"BooleanAlarmChoice: unknown alternative {v.name!r}")
@@ -21581,6 +32807,21 @@ _WC_BooleanArgumentChoice = {
 
 
 def _w_BooleanArgumentChoice(w: X.Writer, v: BooleanArgumentChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``BooleanArgumentType`` holds as its element, ``BinaryDataEncoding``,
+    ``FloatDataEncoding``, ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_BooleanArgumentChoice.get(v.name)
     if fn is None:
         raise X.XtceError("BooleanArgumentChoice: unknown alternative "
@@ -21594,6 +32835,21 @@ _WC_BooleanContextAlarmChoice = {"AlarmConditions": _w_AlarmConditionsType,
 
 def _w_BooleanContextAlarmChoice(w: X.Writer,
                                  v: BooleanContextAlarmChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``BooleanContextAlarmType`` holds as its element, ``AlarmConditions`` or
+    ``CustomAlarm``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_BooleanContextAlarmChoice.get(v.name)
     if fn is None:
         raise X.XtceError("BooleanContextAlarmChoice: unknown alternative "
@@ -21608,6 +32864,21 @@ _WC_BooleanDataChoice = {"BinaryDataEncoding": _w_BinaryDataEncodingType,
 
 
 def _w_BooleanDataChoice(w: X.Writer, v: BooleanDataChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in ``BooleanDataType``
+    holds as its element, ``BinaryDataEncoding``, ``FloatDataEncoding``,
+    ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_BooleanDataChoice.get(v.name)
     if fn is None:
         raise X.XtceError(f"BooleanDataChoice: unknown alternative {v.name!r}")
@@ -21620,6 +32891,21 @@ _WC_BooleanExpressionChoice = {"Condition": _w_ComparisonCheckType,
 
 
 def _w_BooleanExpressionChoice(w: X.Writer, v: BooleanExpressionChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``BooleanExpressionType`` holds as its element, ``Condition``,
+    ``ANDedConditions`` or ``ORedConditions``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_BooleanExpressionChoice.get(v.name)
     if fn is None:
         raise X.XtceError("BooleanExpressionChoice: unknown alternative "
@@ -21634,6 +32920,21 @@ _WC_BooleanParameterChoice = {"BinaryDataEncoding": _w_BinaryDataEncodingType,
 
 
 def _w_BooleanParameterChoice(w: X.Writer, v: BooleanParameterChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``BooleanParameterType`` holds as its element, ``BinaryDataEncoding``,
+    ``FloatDataEncoding``, ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_BooleanParameterChoice.get(v.name)
     if fn is None:
         raise X.XtceError("BooleanParameterChoice: unknown alternative "
@@ -21648,6 +32949,21 @@ _WC_CalibratorChoice = {
 
 
 def _w_CalibratorChoice(w: X.Writer, v: CalibratorChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in ``CalibratorType``
+    holds as its element, ``SplineCalibrator``, ``PolynomialCalibrator`` or
+    ``MathOperationCalibrator``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_CalibratorChoice.get(v.name)
     if fn is None:
         raise X.XtceError(f"CalibratorChoice: unknown alternative {v.name!r}")
@@ -21669,6 +32985,25 @@ _WC_CommandContainerEntryListChoice = {
 
 def _w_CommandContainerEntryListChoice(
         w: X.Writer, v: CommandContainerEntryListChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``CommandContainerEntryListType`` holds as its element,
+    ``ParameterRefEntry``, ``ParameterSegmentRefEntry``,
+    ``ContainerRefEntry``, ``ContainerSegmentRefEntry``,
+    ``StreamSegmentEntry``, ``IndirectParameterRefEntry``,
+    ``ArrayParameterRefEntry``, ``ArgumentRefEntry``,
+    ``ArrayArgumentRefEntry`` or ``FixedValueEntry``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_CommandContainerEntryListChoice.get(v.name)
     if fn is None:
         raise X.XtceError("CommandContainerEntryListChoice: unknown "
@@ -21686,6 +33021,22 @@ _WC_CommandVerifierChoice1 = {
 
 
 def _w_CommandVerifierChoice1(w: X.Writer, v: CommandVerifierChoice1) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``CommandVerifierType`` holds as its element, ``ComparisonList``,
+    ``ContainerRef``, ``ParameterValueChange``, ``CustomAlgorithm``,
+    ``BooleanExpression`` or ``Comparison``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_CommandVerifierChoice1.get(v.name)
     if fn is None:
         raise X.XtceError("CommandVerifierChoice1: unknown alternative "
@@ -21699,6 +33050,21 @@ _WC_CommandVerifierChoice2 = {
 
 
 def _w_CommandVerifierChoice2(w: X.Writer, v: CommandVerifierChoice2) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``CommandVerifierType`` holds as its element, ``CheckWindow`` or
+    ``CheckWindowAlgorithms``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_CommandVerifierChoice2.get(v.name)
     if fn is None:
         raise X.XtceError("CommandVerifierChoice2: unknown alternative "
@@ -21712,6 +33078,17 @@ _WC_ComparisonCheckChoice = {
 
 
 def _w_ComparisonCheckChoice(w: X.Writer, v: ComparisonCheckChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ComparisonCheckType`` holds as its element, ``ParameterInstanceRef`` or
+    ``Value``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If ``v`` names an alternative the choice doesn't have.
+    """
     fn = _WC_ComparisonCheckChoice.get(v.name)
     if fn is None:
         raise X.XtceError("ComparisonCheckChoice: unknown alternative "
@@ -21729,6 +33106,22 @@ _WC_CompleteVerifierChoice1 = {
 
 
 def _w_CompleteVerifierChoice1(w: X.Writer, v: CompleteVerifierChoice1) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``CompleteVerifierType`` holds as its element, ``ComparisonList``,
+    ``ContainerRef``, ``ParameterValueChange``, ``CustomAlgorithm``,
+    ``BooleanExpression`` or ``Comparison``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_CompleteVerifierChoice1.get(v.name)
     if fn is None:
         raise X.XtceError("CompleteVerifierChoice1: unknown alternative "
@@ -21742,6 +33135,21 @@ _WC_CompleteVerifierChoice2 = {
 
 
 def _w_CompleteVerifierChoice2(w: X.Writer, v: CompleteVerifierChoice2) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``CompleteVerifierType`` holds as its element, ``CheckWindow`` or
+    ``CheckWindowAlgorithms``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_CompleteVerifierChoice2.get(v.name)
     if fn is None:
         raise X.XtceError("CompleteVerifierChoice2: unknown alternative "
@@ -21756,6 +33164,21 @@ _WC_ContextMatchChoice = {"Comparison": _w_ComparisonType,
 
 
 def _w_ContextMatchChoice(w: X.Writer, v: ContextMatchChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ContextMatchType`` holds as its element, ``Comparison``,
+    ``ComparisonList``, ``BooleanExpression`` or ``CustomAlgorithm``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ContextMatchChoice.get(v.name)
     if fn is None:
         raise X.XtceError(f"ContextMatchChoice: unknown alternative {v.name!r}")
@@ -21769,6 +33192,21 @@ _WC_DiscreteLookupChoice = {"Comparison": _w_ComparisonType,
 
 
 def _w_DiscreteLookupChoice(w: X.Writer, v: DiscreteLookupChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``DiscreteLookupType`` holds as its element, ``Comparison``,
+    ``ComparisonList``, ``BooleanExpression`` or ``CustomAlgorithm``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_DiscreteLookupChoice.get(v.name)
     if fn is None:
         raise X.XtceError("DiscreteLookupChoice: unknown alternative "
@@ -21783,6 +33221,21 @@ _WC_EncodingChoice = {"BinaryDataEncoding": _w_BinaryDataEncodingType,
 
 
 def _w_EncodingChoice(w: X.Writer, v: EncodingChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in ``EncodingType``
+    holds as its element, ``BinaryDataEncoding``, ``FloatDataEncoding``,
+    ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_EncodingChoice.get(v.name)
     if fn is None:
         raise X.XtceError(f"EncodingChoice: unknown alternative {v.name!r}")
@@ -21800,6 +33253,23 @@ _WC_EntryListChoice = {
 
 
 def _w_EntryListChoice(w: X.Writer, v: EntryListChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in ``EntryListType``
+    holds as its element, ``ParameterRefEntry``,
+    ``ParameterSegmentRefEntry``, ``ContainerRefEntry``,
+    ``ContainerSegmentRefEntry``, ``StreamSegmentEntry``,
+    ``IndirectParameterRefEntry`` or ``ArrayParameterRefEntry``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_EntryListChoice.get(v.name)
     if fn is None:
         raise X.XtceError(f"EntryListChoice: unknown alternative {v.name!r}")
@@ -21815,6 +33285,21 @@ _WC_EnumeratedArgumentChoice = {
 
 def _w_EnumeratedArgumentChoice(w: X.Writer,
                                 v: EnumeratedArgumentChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``EnumeratedArgumentType`` holds as its element, ``BinaryDataEncoding``,
+    ``FloatDataEncoding``, ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_EnumeratedArgumentChoice.get(v.name)
     if fn is None:
         raise X.XtceError("EnumeratedArgumentChoice: unknown alternative "
@@ -21829,6 +33314,21 @@ _WC_EnumeratedDataChoice = {"BinaryDataEncoding": _w_BinaryDataEncodingType,
 
 
 def _w_EnumeratedDataChoice(w: X.Writer, v: EnumeratedDataChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``EnumeratedDataType`` holds as its element, ``BinaryDataEncoding``,
+    ``FloatDataEncoding``, ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_EnumeratedDataChoice.get(v.name)
     if fn is None:
         raise X.XtceError("EnumeratedDataChoice: unknown alternative "
@@ -21845,6 +33345,21 @@ _WC_EnumeratedParameterChoice = {
 
 def _w_EnumeratedParameterChoice(w: X.Writer,
                                  v: EnumeratedParameterChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``EnumeratedParameterType`` holds as its element, ``BinaryDataEncoding``,
+    ``FloatDataEncoding``, ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_EnumeratedParameterChoice.get(v.name)
     if fn is None:
         raise X.XtceError("EnumeratedParameterChoice: unknown alternative "
@@ -21857,6 +33372,21 @@ _WC_EnumerationAlarmChoice = {"AlarmConditions": _w_AlarmConditionsType,
 
 
 def _w_EnumerationAlarmChoice(w: X.Writer, v: EnumerationAlarmChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``EnumerationAlarmType`` holds as its element, ``AlarmConditions`` or
+    ``CustomAlarm``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_EnumerationAlarmChoice.get(v.name)
     if fn is None:
         raise X.XtceError("EnumerationAlarmChoice: unknown alternative "
@@ -21870,6 +33400,21 @@ _WC_EnumerationContextAlarmChoice = {"AlarmConditions": _w_AlarmConditionsType,
 
 def _w_EnumerationContextAlarmChoice(w: X.Writer,
                                      v: EnumerationContextAlarmChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``EnumerationContextAlarmType`` holds as its element, ``AlarmConditions``
+    or ``CustomAlarm``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_EnumerationContextAlarmChoice.get(v.name)
     if fn is None:
         raise X.XtceError("EnumerationContextAlarmChoice: unknown alternative "
@@ -21883,6 +33428,21 @@ _WC_ErrorDetectCorrectChoice = {"Checksum": _w_ChecksumType, "CRC": _w_CRCType,
 
 def _w_ErrorDetectCorrectChoice(w: X.Writer,
                                 v: ErrorDetectCorrectChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ErrorDetectCorrectType`` holds as its element, ``Checksum``, ``CRC``,
+    ``XOR`` or ``Parity``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ErrorDetectCorrectChoice.get(v.name)
     if fn is None:
         raise X.XtceError("ErrorDetectCorrectChoice: unknown alternative "
@@ -21901,6 +33461,22 @@ _WC_ExecutionVerifierChoice1 = {
 
 def _w_ExecutionVerifierChoice1(w: X.Writer,
                                 v: ExecutionVerifierChoice1) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ExecutionVerifierType`` holds as its element, ``ComparisonList``,
+    ``ContainerRef``, ``ParameterValueChange``, ``CustomAlgorithm``,
+    ``BooleanExpression`` or ``Comparison``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ExecutionVerifierChoice1.get(v.name)
     if fn is None:
         raise X.XtceError("ExecutionVerifierChoice1: unknown alternative "
@@ -21915,6 +33491,21 @@ _WC_ExecutionVerifierChoice2 = {
 
 def _w_ExecutionVerifierChoice2(w: X.Writer,
                                 v: ExecutionVerifierChoice2) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ExecutionVerifierType`` holds as its element, ``CheckWindow`` or
+    ``CheckWindowAlgorithms``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ExecutionVerifierChoice2.get(v.name)
     if fn is None:
         raise X.XtceError("ExecutionVerifierChoice2: unknown alternative "
@@ -21932,6 +33523,22 @@ _WC_FailedVerifierChoice1 = {
 
 
 def _w_FailedVerifierChoice1(w: X.Writer, v: FailedVerifierChoice1) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``FailedVerifierType`` holds as its element, ``ComparisonList``,
+    ``ContainerRef``, ``ParameterValueChange``, ``CustomAlgorithm``,
+    ``BooleanExpression`` or ``Comparison``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_FailedVerifierChoice1.get(v.name)
     if fn is None:
         raise X.XtceError("FailedVerifierChoice1: unknown alternative "
@@ -21945,6 +33552,21 @@ _WC_FailedVerifierChoice2 = {
 
 
 def _w_FailedVerifierChoice2(w: X.Writer, v: FailedVerifierChoice2) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``FailedVerifierType`` holds as its element, ``CheckWindow`` or
+    ``CheckWindowAlgorithms``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_FailedVerifierChoice2.get(v.name)
     if fn is None:
         raise X.XtceError("FailedVerifierChoice2: unknown alternative "
@@ -21957,6 +33579,17 @@ _WC_FixedFrameStreamChoice = {"ContainerRef": _w_ContainerRefType,
 
 
 def _w_FixedFrameStreamChoice(w: X.Writer, v: FixedFrameStreamChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``FixedFrameStreamType`` holds as its element, ``ContainerRef`` or
+    ``ServiceRef``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If ``v`` names an alternative the choice doesn't have.
+    """
     fn = _WC_FixedFrameStreamChoice.get(v.name)
     if fn is None:
         raise X.XtceError("FixedFrameStreamChoice: unknown alternative "
@@ -21972,6 +33605,21 @@ _WC_FloatArgumentChoice = {
 
 
 def _w_FloatArgumentChoice(w: X.Writer, v: FloatArgumentChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``FloatArgumentType`` holds as its element, ``BinaryDataEncoding``,
+    ``FloatDataEncoding``, ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_FloatArgumentChoice.get(v.name)
     if fn is None:
         raise X.XtceError("FloatArgumentChoice: unknown alternative "
@@ -21986,6 +33634,21 @@ _WC_FloatDataChoice = {"BinaryDataEncoding": _w_BinaryDataEncodingType,
 
 
 def _w_FloatDataChoice(w: X.Writer, v: FloatDataChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in ``FloatDataType``
+    holds as its element, ``BinaryDataEncoding``, ``FloatDataEncoding``,
+    ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_FloatDataChoice.get(v.name)
     if fn is None:
         raise X.XtceError(f"FloatDataChoice: unknown alternative {v.name!r}")
@@ -21999,6 +33662,21 @@ _WC_FloatParameterChoice = {"BinaryDataEncoding": _w_BinaryDataEncodingType,
 
 
 def _w_FloatParameterChoice(w: X.Writer, v: FloatParameterChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``FloatParameterType`` holds as its element, ``BinaryDataEncoding``,
+    ``FloatDataEncoding``, ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_FloatParameterChoice.get(v.name)
     if fn is None:
         raise X.XtceError("FloatParameterChoice: unknown alternative "
@@ -22011,6 +33689,16 @@ _WC_FrameStreamChoice = {"ContainerRef": _w_ContainerRefType,
 
 
 def _w_FrameStreamChoice(w: X.Writer, v: FrameStreamChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in ``FrameStreamType``
+    holds as its element, ``ContainerRef`` or ``ServiceRef``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If ``v`` names an alternative the choice doesn't have.
+    """
     fn = _WC_FrameStreamChoice.get(v.name)
     if fn is None:
         raise X.XtceError(f"FrameStreamChoice: unknown alternative {v.name!r}")
@@ -22023,6 +33711,16 @@ _WC_InputSetChoice = {
 
 
 def _w_InputSetChoice(w: X.Writer, v: InputSetChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in ``InputSetType``
+    holds as its element, ``InputParameterInstanceRef`` or ``Constant``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If ``v`` names an alternative the choice doesn't have.
+    """
     fn = _WC_InputSetChoice.get(v.name)
     if fn is None:
         raise X.XtceError(f"InputSetChoice: unknown alternative {v.name!r}")
@@ -22037,6 +33735,21 @@ _WC_IntegerArgumentChoice = {
 
 
 def _w_IntegerArgumentChoice(w: X.Writer, v: IntegerArgumentChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``IntegerArgumentType`` holds as its element, ``BinaryDataEncoding``,
+    ``FloatDataEncoding``, ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_IntegerArgumentChoice.get(v.name)
     if fn is None:
         raise X.XtceError("IntegerArgumentChoice: unknown alternative "
@@ -22051,6 +33764,21 @@ _WC_IntegerDataChoice = {"BinaryDataEncoding": _w_BinaryDataEncodingType,
 
 
 def _w_IntegerDataChoice(w: X.Writer, v: IntegerDataChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in ``IntegerDataType``
+    holds as its element, ``BinaryDataEncoding``, ``FloatDataEncoding``,
+    ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_IntegerDataChoice.get(v.name)
     if fn is None:
         raise X.XtceError(f"IntegerDataChoice: unknown alternative {v.name!r}")
@@ -22064,6 +33792,21 @@ _WC_IntegerParameterChoice = {"BinaryDataEncoding": _w_BinaryDataEncodingType,
 
 
 def _w_IntegerParameterChoice(w: X.Writer, v: IntegerParameterChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``IntegerParameterType`` holds as its element, ``BinaryDataEncoding``,
+    ``FloatDataEncoding``, ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_IntegerParameterChoice.get(v.name)
     if fn is None:
         raise X.XtceError("IntegerParameterChoice: unknown alternative "
@@ -22077,6 +33820,21 @@ _WC_IntegerValueChoice = {"FixedValue": lambda w, x, t: w.leaf(t, X.f_int(x)),
 
 
 def _w_IntegerValueChoice(w: X.Writer, v: IntegerValueChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``IntegerValueType`` holds as its element, ``FixedValue``,
+    ``DynamicValue`` or ``DiscreteLookupList``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_IntegerValueChoice.get(v.name)
     if fn is None:
         raise X.XtceError(f"IntegerValueChoice: unknown alternative {v.name!r}")
@@ -22091,6 +33849,21 @@ _WC_LocationInContainerInBitsChoice = {
 
 def _w_LocationInContainerInBitsChoice(
         w: X.Writer, v: LocationInContainerInBitsChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``LocationInContainerInBitsType`` holds as its element, ``FixedValue``,
+    ``DynamicValue`` or ``DiscreteLookupList``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_LocationInContainerInBitsChoice.get(v.name)
     if fn is None:
         raise X.XtceError("LocationInContainerInBitsChoice: unknown "
@@ -22105,6 +33878,21 @@ _WC_MatchCriteriaChoice = {"Comparison": _w_ComparisonType,
 
 
 def _w_MatchCriteriaChoice(w: X.Writer, v: MatchCriteriaChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``MatchCriteriaType`` holds as its element, ``Comparison``,
+    ``ComparisonList``, ``BooleanExpression`` or ``CustomAlgorithm``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_MatchCriteriaChoice.get(v.name)
     if fn is None:
         raise X.XtceError("MatchCriteriaChoice: unknown alternative "
@@ -22121,6 +33909,18 @@ _WC_MathOperationCalibratorChoice = {
 
 def _w_MathOperationCalibratorChoice(w: X.Writer,
                                      v: MathOperationCalibratorChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``MathOperationCalibratorType`` holds as its element, ``ValueOperand``,
+    ``ThisParameterOperand``, ``Operator`` or
+    ``ParameterInstanceRefOperand``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If ``v`` names an alternative the choice doesn't have.
+    """
     fn = _WC_MathOperationCalibratorChoice.get(v.name)
     if fn is None:
         raise X.XtceError("MathOperationCalibratorChoice: unknown alternative "
@@ -22136,6 +33936,18 @@ _WC_MathOperationChoice = {
 
 
 def _w_MathOperationChoice(w: X.Writer, v: MathOperationChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``MathOperationType`` holds as its element, ``ValueOperand``,
+    ``ThisParameterOperand``, ``Operator`` or
+    ``ParameterInstanceRefOperand``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If ``v`` names an alternative the choice doesn't have.
+    """
     fn = _WC_MathOperationChoice.get(v.name)
     if fn is None:
         raise X.XtceError("MathOperationChoice: unknown alternative "
@@ -22149,6 +33961,21 @@ _WC_MetaCommandSetChoice = {"MetaCommand": _w_MetaCommandType,
 
 
 def _w_MetaCommandSetChoice(w: X.Writer, v: MetaCommandSetChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``MetaCommandSetType`` holds as its element, ``MetaCommand``,
+    ``MetaCommandRef`` or ``BlockMetaCommand``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_MetaCommandSetChoice.get(v.name)
     if fn is None:
         raise X.XtceError("MetaCommandSetChoice: unknown alternative "
@@ -22161,6 +33988,21 @@ _WC_NumericAlarmChoice = {"AlarmConditions": _w_AlarmConditionsType,
 
 
 def _w_NumericAlarmChoice(w: X.Writer, v: NumericAlarmChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``NumericAlarmType`` holds as its element, ``AlarmConditions`` or
+    ``CustomAlarm``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_NumericAlarmChoice.get(v.name)
     if fn is None:
         raise X.XtceError(f"NumericAlarmChoice: unknown alternative {v.name!r}")
@@ -22173,6 +34015,21 @@ _WC_NumericContextAlarmChoice = {"AlarmConditions": _w_AlarmConditionsType,
 
 def _w_NumericContextAlarmChoice(w: X.Writer,
                                  v: NumericContextAlarmChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``NumericContextAlarmType`` holds as its element, ``AlarmConditions`` or
+    ``CustomAlarm``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_NumericContextAlarmChoice.get(v.name)
     if fn is None:
         raise X.XtceError("NumericContextAlarmChoice: unknown alternative "
@@ -22185,6 +34042,21 @@ _WC_ORedConditionsChoice = {"Condition": _w_ComparisonCheckType,
 
 
 def _w_ORedConditionsChoice(w: X.Writer, v: ORedConditionsChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ORedConditionsType`` holds as its element, ``Condition`` or
+    ``ANDedConditions``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ORedConditionsChoice.get(v.name)
     if fn is None:
         raise X.XtceError("ORedConditionsChoice: unknown alternative "
@@ -22197,6 +34069,21 @@ _WC_ParameterSetChoice = {"Parameter": _w_ParameterType,
 
 
 def _w_ParameterSetChoice(w: X.Writer, v: ParameterSetChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ParameterSetType`` holds as its element, ``Parameter`` or
+    ``ParameterRef``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ParameterSetChoice.get(v.name)
     if fn is None:
         raise X.XtceError(f"ParameterSetChoice: unknown alternative {v.name!r}")
@@ -22208,6 +34095,21 @@ _WC_ParameterToSetChoice = {"Derivation": _w_ArgumentMathOperationType,
 
 
 def _w_ParameterToSetChoice(w: X.Writer, v: ParameterToSetChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ParameterToSetType`` holds as its element, ``Derivation`` or
+    ``NewValue``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ParameterToSetChoice.get(v.name)
     if fn is None:
         raise X.XtceError("ParameterToSetChoice: unknown alternative "
@@ -22229,6 +34131,25 @@ _WC_ParameterTypeSetChoice = {
 
 
 def _w_ParameterTypeSetChoice(w: X.Writer, v: ParameterTypeSetChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ParameterTypeSetType`` holds as its element, ``StringParameterType``,
+    ``EnumeratedParameterType``, ``IntegerParameterType``,
+    ``BinaryParameterType``, ``FloatParameterType``,
+    ``BooleanParameterType``, ``RelativeTimeParameterType``,
+    ``AbsoluteTimeParameterType``, ``ArrayParameterType`` or
+    ``AggregateParameterType``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ParameterTypeSetChoice.get(v.name)
     if fn is None:
         raise X.XtceError("ParameterTypeSetChoice: unknown alternative "
@@ -22242,6 +34163,17 @@ _WC_PercentCompleteChoice = {
 
 
 def _w_PercentCompleteChoice(w: X.Writer, v: PercentCompleteChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``PercentCompleteType`` holds as its element, ``FixedValue`` or
+    ``DynamicValue``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If ``v`` names an alternative the choice doesn't have.
+    """
     fn = _WC_PercentCompleteChoice.get(v.name)
     if fn is None:
         raise X.XtceError("PercentCompleteChoice: unknown alternative "
@@ -22259,6 +34191,22 @@ _WC_QueuedVerifierChoice1 = {
 
 
 def _w_QueuedVerifierChoice1(w: X.Writer, v: QueuedVerifierChoice1) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``QueuedVerifierType`` holds as its element, ``ComparisonList``,
+    ``ContainerRef``, ``ParameterValueChange``, ``CustomAlgorithm``,
+    ``BooleanExpression`` or ``Comparison``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_QueuedVerifierChoice1.get(v.name)
     if fn is None:
         raise X.XtceError("QueuedVerifierChoice1: unknown alternative "
@@ -22272,6 +34220,21 @@ _WC_QueuedVerifierChoice2 = {
 
 
 def _w_QueuedVerifierChoice2(w: X.Writer, v: QueuedVerifierChoice2) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``QueuedVerifierType`` holds as its element, ``CheckWindow`` or
+    ``CheckWindowAlgorithms``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_QueuedVerifierChoice2.get(v.name)
     if fn is None:
         raise X.XtceError("QueuedVerifierChoice2: unknown alternative "
@@ -22289,6 +34252,22 @@ _WC_ReceivedVerifierChoice1 = {
 
 
 def _w_ReceivedVerifierChoice1(w: X.Writer, v: ReceivedVerifierChoice1) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ReceivedVerifierType`` holds as its element, ``ComparisonList``,
+    ``ContainerRef``, ``ParameterValueChange``, ``CustomAlgorithm``,
+    ``BooleanExpression`` or ``Comparison``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ReceivedVerifierChoice1.get(v.name)
     if fn is None:
         raise X.XtceError("ReceivedVerifierChoice1: unknown alternative "
@@ -22302,6 +34281,21 @@ _WC_ReceivedVerifierChoice2 = {
 
 
 def _w_ReceivedVerifierChoice2(w: X.Writer, v: ReceivedVerifierChoice2) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ReceivedVerifierType`` holds as its element, ``CheckWindow`` or
+    ``CheckWindowAlgorithms``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_ReceivedVerifierChoice2.get(v.name)
     if fn is None:
         raise X.XtceError("ReceivedVerifierChoice2: unknown alternative "
@@ -22314,6 +34308,16 @@ _WC_ReferenceTimeChoice = {"OffsetFrom": _w_ParameterInstanceRefType,
 
 
 def _w_ReferenceTimeChoice(w: X.Writer, v: ReferenceTimeChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``ReferenceTimeType`` holds as its element, ``OffsetFrom`` or ``Epoch``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If ``v`` names an alternative the choice doesn't have.
+    """
     fn = _WC_ReferenceTimeChoice.get(v.name)
     if fn is None:
         raise X.XtceError("ReferenceTimeChoice: unknown alternative "
@@ -22329,6 +34333,21 @@ _WC_RestrictionCriteriaChoice = {"Comparison": _w_ComparisonType,
 
 def _w_RestrictionCriteriaChoice(w: X.Writer,
                                  v: RestrictionCriteriaChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``RestrictionCriteriaType`` holds as its element, ``Comparison``,
+    ``ComparisonList``, ``BooleanExpression`` or ``CustomAlgorithm``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_RestrictionCriteriaChoice.get(v.name)
     if fn is None:
         raise X.XtceError("RestrictionCriteriaChoice: unknown alternative "
@@ -22347,6 +34366,22 @@ _WC_SentFromRangeVerifierChoice1 = {
 
 def _w_SentFromRangeVerifierChoice1(w: X.Writer,
                                     v: SentFromRangeVerifierChoice1) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``SentFromRangeVerifierType`` holds as its element, ``ComparisonList``,
+    ``ContainerRef``, ``ParameterValueChange``, ``CustomAlgorithm``,
+    ``BooleanExpression`` or ``Comparison``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_SentFromRangeVerifierChoice1.get(v.name)
     if fn is None:
         raise X.XtceError("SentFromRangeVerifierChoice1: unknown alternative "
@@ -22361,6 +34396,21 @@ _WC_SentFromRangeVerifierChoice2 = {
 
 def _w_SentFromRangeVerifierChoice2(w: X.Writer,
                                     v: SentFromRangeVerifierChoice2) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``SentFromRangeVerifierType`` holds as its element, ``CheckWindow`` or
+    ``CheckWindowAlgorithms``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_SentFromRangeVerifierChoice2.get(v.name)
     if fn is None:
         raise X.XtceError("SentFromRangeVerifierChoice2: unknown alternative "
@@ -22373,6 +34423,18 @@ _WC_ServiceChoice = {"MessageRefSet": _w_MessageRefSetType,
 
 
 def _w_ServiceChoice(w: X.Writer, v: ServiceChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in ``ServiceType``
+    holds as its element, ``MessageRefSet`` or ``ContainerRefSet``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have.
+    """
     fn = _WC_ServiceChoice.get(v.name)
     if fn is None:
         raise X.XtceError(f"ServiceChoice: unknown alternative {v.name!r}")
@@ -22385,6 +34447,21 @@ _WC_StreamSetChoice = {"FixedFrameStream": _w_FixedFrameStreamType,
 
 
 def _w_StreamSetChoice(w: X.Writer, v: StreamSetChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in ``StreamSetType``
+    holds as its element, ``FixedFrameStream``, ``VariableFrameStream`` or
+    ``CustomStream``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_StreamSetChoice.get(v.name)
     if fn is None:
         raise X.XtceError(f"StreamSetChoice: unknown alternative {v.name!r}")
@@ -22396,6 +34473,20 @@ _WC_StringAlarmChoice = {"AlarmConditions": _w_AlarmConditionsType,
 
 
 def _w_StringAlarmChoice(w: X.Writer, v: StringAlarmChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in ``StringAlarmType``
+    holds as its element, ``AlarmConditions`` or ``CustomAlarm``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_StringAlarmChoice.get(v.name)
     if fn is None:
         raise X.XtceError(f"StringAlarmChoice: unknown alternative {v.name!r}")
@@ -22410,6 +34501,21 @@ _WC_StringArgumentChoice = {
 
 
 def _w_StringArgumentChoice(w: X.Writer, v: StringArgumentChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``StringArgumentType`` holds as its element, ``BinaryDataEncoding``,
+    ``FloatDataEncoding``, ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_StringArgumentChoice.get(v.name)
     if fn is None:
         raise X.XtceError("StringArgumentChoice: unknown alternative "
@@ -22423,6 +34529,21 @@ _WC_StringContextAlarmChoice = {"AlarmConditions": _w_AlarmConditionsType,
 
 def _w_StringContextAlarmChoice(w: X.Writer,
                                 v: StringContextAlarmChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``StringContextAlarmType`` holds as its element, ``AlarmConditions`` or
+    ``CustomAlarm``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_StringContextAlarmChoice.get(v.name)
     if fn is None:
         raise X.XtceError("StringContextAlarmChoice: unknown alternative "
@@ -22437,6 +34558,21 @@ _WC_StringDataChoice = {"BinaryDataEncoding": _w_BinaryDataEncodingType,
 
 
 def _w_StringDataChoice(w: X.Writer, v: StringDataChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in ``StringDataType``
+    holds as its element, ``BinaryDataEncoding``, ``FloatDataEncoding``,
+    ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_StringDataChoice.get(v.name)
     if fn is None:
         raise X.XtceError(f"StringDataChoice: unknown alternative {v.name!r}")
@@ -22449,6 +34585,21 @@ _WC_StringDataEncodingChoice = {"SizeInBits": _w_SizeInBitsType,
 
 def _w_StringDataEncodingChoice(w: X.Writer,
                                 v: StringDataEncodingChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``StringDataEncodingType`` holds as its element, ``SizeInBits`` or
+    ``Variable``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_StringDataEncodingChoice.get(v.name)
     if fn is None:
         raise X.XtceError("StringDataEncodingChoice: unknown alternative "
@@ -22463,6 +34614,21 @@ _WC_StringParameterChoice = {"BinaryDataEncoding": _w_BinaryDataEncodingType,
 
 
 def _w_StringParameterChoice(w: X.Writer, v: StringParameterChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``StringParameterType`` holds as its element, ``BinaryDataEncoding``,
+    ``FloatDataEncoding``, ``IntegerDataEncoding`` or ``StringDataEncoding``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_StringParameterChoice.get(v.name)
     if fn is None:
         raise X.XtceError("StringParameterChoice: unknown alternative "
@@ -22475,6 +34641,20 @@ _WC_TimeAlarmChoice = {"AlarmConditions": _w_AlarmConditionsType,
 
 
 def _w_TimeAlarmChoice(w: X.Writer, v: TimeAlarmChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in ``TimeAlarmType``
+    holds as its element, ``AlarmConditions`` or ``CustomAlarm``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_TimeAlarmChoice.get(v.name)
     if fn is None:
         raise X.XtceError(f"TimeAlarmChoice: unknown alternative {v.name!r}")
@@ -22486,6 +34666,21 @@ _WC_TimeContextAlarmChoice = {"AlarmConditions": _w_AlarmConditionsType,
 
 
 def _w_TimeContextAlarmChoice(w: X.Writer, v: TimeContextAlarmChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``TimeContextAlarmType`` holds as its element, ``AlarmConditions`` or
+    ``CustomAlarm``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_TimeContextAlarmChoice.get(v.name)
     if fn is None:
         raise X.XtceError("TimeContextAlarmChoice: unknown alternative "
@@ -22504,6 +34699,22 @@ _WC_TransferredToRangeVerifierChoice1 = {
 
 def _w_TransferredToRangeVerifierChoice1(
         w: X.Writer, v: TransferredToRangeVerifierChoice1) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``TransferredToRangeVerifierType`` holds as its element,
+    ``ComparisonList``, ``ContainerRef``, ``ParameterValueChange``,
+    ``CustomAlgorithm``, ``BooleanExpression`` or ``Comparison``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_TransferredToRangeVerifierChoice1.get(v.name)
     if fn is None:
         raise X.XtceError("TransferredToRangeVerifierChoice1: unknown "
@@ -22518,6 +34729,21 @@ _WC_TransferredToRangeVerifierChoice2 = {
 
 def _w_TransferredToRangeVerifierChoice2(
         w: X.Writer, v: TransferredToRangeVerifierChoice2) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``TransferredToRangeVerifierType`` holds as its element, ``CheckWindow``
+    or ``CheckWindowAlgorithms``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_TransferredToRangeVerifierChoice2.get(v.name)
     if fn is None:
         raise X.XtceError("TransferredToRangeVerifierChoice2: unknown "
@@ -22533,6 +34759,21 @@ _WC_TransmissionConstraintChoice = {
 
 def _w_TransmissionConstraintChoice(w: X.Writer,
                                     v: TransmissionConstraintChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``TransmissionConstraintType`` holds as its element, ``Comparison``,
+    ``ComparisonList``, ``BooleanExpression`` or ``CustomAlgorithm``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_TransmissionConstraintChoice.get(v.name)
     if fn is None:
         raise X.XtceError("TransmissionConstraintChoice: unknown alternative "
@@ -22547,6 +34788,17 @@ _WC_TriggerSetChoice = {
 
 
 def _w_TriggerSetChoice(w: X.Writer, v: TriggerSetChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in ``TriggerSetType``
+    holds as its element, ``OnParameterUpdateTrigger``,
+    ``OnContainerUpdateTrigger`` or ``OnPeriodicRateTrigger``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If ``v`` names an alternative the choice doesn't have.
+    """
     fn = _WC_TriggerSetChoice.get(v.name)
     if fn is None:
         raise X.XtceError(f"TriggerSetChoice: unknown alternative {v.name!r}")
@@ -22562,6 +34814,18 @@ _WC_TriggeredMathOperationChoice = {
 
 def _w_TriggeredMathOperationChoice(w: X.Writer,
                                     v: TriggeredMathOperationChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``TriggeredMathOperationType`` holds as its element, ``ValueOperand``,
+    ``ThisParameterOperand``, ``Operator`` or
+    ``ParameterInstanceRefOperand``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If ``v`` names an alternative the choice doesn't have.
+    """
     fn = _WC_TriggeredMathOperationChoice.get(v.name)
     if fn is None:
         raise X.XtceError("TriggeredMathOperationChoice: unknown alternative "
@@ -22575,6 +34839,17 @@ _WC_VariableFrameStreamChoice = {"ContainerRef": _w_ContainerRefType,
 
 def _w_VariableFrameStreamChoice(w: X.Writer,
                                  v: VariableFrameStreamChoice) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``VariableFrameStreamType`` holds as its element, ``ContainerRef`` or
+    ``ServiceRef``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If ``v`` names an alternative the choice doesn't have.
+    """
     fn = _WC_VariableFrameStreamChoice.get(v.name)
     if fn is None:
         raise X.XtceError("VariableFrameStreamChoice: unknown alternative "
@@ -22587,6 +34862,21 @@ _WC_VariableStringChoice1 = {"DynamicValue": _w_DynamicValueType,
 
 
 def _w_VariableStringChoice1(w: X.Writer, v: VariableStringChoice1) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``VariableStringType`` holds as its element, ``DynamicValue`` or
+    ``DiscreteLookupList``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If a value nested in ``v`` has a repeated element that
+                     occurs fewer or more times than the schema allows; or if
+                     ``v`` names an alternative the choice doesn't have; or if a
+                     choice nested in ``v`` names an alternative it doesn't
+                     have.
+    """
     fn = _WC_VariableStringChoice1.get(v.name)
     if fn is None:
         raise X.XtceError("VariableStringChoice1: unknown alternative "
@@ -22599,6 +34889,17 @@ _WC_VariableStringChoice2 = {"LeadingSize": _w_LeadingSizeType,
 
 
 def _w_VariableStringChoice2(w: X.Writer, v: VariableStringChoice2) -> None:
+    """Writes the alternative a value of the ``<choice>`` in
+    ``VariableStringType`` holds as its element, ``LeadingSize`` or
+    ``TerminationChar``.
+
+    Args:
+        w: The writer that receives the XML.
+        v: The value; ``v.name`` names the alternative.
+
+    Raises:
+        X.XtceError: If ``v`` names an alternative the choice doesn't have.
+    """
     fn = _WC_VariableStringChoice2.get(v.name)
     if fn is None:
         raise X.XtceError("VariableStringChoice2: unknown alternative "

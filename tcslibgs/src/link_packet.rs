@@ -43,7 +43,11 @@ impl StatusType {
     pub const WRONG_GENERATION: Self = Self(8);
     pub const STALE: Self = Self(9);
 
-    /// The label of this value, if the enumeration lists it.
+    /// Names this value of enumeration `/TcsLink/StatusType`.
+    ///
+    /// # Returns
+    ///
+    /// The value's label, or `None` if the enumeration doesn't list it.
     pub fn label(self) -> Option<&'static str> {
         match self.0 {
             0 => Some("Success"),
@@ -105,17 +109,33 @@ impl PingAnswer {
     /// The number of fields with an alarm.
     pub const ALARMS: usize = 0;
 
-    /// The alarm level of each field with an alarm (`None` when the
-    /// field is absent).  Alarms that depend on earlier samples count only
-    /// this one (see `monitor`).
+    /// Evaluates the alarms of this `/TcsLink/PingAnswer` packet's fields.
+    /// Alarms that depend on earlier samples count only this one (see
+    /// `monitor`).
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn alarms(&self) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
     }
 
-    /// Like `alarms()`, counting the earlier samples whose state `m` keeps,
-    /// for change ranges, minViolations and minConformance; `t` is this
-    /// sample's time in seconds.
+    /// Evaluates the alarms of this `/TcsLink/PingAnswer` packet's fields like
+    /// `alarms()`, counting the earlier samples for change ranges,
+    /// minViolations and minConformance.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
@@ -124,8 +144,13 @@ impl PingAnswer {
     /// The number of MathAlgorithms this packet triggers.
     pub const ALGORITHMS: usize = 0;
 
-    /// The output of each MathAlgorithm this packet triggers (`None` when
-    /// an input is absent).
+    /// Evaluates the MathAlgorithms that a `/TcsLink/PingAnswer` packet
+    /// triggers, from this one's values.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when an input is absent or a custom
+    /// algorithm's function isn't set or fails.
     pub fn algorithms(&self) -> pk::Outputs<0> {
         let mut o = pk::Outputs::new();
         o
@@ -212,7 +237,7 @@ impl Packet for PingAnswer {
             pk::from_unsigned(self.seq_count as u64, 14, "SeqCount")?,
         );
         let l7 = w.position();
-        w.uint(16, 0);
+        w.zeros(16);
         w.uint_order(8, false, pk::from_unsigned(129 as u64, 8, "Kind")?);
         w.uint_order(
             32,
@@ -281,17 +306,33 @@ impl RestartArmAnswer {
     /// The number of fields with an alarm.
     pub const ALARMS: usize = 0;
 
-    /// The alarm level of each field with an alarm (`None` when the
-    /// field is absent).  Alarms that depend on earlier samples count only
-    /// this one (see `monitor`).
+    /// Evaluates the alarms of this `/TcsLink/RestartArmAnswer` packet's
+    /// fields. Alarms that depend on earlier samples count only this one (see
+    /// `monitor`).
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn alarms(&self) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
     }
 
-    /// Like `alarms()`, counting the earlier samples whose state `m` keeps,
-    /// for change ranges, minViolations and minConformance; `t` is this
-    /// sample's time in seconds.
+    /// Evaluates the alarms of this `/TcsLink/RestartArmAnswer` packet's fields
+    /// like `alarms()`, counting the earlier samples for change ranges,
+    /// minViolations and minConformance.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
@@ -300,8 +341,13 @@ impl RestartArmAnswer {
     /// The number of MathAlgorithms this packet triggers.
     pub const ALGORITHMS: usize = 0;
 
-    /// The output of each MathAlgorithm this packet triggers (`None` when
-    /// an input is absent).
+    /// Evaluates the MathAlgorithms that a `/TcsLink/RestartArmAnswer` packet
+    /// triggers, from this one's values.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when an input is absent or a custom
+    /// algorithm's function isn't set or fails.
     pub fn algorithms(&self) -> pk::Outputs<0> {
         let mut o = pk::Outputs::new();
         o
@@ -388,7 +434,7 @@ impl Packet for RestartArmAnswer {
             pk::from_unsigned(self.seq_count as u64, 14, "SeqCount")?,
         );
         let l7 = w.position();
-        w.uint(16, 0);
+        w.zeros(16);
         w.uint_order(8, false, pk::from_unsigned(130 as u64, 8, "Kind")?);
         w.uint_order(
             32,
@@ -457,17 +503,33 @@ impl RestartAnswer {
     /// The number of fields with an alarm.
     pub const ALARMS: usize = 0;
 
-    /// The alarm level of each field with an alarm (`None` when the
-    /// field is absent).  Alarms that depend on earlier samples count only
-    /// this one (see `monitor`).
+    /// Evaluates the alarms of this `/TcsLink/RestartAnswer` packet's fields.
+    /// Alarms that depend on earlier samples count only this one (see
+    /// `monitor`).
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn alarms(&self) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
     }
 
-    /// Like `alarms()`, counting the earlier samples whose state `m` keeps,
-    /// for change ranges, minViolations and minConformance; `t` is this
-    /// sample's time in seconds.
+    /// Evaluates the alarms of this `/TcsLink/RestartAnswer` packet's fields
+    /// like `alarms()`, counting the earlier samples for change ranges,
+    /// minViolations and minConformance.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
@@ -476,8 +538,13 @@ impl RestartAnswer {
     /// The number of MathAlgorithms this packet triggers.
     pub const ALGORITHMS: usize = 0;
 
-    /// The output of each MathAlgorithm this packet triggers (`None` when
-    /// an input is absent).
+    /// Evaluates the MathAlgorithms that a `/TcsLink/RestartAnswer` packet
+    /// triggers, from this one's values.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when an input is absent or a custom
+    /// algorithm's function isn't set or fails.
     pub fn algorithms(&self) -> pk::Outputs<0> {
         let mut o = pk::Outputs::new();
         o
@@ -564,7 +631,7 @@ impl Packet for RestartAnswer {
             pk::from_unsigned(self.seq_count as u64, 14, "SeqCount")?,
         );
         let l7 = w.position();
-        w.uint(16, 0);
+        w.zeros(16);
         w.uint_order(8, false, pk::from_unsigned(131 as u64, 8, "Kind")?);
         w.uint_order(
             32,
@@ -643,17 +710,33 @@ impl ConnectAnswer {
     /// The number of fields with an alarm.
     pub const ALARMS: usize = 0;
 
-    /// The alarm level of each field with an alarm (`None` when the
-    /// field is absent).  Alarms that depend on earlier samples count only
-    /// this one (see `monitor`).
+    /// Evaluates the alarms of this `/TcsLink/ConnectAnswer` packet's fields.
+    /// Alarms that depend on earlier samples count only this one (see
+    /// `monitor`).
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn alarms(&self) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
     }
 
-    /// Like `alarms()`, counting the earlier samples whose state `m` keeps,
-    /// for change ranges, minViolations and minConformance; `t` is this
-    /// sample's time in seconds.
+    /// Evaluates the alarms of this `/TcsLink/ConnectAnswer` packet's fields
+    /// like `alarms()`, counting the earlier samples for change ranges,
+    /// minViolations and minConformance.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
@@ -662,8 +745,13 @@ impl ConnectAnswer {
     /// The number of MathAlgorithms this packet triggers.
     pub const ALGORITHMS: usize = 0;
 
-    /// The output of each MathAlgorithm this packet triggers (`None` when
-    /// an input is absent).
+    /// Evaluates the MathAlgorithms that a `/TcsLink/ConnectAnswer` packet
+    /// triggers, from this one's values.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when an input is absent or a custom
+    /// algorithm's function isn't set or fails.
     pub fn algorithms(&self) -> pk::Outputs<0> {
         let mut o = pk::Outputs::new();
         o
@@ -760,7 +848,7 @@ impl Packet for ConnectAnswer {
             pk::from_unsigned(self.seq_count as u64, 14, "SeqCount")?,
         );
         let l7 = w.position();
-        w.uint(16, 0);
+        w.zeros(16);
         w.uint_order(8, false, pk::from_unsigned(132 as u64, 8, "Kind")?);
         w.uint_order(
             32,
@@ -860,17 +948,33 @@ impl ConfigAnswer {
     /// The number of fields with an alarm.
     pub const ALARMS: usize = 0;
 
-    /// The alarm level of each field with an alarm (`None` when the
-    /// field is absent).  Alarms that depend on earlier samples count only
-    /// this one (see `monitor`).
+    /// Evaluates the alarms of this `/TcsLink/ConfigAnswer` packet's fields.
+    /// Alarms that depend on earlier samples count only this one (see
+    /// `monitor`).
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn alarms(&self) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
     }
 
-    /// Like `alarms()`, counting the earlier samples whose state `m` keeps,
-    /// for change ranges, minViolations and minConformance; `t` is this
-    /// sample's time in seconds.
+    /// Evaluates the alarms of this `/TcsLink/ConfigAnswer` packet's fields
+    /// like `alarms()`, counting the earlier samples for change ranges,
+    /// minViolations and minConformance.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
@@ -879,8 +983,13 @@ impl ConfigAnswer {
     /// The number of MathAlgorithms this packet triggers.
     pub const ALGORITHMS: usize = 0;
 
-    /// The output of each MathAlgorithm this packet triggers (`None` when
-    /// an input is absent).
+    /// Evaluates the MathAlgorithms that a `/TcsLink/ConfigAnswer` packet
+    /// triggers, from this one's values.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when an input is absent or a custom
+    /// algorithm's function isn't set or fails.
     pub fn algorithms(&self) -> pk::Outputs<0> {
         let mut o = pk::Outputs::new();
         o
@@ -967,7 +1076,7 @@ impl Packet for ConfigAnswer {
             pk::from_unsigned(self.seq_count as u64, 14, "SeqCount")?,
         );
         let l7 = w.position();
-        w.uint(16, 0);
+        w.zeros(16);
         w.uint_order(8, false, pk::from_unsigned(160 as u64, 8, "Kind")?);
         w.uint_order(
             32,
@@ -1038,17 +1147,33 @@ impl StartNodeAnswer {
     /// The number of fields with an alarm.
     pub const ALARMS: usize = 0;
 
-    /// The alarm level of each field with an alarm (`None` when the
-    /// field is absent).  Alarms that depend on earlier samples count only
-    /// this one (see `monitor`).
+    /// Evaluates the alarms of this `/TcsLink/StartNodeAnswer` packet's fields.
+    /// Alarms that depend on earlier samples count only this one (see
+    /// `monitor`).
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn alarms(&self) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
     }
 
-    /// Like `alarms()`, counting the earlier samples whose state `m` keeps,
-    /// for change ranges, minViolations and minConformance; `t` is this
-    /// sample's time in seconds.
+    /// Evaluates the alarms of this `/TcsLink/StartNodeAnswer` packet's fields
+    /// like `alarms()`, counting the earlier samples for change ranges,
+    /// minViolations and minConformance.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
@@ -1057,8 +1182,13 @@ impl StartNodeAnswer {
     /// The number of MathAlgorithms this packet triggers.
     pub const ALGORITHMS: usize = 0;
 
-    /// The output of each MathAlgorithm this packet triggers (`None` when
-    /// an input is absent).
+    /// Evaluates the MathAlgorithms that a `/TcsLink/StartNodeAnswer` packet
+    /// triggers, from this one's values.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when an input is absent or a custom
+    /// algorithm's function isn't set or fails.
     pub fn algorithms(&self) -> pk::Outputs<0> {
         let mut o = pk::Outputs::new();
         o
@@ -1147,7 +1277,7 @@ impl Packet for StartNodeAnswer {
             pk::from_unsigned(self.seq_count as u64, 14, "SeqCount")?,
         );
         let l7 = w.position();
-        w.uint(16, 0);
+        w.zeros(16);
         w.uint_order(8, false, pk::from_unsigned(48 as u64, 8, "Kind")?);
         w.uint_order(
             32,
@@ -1225,17 +1355,33 @@ impl StopNodeAnswer {
     /// The number of fields with an alarm.
     pub const ALARMS: usize = 0;
 
-    /// The alarm level of each field with an alarm (`None` when the
-    /// field is absent).  Alarms that depend on earlier samples count only
-    /// this one (see `monitor`).
+    /// Evaluates the alarms of this `/TcsLink/StopNodeAnswer` packet's fields.
+    /// Alarms that depend on earlier samples count only this one (see
+    /// `monitor`).
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn alarms(&self) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
     }
 
-    /// Like `alarms()`, counting the earlier samples whose state `m` keeps,
-    /// for change ranges, minViolations and minConformance; `t` is this
-    /// sample's time in seconds.
+    /// Evaluates the alarms of this `/TcsLink/StopNodeAnswer` packet's fields
+    /// like `alarms()`, counting the earlier samples for change ranges,
+    /// minViolations and minConformance.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
@@ -1244,8 +1390,13 @@ impl StopNodeAnswer {
     /// The number of MathAlgorithms this packet triggers.
     pub const ALGORITHMS: usize = 0;
 
-    /// The output of each MathAlgorithm this packet triggers (`None` when
-    /// an input is absent).
+    /// Evaluates the MathAlgorithms that a `/TcsLink/StopNodeAnswer` packet
+    /// triggers, from this one's values.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when an input is absent or a custom
+    /// algorithm's function isn't set or fails.
     pub fn algorithms(&self) -> pk::Outputs<0> {
         let mut o = pk::Outputs::new();
         o
@@ -1334,7 +1485,7 @@ impl Packet for StopNodeAnswer {
             pk::from_unsigned(self.seq_count as u64, 14, "SeqCount")?,
         );
         let l7 = w.position();
-        w.uint(16, 0);
+        w.zeros(16);
         w.uint_order(8, false, pk::from_unsigned(49 as u64, 8, "Kind")?);
         w.uint_order(
             32,
@@ -1414,17 +1565,33 @@ impl SetNodeAnswer {
     /// The number of fields with an alarm.
     pub const ALARMS: usize = 0;
 
-    /// The alarm level of each field with an alarm (`None` when the
-    /// field is absent).  Alarms that depend on earlier samples count only
-    /// this one (see `monitor`).
+    /// Evaluates the alarms of this `/TcsLink/SetNodeAnswer` packet's fields.
+    /// Alarms that depend on earlier samples count only this one (see
+    /// `monitor`).
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn alarms(&self) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
     }
 
-    /// Like `alarms()`, counting the earlier samples whose state `m` keeps,
-    /// for change ranges, minViolations and minConformance; `t` is this
-    /// sample's time in seconds.
+    /// Evaluates the alarms of this `/TcsLink/SetNodeAnswer` packet's fields
+    /// like `alarms()`, counting the earlier samples for change ranges,
+    /// minViolations and minConformance.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
@@ -1433,8 +1600,13 @@ impl SetNodeAnswer {
     /// The number of MathAlgorithms this packet triggers.
     pub const ALGORITHMS: usize = 0;
 
-    /// The output of each MathAlgorithm this packet triggers (`None` when
-    /// an input is absent).
+    /// Evaluates the MathAlgorithms that a `/TcsLink/SetNodeAnswer` packet
+    /// triggers, from this one's values.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when an input is absent or a custom
+    /// algorithm's function isn't set or fails.
     pub fn algorithms(&self) -> pk::Outputs<0> {
         let mut o = pk::Outputs::new();
         o
@@ -1535,7 +1707,7 @@ impl Packet for SetNodeAnswer {
             pk::from_unsigned(self.seq_count as u64, 14, "SeqCount")?,
         );
         let l7 = w.position();
-        w.uint(16, 0);
+        w.zeros(16);
         w.uint_order(8, false, pk::from_unsigned(50 as u64, 8, "Kind")?);
         w.uint_order(
             32,
@@ -1653,17 +1825,33 @@ impl QueryNodeAnswer {
     /// The number of fields with an alarm.
     pub const ALARMS: usize = 0;
 
-    /// The alarm level of each field with an alarm (`None` when the
-    /// field is absent).  Alarms that depend on earlier samples count only
-    /// this one (see `monitor`).
+    /// Evaluates the alarms of this `/TcsLink/QueryNodeAnswer` packet's fields.
+    /// Alarms that depend on earlier samples count only this one (see
+    /// `monitor`).
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn alarms(&self) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
     }
 
-    /// Like `alarms()`, counting the earlier samples whose state `m` keeps,
-    /// for change ranges, minViolations and minConformance; `t` is this
-    /// sample's time in seconds.
+    /// Evaluates the alarms of this `/TcsLink/QueryNodeAnswer` packet's fields
+    /// like `alarms()`, counting the earlier samples for change ranges,
+    /// minViolations and minConformance.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
@@ -1672,8 +1860,13 @@ impl QueryNodeAnswer {
     /// The number of MathAlgorithms this packet triggers.
     pub const ALGORITHMS: usize = 0;
 
-    /// The output of each MathAlgorithm this packet triggers (`None` when
-    /// an input is absent).
+    /// Evaluates the MathAlgorithms that a `/TcsLink/QueryNodeAnswer` packet
+    /// triggers, from this one's values.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when an input is absent or a custom
+    /// algorithm's function isn't set or fails.
     pub fn algorithms(&self) -> pk::Outputs<0> {
         let mut o = pk::Outputs::new();
         o
@@ -1788,7 +1981,7 @@ impl Packet for QueryNodeAnswer {
             pk::from_unsigned(self.seq_count as u64, 14, "SeqCount")?,
         );
         let l7 = w.position();
-        w.uint(16, 0);
+        w.zeros(16);
         w.uint_order(8, false, pk::from_unsigned(51 as u64, 8, "Kind")?);
         w.uint_order(
             32,
@@ -1969,17 +2162,33 @@ impl QueryNodeSampleAnswer {
     /// The number of fields with an alarm.
     pub const ALARMS: usize = 0;
 
-    /// The alarm level of each field with an alarm (`None` when the
-    /// field is absent).  Alarms that depend on earlier samples count only
-    /// this one (see `monitor`).
+    /// Evaluates the alarms of this `/TcsLink/QueryNodeSampleAnswer` packet's
+    /// fields. Alarms that depend on earlier samples count only this one (see
+    /// `monitor`).
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn alarms(&self) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
     }
 
-    /// Like `alarms()`, counting the earlier samples whose state `m` keeps,
-    /// for change ranges, minViolations and minConformance; `t` is this
-    /// sample's time in seconds.
+    /// Evaluates the alarms of this `/TcsLink/QueryNodeSampleAnswer` packet's
+    /// fields like `alarms()`, counting the earlier samples for change ranges,
+    /// minViolations and minConformance.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
@@ -1988,8 +2197,13 @@ impl QueryNodeSampleAnswer {
     /// The number of MathAlgorithms this packet triggers.
     pub const ALGORITHMS: usize = 0;
 
-    /// The output of each MathAlgorithm this packet triggers (`None` when
-    /// an input is absent).
+    /// Evaluates the MathAlgorithms that a `/TcsLink/QueryNodeSampleAnswer`
+    /// packet triggers, from this one's values.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when an input is absent or a custom
+    /// algorithm's function isn't set or fails.
     pub fn algorithms(&self) -> pk::Outputs<0> {
         let mut o = pk::Outputs::new();
         o
@@ -2098,7 +2312,7 @@ impl Packet for QueryNodeSampleAnswer {
             pk::from_unsigned(self.seq_count as u64, 14, "SeqCount")?,
         );
         let l7 = w.position();
-        w.uint(16, 0);
+        w.zeros(16);
         w.uint_order(8, false, pk::from_unsigned(52 as u64, 8, "Kind")?);
         w.uint_order(
             32,
@@ -2224,17 +2438,32 @@ impl Ping {
     /// The number of fields with an alarm.
     pub const ALARMS: usize = 0;
 
-    /// The alarm level of each field with an alarm (`None` when the
-    /// field is absent).  Alarms that depend on earlier samples count only
-    /// this one (see `monitor`).
+    /// Evaluates the alarms of this `/TcsLink/Ping` packet's fields. Alarms
+    /// that depend on earlier samples count only this one (see `monitor`).
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn alarms(&self) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
     }
 
-    /// Like `alarms()`, counting the earlier samples whose state `m` keeps,
-    /// for change ranges, minViolations and minConformance; `t` is this
-    /// sample's time in seconds.
+    /// Evaluates the alarms of this `/TcsLink/Ping` packet's fields like
+    /// `alarms()`, counting the earlier samples for change ranges,
+    /// minViolations and minConformance.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
@@ -2243,8 +2472,13 @@ impl Ping {
     /// The number of MathAlgorithms this packet triggers.
     pub const ALGORITHMS: usize = 0;
 
-    /// The output of each MathAlgorithm this packet triggers (`None` when
-    /// an input is absent).
+    /// Evaluates the MathAlgorithms that a `/TcsLink/Ping` packet triggers,
+    /// from this one's values.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when an input is absent or a custom
+    /// algorithm's function isn't set or fails.
     pub fn algorithms(&self) -> pk::Outputs<0> {
         let mut o = pk::Outputs::new();
         o
@@ -2327,7 +2561,7 @@ impl Packet for Ping {
             pk::from_unsigned(self.seq_count as u64, 14, "SeqCount")?,
         );
         let l53 = w.position();
-        w.uint(16, 0);
+        w.zeros(16);
         w.uint_order(8, false, pk::from_unsigned(1 as u64, 8, "Opcode")?);
         w.uint_order(
             32,
@@ -2380,17 +2614,33 @@ impl RestartArm {
     /// The number of fields with an alarm.
     pub const ALARMS: usize = 0;
 
-    /// The alarm level of each field with an alarm (`None` when the
-    /// field is absent).  Alarms that depend on earlier samples count only
-    /// this one (see `monitor`).
+    /// Evaluates the alarms of this `/TcsLink/RestartArm` packet's fields.
+    /// Alarms that depend on earlier samples count only this one (see
+    /// `monitor`).
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn alarms(&self) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
     }
 
-    /// Like `alarms()`, counting the earlier samples whose state `m` keeps,
-    /// for change ranges, minViolations and minConformance; `t` is this
-    /// sample's time in seconds.
+    /// Evaluates the alarms of this `/TcsLink/RestartArm` packet's fields like
+    /// `alarms()`, counting the earlier samples for change ranges,
+    /// minViolations and minConformance.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
@@ -2399,8 +2649,13 @@ impl RestartArm {
     /// The number of MathAlgorithms this packet triggers.
     pub const ALGORITHMS: usize = 0;
 
-    /// The output of each MathAlgorithm this packet triggers (`None` when
-    /// an input is absent).
+    /// Evaluates the MathAlgorithms that a `/TcsLink/RestartArm` packet
+    /// triggers, from this one's values.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when an input is absent or a custom
+    /// algorithm's function isn't set or fails.
     pub fn algorithms(&self) -> pk::Outputs<0> {
         let mut o = pk::Outputs::new();
         o
@@ -2485,7 +2740,7 @@ impl Packet for RestartArm {
             pk::from_unsigned(self.seq_count as u64, 14, "SeqCount")?,
         );
         let l53 = w.position();
-        w.uint(16, 0);
+        w.zeros(16);
         w.uint_order(8, false, pk::from_unsigned(2 as u64, 8, "Opcode")?);
         w.uint_order(
             32,
@@ -2545,17 +2800,32 @@ impl Restart {
     /// The number of fields with an alarm.
     pub const ALARMS: usize = 0;
 
-    /// The alarm level of each field with an alarm (`None` when the
-    /// field is absent).  Alarms that depend on earlier samples count only
-    /// this one (see `monitor`).
+    /// Evaluates the alarms of this `/TcsLink/Restart` packet's fields. Alarms
+    /// that depend on earlier samples count only this one (see `monitor`).
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn alarms(&self) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
     }
 
-    /// Like `alarms()`, counting the earlier samples whose state `m` keeps,
-    /// for change ranges, minViolations and minConformance; `t` is this
-    /// sample's time in seconds.
+    /// Evaluates the alarms of this `/TcsLink/Restart` packet's fields like
+    /// `alarms()`, counting the earlier samples for change ranges,
+    /// minViolations and minConformance.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
@@ -2564,8 +2834,13 @@ impl Restart {
     /// The number of MathAlgorithms this packet triggers.
     pub const ALGORITHMS: usize = 0;
 
-    /// The output of each MathAlgorithm this packet triggers (`None` when
-    /// an input is absent).
+    /// Evaluates the MathAlgorithms that a `/TcsLink/Restart` packet triggers,
+    /// from this one's values.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when an input is absent or a custom
+    /// algorithm's function isn't set or fails.
     pub fn algorithms(&self) -> pk::Outputs<0> {
         let mut o = pk::Outputs::new();
         o
@@ -2650,7 +2925,7 @@ impl Packet for Restart {
             pk::from_unsigned(self.seq_count as u64, 14, "SeqCount")?,
         );
         let l53 = w.position();
-        w.uint(16, 0);
+        w.zeros(16);
         w.uint_order(8, false, pk::from_unsigned(3 as u64, 8, "Opcode")?);
         w.uint_order(
             32,
@@ -2716,17 +2991,32 @@ impl Connect {
     /// The number of fields with an alarm.
     pub const ALARMS: usize = 0;
 
-    /// The alarm level of each field with an alarm (`None` when the
-    /// field is absent).  Alarms that depend on earlier samples count only
-    /// this one (see `monitor`).
+    /// Evaluates the alarms of this `/TcsLink/Connect` packet's fields. Alarms
+    /// that depend on earlier samples count only this one (see `monitor`).
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn alarms(&self) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
     }
 
-    /// Like `alarms()`, counting the earlier samples whose state `m` keeps,
-    /// for change ranges, minViolations and minConformance; `t` is this
-    /// sample's time in seconds.
+    /// Evaluates the alarms of this `/TcsLink/Connect` packet's fields like
+    /// `alarms()`, counting the earlier samples for change ranges,
+    /// minViolations and minConformance.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
@@ -2735,8 +3025,13 @@ impl Connect {
     /// The number of MathAlgorithms this packet triggers.
     pub const ALGORITHMS: usize = 0;
 
-    /// The output of each MathAlgorithm this packet triggers (`None` when
-    /// an input is absent).
+    /// Evaluates the MathAlgorithms that a `/TcsLink/Connect` packet triggers,
+    /// from this one's values.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when an input is absent or a custom
+    /// algorithm's function isn't set or fails.
     pub fn algorithms(&self) -> pk::Outputs<0> {
         let mut o = pk::Outputs::new();
         o
@@ -2827,7 +3122,7 @@ impl Packet for Connect {
             pk::from_unsigned(self.seq_count as u64, 14, "SeqCount")?,
         );
         let l53 = w.position();
-        w.uint(16, 0);
+        w.zeros(16);
         w.uint_order(8, false, pk::from_unsigned(4 as u64, 8, "Opcode")?);
         w.uint_order(
             32,
@@ -2904,17 +3199,32 @@ impl Config {
     /// The number of fields with an alarm.
     pub const ALARMS: usize = 0;
 
-    /// The alarm level of each field with an alarm (`None` when the
-    /// field is absent).  Alarms that depend on earlier samples count only
-    /// this one (see `monitor`).
+    /// Evaluates the alarms of this `/TcsLink/Config` packet's fields. Alarms
+    /// that depend on earlier samples count only this one (see `monitor`).
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn alarms(&self) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
     }
 
-    /// Like `alarms()`, counting the earlier samples whose state `m` keeps,
-    /// for change ranges, minViolations and minConformance; `t` is this
-    /// sample's time in seconds.
+    /// Evaluates the alarms of this `/TcsLink/Config` packet's fields like
+    /// `alarms()`, counting the earlier samples for change ranges,
+    /// minViolations and minConformance.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
@@ -2923,8 +3233,13 @@ impl Config {
     /// The number of MathAlgorithms this packet triggers.
     pub const ALGORITHMS: usize = 0;
 
-    /// The output of each MathAlgorithm this packet triggers (`None` when
-    /// an input is absent).
+    /// Evaluates the MathAlgorithms that a `/TcsLink/Config` packet triggers,
+    /// from this one's values.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when an input is absent or a custom
+    /// algorithm's function isn't set or fails.
     pub fn algorithms(&self) -> pk::Outputs<0> {
         let mut o = pk::Outputs::new();
         o
@@ -3009,7 +3324,7 @@ impl Packet for Config {
             pk::from_unsigned(self.seq_count as u64, 14, "SeqCount")?,
         );
         let l53 = w.position();
-        w.uint(16, 0);
+        w.zeros(16);
         w.uint_order(8, false, pk::from_unsigned(32 as u64, 8, "Opcode")?);
         w.uint_order(
             32,
@@ -3073,17 +3388,33 @@ impl StartNode {
     /// The number of fields with an alarm.
     pub const ALARMS: usize = 0;
 
-    /// The alarm level of each field with an alarm (`None` when the
-    /// field is absent).  Alarms that depend on earlier samples count only
-    /// this one (see `monitor`).
+    /// Evaluates the alarms of this `/TcsLink/StartNode` packet's fields.
+    /// Alarms that depend on earlier samples count only this one (see
+    /// `monitor`).
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn alarms(&self) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
     }
 
-    /// Like `alarms()`, counting the earlier samples whose state `m` keeps,
-    /// for change ranges, minViolations and minConformance; `t` is this
-    /// sample's time in seconds.
+    /// Evaluates the alarms of this `/TcsLink/StartNode` packet's fields like
+    /// `alarms()`, counting the earlier samples for change ranges,
+    /// minViolations and minConformance.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
@@ -3092,8 +3423,13 @@ impl StartNode {
     /// The number of MathAlgorithms this packet triggers.
     pub const ALGORITHMS: usize = 0;
 
-    /// The output of each MathAlgorithm this packet triggers (`None` when
-    /// an input is absent).
+    /// Evaluates the MathAlgorithms that a `/TcsLink/StartNode` packet
+    /// triggers, from this one's values.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when an input is absent or a custom
+    /// algorithm's function isn't set or fails.
     pub fn algorithms(&self) -> pk::Outputs<0> {
         let mut o = pk::Outputs::new();
         o
@@ -3178,7 +3514,7 @@ impl Packet for StartNode {
             pk::from_unsigned(self.seq_count as u64, 14, "SeqCount")?,
         );
         let l53 = w.position();
-        w.uint(16, 0);
+        w.zeros(16);
         w.uint_order(8, false, pk::from_unsigned(48 as u64, 8, "Opcode")?);
         w.uint_order(
             32,
@@ -3238,17 +3574,32 @@ impl StopNode {
     /// The number of fields with an alarm.
     pub const ALARMS: usize = 0;
 
-    /// The alarm level of each field with an alarm (`None` when the
-    /// field is absent).  Alarms that depend on earlier samples count only
-    /// this one (see `monitor`).
+    /// Evaluates the alarms of this `/TcsLink/StopNode` packet's fields. Alarms
+    /// that depend on earlier samples count only this one (see `monitor`).
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn alarms(&self) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
     }
 
-    /// Like `alarms()`, counting the earlier samples whose state `m` keeps,
-    /// for change ranges, minViolations and minConformance; `t` is this
-    /// sample's time in seconds.
+    /// Evaluates the alarms of this `/TcsLink/StopNode` packet's fields like
+    /// `alarms()`, counting the earlier samples for change ranges,
+    /// minViolations and minConformance.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
@@ -3257,8 +3608,13 @@ impl StopNode {
     /// The number of MathAlgorithms this packet triggers.
     pub const ALGORITHMS: usize = 0;
 
-    /// The output of each MathAlgorithm this packet triggers (`None` when
-    /// an input is absent).
+    /// Evaluates the MathAlgorithms that a `/TcsLink/StopNode` packet triggers,
+    /// from this one's values.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when an input is absent or a custom
+    /// algorithm's function isn't set or fails.
     pub fn algorithms(&self) -> pk::Outputs<0> {
         let mut o = pk::Outputs::new();
         o
@@ -3343,7 +3699,7 @@ impl Packet for StopNode {
             pk::from_unsigned(self.seq_count as u64, 14, "SeqCount")?,
         );
         let l53 = w.position();
-        w.uint(16, 0);
+        w.zeros(16);
         w.uint_order(8, false, pk::from_unsigned(49 as u64, 8, "Opcode")?);
         w.uint_order(
             32,
@@ -3410,17 +3766,32 @@ impl SetNode {
     /// The number of fields with an alarm.
     pub const ALARMS: usize = 0;
 
-    /// The alarm level of each field with an alarm (`None` when the
-    /// field is absent).  Alarms that depend on earlier samples count only
-    /// this one (see `monitor`).
+    /// Evaluates the alarms of this `/TcsLink/SetNode` packet's fields. Alarms
+    /// that depend on earlier samples count only this one (see `monitor`).
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn alarms(&self) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
     }
 
-    /// Like `alarms()`, counting the earlier samples whose state `m` keeps,
-    /// for change ranges, minViolations and minConformance; `t` is this
-    /// sample's time in seconds.
+    /// Evaluates the alarms of this `/TcsLink/SetNode` packet's fields like
+    /// `alarms()`, counting the earlier samples for change ranges,
+    /// minViolations and minConformance.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
@@ -3429,8 +3800,13 @@ impl SetNode {
     /// The number of MathAlgorithms this packet triggers.
     pub const ALGORITHMS: usize = 0;
 
-    /// The output of each MathAlgorithm this packet triggers (`None` when
-    /// an input is absent).
+    /// Evaluates the MathAlgorithms that a `/TcsLink/SetNode` packet triggers,
+    /// from this one's values.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when an input is absent or a custom
+    /// algorithm's function isn't set or fails.
     pub fn algorithms(&self) -> pk::Outputs<0> {
         let mut o = pk::Outputs::new();
         o
@@ -3544,7 +3920,7 @@ impl Packet for SetNode {
             pk::from_unsigned(self.seq_count as u64, 14, "SeqCount")?,
         );
         let l53 = w.position();
-        w.uint(16, 0);
+        w.zeros(16);
         w.uint_order(8, false, pk::from_unsigned(50 as u64, 8, "Opcode")?);
         w.uint_order(
             32,
@@ -3632,17 +4008,33 @@ impl QueryNode {
     /// The number of fields with an alarm.
     pub const ALARMS: usize = 0;
 
-    /// The alarm level of each field with an alarm (`None` when the
-    /// field is absent).  Alarms that depend on earlier samples count only
-    /// this one (see `monitor`).
+    /// Evaluates the alarms of this `/TcsLink/QueryNode` packet's fields.
+    /// Alarms that depend on earlier samples count only this one (see
+    /// `monitor`).
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn alarms(&self) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
     }
 
-    /// Like `alarms()`, counting the earlier samples whose state `m` keeps,
-    /// for change ranges, minViolations and minConformance; `t` is this
-    /// sample's time in seconds.
+    /// Evaluates the alarms of this `/TcsLink/QueryNode` packet's fields like
+    /// `alarms()`, counting the earlier samples for change ranges,
+    /// minViolations and minConformance.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
@@ -3651,8 +4043,13 @@ impl QueryNode {
     /// The number of MathAlgorithms this packet triggers.
     pub const ALGORITHMS: usize = 0;
 
-    /// The output of each MathAlgorithm this packet triggers (`None` when
-    /// an input is absent).
+    /// Evaluates the MathAlgorithms that a `/TcsLink/QueryNode` packet
+    /// triggers, from this one's values.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when an input is absent or a custom
+    /// algorithm's function isn't set or fails.
     pub fn algorithms(&self) -> pk::Outputs<0> {
         let mut o = pk::Outputs::new();
         o
@@ -3737,7 +4134,7 @@ impl Packet for QueryNode {
             pk::from_unsigned(self.seq_count as u64, 14, "SeqCount")?,
         );
         let l53 = w.position();
-        w.uint(16, 0);
+        w.zeros(16);
         w.uint_order(8, false, pk::from_unsigned(51 as u64, 8, "Opcode")?);
         w.uint_order(
             32,
@@ -3797,17 +4194,33 @@ impl QueryNodeSample {
     /// The number of fields with an alarm.
     pub const ALARMS: usize = 0;
 
-    /// The alarm level of each field with an alarm (`None` when the
-    /// field is absent).  Alarms that depend on earlier samples count only
-    /// this one (see `monitor`).
+    /// Evaluates the alarms of this `/TcsLink/QueryNodeSample` packet's fields.
+    /// Alarms that depend on earlier samples count only this one (see
+    /// `monitor`).
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn alarms(&self) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
     }
 
-    /// Like `alarms()`, counting the earlier samples whose state `m` keeps,
-    /// for change ranges, minViolations and minConformance; `t` is this
-    /// sample's time in seconds.
+    /// Evaluates the alarms of this `/TcsLink/QueryNodeSample` packet's fields
+    /// like `alarms()`, counting the earlier samples for change ranges,
+    /// minViolations and minConformance.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
         let mut a = pk::Alarms::new();
         a
@@ -3816,8 +4229,13 @@ impl QueryNodeSample {
     /// The number of MathAlgorithms this packet triggers.
     pub const ALGORITHMS: usize = 0;
 
-    /// The output of each MathAlgorithm this packet triggers (`None` when
-    /// an input is absent).
+    /// Evaluates the MathAlgorithms that a `/TcsLink/QueryNodeSample` packet
+    /// triggers, from this one's values.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when an input is absent or a custom
+    /// algorithm's function isn't set or fails.
     pub fn algorithms(&self) -> pk::Outputs<0> {
         let mut o = pk::Outputs::new();
         o
@@ -3902,7 +4320,7 @@ impl Packet for QueryNodeSample {
             pk::from_unsigned(self.seq_count as u64, 14, "SeqCount")?,
         );
         let l53 = w.position();
-        w.uint(16, 0);
+        w.zeros(16);
         w.uint_order(8, false, pk::from_unsigned(52 as u64, 8, "Opcode")?);
         w.uint_order(
             32,
@@ -4235,8 +4653,13 @@ impl AnswerLayoutKind {
     /// The most fields with an alarm that a member has.
     pub const ALARMS: usize = 0;
 
-    /// The alarm level of each field with an alarm (`None` when the
-    /// field is absent).
+    /// Evaluates the alarms of the fields of this packet derived from
+    /// `/TcsLink/AnswerLayout`, as its own `alarms()` does.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn alarms(&self) -> pk::Alarms<0> {
         let mut out = pk::Alarms::new();
         match self {
@@ -4297,7 +4720,12 @@ impl AnswerLayoutKind {
     /// The most MathAlgorithms that a member triggers.
     pub const ALGORITHMS: usize = 0;
 
-    /// The output of each MathAlgorithm the packet triggers.
+    /// Evaluates the MathAlgorithms that this packet derived from
+    /// `/TcsLink/AnswerLayout` triggers, as its own `algorithms()` does.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when it can't be computed.
     pub fn algorithms(&self) -> pk::Outputs<0> {
         let mut out = pk::Outputs::new();
         match self {
@@ -4355,7 +4783,19 @@ impl AnswerLayoutKind {
         out
     }
 
-    /// Like `alarms()`, counting the earlier samples whose state `m` keeps.
+    /// Evaluates the alarms of the fields of this packet derived from
+    /// `/TcsLink/AnswerLayout`, as its own `monitor()` does.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
         let mut out = pk::Alarms::new();
         match self {
@@ -4712,8 +5152,13 @@ impl CommandKind {
     /// The most fields with an alarm that a member has.
     pub const ALARMS: usize = 0;
 
-    /// The alarm level of each field with an alarm (`None` when the
-    /// field is absent).
+    /// Evaluates the alarms of the fields of this packet derived from
+    /// `/TcsLink/Command`, as its own `alarms()` does.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn alarms(&self) -> pk::Alarms<0> {
         let mut out = pk::Alarms::new();
         match self {
@@ -4774,7 +5219,12 @@ impl CommandKind {
     /// The most MathAlgorithms that a member triggers.
     pub const ALGORITHMS: usize = 0;
 
-    /// The output of each MathAlgorithm the packet triggers.
+    /// Evaluates the MathAlgorithms that this packet derived from
+    /// `/TcsLink/Command` triggers, as its own `algorithms()` does.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when it can't be computed.
     pub fn algorithms(&self) -> pk::Outputs<0> {
         let mut out = pk::Outputs::new();
         match self {
@@ -4832,7 +5282,19 @@ impl CommandKind {
         out
     }
 
-    /// Like `alarms()`, counting the earlier samples whose state `m` keeps.
+    /// Evaluates the alarms of the fields of this packet derived from
+    /// `/TcsLink/Command`, as its own `monitor()` does.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
     pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
         let mut out = pk::Alarms::new();
         match self {

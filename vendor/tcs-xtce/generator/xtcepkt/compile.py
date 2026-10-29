@@ -13,6 +13,7 @@ another whose root SpaceSystem is ``PUS``.
 
 from __future__ import annotations
 
+import codecs
 import dataclasses
 import keyword
 import math
@@ -224,9 +225,19 @@ MEMBER = re.compile(r"[A-Za-z_][\w-]*")
 def member_path(ref: str) -> tuple[str, tuple]:
     """Splits a reference to an aggregate member or array element
     (``P.a.b``, ``P[2]``, ``P[1].a``) into the reference to its parameter
-    or argument and the steps: member names, and ints for indexes.  Only
-    the last path segment can have steps, and ``.`` and ``..`` are path
-    segments, not members."""
+    or argument and the steps.  Only the last path segment can have steps,
+    and ``.`` and ``..`` are path segments, not members.
+
+    Args:
+        ref: The reference, as written in the document.
+
+    Returns:
+        The reference without its steps, and the steps: member names, and
+        ints for indexes; no steps for a plain reference.
+
+    Raises:
+        Unsupported: The steps are malformed.
+    """
     head, sep, last = ref.strip().rpartition("/")
     name = re.match(r"[^.\[\]]*", last).group()
     if last in (".", "..") or not name or name == last:
@@ -243,8 +254,22 @@ def member_path(ref: str) -> tuple[str, tuple]:
 
 
 def walk_members(vt: VType, members: tuple, what: str) -> tuple[tuple, VType]:
-    """The path (field names, and Index for array elements) of the steps
-    ``members`` inside type ``vt``, and the type they reach."""
+    """Follows member and index steps through a type.
+
+    Args:
+        vt:      The type the steps start in.
+        members: The steps, as ``member_path`` gives them: member names,
+                 and ints for indexes, one per array dimension.
+        what:    What is being resolved, for error messages.
+
+    Returns:
+        The path (field identifiers, and Index for array elements) of the
+        steps inside ``vt``, and the type they reach.
+
+    Raises:
+        Unsupported: A step names no member or element of the type it is
+                     applied to, or an index is out of range.
+    """
     path = []
     steps = list(members)
     while steps:
@@ -303,10 +328,19 @@ def walk_members(vt: VType, members: tuple, what: str) -> tuple[tuple, VType]:
 
 
 def integer_range(t, calibrated: bool = False) -> Optional[tuple[int, int]]:
-    """(min, max) of an integer type's ValidRange, or of the union of an
-    argument type's ValidRangeSet; None unless every bound is given.  For a
-    type with a calibrator (``calibrated``) the range must apply to the
-    calibrated value, which is the value of the generated field."""
+    """Finds the inclusive range of an integer type's ValidRange, or of the
+    union of an argument type's ValidRangeSet.
+
+    Args:
+        t:          The XTCE parameter or argument type.
+        calibrated: Whether the type has a calibrator; the range must then
+                    apply to the calibrated value, which is the value of
+                    the generated field.
+
+    Returns:
+        (min, max), or None unless every bound is given inclusively (and,
+        for a calibrated type, applies to the calibrated value).
+    """
     if getattr(t, "valid_range", None) is not None:
         ranges = [t.valid_range]
     elif getattr(t, "valid_range_set", None) is not None:
@@ -326,10 +360,20 @@ def integer_range(t, calibrated: bool = False) -> Optional[tuple[int, int]]:
 
 
 def valid_bands(t, vt: "VType", calibrated: bool) -> list:
-    """The ranges of type ``t``'s ValidRange, or of an argument type's
-    ValidRangeSet, as Bands a value must lie in (any of them).  None when
-    a calibrated type's range applies to the raw value, which the generated
-    code doesn't keep."""
+    """Converts type ``t``'s ValidRange, or an argument type's
+    ValidRangeSet, to Bands a value must lie in (any of them).
+
+    Args:
+        t:          The XTCE parameter or argument type.
+        vt:         Its compiled type; integer bands are narrowed to whole
+                    numbers.
+        calibrated: Whether the type has a calibrator.
+
+    Returns:
+        The bands; empty when the type has no valid range, or when a
+        calibrated type's range applies to the raw value, which the
+        generated code doesn't keep.
+    """
     if getattr(t, "valid_range", None) is not None:
         ranges = [t.valid_range]
     elif getattr(t, "valid_range_set", None) is not None:
@@ -352,6 +396,16 @@ def valid_bands(t, vt: "VType", calibrated: bool) -> list:
 
 
 def snake(name: str) -> str:
+    """Converts an XTCE name to a snake_case identifier usable in every
+    target language.
+
+    Args:
+        name: The name, in any case and with any punctuation.
+
+    Returns:
+        The identifier: lower case words joined by ``_``, ``f_`` in front
+        if it would start with a digit, and ``_`` after a reserved word.
+    """
     s = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", name)
     s = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", s)
     s = re.sub(r"[^0-9A-Za-z]+", "_", s).strip("_").lower() or "x"
@@ -363,6 +417,16 @@ def snake(name: str) -> str:
 
 
 def camel(name: str) -> str:
+    """Converts an XTCE name to a CamelCase type name.
+
+    Args:
+        name: The name, in any case and with any punctuation.
+
+    Returns:
+        The words of the name, each capitalized, run together; ``T`` in
+        front if it would start with a digit, and ``X`` for a name with
+        no letters or digits.
+    """
     parts = [p for p in re.split(r"[^0-9A-Za-z]+", name) if p]
     s = "".join(p[0].upper() + p[1:] for p in parts) or "X"
     if s[0].isdigit():
@@ -371,6 +435,16 @@ def camel(name: str) -> str:
 
 
 def upper(label: str) -> str:
+    """Converts an enumeration label to an UPPER_CASE constant name.
+
+    Args:
+        label: The label, in any case and with any punctuation.
+
+    Returns:
+        Upper case words joined by ``_``; ``V_`` in front if it would
+        start with a digit, and ``V`` for a label with no letters or
+        digits.
+    """
     s = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", label)
     s = re.sub(r"[^0-9A-Za-z]+", "_", s).strip("_").upper() or "V"
     if s[0].isdigit():
@@ -385,6 +459,16 @@ class Namer:
         self.used = set(reserved)
 
     def take(self, *candidates: str) -> str:
+        """Claims the first candidate not yet used.
+
+        Args:
+            *candidates: The names to try, in order of preference.
+
+        Returns:
+            The first unused candidate, or if all are used the last one
+            followed by the smallest number from 2 up that makes it
+            unique.
+        """
         for c in candidates:
             if c not in self.used:
                 self.used.add(c)
@@ -424,8 +508,19 @@ YAMCS_IGNORE = "_yamcs_ignore"
 
 
 def ancillary_str(item, tag: str, where: str) -> Optional[str]:
-    """The value of ``item``'s AncillaryData ``tag``, without surrounding
-    space, or None if it has none."""
+    """Reads one of an item's AncillaryData values.
+
+    Args:
+        item:  The XTCE element with an AncillaryDataSet.
+        tag:   The AncillaryData name.
+        where: What the item is, for error messages.
+
+    Returns:
+        The value, without surrounding space, or None if it has none.
+
+    Raises:
+        Unsupported: The item has more than one ``tag``.
+    """
     ads = item.ancillary_data_set
     tags = [a for a in (ads.ancillary_data if ads else []) if a.name == tag]
     if not tags:
@@ -436,8 +531,20 @@ def ancillary_str(item, tag: str, where: str) -> Optional[str]:
 
 
 def ancillary_int(item, tag: str, where: str) -> Optional[int]:
-    """The integer value of ``item``'s AncillaryData ``tag``, or None if it
-    has none."""
+    """Reads one of an item's AncillaryData values as an integer.
+
+    Args:
+        item:  The XTCE element with an AncillaryDataSet.
+        tag:   The AncillaryData name.
+        where: What the item is, for error messages.
+
+    Returns:
+        The value, or None if it has none.
+
+    Raises:
+        Unsupported: There is more than one ``tag``, or it isn't an
+                     integer.
+    """
     v = ancillary_str(item, tag, where)
     if v is None:
         return None
@@ -448,8 +555,22 @@ def ancillary_int(item, tag: str, where: str) -> Optional[int]:
 
 
 def length_adjust(item, vt: VType, where: str) -> Optional[int]:
-    """The adjustment of a packet length field, or None if ``item`` (a
-    Parameter or Argument) isn't one."""
+    """Reads the adjustment of a packet length field.
+
+    Args:
+        item:  The Parameter or Argument.
+        vt:    Its compiled type.
+        where: What the item is, for error messages.
+
+    Returns:
+        The number to add to the bytes after the field, or None if
+        ``item`` isn't a packet length field.
+
+    Raises:
+        Unsupported: It is one, but its type isn't an uncalibrated
+                     unsigned binary integer, big or little endian in
+                     whole bytes, most significant bit first.
+    """
     adjust = ancillary_int(item, LENGTH_TAG, where)
     if adjust is None:
         return None
@@ -457,13 +578,26 @@ def length_adjust(item, vt: VType, where: str) -> Optional[int]:
             or vt.enc.bcd or vt.calibrator is not None):
         raise Unsupported(f"{where}: a packet length field must be an "
                           "uncalibrated unsigned binary integer")
-    if vt.wide:
-        raise Unsupported(f"{where}: a {vt.enc.bits}-bit packet length field")
-    if not fast_order(vt.enc):
+    if not plain_order(vt.enc):
         raise Unsupported(f"{where}: a packet length field must be big or "
                           "little endian in whole bytes, most significant bit "
                           "first")
     return adjust
+
+
+def plain_order(e: IntEnc) -> bool:
+    """Whether an integer encoding is most significant bit first, and big
+    endian, or little endian in whole bytes: what a packet length or
+    checksum field may be.
+
+    Args:
+        e: The encoding, of any size.
+
+    Returns:
+        Whether it is.
+    """
+    return (not e.lsb
+            and (e.order == "be" or (e.order == "le" and e.bits % 8 == 0)))
 
 
 # --- the compiler
@@ -473,9 +607,22 @@ def length_adjust(item, vt: VType, where: str) -> Optional[int]:
 class Compiler:
     def __init__(self, roots: list, skip_unsupported: bool = False,
                  dialect: Optional[str] = None):
-        """``roots`` is the root SpaceSystem of each of the mission's
-        documents; ``dialect`` is the one they follow when they don't say
-        (see DIALECT_TAG)."""
+        """Indexes the definitions of a mission's documents.
+
+        Args:
+            roots:            The root SpaceSystem of each of the mission's
+                              documents.
+            skip_unsupported: Whether ``compile`` leaves out the containers
+                              and meta-commands it can't compile instead of
+                              failing.
+            dialect:          The dialect of XTCE the documents follow when
+                              they don't say (see DIALECT_TAG), or None.
+
+        Raises:
+            Unsupported: The dialect is unknown, two documents have the
+                         same root SpaceSystem, or the roots'
+                         AncillaryData is invalid or disagrees.
+        """
         self.roots = list(roots)
         self.skip_unsupported = skip_unsupported
         if dialect is not None and dialect not in DIALECTS:
@@ -525,8 +672,16 @@ class Compiler:
             self.tc_containers.setdefault(k, v)
 
     def max_field_bytes(self) -> int:
-        """The roots' tcs-xtce.max-field-bytes, which all that give one must
-        agree on, or the default."""
+        """Finds the most bytes a field whose size another value gives may
+        take on the wire.
+
+        Returns:
+            The roots' tcs-xtce.max-field-bytes, which all that give one
+            must agree on, or the default.
+
+        Raises:
+            Unsupported: A value is out of range, or the roots disagree.
+        """
         given = {}
         for root in self.roots:
             n = ancillary_int(root, MAX_FIELD_TAG, f"SpaceSystem {root.name}")
@@ -543,8 +698,18 @@ class Compiler:
         return next(iter(given.values()), MAX_FIELD_BITS // 8)
 
     def root_dialect(self, default: Optional[str]) -> Optional[str]:
-        """The roots' tcs-xtce.dialect, which all that give one must agree
-        on, and ``default``, if given, too; or ``default``."""
+        """Finds the dialect of XTCE the documents follow.
+
+        Args:
+            default: The dialect given to the compiler, or None.
+
+        Returns:
+            The roots' tcs-xtce.dialect, which all that give one must agree
+            on, and ``default``, if given, too; or ``default``.
+
+        Raises:
+            Unsupported: A dialect is unknown, or they disagree.
+        """
         given = {} if default is None else {"(the dialect given)": default}
         for root in self.roots:
             d = ancillary_str(root, DIALECT_TAG, f"SpaceSystem {root.name}")
@@ -562,6 +727,18 @@ class Compiler:
     # -- indexing and name resolution --
 
     def _index(self, ss, parent: Key) -> None:
+        """Records the definitions of a SpaceSystem and those within it in
+        the compiler's tables, by key.
+
+        Args:
+            ss:     The SpaceSystem.
+            parent: The key of the SpaceSystem that holds it; empty for a
+                    document's root.
+
+        Raises:
+            Unsupported: A SpaceSystem other than a root has tcs-xtce
+                         AncillaryData that only roots may have.
+        """
         path = parent + (ss.name,)
         if parent and ancillary_int(ss, MAX_FIELD_TAG, qname(path)) is not None:
             raise Unsupported(f"SpaceSystem {qname(path)}: {MAX_FIELD_TAG} is "
@@ -617,7 +794,7 @@ class Compiler:
             self._index(child, path)
 
     def resolve(self, ref: str, cur: Key, table: dict, what: str) -> Key:
-        """Resolve an XTCE name reference relative to SpaceSystem ``cur``.
+        """Resolves an XTCE name reference relative to SpaceSystem ``cur``.
 
         Absolute paths start with ``/`` and the name of a document's root
         SpaceSystem.  Relative paths may use ``.`` and ``..``.  An unqualified
@@ -625,6 +802,18 @@ class Compiler:
         looked up from ``cur`` and then from each enclosing SpaceSystem, as
         Yamcs does, so ``cfs-ccsds/cfs-cmd`` can name a meta-command in
         another document whose root SpaceSystem is ``cfs-ccsds``.
+
+        Args:
+            ref:   The reference.
+            cur:   The key of the SpaceSystem it is written in.
+            table: The table of definitions it names one of.
+            what:  What it names, for error messages.
+
+        Returns:
+            The key of the definition it names.
+
+        Raises:
+            Unsupported: It names nothing in ``table``.
         """
         ref = ref.strip()
         parts = ref.split("/")
@@ -656,9 +845,22 @@ class Compiler:
                           f"{qname(cur)}")
 
     def param_ref(self, ref: str, cur: Key) -> tuple[Key, tuple]:
-        """The parameter and member steps that ``ref`` names.  In the Yamcs
-        dialect a path that names no parameter may end in member names
-        after ``/`` (``CCSDS_Packet_ID/Version``), as Yamcs allows."""
+        """Resolves a reference to a parameter, or to a member or element
+        of one.  In the Yamcs dialect a path that names no parameter may
+        end in member names after ``/`` (``CCSDS_Packet_ID/Version``), as
+        Yamcs allows.
+
+        Args:
+            ref: The reference.
+            cur: The key of the SpaceSystem it is written in.
+
+        Returns:
+            The parameter's key and the member steps, as ``member_path``
+            gives them.
+
+        Raises:
+            Unsupported: It names no parameter.
+        """
         base, members = member_path(ref)
         try:
             return self.resolve(base, cur, self.params, "parameter"), members
@@ -685,6 +887,19 @@ class Compiler:
     # -- types --
 
     def vtype(self, key: Key, table: dict) -> VType:
+        """Compiles a parameter or argument type, once.
+
+        Args:
+            key:   The type's key.
+            table: ``ptypes`` for a parameter type, ``atypes`` for an
+                   argument type.
+
+        Returns:
+            The compiled type, with a parameter type's alarm.
+
+        Raises:
+            Unsupported: The type uses something not supported.
+        """
         cache = (table is self.atypes, key)
         if cache in self.vtypes:
             return self.vtypes[cache]
@@ -698,9 +913,19 @@ class Compiler:
     # -- alarms --
 
     def alarm(self, t, vt: VType, path: Key, where: str) -> Optional[Alarm]:
-        """The DefaultAlarm and ContextAlarmList of parameter type ``t``.
-        One that can't be evaluated is kept with a ``note`` saying why, so
-        that the packets still compile."""
+        """Compiles the DefaultAlarm and ContextAlarmList of parameter type
+        ``t``.  One that can't be evaluated is kept with a ``note`` saying
+        why, so that the packets still compile.
+
+        Args:
+            t:     The XTCE parameter type, with what it inherits.
+            vt:    Its compiled type.
+            path:  The key of the SpaceSystem it is defined in.
+            where: What it is, for messages.
+
+        Returns:
+            The alarm, or None if the type has none.
+        """
         da = getattr(t, "default_alarm", None)
         cl = getattr(t, "context_alarm_list", None)
         if da is None and cl is None:
@@ -714,13 +939,26 @@ class Compiler:
             return Alarm(path, None, note=str(e))
 
     def alarm_def(self, a, vt: VType, path: Key, where: str) -> AlarmDef:
+        """Compiles one DefaultAlarm or ContextAlarm.
+
+        Args:
+            a:     The XTCE alarm.
+            vt:    The compiled type of the value it watches.
+            path:  The key of the SpaceSystem the type is defined in.
+            where: What the type is, for error messages.
+
+        Returns:
+            The alarm's conditions, ranges, change limits, label and
+            pattern levels; empty if it is disabled.
+
+        Raises:
+            Unsupported: It uses something not supported, or doesn't fit
+                         the value's kind.
+        """
         d = AlarmDef(min_violations=a.min_violations or 1,
                      min_conformance=a.min_conformance or 1)
         if a.disabled:
             return d
-        if vt.wide:
-            raise Unsupported(f"{where}: an alarm on a {vt.enc.bits}-bit "
-                              "integer")
         if a.choice is not None and a.choice.name == "CustomAlarm":
             alg = a.choice.value.input_algorithm
             d.custom = (self.hook("alarm", qname(path + (alg.name,))), alg)
@@ -786,6 +1024,20 @@ class Compiler:
         return d
 
     def _vtype(self, key: Key, table: dict, cache: tuple) -> VType:
+        """Compiles a parameter or argument type, without its alarm.
+
+        Args:
+            key:   The type's key.
+            table: ``ptypes`` or ``atypes``, the table it is in.
+            cache: Its key in ``vtypes``, where the result is stored; an
+                   aggregate type uses it to find cycles.
+
+        Returns:
+            The compiled type.
+
+        Raises:
+            Unsupported: The type uses something not supported.
+        """
         path, kind, _ = table[key]
         where = f"type {qname(key)}"
         t = self.inherited(key, table)
@@ -809,12 +1061,6 @@ class Compiler:
             raise Unsupported(f"{where}: no data encoding")
         enc_name, e = t.choice.name, t.choice.value
         enc, cal = self.encoding(enc_name, e, path, where)
-        if (isinstance(enc, IntEnc) and enc.bits > 64
-                and (base != "Integer" or cal is not None)):
-            # Only its integer value is kept; nothing computes with it.
-            what = ("calibrated integer" if base == "Integer" else base.lower())
-            raise Unsupported(f"{where}: {what} in a {enc.bits}-bit integer "
-                              "encoding")
         if isinstance(enc, BinaryEnc) and enc.transform is not None:
             if base != "Binary":
                 raise Unsupported(f"{where}: {base.lower()} with transform "
@@ -882,11 +1128,25 @@ class Compiler:
         return vt
 
     def inherited(self, key: Key, table: dict, seen: tuple = ()):
-        """The type ``key`` with what it inherits from its ``baseType``, if
-        it has one, filled in: every attribute and child element it leaves
-        out comes from its base type, which must be the same kind of type,
-        and those it gives replace the base's.  (References in what it
-        inherits are resolved from its own SpaceSystem.)"""
+        """Fills in what a type inherits from its ``baseType``, if it has
+        one: every attribute and child element it leaves out comes from its
+        base type, which must be the same kind of type, and those it gives
+        replace the base's.  (References in what it inherits are resolved
+        from its own SpaceSystem.)
+
+        Args:
+            key:   The type's key.
+            table: ``ptypes`` or ``atypes``, the table it is in.
+            seen:  The keys of the types that inherit from it, to find
+                   cycles; empty when called from outside.
+
+        Returns:
+            The XTCE type, with what it inherits, and no ``baseType``.
+
+        Raises:
+            Unsupported: The chain of base types is a cycle, or a base type
+                         is another kind of type.
+        """
         path, kind, t = table[key]
         if not getattr(t, "base_type", None):
             return t
@@ -905,8 +1165,18 @@ class Compiler:
 
     @staticmethod
     def check_bool_strings(vt: VType, where: str) -> None:
-        """A boolean encoded as a string: its two strings must differ and
-        fit the encoding."""
+        """Checks a boolean encoded as a string: its two strings must differ
+        and fit the encoding.
+
+        Args:
+            vt:    The boolean's compiled type.
+            where: What it is, for error messages.
+
+        Raises:
+            Unsupported: The strings are the same, aren't in the character
+                         set, contain the termination character or don't
+                         fit.
+        """
         if vt.one_string == vt.zero_string:
             raise Unsupported(f"{where}: oneStringValue and zeroStringValue "
                               f"are both {vt.one_string!r}")
@@ -925,10 +1195,26 @@ class Compiler:
                 raise Unsupported(f"{where}: {s!r} does not fit its encoding")
 
     def time_type(self, key: Key, base: str, t, path: Key, where: str) -> VType:
-        """Times are seconds from the reference time: the encoding's raw
-        value, calibrated, then ``scale * value + offset`` in its units.  A
-        time encoded as a string or as binary data keeps that text or those
-        bytes."""
+        """Compiles an absolute or relative time type.  Times are seconds
+        from the reference time: the encoding's raw value, calibrated, then
+        ``scale * value + offset`` in its units.  A time encoded as a string
+        or as binary data keeps that text or those bytes.
+
+        Args:
+            key:   The type's key.
+            base:  ``AbsoluteTime`` or ``RelativeTime``.
+            t:     The XTCE type, with what it inherits.
+            path:  The key of the SpaceSystem it is defined in.
+            where: What it is, for error messages.
+
+        Returns:
+            The compiled type: a float, or the string or binary data.
+
+        Raises:
+            Unsupported: It has no encoding, its reference time is invalid,
+                         or a string or binary time has units, scale or
+                         offset.
+        """
         enc = t.encoding
         if enc is None:
             raise Unsupported(f"{where}: time type without Encoding")
@@ -938,9 +1224,6 @@ class Compiler:
         what = "absolute" if base == "AbsoluteTime" else "relative"
         ref = self.reference_time(t.reference_time, where)
         e, cal = self.encoding(enc.choice.name, enc.choice.value, path, where)
-        if isinstance(e, IntEnc) and e.bits > 64:
-            raise Unsupported(f"{where}: time in a {e.bits}-bit integer "
-                              "encoding")
         if isinstance(e, (StringEnc, BinaryEnc)):
             if (units, scale, offset) != ("seconds", 1.0, 0.0):
                 raise Unsupported(f"{where}: a time encoded as "
@@ -961,7 +1244,19 @@ class Compiler:
 
     @staticmethod
     def reference_time(ref, where: str) -> str:
-        """What a time is reckoned from, for documentation."""
+        """Describes what a time is reckoned from, for documentation.
+
+        Args:
+            ref:   The XTCE ReferenceTime, or None.
+            where: What the time type is, for error messages.
+
+        Returns:
+            The description, such as ``since epoch TAI``.
+
+        Raises:
+            Unsupported: The epoch is not a date, a date and time, or TAI,
+                         J2000, UNIX or GPS.
+        """
         if ref is None:
             return "from an unstated time"
         if ref.choice.name == "OffsetFrom":
@@ -976,8 +1271,24 @@ class Compiler:
 
     def array_type(self, key: Key, table: dict, path: Key, t,
                    where: str) -> VType:
-        """An array type: its elements in the order they are encoded, which
-        for several dimensions is the order of the DimensionList."""
+        """Compiles an array type: its elements in the order they are
+        encoded, which for several dimensions is the order of the
+        DimensionList.
+
+        Args:
+            key:   The type's key.
+            table: ``ptypes`` or ``atypes``, the table it is in.
+            path:  The key of the SpaceSystem it is defined in.
+            t:     The XTCE type, with what it inherits.
+            where: What it is, for error messages.
+
+        Returns:
+            The compiled type, with an ArrayEnc.
+
+        Raises:
+            Unsupported: Its elements take the rest of the packet, or its
+                         dimensions are invalid.
+        """
         ekey = self.resolve(t.array_type_ref, path, table, "array element type")
         # An element may itself be an array, and its size may come from
         # another value: each packet entry binds it.
@@ -989,8 +1300,26 @@ class Compiler:
                      enc=self.dimensions(elem, t.dimension_list, path, where))
 
     def dimensions(self, elem: VType, dl, path: Key, where: str) -> ArrayEnc:
-        """The ArrayEnc of a DimensionList's elements, flattened with the
-        last dimension varying fastest."""
+        """Compiles a DimensionList, flattened with the last dimension
+        varying fastest.
+
+        Args:
+            elem:  The compiled type of the elements.
+            dl:    The XTCE DimensionList, or None.
+            path:  The key of the SpaceSystem it is written in.
+            where: What it belongs to, for error messages.
+
+        Returns:
+            The ArrayEnc of the elements; its count is a number, or an
+            unbound DynSize if one dimension's size comes from another
+            value.
+
+        Raises:
+            Unsupported: There are no dimensions, a StartingIndex comes
+                         from another value, an EndingIndex is before its
+                         StartingIndex, or more than one dimension's size
+                         comes from another value.
+        """
         dims = dl.dimension if dl is not None else []
         if not dims:
             raise Unsupported(f"{where}: array without dimensions")
@@ -1026,7 +1355,22 @@ class Compiler:
 
     def subset(self, local: Local, e, path: Key, where: str) -> Local:
         """Turns the value of an array entry with a DimensionList into the
-        subset it gives: a list of just those elements."""
+        subset it gives: a list of just those elements.
+
+        Args:
+            local: The entry's value; its type is replaced.
+            e:     The XTCE entry.
+            path:  The key of the SpaceSystem the entry is in.
+            where: What the entry is in, for error messages.
+
+        Returns:
+            ``local``, its type now the subset's if the entry has a
+            DimensionList.
+
+        Raises:
+            Unsupported: The value isn't an array, or the subset has
+                         another number of dimensions or lies outside it.
+        """
         dl = getattr(e, "dimension_list", None)
         if dl is None:
             return local
@@ -1055,7 +1399,26 @@ class Compiler:
 
     def aggregate_type(self, key: Key, table: dict, path: Key, t, where: str,
                        cache) -> VType:
-        """An aggregate type: its members, encoded one after another."""
+        """Compiles an aggregate type: its members, encoded one after
+        another.
+
+        Args:
+            key:   The type's key.
+            table: ``ptypes`` or ``atypes``, the table it is in.
+            path:  The key of the SpaceSystem it is defined in.
+            t:     The XTCE type, with what it inherits.
+            where: What it is, for error messages.
+            cache: Its key in ``vtypes``, to find aggregates that contain
+                   themselves.
+
+        Returns:
+            The compiled type, with an AggregateEnc.
+
+        Raises:
+            Unsupported: It contains itself or has no members, or a member
+                         takes the rest of the packet or has a size that
+                         isn't from an earlier integer member.
+        """
         if cache in self._aggregating:
             raise Unsupported(f"{where}: aggregate contains itself")
         if not t.member_list.member:
@@ -1094,7 +1457,21 @@ class Compiler:
                      enc=AggregateEnc(members))
 
     def int_value(self, iv, path: Key, what: str, where: str):
-        """An IntegerValueType: a number, or an unbound DynSize."""
+        """Compiles an IntegerValueType.
+
+        Args:
+            iv:    The XTCE IntegerValueType.
+            path:  The key of the SpaceSystem it is written in.
+            what:  What it gives, for error messages.
+            where: What it belongs to, for error messages.
+
+        Returns:
+            A number for a FixedValue, or an unbound DynSize for a
+            DynamicValue or DiscreteLookupList.
+
+        Raises:
+            Unsupported: It is of another form.
+        """
         c = iv.choice
         if c.name == "FixedValue":
             return int(c.value)
@@ -1105,7 +1482,22 @@ class Compiler:
         raise Unsupported(f"{where}: {what} from {c.name}")
 
     def dyn_size(self, dv, path: Key, what: str, where: str) -> DynSize:
-        """A DynamicValue (or argument DynamicValue), unbound."""
+        """Compiles a DynamicValue (or argument DynamicValue), unbound.
+
+        Args:
+            dv:    The XTCE DynamicValue.
+            path:  The key of the SpaceSystem it is written in.
+            what:  What it gives, for error messages.
+            where: What it belongs to, for error messages.
+
+        Returns:
+            The DynSize, naming the parameter (or argument) and member
+            steps and holding the LinearAdjustment.
+
+        Raises:
+            Unsupported: It refers to a later instance of a parameter, or
+                         its LinearAdjustment isn't finite.
+        """
         if hasattr(dv, "parameter_instance_ref"):
             ref, kind = dv.parameter_instance_ref, "ParameterInstanceRef"
         else:
@@ -1138,10 +1530,23 @@ class Compiler:
 
     @staticmethod
     def byte_order(e, bits: int, where: str):
-        """The bit order (``lsb``) and byte order (``order``) of an
-        encoding, as IntEnc holds them.  A byte order list must give the
-        significance of each of a whole number of bytes once; a list that
-        amounts to big or little endian is that."""
+        """Reads the bit order and byte order of an encoding.  A byte order
+        list must give the significance of each of a whole number of bytes
+        once; a list that amounts to big or little endian is that.
+
+        Args:
+            e:     The XTCE data encoding.
+            bits:  The size of the value in bits.
+            where: What it belongs to, for error messages.
+
+        Returns:
+            ``lsb`` and ``order``, as IntEnc holds them: whether the least
+            significant bit is first, and ``"be"``, ``"le"`` or the tuple
+            of byte significances.
+
+        Raises:
+            Unsupported: A byte order list doesn't give each byte once.
+        """
         lsb = bool(getattr(e, "bit_order", None)
                    and e.bit_order.value == "leastSignificantBitFirst")
         bo = (e.byte_order or "mostSignificantByteFirst").strip()
@@ -1160,16 +1565,49 @@ class Compiler:
         return lsb, sig
 
     def encoding(self, name: str, e, path: Key, where: str):
+        """Compiles a data encoding.
+
+        Args:
+            name:  The encoding's element name, such as
+                   ``IntegerDataEncoding``.
+            e:     The XTCE encoding.
+            path:  The key of the SpaceSystem it is written in.
+            where: What it belongs to, for error messages.
+
+        Returns:
+            The encoding (IntEnc, FloatEnc, StringEnc or BinaryEnc) and its
+            calibrator, or None.
+
+        Raises:
+            Unsupported: The encoding uses something not supported.
+        """
         enc, cal = self._encoding(name, e, path, where)
         if (isinstance(enc, (StringEnc, BinaryEnc))
                 and getattr(e, "bit_order", None)
                 and e.bit_order.value == "leastSignificantBitFirst"):
-            # Its bytes read the same either way when they start on a byte
-            # boundary, which check_aligned makes sure of.
+            # Each byte is a group of 8 bits read in that order, as an
+            # integer's are: on a byte boundary, the bytes as they are.
             enc.lsb = True
         return enc, cal
 
     def _encoding(self, name: str, e, path: Key, where: str):
+        """Compiles a data encoding, without the bit order of strings and
+        binary data.
+
+        Args:
+            name:  The encoding's element name, such as
+                   ``IntegerDataEncoding``.
+            e:     The XTCE encoding.
+            path:  The key of the SpaceSystem it is written in.
+            where: What it belongs to, for error messages.
+
+        Returns:
+            The encoding and its calibrator, or None.
+
+        Raises:
+            Unsupported: The encoding uses something not supported, or its
+                         sizes are invalid.
+        """
         if getattr(e, "error_detect_correct", None):
             # XTCE deprecates it here: it doesn't say where the value goes.
             raise Unsupported(f"{where}: ErrorDetectCorrect in a data encoding "
@@ -1258,10 +1696,24 @@ class Compiler:
         raise Unsupported(f"{where}: {name}")
 
     def xform(self, e: BinaryEnc, time: bool, where: str) -> XformEnc:
-        """The encoding of binary data with transform algorithms, which
-        make bytes of it, or with ``time``, a time in seconds.  A size of
-        -1 offers the decoding algorithm the rest of the packet; in the
-        Yamcs dialect it says how much it takes, and entries may follow."""
+        """Compiles the encoding of binary data with transform algorithms,
+        which make bytes of it, or with ``time``, a time in seconds.  A
+        size of -1 offers the decoding algorithm the rest of the packet; in
+        the Yamcs dialect it says how much it takes, and entries may follow.
+
+        Args:
+            e:     The binary encoding, with the names of its algorithms.
+            time:  Whether the algorithms give a time in seconds rather
+                   than bytes.
+            where: What it belongs to, for error messages.
+
+        Returns:
+            The XformEnc, with the hooks for its algorithms.
+
+        Raises:
+            Unsupported: Its size comes from another value, or its bits are
+                         least significant first.
+        """
         if e.dyn is not None:
             raise Unsupported(f"{where}: transformed binary data whose size "
                               "another value gives")
@@ -1281,22 +1733,56 @@ class Compiler:
         """A container's items (from mark ``start``, which must be first)
         in a Transform, if its BinaryEncoding has transform algorithms;
         its SizeInBits is then its size on the wire, which only the packet
-        itself may leave out, to take the rest of it."""
+        itself may leave out, to take the rest of it.
+
+        Its checks, and those of the containers it includes, cover its
+        bytes before the transform, so they are Verify items at its end:
+        checked once its items are read, and computed before the transform
+        when encoding.  A length field can't be in it: what it counts on
+        the wire would depend on the transform of its own value.
+
+        Args:
+            sc:     The XTCE container.
+            items:  Its compiled items.
+            start:  The id of the Mark at its start.
+            where:  What it is, for error messages.
+            path:   The key of the SpaceSystem it is defined in.
+            name:   Its name, given to the Transform and its checks.
+            packet: Whether it is the packet itself rather than an
+                    included container.
+
+        Returns:
+            ``items`` as they are, or a list of the one Transform holding
+            them and their checks.
+
+        Raises:
+            Unsupported: It holds a packet length field, or its SizeInBits
+                         isn't a number of whole bytes, or an included
+                         container has none.
+        """
         be = sc.binary_encoding
         names = self.transform_names(be, where) if be is not None else None
         if names is None:
             return items
-        if edc_items(sc):
-            raise Unsupported(f"{where}: ErrorDetectCorrect in a container "
-                              "with transform algorithms")
         for it in walk(items):
-            if isinstance(it, Value) and it.local.computed:
-                raise Unsupported(f"{where}: packet length or checksum field "
+            if isinstance(it, Value) and it.local.length is not None:
+                raise Unsupported(f"{where}: packet length field "
                                   f"{it.local.name} in a container with "
                                   "transform algorithms")
-            if isinstance(it, TailSeek):
-                raise Unsupported(f"{where}: a transformed container with an "
-                                  "entry located from its end")
+        marks = {it.id for it in walk(items) if isinstance(it, Mark)}
+        inside = [c for c in self.included_checks if c[2] in marks]
+        self.included_checks = [c for c in self.included_checks
+                                if c not in inside]
+        checks = [Verify(self.check(name, v, cpath, scope, m, end, ckey, where))
+                  for inc, cpath, m, end, scope, ckey in inside
+                  for name, v in edc_items(inc)]
+        if edc_items(sc):
+            end = self._id()
+            scope = [it.local for it in walk(items) if isinstance(it, Value)]
+            checks = ([Mark(end)] + checks
+                      + [Verify(self.check(n, v, path, scope, start, end, name,
+                                           where)) for n, v in edc_items(sc)])
+        items = items + checks
         raw = None
         if be.size_in_bits is not None:
             size = self.int_value(be.size_in_bits, path, "container SizeInBits",
@@ -1321,8 +1807,17 @@ class Compiler:
 
     @staticmethod
     def transform_names(e, where: str) -> Optional[tuple]:
-        """The names of the algorithms that transform the bits of ``e``, a
-        BinaryDataEncoding or a container's BinaryEncoding, or None."""
+        """Reads the names of the algorithms that transform the bits of an
+        encoding.
+
+        Args:
+            e:     A BinaryDataEncoding or a container's BinaryEncoding.
+            where: What it belongs to (unused).
+
+        Returns:
+            The names of the from-binary and to-binary algorithms, either
+            None if missing, or None if it has neither.
+        """
         fa = e.from_binary_transform_algorithm
         ta = e.to_binary_transform_algorithm
         if fa is None and ta is None:
@@ -1332,7 +1827,22 @@ class Compiler:
                 ta.name if ta is not None else None)
 
     def binary_encoding(self, e, path: Key, where: str) -> BinaryEnc:
-        """A BinaryDataEncoding's BinaryEnc."""
+        """Compiles a BinaryDataEncoding.
+
+        Args:
+            e:     The XTCE encoding.
+            path:  The key of the SpaceSystem it is written in.
+            where: What it belongs to, for error messages.
+
+        Returns:
+            Its BinaryEnc: of a fixed size, of a size another value gives
+            (with an unbound DynSize), or, for size -1, taking the rest of
+            the packet.
+
+        Raises:
+            Unsupported: Its size is negative, not whole bytes or of an
+                         unsupported form.
+        """
         c = e.size_in_bits.choice
         if c.name in ("DynamicValue", "DiscreteLookupList"):
             dyn = self.int_value(e.size_in_bits, path, "binary size", where)
@@ -1364,8 +1874,22 @@ class Compiler:
 
     @staticmethod
     def _term(hexchar: Optional[str], cs: str, where: str) -> bytes:
-        """The bytes that end a string in charset ``cs``: a whole number of
-        its code units, and a zero byte stands for a zero code unit."""
+        """Compiles the bytes that end a string in charset ``cs``: a whole
+        number of its code units, and a zero byte stands for a zero code
+        unit.
+
+        Args:
+            hexchar: The TerminationChar in hexadecimal, or None for the
+                     default, zero.
+            cs:      The string's character set.
+            where:   What the string belongs to, for error messages.
+
+        Returns:
+            The terminating bytes.
+
+        Raises:
+            Unsupported: They aren't 1 to 16 bytes of whole code units.
+        """
         h = (hexchar or "").strip() or "00"
         b = hex_bytes(h, where)
         unit = code_unit(cs)
@@ -1377,8 +1901,18 @@ class Compiler:
         return b
 
     def calibrator(self, e, path: Key, where: str):
-        """The calibrator of an integer or float encoding: its default
-        calibrator, and its context calibrators if it has any."""
+        """Compiles the calibrator of an integer or float encoding: its
+        default calibrator, and its context calibrators if it has any.
+
+        Args:
+            e:     The XTCE encoding.
+            path:  The key of the SpaceSystem it is written in.
+            where: What it belongs to, for error messages.
+
+        Returns:
+            The default calibrator, a ContextCal if there are context
+            calibrators, or None if there are neither.
+        """
         default = (self.one_calibrator(e.default_calibrator, path, where)
                    if e.default_calibrator is not None else None)
         ccl = getattr(e, "context_calibrator_list", None)
@@ -1389,6 +1923,20 @@ class Compiler:
                            for cc in ccl.context_calibrator], default)
 
     def one_calibrator(self, c, path: Key, where: str):
+        """Compiles one polynomial, spline or math operation calibrator.
+
+        Args:
+            c:     The XTCE calibrator.
+            path:  The key of the SpaceSystem it is written in.
+            where: What it belongs to, for error messages.
+
+        Returns:
+            The Polynomial, Spline or MathOp.
+
+        Raises:
+            Unsupported: A spline has fewer than two points or two at the
+                         same raw value, or a math operation is invalid.
+        """
         if c.choice.name == "PolynomialCalibrator":
             return Polynomial([(t.coefficient, t.exponent)
                                for t in c.choice.value.term])
@@ -1412,10 +1960,39 @@ class Compiler:
         return self.math_operation(c.choice.value, path, where)
 
     def math_operation(self, mc, path: Key, where: str) -> MathOp:
-        """A MathOperationCalibrator's postfix expression as a tree."""
+        """Compiles a MathOperationCalibrator's postfix expression into a
+        tree.
+
+        Args:
+            mc:    The XTCE MathOperationCalibrator.
+            path:  The key of the SpaceSystem it is written in, from which
+                   the parameters it uses are resolved.
+            where: What it belongs to, for error messages.
+
+        Returns:
+            The MathOp, whose tree's nodes are ``("const", x)``,
+            ``("raw",)``, ``("value", ValueRef)`` and operator tuples.
+
+        Raises:
+            Unsupported: An operand isn't a number, an operator has too
+                         few operands, or more or fewer than one value is
+                         left.
+        """
         stack: list = []
 
         def pop(n: int, op: str) -> list:
+            """Takes an operator's operands off the stack.
+
+            Args:
+                n:  How many it takes.
+                op: The operator, for error messages.
+
+            Returns:
+                The operands, the deepest first.
+
+            Raises:
+                Unsupported: The stack holds fewer than ``n``.
+            """
             if len(stack) < n:
                 raise Unsupported(f"{where}: MathOperationCalibrator operator "
                                   f"{op!r} has too few operands")
@@ -1460,6 +2037,24 @@ class Compiler:
     # -- literals --
 
     def literal(self, vt: VType, text: str, raw: bool, where: str):
+        """Converts a value written in the document to one of a type.
+
+        Args:
+            vt:    The type.
+            text:  The value as written.
+            raw:   Whether it is a raw (uncalibrated, encoded) value, which
+                   is an integer.
+            where: Where it is written, for error messages.
+
+        Returns:
+            An int, float, bool, str or bytes: an enumeration's label as
+            its value, a boolean's strings as True and False, and binary
+            data from hexadecimal.
+
+        Raises:
+            Unsupported: The value doesn't fit the type, or the type is an
+                         array or aggregate.
+        """
         s = text.strip()
         if vt.kind in ("array", "aggregate"):
             raise Unsupported(f"{where}: value {text!r} for {vt.kind} type "
@@ -1496,8 +2091,27 @@ class Compiler:
 
     def location(self, loc, start: int, path: Key, scope: list, where: str,
                  arg_key=None) -> list[Item]:
-        """The Seek for an entry's location; one from other values is bound
-        to ``scope`` and must not move backwards."""
+        """Compiles an entry's location; one from other values is bound to
+        ``scope`` and must not move backwards.
+
+        Args:
+            loc:     The entry's XTCE LocationInContainerInBits, or None.
+            start:   The id of the Mark at its container's start.
+            path:    The key of the SpaceSystem the container is in.
+            scope:   The Locals decoded before the entry.
+            where:   What the container is, for error messages.
+            arg_key: In a command, gives the key of an argument from its
+                     name; None elsewhere.
+
+        Returns:
+            The items that place it: none, a Seek, an EndSeek or a
+            NextSeek.
+
+        Raises:
+            Unsupported: The location is of an unsupported form, or one
+                         from the container's end or the next entry comes
+                         from other values.
+        """
         if loc is None:
             return []
         ref = (loc.reference_location.value if loc.reference_location
@@ -1531,7 +2145,15 @@ class Compiler:
     @staticmethod
     def no_next(items: list, where: str) -> None:
         """Rejects a nextEntry location with no entry after it in its entry
-        list, or inside an IncludeCondition."""
+        list, or inside an IncludeCondition.
+
+        Args:
+            items: The items compiled from the list.
+            where: What they belong to, for error messages.
+
+        Raises:
+            Unsupported: There is a NextSeek among them.
+        """
         if any(isinstance(it, NextSeek) for it in walk(items)):
             raise Unsupported(f"{where}: an entry located from the next entry, "
                               "without one after it in its entry list and "
@@ -1539,10 +2161,24 @@ class Compiler:
 
     @staticmethod
     def next_seek(items: list, loc: list, where: str) -> list:
-        """Places an entry with a nextEntry location, which is in ``items``
-        (its NextSeek, then its Value), now that the entry after it has the
-        location items ``loc``: the earlier entry ends where the later one
-        starts, less the offset.  Returns ``loc``, adjusted."""
+        """Places an entry with a nextEntry location, now that the entry
+        after it has been located: the earlier entry ends where the later
+        one starts, less the offset.
+
+        Args:
+            items: The items so far; the last NextSeek in it, if any, is
+                   replaced by a Seek or removed.
+            loc:   The location items of the entry after it.
+            where: What they belong to, for error messages.
+
+        Returns:
+            ``loc``, adjusted.
+
+        Raises:
+            Unsupported: The earlier entry's size varies, the later entry
+                         is located from another, or its location says
+                         something else.
+        """
         at = next((i for i in range(len(items) - 1, -1, -1)
                    if isinstance(items[i], NextSeek)), None)
         if at is None:
@@ -1576,7 +2212,23 @@ class Compiler:
         return [Seek(None, k)] if k else []
 
     def repeat(self, local: Local, e, path: Key, where: str) -> Local:
-        """Turns the value of an entry with a RepeatEntry into an array."""
+        """Turns the value of an entry with a RepeatEntry into an array.
+
+        Args:
+            local: The entry's value; its type is replaced.
+            e:     The XTCE entry.
+            path:  The key of the SpaceSystem the entry is in.
+            where: What it is in, for error messages.
+
+        Returns:
+            ``local``, its type now an array of the repeats if the count
+            isn't 1.
+
+        Raises:
+            Unsupported: It is a length or checksum field or takes the
+                         rest of the packet, or its Count isn't positive or
+                         its Offset is negative.
+        """
         rp = getattr(e, "repeat_entry", None)
         if rp is None:
             return local
@@ -1616,8 +2268,19 @@ class Compiler:
         return local
 
     def bind_sizes(self, vt: VType, scope: list, where: str, arg_key) -> VType:
-        """``vt`` with its sizes, counts and gaps that other values give,
-        its array elements' too, bound to the values in ``scope``."""
+        """Binds the sizes, counts and gaps of a type that other values
+        give, its array elements' too, to the values in ``scope``.
+
+        Args:
+            vt:      The type.
+            scope:   The Locals decoded before the value.
+            where:   What it is in, for error messages.
+            arg_key: In a command, gives the key of an argument from its
+                     name; None elsewhere.
+
+        Returns:
+            ``vt``, or a bounded copy if anything was bound.
+        """
         e = vt.enc
         if isinstance(e, ArrayEnc):
             elem = self.bind_sizes(e.elem, scope, where, arg_key)
@@ -1635,8 +2298,20 @@ class Compiler:
 
     def bind_calibrators(self, vt: VType, scope: list, where: str,
                          arg_key) -> VType:
-        """``vt``, with copies of the calibrators in it that use other
-        values of the packet bound to those in ``scope``."""
+        """Binds the calibrators in a type that use other values of the
+        packet to those in ``scope``.
+
+        Args:
+            vt:      The type.
+            scope:   The Locals decoded before the value.
+            where:   What it is in, for error messages.
+            arg_key: In a command, gives the key of an argument from its
+                     name; None elsewhere.
+
+        Returns:
+            ``vt``, or a copy with bound copies of its calibrators (its
+            array elements' and members' too).
+        """
         e = vt.enc
         if isinstance(e, ArrayEnc):
             elem = self.bind_calibrators(e.elem, scope, where, arg_key)
@@ -1662,7 +2337,23 @@ class Compiler:
             vt, calibrator=self.bind_cal(vt.calibrator, scope, where, arg_key))
 
     def bind_cal(self, cal, scope: list, where: str, arg_key):
-        """A copy of ``cal`` bound to the values in ``scope``."""
+        """Binds a calibrator to the values in ``scope``.
+
+        Args:
+            cal:     The calibrator.
+            scope:   The Locals decoded before the value.
+            where:   What it is in, for error messages.
+            arg_key: In a command, gives the key of an argument from its
+                     name; None elsewhere.
+
+        Returns:
+            A bound copy of a ContextCal or MathOp; any other calibrator
+            as it is.
+
+        Raises:
+            Unsupported: A context depends on a packet length or checksum
+                         field.
+        """
         if isinstance(cal, ContextCal):
             cases = []
             for path, mc, c in cal.cases:
@@ -1681,6 +2372,23 @@ class Compiler:
         return cal
 
     def bind_expr(self, e: tuple, scope: list, where: str, arg_key) -> tuple:
+        """Binds the values a MathOperationCalibrator's tree uses.
+
+        Args:
+            e:       The tree, or a subtree.
+            scope:   The Locals decoded before the value.
+            where:   What it is in, for error messages.
+            arg_key: In a command, gives the key of an argument from its
+                     name; None elsewhere.
+
+        Returns:
+            A copy of ``e`` whose ValueRefs hold the Locals they use.
+
+        Raises:
+            Unsupported: A value used is optional, isn't a number, is a
+                         length or checksum field, or is raw but
+                         calibrated.
+        """
         if e[0] in ("const", "raw"):
             return e
         if e[0] != "value":
@@ -1695,9 +2403,6 @@ class Compiler:
         if vt.kind not in ("int", "float", "enum", "bool"):
             raise Unsupported(f"{where}: MathOperationCalibrator uses "
                               f"{vt.kind} value {name}")
-        if vt.wide:
-            raise Unsupported(f"{where}: MathOperationCalibrator uses "
-                              f"{vt.enc.bits}-bit integer {name}")
         if local.computed:
             raise Unsupported(f"{where}: MathOperationCalibrator uses packet "
                               f"length or checksum field {name}")
@@ -1708,8 +2413,23 @@ class Compiler:
 
     def bind_dyn(self, d: DynSize, scope: list, where: str,
                  arg_key: Optional[Callable] = None):
-        """A copy of ``d`` bound to the values in ``scope``, and the range
-        (lo, hi) of the value it adjusts."""
+        """Binds a DynSize to the values in ``scope``.
+
+        Args:
+            d:       The DynSize.
+            scope:   The Locals decoded before the value it sizes.
+            where:   What it is in, for error messages.
+            arg_key: In a command, gives the key of an argument from its
+                     name; None elsewhere.
+
+        Returns:
+            A bound copy of ``d``, and the range (lo, hi) of the value it
+            adjusts.
+
+        Raises:
+            Unsupported: The value it names isn't there, or can't give a
+                         size.
+        """
         if d.table is not None:
             path, table = d.table
             lookup = [(self.match(lk, path, scope, where, arg_key), lk.value)
@@ -1748,12 +2468,25 @@ class Compiler:
         if vt.kind != "int":
             raise Unsupported(f"{where}: size or count from {vt.kind} value "
                               f"{d.name or name}")
-        if vt.wide:
-            raise Unsupported(f"{where}: size or count from {vt.enc.bits}-bit "
-                              f"integer {d.name or name}")
-        return dataclasses.replace(d, local=ref, path=member), int_bounds(vt)
+        return (dataclasses.replace(d, local=ref, path=member,
+                                    wide_type=vt if vt.wide else None),
+                int_bounds(vt))
 
     def param_local(self, ref: str, path: Key) -> Local:
+        """Makes a new value of a parameter, for an entry that holds it.
+
+        Args:
+            ref:  The reference to the parameter.
+            path: The key of the SpaceSystem the reference is written in.
+
+        Returns:
+            The Local, with the parameter's type, and its length
+            adjustment if it is a packet length field.
+
+        Raises:
+            Unsupported: The reference or the parameter's type doesn't
+                         resolve, or the type isn't supported.
+        """
         pkey = self.resolve(ref, path, self.params, "parameter")
         ppath, p = self.params[pkey]
         tkey = self.resolve(p.parameter_type_ref, ppath, self.ptypes,
@@ -1764,10 +2497,26 @@ class Compiler:
 
     def tm_items(self, sc, path: Key, stack: list, start: int, scope: list,
                  conditional: bool = False) -> list[Item]:
-        """Items for a container's entries.  ``scope`` lists the values read
-        so far (base containers first) and grows as entries are added;
-        ``conditional`` says whether the container is inside an
-        IncludeCondition."""
+        """Compiles a container's entries into items.
+
+        Args:
+            sc:          The XTCE container.
+            path:        The key of the SpaceSystem it is defined in.
+            stack:       The keys of the containers being compiled, the
+                         outermost first and ``sc``'s last, to find
+                         containers that include themselves.
+            start:       The id of the Mark at the container's start.
+            scope:       The values read so far (base containers first);
+                         grows as entries are added.
+            conditional: Whether the container is inside an
+                         IncludeCondition.
+
+        Returns:
+            The items.
+
+        Raises:
+            Unsupported: An entry uses something not supported.
+        """
         items: list[Item] = []
         segs: dict = {}
         where = f"container {qname(stack[-1])}"
@@ -1795,11 +2544,9 @@ class Compiler:
             if ch.name in SEGMENTS:
                 after = []
                 if out and isinstance(out[-1], EndSeek):
-                    if e.repeat_entry is not None:
-                        raise Unsupported(f"{where}: a repeated {ch.name} "
-                                          "located from the container's end")
-                    out[-1], after = self.end_seek(out[-1], sc, None, where,
-                                                   e.size_in_bits)
+                    out[-1], after = self.end_seek(
+                        out[-1], sc, None, where,
+                        self.segment_bits(ch.name, e, path, where), scope, path)
                 out += self.segment(ch.name, e, path, where, segs,
                                     cond is not None, scope)
                 out += after
@@ -1812,7 +2559,8 @@ class Compiler:
                                   where)
                 after = []
                 if out and isinstance(out[-1], EndSeek):
-                    out[-1], after = self.end_seek(out[-1], sc, local, where)
+                    out[-1], after = self.end_seek(out[-1], sc, local, where,
+                                                   scope=scope, path=path)
                 out.append(Value(local))
                 out += after
                 scope.append(local)
@@ -1852,7 +2600,7 @@ class Compiler:
                     out += self.measure(
                         self.wrap_transform(inc, inner, m, where, cpath,
                                             qname(ckey), False), where)
-                    if edc_items(inc):
+                    if edc_items(inc) and not self.has_transform(inc, where):
                         end = self._id()
                         out.append(Mark(end))
                         if conditional or cond is not None:
@@ -1887,7 +2635,29 @@ class Compiler:
         A segment repeated a fixed number of times, one right after
         another, is that many segments.  Repeated otherwise (a count that
         another value gives, or an Offset between the repeats), its
-        segments are a list of raw fields."""
+        segments are a list of raw fields.
+
+        Args:
+            name:    The entry's element name, such as
+                     ``ParameterSegmentRefEntry``.
+            e:       The XTCE entry.
+            path:    The key of the SpaceSystem it is in.
+            where:   What it is in, for error messages.
+            segs:    The incomplete parameters of the entry list, and
+                     under ``"#counts"`` how many segments of each thing
+                     there have been.
+            cond:    Whether the entry has an IncludeCondition.
+            scope:   The values read so far; grows as values are added.
+            arg_key: In a command, gives the key of an argument from its
+                     name; None elsewhere.
+
+        Returns:
+            The items for the entry.
+
+        Raises:
+            Unsupported: A repeated segment has an order or a Count that
+                         isn't positive, or a segment is invalid.
+        """
         rp = e.repeat_entry
         if rp is None:
             return self.one_segment(name, e, path, where, segs, cond, scope)
@@ -1913,8 +2683,49 @@ class Compiler:
         scope.append(lc)
         return [Value(lc)]
 
+    def segment_bits(self, name: str, e, path: Key, where: str) -> int:
+        """Measures the bits that a segment entry takes, its repeats and
+        the gaps between them too, for a location from the container's end.
+
+        Args:
+            name:  The entry's element name, for error messages.
+            e:     The XTCE entry.
+            path:  The key of the SpaceSystem it is in.
+            where: What it is in, for error messages.
+
+        Returns:
+            The number of bits.
+
+        Raises:
+            Unsupported: Its count or offset varies or is out of range.
+        """
+        rp = e.repeat_entry
+        if rp is None:
+            return e.size_in_bits
+        count = self.int_value(rp.count, path, "RepeatEntry Count", where)
+        gap = (self.int_value(rp.offset, path, "RepeatEntry Offset", where)
+               if rp.offset is not None else 0)
+        if not isinstance(count, int) or not isinstance(gap, int):
+            raise Unsupported(f"{where}: a repeated {name} located from the "
+                              "container's end, whose size varies")
+        if count < 1 or gap < 0:
+            raise Unsupported(f"{where}: RepeatEntry Count {count} or Offset "
+                              f"{gap} is out of range")
+        return count * e.size_in_bits + (count - 1) * gap
+
     def segment_ref(self, name: str, e, path: Key) -> str:
-        """What a segment entry is a segment of."""
+        """Finds what a segment entry is a segment of.
+
+        Args:
+            name: The entry's element name, such as
+                  ``ParameterSegmentRefEntry``.
+            e:    The XTCE entry.
+            path: The key of the SpaceSystem it is in.
+
+        Returns:
+            The qualified name of the parameter or container, or the
+            stream reference as written.
+        """
         if name == "ParameterSegmentRefEntry":
             return qname(self.resolve(e.parameter_ref, path, self.params,
                                       "parameter"))
@@ -1925,6 +2736,30 @@ class Compiler:
 
     def one_segment(self, name: str, e, path: Key, where: str, segs: dict,
                     cond: bool, scope: list) -> list[Item]:
+        """Compiles one segment of an entry.  A parameter's segments are
+        collected in ``segs`` until they make up its encoding, when the
+        value is assembled; other segments are raw fields of their own.
+
+        Args:
+            name:  The entry's element name, such as
+                   ``ParameterSegmentRefEntry``.
+            e:     The XTCE entry.
+            path:  The key of the SpaceSystem it is in.
+            where: What it is in, for error messages.
+            segs:  The incomplete parameters of the entry list, and under
+                   ``"#counts"`` how many segments of each thing there
+                   have been.
+            cond:  Whether the entry has an IncludeCondition.
+            scope: The values read so far; grows as values are added.
+
+        Returns:
+            The items: the Segment, followed by the parameter's Value once
+            it is complete; or the Value of a raw field.
+
+        Raises:
+            Unsupported: A parameter's segments have more bits than its
+                         encoding, or a raw segment is too big.
+        """
         bits = e.size_in_bits
         ref = self.segment_ref(name, e, path)
         counts = segs.setdefault("#counts", {})
@@ -1961,10 +2796,32 @@ class Compiler:
         """An IndirectParameterRefEntry: the parameter that the value of
         its ParameterInstance names.  Each parameter it can name becomes a
         field, present when the value names it.  The value is an
-        enumeration whose labels name parameters, or with an
-        aliasNameSpace, an enumeration, integer or string that gives an
-        alias in that name space, as Yamcs reads it.  Values that name no
-        parameter select nothing."""
+        enumeration whose labels name parameters; with an aliasNameSpace,
+        an enumeration, integer or string that gives an alias in that name
+        space, as Yamcs reads it; or without one, an integer or string
+        that is a parameter's name.  An enumeration label that names no
+        parameter (such as ``NONE``) selects nothing; a value that is none
+        of the enumeration's labels, or names no parameter, fails.
+
+        Args:
+            e:       The XTCE entry.
+            path:    The key of the SpaceSystem it is in.
+            scope:   The values read so far; grows by the parameters it
+                     can select.
+            where:   What it is in, for error messages.
+            arg_key: In a command, gives the key of an argument from its
+                     name; None elsewhere.
+
+        Returns:
+            The items: a Require that the value selects a parameter (or,
+            for an enumeration, is one of its labels), then a Cond for each
+            parameter it can select.
+
+        Raises:
+            Unsupported: It is repeated, the selector's kind can't name
+                         parameters, it can select none, or one it must
+                         select can't be read here.
+        """
         if e.repeat_entry is not None:
             raise Unsupported(f"{where}: a repeated IndirectParameterRefEntry")
         sel = e.parameter_instance
@@ -1984,33 +2841,131 @@ class Compiler:
                     except Unsupported:
                         key = None
                 if key is not None:
-                    choices.append((lab.label, key))
+                    choices.append(([lab.label], key))
         elif aliases is not None and vt.kind in ("int", "string"):
-            choices = [(a, key) for a, key in aliases.items()
+            choices = [([a], key) for a, key in aliases.items()
                        if vt.kind == "string" or re.fullmatch(r"-?\d+", a)]
+        elif vt.kind in ("int", "string"):
+            choices = self.named_by(vt, path)
         else:
-            why = (" without an aliasNameSpace" if vt.kind in ("int", "string")
-                   else "")
             raise Unsupported(f"{where}: an IndirectParameterRefEntry chosen "
-                              f"by {vt.kind} value {pkey}{why}")
+                              f"by {vt.kind} value {pkey}")
         out: list[Item] = []
-        for text, key in choices:
-            crit = self.comparison("ParameterInstanceRef", sel, "==", text,
-                                   path, scope, where, arg_key)
-            lc = self.bind(self.param_local("/" + "/".join(key), ()), scope,
-                           where, arg_key)
+        group = self._id()
+        # Only one choice is there, so each sees only the values before the
+        # entry: the selector itself, not a choice that is a copy of it.
+        before = list(scope)
+        chosen = []
+        crits = []
+        for texts, key in choices:
+            terms = [self.comparison("ParameterInstanceRef", sel, "==", t, path,
+                                     before, where, arg_key) for t in texts]
+            crit = (terms[0] if len(terms) == 1
+                    else AnyOf(terms, " or ".join(t.text for t in terms)))
+            crits.append(crit)
+            try:
+                lc = self.bind(self.param_local("/" + "/".join(key), ()),
+                               before, where, arg_key)
+                if lc.computed:
+                    raise Unsupported(f"{where}: an IndirectParameterRefEntry "
+                                      f"selects length field {lc.name}")
+                if is_rest(lc.vtype):
+                    raise Unsupported(f"{lc.name} takes the rest of the packet")
+            except Unsupported as x:
+                if vt.kind == "enum" or aliases is not None:
+                    raise
+                # Any parameter in the mission can be named: one that
+                # can't be decoded here fails decoding when it is.
+                text = f"{pkey} names {qname(key)}, which can't be read here"
+                never = self.comparison("ParameterInstanceRef", sel, "!=",
+                                        texts[0], path, before, where, arg_key)
+                out.append(Cond([crit],
+                                [Require([never], where, f"{text} ({x})")],
+                                group))
+                continue
             lc.optional = True
-            if lc.computed:
-                raise Unsupported(f"{where}: an IndirectParameterRefEntry "
-                                  f"selects length field {lc.name}")
-            out.append(Cond([crit], [Value(lc)]))
-            scope.append(lc)
-        if not out:
+            out.append(Cond([crit], [Value(lc)], group))
+            chosen.append(lc)
+        scope += chosen
+        if not any(isinstance(it.items[0], Value) for it in out):
+            if vt.kind == "int" and aliases is None:
+                # Every value would name no parameter, which fails: the
+                # packet could never be read or written.
+                raise Unsupported(
+                    f"{where}: no parameter has a name that integer {pkey} can "
+                    "hold, so it can never select one; give the entry an "
+                    "aliasNameSpace whose aliases are numbers, or make the "
+                    "selector an enumeration of parameter names or a string")
             raise Unsupported(f"{where}: no label of {pkey} names a parameter")
+        # A selector must be one of its labels, or name a parameter: one
+        # that isn't fails, before anything after it is read.
+        if vt.kind == "enum":
+            crits = [self.comparison("ParameterInstanceRef", sel, "==",
+                                     lab.label, path, before, where, arg_key)
+                     for lab in vt.labels]
+            why = "is none of its labels"
+        else:
+            why = "names no parameter"
+        out.insert(0,
+                   Require([AnyOf(crits, f"not {pkey} {why}")], where,
+                           f"{pkey} {why}"))
+        return out
+
+    def named_by(self, vt: VType, path: Key) -> list[tuple[list, Key]]:
+        """Finds the parameters that a string or integer value can name:
+        by its full path, and by its own name when that finds it from
+        SpaceSystem ``path``, as references do.  Names a string is too
+        short to hold, or an integer can't be, are left out.
+
+        Args:
+            vt:   The type of the value.
+            path: The key of the SpaceSystem the entry is in.
+
+        Returns:
+            (names, parameter key) for each parameter it can name.
+        """
+        e = vt.enc
+        limit = None
+        if isinstance(e, StringEnc):
+            # The most bits of content: without the size tag or terminator.
+            limit = (e.fixed_bits
+                     or (e.max_bits
+                         - (e.size_tag_bits if e.size_tag_bits is not None
+                            else 8 * len(e.terminator or b""))))
+            try:
+                codecs.lookup(e.charset)
+            except LookupError:
+                limit = None
+        out = []
+        for key in self.params:
+            names = []
+            try:
+                if self.resolve(key[-1], path, self.params, "parameter") == key:
+                    names.append(key[-1])
+            except Unsupported:
+                pass
+            names.append("/" + "/".join(key))
+            if vt.kind == "int":
+                lo, hi = int_bounds(vt)
+                names = [n for n in names if re.fullmatch(r"-?\d+", n)
+                         and lo <= int(n) <= hi]
+            elif limit is not None:
+                names = [n for n in names
+                         if 8 * len(n.encode(e.charset)) <= limit]
+            if names:
+                out.append((names, key))
         return out
 
     def aliases(self, space: str) -> dict:
-        """Alias -> parameter, for the aliases in name space ``space``."""
+        """Collects the parameter aliases in a name space.
+
+        Args:
+            space: The name space.
+
+        Returns:
+            Each alias in it, mapped to the key of the first parameter
+            that has it.
+        """
         out = {}
         for key, (_, p) in self.params.items():
             for a in p.alias_set.alias if p.alias_set else []:
@@ -2021,7 +2976,19 @@ class Compiler:
     @staticmethod
     def assemble(parts: list, where: str, ref: str) -> None:
         """Places each Segment of a value in its encoding: by their order
-        attributes, or in document order without them."""
+        attributes, or in document order without them.  Sets each one's
+        shift, and marks the first in the document.
+
+        Args:
+            parts: (Segment, order attribute or None, count) for each of
+                   the value's segments, in document order.
+            where: What they are in, for error messages.
+            ref:   What they are segments of, for error messages.
+
+        Raises:
+            Unsupported: Some but not all have an order, or an order is
+                         repeated.
+        """
         orders = [o for _, o, _ in parts]
         if all(o is None for o in orders):
             ranked = [s for s, _, _ in parts]
@@ -2037,7 +3004,22 @@ class Compiler:
         parts[0][0].first = True
 
     def raw_segment(self, ref: str, k: int, bits: int, where: str) -> Local:
-        """A field that holds a segment's bits as they are."""
+        """Makes a field that holds a segment's bits as they are.
+
+        Args:
+            ref:   What it is a segment of.
+            k:     Which segment of it this is, from 0.
+            bits:  Its size in bits.
+            where: What it is in, for error messages.
+
+        Returns:
+            The Local: an integer of up to 64 bits, or binary data of
+            whole bytes.
+
+        Raises:
+            Unsupported: It is over 64 bits and not whole bytes, or bigger
+                         than a field may be.
+        """
         if bits <= 64:
             vt = VType(key=f"{ref} segment", name=f"segment of {ref}",
                        kind="int", enc=IntEnc(bits))
@@ -2052,7 +3034,15 @@ class Compiler:
 
     def raw_segments(self, items: list, segs: dict, scope: list) -> None:
         """Makes fields of the segments of values that an entry list holds
-        only part of."""
+        only part of.
+
+        Args:
+            items: The entry list's items; each such Segment is replaced
+                   by the Value of a raw field.
+            segs:  The incomplete parameters, as ``one_segment`` leaves
+                   them.
+            scope: The values read so far; grows by the new fields.
+        """
         for ref, group in segs.items():
             if ref == "#counts":
                 continue
@@ -2063,8 +3053,20 @@ class Compiler:
                 scope.append(lc)
 
     def include_chain(self, ckey: Key, stack: list, where: str) -> list:
-        """(path, container, key) of an included container and its bases,
-        the root first."""
+        """Lists an included container and its bases.
+
+        Args:
+            ckey:  The included container's key.
+            stack: The keys of the containers being compiled, to find
+                   containers that include themselves.
+            where: What includes it, for error messages.
+
+        Returns:
+            (SpaceSystem key, container, key) of each, the root first.
+
+        Raises:
+            Unsupported: A container includes itself.
+        """
         chain = []
         key = ckey
         while True:
@@ -2078,13 +3080,37 @@ class Compiler:
                                self.containers, "container")
 
     def end_seek(self, es: EndSeek, sc, local: Optional[Local], where: str,
-                 bits: int = 0) -> tuple:
+                 bits: int = 0, scope: Optional[list] = None, path: Key = (),
+                 arg_key: Optional[Callable] = None) -> tuple:
         """The Seek that ends ``local`` (or a segment of ``bits``)
         ``es.offset`` bits before the end of container ``sc``, and the items
         to follow it.  In a container with a fixed size, that is a place
-        from its start.  Otherwise the container must be the packet itself,
-        whose end decoding knows (a TailSeek, and a TailPad after): an
-        included container's end would depend on where its entries are."""
+        from its start; with a size that a value in ``scope`` gives, one
+        from its start that must not be before the entries before it.
+        Otherwise the container must be the packet itself, whose end
+        decoding knows (a TailSeek, and a TailPad after): an included
+        container's end would depend on where its entries are.
+
+        Args:
+            es:      The entry's EndSeek, with the Mark of the container's
+                     start and the offset.
+            sc:      The XTCE container.
+            local:   The entry's value, or None for a segment.
+            where:   What the container is, for error messages.
+            bits:    A segment's size in bits.
+            scope:   The values decoded before the entry, or None if a
+                     size another value gives can't be used.
+            path:    The key of the SpaceSystem the container is in.
+            arg_key: In a command, gives the key of an argument from its
+                     name; None elsewhere.
+
+        Returns:
+            The Seek or TailSeek, and the items to follow the entry.
+
+        Raises:
+            Unsupported: The entry's size varies, or the container is an
+                         included one whose size varies.
+        """
         if local is not None:
             vt = local.vtype
             if vt.dyn is not None or is_rest(vt) or fixed_bits(vt) is None:
@@ -2092,42 +3118,95 @@ class Compiler:
                                   f"end for {local.name}, whose size varies")
             bits = item_bits(vt)
         be = sc.binary_encoding
+        if self.has_transform(sc, where):
+            # Its end is that of its bytes before the transform, which
+            # decoding knows as a packet's: its SizeInBits is on the wire.
+            return TailSeek(es.offset + bits), [TailPad(es.offset)]
         size = (
-            self.int_value(be.size_in_bits, (), "container SizeInBits", where)
+            self.int_value(be.size_in_bits, path, "container SizeInBits", where)
             if be is not None and be.size_in_bits is not None else None)
         if isinstance(size, int):
             return Seek(es.start, size - es.offset - bits), []
+        if isinstance(size, DynSize) and scope is not None:
+            off, rng = self.bind_dyn(size, scope, where, arg_key)
+            off.max = dyn_units(off, rng, self.max_field_bits)
+            return Seek(es.start, off, es.offset + bits, True), []
         if es.start != 0 or size is not None:
             raise Unsupported(f"{where}: a location from the end of an "
-                              "included container, or one whose size another "
-                              "value gives")
+                              "included container whose size varies")
         return TailSeek(es.offset + bits), [TailPad(es.offset)]
 
     @staticmethod
     def check_tail(node: Node, where: str) -> None:
-        """An entry located from the end of a packet whose size varies is
-        its last, and is always there."""
-        items = node.all_items()
-        for it in items:
-            if (isinstance(it, Cond)
-                    and any(isinstance(x, TailSeek) for x in walk(it.items))):
-                raise Unsupported(f"{where}: an entry located from the "
-                                  "packet's end has an IncludeCondition")
-        at = [i for i, it in enumerate(items) if isinstance(it, TailSeek)]
-        if not at:
-            return
-        rest = items[at[0] + 3:]
-        if (len(at) > 1
-                or any(not isinstance(it, (Require, Mark)) for it in rest)):
-            raise Unsupported(f"{where}: an entry located from the end of a "
-                              "packet whose size varies is not its last")
+        """Checks that an entry located from the end of a packet whose size
+        varies, or of a transformed container's bytes, is its last, and is
+        always there.
+
+        Args:
+            node:  The packet.
+            where: What it is, for error messages.
+
+        Raises:
+            Unsupported: Such an entry has an IncludeCondition or isn't
+                         last.
+        """
+        def last(items: list, what: str) -> None:
+            """Checks the entries located from the end of a list of items
+            and of the Transforms in it.
+
+            Args:
+                items: The items.
+                what:  What they make up, for error messages.
+
+            Raises:
+                Unsupported: Such an entry has an IncludeCondition or
+                             isn't last.
+            """
+            for it in items:
+                if (isinstance(it, Cond)
+                        and any(isinstance(x, TailSeek)
+                                for x in walk(it.items, False))):
+                    raise Unsupported(f"{where}: an entry located from the "
+                                      f"{what}'s end has an IncludeCondition")
+            at = [i for i, it in enumerate(items) if isinstance(it, TailSeek)]
+            if at:
+                # The entry is everything up to its TailPad.
+                rest = items[next(i for i in range(at[0], len(items))
+                                  if isinstance(items[i], TailPad)) + 1:]
+                if (len(at) > 1
+                        or any(not isinstance(it, (Require, Mark, Verify))
+                               for it in rest)):
+                    raise Unsupported(f"{where}: an entry located from the end "
+                                      f"of a {what} is not its last")
+            for it in walk(items, False):
+                if isinstance(it, Transform):
+                    last(it.items, "transformed container")
+
+        last(node.all_items(), "packet whose size varies")
 
     def size_pad(self, sc, items: list, start: int, where: str,
                  scope: Optional[list] = None, path: Key = ()) -> list[Item]:
-        """The padding that makes a container with a BinaryEncoding occupy
-        its SizeInBits; ``items`` are its entries, from mark ``start``, and
-        ``scope`` the values decoded before its end, for a size another
-        value gives."""
+        """Makes the padding that makes a container with a BinaryEncoding
+        occupy its SizeInBits.
+
+        Args:
+            sc:    The XTCE container.
+            items: Its entries' items.
+            start: The id of the Mark at its start.
+            where: What it is, for error messages.
+            scope: The values decoded before its end, for a size another
+                   value gives or entries whose size varies; None for a
+                   repeated container, which can have neither.
+            path:  The key of the SpaceSystem it is defined in.
+
+        Returns:
+            The items to put after its entries: none, a Pad, or a Fill
+            done when the packet is decoded or encoded.
+
+        Raises:
+            Unsupported: The entries take more than the size or overlap,
+                         or a repeated container's size or entries vary.
+        """
         be = sc.binary_encoding
         if be is None:
             return []
@@ -2165,9 +3244,24 @@ class Compiler:
 
     def container_type(self, ckey: Key, stack: list, where: str,
                        table: Optional[dict] = None) -> VType:
-        """The aggregate holding one copy of a repeated container's entries,
-        with skips and padding from their locations and the container size.
-        ``table`` holds the container (telemetry's by default)."""
+        """Compiles the aggregate holding one copy of a repeated container's
+        entries, with skips and padding from their locations and the
+        container size, once.
+
+        Args:
+            ckey:  The container's key.
+            stack: The keys of the containers being compiled, to find
+                   containers that include themselves.
+            where: What repeats it, for error messages.
+            table: The table that holds the container; telemetry's by
+                   default.
+
+        Returns:
+            The aggregate type.
+
+        Raises:
+            Unsupported: Its entries can't be the members of an aggregate.
+        """
         if ckey in self.ctypes:
             return self.ctypes[ckey]
         cpath, inc = (self.containers if table is None else table)[ckey]
@@ -2186,9 +3280,23 @@ class Compiler:
 
     def copy_transform(self, sc, items: list, what: str,
                        path: Key) -> Optional[XformEnc]:
-        """The transform of each copy of repeated container ``sc``, whose
-        entries are ``items``, if its BinaryEncoding has transform
-        algorithms; its SizeInBits is then its size on the wire."""
+        """Compiles the transform of each copy of a repeated container, if
+        its BinaryEncoding has transform algorithms; its SizeInBits is then
+        its size on the wire.
+
+        Args:
+            sc:    The XTCE container.
+            items: Its entries' items.
+            what:  What it is, for error messages.
+            path:  The key of the SpaceSystem it is defined in.
+
+        Returns:
+            The XformEnc, or None if it has no transform algorithms.
+
+        Raises:
+            Unsupported: It also has ErrorDetectCorrect, or no SizeInBits
+                         of whole bytes.
+        """
         be = sc.binary_encoding
         names = self.transform_names(be, what) if be is not None else None
         if names is None:
@@ -2207,8 +3315,23 @@ class Compiler:
                         (max_bits(items) + 7) // 8)
 
     def mc_container_type(self, key: Key, where: str, stack: tuple) -> VType:
-        """container_type for the CommandContainer of meta-command ``key``,
-        with its arguments as members."""
+        """Compiles the aggregate for a repeated CommandContainer of a
+        meta-command, as container_type does, with its arguments as
+        members, once.
+
+        Args:
+            key:   The meta-command's key.
+            where: What repeats it, for error messages.
+            stack: The keys of the containers being included (a
+                   meta-command's as ``("meta-command",) + key``), to find
+                   ones that include themselves.
+
+        Returns:
+            The aggregate type.
+
+        Raises:
+            Unsupported: Its entries can't be the members of an aggregate.
+        """
         ckey = ("meta-command",) + key
         if ckey in self.ctypes:
             return self.ctypes[ckey]
@@ -2223,9 +3346,26 @@ class Compiler:
 
     def aggregate_of(self, items: list, m: int, what: str, key: str,
                      name: str) -> VType:
-        """The aggregate of a repeated container's items, which start at
-        mark ``m``.  A size or count from an earlier value of the copy is
-        that member's."""
+        """Makes the aggregate of a repeated container's items.  A size or
+        count from an earlier value of the copy is that member's.
+
+        Args:
+            items: The items.
+            m:     The id of the Mark they start at.
+            what:  What the container is, for error messages.
+            key:   The aggregate's key.
+            name:  The aggregate's name.
+
+        Returns:
+            The aggregate type, its members the values with the bits to
+            skip before each, and its restriction criteria as checks.
+
+        Raises:
+            Unsupported: The items have something an aggregate can't hold:
+                         a condition, a criterion on a value outside it, a
+                         size or location that varies, a checksum, a
+                         length field or a segment.
+        """
         this = Local(0, name, key, None)
         idents: dict = {}  # id(Local) -> member
         checks: list = []
@@ -2253,8 +3393,24 @@ class Compiler:
             if isinstance(it, Fill):
                 raise Unsupported(f"{what} includes a container whose size "
                                   "varies")
+            if isinstance(it, Verify):
+                raise Unsupported(f"{what} has a checksum")
             if isinstance(it, Transform):
-                raise Unsupported(f"{what} has transformed data")
+                # An included container whose entries are transformed: a
+                # member holding them, transformed as a repeated one is.
+                if it.raw is None:
+                    raise Unsupported(f"{what} has transformed data whose size "
+                                      "varies")
+                inner = self.aggregate_of(it.items, it.start, what, it.name,
+                                          it.name.rsplit("/", 1)[-1])
+                inner.enc.transform = XformEnc(it.raw, it.decode, it.encode,
+                                               it.cap)
+                inner.doc = "an included container, transformed on the wire"
+                members.append(Member(inner.name, names.take(snake(inner.name)),
+                                      inner, skip))
+                skip = 0
+                pos = pos + 8 * it.raw if pos is not None else None
+                continue
             if isinstance(it, Seek):
                 if isinstance(it.offset, DynSize):
                     raise Unsupported(f"{what} has a location that other "
@@ -2306,9 +3462,27 @@ class Compiler:
 
     def member_bound(self, vt: VType, members: list, idents: dict, items: list,
                      what: str, name: str) -> VType:
-        """``vt``, whose size or count another value gives, bound to the
-        latest earlier member of a repeated container's copy that is
-        that value."""
+        """Binds a type whose size or count another value gives to the
+        latest earlier member of a repeated container's copy that is that
+        value.
+
+        Args:
+            vt:      The type.
+            members: The copy's members so far.
+            idents:  The member for each value so far, by ``id`` of its
+                     Local.
+            items:   The copy's items.
+            what:    What the container is, for error messages.
+            name:    The name of the value of type ``vt``, for error
+                     messages.
+
+        Returns:
+            A bounded copy of ``vt``.
+
+        Raises:
+            Unsupported: The value isn't an earlier integer entry of the
+                         copy.
+        """
         d = vt.dyn
         locs = {id(it.local): it.local for it in items if isinstance(it, Value)}
         sib = None
@@ -2324,10 +3498,24 @@ class Compiler:
         if sib.vtype.kind != "int":
             raise Unsupported(f"{what}: size or count from {sib.vtype.kind} "
                               f"entry {sib.name}")
-        return bounded(vt, dataclasses.replace(d, member=sib.ident),
+        wide = sib.vtype if sib.vtype.wide else None
+        return bounded(vt,
+                       dataclasses.replace(d, member=sib.ident, wide_type=wide),
                        int_bounds(sib.vtype), self.max_field_bits)
 
     def tm_node(self, key: Key) -> Node:
+        """Compiles a SequenceContainer, and its bases, once.
+
+        Args:
+            key: The container's key.
+
+        Returns:
+            Its Node; one that can't be compiled has an ``error`` saying
+            why.
+
+        Raises:
+            Unsupported: Its inheritance chain is a cycle.
+        """
         if key in self.nodes:
             n = self.nodes[key]
             if getattr(n, "_building", False):
@@ -2363,6 +3551,7 @@ class Compiler:
             self.included_checks = []
             where = f"container {node.key}"
             if self.has_transform(sc, where):
+                node._edc = (None, None)  # its checks are in its Transform
                 # Its own entries are transformed: they start at the start
                 # of what the transform gives.
                 m = self._id()
@@ -2392,10 +3581,22 @@ class Compiler:
         return node
 
     def node_checks(self, node: Node, where: str) -> list:
-        """The ErrorDetectCorrect checks of a concrete packet: those of the
-        containers in its inheritance chain, which cover the packet, and
-        those of the containers it includes.  Values are computed in the
-        order of their fields in the packet."""
+        """Compiles the ErrorDetectCorrect checks of a concrete packet:
+        those of the containers in its inheritance chain, which cover the
+        packet, and those of the containers it includes.
+
+        Args:
+            node:  The packet.
+            where: What it is, for error messages.
+
+        Returns:
+            The checks, in the order of their fields in the packet, which
+            is the order they are computed in.
+
+        Raises:
+            Unsupported: A checksum field is in transformed data, or a
+                         criterion or assignment is on one.
+        """
         out = []
         chain = node.chain()
         for k, n in enumerate(chain):
@@ -2412,6 +3613,14 @@ class Compiler:
                 for name, v in edc_items(inc):
                     out.append(self.check(name, v, path, scope, m, end, ckey,
                                           where))
+        transformed = {id(x.local) for it in walk(node.all_items())
+                       if isinstance(it, Transform) for x in walk(it.items)
+                       if isinstance(x, Value)}
+        for c in out:
+            if id(c.local) in transformed:
+                raise Unsupported(f"{where}: checksum field {c.local.name} is "
+                                  "in transformed data, but its check covers "
+                                  "bytes outside it")
         criteria = (node.all_criteria()
                     + [c for it in node.all_items() for c in conds(it)])
         verified = [it.check for it in walk(node.all_items())
@@ -2426,8 +3635,30 @@ class Compiler:
 
     def check(self, name: str, v, path: Key, scope: list, start: int, end,
               container: str, where: str) -> Check:
-        """One ErrorDetectCorrect algorithm, whose value is in a field among
-        ``scope``."""
+        """Compiles one ErrorDetectCorrect algorithm, and marks its field as
+        a checksum.
+
+        Args:
+            name:      The algorithm's element name: ``CRC``, ``Checksum``,
+                       ``XOR`` or ``Parity``.
+            v:         The XTCE algorithm.
+            path:      The key of the SpaceSystem it is written in.
+            scope:     The values it may be held in; the latest that is
+                       its parameter is used.
+            start:     The id of the Mark at the start of what it covers.
+            end:       The id of the Mark at the end, or None for the end
+                       of the packet.
+            container: The name of the container it belongs to.
+            where:     What it is in, for error messages.
+
+        Returns:
+            The Check.
+
+        Raises:
+            Unsupported: Its field isn't in ``scope``, isn't a plain
+                         unsigned integer, has an IncludeCondition or is
+                         already computed, or a CRC isn't 1 to 64 bits.
+        """
         pkey = qname(self.resolve(v.parameter_ref, path, self.params,
                                   "parameter"))
         local = next((lc for lc in reversed(scope) if lc.key == pkey), None)
@@ -2436,8 +3667,8 @@ class Compiler:
                               f"container {container}")
         vt = local.vtype
         if (vt.kind != "int" or not isinstance(vt.enc, IntEnc) or vt.enc.signed
-                or vt.enc.bcd or vt.calibrator is not None or vt.wide
-                or not fast_order(vt.enc)):
+                or vt.enc.bcd or vt.calibrator is not None
+                or not plain_order(vt.enc)):
             raise Unsupported(f"{where}: checksum field {local.name} must be "
                               "an uncalibrated unsigned binary integer, big "
                               "or little endian in whole bytes, most "
@@ -2482,10 +3713,19 @@ class Compiler:
         return Check(spec, local, start, end, skip, from_end, container)
 
     def check_rest(self, node: Node, where: str) -> None:
-        """A value that takes the rest of the packet must come last, as
-        must a transformed one that does, unless it is binary data with
-        only entries of a fixed size after it: then it takes the rest but
-        them, which its ``tail`` records."""
+        """Checks that a value that takes the rest of the packet comes
+        last, as must a transformed one that does, unless it is binary data
+        with only entries of a fixed size after it: then it takes the rest
+        but them, which its ``tail`` records.
+
+        Args:
+            node:  The packet.
+            where: What it is, for error messages.
+
+        Raises:
+            Unsupported: Such a value isn't last, or has entries of
+                         another size after it in another packet.
+        """
         top = node.all_items()
         items = walk(top, inner=False)
         for i, it in enumerate(items):
@@ -2514,8 +3754,16 @@ class Compiler:
 
     @staticmethod
     def check_length(node: Node, where: str) -> None:
-        """A packet has at most one length field, which is always present
-        and which nothing compares or takes a size from."""
+        """Checks that a packet has at most one length field, which is
+        always present and which nothing compares or takes a size from.
+
+        Args:
+            node:  The packet.
+            where: What it is, for error messages.
+
+        Raises:
+            Unsupported: It doesn't.
+        """
         items = node.all_items()
         lengths = [it.local for it in walk(items) if isinstance(it, Value)
                    and it.local.length is not None and not it.local.measures]
@@ -2539,9 +3787,24 @@ class Compiler:
 
     def match(self, mc, path: Key, scope: list, where: str,
               arg_key: Optional[Callable] = None) -> list:
-        """Terms of a RestrictionCriteria, IncludeCondition or
-        DiscreteLookup, on values in ``scope``; ``arg_key`` resolves
-        argument names in commands."""
+        """Compiles a RestrictionCriteria, IncludeCondition or
+        DiscreteLookup.
+
+        Args:
+            mc:      The XTCE match criteria.
+            path:    The key of the SpaceSystem it is written in.
+            scope:   The values decoded before it, which it may use.
+            where:   What it is in, for error messages.
+            arg_key: In a command, gives the key of an argument from its
+                     name; None elsewhere.
+
+        Returns:
+            Its terms, all of which must hold.
+
+        Raises:
+            Unsupported: It is of an unsupported form, or uses a value
+                         that isn't decoded before it.
+        """
         c = mc.choice
         if c.name == "BooleanExpression":
             return [self.boolean(c.value.choice, path, scope, where, arg_key)]
@@ -2571,8 +3834,23 @@ class Compiler:
         return out
 
     def boolean(self, c, path: Key, scope: list, where: str, arg_key) -> Term:
-        """A term from one alternative of a BooleanExpression (or of its
-        ANDedConditions or ORedConditions)."""
+        """Compiles one alternative of a BooleanExpression (or of its
+        ANDedConditions or ORedConditions).
+
+        Args:
+            c:       The alternative.
+            path:    The key of the SpaceSystem it is written in.
+            scope:   The values decoded before it, which it may use.
+            where:   What it is in, for error messages.
+            arg_key: In a command, gives the key of an argument from its
+                     name; None elsewhere.
+
+        Returns:
+            The term: a Criterion, AllOf or AnyOf.
+
+        Raises:
+            Unsupported: It is of an unsupported form.
+        """
         if c.name == "Condition":
             cc = c.value
             if hasattr(cc, "parameter_instance_ref"):
@@ -2597,8 +3875,28 @@ class Compiler:
 
     def value_ref(self, kind: str, ref, path: Key, scope: list, where: str,
                   arg_key):
-        """(local, member path, type, name) of the value that a
-        ParameterInstanceRef, ArgumentInstanceRef or Comparison names."""
+        """Finds the value that a ParameterInstanceRef, ArgumentInstanceRef
+        or Comparison names.
+
+        Args:
+            kind:    ``ArgumentInstanceRef`` for an argument; anything
+                     else for a parameter.
+            ref:     The XTCE reference.
+            path:    The key of the SpaceSystem it is written in.
+            scope:   The values decoded before it.
+            where:   What it is in, for error messages.
+            arg_key: In a command, gives the key of an argument from its
+                     name; None elsewhere.
+
+        Returns:
+            (Local, member path, type, name) of the value: the Local that
+            holds it, the path to it in that Local, its type and its name
+            for messages.
+
+        Raises:
+            Unsupported: It isn't decoded before, or is an array or
+                         aggregate.
+        """
         if kind == "ArgumentInstanceRef":
             if arg_key is None:
                 raise Unsupported(f"{where}: comparison of argument "
@@ -2623,8 +3921,31 @@ class Compiler:
 
     def comparison(self, kind: str, ref, op: str, text, path: Key, scope: list,
                    where: str, arg_key, other=None):
-        """``ref <op> text`` (a value as written), or with ``other`` (the
-        kind and reference of a second value) ``ref <op> other``."""
+        """Compiles a comparison: ``ref <op> text`` (a value as written),
+        or with ``other`` ``ref <op> other``.
+
+        Args:
+            kind:    ``ArgumentInstanceRef`` for an argument; anything
+                     else for a parameter.
+            ref:     The XTCE reference to the value compared.
+            op:      The comparison operator, such as ``==``.
+            text:    The value compared with, as written, or None.
+            path:    The key of the SpaceSystem it is written in.
+            scope:   The values decoded before it.
+            where:   What it is in, for error messages.
+            arg_key: In a command, gives the key of an argument from its
+                     name; None elsewhere.
+            other:   The kind and reference of a second value to compare
+                     with, or None.
+
+        Returns:
+            The Criterion.
+
+        Raises:
+            Unsupported: The operator doesn't fit the values, a value
+                         compared with another has an IncludeCondition, or
+                         the comparison is raw where it can't be.
+        """
         local, member, vt, pkey = self.value_ref(kind, ref, path, scope, where,
                                                  arg_key)
         raw = getattr(ref, "use_calibrated_value", None) is False
@@ -2662,8 +3983,21 @@ class Compiler:
     # -- commands --
 
     def arg_scope(self, key: Key, seen: tuple = ()) -> dict:
-        """Argument name -> (MetaCommand key, Argument) visible in a
-        MetaCommand."""
+        """Collects the arguments visible in a MetaCommand: its own and
+        its bases'.
+
+        Args:
+            key:  The MetaCommand's key.
+            seen: The keys of the meta-commands derived from it, to find
+                  cycles; empty when called from outside.
+
+        Returns:
+            Argument name -> (key of the MetaCommand that has it,
+            Argument); its own replace its bases'.
+
+        Raises:
+            Unsupported: The inheritance chain is a cycle.
+        """
         if key in seen:
             raise Unsupported("meta-command inheritance cycle through "
                               f"{qname(key)}")
@@ -2679,6 +4013,21 @@ class Compiler:
         return scope
 
     def arg_local(self, scope: dict, name: str, where: str) -> Local:
+        """Makes a new value of an argument, for an entry that holds it.
+
+        Args:
+            scope: The arguments visible, as ``arg_scope`` gives them.
+            name:  The argument's name.
+            where: What refers to it, for error messages.
+
+        Returns:
+            The Local, with the argument's type, and its length adjustment
+            if it is a packet length field.
+
+        Raises:
+            Unsupported: The argument isn't visible, or its type isn't
+                         supported.
+        """
         if name not in scope:
             raise Unsupported(f"{where}: unknown argument {name!r}")
         owner, a = scope[name]
@@ -2690,9 +4039,17 @@ class Compiler:
         return local
 
     def msg_node(self, key: Key) -> Node:
-        """A Message: the root container it names, chosen by its
+        """Compiles a Message: the root container it names, chosen by its
         MatchCriteria, like a container derived from it with no entries of
-        its own."""
+        its own.
+
+        Args:
+            key: The Message's key.
+
+        Returns:
+            Its Node; one that can't be compiled has an ``error`` saying
+            why.
+        """
         path, m = self.messages[key]
         node = Node("tm", qname(key), m.name, False)
         # Messages are named apart from containers.
@@ -2717,6 +4074,18 @@ class Compiler:
         return node
 
     def tc_node(self, key: Key) -> Node:
+        """Compiles a MetaCommand, and its bases, once.
+
+        Args:
+            key: The MetaCommand's key.
+
+        Returns:
+            Its Node; one that can't be compiled has an ``error`` saying
+            why.
+
+        Raises:
+            Unsupported: Its inheritance chain is a cycle.
+        """
         if key in self.nodes:
             n = self.nodes[key]
             if getattr(n, "_building", False):
@@ -2805,6 +4174,7 @@ class Compiler:
                 # A CommandContainer without a BaseContainer still extends
                 # the container of its BaseMetaCommand, as Yamcs reads it.
                 if self.has_transform(cc, where):
+                    node._edc = (None, None)  # its checks are in it
                     m = self._id()
                     node.items = prefix + self.wrap_transform(
                         cc,
@@ -2835,10 +4205,27 @@ class Compiler:
 
     def tc_items(self, cc, scope: dict, path: Key, where: str, values: list,
                  start: int = 0, stack: tuple = ()) -> list[Item]:
-        """Items for a CommandContainer's entries, or those of a container
-        it includes (from mark ``start``; ``stack`` lists the containers
-        being included).  ``values`` lists the values encoded so far (base
-        meta-commands first) and grows."""
+        """Compiles a CommandContainer's entries, or those of a container
+        it includes, into items.
+
+        Args:
+            cc:     The XTCE container.
+            scope:  The arguments visible, as ``arg_scope`` gives them.
+            path:   The key of the SpaceSystem the container is in.
+            where:  What the command is, for error messages.
+            values: The values encoded so far (base meta-commands first);
+                    grows as entries are added.
+            start:  The id of the Mark at the container's start.
+            stack:  The keys of the containers being included (a
+                    meta-command's as ``("meta-command",) + key``), to
+                    find ones that include themselves.
+
+        Returns:
+            The items.
+
+        Raises:
+            Unsupported: An entry uses something not supported.
+        """
 
         def arg_key(name: str) -> str:
             if name not in scope:
@@ -2871,11 +4258,10 @@ class Compiler:
             if ch.name in SEGMENTS:
                 after = []
                 if out and isinstance(out[-1], EndSeek):
-                    if e.repeat_entry is not None:
-                        raise Unsupported(f"{where}: a repeated {ch.name} "
-                                          "located from the container's end")
-                    out[-1], after = self.end_seek(out[-1], cc, None, where,
-                                                   e.size_in_bits)
+                    out[-1], after = self.end_seek(
+                        out[-1], cc, None, where,
+                        self.segment_bits(ch.name, e, path, where), values,
+                        path, arg_key)
                 out += self.segment(ch.name, e, path, where, segs,
                                     cond is not None, values, arg_key)
                 out += after
@@ -2922,7 +4308,9 @@ class Compiler:
                                   where, arg_key)
                 after = []
                 if out and isinstance(out[-1], EndSeek):
-                    out[-1], after = self.end_seek(out[-1], cc, local, where)
+                    out[-1], after = self.end_seek(out[-1], cc, local, where,
+                                                   scope=values, path=path,
+                                                   arg_key=arg_key)
                 out.append(Value(local))
                 out += after
                 values.append(local)
@@ -2939,9 +4327,27 @@ class Compiler:
 
     def tc_include(self, ckey: Key, scope: dict, where: str, values: list,
                    stack: tuple) -> list[Item]:
-        """Items for a container that a command includes: its bases'
+        """Compiles a container that a command includes: its bases'
         entries, then its own, each base's RestrictionCriteria checked
-        after its entries, and padding up to its size."""
+        after its entries, and padding up to its size.
+
+        Args:
+            ckey:   The container's key in ``tc_containers``.
+            scope:  The arguments visible, as ``arg_scope`` gives them.
+            where:  What the command is, for error messages.
+            values: The values encoded so far; grows as entries are added.
+            stack:  The keys of the containers being included, to find
+                    ones that include themselves.
+
+        Returns:
+            The items, starting with a Mark and in a Transform if the
+            container has transform algorithms.
+
+        Raises:
+            Unsupported: A container includes itself, or has
+                         ErrorDetectCorrect, or a base has transform
+                         algorithms.
+        """
         m = self._id()
         items: list[Item] = [Mark(m)]
         arg_key = lambda name: self.arg_key_of(scope, name, where)  # noqa
@@ -2981,9 +4387,19 @@ class Compiler:
 
     @staticmethod
     def measure(items: list, where: str) -> list[Item]:
-        """An included container's items, its length fields (those not
-        already measuring a container inside it) made to measure it, with
-        a LengthEnd for each where it ends."""
+        """Makes an included container's length fields (those not already
+        measuring a container inside it) measure it.
+
+        Args:
+            items: The container's items; their Locals are marked.
+            where: What includes it, for error messages.
+
+        Returns:
+            ``items``, with a LengthEnd after them for each length field.
+
+        Raises:
+            Unsupported: A length field has an IncludeCondition.
+        """
         ends = []
         for it in walk(items):
             if (isinstance(it, Value) and it.local.length is not None
@@ -2997,8 +4413,16 @@ class Compiler:
         return items + ends
 
     def mc_owner(self, ref: str, path: Key) -> Optional[Key]:
-        """The meta-command whose CommandContainer ``ref`` names, if it
-        names no container of a CommandContainerSet or of telemetry."""
+        """Finds the meta-command whose CommandContainer a reference names.
+
+        Args:
+            ref:  The reference.
+            path: The key of the SpaceSystem it is written in.
+
+        Returns:
+            The meta-command's key, or None if ``ref`` names a container
+            of a CommandContainerSet or of telemetry, or nothing.
+        """
         try:
             self.resolve(ref, path, self.tc_containers, "container")
             return None
@@ -3017,7 +4441,26 @@ class Compiler:
         command includes: those of the container it extends (its
         BaseMetaCommand's, included the same way, or another), then its
         own, with its own arguments; its argument assignments, which fix
-        what they assign; and padding up to its size."""
+        what they assign; and padding up to its size.
+
+        Args:
+            key:    The meta-command's key.
+            where:  What includes it, for error messages.
+            values: The values encoded so far; grows as entries are added.
+            stack:  The keys of the containers being included (a
+                    meta-command's as ``("meta-command",) + key``), to
+                    find ones that include themselves.
+
+        Returns:
+            The items, starting with a Mark and in a Transform if the
+            container has transform algorithms.
+
+        Raises:
+            Unsupported: It includes itself, has no CommandContainer or
+                         has ErrorDetectCorrect, its container extends
+                         another than its BaseMetaCommand's, or an
+                         assignment or criterion is invalid.
+        """
         mark = ("meta-command",) + key
         if mark in stack:
             raise Unsupported(f"{where}: the CommandContainer of {qname(key)} "
@@ -3105,8 +4548,23 @@ class Compiler:
         return f"{qname(scope[name][0])}#{name}"
 
     def fixed_entry(self, e, path: Key, where: str) -> list[Item]:
-        """A FixedValueEntry of any size, repeated as its RepeatEntry says:
-        Fixed items of at most 64 bits each."""
+        """Compiles a FixedValueEntry of any size, repeated as its
+        RepeatEntry says.
+
+        Args:
+            e:     The XTCE entry.
+            path:  The key of the SpaceSystem it is in.
+            where: What it is in, for error messages.
+
+        Returns:
+            Fixed items of at most 64 bits each, most significant first,
+            with a Seek between repeats that have an Offset.
+
+        Raises:
+            Unsupported: The value doesn't fit its size, or it is repeated
+                         as other values say, or its Count or Offset is out
+                         of range.
+        """
         bits = e.size_in_bits
         value = int.from_bytes(hex_bytes(e.binary_value.strip() or "0", where),
                                "big")
@@ -3142,6 +4600,18 @@ class Compiler:
     # -- whole mission --
 
     def compile(self) -> Mission:
+        """Compiles every container, meta-command, message and stream, and
+        names what the generated code defines.
+
+        Returns:
+            The mission, without those left out when ``skip_unsupported``
+            is set (``skipped`` lists them and why).
+
+        Raises:
+            Unsupported: Something can't be compiled and
+                         ``skip_unsupported`` isn't set; the message lists
+                         the root causes.
+        """
         for key in self.containers:
             self.tm_node(key)
         for key in self.mcs:
@@ -3256,7 +4726,20 @@ class Compiler:
             hooks=list(self.hooks.values()))
 
     def stream(self, key: Key) -> Stream:
-        """A FixedFrameStream or VariableFrameStream."""
+        """Compiles a FixedFrameStream, VariableFrameStream or
+        CustomStream; the streams it refers to are linked later, by
+        ``link_streams``.
+
+        Args:
+            key: The stream's key.
+
+        Returns:
+            The Stream.
+
+        Raises:
+            Unsupported: Its pcmType, flag or sync pattern isn't supported,
+                         or a variable stream has an InvertAlgorithm.
+        """
         path, kind, st = self.streams[key]
         where = f"stream {qname(key)}"
         pcm = st.pcm_type.value if st.pcm_type else "NRZL"
@@ -3340,10 +4823,31 @@ class Compiler:
 
     def link_streams(self, streams: list, errors: list) -> list:
         """Connects each stream to the one that feeds it, and leaves out
-        (adding why to ``errors``) those whose chain doesn't work."""
+        those whose chain doesn't work.
+
+        Args:
+            streams: The streams compiled.
+            errors:  Where to add why each one left out is.
+
+        Returns:
+            The streams kept, each after those that feed it.
+        """
         by_key = {st.key: st for st in streams}
 
         def find(path, ref, where):
+            """Finds a compiled stream by reference.
+
+            Args:
+                path:  The key of the SpaceSystem the reference is in.
+                ref:   The reference.
+                where: What refers to it, for error messages.
+
+            Returns:
+                The Stream.
+
+            Raises:
+                Unsupported: It names no stream, or one not compiled.
+            """
             key = qname(self.resolve(ref, path, self.streams, "stream"))
             if key not in by_key:
                 raise Unsupported(f"{where}: stream {key} is not supported")
@@ -3394,7 +4898,17 @@ class Compiler:
         return out
 
     def hook(self, kind: str, name: str, outputs: int = 0) -> Hook:
-        """The hook for custom algorithm ``name``, which computes ``kind``."""
+        """Gets the hook for a custom algorithm, making it the first time.
+
+        Args:
+            kind:    What it computes, such as ``checksum`` or
+                     ``binary_from``.
+            name:    The algorithm's qualified name.
+            outputs: How many values it gives, for an ``algorithm``.
+
+        Returns:
+            The one Hook for ``kind`` and ``name``.
+        """
         h = self.hooks.get((kind, name))
         if h is None:
             h = self.hooks[kind, name] = Hook(kind, name, outputs=outputs)
@@ -3402,8 +4916,26 @@ class Compiler:
 
     def hook_inputs(self, alg, path: Key, scope: list, where: str,
                     arg_key=None) -> list:
-        """The inputs of a custom algorithm, in order: values of the packet,
-        which must be present, and constants."""
+        """Compiles the inputs of a custom algorithm.
+
+        Args:
+            alg:     The XTCE algorithm, with an InputSet.
+            path:    The key of the SpaceSystem it is defined in.
+            scope:   The values of the packet decoded before it is used.
+            where:   What uses it, for error messages.
+            arg_key: In a command, gives the key of an argument from its
+                     name; None elsewhere.
+
+        Returns:
+            The inputs, in order: ``("const", x)`` for a constant, and
+            ``("value", Local, member path, type)`` for a value of the
+            packet.
+
+        Raises:
+            Unsupported: There are too many, a constant isn't a number, or
+                         a value is optional, not a number, or raw but
+                         calibrated.
+        """
         out: list = []
         items = alg.input_set.items if alg.input_set else []
         if len(items) > MAX_HOOK_INPUTS:
@@ -3426,9 +4958,6 @@ class Compiler:
             if vt.kind not in ("int", "float", "enum", "bool"):
                 raise Unsupported(f"{where}: custom algorithm input {name} is "
                                   f"a {vt.kind} value")
-            if vt.wide:
-                raise Unsupported(f"{where}: custom algorithm input {name} is "
-                                  f"a {vt.enc.bits}-bit integer")
             if v.use_calibrated_value is False and vt.calibrator is not None:
                 raise Unsupported(f"{where}: the raw value of calibrated "
                                   f"{name}")
@@ -3436,10 +4965,15 @@ class Compiler:
         return out
 
     def bind_algorithms(self, n: Node) -> None:
-        """The MathAlgorithms that packet ``n`` triggers, by holding a value
-        of a parameter that triggers it or being (or deriving from) a
-        container that does.  One whose inputs the packet doesn't hold is
-        left out, and ``algorithm_notes`` says why."""
+        """Finds the MathAlgorithms and CustomAlgorithms that a packet
+        triggers, by holding a value of a parameter that triggers it or
+        being (or deriving from) a container that does, and adds them to
+        its ``algorithms``.  One whose inputs the packet doesn't hold is
+        left out, and ``algorithm_notes`` says why.
+
+        Args:
+            n: The packet.
+        """
         scope = self.scope_of(n)
         fields = {lc for _, lc in n.fields}
         keys = {lc.key for lc in scope}
@@ -3485,7 +5019,20 @@ class Compiler:
 
     def custom_algorithm(self, n: Node, key: Key, path: Key, alg, scope: list,
                          fields: set, names, where: str) -> None:
-        """The outputs of a CustomAlgorithm that packet ``n`` triggers."""
+        """Adds the outputs of a CustomAlgorithm that a packet triggers to
+        its ``algorithms``; or, if it can't be computed, why to its
+        ``algorithm_notes``.
+
+        Args:
+            n:      The packet.
+            key:    The algorithm's key.
+            path:   The key of the SpaceSystem it is defined in.
+            alg:    The XTCE algorithm.
+            scope:  The packet's values.
+            fields: The packet's fields' Locals.
+            names:  The Namer of the packet's algorithm identifiers.
+            where:  What the algorithm is, for messages.
+        """
         try:
             inputs = self.hook_inputs(alg, path, scope, where)
             for x in input_locals(inputs):
@@ -3510,8 +5057,24 @@ class Compiler:
 
     def bind_inputs(self, e: tuple, scope: list, fields: set, n: Node,
                     where: str) -> tuple:
-        """A MathAlgorithm's expression bound to the fields of packet ``n``;
-        an input may be absent, which makes the output absent."""
+        """Binds a MathAlgorithm's expression to the fields of a packet; an
+        input may be absent, which makes the output absent.
+
+        Args:
+            e:      The expression tree, or a subtree.
+            scope:  The packet's values.
+            fields: The packet's fields' Locals.
+            n:      The packet.
+            where:  What the algorithm is, for error messages.
+
+        Returns:
+            A copy of ``e`` whose ValueRefs hold the Locals they use.
+
+        Raises:
+            Unsupported: It uses the output's own earlier value, or an
+                         input the packet computes, isn't a number, or is
+                         raw but calibrated.
+        """
         if e[0] == "const":
             return e
         if e[0] == "raw":
@@ -3529,17 +5092,19 @@ class Compiler:
                               "packet")
         if vt.kind not in ("int", "float", "enum", "bool"):
             raise Unsupported(f"{where}: input {name} is a {vt.kind} value")
-        if vt.wide:
-            raise Unsupported(f"{where}: input {name} is a {vt.enc.bits}-bit "
-                              "integer")
         if r.ref.use_calibrated_value is False and vt.calibrator is not None:
             raise Unsupported(f"{where}: the raw value of calibrated {name}")
         return ("value", ValueRef(r.ref, r.path, local, member, vt))
 
     def bind_alarms(self, n: Node) -> None:
-        """The alarms of a packet's fields, their criteria bound to its
-        values.  An array's alarm is its elements'.  Alarms that can't be
-        evaluated are left out, and ``alarm_notes`` says why."""
+        """Adds the alarms of a packet's fields to its ``alarms``, their
+        criteria bound to its values.  An array's alarm is its elements'.
+        Alarms that can't be evaluated are left out, and ``alarm_notes``
+        says why.
+
+        Args:
+            n: The packet.
+        """
         fields = {lc for _, lc in n.fields}
         scope = self.scope_of(n)
         # A value its inheritance fixes has an alarm too, of that value.
@@ -3563,6 +5128,17 @@ class Compiler:
             where = f"{n.key}: alarm of {lc.name}"
 
             def terms(mc):
+                """Compiles an alarm's context or condition on the packet.
+
+                Args:
+                    mc: The XTCE match criteria.
+
+                Returns:
+                    Its terms.
+
+                Raises:
+                    Unsupported: They use a value the packet computes.
+                """
                 ts = self.match(mc, a.path, scope, where)
                 for t in ts:
                     for x in term_locals(t):
@@ -3572,6 +5148,18 @@ class Compiler:
                 return ts
 
             def bound(d):
+                """Binds an alarm definition to the packet.
+
+                Args:
+                    d: The AlarmDef.
+
+                Returns:
+                    A copy with its conditions and its custom alarm's
+                    inputs bound.
+
+                Raises:
+                    Unsupported: They use a value the packet computes.
+                """
                 custom = None
                 if d.custom is not None:
                     custom = (d.custom[0],
@@ -3599,7 +5187,14 @@ class Compiler:
 
     @staticmethod
     def node_hooks(n: Node) -> list:
-        """The hooks that decoding or encoding ``n`` calls."""
+        """Lists the hooks that decoding or encoding a packet calls.
+
+        Args:
+            n: The packet.
+
+        Returns:
+            The hooks, each once.
+        """
         out = terms_hooks(n.all_criteria())
         for h in items_hooks(n.all_items()) + checks_hooks(n.checks):
             if h not in out:
@@ -3607,6 +5202,13 @@ class Compiler:
         return out
 
     def _finish(self, n: Node) -> None:
+        """Completes a concrete packet: the values its inheritance fixes,
+        the sizes derived from others, its fields and their names, its
+        largest size and the hooks it calls.
+
+        Args:
+            n: The packet.
+        """
         fixed = {}
         for c in n.all_criteria():
             fixes = (isinstance(c, Criterion) and c.op == "==" and not c.path
@@ -3622,19 +5224,51 @@ class Compiler:
                         fixed[c.local] = c.value
         n.fixed = fixed
         n.derived = derived_sizes(n)
+        values = [it.local for it in walk(n.all_items())
+                  if isinstance(it, Value) and it.local not in fixed
+                  and not it.local.computed and it.local not in n.derived]
+        # The values an IndirectParameterRefEntry can select are named
+        # last, so the packet's own keep their names.
+        chosen = {id(lc) for lc in chosen_locals(n.all_items())}
         names = Namer()
-        n.fields = [(names.take(snake(it.local.name)), it.local)
-                    for it in walk(n.all_items()) if isinstance(it, Value)
-                    and it.local not in fixed and not it.local.computed
-                    and it.local not in n.derived]
+        idents = {id(lc): names.take(snake(lc.name)) for lc in values
+                  if id(lc) not in chosen}
+        idents.update({id(lc): names.take(snake(lc.name)) for lc in values
+                       if id(lc) in chosen})
+        n.fields = [(idents[id(lc)], lc) for lc in values]
         n.max_bytes = (max_bits(n.all_items()) + 7) // 8
         n.hooks = self.node_hooks(n)
 
 
+def chosen_locals(items: list) -> list[Local]:
+    """Lists the values that alternatives hold (the parameters an
+    IndirectParameterRefEntry can select).
+
+    Args:
+        items: The items to search, conditions included.
+
+    Returns:
+        The Locals.
+    """
+    out = []
+    for it in items:
+        if isinstance(it, Cond):
+            out += ([x.local for x in walk(it.items) if isinstance(x, Value)]
+                    if it.group else chosen_locals(it.items))
+    return out
+
+
 def edc_items(container) -> list:
-    """The (kind, algorithm) ErrorDetectCorrect items of a container's
-    BinaryEncoding that name the parameter holding their value; the others
-    only document the container."""
+    """Lists the ErrorDetectCorrect items of a container's BinaryEncoding
+    that name the parameter holding their value; the others only document
+    the container.
+
+    Args:
+        container: The XTCE container, or None.
+
+    Returns:
+        (element name, algorithm) of each.
+    """
     be = getattr(container, "binary_encoding", None)
     edc = be.error_detect_correct if be is not None else None
     if edc is None:
@@ -3653,7 +5287,17 @@ TIME_UNITS = {"seconds": 1.0, "milliseconds": 1e-3, "microseconds": 1e-6,
 
 
 def affine(cal, a: float, b: float):
-    """``a * cal(x) + b``, as a calibrator (None for the identity)."""
+    """Composes a calibrator with an affine function.
+
+    Args:
+        cal: The calibrator, or None for the identity.
+        a:   The factor.
+        b:   The term added.
+
+    Returns:
+        A calibrator giving ``a * cal(x) + b``, or ``cal`` itself when
+        ``a`` is 1 and ``b`` 0.
+    """
     if (a, b) == (1.0, 0.0):
         return cal
     if cal is None:
@@ -3678,7 +5322,16 @@ def unbound(d: DynSize) -> bool:
 
 
 def int_range(e: IntEnc) -> tuple[int, int]:
-    """The smallest and largest value an integer encoding holds."""
+    """Finds the smallest and largest value an integer encoding holds.
+
+    Args:
+        e: The encoding.
+
+    Returns:
+        (smallest, largest).  Any encoding but unsigned and two's
+        complement is taken as sign-magnitude or ones' complement, which
+        has no most negative value.
+    """
     b = e.bits
     if e.encoding == "unsigned":
         return 0, (1 << b) - 1
@@ -3688,8 +5341,16 @@ def int_range(e: IntEnc) -> tuple[int, int]:
 
 
 def value_range(vt: VType) -> tuple[int, int]:
-    """The smallest and largest value of an integer type, from its encoding
-    and calibrator."""
+    """Finds the smallest and largest value of an integer type, from its
+    encoding and calibrator.
+
+    Args:
+        vt: The type.
+
+    Returns:
+        (smallest, largest); for a calibrator whose range isn't known,
+        those of the type's own size.
+    """
     lo, hi = int_range(vt.enc)
     if vt.calibrator is None:
         return lo, hi
@@ -3713,8 +5374,17 @@ def int_bounds(vt: VType) -> tuple[int, int]:
 
 
 def dyn_units(b: DynSize, rng: tuple[int, int], cap: int) -> int:
-    """The largest ``(slope * x + intercept) / unit`` for x in ``rng``, at
-    most ``cap``."""
+    """Finds the largest size or count a DynSize gives.
+
+    Args:
+        b:   The DynSize.
+        rng: The range (lo, hi) of the value it adjusts.
+        cap: The most it may be.
+
+    Returns:
+        The largest ``(slope * x + intercept) / unit`` for x in ``rng``,
+        at least 0 and at most ``cap``.
+    """
     lo, hi = rng
     top = max(b.slope * lo, b.slope * hi) + b.intercept
     return (min(max(math.floor(top), 0) // b.unit, cap) if math.isfinite(top)
@@ -3722,9 +5392,18 @@ def dyn_units(b: DynSize, rng: tuple[int, int], cap: int) -> int:
 
 
 def bounded(vt: VType, b: DynSize, rng: tuple[int, int], cap: int) -> VType:
-    """A copy of ``vt`` whose size or count is the bound ``b``, with
-    ``b.max`` set from the range ``rng`` of the value it adjusts and the
-    most bits, ``cap``, the field may take."""
+    """Makes a type's size or count a bound DynSize, and sets the most it
+    may be.
+
+    Args:
+        vt:  The type: an array, string or binary data.
+        b:   The bound DynSize; its ``max`` is set.
+        rng: The range (lo, hi) of the value it adjusts.
+        cap: The most bits the field may take.
+
+    Returns:
+        A copy of ``vt`` whose size or count is ``b``.
+    """
     units = dyn_units(b, rng, cap)
     e = vt.enc
     if isinstance(e, ArrayEnc):
@@ -3741,7 +5420,15 @@ def bounded(vt: VType, b: DynSize, rng: tuple[int, int], cap: int) -> VType:
 
 
 def range_bands(ranges, unit: float) -> list[Band]:
-    """The Bands of an AlarmRanges (in ``unit`` seconds, for a time)."""
+    """Converts an AlarmRanges to Bands.
+
+    Args:
+        ranges: The XTCE AlarmRanges.
+        unit:   The seconds in its units, for a time; 1 otherwise.
+
+    Returns:
+        A Band for each level it gives a range for.
+    """
     inside = (ranges.range_form is not None
               and ranges.range_form.value == "inside")
     return [band(r, level, inside, unit) for level, name in enumerate(LEVELS)
@@ -3749,7 +5436,18 @@ def range_bands(ranges, unit: float) -> list[Band]:
 
 
 def band(r, level: int, inside: bool, unit: float) -> Band:
-    """An alarm range (in ``unit`` seconds, for a time) as a Band."""
+    """Converts one alarm range to a Band.
+
+    Args:
+        r:      The XTCE range.
+        level:  The alarm level, an index into LEVELS.
+        inside: Whether a value inside the range is in alarm, rather than
+                one outside it.
+        unit:   The seconds in its units, for a time; 1 otherwise.
+
+    Returns:
+        The Band.
+    """
     def scaled(x):
         return None if x is None else x * unit
     lo = r.min_inclusive if r.min_inclusive is not None else r.min_exclusive
@@ -3762,7 +5460,15 @@ def int_band(b: Band, vt: VType) -> Band:
     """A Band for integer values: whole, inclusive bounds within the range
     of the field's type (None when the type's own limit is as far), so
     that every language compares integers exactly.  An empty range is
-    1 to 0."""
+    1 to 0.
+
+    Args:
+        b:  The Band.
+        vt: The integer field's type.
+
+    Returns:
+        The integer Band.
+    """
     lo_lim, hi_lim = (vt.eng_limits if vt.eng
                       else ((-(1 << (vt.width - 1)), 1 << (vt.width - 1))
                             if vt.signed else (0, 1 << vt.width)))
@@ -3791,7 +5497,20 @@ def instance_of(scope: list, key: str, instance: int,
     """The value ``key`` of ``scope`` that a ParameterInstanceRef's
     ``instance`` names: 0 is the one decoded last, -1 the one before it,
     and so on, within the packet.  Positive instances are values yet to
-    come, and so are other packets' values: they aren't supported."""
+    come, and so are other packets' values: they aren't supported.
+
+    Args:
+        scope:    The values decoded so far.
+        key:      The qualified name of the parameter or argument.
+        instance: The instance, 0 or less.
+        where:    What refers to it, for error messages.
+
+    Returns:
+        The Local, or None if ``scope`` holds no value of ``key``.
+
+    Raises:
+        Unsupported: The instance is positive, or before the first.
+    """
     if instance > 0:
         raise Unsupported(f"{where}: instance {instance} of {key}, a value yet "
                           "to come")
@@ -3806,13 +5525,43 @@ def instance_of(scope: list, key: str, instance: int,
 
 
 def check_aligned(items: list[Item], where: str) -> None:
-    """Strings and binary data with bitOrder leastSignificantBitFirst must
-    start on a byte boundary, where their bytes read the same as with the
-    usual bit order."""
+    """Checks that transformed data starts on a byte boundary, as the
+    transform works on whole bytes.
+
+    Args:
+        items: A packet's items.
+        where: What it is, for error messages.
+
+    Raises:
+        Unsupported: Transformed data may not start on a byte boundary.
+    """
     marks = {0: 0}
 
     def walk_items(items: list, pos: Optional[int]) -> Optional[int]:
+        """Checks a list of items, and records where its Marks are.
+
+        Args:
+            items: The items.
+            pos:   Where they start, in bits after a byte boundary; None
+                   when unknown.
+
+        Returns:
+            Where they end, the same way.
+
+        Raises:
+            Unsupported: Transformed data in them may not start on a byte
+                         boundary.
+        """
+        group = start = 0
         for it in items:
+            if isinstance(it, Cond) and it.group:
+                # Alternatives each start where the first does.
+                if it.group != group:
+                    group, start = it.group, pos
+                after = walk_items(it.items, start)
+                pos = pos if after == start else None
+                continue
+            group = 0
             if isinstance(it, Cond):
                 after = walk_items(it.items, pos)
                 pos = pos if after == pos else None
@@ -3843,15 +5592,22 @@ def check_aligned(items: list[Item], where: str) -> None:
         return pos
 
     def advance(vt: VType, pos: Optional[int], name: str) -> Optional[int]:
-        """Checks ``vt`` at ``pos`` (in bits after a byte boundary, None
-        when unknown) and returns the position after it."""
+        """Checks a value that may hold transformed data.
+
+        Args:
+            vt:   The value's type.
+            pos:  Where it starts, in bits after a byte boundary; None
+                  when unknown.
+            name: The value's name, for error messages.
+
+        Returns:
+            Where it ends, the same way.
+
+        Raises:
+            Unsupported: Transformed data in it may not start on a byte
+                         boundary.
+        """
         e = vt.enc
-        if isinstance(e, (StringEnc, BinaryEnc)) and e.lsb:
-            tag = getattr(e, "size_tag_bits", None) or 0
-            if pos != 0 or tag % 8:
-                raise Unsupported(f"{where}: {name} has bitOrder "
-                                  "leastSignificantBitFirst but may not start "
-                                  "on a byte boundary")
         if isinstance(e, AggregateEnc) and e.transform is not None:
             if pos != 0:
                 raise Unsupported(f"{where}: transformed data {name} may not "
@@ -3879,7 +5635,9 @@ def check_aligned(items: list[Item], where: str) -> None:
             if step == 0:
                 return pos
             for t in e.elem.tree():
-                if isinstance(t.enc, (StringEnc, BinaryEnc)) and t.enc.lsb:
+                if (isinstance(t.enc, XformEnc)
+                        or isinstance(t.enc, AggregateEnc)
+                        and t.enc.transform is not None):
                     advance(t, None, name)
             return None
         if isinstance(e, XformEnc):
@@ -3906,7 +5664,14 @@ SEGMENTS = ("ParameterSegmentRefEntry", "ContainerSegmentRefEntry",
 
 
 def fixed_bits(vt: VType) -> Optional[int]:
-    """The bits a value of this type always occupies, or None if it varies."""
+    """Finds the bits a value of a type always occupies.
+
+    Args:
+        vt: The type.
+
+    Returns:
+        The bits, or None if it varies.
+    """
     e = vt.enc
     if isinstance(e, ArrayEnc):
         b = fixed_bits(e.elem)
@@ -3929,8 +5694,17 @@ def fixed_bits(vt: VType) -> Optional[int]:
 
 
 def static_end(items: list[Item], start: int) -> Optional[tuple[int, int]]:
-    """(position, furthest bit) after ``items``, in bits from mark
-    ``start``, or None when they depend on the data."""
+    """Finds where a list of items ends, when that doesn't depend on the
+    data.
+
+    Args:
+        items: The items.
+        start: The id of the Mark they are measured from.
+
+    Returns:
+        (position, furthest bit) after them, in bits from the Mark, or
+        None when they depend on the data.
+    """
     pos = extent = 0
     marks = {start: 0}
     for it in items:
@@ -3970,7 +5744,14 @@ def derived_sizes(n: Node) -> dict:
     encoding computes it first and they read the computed value.  Anything
     else that uses it (a string's size, an aggregate's or element's size,
     or a size or count of a value that may be absent) leaves it a field
-    that the application sets."""
+    that the application sets.
+
+    Args:
+        n: The packet, its ``fixed`` values already found.
+
+    Returns:
+        Local -> (the value whose size or count it gives, that DynSize).
+    """
     items = walk(n.all_items())
     # Local -> [(consumer, DynSize) for a size or count it gives, READ for a
     # criterion, location or lookup that reads it, or None for any other use]
@@ -3980,8 +5761,15 @@ def derived_sizes(n: Node) -> dict:
         uses.setdefault(lc, []).append(what)
 
     def dyn_uses(d: DynSize, consumer=None, read=False) -> None:
-        """A size or count, of ``consumer`` when it is a whole value that is
-        always present, or a location's offset when ``read``."""
+        """Records the use of a value as a size or count.
+
+        Args:
+            d:        The DynSize.
+            consumer: The value it sizes, when that is a whole value that
+                      is always present; None otherwise.
+            read:     Whether it is a location's offset, which only reads
+                      the value.
+        """
         if d.lookup is not None:
             for crit, _ in d.lookup:
                 for lc in (x for c in crit for x in term_locals(c)):
@@ -4015,8 +5803,10 @@ def derived_sizes(n: Node) -> dict:
             continue
         lc = it.local
         vt = lc.vtype
+        # A wide one stays a field the application sets, which encoding
+        # checks against what it sizes.
         if (lc.optional or lc in n.fixed or lc.computed or vt.kind != "int"
-                or vt.calibrator is not None):
+                or vt.calibrator is not None or vt.wide):
             continue
         found = uses.get(lc, [])
         sizes = [u for u in found if u is not None and u is not READ]
@@ -4036,8 +5826,16 @@ def conds(it: Item) -> list[Term]:
 
 
 def tail_bits(items: list[Item], it: Value) -> Optional[int]:
-    """The bits of the entries after value ``it`` in ``items``, or None
-    when ``it`` is in a conditional block or they vary."""
+    """Measures the entries after a value.
+
+    Args:
+        items: The items, as ``walk(inner=False)`` gives them.
+        it:    The value.
+
+    Returns:
+        The bits of the entries after ``it``, or None when ``it`` isn't
+        among ``items`` (it is in a conditional block) or they vary.
+    """
     i = next((i for i, x in enumerate(items) if x is it), None)
     if i is None:
         return None
@@ -4067,7 +5865,14 @@ def is_rest(vt: VType) -> bool:
 def work_bytes(vt: VType) -> int:
     """The bytes after a value that encoding it may use for a while:
     encoding transformed bytes writes them, then what the transform gives
-    after them."""
+    after them.
+
+    Args:
+        vt: The value's type.
+
+    Returns:
+        The bytes, for the value and those inside it.
+    """
     e = vt.enc
     inner = max((work_bytes(t)
                  for t in ([e.elem] if isinstance(e, ArrayEnc)
@@ -4081,7 +5886,14 @@ def work_bytes(vt: VType) -> int:
 
 
 def item_bits(vt: VType) -> int:
-    """The most bits a value of this type occupies."""
+    """Finds the most bits a value of a type occupies.
+
+    Args:
+        vt: The type.
+
+    Returns:
+        The bits.
+    """
     e = vt.enc
     if isinstance(e, ArrayEnc):
         n = e.max_count
@@ -4096,29 +5908,86 @@ def item_bits(vt: VType) -> int:
 
 
 def max_bits(items: list[Item]) -> int:
-    """Upper bound on the bits a packet with these items occupies."""
+    """Bounds the bits a packet occupies.
+
+    Args:
+        items: Its items.
+
+    Returns:
+        The most bits it may occupy, and encoding may use while
+        transforming data.
+    """
     pos = extent = 0
     marks = {0: 0}
-    for it in walk(items, inner=False):
-        if isinstance(it, Transform):
-            # Encoding writes its items, then what it gives after them.
-            extent = max(extent, pos + 8 * (it.cap + it.out_cap))
-        if isinstance(it, Seek):
-            pos = ((marks[it.from_start] if it.from_start is not None else pos)
-                   + it.max_offset)
-        elif isinstance(it, Fill):
-            pos = max(pos, marks[it.start] + it.max_size)
-        elif isinstance(it, Mark):
-            marks[it.id] = pos
-        elif isinstance(it, Value):
-            vt = it.local.vtype
-            pos += 0 if it.assembled else item_bits(vt)
-            extent = max(extent, pos + 8 * work_bytes(vt))
-        else:
-            pos += it.bits
-        extent = max(extent, pos)
+
+    def run(items: list) -> None:
+        """Advances the position and furthest bit over a list of items.
+
+        Args:
+            items: The items, as ``alternatives`` gives them.
+        """
+        nonlocal pos, extent
+        for it in items:
+            if isinstance(it, list):
+                # Alternatives: each starts where the first does, and the
+                # longest counts.
+                start, ends = pos, []
+                for branch in it:
+                    pos = start
+                    run(branch)
+                    ends.append(pos)
+                pos = max(ends)
+                continue
+            if isinstance(it, Transform):
+                # Encoding writes its items, then what it gives after them.
+                extent = max(extent, pos + 8 * (it.cap + it.out_cap))
+            if isinstance(it, Seek):
+                pos = ((marks[it.from_start] if it.from_start is not None
+                        else pos) + it.max_offset)
+            elif isinstance(it, Fill):
+                pos = max(pos, marks[it.start] + it.max_size)
+            elif isinstance(it, Mark):
+                marks[it.id] = pos
+            elif isinstance(it, Value):
+                vt = it.local.vtype
+                pos += 0 if it.assembled else item_bits(vt)
+                extent = max(extent, pos + 8 * work_bytes(vt))
+            else:
+                pos += it.bits
+            extent = max(extent, pos)
+
+    run(alternatives(items))
     return extent
 
+
+def alternatives(items: list[Item]) -> list:
+    """Groups the alternatives among items.
+
+    Args:
+        items: The items.
+
+    Returns:
+        ``items`` as walk(inner=False) gives them, but with each run of
+        Conds that are alternatives (the same nonzero group) as one list
+        of branches, each branch itself given this way.
+    """
+    out: list = []
+    group = 0
+    for it in items:
+        if isinstance(it, Cond) and it.group:
+            branch = alternatives(it.items)
+            if it.group == group:
+                out[-1].append(branch)
+            else:
+                out.append([branch])
+            group = it.group
+            continue
+        group = 0
+        if isinstance(it, Cond):
+            out += alternatives(it.items)
+        else:
+            out.append(it)
+    return out
 
 def compile_document(root, skip_unsupported: bool = False,
                      dialect: Optional[str] = None) -> Mission:

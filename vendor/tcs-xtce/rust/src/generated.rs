@@ -34,7 +34,12 @@ impl BasisType {
     pub const ALL: &'static [Self] =
         &[Self::PerSecond, Self::PerContainerUpdate];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `BasisType` value, spelled as the
+    /// schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `perSecond` or `perContainerUpdate`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::PerSecond => "perSecond",
@@ -80,7 +85,12 @@ impl BitOrderType {
         Self::MostSignificantBitFirst,
     ];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `BitOrderType` value, spelled as the
+    /// schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `leastSignificantBitFirst` or `mostSignificantBitFirst`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::LeastSignificantBitFirst => "leastSignificantBitFirst",
@@ -126,7 +136,12 @@ impl ByteOrderCommonType {
         Self::LeastSignificantByteFirst,
     ];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `ByteOrderCommonType` value, spelled
+    /// as the schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `mostSignificantByteFirst` or `leastSignificantByteFirst`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::MostSignificantByteFirst => "mostSignificantByteFirst",
@@ -172,7 +187,12 @@ impl ChangeBasisType {
     pub const ALL: &'static [Self] =
         &[Self::AbsoluteChange, Self::PercentageChange];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `ChangeBasisType` value, spelled as
+    /// the schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `absoluteChange` or `percentageChange`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::AbsoluteChange => "absoluteChange",
@@ -216,7 +236,12 @@ impl ChangeSpanType {
     pub const ALL: &'static [Self] =
         &[Self::ChangePerSecond, Self::ChangePerSample];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `ChangeSpanType` value, spelled as
+    /// the schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `changePerSecond` or `changePerSample`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::ChangePerSecond => "changePerSecond",
@@ -259,7 +284,12 @@ pub enum CharacterWidthType {
 impl CharacterWidthType {
     pub const ALL: &'static [Self] = &[Self::V8, Self::V16, Self::V32];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `CharacterWidthType` value, spelled
+    /// as the schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `8`, `16` or `32`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::V8 => "8",
@@ -343,7 +373,14 @@ impl ChecksumnameType {
         Self::Custom,
     ];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `ChecksumnameType` value, spelled as
+    /// the schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `unix_sum`, `sum8`, `sum16`, `sum24`, `sum32`, `fletcher4`,
+    /// `fletcher8`, `fletcher16`, `fletcher32`, `adler32`, `luhn`, `verhoeff`,
+    /// `damm` or `custom`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::UnixSum => "unix_sum",
@@ -424,7 +461,12 @@ impl ComparisonOperatorsType {
         Self::Empty6,
     ];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `ComparisonOperatorsType` value,
+    /// spelled as the schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `==`, `!=`, `<`, `<=`, `>` or `>=`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Empty => "==",
@@ -501,7 +543,13 @@ impl ConcernLevelsType {
         Self::Severe,
     ];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `ConcernLevelsType` value, spelled
+    /// as the schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `normal`, `watch`, `warning`, `distress`, `critical` or
+    /// `severe`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Normal => "normal",
@@ -569,7 +617,13 @@ impl ConsequenceLevelType {
         Self::User2,
     ];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `ConsequenceLevelType` value,
+    /// spelled as the schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `normal`, `vital`, `critical`, `forbidden`, `user1` or
+    /// `user2`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Normal => "normal",
@@ -626,7 +680,12 @@ impl EpochTimeEnumsType {
     pub const ALL: &'static [Self] =
         &[Self::TAI, Self::J2000, Self::UNIX, Self::GPS];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `EpochTimeEnumsType` value, spelled
+    /// as the schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `TAI`, `J2000`, `UNIX` or `GPS`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::TAI => "TAI",
@@ -673,7 +732,12 @@ pub enum FlagBitType {
 impl FlagBitType {
     pub const ALL: &'static [Self] = &[Self::Zeros, Self::Ones];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `FlagBitType` value, spelled as the
+    /// schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `zeros` or `ones`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Zeros => "zeros",
@@ -732,7 +796,12 @@ impl FloatEncodingSizeInBitsType {
         Self::V128,
     ];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `FloatEncodingSizeInBitsType` value,
+    /// spelled as the schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `16`, `32`, `40`, `48`, `64`, `80` or `128`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::V16 => "16",
@@ -803,7 +872,13 @@ impl FloatEncodingType {
         Self::TI,
     ];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `FloatEncodingType` value, spelled
+    /// as the schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `IEEE754_1985`, `IEEE754`, `MILSTD_1750A`, `DEC`, `IBM` or
+    /// `TI`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::IEEE754_1985 => "IEEE754_1985",
@@ -856,7 +931,12 @@ pub enum FloatSizeInBitsType {
 impl FloatSizeInBitsType {
     pub const ALL: &'static [Self] = &[Self::V32, Self::V64, Self::V128];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `FloatSizeInBitsType` value, spelled
+    /// as the schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `32`, `64` or `128`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::V32 => "32",
@@ -904,7 +984,12 @@ impl FloatingPointNotationType {
     pub const ALL: &'static [Self] =
         &[Self::Normal, Self::Scientific, Self::Engineering];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `FloatingPointNotationType` value,
+    /// spelled as the schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `normal`, `scientific` or `engineering`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Normal => "normal",
@@ -967,7 +1052,13 @@ impl IntegerEncodingType {
         Self::PackedBCD,
     ];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `IntegerEncodingType` value, spelled
+    /// as the schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `unsigned`, `signMagnitude`, `twosComplement`,
+    /// `onesComplement`, `BCD` or `packedBCD`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Unsigned => "unsigned",
@@ -1166,7 +1257,16 @@ impl MathOperatorsType {
         Self::Empty20,
     ];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `MathOperatorsType` value, spelled
+    /// as the schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `+`, `-`, `*`, `/`, `%`, `^`, `y^x`, `ln`, `log`, `e^x`,
+    /// `1/x`, `x!`, `tan`, `cos`, `sin`, `atan`, `atan2`, `acos`, `asin`,
+    /// `tanh`, `cosh`, `sinh`, `atanh`, `acosh`, `asinh`, `swap`, `drop`,
+    /// `dup`, `over`, `<<`, `>>`, `&`, `|`, `&&`, `||`, `!`, `abs`, `div`,
+    /// `int`, `>`, `>=`, `<`, `<=`, `==`, `!=`, `min`, `max`, `xor` or `~`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Empty => "+",
@@ -1318,7 +1418,12 @@ impl PCMType {
         Self::BiPhaseS,
     ];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `PCMType` value, spelled as the
+    /// schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `NRZL`, `NRZM`, `NRZS`, `BiPhaseL`, `BiPhaseM` or `BiPhaseS`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::NRZL => "NRZL",
@@ -1367,7 +1472,12 @@ pub enum ParityFormType {
 impl ParityFormType {
     pub const ALL: &'static [Self] = &[Self::Even, Self::Odd];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `ParityFormType` value, spelled as
+    /// the schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `Even` or `Odd`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Even => "Even",
@@ -1414,7 +1524,12 @@ impl RadixType {
     pub const ALL: &'static [Self] =
         &[Self::Decimal, Self::Hexadecimal, Self::Octal, Self::Binary];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `RadixType` value, spelled as the
+    /// schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `Decimal`, `Hexadecimal`, `Octal` or `Binary`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Decimal => "Decimal",
@@ -1465,7 +1580,12 @@ pub enum RangeFormType {
 impl RangeFormType {
     pub const ALL: &'static [Self] = &[Self::Outside, Self::Inside];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `RangeFormType` value, spelled as
+    /// the schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `outside` or `inside`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Outside => "outside",
@@ -1522,7 +1642,13 @@ impl ReferenceLocationType {
         Self::NextEntry,
     ];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `ReferenceLocationType` value,
+    /// spelled as the schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `containerStart`, `containerEnd`, `previousEntry` or
+    /// `nextEntry`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::ContainerStart => "containerStart",
@@ -1569,7 +1695,12 @@ pub enum ReferencePointType {
 impl ReferencePointType {
     pub const ALL: &'static [Self] = &[Self::Start, Self::End];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `ReferencePointType` value, spelled
+    /// as the schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `start` or `end`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Start => "start",
@@ -1643,7 +1774,13 @@ impl StringEncodingType {
         Self::UTF_32BE,
     ];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `StringEncodingType` value, spelled
+    /// as the schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `US-ASCII`, `ISO-8859-1`, `Windows-1252`, `UTF-8`, `UTF-16`,
+    /// `UTF-16LE`, `UTF-16BE`, `UTF-32`, `UTF-32LE` or `UTF-32BE`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::USASCII => "US-ASCII",
@@ -1715,7 +1852,12 @@ impl SystemTypeType {
         Self::Unknown,
     ];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `SystemTypeType` value, spelled as
+    /// the schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `asset`, `assetGroup`, `assetComponent` or `unknown`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Asset => "asset",
@@ -1778,7 +1920,12 @@ impl TelemetryDataSourceType {
         Self::Ground,
     ];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `TelemetryDataSourceType` value,
+    /// spelled as the schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `telemetered`, `derived`, `constant`, `local` or `ground`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Telemetered => "telemetered",
@@ -1858,7 +2005,13 @@ impl TimeAssociationUnitType {
         Self::Years,
     ];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `TimeAssociationUnitType` value,
+    /// spelled as the schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `seconds`, `milliseconds`, `microseconds`, `nanoseconds`,
+    /// `picoseconds`, `minutes`, `hours`, `days`, `months` or `years`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Seconds => "seconds",
@@ -1950,7 +2103,13 @@ impl TimeUnitsType {
         Self::Years,
     ];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `TimeUnitsType` value, spelled as
+    /// the schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `seconds`, `milliseconds`, `microseconds`, `nanoseconds`,
+    /// `picoseconds`, `minutes`, `hours`, `days`, `months` or `years`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Seconds => "seconds",
@@ -2008,7 +2167,12 @@ impl TimeWindowIsRelativeToType {
     pub const ALL: &'static [Self] =
         &[Self::CommandRelease, Self::TimeLastVerifierPassed];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `TimeWindowIsRelativeToType` value,
+    /// spelled as the schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `commandRelease` or `timeLastVerifierPassed`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::CommandRelease => "commandRelease",
@@ -2062,7 +2226,12 @@ impl UnitFormType {
     pub const ALL: &'static [Self] =
         &[Self::Calibrated, Self::Uncalibrated, Self::Raw];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `UnitFormType` value, spelled as the
+    /// schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `calibrated`, `uncalibrated` or `raw`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Calibrated => "calibrated",
@@ -2123,7 +2292,13 @@ impl ValidationStatusType {
         Self::Withdrawn,
     ];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `ValidationStatusType` value,
+    /// spelled as the schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `Unknown`, `Working`, `Draft`, `Test`, `Validated`,
+    /// `Released` or `Withdrawn`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Unknown => "Unknown",
@@ -2201,7 +2376,13 @@ impl VerifierEnumerationType {
         Self::Failed,
     ];
 
-    /// The XML lexical value.
+    /// Gives the XML lexical value of this `VerifierEnumerationType` value,
+    /// spelled as the schema spells it.
+    ///
+    /// # Returns
+    ///
+    /// The value: `release`, `transferredToRange`, `sentFromRange`, `received`,
+    /// `accepted`, `queued`, `executing`, `complete` or `failed`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Release => "release",
@@ -24224,12 +24405,25 @@ impl Default for ANDedConditionsChoice {
 }
 
 impl ANDedConditionsChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ANDedConditionsType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `Condition` or `ORedConditions`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "Condition" | "ORedConditions")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `Condition` or `ORedConditions`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::Condition(_) => "Condition",
@@ -24237,6 +24431,17 @@ impl ANDedConditionsChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `Condition` or
+    /// `ORedConditions`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::Condition(v) => v.write_xml(w, "Condition")?,
@@ -24245,6 +24450,23 @@ impl ANDedConditionsChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `Condition` or `ORedConditions`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `Condition` and
+    /// `ORedConditions`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("Condition") => Self::Condition(r.read_child()?),
@@ -24282,7 +24504,18 @@ impl Default for AcceptedVerifierChoice1 {
 }
 
 impl AcceptedVerifierChoice1 {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`AcceptedVerifierType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `ComparisonList`, `ContainerRef`,
+    /// `ParameterValueChange`, `CustomAlgorithm`, `BooleanExpression` or
+    /// `Comparison`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -24295,7 +24528,12 @@ impl AcceptedVerifierChoice1 {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `ComparisonList`, `ContainerRef`, `ParameterValueChange`,
+    /// `CustomAlgorithm`, `BooleanExpression` or `Comparison`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::ComparisonList(_) => "ComparisonList",
@@ -24307,6 +24545,18 @@ impl AcceptedVerifierChoice1 {
         }
     }
 
+    /// Writes the selected alternative as its element, `ComparisonList`,
+    /// `ContainerRef`, `ParameterValueChange`, `CustomAlgorithm`,
+    /// `BooleanExpression` or `Comparison`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::ComparisonList(v) => v.write_xml(w, "ComparisonList")?,
@@ -24323,6 +24573,25 @@ impl AcceptedVerifierChoice1 {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `ComparisonList`, `ContainerRef`, `ParameterValueChange`,
+    /// `CustomAlgorithm`, `BooleanExpression` or `Comparison`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `ComparisonList`,
+    /// `ContainerRef`, `ParameterValueChange`, `CustomAlgorithm`,
+    /// `BooleanExpression` and `Comparison`, if the alternative's element is
+    /// invalid (see the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("ComparisonList") => Self::ComparisonList(r.read_child()?),
@@ -24362,12 +24631,26 @@ impl Default for AcceptedVerifierChoice2 {
 }
 
 impl AcceptedVerifierChoice2 {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`AcceptedVerifierType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `CheckWindow` or `CheckWindowAlgorithms`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "CheckWindow" | "CheckWindowAlgorithms")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `CheckWindow` or `CheckWindowAlgorithms`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::CheckWindow(_) => "CheckWindow",
@@ -24375,6 +24658,17 @@ impl AcceptedVerifierChoice2 {
         }
     }
 
+    /// Writes the selected alternative as its element, `CheckWindow` or
+    /// `CheckWindowAlgorithms`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::CheckWindow(v) => v.write_xml(w, "CheckWindow")?,
@@ -24385,6 +24679,23 @@ impl AcceptedVerifierChoice2 {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `CheckWindow` or `CheckWindowAlgorithms`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `CheckWindow` and
+    /// `CheckWindowAlgorithms`, if the alternative's element is invalid (see
+    /// the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("CheckWindow") => Self::CheckWindow(r.read_child()?),
@@ -24415,12 +24726,26 @@ impl Default for AlarmChoice {
 }
 
 impl AlarmChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`AlarmType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `AlarmConditions` or `CustomAlarm`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "AlarmConditions" | "CustomAlarm")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `AlarmConditions` or `CustomAlarm`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::AlarmConditions(_) => "AlarmConditions",
@@ -24428,6 +24753,17 @@ impl AlarmChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `AlarmConditions` or
+    /// `CustomAlarm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::AlarmConditions(v) => v.write_xml(w, "AlarmConditions")?,
@@ -24436,6 +24772,23 @@ impl AlarmChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `AlarmConditions` or `CustomAlarm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `AlarmConditions`
+    /// and `CustomAlarm`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("AlarmConditions") => Self::AlarmConditions(r.read_child()?),
@@ -24459,12 +24812,26 @@ impl Default for AlgorithmSetChoice {
 }
 
 impl AlgorithmSetChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`AlgorithmSetType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `CustomAlgorithm` or `MathAlgorithm`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "CustomAlgorithm" | "MathAlgorithm")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `CustomAlgorithm` or `MathAlgorithm`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::CustomAlgorithm(_) => "CustomAlgorithm",
@@ -24472,6 +24839,17 @@ impl AlgorithmSetChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `CustomAlgorithm` or
+    /// `MathAlgorithm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::CustomAlgorithm(v) => v.write_xml(w, "CustomAlgorithm")?,
@@ -24480,6 +24858,23 @@ impl AlgorithmSetChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `CustomAlgorithm` or `MathAlgorithm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `CustomAlgorithm`
+    /// and `MathAlgorithm`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("CustomAlgorithm") => Self::CustomAlgorithm(r.read_child()?),
@@ -24509,12 +24904,25 @@ impl Default for ArgumentANDedConditionsChoice {
 }
 
 impl ArgumentANDedConditionsChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ArgumentANDedConditionsType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `Condition` or `ORedConditions`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "Condition" | "ORedConditions")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `Condition` or `ORedConditions`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::Condition(_) => "Condition",
@@ -24522,6 +24930,17 @@ impl ArgumentANDedConditionsChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `Condition` or
+    /// `ORedConditions`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::Condition(v) => v.write_xml(w, "Condition")?,
@@ -24530,6 +24949,23 @@ impl ArgumentANDedConditionsChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `Condition` or `ORedConditions`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `Condition` and
+    /// `ORedConditions`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("Condition") => Self::Condition(r.read_child()?),
@@ -24564,7 +25000,17 @@ impl Default for ArgumentBaseDataChoice {
 }
 
 impl ArgumentBaseDataChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ArgumentBaseDataType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -24575,7 +25021,12 @@ impl ArgumentBaseDataChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::BinaryDataEncoding(_) => "BinaryDataEncoding",
@@ -24585,6 +25036,17 @@ impl ArgumentBaseDataChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `BinaryDataEncoding`,
+    /// `FloatDataEncoding`, `IntegerDataEncoding` or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::BinaryDataEncoding(v) => {
@@ -24603,6 +25065,25 @@ impl ArgumentBaseDataChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`
+    /// or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding` and
+    /// `StringDataEncoding`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("BinaryDataEncoding") => {
@@ -24652,7 +25133,17 @@ impl Default for ArgumentBinaryDataChoice {
 }
 
 impl ArgumentBinaryDataChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ArgumentBinaryDataType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -24663,7 +25154,12 @@ impl ArgumentBinaryDataChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::BinaryDataEncoding(_) => "BinaryDataEncoding",
@@ -24673,6 +25169,17 @@ impl ArgumentBinaryDataChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `BinaryDataEncoding`,
+    /// `FloatDataEncoding`, `IntegerDataEncoding` or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::BinaryDataEncoding(v) => {
@@ -24691,6 +25198,25 @@ impl ArgumentBinaryDataChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`
+    /// or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding` and
+    /// `StringDataEncoding`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("BinaryDataEncoding") => {
@@ -24740,7 +25266,17 @@ impl Default for ArgumentBooleanDataChoice {
 }
 
 impl ArgumentBooleanDataChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ArgumentBooleanDataType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -24751,7 +25287,12 @@ impl ArgumentBooleanDataChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::BinaryDataEncoding(_) => "BinaryDataEncoding",
@@ -24761,6 +25302,17 @@ impl ArgumentBooleanDataChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `BinaryDataEncoding`,
+    /// `FloatDataEncoding`, `IntegerDataEncoding` or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::BinaryDataEncoding(v) => {
@@ -24779,6 +25331,25 @@ impl ArgumentBooleanDataChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`
+    /// or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding` and
+    /// `StringDataEncoding`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("BinaryDataEncoding") => {
@@ -24824,12 +25395,26 @@ impl Default for ArgumentBooleanExpressionChoice {
 }
 
 impl ArgumentBooleanExpressionChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ArgumentBooleanExpressionType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `Condition`, `ANDedConditions` or `ORedConditions`;
+    /// otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "Condition" | "ANDedConditions" | "ORedConditions")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `Condition`, `ANDedConditions` or `ORedConditions`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::Condition(_) => "Condition",
@@ -24838,6 +25423,17 @@ impl ArgumentBooleanExpressionChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `Condition`,
+    /// `ANDedConditions` or `ORedConditions`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::Condition(v) => v.write_xml(w, "Condition")?,
@@ -24847,6 +25443,23 @@ impl ArgumentBooleanExpressionChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `Condition`, `ANDedConditions` or `ORedConditions`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `Condition`,
+    /// `ANDedConditions` and `ORedConditions`, if the alternative's element is
+    /// invalid (see the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("Condition") => Self::Condition(r.read_child()?),
@@ -24877,12 +25490,26 @@ impl Default for ArgumentComparisonCheckChoice1 {
 }
 
 impl ArgumentComparisonCheckChoice1 {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ArgumentComparisonCheckType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `ParameterInstanceRef` or `ArgumentInstanceRef`;
+    /// otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "ParameterInstanceRef" | "ArgumentInstanceRef")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `ParameterInstanceRef` or `ArgumentInstanceRef`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::ParameterInstanceRef(_) => "ParameterInstanceRef",
@@ -24890,6 +25517,16 @@ impl ArgumentComparisonCheckChoice1 {
         }
     }
 
+    /// Writes the selected alternative as its element, `ParameterInstanceRef`
+    /// or `ArgumentInstanceRef`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// Never fails; it returns a `Result` as the writers of other choices do.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::ParameterInstanceRef(v) => {
@@ -24902,6 +25539,24 @@ impl ArgumentComparisonCheckChoice1 {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `ParameterInstanceRef` or `ArgumentInstanceRef`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `ParameterInstanceRef` and `ArgumentInstanceRef`, if the alternative's
+    /// element is invalid (see the `read_xml` of its type) or if the XML is
+    /// malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("ParameterInstanceRef") => {
@@ -24946,7 +25601,17 @@ impl Default for ArgumentComparisonCheckChoice2 {
 }
 
 impl ArgumentComparisonCheckChoice2 {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ArgumentComparisonCheckType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `ParameterInstanceRef`, `ArgumentInstanceRef` or
+    /// `Value`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -24954,7 +25619,11 @@ impl ArgumentComparisonCheckChoice2 {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `ParameterInstanceRef`, `ArgumentInstanceRef` or `Value`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::ParameterInstanceRef(_) => "ParameterInstanceRef",
@@ -24963,6 +25632,16 @@ impl ArgumentComparisonCheckChoice2 {
         }
     }
 
+    /// Writes the selected alternative as its element, `ParameterInstanceRef`,
+    /// `ArgumentInstanceRef` or `Value`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// Never fails; it returns a `Result` as the writers of other choices do.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::ParameterInstanceRef(v) => {
@@ -24976,6 +25655,24 @@ impl ArgumentComparisonCheckChoice2 {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `ParameterInstanceRef`, `ArgumentInstanceRef` or `Value`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `ParameterInstanceRef`, `ArgumentInstanceRef` and `Value`, if the
+    /// alternative's element is invalid (see the `read_xml` of its type) or if
+    /// the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("ParameterInstanceRef") => {
@@ -25013,12 +25710,26 @@ impl Default for ArgumentComparisonChoice {
 }
 
 impl ArgumentComparisonChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ArgumentComparisonType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `ParameterInstanceRef` or `ArgumentInstanceRef`;
+    /// otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "ParameterInstanceRef" | "ArgumentInstanceRef")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `ParameterInstanceRef` or `ArgumentInstanceRef`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::ParameterInstanceRef(_) => "ParameterInstanceRef",
@@ -25026,6 +25737,16 @@ impl ArgumentComparisonChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `ParameterInstanceRef`
+    /// or `ArgumentInstanceRef`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// Never fails; it returns a `Result` as the writers of other choices do.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::ParameterInstanceRef(v) => {
@@ -25038,6 +25759,24 @@ impl ArgumentComparisonChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `ParameterInstanceRef` or `ArgumentInstanceRef`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `ParameterInstanceRef` and `ArgumentInstanceRef`, if the alternative's
+    /// element is invalid (see the `read_xml` of its type) or if the XML is
+    /// malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("ParameterInstanceRef") => {
@@ -25079,7 +25818,17 @@ impl Default for ArgumentDiscreteLookupChoice {
 }
 
 impl ArgumentDiscreteLookupChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ArgumentDiscreteLookupType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `Comparison`, `ComparisonList`, `BooleanExpression`
+    /// or `CustomAlgorithm`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -25090,7 +25839,12 @@ impl ArgumentDiscreteLookupChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `Comparison`, `ComparisonList`, `BooleanExpression` or
+    /// `CustomAlgorithm`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::Comparison(_) => "Comparison",
@@ -25100,6 +25854,17 @@ impl ArgumentDiscreteLookupChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `Comparison`,
+    /// `ComparisonList`, `BooleanExpression` or `CustomAlgorithm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::Comparison(v) => v.write_xml(w, "Comparison")?,
@@ -25112,6 +25877,25 @@ impl ArgumentDiscreteLookupChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `Comparison`, `ComparisonList`, `BooleanExpression` or
+    /// `CustomAlgorithm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `Comparison`,
+    /// `ComparisonList`, `BooleanExpression` and `CustomAlgorithm`, if the
+    /// alternative's element is invalid (see the `read_xml` of its type) or if
+    /// the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("Comparison") => Self::Comparison(r.read_child()?),
@@ -25146,12 +25930,26 @@ impl Default for ArgumentDynamicValueChoice {
 }
 
 impl ArgumentDynamicValueChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ArgumentDynamicValueType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `ArgumentInstanceRef` or `ParameterInstanceRef`;
+    /// otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "ArgumentInstanceRef" | "ParameterInstanceRef")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `ArgumentInstanceRef` or `ParameterInstanceRef`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::ArgumentInstanceRef(_) => "ArgumentInstanceRef",
@@ -25159,6 +25957,16 @@ impl ArgumentDynamicValueChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `ArgumentInstanceRef` or
+    /// `ParameterInstanceRef`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// Never fails; it returns a `Result` as the writers of other choices do.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::ArgumentInstanceRef(v) => {
@@ -25171,6 +25979,24 @@ impl ArgumentDynamicValueChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `ArgumentInstanceRef` or `ParameterInstanceRef`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `ArgumentInstanceRef` and `ParameterInstanceRef`, if the alternative's
+    /// element is invalid (see the `read_xml` of its type) or if the XML is
+    /// malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("ArgumentInstanceRef") => {
@@ -25213,7 +26039,17 @@ impl Default for ArgumentEnumeratedDataChoice {
 }
 
 impl ArgumentEnumeratedDataChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ArgumentEnumeratedDataType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -25224,7 +26060,12 @@ impl ArgumentEnumeratedDataChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::BinaryDataEncoding(_) => "BinaryDataEncoding",
@@ -25234,6 +26075,17 @@ impl ArgumentEnumeratedDataChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `BinaryDataEncoding`,
+    /// `FloatDataEncoding`, `IntegerDataEncoding` or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::BinaryDataEncoding(v) => {
@@ -25252,6 +26104,25 @@ impl ArgumentEnumeratedDataChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`
+    /// or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding` and
+    /// `StringDataEncoding`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("BinaryDataEncoding") => {
@@ -25301,7 +26172,17 @@ impl Default for ArgumentFloatDataChoice {
 }
 
 impl ArgumentFloatDataChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ArgumentFloatDataType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -25312,7 +26193,12 @@ impl ArgumentFloatDataChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::BinaryDataEncoding(_) => "BinaryDataEncoding",
@@ -25322,6 +26208,17 @@ impl ArgumentFloatDataChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `BinaryDataEncoding`,
+    /// `FloatDataEncoding`, `IntegerDataEncoding` or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::BinaryDataEncoding(v) => {
@@ -25340,6 +26237,25 @@ impl ArgumentFloatDataChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`
+    /// or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding` and
+    /// `StringDataEncoding`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("BinaryDataEncoding") => {
@@ -25382,7 +26298,17 @@ impl Default for ArgumentInputSetChoice {
 }
 
 impl ArgumentInputSetChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ArgumentInputSetType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `InputParameterInstanceRef`,
+    /// `InputArgumentInstanceRef` or `Constant`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -25392,7 +26318,12 @@ impl ArgumentInputSetChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `InputParameterInstanceRef`, `InputArgumentInstanceRef` or
+    /// `Constant`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::InputParameterInstanceRef(_) => "InputParameterInstanceRef",
@@ -25401,6 +26332,16 @@ impl ArgumentInputSetChoice {
         }
     }
 
+    /// Writes the selected alternative as its element,
+    /// `InputParameterInstanceRef`, `InputArgumentInstanceRef` or `Constant`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// Never fails; it returns a `Result` as the writers of other choices do.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::InputParameterInstanceRef(v) => {
@@ -25414,6 +26355,25 @@ impl ArgumentInputSetChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `InputParameterInstanceRef`, `InputArgumentInstanceRef` or
+    /// `Constant`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `InputParameterInstanceRef`, `InputArgumentInstanceRef` and `Constant`,
+    /// if the alternative's element is invalid (see the `read_xml` of its type)
+    /// or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("InputParameterInstanceRef") => {
@@ -25458,7 +26418,17 @@ impl Default for ArgumentIntegerDataChoice {
 }
 
 impl ArgumentIntegerDataChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ArgumentIntegerDataType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -25469,7 +26439,12 @@ impl ArgumentIntegerDataChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::BinaryDataEncoding(_) => "BinaryDataEncoding",
@@ -25479,6 +26454,17 @@ impl ArgumentIntegerDataChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `BinaryDataEncoding`,
+    /// `FloatDataEncoding`, `IntegerDataEncoding` or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::BinaryDataEncoding(v) => {
@@ -25497,6 +26483,25 @@ impl ArgumentIntegerDataChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`
+    /// or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding` and
+    /// `StringDataEncoding`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("BinaryDataEncoding") => {
@@ -25542,12 +26547,26 @@ impl Default for ArgumentIntegerValueChoice {
 }
 
 impl ArgumentIntegerValueChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ArgumentIntegerValueType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `FixedValue`, `DynamicValue` or
+    /// `DiscreteLookupList`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "FixedValue" | "DynamicValue" | "DiscreteLookupList")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `FixedValue`, `DynamicValue` or `DiscreteLookupList`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::FixedValue(_) => "FixedValue",
@@ -25556,6 +26575,17 @@ impl ArgumentIntegerValueChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `FixedValue`,
+    /// `DynamicValue` or `DiscreteLookupList`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::FixedValue(v) => w.leaf("FixedValue", v),
@@ -25567,6 +26597,23 @@ impl ArgumentIntegerValueChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `FixedValue`, `DynamicValue` or `DiscreteLookupList`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `FixedValue`,
+    /// `DynamicValue` and `DiscreteLookupList`, if the alternative's element is
+    /// invalid (see the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("FixedValue") => Self::FixedValue(r.read_leaf()?),
@@ -25605,12 +26652,26 @@ impl Default for ArgumentLocationInContainerInBitsChoice {
 }
 
 impl ArgumentLocationInContainerInBitsChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ArgumentLocationInContainerInBitsType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `FixedValue`, `DynamicValue` or
+    /// `DiscreteLookupList`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "FixedValue" | "DynamicValue" | "DiscreteLookupList")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `FixedValue`, `DynamicValue` or `DiscreteLookupList`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::FixedValue(_) => "FixedValue",
@@ -25619,6 +26680,17 @@ impl ArgumentLocationInContainerInBitsChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `FixedValue`,
+    /// `DynamicValue` or `DiscreteLookupList`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::FixedValue(v) => w.leaf("FixedValue", v),
@@ -25630,6 +26702,23 @@ impl ArgumentLocationInContainerInBitsChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `FixedValue`, `DynamicValue` or `DiscreteLookupList`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `FixedValue`,
+    /// `DynamicValue` and `DiscreteLookupList`, if the alternative's element is
+    /// invalid (see the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("FixedValue") => Self::FixedValue(r.read_leaf()?),
@@ -25671,7 +26760,17 @@ impl Default for ArgumentMatchCriteriaChoice {
 }
 
 impl ArgumentMatchCriteriaChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ArgumentMatchCriteriaType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `Comparison`, `ComparisonList`, `BooleanExpression`
+    /// or `CustomAlgorithm`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -25682,7 +26781,12 @@ impl ArgumentMatchCriteriaChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `Comparison`, `ComparisonList`, `BooleanExpression` or
+    /// `CustomAlgorithm`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::Comparison(_) => "Comparison",
@@ -25692,6 +26796,17 @@ impl ArgumentMatchCriteriaChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `Comparison`,
+    /// `ComparisonList`, `BooleanExpression` or `CustomAlgorithm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::Comparison(v) => v.write_xml(w, "Comparison")?,
@@ -25704,6 +26819,25 @@ impl ArgumentMatchCriteriaChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `Comparison`, `ComparisonList`, `BooleanExpression` or
+    /// `CustomAlgorithm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `Comparison`,
+    /// `ComparisonList`, `BooleanExpression` and `CustomAlgorithm`, if the
+    /// alternative's element is invalid (see the `read_xml` of its type) or if
+    /// the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("Comparison") => Self::Comparison(r.read_child()?),
@@ -25753,7 +26887,18 @@ impl Default for ArgumentMathOperationChoice {
 }
 
 impl ArgumentMathOperationChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ArgumentMathOperationType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `ValueOperand`, `ThisParameterOperand`, `Operator`,
+    /// `ParameterInstanceRefOperand` or `ArgumentInstanceRefOperand`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -25765,7 +26910,12 @@ impl ArgumentMathOperationChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `ValueOperand`, `ThisParameterOperand`, `Operator`,
+    /// `ParameterInstanceRefOperand` or `ArgumentInstanceRefOperand`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::ValueOperand(_) => "ValueOperand",
@@ -25778,6 +26928,17 @@ impl ArgumentMathOperationChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `ValueOperand`,
+    /// `ThisParameterOperand`, `Operator`, `ParameterInstanceRefOperand` or
+    /// `ArgumentInstanceRefOperand`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// Never fails; it returns a `Result` as the writers of other choices do.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::ValueOperand(v) => w.leaf("ValueOperand", v),
@@ -25793,6 +26954,25 @@ impl ArgumentMathOperationChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `ValueOperand`, `ThisParameterOperand`, `Operator`,
+    /// `ParameterInstanceRefOperand` or `ArgumentInstanceRefOperand`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `ValueOperand`,
+    /// `ThisParameterOperand`, `Operator`, `ParameterInstanceRefOperand` and
+    /// `ArgumentInstanceRefOperand`, if the alternative's element is invalid
+    /// (see the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("ValueOperand") => Self::ValueOperand(r.read_leaf()?),
@@ -25837,12 +27017,25 @@ impl Default for ArgumentORedConditionsChoice {
 }
 
 impl ArgumentORedConditionsChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ArgumentORedConditionsType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `Condition` or `ANDedConditions`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "Condition" | "ANDedConditions")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `Condition` or `ANDedConditions`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::Condition(_) => "Condition",
@@ -25850,6 +27043,17 @@ impl ArgumentORedConditionsChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `Condition` or
+    /// `ANDedConditions`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::Condition(v) => v.write_xml(w, "Condition")?,
@@ -25858,6 +27062,23 @@ impl ArgumentORedConditionsChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `Condition` or `ANDedConditions`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `Condition` and
+    /// `ANDedConditions`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("Condition") => Self::Condition(r.read_child()?),
@@ -25892,7 +27113,17 @@ impl Default for ArgumentStringDataChoice {
 }
 
 impl ArgumentStringDataChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ArgumentStringDataType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -25903,7 +27134,12 @@ impl ArgumentStringDataChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::BinaryDataEncoding(_) => "BinaryDataEncoding",
@@ -25913,6 +27149,17 @@ impl ArgumentStringDataChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `BinaryDataEncoding`,
+    /// `FloatDataEncoding`, `IntegerDataEncoding` or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::BinaryDataEncoding(v) => {
@@ -25931,6 +27178,25 @@ impl ArgumentStringDataChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`
+    /// or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding` and
+    /// `StringDataEncoding`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("BinaryDataEncoding") => {
@@ -25982,12 +27248,25 @@ impl Default for ArgumentStringDataEncodingChoice {
 }
 
 impl ArgumentStringDataEncodingChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ArgumentStringDataEncodingType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `SizeInBits` or `Variable`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "SizeInBits" | "Variable")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `SizeInBits` or `Variable`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::SizeInBits(_) => "SizeInBits",
@@ -25995,6 +27274,17 @@ impl ArgumentStringDataEncodingChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `SizeInBits` or
+    /// `Variable`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::SizeInBits(v) => v.write_xml(w, "SizeInBits")?,
@@ -26003,6 +27293,23 @@ impl ArgumentStringDataEncodingChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `SizeInBits` or `Variable`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `SizeInBits` and
+    /// `Variable`, if the alternative's element is invalid (see the `read_xml`
+    /// of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("SizeInBits") => Self::SizeInBits(r.read_child()?),
@@ -26054,7 +27361,20 @@ impl Default for ArgumentTypeSetChoice {
 }
 
 impl ArgumentTypeSetChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ArgumentTypeSetType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `StringArgumentType`, `EnumeratedArgumentType`,
+    /// `IntegerArgumentType`, `BinaryArgumentType`, `FloatArgumentType`,
+    /// `BooleanArgumentType`, `RelativeTimeArgumentType`,
+    /// `AbsoluteTimeArgumentType`, `ArrayArgumentType` or
+    /// `AggregateArgumentType`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -26071,7 +27391,15 @@ impl ArgumentTypeSetChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `StringArgumentType`, `EnumeratedArgumentType`,
+    /// `IntegerArgumentType`, `BinaryArgumentType`, `FloatArgumentType`,
+    /// `BooleanArgumentType`, `RelativeTimeArgumentType`,
+    /// `AbsoluteTimeArgumentType`, `ArrayArgumentType` or
+    /// `AggregateArgumentType`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::StringArgumentType(_) => "StringArgumentType",
@@ -26087,6 +27415,20 @@ impl ArgumentTypeSetChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `StringArgumentType`,
+    /// `EnumeratedArgumentType`, `IntegerArgumentType`, `BinaryArgumentType`,
+    /// `FloatArgumentType`, `BooleanArgumentType`, `RelativeTimeArgumentType`,
+    /// `AbsoluteTimeArgumentType`, `ArrayArgumentType` or
+    /// `AggregateArgumentType`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::StringArgumentType(v) => {
@@ -26123,6 +27465,31 @@ impl ArgumentTypeSetChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `StringArgumentType`, `EnumeratedArgumentType`,
+    /// `IntegerArgumentType`, `BinaryArgumentType`, `FloatArgumentType`,
+    /// `BooleanArgumentType`, `RelativeTimeArgumentType`,
+    /// `AbsoluteTimeArgumentType`, `ArrayArgumentType` or
+    /// `AggregateArgumentType`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `StringArgumentType`, `EnumeratedArgumentType`, `IntegerArgumentType`,
+    /// `BinaryArgumentType`, `FloatArgumentType`, `BooleanArgumentType`,
+    /// `RelativeTimeArgumentType`, `AbsoluteTimeArgumentType`,
+    /// `ArrayArgumentType` and `AggregateArgumentType`, if the alternative's
+    /// element is invalid (see the `read_xml` of its type) or if the XML is
+    /// malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("StringArgumentType") => {
@@ -26189,12 +27556,26 @@ impl Default for ArgumentVariableStringChoice1 {
 }
 
 impl ArgumentVariableStringChoice1 {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ArgumentVariableStringType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `DynamicValue` or `DiscreteLookupList`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "DynamicValue" | "DiscreteLookupList")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `DynamicValue` or `DiscreteLookupList`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::DynamicValue(_) => "DynamicValue",
@@ -26202,6 +27583,17 @@ impl ArgumentVariableStringChoice1 {
         }
     }
 
+    /// Writes the selected alternative as its element, `DynamicValue` or
+    /// `DiscreteLookupList`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::DynamicValue(v) => v.write_xml(w, "DynamicValue")?,
@@ -26212,6 +27604,23 @@ impl ArgumentVariableStringChoice1 {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `DynamicValue` or `DiscreteLookupList`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `DynamicValue` and
+    /// `DiscreteLookupList`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("DynamicValue") => Self::DynamicValue(r.read_child()?),
@@ -26245,12 +27654,26 @@ impl Default for ArgumentVariableStringChoice2 {
 }
 
 impl ArgumentVariableStringChoice2 {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ArgumentVariableStringType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `LeadingSize` or `TerminationChar`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "LeadingSize" | "TerminationChar")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `LeadingSize` or `TerminationChar`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::LeadingSize(_) => "LeadingSize",
@@ -26258,6 +27681,16 @@ impl ArgumentVariableStringChoice2 {
         }
     }
 
+    /// Writes the selected alternative as its element, `LeadingSize` or
+    /// `TerminationChar`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// Never fails; it returns a `Result` as the writers of other choices do.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::LeadingSize(v) => v.write_xml(w, "LeadingSize")?,
@@ -26266,6 +27699,23 @@ impl ArgumentVariableStringChoice2 {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `LeadingSize` or `TerminationChar`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `LeadingSize` and
+    /// `TerminationChar`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("LeadingSize") => Self::LeadingSize(r.read_child()?),
@@ -26300,7 +27750,17 @@ impl Default for BaseDataChoice {
 }
 
 impl BaseDataChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`BaseDataType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -26311,7 +27771,12 @@ impl BaseDataChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::BinaryDataEncoding(_) => "BinaryDataEncoding",
@@ -26321,6 +27786,17 @@ impl BaseDataChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `BinaryDataEncoding`,
+    /// `FloatDataEncoding`, `IntegerDataEncoding` or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::BinaryDataEncoding(v) => {
@@ -26339,6 +27815,25 @@ impl BaseDataChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`
+    /// or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding` and
+    /// `StringDataEncoding`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("BinaryDataEncoding") => {
@@ -26382,12 +27877,26 @@ impl Default for BinaryAlarmChoice {
 }
 
 impl BinaryAlarmChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`BinaryAlarmType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `AlarmConditions` or `CustomAlarm`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "AlarmConditions" | "CustomAlarm")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `AlarmConditions` or `CustomAlarm`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::AlarmConditions(_) => "AlarmConditions",
@@ -26395,6 +27904,17 @@ impl BinaryAlarmChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `AlarmConditions` or
+    /// `CustomAlarm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::AlarmConditions(v) => v.write_xml(w, "AlarmConditions")?,
@@ -26403,6 +27923,23 @@ impl BinaryAlarmChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `AlarmConditions` or `CustomAlarm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `AlarmConditions`
+    /// and `CustomAlarm`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("AlarmConditions") => Self::AlarmConditions(r.read_child()?),
@@ -26437,7 +27974,17 @@ impl Default for BinaryArgumentChoice {
 }
 
 impl BinaryArgumentChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`BinaryArgumentType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -26448,7 +27995,12 @@ impl BinaryArgumentChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::BinaryDataEncoding(_) => "BinaryDataEncoding",
@@ -26458,6 +28010,17 @@ impl BinaryArgumentChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `BinaryDataEncoding`,
+    /// `FloatDataEncoding`, `IntegerDataEncoding` or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::BinaryDataEncoding(v) => {
@@ -26476,6 +28039,25 @@ impl BinaryArgumentChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`
+    /// or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding` and
+    /// `StringDataEncoding`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("BinaryDataEncoding") => {
@@ -26519,12 +28101,26 @@ impl Default for BinaryContextAlarmChoice {
 }
 
 impl BinaryContextAlarmChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`BinaryContextAlarmType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `AlarmConditions` or `CustomAlarm`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "AlarmConditions" | "CustomAlarm")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `AlarmConditions` or `CustomAlarm`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::AlarmConditions(_) => "AlarmConditions",
@@ -26532,6 +28128,17 @@ impl BinaryContextAlarmChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `AlarmConditions` or
+    /// `CustomAlarm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::AlarmConditions(v) => v.write_xml(w, "AlarmConditions")?,
@@ -26540,6 +28147,23 @@ impl BinaryContextAlarmChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `AlarmConditions` or `CustomAlarm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `AlarmConditions`
+    /// and `CustomAlarm`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("AlarmConditions") => Self::AlarmConditions(r.read_child()?),
@@ -26574,7 +28198,17 @@ impl Default for BinaryDataChoice {
 }
 
 impl BinaryDataChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`BinaryDataType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -26585,7 +28219,12 @@ impl BinaryDataChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::BinaryDataEncoding(_) => "BinaryDataEncoding",
@@ -26595,6 +28234,17 @@ impl BinaryDataChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `BinaryDataEncoding`,
+    /// `FloatDataEncoding`, `IntegerDataEncoding` or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::BinaryDataEncoding(v) => {
@@ -26613,6 +28263,25 @@ impl BinaryDataChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`
+    /// or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding` and
+    /// `StringDataEncoding`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("BinaryDataEncoding") => {
@@ -26662,7 +28331,17 @@ impl Default for BinaryParameterChoice {
 }
 
 impl BinaryParameterChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`BinaryParameterType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -26673,7 +28352,12 @@ impl BinaryParameterChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::BinaryDataEncoding(_) => "BinaryDataEncoding",
@@ -26683,6 +28367,17 @@ impl BinaryParameterChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `BinaryDataEncoding`,
+    /// `FloatDataEncoding`, `IntegerDataEncoding` or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::BinaryDataEncoding(v) => {
@@ -26701,6 +28396,25 @@ impl BinaryParameterChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`
+    /// or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding` and
+    /// `StringDataEncoding`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("BinaryDataEncoding") => {
@@ -26744,12 +28458,26 @@ impl Default for BooleanAlarmChoice {
 }
 
 impl BooleanAlarmChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`BooleanAlarmType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `AlarmConditions` or `CustomAlarm`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "AlarmConditions" | "CustomAlarm")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `AlarmConditions` or `CustomAlarm`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::AlarmConditions(_) => "AlarmConditions",
@@ -26757,6 +28485,17 @@ impl BooleanAlarmChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `AlarmConditions` or
+    /// `CustomAlarm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::AlarmConditions(v) => v.write_xml(w, "AlarmConditions")?,
@@ -26765,6 +28504,23 @@ impl BooleanAlarmChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `AlarmConditions` or `CustomAlarm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `AlarmConditions`
+    /// and `CustomAlarm`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("AlarmConditions") => Self::AlarmConditions(r.read_child()?),
@@ -26799,7 +28555,17 @@ impl Default for BooleanArgumentChoice {
 }
 
 impl BooleanArgumentChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`BooleanArgumentType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -26810,7 +28576,12 @@ impl BooleanArgumentChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::BinaryDataEncoding(_) => "BinaryDataEncoding",
@@ -26820,6 +28591,17 @@ impl BooleanArgumentChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `BinaryDataEncoding`,
+    /// `FloatDataEncoding`, `IntegerDataEncoding` or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::BinaryDataEncoding(v) => {
@@ -26838,6 +28620,25 @@ impl BooleanArgumentChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`
+    /// or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding` and
+    /// `StringDataEncoding`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("BinaryDataEncoding") => {
@@ -26881,12 +28682,26 @@ impl Default for BooleanContextAlarmChoice {
 }
 
 impl BooleanContextAlarmChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`BooleanContextAlarmType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `AlarmConditions` or `CustomAlarm`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "AlarmConditions" | "CustomAlarm")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `AlarmConditions` or `CustomAlarm`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::AlarmConditions(_) => "AlarmConditions",
@@ -26894,6 +28709,17 @@ impl BooleanContextAlarmChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `AlarmConditions` or
+    /// `CustomAlarm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::AlarmConditions(v) => v.write_xml(w, "AlarmConditions")?,
@@ -26902,6 +28728,23 @@ impl BooleanContextAlarmChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `AlarmConditions` or `CustomAlarm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `AlarmConditions`
+    /// and `CustomAlarm`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("AlarmConditions") => Self::AlarmConditions(r.read_child()?),
@@ -26936,7 +28779,17 @@ impl Default for BooleanDataChoice {
 }
 
 impl BooleanDataChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`BooleanDataType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -26947,7 +28800,12 @@ impl BooleanDataChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::BinaryDataEncoding(_) => "BinaryDataEncoding",
@@ -26957,6 +28815,17 @@ impl BooleanDataChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `BinaryDataEncoding`,
+    /// `FloatDataEncoding`, `IntegerDataEncoding` or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::BinaryDataEncoding(v) => {
@@ -26975,6 +28844,25 @@ impl BooleanDataChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`
+    /// or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding` and
+    /// `StringDataEncoding`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("BinaryDataEncoding") => {
@@ -27020,12 +28908,26 @@ impl Default for BooleanExpressionChoice {
 }
 
 impl BooleanExpressionChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`BooleanExpressionType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `Condition`, `ANDedConditions` or `ORedConditions`;
+    /// otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "Condition" | "ANDedConditions" | "ORedConditions")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `Condition`, `ANDedConditions` or `ORedConditions`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::Condition(_) => "Condition",
@@ -27034,6 +28936,17 @@ impl BooleanExpressionChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `Condition`,
+    /// `ANDedConditions` or `ORedConditions`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::Condition(v) => v.write_xml(w, "Condition")?,
@@ -27043,6 +28956,23 @@ impl BooleanExpressionChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `Condition`, `ANDedConditions` or `ORedConditions`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `Condition`,
+    /// `ANDedConditions` and `ORedConditions`, if the alternative's element is
+    /// invalid (see the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("Condition") => Self::Condition(r.read_child()?),
@@ -27082,7 +29012,17 @@ impl Default for BooleanParameterChoice {
 }
 
 impl BooleanParameterChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`BooleanParameterType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -27093,7 +29033,12 @@ impl BooleanParameterChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::BinaryDataEncoding(_) => "BinaryDataEncoding",
@@ -27103,6 +29048,17 @@ impl BooleanParameterChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `BinaryDataEncoding`,
+    /// `FloatDataEncoding`, `IntegerDataEncoding` or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::BinaryDataEncoding(v) => {
@@ -27121,6 +29077,25 @@ impl BooleanParameterChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`
+    /// or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding` and
+    /// `StringDataEncoding`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("BinaryDataEncoding") => {
@@ -27164,7 +29139,17 @@ impl Default for CalibratorChoice {
 }
 
 impl CalibratorChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`CalibratorType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `SplineCalibrator`, `PolynomialCalibrator` or
+    /// `MathOperationCalibrator`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -27174,7 +29159,12 @@ impl CalibratorChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `SplineCalibrator`, `PolynomialCalibrator` or
+    /// `MathOperationCalibrator`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::SplineCalibrator(_) => "SplineCalibrator",
@@ -27183,6 +29173,17 @@ impl CalibratorChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `SplineCalibrator`,
+    /// `PolynomialCalibrator` or `MathOperationCalibrator`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::SplineCalibrator(v) => v.write_xml(w, "SplineCalibrator")?,
@@ -27196,6 +29197,25 @@ impl CalibratorChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `SplineCalibrator`, `PolynomialCalibrator` or
+    /// `MathOperationCalibrator`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `SplineCalibrator`,
+    /// `PolynomialCalibrator` and `MathOperationCalibrator`, if the
+    /// alternative's element is invalid (see the `read_xml` of its type) or if
+    /// the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("SplineCalibrator") => Self::SplineCalibrator(r.read_child()?),
@@ -27260,7 +29280,20 @@ impl Default for CommandContainerEntryListChoice {
 }
 
 impl CommandContainerEntryListChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`CommandContainerEntryListType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `ParameterRefEntry`, `ParameterSegmentRefEntry`,
+    /// `ContainerRefEntry`, `ContainerSegmentRefEntry`, `StreamSegmentEntry`,
+    /// `IndirectParameterRefEntry`, `ArrayParameterRefEntry`,
+    /// `ArgumentRefEntry`, `ArrayArgumentRefEntry` or `FixedValueEntry`;
+    /// otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -27277,7 +29310,14 @@ impl CommandContainerEntryListChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `ParameterRefEntry`, `ParameterSegmentRefEntry`,
+    /// `ContainerRefEntry`, `ContainerSegmentRefEntry`, `StreamSegmentEntry`,
+    /// `IndirectParameterRefEntry`, `ArrayParameterRefEntry`,
+    /// `ArgumentRefEntry`, `ArrayArgumentRefEntry` or `FixedValueEntry`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::ParameterRefEntry(_) => "ParameterRefEntry",
@@ -27293,6 +29333,20 @@ impl CommandContainerEntryListChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `ParameterRefEntry`,
+    /// `ParameterSegmentRefEntry`, `ContainerRefEntry`,
+    /// `ContainerSegmentRefEntry`, `StreamSegmentEntry`,
+    /// `IndirectParameterRefEntry`, `ArrayParameterRefEntry`,
+    /// `ArgumentRefEntry`, `ArrayArgumentRefEntry` or `FixedValueEntry`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::ParameterRefEntry(v) => {
@@ -27325,6 +29379,30 @@ impl CommandContainerEntryListChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `ParameterRefEntry`, `ParameterSegmentRefEntry`,
+    /// `ContainerRefEntry`, `ContainerSegmentRefEntry`, `StreamSegmentEntry`,
+    /// `IndirectParameterRefEntry`, `ArrayParameterRefEntry`,
+    /// `ArgumentRefEntry`, `ArrayArgumentRefEntry` or `FixedValueEntry`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `ParameterRefEntry`,
+    /// `ParameterSegmentRefEntry`, `ContainerRefEntry`,
+    /// `ContainerSegmentRefEntry`, `StreamSegmentEntry`,
+    /// `IndirectParameterRefEntry`, `ArrayParameterRefEntry`,
+    /// `ArgumentRefEntry`, `ArrayArgumentRefEntry` and `FixedValueEntry`, if
+    /// the alternative's element is invalid (see the `read_xml` of its type) or
+    /// if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("ParameterRefEntry") => {
@@ -27397,7 +29475,18 @@ impl Default for CommandVerifierChoice1 {
 }
 
 impl CommandVerifierChoice1 {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`CommandVerifierType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `ComparisonList`, `ContainerRef`,
+    /// `ParameterValueChange`, `CustomAlgorithm`, `BooleanExpression` or
+    /// `Comparison`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -27410,7 +29499,12 @@ impl CommandVerifierChoice1 {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `ComparisonList`, `ContainerRef`, `ParameterValueChange`,
+    /// `CustomAlgorithm`, `BooleanExpression` or `Comparison`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::ComparisonList(_) => "ComparisonList",
@@ -27422,6 +29516,18 @@ impl CommandVerifierChoice1 {
         }
     }
 
+    /// Writes the selected alternative as its element, `ComparisonList`,
+    /// `ContainerRef`, `ParameterValueChange`, `CustomAlgorithm`,
+    /// `BooleanExpression` or `Comparison`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::ComparisonList(v) => v.write_xml(w, "ComparisonList")?,
@@ -27438,6 +29544,25 @@ impl CommandVerifierChoice1 {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `ComparisonList`, `ContainerRef`, `ParameterValueChange`,
+    /// `CustomAlgorithm`, `BooleanExpression` or `Comparison`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `ComparisonList`,
+    /// `ContainerRef`, `ParameterValueChange`, `CustomAlgorithm`,
+    /// `BooleanExpression` and `Comparison`, if the alternative's element is
+    /// invalid (see the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("ComparisonList") => Self::ComparisonList(r.read_child()?),
@@ -27477,12 +29602,26 @@ impl Default for CommandVerifierChoice2 {
 }
 
 impl CommandVerifierChoice2 {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`CommandVerifierType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `CheckWindow` or `CheckWindowAlgorithms`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "CheckWindow" | "CheckWindowAlgorithms")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `CheckWindow` or `CheckWindowAlgorithms`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::CheckWindow(_) => "CheckWindow",
@@ -27490,6 +29629,17 @@ impl CommandVerifierChoice2 {
         }
     }
 
+    /// Writes the selected alternative as its element, `CheckWindow` or
+    /// `CheckWindowAlgorithms`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::CheckWindow(v) => v.write_xml(w, "CheckWindow")?,
@@ -27500,6 +29650,23 @@ impl CommandVerifierChoice2 {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `CheckWindow` or `CheckWindowAlgorithms`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `CheckWindow` and
+    /// `CheckWindowAlgorithms`, if the alternative's element is invalid (see
+    /// the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("CheckWindow") => Self::CheckWindow(r.read_child()?),
@@ -27535,12 +29702,26 @@ impl Default for ComparisonCheckChoice {
 }
 
 impl ComparisonCheckChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ComparisonCheckType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `ParameterInstanceRef` or `Value`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "ParameterInstanceRef" | "Value")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `ParameterInstanceRef` or `Value`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::ParameterInstanceRef(_) => "ParameterInstanceRef",
@@ -27548,6 +29729,16 @@ impl ComparisonCheckChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `ParameterInstanceRef`
+    /// or `Value`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// Never fails; it returns a `Result` as the writers of other choices do.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::ParameterInstanceRef(v) => {
@@ -27558,6 +29749,23 @@ impl ComparisonCheckChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `ParameterInstanceRef` or `Value`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `ParameterInstanceRef` and `Value`, if the alternative's element is
+    /// invalid (see the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("ParameterInstanceRef") => {
@@ -27597,7 +29805,18 @@ impl Default for CompleteVerifierChoice1 {
 }
 
 impl CompleteVerifierChoice1 {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`CompleteVerifierType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `ComparisonList`, `ContainerRef`,
+    /// `ParameterValueChange`, `CustomAlgorithm`, `BooleanExpression` or
+    /// `Comparison`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -27610,7 +29829,12 @@ impl CompleteVerifierChoice1 {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `ComparisonList`, `ContainerRef`, `ParameterValueChange`,
+    /// `CustomAlgorithm`, `BooleanExpression` or `Comparison`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::ComparisonList(_) => "ComparisonList",
@@ -27622,6 +29846,18 @@ impl CompleteVerifierChoice1 {
         }
     }
 
+    /// Writes the selected alternative as its element, `ComparisonList`,
+    /// `ContainerRef`, `ParameterValueChange`, `CustomAlgorithm`,
+    /// `BooleanExpression` or `Comparison`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::ComparisonList(v) => v.write_xml(w, "ComparisonList")?,
@@ -27638,6 +29874,25 @@ impl CompleteVerifierChoice1 {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `ComparisonList`, `ContainerRef`, `ParameterValueChange`,
+    /// `CustomAlgorithm`, `BooleanExpression` or `Comparison`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `ComparisonList`,
+    /// `ContainerRef`, `ParameterValueChange`, `CustomAlgorithm`,
+    /// `BooleanExpression` and `Comparison`, if the alternative's element is
+    /// invalid (see the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("ComparisonList") => Self::ComparisonList(r.read_child()?),
@@ -27677,12 +29932,26 @@ impl Default for CompleteVerifierChoice2 {
 }
 
 impl CompleteVerifierChoice2 {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`CompleteVerifierType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `CheckWindow` or `CheckWindowAlgorithms`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "CheckWindow" | "CheckWindowAlgorithms")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `CheckWindow` or `CheckWindowAlgorithms`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::CheckWindow(_) => "CheckWindow",
@@ -27690,6 +29959,17 @@ impl CompleteVerifierChoice2 {
         }
     }
 
+    /// Writes the selected alternative as its element, `CheckWindow` or
+    /// `CheckWindowAlgorithms`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::CheckWindow(v) => v.write_xml(w, "CheckWindow")?,
@@ -27700,6 +29980,23 @@ impl CompleteVerifierChoice2 {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `CheckWindow` or `CheckWindowAlgorithms`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `CheckWindow` and
+    /// `CheckWindowAlgorithms`, if the alternative's element is invalid (see
+    /// the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("CheckWindow") => Self::CheckWindow(r.read_child()?),
@@ -27734,7 +30031,17 @@ impl Default for ContextMatchChoice {
 }
 
 impl ContextMatchChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ContextMatchType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `Comparison`, `ComparisonList`, `BooleanExpression`
+    /// or `CustomAlgorithm`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -27745,7 +30052,12 @@ impl ContextMatchChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `Comparison`, `ComparisonList`, `BooleanExpression` or
+    /// `CustomAlgorithm`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::Comparison(_) => "Comparison",
@@ -27755,6 +30067,17 @@ impl ContextMatchChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `Comparison`,
+    /// `ComparisonList`, `BooleanExpression` or `CustomAlgorithm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::Comparison(v) => v.write_xml(w, "Comparison")?,
@@ -27767,6 +30090,25 @@ impl ContextMatchChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `Comparison`, `ComparisonList`, `BooleanExpression` or
+    /// `CustomAlgorithm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `Comparison`,
+    /// `ComparisonList`, `BooleanExpression` and `CustomAlgorithm`, if the
+    /// alternative's element is invalid (see the `read_xml` of its type) or if
+    /// the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("Comparison") => Self::Comparison(r.read_child()?),
@@ -27808,7 +30150,17 @@ impl Default for DiscreteLookupChoice {
 }
 
 impl DiscreteLookupChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`DiscreteLookupType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `Comparison`, `ComparisonList`, `BooleanExpression`
+    /// or `CustomAlgorithm`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -27819,7 +30171,12 @@ impl DiscreteLookupChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `Comparison`, `ComparisonList`, `BooleanExpression` or
+    /// `CustomAlgorithm`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::Comparison(_) => "Comparison",
@@ -27829,6 +30186,17 @@ impl DiscreteLookupChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `Comparison`,
+    /// `ComparisonList`, `BooleanExpression` or `CustomAlgorithm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::Comparison(v) => v.write_xml(w, "Comparison")?,
@@ -27841,6 +30209,25 @@ impl DiscreteLookupChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `Comparison`, `ComparisonList`, `BooleanExpression` or
+    /// `CustomAlgorithm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `Comparison`,
+    /// `ComparisonList`, `BooleanExpression` and `CustomAlgorithm`, if the
+    /// alternative's element is invalid (see the `read_xml` of its type) or if
+    /// the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("Comparison") => Self::Comparison(r.read_child()?),
@@ -27884,7 +30271,17 @@ impl Default for EncodingChoice {
 }
 
 impl EncodingChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`EncodingType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -27895,7 +30292,12 @@ impl EncodingChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::BinaryDataEncoding(_) => "BinaryDataEncoding",
@@ -27905,6 +30307,17 @@ impl EncodingChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `BinaryDataEncoding`,
+    /// `FloatDataEncoding`, `IntegerDataEncoding` or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::BinaryDataEncoding(v) => {
@@ -27923,6 +30336,25 @@ impl EncodingChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`
+    /// or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding` and
+    /// `StringDataEncoding`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("BinaryDataEncoding") => {
@@ -27982,7 +30414,19 @@ impl Default for EntryListChoice {
 }
 
 impl EntryListChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`EntryListType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `ParameterRefEntry`, `ParameterSegmentRefEntry`,
+    /// `ContainerRefEntry`, `ContainerSegmentRefEntry`, `StreamSegmentEntry`,
+    /// `IndirectParameterRefEntry` or `ArrayParameterRefEntry`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -27996,7 +30440,13 @@ impl EntryListChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `ParameterRefEntry`, `ParameterSegmentRefEntry`,
+    /// `ContainerRefEntry`, `ContainerSegmentRefEntry`, `StreamSegmentEntry`,
+    /// `IndirectParameterRefEntry` or `ArrayParameterRefEntry`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::ParameterRefEntry(_) => "ParameterRefEntry",
@@ -28009,6 +30459,19 @@ impl EntryListChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `ParameterRefEntry`,
+    /// `ParameterSegmentRefEntry`, `ContainerRefEntry`,
+    /// `ContainerSegmentRefEntry`, `StreamSegmentEntry`,
+    /// `IndirectParameterRefEntry` or `ArrayParameterRefEntry`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::ParameterRefEntry(v) => {
@@ -28036,6 +30499,28 @@ impl EntryListChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `ParameterRefEntry`, `ParameterSegmentRefEntry`,
+    /// `ContainerRefEntry`, `ContainerSegmentRefEntry`, `StreamSegmentEntry`,
+    /// `IndirectParameterRefEntry` or `ArrayParameterRefEntry`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `ParameterRefEntry`,
+    /// `ParameterSegmentRefEntry`, `ContainerRefEntry`,
+    /// `ContainerSegmentRefEntry`, `StreamSegmentEntry`,
+    /// `IndirectParameterRefEntry` and `ArrayParameterRefEntry`, if the
+    /// alternative's element is invalid (see the `read_xml` of its type) or if
+    /// the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("ParameterRefEntry") => {
@@ -28099,7 +30584,17 @@ impl Default for EnumeratedArgumentChoice {
 }
 
 impl EnumeratedArgumentChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`EnumeratedArgumentType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -28110,7 +30605,12 @@ impl EnumeratedArgumentChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::BinaryDataEncoding(_) => "BinaryDataEncoding",
@@ -28120,6 +30620,17 @@ impl EnumeratedArgumentChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `BinaryDataEncoding`,
+    /// `FloatDataEncoding`, `IntegerDataEncoding` or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::BinaryDataEncoding(v) => {
@@ -28138,6 +30649,25 @@ impl EnumeratedArgumentChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`
+    /// or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding` and
+    /// `StringDataEncoding`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("BinaryDataEncoding") => {
@@ -28187,7 +30717,17 @@ impl Default for EnumeratedDataChoice {
 }
 
 impl EnumeratedDataChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`EnumeratedDataType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -28198,7 +30738,12 @@ impl EnumeratedDataChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::BinaryDataEncoding(_) => "BinaryDataEncoding",
@@ -28208,6 +30753,17 @@ impl EnumeratedDataChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `BinaryDataEncoding`,
+    /// `FloatDataEncoding`, `IntegerDataEncoding` or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::BinaryDataEncoding(v) => {
@@ -28226,6 +30782,25 @@ impl EnumeratedDataChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`
+    /// or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding` and
+    /// `StringDataEncoding`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("BinaryDataEncoding") => {
@@ -28275,7 +30850,17 @@ impl Default for EnumeratedParameterChoice {
 }
 
 impl EnumeratedParameterChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`EnumeratedParameterType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -28286,7 +30871,12 @@ impl EnumeratedParameterChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::BinaryDataEncoding(_) => "BinaryDataEncoding",
@@ -28296,6 +30886,17 @@ impl EnumeratedParameterChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `BinaryDataEncoding`,
+    /// `FloatDataEncoding`, `IntegerDataEncoding` or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::BinaryDataEncoding(v) => {
@@ -28314,6 +30915,25 @@ impl EnumeratedParameterChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`
+    /// or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding` and
+    /// `StringDataEncoding`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("BinaryDataEncoding") => {
@@ -28357,12 +30977,26 @@ impl Default for EnumerationAlarmChoice {
 }
 
 impl EnumerationAlarmChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`EnumerationAlarmType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `AlarmConditions` or `CustomAlarm`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "AlarmConditions" | "CustomAlarm")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `AlarmConditions` or `CustomAlarm`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::AlarmConditions(_) => "AlarmConditions",
@@ -28370,6 +31004,17 @@ impl EnumerationAlarmChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `AlarmConditions` or
+    /// `CustomAlarm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::AlarmConditions(v) => v.write_xml(w, "AlarmConditions")?,
@@ -28378,6 +31023,23 @@ impl EnumerationAlarmChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `AlarmConditions` or `CustomAlarm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `AlarmConditions`
+    /// and `CustomAlarm`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("AlarmConditions") => Self::AlarmConditions(r.read_child()?),
@@ -28406,12 +31068,26 @@ impl Default for EnumerationContextAlarmChoice {
 }
 
 impl EnumerationContextAlarmChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`EnumerationContextAlarmType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `AlarmConditions` or `CustomAlarm`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "AlarmConditions" | "CustomAlarm")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `AlarmConditions` or `CustomAlarm`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::AlarmConditions(_) => "AlarmConditions",
@@ -28419,6 +31095,17 @@ impl EnumerationContextAlarmChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `AlarmConditions` or
+    /// `CustomAlarm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::AlarmConditions(v) => v.write_xml(w, "AlarmConditions")?,
@@ -28427,6 +31114,23 @@ impl EnumerationContextAlarmChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `AlarmConditions` or `CustomAlarm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `AlarmConditions`
+    /// and `CustomAlarm`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("AlarmConditions") => Self::AlarmConditions(r.read_child()?),
@@ -28459,12 +31163,26 @@ impl Default for ErrorDetectCorrectChoice {
 }
 
 impl ErrorDetectCorrectChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ErrorDetectCorrectType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `Checksum`, `CRC`, `XOR` or `Parity`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "Checksum" | "CRC" | "XOR" | "Parity")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `Checksum`, `CRC`, `XOR` or `Parity`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::Checksum(_) => "Checksum",
@@ -28474,6 +31192,17 @@ impl ErrorDetectCorrectChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `Checksum`, `CRC`, `XOR`
+    /// or `Parity`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::Checksum(v) => v.write_xml(w, "Checksum")?,
@@ -28484,6 +31213,23 @@ impl ErrorDetectCorrectChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `Checksum`, `CRC`, `XOR` or `Parity`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `Checksum`, `CRC`,
+    /// `XOR` and `Parity`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("Checksum") => Self::Checksum(r.read_child()?),
@@ -28523,7 +31269,18 @@ impl Default for ExecutionVerifierChoice1 {
 }
 
 impl ExecutionVerifierChoice1 {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ExecutionVerifierType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `ComparisonList`, `ContainerRef`,
+    /// `ParameterValueChange`, `CustomAlgorithm`, `BooleanExpression` or
+    /// `Comparison`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -28536,7 +31293,12 @@ impl ExecutionVerifierChoice1 {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `ComparisonList`, `ContainerRef`, `ParameterValueChange`,
+    /// `CustomAlgorithm`, `BooleanExpression` or `Comparison`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::ComparisonList(_) => "ComparisonList",
@@ -28548,6 +31310,18 @@ impl ExecutionVerifierChoice1 {
         }
     }
 
+    /// Writes the selected alternative as its element, `ComparisonList`,
+    /// `ContainerRef`, `ParameterValueChange`, `CustomAlgorithm`,
+    /// `BooleanExpression` or `Comparison`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::ComparisonList(v) => v.write_xml(w, "ComparisonList")?,
@@ -28564,6 +31338,25 @@ impl ExecutionVerifierChoice1 {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `ComparisonList`, `ContainerRef`, `ParameterValueChange`,
+    /// `CustomAlgorithm`, `BooleanExpression` or `Comparison`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `ComparisonList`,
+    /// `ContainerRef`, `ParameterValueChange`, `CustomAlgorithm`,
+    /// `BooleanExpression` and `Comparison`, if the alternative's element is
+    /// invalid (see the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("ComparisonList") => Self::ComparisonList(r.read_child()?),
@@ -28603,12 +31396,26 @@ impl Default for ExecutionVerifierChoice2 {
 }
 
 impl ExecutionVerifierChoice2 {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ExecutionVerifierType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `CheckWindow` or `CheckWindowAlgorithms`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "CheckWindow" | "CheckWindowAlgorithms")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `CheckWindow` or `CheckWindowAlgorithms`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::CheckWindow(_) => "CheckWindow",
@@ -28616,6 +31423,17 @@ impl ExecutionVerifierChoice2 {
         }
     }
 
+    /// Writes the selected alternative as its element, `CheckWindow` or
+    /// `CheckWindowAlgorithms`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::CheckWindow(v) => v.write_xml(w, "CheckWindow")?,
@@ -28626,6 +31444,23 @@ impl ExecutionVerifierChoice2 {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `CheckWindow` or `CheckWindowAlgorithms`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `CheckWindow` and
+    /// `CheckWindowAlgorithms`, if the alternative's element is invalid (see
+    /// the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("CheckWindow") => Self::CheckWindow(r.read_child()?),
@@ -28665,7 +31500,18 @@ impl Default for FailedVerifierChoice1 {
 }
 
 impl FailedVerifierChoice1 {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`FailedVerifierType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `ComparisonList`, `ContainerRef`,
+    /// `ParameterValueChange`, `CustomAlgorithm`, `BooleanExpression` or
+    /// `Comparison`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -28678,7 +31524,12 @@ impl FailedVerifierChoice1 {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `ComparisonList`, `ContainerRef`, `ParameterValueChange`,
+    /// `CustomAlgorithm`, `BooleanExpression` or `Comparison`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::ComparisonList(_) => "ComparisonList",
@@ -28690,6 +31541,18 @@ impl FailedVerifierChoice1 {
         }
     }
 
+    /// Writes the selected alternative as its element, `ComparisonList`,
+    /// `ContainerRef`, `ParameterValueChange`, `CustomAlgorithm`,
+    /// `BooleanExpression` or `Comparison`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::ComparisonList(v) => v.write_xml(w, "ComparisonList")?,
@@ -28706,6 +31569,25 @@ impl FailedVerifierChoice1 {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `ComparisonList`, `ContainerRef`, `ParameterValueChange`,
+    /// `CustomAlgorithm`, `BooleanExpression` or `Comparison`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `ComparisonList`,
+    /// `ContainerRef`, `ParameterValueChange`, `CustomAlgorithm`,
+    /// `BooleanExpression` and `Comparison`, if the alternative's element is
+    /// invalid (see the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("ComparisonList") => Self::ComparisonList(r.read_child()?),
@@ -28745,12 +31627,26 @@ impl Default for FailedVerifierChoice2 {
 }
 
 impl FailedVerifierChoice2 {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`FailedVerifierType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `CheckWindow` or `CheckWindowAlgorithms`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "CheckWindow" | "CheckWindowAlgorithms")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `CheckWindow` or `CheckWindowAlgorithms`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::CheckWindow(_) => "CheckWindow",
@@ -28758,6 +31654,17 @@ impl FailedVerifierChoice2 {
         }
     }
 
+    /// Writes the selected alternative as its element, `CheckWindow` or
+    /// `CheckWindowAlgorithms`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::CheckWindow(v) => v.write_xml(w, "CheckWindow")?,
@@ -28768,6 +31675,23 @@ impl FailedVerifierChoice2 {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `CheckWindow` or `CheckWindowAlgorithms`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `CheckWindow` and
+    /// `CheckWindowAlgorithms`, if the alternative's element is invalid (see
+    /// the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("CheckWindow") => Self::CheckWindow(r.read_child()?),
@@ -28796,12 +31720,25 @@ impl Default for FixedFrameStreamChoice {
 }
 
 impl FixedFrameStreamChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`FixedFrameStreamType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `ContainerRef` or `ServiceRef`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "ContainerRef" | "ServiceRef")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `ContainerRef` or `ServiceRef`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::ContainerRef(_) => "ContainerRef",
@@ -28809,6 +31746,16 @@ impl FixedFrameStreamChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `ContainerRef` or
+    /// `ServiceRef`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// Never fails; it returns a `Result` as the writers of other choices do.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::ContainerRef(v) => v.write_xml(w, "ContainerRef")?,
@@ -28817,6 +31764,23 @@ impl FixedFrameStreamChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `ContainerRef` or `ServiceRef`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `ContainerRef` and
+    /// `ServiceRef`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("ContainerRef") => Self::ContainerRef(r.read_child()?),
@@ -28851,7 +31815,17 @@ impl Default for FloatArgumentChoice {
 }
 
 impl FloatArgumentChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`FloatArgumentType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -28862,7 +31836,12 @@ impl FloatArgumentChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::BinaryDataEncoding(_) => "BinaryDataEncoding",
@@ -28872,6 +31851,17 @@ impl FloatArgumentChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `BinaryDataEncoding`,
+    /// `FloatDataEncoding`, `IntegerDataEncoding` or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::BinaryDataEncoding(v) => {
@@ -28890,6 +31880,25 @@ impl FloatArgumentChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`
+    /// or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding` and
+    /// `StringDataEncoding`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("BinaryDataEncoding") => {
@@ -28939,7 +31948,17 @@ impl Default for FloatDataChoice {
 }
 
 impl FloatDataChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`FloatDataType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -28950,7 +31969,12 @@ impl FloatDataChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::BinaryDataEncoding(_) => "BinaryDataEncoding",
@@ -28960,6 +31984,17 @@ impl FloatDataChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `BinaryDataEncoding`,
+    /// `FloatDataEncoding`, `IntegerDataEncoding` or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::BinaryDataEncoding(v) => {
@@ -28978,6 +32013,25 @@ impl FloatDataChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`
+    /// or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding` and
+    /// `StringDataEncoding`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("BinaryDataEncoding") => {
@@ -29027,7 +32081,17 @@ impl Default for FloatParameterChoice {
 }
 
 impl FloatParameterChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`FloatParameterType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -29038,7 +32102,12 @@ impl FloatParameterChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::BinaryDataEncoding(_) => "BinaryDataEncoding",
@@ -29048,6 +32117,17 @@ impl FloatParameterChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `BinaryDataEncoding`,
+    /// `FloatDataEncoding`, `IntegerDataEncoding` or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::BinaryDataEncoding(v) => {
@@ -29066,6 +32146,25 @@ impl FloatParameterChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`
+    /// or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding` and
+    /// `StringDataEncoding`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("BinaryDataEncoding") => {
@@ -29107,12 +32206,25 @@ impl Default for FrameStreamChoice {
 }
 
 impl FrameStreamChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`FrameStreamType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `ContainerRef` or `ServiceRef`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "ContainerRef" | "ServiceRef")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `ContainerRef` or `ServiceRef`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::ContainerRef(_) => "ContainerRef",
@@ -29120,6 +32232,16 @@ impl FrameStreamChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `ContainerRef` or
+    /// `ServiceRef`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// Never fails; it returns a `Result` as the writers of other choices do.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::ContainerRef(v) => v.write_xml(w, "ContainerRef")?,
@@ -29128,6 +32250,23 @@ impl FrameStreamChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `ContainerRef` or `ServiceRef`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `ContainerRef` and
+    /// `ServiceRef`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("ContainerRef") => Self::ContainerRef(r.read_child()?),
@@ -29153,12 +32292,26 @@ impl Default for InputSetChoice {
 }
 
 impl InputSetChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`InputSetType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `InputParameterInstanceRef` or `Constant`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "InputParameterInstanceRef" | "Constant")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `InputParameterInstanceRef` or `Constant`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::InputParameterInstanceRef(_) => "InputParameterInstanceRef",
@@ -29166,6 +32319,16 @@ impl InputSetChoice {
         }
     }
 
+    /// Writes the selected alternative as its element,
+    /// `InputParameterInstanceRef` or `Constant`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// Never fails; it returns a `Result` as the writers of other choices do.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::InputParameterInstanceRef(v) => {
@@ -29176,6 +32339,23 @@ impl InputSetChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `InputParameterInstanceRef` or `Constant`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `InputParameterInstanceRef` and `Constant`, if the alternative's element
+    /// is invalid (see the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("InputParameterInstanceRef") => {
@@ -29212,7 +32392,17 @@ impl Default for IntegerArgumentChoice {
 }
 
 impl IntegerArgumentChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`IntegerArgumentType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -29223,7 +32413,12 @@ impl IntegerArgumentChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::BinaryDataEncoding(_) => "BinaryDataEncoding",
@@ -29233,6 +32428,17 @@ impl IntegerArgumentChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `BinaryDataEncoding`,
+    /// `FloatDataEncoding`, `IntegerDataEncoding` or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::BinaryDataEncoding(v) => {
@@ -29251,6 +32457,25 @@ impl IntegerArgumentChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`
+    /// or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding` and
+    /// `StringDataEncoding`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("BinaryDataEncoding") => {
@@ -29300,7 +32525,17 @@ impl Default for IntegerDataChoice {
 }
 
 impl IntegerDataChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`IntegerDataType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -29311,7 +32546,12 @@ impl IntegerDataChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::BinaryDataEncoding(_) => "BinaryDataEncoding",
@@ -29321,6 +32561,17 @@ impl IntegerDataChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `BinaryDataEncoding`,
+    /// `FloatDataEncoding`, `IntegerDataEncoding` or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::BinaryDataEncoding(v) => {
@@ -29339,6 +32590,25 @@ impl IntegerDataChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`
+    /// or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding` and
+    /// `StringDataEncoding`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("BinaryDataEncoding") => {
@@ -29388,7 +32658,17 @@ impl Default for IntegerParameterChoice {
 }
 
 impl IntegerParameterChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`IntegerParameterType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -29399,7 +32679,12 @@ impl IntegerParameterChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::BinaryDataEncoding(_) => "BinaryDataEncoding",
@@ -29409,6 +32694,17 @@ impl IntegerParameterChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `BinaryDataEncoding`,
+    /// `FloatDataEncoding`, `IntegerDataEncoding` or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::BinaryDataEncoding(v) => {
@@ -29427,6 +32723,25 @@ impl IntegerParameterChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`
+    /// or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding` and
+    /// `StringDataEncoding`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("BinaryDataEncoding") => {
@@ -29471,12 +32786,26 @@ impl Default for IntegerValueChoice {
 }
 
 impl IntegerValueChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`IntegerValueType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `FixedValue`, `DynamicValue` or
+    /// `DiscreteLookupList`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "FixedValue" | "DynamicValue" | "DiscreteLookupList")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `FixedValue`, `DynamicValue` or `DiscreteLookupList`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::FixedValue(_) => "FixedValue",
@@ -29485,6 +32814,17 @@ impl IntegerValueChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `FixedValue`,
+    /// `DynamicValue` or `DiscreteLookupList`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::FixedValue(v) => w.leaf("FixedValue", v),
@@ -29496,6 +32836,23 @@ impl IntegerValueChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `FixedValue`, `DynamicValue` or `DiscreteLookupList`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `FixedValue`,
+    /// `DynamicValue` and `DiscreteLookupList`, if the alternative's element is
+    /// invalid (see the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("FixedValue") => Self::FixedValue(r.read_leaf()?),
@@ -29533,12 +32890,26 @@ impl Default for LocationInContainerInBitsChoice {
 }
 
 impl LocationInContainerInBitsChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`LocationInContainerInBitsType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `FixedValue`, `DynamicValue` or
+    /// `DiscreteLookupList`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "FixedValue" | "DynamicValue" | "DiscreteLookupList")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `FixedValue`, `DynamicValue` or `DiscreteLookupList`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::FixedValue(_) => "FixedValue",
@@ -29547,6 +32918,17 @@ impl LocationInContainerInBitsChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `FixedValue`,
+    /// `DynamicValue` or `DiscreteLookupList`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::FixedValue(v) => w.leaf("FixedValue", v),
@@ -29558,6 +32940,23 @@ impl LocationInContainerInBitsChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `FixedValue`, `DynamicValue` or `DiscreteLookupList`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `FixedValue`,
+    /// `DynamicValue` and `DiscreteLookupList`, if the alternative's element is
+    /// invalid (see the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("FixedValue") => Self::FixedValue(r.read_leaf()?),
@@ -29598,7 +32997,17 @@ impl Default for MatchCriteriaChoice {
 }
 
 impl MatchCriteriaChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`MatchCriteriaType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `Comparison`, `ComparisonList`, `BooleanExpression`
+    /// or `CustomAlgorithm`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -29609,7 +33018,12 @@ impl MatchCriteriaChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `Comparison`, `ComparisonList`, `BooleanExpression` or
+    /// `CustomAlgorithm`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::Comparison(_) => "Comparison",
@@ -29619,6 +33033,17 @@ impl MatchCriteriaChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `Comparison`,
+    /// `ComparisonList`, `BooleanExpression` or `CustomAlgorithm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::Comparison(v) => v.write_xml(w, "Comparison")?,
@@ -29631,6 +33056,25 @@ impl MatchCriteriaChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `Comparison`, `ComparisonList`, `BooleanExpression` or
+    /// `CustomAlgorithm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `Comparison`,
+    /// `ComparisonList`, `BooleanExpression` and `CustomAlgorithm`, if the
+    /// alternative's element is invalid (see the `read_xml` of its type) or if
+    /// the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("Comparison") => Self::Comparison(r.read_child()?),
@@ -29677,7 +33121,17 @@ impl Default for MathOperationCalibratorChoice {
 }
 
 impl MathOperationCalibratorChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`MathOperationCalibratorType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `ValueOperand`, `ThisParameterOperand`, `Operator`
+    /// or `ParameterInstanceRefOperand`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -29688,7 +33142,12 @@ impl MathOperationCalibratorChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `ValueOperand`, `ThisParameterOperand`, `Operator` or
+    /// `ParameterInstanceRefOperand`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::ValueOperand(_) => "ValueOperand",
@@ -29700,6 +33159,16 @@ impl MathOperationCalibratorChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `ValueOperand`,
+    /// `ThisParameterOperand`, `Operator` or `ParameterInstanceRefOperand`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// Never fails; it returns a `Result` as the writers of other choices do.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::ValueOperand(v) => w.leaf("ValueOperand", v),
@@ -29712,6 +33181,25 @@ impl MathOperationCalibratorChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `ValueOperand`, `ThisParameterOperand`, `Operator` or
+    /// `ParameterInstanceRefOperand`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `ValueOperand`,
+    /// `ThisParameterOperand`, `Operator` and `ParameterInstanceRefOperand`, if
+    /// the alternative's element is invalid (see the `read_xml` of its type) or
+    /// if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("ValueOperand") => Self::ValueOperand(r.read_leaf()?),
@@ -29760,7 +33248,17 @@ impl Default for MathOperationChoice {
 }
 
 impl MathOperationChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`MathOperationType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `ValueOperand`, `ThisParameterOperand`, `Operator`
+    /// or `ParameterInstanceRefOperand`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -29771,7 +33269,12 @@ impl MathOperationChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `ValueOperand`, `ThisParameterOperand`, `Operator` or
+    /// `ParameterInstanceRefOperand`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::ValueOperand(_) => "ValueOperand",
@@ -29783,6 +33286,16 @@ impl MathOperationChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `ValueOperand`,
+    /// `ThisParameterOperand`, `Operator` or `ParameterInstanceRefOperand`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// Never fails; it returns a `Result` as the writers of other choices do.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::ValueOperand(v) => w.leaf("ValueOperand", v),
@@ -29795,6 +33308,25 @@ impl MathOperationChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `ValueOperand`, `ThisParameterOperand`, `Operator` or
+    /// `ParameterInstanceRefOperand`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `ValueOperand`,
+    /// `ThisParameterOperand`, `Operator` and `ParameterInstanceRefOperand`, if
+    /// the alternative's element is invalid (see the `read_xml` of its type) or
+    /// if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("ValueOperand") => Self::ValueOperand(r.read_leaf()?),
@@ -29836,12 +33368,26 @@ impl Default for MetaCommandSetChoice {
 }
 
 impl MetaCommandSetChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`MetaCommandSetType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `MetaCommand`, `MetaCommandRef` or
+    /// `BlockMetaCommand`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "MetaCommand" | "MetaCommandRef" | "BlockMetaCommand")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `MetaCommand`, `MetaCommandRef` or `BlockMetaCommand`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::MetaCommand(_) => "MetaCommand",
@@ -29850,6 +33396,17 @@ impl MetaCommandSetChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `MetaCommand`,
+    /// `MetaCommandRef` or `BlockMetaCommand`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::MetaCommand(v) => v.write_xml(w, "MetaCommand")?,
@@ -29859,6 +33416,23 @@ impl MetaCommandSetChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `MetaCommand`, `MetaCommandRef` or `BlockMetaCommand`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `MetaCommand`,
+    /// `MetaCommandRef` and `BlockMetaCommand`, if the alternative's element is
+    /// invalid (see the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("MetaCommand") => Self::MetaCommand(r.read_child()?),
@@ -29893,12 +33467,26 @@ impl Default for NumericAlarmChoice {
 }
 
 impl NumericAlarmChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`NumericAlarmType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `AlarmConditions` or `CustomAlarm`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "AlarmConditions" | "CustomAlarm")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `AlarmConditions` or `CustomAlarm`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::AlarmConditions(_) => "AlarmConditions",
@@ -29906,6 +33494,17 @@ impl NumericAlarmChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `AlarmConditions` or
+    /// `CustomAlarm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::AlarmConditions(v) => v.write_xml(w, "AlarmConditions")?,
@@ -29914,6 +33513,23 @@ impl NumericAlarmChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `AlarmConditions` or `CustomAlarm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `AlarmConditions`
+    /// and `CustomAlarm`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("AlarmConditions") => Self::AlarmConditions(r.read_child()?),
@@ -29942,12 +33558,26 @@ impl Default for NumericContextAlarmChoice {
 }
 
 impl NumericContextAlarmChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`NumericContextAlarmType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `AlarmConditions` or `CustomAlarm`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "AlarmConditions" | "CustomAlarm")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `AlarmConditions` or `CustomAlarm`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::AlarmConditions(_) => "AlarmConditions",
@@ -29955,6 +33585,17 @@ impl NumericContextAlarmChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `AlarmConditions` or
+    /// `CustomAlarm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::AlarmConditions(v) => v.write_xml(w, "AlarmConditions")?,
@@ -29963,6 +33604,23 @@ impl NumericContextAlarmChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `AlarmConditions` or `CustomAlarm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `AlarmConditions`
+    /// and `CustomAlarm`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("AlarmConditions") => Self::AlarmConditions(r.read_child()?),
@@ -29992,12 +33650,25 @@ impl Default for ORedConditionsChoice {
 }
 
 impl ORedConditionsChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ORedConditionsType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `Condition` or `ANDedConditions`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "Condition" | "ANDedConditions")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `Condition` or `ANDedConditions`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::Condition(_) => "Condition",
@@ -30005,6 +33676,17 @@ impl ORedConditionsChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `Condition` or
+    /// `ANDedConditions`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::Condition(v) => v.write_xml(w, "Condition")?,
@@ -30013,6 +33695,23 @@ impl ORedConditionsChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `Condition` or `ANDedConditions`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `Condition` and
+    /// `ANDedConditions`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("Condition") => Self::Condition(r.read_child()?),
@@ -30039,12 +33738,25 @@ impl Default for ParameterSetChoice {
 }
 
 impl ParameterSetChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ParameterSetType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `Parameter` or `ParameterRef`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "Parameter" | "ParameterRef")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `Parameter` or `ParameterRef`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::Parameter(_) => "Parameter",
@@ -30052,6 +33764,17 @@ impl ParameterSetChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `Parameter` or
+    /// `ParameterRef`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::Parameter(v) => v.write_xml(w, "Parameter")?,
@@ -30060,6 +33783,23 @@ impl ParameterSetChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `Parameter` or `ParameterRef`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `Parameter` and
+    /// `ParameterRef`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("Parameter") => Self::Parameter(r.read_child()?),
@@ -30091,12 +33831,25 @@ impl Default for ParameterToSetChoice {
 }
 
 impl ParameterToSetChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ParameterToSetType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `Derivation` or `NewValue`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "Derivation" | "NewValue")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `Derivation` or `NewValue`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::Derivation(_) => "Derivation",
@@ -30104,6 +33857,17 @@ impl ParameterToSetChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `Derivation` or
+    /// `NewValue`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::Derivation(v) => v.write_xml(w, "Derivation")?,
@@ -30112,6 +33876,23 @@ impl ParameterToSetChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `Derivation` or `NewValue`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `Derivation` and
+    /// `NewValue`, if the alternative's element is invalid (see the `read_xml`
+    /// of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("Derivation") => Self::Derivation(r.read_child()?),
@@ -30163,7 +33944,20 @@ impl Default for ParameterTypeSetChoice {
 }
 
 impl ParameterTypeSetChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ParameterTypeSetType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `StringParameterType`, `EnumeratedParameterType`,
+    /// `IntegerParameterType`, `BinaryParameterType`, `FloatParameterType`,
+    /// `BooleanParameterType`, `RelativeTimeParameterType`,
+    /// `AbsoluteTimeParameterType`, `ArrayParameterType` or
+    /// `AggregateParameterType`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -30180,7 +33974,15 @@ impl ParameterTypeSetChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `StringParameterType`, `EnumeratedParameterType`,
+    /// `IntegerParameterType`, `BinaryParameterType`, `FloatParameterType`,
+    /// `BooleanParameterType`, `RelativeTimeParameterType`,
+    /// `AbsoluteTimeParameterType`, `ArrayParameterType` or
+    /// `AggregateParameterType`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::StringParameterType(_) => "StringParameterType",
@@ -30196,6 +33998,20 @@ impl ParameterTypeSetChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `StringParameterType`,
+    /// `EnumeratedParameterType`, `IntegerParameterType`,
+    /// `BinaryParameterType`, `FloatParameterType`, `BooleanParameterType`,
+    /// `RelativeTimeParameterType`, `AbsoluteTimeParameterType`,
+    /// `ArrayParameterType` or `AggregateParameterType`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::StringParameterType(v) => {
@@ -30232,6 +34048,31 @@ impl ParameterTypeSetChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `StringParameterType`, `EnumeratedParameterType`,
+    /// `IntegerParameterType`, `BinaryParameterType`, `FloatParameterType`,
+    /// `BooleanParameterType`, `RelativeTimeParameterType`,
+    /// `AbsoluteTimeParameterType`, `ArrayParameterType` or
+    /// `AggregateParameterType`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `StringParameterType`, `EnumeratedParameterType`,
+    /// `IntegerParameterType`, `BinaryParameterType`, `FloatParameterType`,
+    /// `BooleanParameterType`, `RelativeTimeParameterType`,
+    /// `AbsoluteTimeParameterType`, `ArrayParameterType` and
+    /// `AggregateParameterType`, if the alternative's element is invalid (see
+    /// the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("StringParameterType") => {
@@ -30300,12 +34141,25 @@ impl Default for PercentCompleteChoice {
 }
 
 impl PercentCompleteChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`PercentCompleteType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `FixedValue` or `DynamicValue`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "FixedValue" | "DynamicValue")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `FixedValue` or `DynamicValue`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::FixedValue(_) => "FixedValue",
@@ -30313,6 +34167,16 @@ impl PercentCompleteChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `FixedValue` or
+    /// `DynamicValue`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// Never fails; it returns a `Result` as the writers of other choices do.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::FixedValue(v) => w.leaf("FixedValue", v),
@@ -30321,6 +34185,23 @@ impl PercentCompleteChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `FixedValue` or `DynamicValue`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `FixedValue` and
+    /// `DynamicValue`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("FixedValue") => Self::FixedValue(r.read_leaf()?),
@@ -30358,7 +34239,18 @@ impl Default for QueuedVerifierChoice1 {
 }
 
 impl QueuedVerifierChoice1 {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`QueuedVerifierType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `ComparisonList`, `ContainerRef`,
+    /// `ParameterValueChange`, `CustomAlgorithm`, `BooleanExpression` or
+    /// `Comparison`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -30371,7 +34263,12 @@ impl QueuedVerifierChoice1 {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `ComparisonList`, `ContainerRef`, `ParameterValueChange`,
+    /// `CustomAlgorithm`, `BooleanExpression` or `Comparison`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::ComparisonList(_) => "ComparisonList",
@@ -30383,6 +34280,18 @@ impl QueuedVerifierChoice1 {
         }
     }
 
+    /// Writes the selected alternative as its element, `ComparisonList`,
+    /// `ContainerRef`, `ParameterValueChange`, `CustomAlgorithm`,
+    /// `BooleanExpression` or `Comparison`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::ComparisonList(v) => v.write_xml(w, "ComparisonList")?,
@@ -30399,6 +34308,25 @@ impl QueuedVerifierChoice1 {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `ComparisonList`, `ContainerRef`, `ParameterValueChange`,
+    /// `CustomAlgorithm`, `BooleanExpression` or `Comparison`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `ComparisonList`,
+    /// `ContainerRef`, `ParameterValueChange`, `CustomAlgorithm`,
+    /// `BooleanExpression` and `Comparison`, if the alternative's element is
+    /// invalid (see the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("ComparisonList") => Self::ComparisonList(r.read_child()?),
@@ -30438,12 +34366,26 @@ impl Default for QueuedVerifierChoice2 {
 }
 
 impl QueuedVerifierChoice2 {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`QueuedVerifierType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `CheckWindow` or `CheckWindowAlgorithms`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "CheckWindow" | "CheckWindowAlgorithms")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `CheckWindow` or `CheckWindowAlgorithms`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::CheckWindow(_) => "CheckWindow",
@@ -30451,6 +34393,17 @@ impl QueuedVerifierChoice2 {
         }
     }
 
+    /// Writes the selected alternative as its element, `CheckWindow` or
+    /// `CheckWindowAlgorithms`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::CheckWindow(v) => v.write_xml(w, "CheckWindow")?,
@@ -30461,6 +34414,23 @@ impl QueuedVerifierChoice2 {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `CheckWindow` or `CheckWindowAlgorithms`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `CheckWindow` and
+    /// `CheckWindowAlgorithms`, if the alternative's element is invalid (see
+    /// the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("CheckWindow") => Self::CheckWindow(r.read_child()?),
@@ -30500,7 +34470,18 @@ impl Default for ReceivedVerifierChoice1 {
 }
 
 impl ReceivedVerifierChoice1 {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ReceivedVerifierType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `ComparisonList`, `ContainerRef`,
+    /// `ParameterValueChange`, `CustomAlgorithm`, `BooleanExpression` or
+    /// `Comparison`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -30513,7 +34494,12 @@ impl ReceivedVerifierChoice1 {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `ComparisonList`, `ContainerRef`, `ParameterValueChange`,
+    /// `CustomAlgorithm`, `BooleanExpression` or `Comparison`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::ComparisonList(_) => "ComparisonList",
@@ -30525,6 +34511,18 @@ impl ReceivedVerifierChoice1 {
         }
     }
 
+    /// Writes the selected alternative as its element, `ComparisonList`,
+    /// `ContainerRef`, `ParameterValueChange`, `CustomAlgorithm`,
+    /// `BooleanExpression` or `Comparison`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::ComparisonList(v) => v.write_xml(w, "ComparisonList")?,
@@ -30541,6 +34539,25 @@ impl ReceivedVerifierChoice1 {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `ComparisonList`, `ContainerRef`, `ParameterValueChange`,
+    /// `CustomAlgorithm`, `BooleanExpression` or `Comparison`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `ComparisonList`,
+    /// `ContainerRef`, `ParameterValueChange`, `CustomAlgorithm`,
+    /// `BooleanExpression` and `Comparison`, if the alternative's element is
+    /// invalid (see the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("ComparisonList") => Self::ComparisonList(r.read_child()?),
@@ -30580,12 +34597,26 @@ impl Default for ReceivedVerifierChoice2 {
 }
 
 impl ReceivedVerifierChoice2 {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ReceivedVerifierType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `CheckWindow` or `CheckWindowAlgorithms`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "CheckWindow" | "CheckWindowAlgorithms")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `CheckWindow` or `CheckWindowAlgorithms`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::CheckWindow(_) => "CheckWindow",
@@ -30593,6 +34624,17 @@ impl ReceivedVerifierChoice2 {
         }
     }
 
+    /// Writes the selected alternative as its element, `CheckWindow` or
+    /// `CheckWindowAlgorithms`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::CheckWindow(v) => v.write_xml(w, "CheckWindow")?,
@@ -30603,6 +34645,23 @@ impl ReceivedVerifierChoice2 {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `CheckWindow` or `CheckWindowAlgorithms`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `CheckWindow` and
+    /// `CheckWindowAlgorithms`, if the alternative's element is invalid (see
+    /// the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("CheckWindow") => Self::CheckWindow(r.read_child()?),
@@ -30632,12 +34691,25 @@ impl Default for ReferenceTimeChoice {
 }
 
 impl ReferenceTimeChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ReferenceTimeType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `OffsetFrom` or `Epoch`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "OffsetFrom" | "Epoch")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `OffsetFrom` or `Epoch`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::OffsetFrom(_) => "OffsetFrom",
@@ -30645,6 +34717,15 @@ impl ReferenceTimeChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `OffsetFrom` or `Epoch`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// Never fails; it returns a `Result` as the writers of other choices do.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::OffsetFrom(v) => v.write_xml(w, "OffsetFrom")?,
@@ -30653,6 +34734,23 @@ impl ReferenceTimeChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `OffsetFrom` or `Epoch`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `OffsetFrom` and
+    /// `Epoch`, if the alternative's element is invalid (see the `read_xml` of
+    /// its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("OffsetFrom") => Self::OffsetFrom(r.read_child()?),
@@ -30685,7 +34783,17 @@ impl Default for RestrictionCriteriaChoice {
 }
 
 impl RestrictionCriteriaChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`RestrictionCriteriaType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `Comparison`, `ComparisonList`, `BooleanExpression`
+    /// or `CustomAlgorithm`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -30696,7 +34804,12 @@ impl RestrictionCriteriaChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `Comparison`, `ComparisonList`, `BooleanExpression` or
+    /// `CustomAlgorithm`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::Comparison(_) => "Comparison",
@@ -30706,6 +34819,17 @@ impl RestrictionCriteriaChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `Comparison`,
+    /// `ComparisonList`, `BooleanExpression` or `CustomAlgorithm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::Comparison(v) => v.write_xml(w, "Comparison")?,
@@ -30718,6 +34842,25 @@ impl RestrictionCriteriaChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `Comparison`, `ComparisonList`, `BooleanExpression` or
+    /// `CustomAlgorithm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `Comparison`,
+    /// `ComparisonList`, `BooleanExpression` and `CustomAlgorithm`, if the
+    /// alternative's element is invalid (see the `read_xml` of its type) or if
+    /// the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("Comparison") => Self::Comparison(r.read_child()?),
@@ -30764,7 +34907,18 @@ impl Default for SentFromRangeVerifierChoice1 {
 }
 
 impl SentFromRangeVerifierChoice1 {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`SentFromRangeVerifierType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `ComparisonList`, `ContainerRef`,
+    /// `ParameterValueChange`, `CustomAlgorithm`, `BooleanExpression` or
+    /// `Comparison`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -30777,7 +34931,12 @@ impl SentFromRangeVerifierChoice1 {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `ComparisonList`, `ContainerRef`, `ParameterValueChange`,
+    /// `CustomAlgorithm`, `BooleanExpression` or `Comparison`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::ComparisonList(_) => "ComparisonList",
@@ -30789,6 +34948,18 @@ impl SentFromRangeVerifierChoice1 {
         }
     }
 
+    /// Writes the selected alternative as its element, `ComparisonList`,
+    /// `ContainerRef`, `ParameterValueChange`, `CustomAlgorithm`,
+    /// `BooleanExpression` or `Comparison`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::ComparisonList(v) => v.write_xml(w, "ComparisonList")?,
@@ -30805,6 +34976,25 @@ impl SentFromRangeVerifierChoice1 {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `ComparisonList`, `ContainerRef`, `ParameterValueChange`,
+    /// `CustomAlgorithm`, `BooleanExpression` or `Comparison`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `ComparisonList`,
+    /// `ContainerRef`, `ParameterValueChange`, `CustomAlgorithm`,
+    /// `BooleanExpression` and `Comparison`, if the alternative's element is
+    /// invalid (see the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("ComparisonList") => Self::ComparisonList(r.read_child()?),
@@ -30844,12 +35034,26 @@ impl Default for SentFromRangeVerifierChoice2 {
 }
 
 impl SentFromRangeVerifierChoice2 {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`SentFromRangeVerifierType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `CheckWindow` or `CheckWindowAlgorithms`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "CheckWindow" | "CheckWindowAlgorithms")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `CheckWindow` or `CheckWindowAlgorithms`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::CheckWindow(_) => "CheckWindow",
@@ -30857,6 +35061,17 @@ impl SentFromRangeVerifierChoice2 {
         }
     }
 
+    /// Writes the selected alternative as its element, `CheckWindow` or
+    /// `CheckWindowAlgorithms`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::CheckWindow(v) => v.write_xml(w, "CheckWindow")?,
@@ -30867,6 +35082,23 @@ impl SentFromRangeVerifierChoice2 {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `CheckWindow` or `CheckWindowAlgorithms`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `CheckWindow` and
+    /// `CheckWindowAlgorithms`, if the alternative's element is invalid (see
+    /// the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("CheckWindow") => Self::CheckWindow(r.read_child()?),
@@ -30892,12 +35124,26 @@ impl Default for ServiceChoice {
 }
 
 impl ServiceChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`ServiceType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `MessageRefSet` or `ContainerRefSet`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "MessageRefSet" | "ContainerRefSet")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `MessageRefSet` or `ContainerRefSet`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::MessageRefSet(_) => "MessageRefSet",
@@ -30905,6 +35151,17 @@ impl ServiceChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `MessageRefSet` or
+    /// `ContainerRefSet`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::MessageRefSet(v) => v.write_xml(w, "MessageRefSet")?,
@@ -30913,6 +35170,23 @@ impl ServiceChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `MessageRefSet` or `ContainerRefSet`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `MessageRefSet` and
+    /// `ContainerRefSet`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("MessageRefSet") => Self::MessageRefSet(r.read_child()?),
@@ -30937,7 +35211,17 @@ impl Default for StreamSetChoice {
 }
 
 impl StreamSetChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`StreamSetType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `FixedFrameStream`, `VariableFrameStream` or
+    /// `CustomStream`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -30945,7 +35229,11 @@ impl StreamSetChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `FixedFrameStream`, `VariableFrameStream` or `CustomStream`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::FixedFrameStream(_) => "FixedFrameStream",
@@ -30954,6 +35242,17 @@ impl StreamSetChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `FixedFrameStream`,
+    /// `VariableFrameStream` or `CustomStream`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::FixedFrameStream(v) => v.write_xml(w, "FixedFrameStream")?,
@@ -30965,6 +35264,23 @@ impl StreamSetChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `FixedFrameStream`, `VariableFrameStream` or `CustomStream`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `FixedFrameStream`,
+    /// `VariableFrameStream` and `CustomStream`, if the alternative's element
+    /// is invalid (see the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("FixedFrameStream") => Self::FixedFrameStream(r.read_child()?),
@@ -31001,12 +35317,26 @@ impl Default for StringAlarmChoice {
 }
 
 impl StringAlarmChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`StringAlarmType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `AlarmConditions` or `CustomAlarm`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "AlarmConditions" | "CustomAlarm")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `AlarmConditions` or `CustomAlarm`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::AlarmConditions(_) => "AlarmConditions",
@@ -31014,6 +35344,17 @@ impl StringAlarmChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `AlarmConditions` or
+    /// `CustomAlarm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::AlarmConditions(v) => v.write_xml(w, "AlarmConditions")?,
@@ -31022,6 +35363,23 @@ impl StringAlarmChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `AlarmConditions` or `CustomAlarm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `AlarmConditions`
+    /// and `CustomAlarm`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("AlarmConditions") => Self::AlarmConditions(r.read_child()?),
@@ -31056,7 +35414,17 @@ impl Default for StringArgumentChoice {
 }
 
 impl StringArgumentChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`StringArgumentType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -31067,7 +35435,12 @@ impl StringArgumentChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::BinaryDataEncoding(_) => "BinaryDataEncoding",
@@ -31077,6 +35450,17 @@ impl StringArgumentChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `BinaryDataEncoding`,
+    /// `FloatDataEncoding`, `IntegerDataEncoding` or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::BinaryDataEncoding(v) => {
@@ -31095,6 +35479,25 @@ impl StringArgumentChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`
+    /// or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding` and
+    /// `StringDataEncoding`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("BinaryDataEncoding") => {
@@ -31138,12 +35541,26 @@ impl Default for StringContextAlarmChoice {
 }
 
 impl StringContextAlarmChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`StringContextAlarmType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `AlarmConditions` or `CustomAlarm`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "AlarmConditions" | "CustomAlarm")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `AlarmConditions` or `CustomAlarm`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::AlarmConditions(_) => "AlarmConditions",
@@ -31151,6 +35568,17 @@ impl StringContextAlarmChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `AlarmConditions` or
+    /// `CustomAlarm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::AlarmConditions(v) => v.write_xml(w, "AlarmConditions")?,
@@ -31159,6 +35587,23 @@ impl StringContextAlarmChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `AlarmConditions` or `CustomAlarm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `AlarmConditions`
+    /// and `CustomAlarm`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("AlarmConditions") => Self::AlarmConditions(r.read_child()?),
@@ -31193,7 +35638,17 @@ impl Default for StringDataChoice {
 }
 
 impl StringDataChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`StringDataType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -31204,7 +35659,12 @@ impl StringDataChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::BinaryDataEncoding(_) => "BinaryDataEncoding",
@@ -31214,6 +35674,17 @@ impl StringDataChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `BinaryDataEncoding`,
+    /// `FloatDataEncoding`, `IntegerDataEncoding` or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::BinaryDataEncoding(v) => {
@@ -31232,6 +35703,25 @@ impl StringDataChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`
+    /// or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding` and
+    /// `StringDataEncoding`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("BinaryDataEncoding") => {
@@ -31283,12 +35773,25 @@ impl Default for StringDataEncodingChoice {
 }
 
 impl StringDataEncodingChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`StringDataEncodingType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `SizeInBits` or `Variable`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "SizeInBits" | "Variable")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `SizeInBits` or `Variable`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::SizeInBits(_) => "SizeInBits",
@@ -31296,6 +35799,17 @@ impl StringDataEncodingChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `SizeInBits` or
+    /// `Variable`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::SizeInBits(v) => v.write_xml(w, "SizeInBits")?,
@@ -31304,6 +35818,23 @@ impl StringDataEncodingChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `SizeInBits` or `Variable`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `SizeInBits` and
+    /// `Variable`, if the alternative's element is invalid (see the `read_xml`
+    /// of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("SizeInBits") => Self::SizeInBits(r.read_child()?),
@@ -31338,7 +35869,17 @@ impl Default for StringParameterChoice {
 }
 
 impl StringParameterChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`StringParameterType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -31349,7 +35890,12 @@ impl StringParameterChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `BinaryDataEncoding`, `FloatDataEncoding`,
+    /// `IntegerDataEncoding` or `StringDataEncoding`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::BinaryDataEncoding(_) => "BinaryDataEncoding",
@@ -31359,6 +35905,17 @@ impl StringParameterChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `BinaryDataEncoding`,
+    /// `FloatDataEncoding`, `IntegerDataEncoding` or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::BinaryDataEncoding(v) => {
@@ -31377,6 +35934,25 @@ impl StringParameterChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding`
+    /// or `StringDataEncoding`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `BinaryDataEncoding`, `FloatDataEncoding`, `IntegerDataEncoding` and
+    /// `StringDataEncoding`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("BinaryDataEncoding") => {
@@ -31420,12 +35996,26 @@ impl Default for TimeAlarmChoice {
 }
 
 impl TimeAlarmChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`TimeAlarmType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `AlarmConditions` or `CustomAlarm`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "AlarmConditions" | "CustomAlarm")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `AlarmConditions` or `CustomAlarm`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::AlarmConditions(_) => "AlarmConditions",
@@ -31433,6 +36023,17 @@ impl TimeAlarmChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `AlarmConditions` or
+    /// `CustomAlarm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::AlarmConditions(v) => v.write_xml(w, "AlarmConditions")?,
@@ -31441,6 +36042,23 @@ impl TimeAlarmChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `AlarmConditions` or `CustomAlarm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `AlarmConditions`
+    /// and `CustomAlarm`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("AlarmConditions") => Self::AlarmConditions(r.read_child()?),
@@ -31469,12 +36087,26 @@ impl Default for TimeContextAlarmChoice {
 }
 
 impl TimeContextAlarmChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`TimeContextAlarmType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `AlarmConditions` or `CustomAlarm`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "AlarmConditions" | "CustomAlarm")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `AlarmConditions` or `CustomAlarm`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::AlarmConditions(_) => "AlarmConditions",
@@ -31482,6 +36114,17 @@ impl TimeContextAlarmChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `AlarmConditions` or
+    /// `CustomAlarm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::AlarmConditions(v) => v.write_xml(w, "AlarmConditions")?,
@@ -31490,6 +36133,23 @@ impl TimeContextAlarmChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `AlarmConditions` or `CustomAlarm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `AlarmConditions`
+    /// and `CustomAlarm`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("AlarmConditions") => Self::AlarmConditions(r.read_child()?),
@@ -31527,7 +36187,18 @@ impl Default for TransferredToRangeVerifierChoice1 {
 }
 
 impl TransferredToRangeVerifierChoice1 {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`TransferredToRangeVerifierType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `ComparisonList`, `ContainerRef`,
+    /// `ParameterValueChange`, `CustomAlgorithm`, `BooleanExpression` or
+    /// `Comparison`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -31540,7 +36211,12 @@ impl TransferredToRangeVerifierChoice1 {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `ComparisonList`, `ContainerRef`, `ParameterValueChange`,
+    /// `CustomAlgorithm`, `BooleanExpression` or `Comparison`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::ComparisonList(_) => "ComparisonList",
@@ -31552,6 +36228,18 @@ impl TransferredToRangeVerifierChoice1 {
         }
     }
 
+    /// Writes the selected alternative as its element, `ComparisonList`,
+    /// `ContainerRef`, `ParameterValueChange`, `CustomAlgorithm`,
+    /// `BooleanExpression` or `Comparison`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::ComparisonList(v) => v.write_xml(w, "ComparisonList")?,
@@ -31568,6 +36256,25 @@ impl TransferredToRangeVerifierChoice1 {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `ComparisonList`, `ContainerRef`, `ParameterValueChange`,
+    /// `CustomAlgorithm`, `BooleanExpression` or `Comparison`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `ComparisonList`,
+    /// `ContainerRef`, `ParameterValueChange`, `CustomAlgorithm`,
+    /// `BooleanExpression` and `Comparison`, if the alternative's element is
+    /// invalid (see the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("ComparisonList") => Self::ComparisonList(r.read_child()?),
@@ -31607,12 +36314,26 @@ impl Default for TransferredToRangeVerifierChoice2 {
 }
 
 impl TransferredToRangeVerifierChoice2 {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`TransferredToRangeVerifierType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `CheckWindow` or `CheckWindowAlgorithms`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "CheckWindow" | "CheckWindowAlgorithms")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `CheckWindow` or `CheckWindowAlgorithms`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::CheckWindow(_) => "CheckWindow",
@@ -31620,6 +36341,17 @@ impl TransferredToRangeVerifierChoice2 {
         }
     }
 
+    /// Writes the selected alternative as its element, `CheckWindow` or
+    /// `CheckWindowAlgorithms`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::CheckWindow(v) => v.write_xml(w, "CheckWindow")?,
@@ -31630,6 +36362,23 @@ impl TransferredToRangeVerifierChoice2 {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `CheckWindow` or `CheckWindowAlgorithms`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `CheckWindow` and
+    /// `CheckWindowAlgorithms`, if the alternative's element is invalid (see
+    /// the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("CheckWindow") => Self::CheckWindow(r.read_child()?),
@@ -31664,7 +36413,17 @@ impl Default for TransmissionConstraintChoice {
 }
 
 impl TransmissionConstraintChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`TransmissionConstraintType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `Comparison`, `ComparisonList`, `BooleanExpression`
+    /// or `CustomAlgorithm`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -31675,7 +36434,12 @@ impl TransmissionConstraintChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `Comparison`, `ComparisonList`, `BooleanExpression` or
+    /// `CustomAlgorithm`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::Comparison(_) => "Comparison",
@@ -31685,6 +36449,17 @@ impl TransmissionConstraintChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `Comparison`,
+    /// `ComparisonList`, `BooleanExpression` or `CustomAlgorithm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::Comparison(v) => v.write_xml(w, "Comparison")?,
@@ -31697,6 +36472,25 @@ impl TransmissionConstraintChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `Comparison`, `ComparisonList`, `BooleanExpression` or
+    /// `CustomAlgorithm`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `Comparison`,
+    /// `ComparisonList`, `BooleanExpression` and `CustomAlgorithm`, if the
+    /// alternative's element is invalid (see the `read_xml` of its type) or if
+    /// the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("Comparison") => Self::Comparison(r.read_child()?),
@@ -31736,7 +36530,18 @@ impl Default for TriggerSetChoice {
 }
 
 impl TriggerSetChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`TriggerSetType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `OnParameterUpdateTrigger`,
+    /// `OnContainerUpdateTrigger` or `OnPeriodicRateTrigger`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -31746,7 +36551,12 @@ impl TriggerSetChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `OnParameterUpdateTrigger`, `OnContainerUpdateTrigger` or
+    /// `OnPeriodicRateTrigger`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::OnParameterUpdateTrigger(_) => "OnParameterUpdateTrigger",
@@ -31755,6 +36565,17 @@ impl TriggerSetChoice {
         }
     }
 
+    /// Writes the selected alternative as its element,
+    /// `OnParameterUpdateTrigger`, `OnContainerUpdateTrigger` or
+    /// `OnPeriodicRateTrigger`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// Never fails; it returns a `Result` as the writers of other choices do.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::OnParameterUpdateTrigger(v) => {
@@ -31770,6 +36591,25 @@ impl TriggerSetChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `OnParameterUpdateTrigger`, `OnContainerUpdateTrigger` or
+    /// `OnPeriodicRateTrigger`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of
+    /// `OnParameterUpdateTrigger`, `OnContainerUpdateTrigger` and
+    /// `OnPeriodicRateTrigger`, if the alternative's element is invalid (see
+    /// the `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("OnParameterUpdateTrigger") => {
@@ -31820,7 +36660,17 @@ impl Default for TriggeredMathOperationChoice {
 }
 
 impl TriggeredMathOperationChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`TriggeredMathOperationType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `ValueOperand`, `ThisParameterOperand`, `Operator`
+    /// or `ParameterInstanceRefOperand`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(
             name,
@@ -31831,7 +36681,12 @@ impl TriggeredMathOperationChoice {
         )
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `ValueOperand`, `ThisParameterOperand`, `Operator` or
+    /// `ParameterInstanceRefOperand`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::ValueOperand(_) => "ValueOperand",
@@ -31843,6 +36698,16 @@ impl TriggeredMathOperationChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `ValueOperand`,
+    /// `ThisParameterOperand`, `Operator` or `ParameterInstanceRefOperand`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// Never fails; it returns a `Result` as the writers of other choices do.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::ValueOperand(v) => w.leaf("ValueOperand", v),
@@ -31855,6 +36720,25 @@ impl TriggeredMathOperationChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `ValueOperand`, `ThisParameterOperand`, `Operator` or
+    /// `ParameterInstanceRefOperand`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `ValueOperand`,
+    /// `ThisParameterOperand`, `Operator` and `ParameterInstanceRefOperand`, if
+    /// the alternative's element is invalid (see the `read_xml` of its type) or
+    /// if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("ValueOperand") => Self::ValueOperand(r.read_leaf()?),
@@ -31892,12 +36776,25 @@ impl Default for VariableFrameStreamChoice {
 }
 
 impl VariableFrameStreamChoice {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`VariableFrameStreamType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `ContainerRef` or `ServiceRef`; otherwise `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "ContainerRef" | "ServiceRef")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `ContainerRef` or `ServiceRef`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::ContainerRef(_) => "ContainerRef",
@@ -31905,6 +36802,16 @@ impl VariableFrameStreamChoice {
         }
     }
 
+    /// Writes the selected alternative as its element, `ContainerRef` or
+    /// `ServiceRef`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// Never fails; it returns a `Result` as the writers of other choices do.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::ContainerRef(v) => v.write_xml(w, "ContainerRef")?,
@@ -31913,6 +36820,23 @@ impl VariableFrameStreamChoice {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `ContainerRef` or `ServiceRef`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `ContainerRef` and
+    /// `ServiceRef`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("ContainerRef") => Self::ContainerRef(r.read_child()?),
@@ -31941,12 +36865,26 @@ impl Default for VariableStringChoice1 {
 }
 
 impl VariableStringChoice1 {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`VariableStringType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `DynamicValue` or `DiscreteLookupList`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "DynamicValue" | "DiscreteLookupList")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `DynamicValue` or `DiscreteLookupList`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::DynamicValue(_) => "DynamicValue",
@@ -31954,6 +36892,17 @@ impl VariableStringChoice1 {
         }
     }
 
+    /// Writes the selected alternative as its element, `DynamicValue` or
+    /// `DiscreteLookupList`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// An error if a value nested in the alternative has a repeated element
+    /// that occurs fewer or more times than the schema allows.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::DynamicValue(v) => v.write_xml(w, "DynamicValue")?,
@@ -31964,6 +36913,23 @@ impl VariableStringChoice1 {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `DynamicValue` or `DiscreteLookupList`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `DynamicValue` and
+    /// `DiscreteLookupList`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("DynamicValue") => Self::DynamicValue(r.read_child()?),
@@ -31997,12 +36963,26 @@ impl Default for VariableStringChoice2 {
 }
 
 impl VariableStringChoice2 {
-    /// Whether `name` starts one of the alternatives.
+    /// Says whether an element named `name` starts an alternative of the
+    /// `<choice>` in [`VariableStringType`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - An element's local name.
+    ///
+    /// # Returns
+    ///
+    /// `true` if `name` is `LeadingSize` or `TerminationChar`; otherwise
+    /// `false`.
     pub fn accepts(name: &str) -> bool {
         matches!(name, "LeadingSize" | "TerminationChar")
     }
 
-    /// The element name of the selected alternative.
+    /// Gives the element name of the selected alternative.
+    ///
+    /// # Returns
+    ///
+    /// The name: `LeadingSize` or `TerminationChar`.
     pub fn xml_name(&self) -> &'static str {
         match self {
             Self::LeadingSize(_) => "LeadingSize",
@@ -32010,6 +36990,16 @@ impl VariableStringChoice2 {
         }
     }
 
+    /// Writes the selected alternative as its element, `LeadingSize` or
+    /// `TerminationChar`.
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - The writer that receives the XML.
+    ///
+    /// # Errors
+    ///
+    /// Never fails; it returns a `Result` as the writers of other choices do.
     pub fn write_xml(&self, w: &mut Writer<'_>) -> Result<()> {
         match self {
             Self::LeadingSize(v) => v.write_xml(w, "LeadingSize")?,
@@ -32018,6 +37008,23 @@ impl VariableStringChoice2 {
         Ok(())
     }
 
+    /// Reads the alternative that the reader's next child element starts, which
+    /// must be `LeadingSize` or `TerminationChar`.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - The reader, positioned before the child element; it is left
+    ///         after the child's end tag.
+    ///
+    /// # Returns
+    ///
+    /// The alternative read.
+    ///
+    /// # Errors
+    ///
+    /// An error if there is no next child or it is none of `LeadingSize` and
+    /// `TerminationChar`, if the alternative's element is invalid (see the
+    /// `read_xml` of its type) or if the XML is malformed.
     pub fn read_xml(r: &mut Reader<'_>) -> Result<Self> {
         Ok(match r.peek_child()? {
             Some("LeadingSize") => Self::LeadingSize(r.read_child()?),

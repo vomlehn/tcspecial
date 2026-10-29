@@ -5935,10 +5935,18 @@ Requirement
     relied on to deliver at all, or to deliver once.
 
 Requirement
+    **Communication on the vehicle and within the MOC uses reliable
+    datagrams.** Between components on the vehicle, and between components
+    of the MOC, a datagram is neither lost, repeated nor delivered out of
+    order. Only the radio loses or repeats a packet, so the radio is the one
+    place a loss or a repeat between tcspecial and the ground comes from.
+
+Requirement
     The receiver still drops what arrives out of order, as a guard and not as
-    the way order is kept. The UDP hops at either end of the radio, and the
-    sockets a restart closes and opens again, are outside what the radio
-    promises, and the check costs a comparison. A command older than one
+    the way order is kept. Under the two assumptions above nothing arrives
+    out of order, so the check is for an assumption that fails in flight: a
+    packet acted on out of order would change the vehicle's state the wrong
+    way, and refusing it costs a comparison. A command older than one
     already taken is not acted on -- see `What the ground may send
     meanwhile`_ -- and a beacon of the same start numbered at or before one
     already heard is late, and counts for nothing: see `Asynchronous
@@ -6181,9 +6189,10 @@ Requirement
 Requirement
     A command older than one this start of tcspecial has already taken, on
     either link, is answered ``Stale`` and nothing in it is acted on. The
-    radio delivers in order, but what lies either side of it may not -- see
-    `What is assumed`_ -- and should a command arrive after one sent later,
-    the later one is what the ground meant last. Older is by serial-number arithmetic on the four-byte sequence
+    radio delivers in order, and what lies either side of it uses reliable
+    datagrams -- see `What is assumed`_ -- so this is a guard: should a
+    command arrive after one sent later all the same, the later one is what
+    the ground meant last. Older is by serial-number arithmetic on the four-byte sequence
     (RFC 1982), ``tcslibgs::sequence_is_before``, so that a count that wraps
     still goes forward. A command of the same sequence as the newest taken
     is a repeat, not an older command, and is taken. PING and CONNECT are

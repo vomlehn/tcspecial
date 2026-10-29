@@ -178,6 +178,9 @@ impl I2cEndpoint {
         // What this adapter can do decides how every transfer below is
         // made, so it is asked once, here, rather than guessed at each one.
         let mut funcs: libc::c_ulong = 0;
+        // SAFETY: I2C_FUNCS needs an open i2c-dev descriptor and a pointer
+        // to an unsigned long it can write, which is what i2c-dev puts. `fd`
+        // is `bus`'s, held open above; `funcs` is a local c_ulong.
         if unsafe { libc::ioctl(fd, I2C_FUNCS, &mut funcs) } < 0 {
             return Err(TcsError::Endpoint(format!(
                 "{} will not say what it can do: {}",

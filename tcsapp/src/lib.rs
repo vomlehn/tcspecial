@@ -161,6 +161,10 @@ impl Interface {
 pub fn is_open(fd: RawFd) -> bool {
     // F_GETFD asks for the descriptor's flags, which is the cheapest question
     // that has to be answered by the descriptor existing.
+    //
+    // SAFETY: F_GETFD only reads the descriptor table, so any number may be
+    // asked about: one that is not open is answered with -1 and EBADF, and
+    // nothing is changed or read through a pointer.
     unsafe { libc::fcntl(fd, libc::F_GETFD) != -1 }
 }
 
@@ -179,6 +183,10 @@ pub fn is_open(fd: RawFd) -> bool {
 /// once rather than discovered as a read that never answers.
 pub fn is_handed_over(fd: RawFd) -> bool {
     let mut about = std::mem::MaybeUninit::<libc::stat>::uninit();
+    // SAFETY: fstat needs a stat it can write, which `about` is, alive for
+    // the call; any descriptor may be asked about, and one that is not open
+    // fails with EBADF. assume_init needs the stat written, which it is once
+    // fstat has not failed -- and a failure returns before it is reached.
     unsafe {
         if libc::fstat(fd, about.as_mut_ptr()) == -1 {
             return false;

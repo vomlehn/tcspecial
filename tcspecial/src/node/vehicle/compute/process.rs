@@ -236,6 +236,8 @@ impl Process {
             let woken = self
                 .abandon
                 .io_fd()
+                // SAFETY: as above: the wakeup is held open by `abandon`,
+                // which `self` keeps for longer than this borrow.
                 .map(|fd| unsafe { std::os::fd::BorrowedFd::borrow_raw(fd) });
             // On the stack: the program's output, and the node's wakeup
             // where it has one.

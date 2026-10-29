@@ -1565,6 +1565,8 @@ mod tests {
         use std::os::unix::io::FromRawFd;
         use tcslibgs::graph::{Destinations, Link, Node};
 
+        // SAFETY: posix_openpt takes only flags and has no preconditions;
+        // its result is checked before it is used.
         let master_fd =
             unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY) };
         assert!(
@@ -1572,16 +1574,30 @@ mod tests {
             "no pty: {}",
             std::io::Error::last_os_error()
         );
+        // SAFETY: from_raw_fd needs sole ownership of an open descriptor.
+        // `master_fd` was just opened, is checked above, and nothing else
+        // takes ownership of it; the uses below only borrow it while the File
+        // is alive.
         let mut master = unsafe { std::fs::File::from_raw_fd(master_fd) };
+        // SAFETY: grantpt needs an open pty master, which `master_fd` is,
+        // owned by the File above for the rest of the test.
         assert_eq!(unsafe { libc::grantpt(master_fd) }, 0);
+        // SAFETY: as for grantpt.
         assert_eq!(unsafe { libc::unlockpt(master_fd) }, 0);
         let mut name = [0 as libc::c_char; 128];
         assert_eq!(
+            // SAFETY: ptsname_r needs an open pty master and a buffer it can
+            // write of the length it is given: `name` is a local array, and
+            // its own length is what is passed.
             unsafe {
                 libc::ptsname_r(master_fd, name.as_mut_ptr(), name.len())
             },
             0
         );
+        // SAFETY: from_ptr needs a NUL-terminated string that outlives the
+        // borrow. ptsname_r returned 0, so it wrote a terminated name into
+        // `name` (it fails with ERANGE rather than truncate), and `name`
+        // outlives the CStr, which is copied out at once.
         let line = unsafe { std::ffi::CStr::from_ptr(name.as_ptr()) }
             .to_string_lossy()
             .into_owned();
@@ -2215,8 +2231,9 @@ mod tests {
         let path = where_.path().join("pipe");
         let name =
             CString::new(path.to_str().expect("a path")).expect("a name");
-        // SAFETY: a path in a directory this test owns, and a mode.
         assert_eq!(
+            // SAFETY: mkfifo needs a NUL-terminated path alive for the call,
+            // which `name` is: a CString, held to the end of the test.
             unsafe { libc::mkfifo(name.as_ptr(), 0o600) },
             0,
             "a named pipe"
@@ -2266,8 +2283,9 @@ mod tests {
         let path = where_.path().join("pipe");
         let name =
             CString::new(path.to_str().expect("a path")).expect("a name");
-        // SAFETY: a path in a directory this test owns, and a mode.
         assert_eq!(
+            // SAFETY: mkfifo needs a NUL-terminated path alive for the call,
+            // which `name` is: a CString, held to the end of the test.
             unsafe { libc::mkfifo(name.as_ptr(), 0o600) },
             0,
             "a named pipe: {}",

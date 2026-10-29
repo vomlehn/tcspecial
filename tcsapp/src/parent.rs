@@ -385,6 +385,10 @@ impl End {
             None => -1,
         };
         loop {
+            // SAFETY: poll needs an array of as many pollfds as it is told,
+            // writable for the call: `asking` is one local pollfd, and the
+            // count is 1. Its descriptor is `self.socket`'s, open for as long
+            // as `self` is borrowed.
             let said = unsafe { libc::poll(&mut asking, 1, waiting) };
             if said >= 0 {
                 return Ok(());
@@ -484,6 +488,12 @@ pub fn start(
     .flatten()
     .collect();
     if !shut.is_empty() {
+        // SAFETY: pre_exec needs a closure that is safe to run between fork
+        // and exec, in a child that may have one thread: nothing that
+        // allocates, locks or is not async-signal-safe. This walks a Vec it
+        // owns, allocated before the fork, and calls close, which is
+        // async-signal-safe; and the descriptors it closes are the child's
+        // copies, which nothing in the child owns or uses again before exec.
         unsafe {
             command.pre_exec(move || {
                 for fd in &shut {
@@ -752,6 +762,12 @@ mod tests {
             }
         }
 
+        // SAFETY: GlobalAlloc asks that an allocator not unwind and that it
+        // give and take back memory as its layouts say. Every method here
+        // hands its arguments unchanged to System, which keeps that contract,
+        // and before it only counts: `note` touches two const-initialized
+        // thread locals through `try_with`, which neither allocates nor
+        // panics, even while the thread is being torn down.
         unsafe impl GlobalAlloc for Counting {
             unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
                 note();

@@ -465,6 +465,15 @@ fn take_once(taken: &AtomicBool) -> Result<(), String> {
 /// are its to take, which it says once: the descriptor is owned from here on
 /// and closed when the handle is dropped.
 fn stream(interface: Interface) -> UnixStream {
+    // SAFETY: from_raw_fd needs an open descriptor that nothing else owns.
+    // Open holds: every `inherited` calls `taking` first, which refuses an
+    // interface that was not handed over. Owned by nothing else is not
+    // shown. That `inherited` runs once is the documented rule, not one the
+    // code keeps -- it is a safe fn, and a second call makes a second owner
+    // of each descriptor, which then closes it twice -- and descriptors 0
+    // and 1 are std's stdin and stdout as well, which go on using them, so
+    // this is sound only while the program does not read or print through
+    // std.
     unsafe { UnixStream::from_raw_fd(interface.fd() as RawFd) }
 }
 
@@ -472,6 +481,11 @@ fn stream(interface: Interface) -> UnixStream {
 ///
 /// Called as [`stream`] is.
 fn file(interface: Interface) -> File {
+    // SAFETY: as for `stream`, and as unproven: `taking`, or `complain`
+    // itself, has checked descriptor 2 is open, but sole ownership rests on
+    // `inherited` being called once, and descriptor 2 is std's stderr as
+    // well, which a panic message is written to. `complain` holds its File
+    // in a ManuallyDrop, so that one never closes the descriptor.
     unsafe { File::from_raw_fd(interface.fd() as RawFd) }
 }
 

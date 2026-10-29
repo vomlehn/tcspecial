@@ -70,6 +70,10 @@ impl CanEndpoint {
             )));
         }
         // From here the descriptor is owned, so every path below closes it.
+        //
+        // SAFETY: from_raw_fd needs sole ownership of an open descriptor.
+        // socket has just made this one and it is checked above; nothing
+        // else has been given it.
         let socket = unsafe { OwnedFd::from_raw_fd(fd) };
 
         // Only this device's frames. A bus carries everybody's.
@@ -268,6 +272,8 @@ fn set_nonblocking(what: &str, fd: RawFd) -> TcsResult<()> {
     // SAFETY: both calls take the descriptor by value and return a status.
     let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
     if flags < 0
+        // SAFETY: as for F_GETFL; the descriptor is the caller's socket,
+        // which it holds open across this call.
         || unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) }
             < 0
     {

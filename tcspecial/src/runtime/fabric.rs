@@ -173,7 +173,16 @@ impl Taken {
         again: false,
     };
 
-    /// This many bytes, to go wherever this node's links go.
+    /// Makes a result of this many bytes, to go wherever this node's links
+    /// go.
+    ///
+    /// # Arguments
+    ///
+    /// * `bytes` - How many bytes of the buffer were filled.
+    ///
+    /// # Returns
+    ///
+    /// The result, on no stream in particular and new.
     pub fn of(bytes: usize) -> Taken {
         Taken {
             bytes,
@@ -182,7 +191,16 @@ impl Taken {
         }
     }
 
-    /// And this many, on one stream.
+    /// Makes a result of this many bytes, on one stream.
+    ///
+    /// # Arguments
+    ///
+    /// * `bytes`  - How many bytes of the buffer were filled.
+    /// * `stream` - The stream they are on.
+    ///
+    /// # Returns
+    ///
+    /// The result, new, following only the links that carry `stream`.
     pub fn on(bytes: usize, stream: Stream) -> Taken {
         Taken {
             bytes,
@@ -191,7 +209,16 @@ impl Taken {
         }
     }
 
-    /// This many bytes, which are what was said before, said again.
+    /// Makes a result of this many bytes, which are what was said before,
+    /// said again.
+    ///
+    /// # Arguments
+    ///
+    /// * `bytes` - How many bytes of the buffer were filled.
+    ///
+    /// # Returns
+    ///
+    /// The result, on no stream in particular and marked as a repeat.
     pub fn again(bytes: usize) -> Taken {
         Taken {
             bytes,
@@ -229,7 +256,15 @@ impl<'a> Arriving<'a> {
         stream: None,
     };
 
-    /// At a named input.
+    /// Says a datum arrives at a named input.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The name of the input it fills.
+    ///
+    /// # Returns
+    ///
+    /// Where it arrives, on no stream in particular.
     pub fn named(input: &'a str) -> Arriving<'a> {
         Arriving {
             input: Some(input),
@@ -237,7 +272,16 @@ impl<'a> Arriving<'a> {
         }
     }
 
-    /// On one stream, at whichever way in that stream arrives by.
+    /// Says a datum arrives on one stream, at whichever way in that stream
+    /// arrives by.
+    ///
+    /// # Arguments
+    ///
+    /// * `stream` - The stream it is on.
+    ///
+    /// # Returns
+    ///
+    /// Where it arrives, at no named input.
     pub fn on(stream: Stream) -> Arriving<'static> {
         Arriving {
             input: None,
@@ -260,14 +304,27 @@ impl<'a> Arriving<'a> {
 /// threads; what the bound rules out is a port holding something that cannot,
 /// which a stand-in in a test is the likeliest thing to be.
 pub trait Port: Send {
-    /// Take what this node has produced, if anything.
+    /// Takes what this node has produced, if anything.
     ///
     /// Nought bytes is "nothing to say", which is the ordinary answer from a
     /// device that is not due. An error is a failure to read a node that
     /// should have had something.
+    ///
+    /// # Arguments
+    ///
+    /// * `buffer` - Where the node writes what it produced, from the start.
+    ///
+    /// # Returns
+    ///
+    /// How many bytes of `buffer` were filled, and on which stream if the
+    /// node keeps its streams apart.
+    ///
+    /// # Errors
+    ///
+    /// Why the node could not be read.
     fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String>;
 
-    /// Take what has arrived at this node, without asking it anything.
+    /// Takes what has arrived at this node, without asking it anything.
     ///
     /// For a payload that sends on its own and is asked on a timer of its own:
     /// its answers are taken on whatever pass they arrive on, and the asking is
@@ -284,7 +341,7 @@ pub trait Port: Send {
         0
     }
 
-    /// Ask this node for a reading, and take nothing: send its trigger.
+    /// Asks this node for a reading, and takes nothing: sends its trigger.
     ///
     /// Nothing for a node that has no trigger, which is every node but a
     /// payload that is asked.
@@ -292,7 +349,20 @@ pub trait Port: Send {
         Ok(())
     }
 
-    /// Hand this node something, saying where it arrived.
+    /// Hands this node something, saying where it arrived.
+    ///
+    /// # Arguments
+    ///
+    /// * `arriving` - Which named input it fills and which stream it is on.
+    /// * `data`     - The datum.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` once the node has taken it.
+    ///
+    /// # Errors
+    ///
+    /// Why the node would not take it.
     fn give(
         &mut self,
         arriving: Arriving<'_>,
@@ -321,7 +391,8 @@ pub trait Port: Send {
         true
     }
 
-    /// Set a named attribute of this node, as a command from the ground does.
+    /// Sets a named attribute of this node, as a command from the ground
+    /// does.
     ///
     /// Refused by default, which is what a device answers: a bus address or a
     /// set of line numbers is what the configuration said, and a vehicle whose
@@ -336,7 +407,7 @@ pub trait Port: Send {
         ))
     }
 
-    /// Push whatever this node has buffered to where it belongs.
+    /// Pushes whatever this node has buffered to where it belongs.
     ///
     /// For a log, which does not write a record to its file as it takes it: a
     /// log flushed per arrival is a write system call per reading. Nothing for
@@ -375,6 +446,15 @@ pub trait Port: Send {
 /// configuration that worked before working: it is only a node that says which
 /// stream it produced on, delivering to a link that says which stream it
 /// carries, that can be told apart at all.
+///
+/// # Arguments
+///
+/// * `delivery` - The link, with the stream it carries if that is settled.
+/// * `stream`   - The stream the datum is on, if the node said.
+///
+/// # Returns
+///
+/// False only when both streams are known and differ.
 fn carries(delivery: &Delivery, stream: Option<Stream>) -> bool {
     match (delivery.stream, stream) {
         (Some(link), Some(datum)) => link == datum,
@@ -414,11 +494,16 @@ impl Moved {
         self.refused.is_empty()
     }
 
-    /// Take in what another pass moved.
+    /// Takes in what another pass moved.
     ///
     /// Public because a pass is made of several: a group, then another, then
     /// the polled nodes, then the logs -- and what the caller wants at the end
     /// is one account of all of it, failures included.
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - What the other pass moved, added to this one's counts and
+    ///             its refusals appended to this one's.
     pub fn add(&mut self, other: Moved) {
         self.delivered += other.delivered;
         self.bytes += other.bytes;
@@ -440,9 +525,18 @@ impl Moved {
 /// It was called `Gate` when it only answered the first question. A gate that
 /// also counts is a gate in name only.
 pub trait Watch: Send + Sync {
-    /// Whether this node may be touched. A name this knows nothing about is
-    /// enabled: a link to the ground is not something the ground can stop, and
-    /// the node that feeds it is.
+    /// Says whether this node may be touched.
+    ///
+    /// A name this knows nothing about is enabled: a link to the ground is
+    /// not something the ground can stop, and the node that feeds it is.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - What the configuration calls the node.
+    ///
+    /// # Returns
+    ///
+    /// True if the node is enabled or unknown.
     fn is_enabled(&self, node: &str) -> bool;
 
     /// What the vehicle took from this node.
@@ -644,6 +738,19 @@ pub struct Fabric {
 }
 
 impl Fabric {
+    /// Makes a fabric holding no nodes yet, which nobody is watching.
+    ///
+    /// # Arguments
+    ///
+    /// * `routes` - Where each node's output goes and which link fills each
+    ///              named input.
+    /// * `buffer` - How large a datum may be: the size of the buffer each
+    ///              read is given.
+    ///
+    /// # Returns
+    ///
+    /// The fabric, with every node enabled until [`Fabric::watched_by`]
+    /// says otherwise.
     pub fn new(routes: Routes, buffer: usize) -> Fabric {
         Fabric {
             shared: Arc::new(Shared {
@@ -665,17 +772,25 @@ impl Fabric {
         }
     }
 
-    /// Let something say which nodes are enabled, and be told what they move:
-    /// see [`Watch`].
+    /// Lets something say which nodes are enabled, and be told what they
+    /// move: see [`Watch`].
     pub fn watched_by(&mut self, watch: Arc<dyn Watch>) {
         *write(&self.shared.watch) = watch;
     }
 
-    /// The index of a name, given one the first time it is seen.
+    /// Finds the index of a name, giving it one the first time it is seen.
     ///
     /// Allocates that first time, which for a node is when it is first held,
     /// as the vehicle starts. A delivery started from a name never held is a
     /// test's, and is given one the same way.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - What the configuration calls the node.
+    ///
+    /// # Returns
+    ///
+    /// Its index in [`Shared::names`] and [`Shared::workers`].
     fn indexed(&mut self, name: &str) -> usize {
         if let Some(&at) = self.index.get(name) {
             return at;
@@ -690,12 +805,17 @@ impl Fabric {
         at
     }
 
-    /// Put a node in, under the name the configuration calls it.
+    /// Puts a node in, under the name the configuration calls it.
     ///
     /// Allocates: the node's place in the table, and the first time a node of
     /// this name is held, its thread, its mailbox and room in what a pass
     /// works in. This is done as the vehicle starts, and again only when the
     /// ground starts a node it had stopped -- never in a pass.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - What the configuration calls the node.
+    /// * `port` - The node, replacing any port already held under `name`.
     pub fn hold(&mut self, name: &str, port: Box<dyn Port>) {
         let at = self.indexed(name);
         let existing = read(&self.shared.workers)[at].clone();
@@ -718,11 +838,20 @@ impl Fabric {
         }
     }
 
-    /// Make a node's thread, and what it shares with the conductor.
+    /// Makes a node's thread, and what it shares with the conductor.
     ///
     /// A thread that will not start -- the system is out of them -- is said
     /// once and leaves the node to the conductor, rather than refusing a
     /// vehicle whose every node opened.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - What the configuration calls the node.
+    ///
+    /// # Returns
+    ///
+    /// The node's worker, holding no port yet; `threaded` is false if no
+    /// thread could be started for it.
     fn start(&mut self, name: &str) -> Arc<Worker> {
         let mut worker = Worker {
             name: name.to_string(),
@@ -782,7 +911,7 @@ impl Fabric {
             .is_some_and(|worker| locked(&worker.port).is_some())
     }
 
-    /// Do `f` with the port this node is, between stages.
+    /// Does `f` with the port this node is, between stages.
     ///
     /// `None` is a node this fabric does not hold, which a checked
     /// configuration has no link to and which a node the ground released is
@@ -797,16 +926,24 @@ impl Fabric {
         port.as_mut().map(|port| f(port.as_mut()))
     }
 
-    /// Take a node out, and with it whatever it had open.
+    /// Takes a node out, and with it whatever it had open.
     ///
     /// For a node the ground has disabled: dropping the port is what closes
     /// the device, frees the bus address or gives up the socket, because every
-    /// port owns what it opened. `None` is a node that was not held, which a
-    /// stop arriving twice gives.
+    /// port owns what it opened.
     ///
     /// Nothing else changes. The routing still names the node, its thread
     /// waits for the node to be held again, and a delivery to it is dropped
     /// before it gets that far, by what [`Watch`] says of it.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - What the configuration calls the node.
+    ///
+    /// # Returns
+    ///
+    /// The port that was held, for the caller to drop; `None` for a node
+    /// that was not held, which a stop arriving twice gives.
     pub fn release(&mut self, name: &str) -> Option<Box<dyn Port>> {
         let released = locked(&self.worker(name)?.port).take();
         if released.is_some() {
@@ -825,11 +962,20 @@ impl Fabric {
         self.held == 0
     }
 
-    /// Flush one node, saying what went wrong if anything did.
+    /// Flushes one node, saying what went wrong if anything did.
     ///
-    /// `None` is "nothing to report", which is what every node but a log
-    /// answers. A name that is not held is reported, as a delivery to one is:
-    /// a log that is not there is a log nothing is being written to.
+    /// A name that is not held is reported, as a delivery to one is: a log
+    /// that is not there is a log nothing is being written to. A node the
+    /// ground has disabled is not flushed.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - What the configuration calls the node.
+    ///
+    /// # Returns
+    ///
+    /// `None` for "nothing to report", which is what every node but a log
+    /// answers; otherwise why the flush failed or that the node is not held.
     pub fn flush(&mut self, name: &str) -> Option<String> {
         // A node the ground has stopped holds nothing to flush, and may hold
         // no port at all: nothing has been delivered to it since it stopped.
@@ -842,8 +988,8 @@ impl Fabric {
         }
     }
 
-    /// Hand `data` to every place `from`'s output goes, and pass on whatever
-    /// that produces.
+    /// Hands `data` to every place `from`'s output goes, and passes on
+    /// whatever that produces.
     ///
     /// Each destination is attempted whatever happened to the ones before it.
     /// A log that cannot be written must not stop the ground getting its
@@ -898,7 +1044,7 @@ impl Fabric {
         self.deliver_as(from, data, stream, false)
     }
 
-    /// Deliver a datum, saying whether it is new or said again.
+    /// Delivers a datum, saying whether it is new or said again.
     ///
     /// A re-assertion goes to the devices this node drives and to nothing
     /// else. It is not a reading and not a command: it is the vehicle holding
@@ -910,6 +1056,18 @@ impl Fabric {
     /// Nothing is counted for a destination passed over. A re-assertion that
     /// does not go to a log is not a datum dropped: it is a datum that was
     /// never for the log, which the counters would otherwise report as loss.
+    ///
+    /// # Arguments
+    ///
+    /// * `from`   - The node whose links the datum follows.
+    /// * `data`   - The datum, copied into the fabric's own buffer.
+    /// * `stream` - The stream it is on, or `None` to follow every link.
+    /// * `again`  - Whether it is a re-assertion, for the devices only.
+    ///
+    /// # Returns
+    ///
+    /// What the delivery and everything it gave rise to moved, and what
+    /// was refused or dropped.
     fn deliver_as(
         &mut self,
         from: &str,
@@ -941,9 +1099,11 @@ impl Fabric {
         moved
     }
 
-    /// Deliver the wave in [`Fabric::wave`], and every wave it gives rise to,
-    /// until one produces nothing. Each wave reads the bank the one before it
-    /// wrote, starting from `bank`'s other.
+    /// Delivers the wave in [`Fabric::wave`], and every wave it gives rise
+    /// to, until one produces nothing.
+    ///
+    /// Each wave reads the bank the one before it wrote, starting from
+    /// `bank`'s other.
     ///
     /// How far a result may be passed on is bounded. A path through a graph
     /// with no cycle in it visits each node at most once, so a cascade longer
@@ -952,6 +1112,13 @@ impl Fabric {
     /// backstop for a check that was wrong rather than the rule itself.
     /// Stopped and named rather than left to run: a loop here would be a
     /// vehicle that stops reading its sensors.
+    ///
+    /// # Arguments
+    ///
+    /// * `bank`  - The bank the first wave's results are written to; its
+    ///             datums are read from the other, or from the origin.
+    /// * `moved` - The pass's account, to which every wave's deliveries,
+    ///             refusals and drops are added.
     fn cascade(&mut self, mut bank: usize, moved: &mut Moved) {
         let most = self.held.max(1);
         let shared = self.shared.clone();
@@ -1067,8 +1234,8 @@ impl Fabric {
         }
     }
 
-    /// Run the stage whose jobs are set for the nodes in [`Fabric::busy`]:
-    /// every one at once, each on its own thread, and wait for the last.
+    /// Runs the stage whose jobs are set for the nodes in [`Fabric::busy`]:
+    /// every one at once, each on its own thread, and waits for the last.
     fn stage(&mut self) {
         let shared = self.shared.clone();
         let workers = read(&shared.workers);
@@ -1110,7 +1277,7 @@ impl Fabric {
         }
     }
 
-    /// Apply a command from the ground.
+    /// Applies a command from the ground.
     ///
     /// Two things have to be true, and the order matters. The configuration
     /// must say the ground may set this attribute of this node -- an
@@ -1122,6 +1289,23 @@ impl Fabric {
     ///
     /// One answer rather than a [`Moved`]: a command is one thing, and the
     /// ground is told whether it took effect.
+    ///
+    /// # Arguments
+    ///
+    /// * `node`      - What the configuration calls the node.
+    /// * `attribute` - The attribute to set, as a command binding names it.
+    /// * `value`     - The value, as the command carried it.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` once the node has taken the value.
+    ///
+    /// # Errors
+    ///
+    /// Why the command did not take effect: no command binding names this
+    /// attribute of this node (with the spelling one does give, where a
+    /// hyphen or underscore was swapped), the node is not held, or the node
+    /// refused the value.
     pub fn set(
         &mut self,
         node: &str,
@@ -1158,7 +1342,7 @@ impl Fabric {
             })
     }
 
-    /// Read one node and deliver whatever it had.
+    /// Reads one node and delivers whatever it had.
     ///
     /// Nothing to say is not a failure and not a delivery: a device that is
     /// not due returns no bytes, which is the ordinary case on most passes.
@@ -1166,14 +1350,25 @@ impl Fabric {
         self.read_stage([(name, Read::Take)])
     }
 
-    /// Read a node without asking it, and deliver what it had: see
+    /// Reads a node without asking it, and delivers what it had: see
     /// [`Port::take_unasked`].
     pub fn pump_unasked(&mut self, name: &str) -> Moved {
         self.read_stage([(name, Read::Unasked)])
     }
 
-    /// Ask a node, and take nothing: see [`Port::ask`]. What went wrong, if
-    /// anything did.
+    /// Asks a node, and takes nothing: see [`Port::ask`].
+    ///
+    /// A node the ground has stopped is not asked. A trigger sent, or one
+    /// refused, is told to the [`Watch`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - What the configuration calls the node.
+    ///
+    /// # Returns
+    ///
+    /// What went wrong, if anything did: why the node would not send its
+    /// trigger, or that it is not held.
     pub fn ask(&mut self, name: &str) -> Option<String> {
         // A node the ground has stopped is not asked, and that is not a
         // failure to report: it is what stopping it means.
@@ -1196,7 +1391,7 @@ impl Fabric {
         }
     }
 
-    /// Read every node of a group at once, and deliver what they had.
+    /// Reads every node of a group at once, and delivers what they had.
     ///
     /// At once, which is what a group is for: three sensors read together are
     /// three readings of one moment, where three reads one after another are
@@ -1209,13 +1404,22 @@ impl Fabric {
         )
     }
 
-    /// Read every node named, each as it says, all at once, and then deliver
-    /// what they had, a wave at a time.
+    /// Reads every node named, each as it says, all at once, and then
+    /// delivers what they had, a wave at a time.
     ///
     /// A node the ground has stopped is not read, and nothing is counted for
     /// it: a read that was not attempted is not a datum that was dropped, and
     /// the pass has nothing to say about a node that is off. A node named
     /// twice is read once.
+    ///
+    /// # Arguments
+    ///
+    /// * `reads` - Each node to read, by name, with how to read it.
+    ///
+    /// # Returns
+    ///
+    /// What the reads and the deliveries they gave rise to moved, with a
+    /// refusal for each name that is not held.
     pub fn read_stage<'a>(
         &mut self,
         reads: impl IntoIterator<Item = (&'a str, Read)>,
@@ -1282,7 +1486,7 @@ impl Fabric {
 }
 
 impl Drop for Fabric {
-    /// Stop every node's thread and wait for it, so that a fabric that has
+    /// Stops every node's thread and waits for it, so that a fabric that has
     /// gone has left nothing running -- and the ports go with it, every one
     /// closing what it opened.
     fn drop(&mut self) {
@@ -1298,8 +1502,14 @@ impl Drop for Fabric {
     }
 }
 
-/// A node's thread: wait for a job, do it, say so, and wait again, until the
-/// fabric goes.
+/// Runs a node's thread: waits for a job, does it, says so, and waits
+/// again, until the fabric goes.
+///
+/// # Arguments
+///
+/// * `worker` - The node's worker, whose mailbox the jobs arrive in.
+/// * `shared` - What every thread shares, including the count of threads
+///              the stage under way is waiting for.
 fn serve(worker: &Worker, shared: &Shared) {
     loop {
         let mut mail = locked(&worker.mail);
@@ -1322,12 +1532,20 @@ fn serve(worker: &Worker, shared: &Shared) {
     }
 }
 
-/// Do one job, and say so whatever happens in it.
+/// Does one job, and says so whatever happens in it.
 ///
 /// A port that panics is a fault in that port, and is reported against its
 /// node like any other failure. What it must not do is take the stage with
 /// it: a thread that died without saying it had finished would leave the
 /// conductor waiting for it for the rest of the flight.
+///
+/// # Arguments
+///
+/// * `worker` - The node the job is for.
+/// * `shared` - What every node's thread and the conductor share.
+/// * `mail`   - The node's mailbox, held for the job: the inbox it reads
+///              and where what it produced and moved is written.
+/// * `job`    - The job to do.
 fn perform(worker: &Worker, shared: &Shared, mail: &mut Mail, job: Job) {
     let done =
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| match job {
@@ -1349,7 +1567,20 @@ fn perform(worker: &Worker, shared: &Shared, mail: &mut Mail, job: Job) {
     }
 }
 
-/// Read a node, into item 0 of `bank`.
+/// Reads a node, into item 0 of `bank`.
+///
+/// What it read, what failed, and the strangers its socket turned away are
+/// told to the [`Watch`]; a read of nought bytes is nothing to say and is
+/// counted as nothing.
+///
+/// # Arguments
+///
+/// * `worker` - The node to read.
+/// * `shared` - What every node's thread and the conductor share.
+/// * `mail`   - The node's mailbox, to which the result and any refusal are
+///              added.
+/// * `how`    - How the node is read, and whether it is then asked.
+/// * `bank`   - The bank whose item 0 the result is written to.
 fn read_node(
     worker: &Worker,
     shared: &Shared,
@@ -1417,8 +1648,22 @@ fn read_node(
     }
 }
 
-/// Give a node everything in its inbox, in the order it arrived, and take a
-/// result after each arrival it has one for, into `bank`.
+/// Gives a node everything in its inbox, in the order it arrived, and takes
+/// a result after each arrival it has one for, into `bank`.
+///
+/// A re-assertion is passed over unless the node holds at what it is told.
+/// A result that has been passed on through `most` nodes is refused as one
+/// that has gone round a cycle.
+///
+/// # Arguments
+///
+/// * `worker` - The node to give to.
+/// * `shared` - What every node's thread and the conductor share.
+/// * `mail`   - The node's mailbox: the inbox it is given, and where its
+///              results and what it moved are written.
+/// * `bank`   - The bank this wave writes the node's results to.
+/// * `most`   - How far a result may have been passed on before it has gone
+///              round a cycle.
 fn deliver_to(
     worker: &Worker,
     shared: &Shared,
@@ -1550,7 +1795,21 @@ fn deliver_to(
     }
 }
 
-/// Hand a node one datum, counting how it went. Whether it took it.
+/// Hands a node one datum, counting how it went.
+///
+/// # Arguments
+///
+/// * `node`     - The node to hand it to.
+/// * `arriving` - Which named input it fills and which stream it is on.
+/// * `bytes`    - The datum.
+/// * `name`     - What the configuration calls the node, for the counts.
+/// * `watch`    - What is told what the node was given, or that it refused.
+/// * `moved`    - The account the delivery, or the refusal and its reason,
+///                is added to.
+///
+/// # Returns
+///
+/// Whether the node took it.
 fn give(
     node: &mut Box<dyn Port>,
     arriving: Arriving<'_>,
@@ -1648,6 +1907,11 @@ mod tests {
         }
     }
 
+    /// Makes a recorder that accepts and produces.
+    ///
+    /// # Returns
+    ///
+    /// The record the test reads and fills, and the port the fabric holds.
     fn recorder() -> (Arc<TestLock<Record>>, Box<dyn Port>) {
         let record = Arc::new(TestLock::new(Record {
             accepts: true,
@@ -1661,6 +1925,10 @@ mod tests {
     ///
     /// The difference is [`Port::holds`], which is what decides whether a
     /// decision asserted a second time is sent to it.
+    ///
+    /// # Returns
+    ///
+    /// The record the test reads and fills, and the port the fabric holds.
     fn device() -> (Arc<TestLock<Record>>, Box<dyn Port>) {
         let record = Arc::new(TestLock::new(Record {
             accepts: true,
@@ -1696,6 +1964,14 @@ mod tests {
     /// [`thermostat`]. With no `tcspecial` section no payload reports on its
     /// own, and with no `ground_base` on the moc node what is drawn into it
     /// is delivered to it, as drawn.
+    ///
+    /// # Returns
+    ///
+    /// The graph of `tests/manual/thermostat.yaml`, so changed.
+    ///
+    /// # Panics
+    ///
+    /// If the file cannot be read.
     fn drawn() -> Graph {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let mut graph = Graph::load(root.join("tests/manual/thermostat.yaml"))
@@ -2505,8 +2781,17 @@ vehicle:
         }
     }
 
-    /// A graph of computations joined as `links` says, built by hand: what
+    /// Builds by hand a graph of computations joined as `links` says: what
     /// the tests of a stage want is the shape, and nothing else.
+    ///
+    /// # Arguments
+    ///
+    /// * `nodes` - The name of each node, every one a `compute`.
+    /// * `links` - Each link, as the node it leaves and the one it reaches.
+    ///
+    /// # Returns
+    ///
+    /// The routes of that graph.
     fn shaped(nodes: &[&str], links: &[(&str, &str)]) -> Routes {
         use tcslibgs::graph::{Destinations, Link, Node};
         Routes::of(&Graph {
@@ -2574,6 +2859,16 @@ vehicle:
         }
     }
 
+    /// Makes a [`Slow`] node that takes 200 ms over a read and a delivery.
+    ///
+    /// # Arguments
+    ///
+    /// * `name`   - What it calls itself in the events.
+    /// * `events` - Where it says when it was read and when given something.
+    ///
+    /// # Returns
+    ///
+    /// The node, as the port the fabric holds.
     fn slow(name: &'static str, events: &Events) -> Box<dyn Port> {
         Box::new(Slow {
             name,

@@ -54,11 +54,16 @@ extern "C" {
  * many more there were: "... and 3 more". */
 #define TCS_MAX_REMARKS 8
 
-/* This library's version, as tcspecial's is written: "0.1.0". */
+/** Returns this library's version, as tcspecial's is written.
+ *
+ * @return  The version, such as "0.1.0"; static, never freed. */
 const char *tcs_version(void);
 
-/* What went wrong with the last call on this thread that failed, or "" where
- * none has. */
+/** Says what went wrong with the last call on this thread that failed.
+ *
+ * @return  The reason, in words for a person, or "" where no call has
+ *          failed; at most TCS_ERROR_BYTES, its NUL included, and good
+ *          until the next call on this thread that fails. */
 const char *tcs_last_error(void);
 
 /* ---- A configuration ---------------------------------------------------- */
@@ -66,17 +71,33 @@ const char *tcs_last_error(void);
 /* A tcspecial configuration, read and checked as the vehicle reads it. */
 typedef struct tcs_configuration tcs_configuration;
 
-/* Read the configuration at path, YAML or XML by its extension. */
+/** Reads the configuration at path and checks it as the vehicle does.
+ *
+ * @param path  The configuration file, YAML or XML by its extension.
+ * @return      The configuration, or NULL where it cannot be read or the
+ *              vehicle would refuse it. */
 tcs_configuration *tcs_configuration_open(const char *path);
 
+/** Frees a configuration.
+ *
+ * @param configuration  The configuration, or NULL to do nothing. */
 void tcs_configuration_close(tcs_configuration *configuration);
 
-/* The configuration's digest, as thirty-two hex digits: what the vehicle
- * announces in every beacon and the answer to a CONNECT. */
+/** Gives the configuration's digest: what the vehicle announces in every
+ * beacon and the answer to a CONNECT.
+ *
+ * @param configuration  The configuration.
+ * @return               The digest, as thirty-two hex digits, or NULL on an
+ *                       error. */
 const char *tcs_configuration_digest(const tcs_configuration *configuration);
 
-/* The id of the node called name -- its place among the configuration's
- * nodes, which is what a node command names -- into *id. */
+/** Finds the id of a node: its place among the configuration's nodes, which
+ * is what a node command names.
+ *
+ * @param configuration  The configuration.
+ * @param name           The node's name.
+ * @param id             Where the id is written.
+ * @return               0, or -1 where there is no such node. */
 int tcs_configuration_node_id(const tcs_configuration *configuration,
 			      const char *name, uint32_t *id);
 
@@ -92,8 +113,11 @@ typedef enum tcs_stage {
 	                          again */
 } tcs_stage;
 
-/* What a stage is called where a person reads it: "Unheard", "Heard",
- * "Aging" or "Waiting". */
+/** Names a stage as a person reads it.
+ *
+ * @param stage  The stage.
+ * @return       "Unheard", "Heard", "Aging" or "Waiting", or "" for a
+ *               number that is no stage; static, never freed. */
 const char *tcs_stage_label(tcs_stage stage);
 
 /* What one pass of the beacon watch found. */
@@ -116,29 +140,64 @@ typedef struct tcs_pass {
  * beacons arrive, taking them only from where it says they come from. */
 typedef struct tcs_beacons tcs_beacons;
 
-/* Listen where the configuration says beacons arrive. */
+/** Listens where the configuration says beacons arrive.
+ *
+ * @param configuration  The configuration, which must have a tcspecial
+ *                       section.
+ * @return               The beacon watch, or NULL where beacons cannot be
+ *                       received. */
 tcs_beacons *tcs_beacons_listen(const tcs_configuration *configuration);
 
-/* Wait for a beacon, or for the moment the stage or the indicator would
- * change by itself, and say what is so now. Before any beacon has arrived it
- * waits for one. */
+/** Waits for a beacon, or for the moment the stage or the indicator would
+ * change by itself, and says what is so now. Before any beacon has arrived
+ * it waits for one.
+ *
+ * @param beacons  The beacon watch.
+ * @param pass     Where what the pass found is written.
+ * @return         0, or -1 on an error. */
 int tcs_beacons_pass(tcs_beacons *beacons, tcs_pass *pass);
 
-/* What the last beacon said: "tcspecial v0.1.0 md5 ...", with
- * ", COMMANDED RESTART" after it while a commanded restart is under way, or
- * "<none>". */
+/** Says what the last beacon said.
+ *
+ * @param beacons  The beacon watch.
+ * @return         "tcspecial v0.1.0 md5 ...", with ", COMMANDED RESTART"
+ *                 after it while a commanded restart is under way; "<none>"
+ *                 before any beacon; NULL on an error. */
 const char *tcs_beacons_said(const tcs_beacons *beacons);
 
-/* What the last pass had to say on a console, which is news: beacons missed,
- * a restart, a configuration that differs. */
+/** Counts what the last pass had to say on a console, which is news:
+ * beacons missed, a restart, a configuration that differs.
+ *
+ * @param beacons  The beacon watch.
+ * @return         How many remarks, at most TCS_MAX_REMARKS; 0 on an
+ *                 error. */
 size_t tcs_beacons_remark_count(const tcs_beacons *beacons);
+
+/** Gives one of the last pass's remarks.
+ *
+ * @param beacons  The beacon watch.
+ * @param index    Which remark, from 0 to tcs_beacons_remark_count() - 1.
+ * @return         The remark, or NULL past the end or on an error. */
 const char *tcs_beacons_remark(const tcs_beacons *beacons, size_t index);
 
-/* And what is wrong, to be said whether or not anybody asked: a beacon from
- * somewhere beacons do not come from. */
+/** Counts what the last pass found wrong, to be said whether or not anybody
+ * asked: a beacon from somewhere beacons do not come from.
+ *
+ * @param beacons  The beacon watch.
+ * @return         How many warnings, at most TCS_MAX_REMARKS; 0 on an
+ *                 error. */
 size_t tcs_beacons_warning_count(const tcs_beacons *beacons);
+
+/** Gives one of the last pass's warnings.
+ *
+ * @param beacons  The beacon watch.
+ * @param index    Which warning, from 0 to tcs_beacons_warning_count() - 1.
+ * @return         The warning, or NULL past the end or on an error. */
 const char *tcs_beacons_warning(const tcs_beacons *beacons, size_t index);
 
+/** Stops listening for beacons and frees the watch.
+ *
+ * @param beacons  The beacon watch, or NULL to do nothing. */
 void tcs_beacons_close(tcs_beacons *beacons);
 
 /* ---- The vehicle's data ------------------------------------------------- */
@@ -153,14 +212,27 @@ typedef struct tcs_datum {
 	size_t length;
 } tcs_datum;
 
-/* Open the moc node called moc. */
+/** Opens a moc node on the ground.
+ *
+ * @param configuration  The configuration.
+ * @param moc            The moc node's name.
+ * @return               The moc node, or NULL where it cannot be opened. */
 tcs_moc *tcs_moc_open(const tcs_configuration *configuration, const char *moc);
 
-/* The next datum from any source, waiting up to wait_ms milliseconds, or for
- * ever where wait_ms is negative: 1 for a datum, 0 for none in that time,
- * -1 for an error. */
+/** Takes the next datum from any of the moc node's sources.
+ *
+ * @param moc      The moc node.
+ * @param wait_ms  How long to wait, in milliseconds, or for ever where it is
+ *                 negative.
+ * @param datum    Where the datum is written; its source and data are the
+ *                 moc node's, good until the next receive.
+ * @return         1 for a datum, 0 for none in that time, -1 on an
+ *                 error. */
 int tcs_moc_receive(tcs_moc *moc, int64_t wait_ms, tcs_datum *datum);
 
+/** Closes a moc node.
+ *
+ * @param moc  The moc node, or NULL to do nothing. */
 void tcs_moc_close(tcs_moc *moc);
 
 /* ---- Commands ----------------------------------------------------------- */
@@ -185,17 +257,25 @@ typedef enum tcs_status {
 	TCS_STATUS_STALE = 9
 } tcs_status;
 
-/* A status's name: "Success", "NotFound" and so on. */
+/** Names a status.
+ *
+ * @param status  The status.
+ * @return        "Success", "NotFound" and so on, or "" for a number that
+ *                is no status; static, never freed. */
 const char *tcs_status_name(tcs_status status);
 
 /* The ground's end of the two command links the configuration states. */
 typedef struct tcs_client tcs_client;
 
+/** Opens the two command links the configuration states.
+ *
+ * @param configuration  The configuration, which must have a tcspecial
+ *                       section.
+ * @return               The client, or NULL where the links cannot be
+ *                       opened. */
 tcs_client *tcs_client_open(const tcs_configuration *configuration);
 
-/* Say what this end read, and hear what the vehicle read: *agrees is 1 where
- * the vehicle is flying this configuration -- the digests match -- and 0
- * where it is not, in which case no node command should be sent.
+/** Sends CONNECT: says what this end read, and hears what the vehicle read.
  *
  * The answer also says which generation of tcspecial is flying, and clears
  * the commanded-restart bit in the vehicle's beacons. Until a Connect has
@@ -203,61 +283,115 @@ tcs_client *tcs_client_open(const tcs_configuration *configuration);
  * says tcspecial has started again or an answer comes from another
  * generation, every command but PING and CONNECT fails, unsent, because what
  * the vehicle flies may have changed. A command carries no generation, only
- * its sequence. */
+ * its sequence.
+ *
+ * @param client  The client.
+ * @param agrees  Where 1 is written when the vehicle is flying this
+ *                configuration -- the digests match -- and 0 when it is
+ *                not, in which case no node command should be sent.
+ * @return        0, or -1 on an error. */
 int tcs_client_connect(tcs_client *client, int *agrees);
 
-/* Ask whether the vehicle's command link answers. */
+/** Sends PING, to ask whether the vehicle's command link answers.
+ *
+ * @param client  The client.
+ * @return        0 when it answered, or -1 on an error. */
 int tcs_client_ping(tcs_client *client);
 
-/* Start or stop the node whose id is node, saying what the vehicle answered
- * in *status. */
+/** Sends START_NODE, to start a node.
+ *
+ * @param client  The client.
+ * @param node    The node's id, from tcs_configuration_node_id().
+ * @param status  Where what the vehicle answered is written.
+ * @return        0, or -1 on an error. */
 int tcs_client_start_node(tcs_client *client, uint32_t node,
 			  tcs_status *status);
+
+/** Sends STOP_NODE, to stop a node.
+ *
+ * @param client  The client.
+ * @param node    The node's id, from tcs_configuration_node_id().
+ * @param status  Where what the vehicle answered is written.
+ * @return        0, or -1 on an error. */
 int tcs_client_stop_node(tcs_client *client, uint32_t node,
 			 tcs_status *status);
 
-/* Ask what the node whose id is node is doing: *enabled is 1 where it is
- * running. */
+/** Sends QUERY_NODE, to ask what a node is doing.
+ *
+ * @param client   The client.
+ * @param node     The node's id, from tcs_configuration_node_id().
+ * @param status   Where what the vehicle answered is written.
+ * @param enabled  Where 1 is written when the node is running, 0 when not.
+ * @return         0, or -1 on an error. */
 int tcs_client_query_node(tcs_client *client, uint32_t node,
 			  tcs_status *status, int *enabled);
 
-/* Arm a restart with key, which the RESTART that follows must carry. */
+/** Sends RESTART_ARM, to arm a restart.
+ *
+ * @param client  The client.
+ * @param key     The key, which the RESTART that follows must carry.
+ * @param status  Where what the vehicle answered is written.
+ * @return        0, or -1 on an error. */
 int tcs_client_restart_arm(tcs_client *client, uint64_t key,
 			   tcs_status *status);
 
-/* Restart the vehicle, which the last RESTART_ARM must have armed with the
- * same key: the beacons carry the commanded-restart bit from then, the
- * process restarts, and its beacons start again at #1, the bit still set
- * until a Connect.
+/** Sends RESTART, to restart the vehicle, which the last RESTART_ARM must
+ * have armed with the same key: the beacons carry the commanded-restart bit
+ * from then, the process restarts, and its beacons start again at #1, the
+ * bit still set until a Connect.
  *
  * Never send it again for want of an answer: the beacons say whether it was
  * taken. From the moment it is sent, every command on this client is
  * refused, unsent, until a beacon whose number starts again says tcspecial
- * has started again, and then all but PING and CONNECT until a Connect: the beacon is the acknowledgement, and the
- * answer to the RESTART may never arrive. Hand the client each pass's beacon
+ * has started again, and then all but PING and CONNECT until a Connect:
+ * the beacon is the acknowledgement, and the answer to the RESTART may never
+ * arrive. Hand the client each pass's beacon
  * with tcs_client_beacon_heard. A RESTART answered as refused ends the wait
- * at once. */
+ * at once.
+ *
+ * @param client  The client.
+ * @param key     The key the last RESTART_ARM armed the restart with.
+ * @param status  Where what the vehicle answered is written.
+ * @return        0, or -1 on an error. */
 int tcs_client_restart(tcs_client *client, uint64_t key,
 		       tcs_status *status);
 
-/* Hand the client what the last pass of beacons heard: 1 when that ended a
- * wait begun by a RESTART with the start the RESTART commanded; 2 when it
- * ended it with a start nobody commanded -- the vehicle restarted for some
- * other reason before the RESTART was taken, and runs with the definitions
- * it had; 0 when it did not end one; -1 on an error. */
+/** Hands the client what the last pass of beacons heard, so that a wait
+ * begun by a RESTART can end.
+ *
+ * @param client   The client.
+ * @param beacons  The beacon watch, just passed.
+ * @return         1 when that ended the wait with the start the RESTART
+ *                 commanded; 2 when it ended it with a start nobody
+ *                 commanded -- the vehicle restarted for some other reason
+ *                 before the RESTART was taken, and runs with the
+ *                 definitions it had; 0 when it did not end one; -1 on an
+ *                 error. */
 int tcs_client_beacon_heard(tcs_client *client, const tcs_beacons *beacons);
 
-/* Whether the client is waiting for a beacon to say a RESTART is done: 1 or
- * 0, or -1 on an error. */
+/** Says whether the client is waiting for a beacon to say a RESTART is
+ * done, during which every command is refused.
+ *
+ * @param client  The client.
+ * @return        1 when it is, 0 when not, -1 on an error. */
 int tcs_client_awaiting_restart(const tcs_client *client);
 
-/* End that wait by hand, for an operator who knows the RESTART was never
- * taken: 1 when there was one to end, 0 when not, -1 on an error. */
+/** Ends the wait for a RESTART by hand, for an operator who knows the
+ * RESTART was never taken.
+ *
+ * @param client  The client.
+ * @return        1 when there was a wait to end, 0 when not, -1 on an
+ *                error. */
 int tcs_client_end_restart_wait(tcs_client *client);
 
-/* Change how often the vehicle beacons, in microseconds. A station's beacon
+/** Sends CONFIG, to change how often the vehicle beacons. A station's beacon
  * watch goes on aging beacons against the configuration's interval: see the
- * README's known limits. */
+ * README's known limits.
+ *
+ * @param client              The client.
+ * @param beacon_interval_us  The new interval, in microseconds.
+ * @param status              Where what the vehicle answered is written.
+ * @return                    0, or -1 on an error. */
 int tcs_client_configure(tcs_client *client, uint64_t beacon_interval_us,
 			 tcs_status *status);
 
@@ -266,17 +400,29 @@ int tcs_client_configure(tcs_client *client, uint64_t beacon_interval_us,
 #define TCS_ATTRIBUTE_BYTES 64
 #define TCS_VALUE_BYTES 256
 
-/* Set attribute of the node whose id is node to the length bytes at value,
- * which the configuration must let the ground set: an attribute of at most
- * TCS_ATTRIBUTE_BYTES and a value of at most TCS_VALUE_BYTES. */
+/** Sends SET_NODE, to set an attribute of a node, which the configuration
+ * must let the ground set. Where the vehicle refuses, tcs_client_reason()
+ * says why.
+ *
+ * @param client     The client.
+ * @param node       The node's id, from tcs_configuration_node_id().
+ * @param attribute  The attribute's name, of at most TCS_ATTRIBUTE_BYTES.
+ * @param value      The value's bytes; may be NULL where length is 0.
+ * @param length     How many bytes value holds, at most TCS_VALUE_BYTES.
+ * @param status     Where what the vehicle answered is written.
+ * @return           0, or -1 on an error. */
 int tcs_client_set_node(tcs_client *client, uint32_t node,
 			const char *attribute, const uint8_t *value,
 			size_t length, tcs_status *status);
 
-/* Why the vehicle refused the last SET_NODE this client sent -- which
- * attribute no binding names, and its spelling where that was what was wrong;
- * what the node would not take -- or "" where it did not. The client's, good
- * until its next SET_NODE; at most TCS_TEXT_BYTES, its NUL included. */
+/** Says why the vehicle refused the last SET_NODE this client sent.
+ *
+ * @param client  The client.
+ * @return        Which attribute no binding names, and its spelling where
+ *                that was what was wrong, or what the node would not take;
+ *                "" where it did not refuse; NULL on an error. The client's,
+ *                good until its next SET_NODE; at most TCS_TEXT_BYTES, its
+ *                NUL included. */
 const char *tcs_client_reason(const tcs_client *client);
 
 /* How many bytes of a transfer a sample holds: the head of it. */
@@ -292,11 +438,22 @@ typedef struct tcs_sample {
 	uint8_t bytes[TCS_SAMPLE_BYTES];
 } tcs_sample;
 
-/* The last datum the node whose id is node took, and the last it gave. */
+/** Sends QUERY_NODE_SAMPLE, to ask for the last datum a node took and the
+ * last it gave.
+ *
+ * @param client  The client.
+ * @param node    The node's id, from tcs_configuration_node_id().
+ * @param status  Where what the vehicle answered is written.
+ * @param taken   Where the last datum the node took is written.
+ * @param given   Where the last datum the node gave is written.
+ * @return        0, or -1 on an error. */
 int tcs_client_query_node_sample(tcs_client *client, uint32_t node,
 				 tcs_status *status, tcs_sample *taken,
 				 tcs_sample *given);
 
+/** Closes the command links and frees the client.
+ *
+ * @param client  The client, or NULL to do nothing. */
 void tcs_client_close(tcs_client *client);
 
 /* ---- Pinging a ping node ------------------------------------------------ */
@@ -323,30 +480,66 @@ typedef struct tcs_exchange {
 	int64_t down;          /* vehicle had to ground received */
 } tcs_exchange;
 
-/* Ping the first ping node the configuration lets the ground reach both
- * ways, through its moc node. */
+/** Opens a way to ping the first ping node the configuration lets the
+ * ground reach both ways, through its moc node.
+ *
+ * @param configuration  The configuration.
+ * @return               The pinger, or NULL where there is no such ping
+ *                       node or its moc node cannot be reached. */
 tcs_pinger *tcs_pinger_open(const tcs_configuration *configuration);
 
-/* The ping node's name, which a datum from tcs_moc_receive is an answer
- * from; and the moc node's, which is the one to receive it from. */
+/** Names the ping node, which a datum from tcs_moc_receive() is an answer
+ * from.
+ *
+ * @param pinger  The pinger.
+ * @return        The ping node's name, or NULL on an error. */
 const char *tcs_pinger_node(const tcs_pinger *pinger);
+
+/** Names the moc node the ping node's answers are to be received from.
+ *
+ * @param pinger  The pinger.
+ * @return        The moc node's name, or NULL on an error. */
 const char *tcs_pinger_moc(const tcs_pinger *pinger);
 
-/* Send the next ping, numbered from one. */
+/** Sends the next ping, numbered from one.
+ *
+ * @param pinger  The pinger.
+ * @return        0, or -1 on an error. */
 int tcs_pinger_ping(tcs_pinger *pinger);
 
-/* Fold in a datum the ping node sent down, which has just arrived. */
+/** Folds in a datum the ping node sent down, which has just arrived.
+ *
+ * @param pinger  The pinger.
+ * @param data    The datum's bytes; may be NULL where length is 0.
+ * @param length  How many bytes data holds.
+ * @return        0, or -1 on an error. */
 int tcs_pinger_answered(tcs_pinger *pinger, const uint8_t *data,
 			size_t length);
 
-/* What there is to know now. */
+/** Says what there is to know of the pings now.
+ *
+ * @param pinger    The pinger.
+ * @param exchange  Where it is written.
+ * @return          0, or -1 on an error. */
 int tcs_pinger_exchange(const tcs_pinger *pinger, tcs_exchange *exchange);
 
-/* The last ping sent, and the last thing received, as text: "<none>" before
- * there is one. */
+/** Gives the last ping sent, as text.
+ *
+ * @param pinger  The pinger.
+ * @return        The ping, "<none>" before one is sent, or NULL on an
+ *                error. */
 const char *tcs_pinger_sent(const tcs_pinger *pinger);
+
+/** Gives the last thing received from the ping node, as text.
+ *
+ * @param pinger  The pinger.
+ * @return        What was received, "<none>" before anything has been, or
+ *                NULL on an error. */
 const char *tcs_pinger_received(const tcs_pinger *pinger);
 
+/** Frees a pinger.
+ *
+ * @param pinger  The pinger, or NULL to do nothing. */
 void tcs_pinger_close(tcs_pinger *pinger);
 
 #ifdef __cplusplus

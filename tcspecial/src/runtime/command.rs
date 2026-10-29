@@ -78,12 +78,20 @@ use crate::telemetry_log::TelemetryLog;
 /// what it is, rather than cut to a command's length and read as one.
 const COMMAND_BYTES: usize = 65535;
 
-/// What this vehicle calls each of the two links.
+/// Says what this vehicle calls each of the two links.
 ///
 /// [`CommandLink::spelling`] says "payload command", after the link's name in
 /// the protocol and the configuration. A graph has no payloads to command: the
 /// link carries commands about nodes, so a message from this vehicle says so.
 /// The wire is unaffected -- this is the word in a log line somebody reads.
+///
+/// # Arguments
+///
+/// * `which` - The link.
+///
+/// # Returns
+///
+/// Its name, for a log line.
 fn spelling(which: CommandLink) -> &'static str {
     match which {
         CommandLink::Spacecraft => "spacecraft command",
@@ -142,11 +150,34 @@ pub struct Commands {
 }
 
 impl Commands {
-    /// Bind both links and start answering.
+    /// Binds both links and starts answering, on a thread of its own.
     ///
     /// A link that will not bind stops the start and says which it was: a
     /// vehicle that came up with no command link is a vehicle nobody can stop,
     /// and finding that out in flight is finding it out too late.
+    ///
+    /// # Arguments
+    ///
+    /// * `ci`      - The `tcspecial` section: where the links are bound,
+    ///               where their commands must come from, how long an arm
+    ///               lasts and the state file.
+    /// * `states`  - Every node's state, which commands read and change.
+    /// * `bench`   - How work a command causes is handed to the pass.
+    /// * `flying`  - What this vehicle answers a CONNECT with, and the
+    ///               generation commands must be sent for.
+    /// * `beacon`  - The beacon sender, which a CONFIG retimes and hearing
+    ///               from the MOC slows; `None` where no beacons are sent.
+    /// * `log`     - Where every answer is recorded.
+    /// * `restart` - What an armed RESTART calls once it has been answered.
+    ///
+    /// # Returns
+    ///
+    /// The running interpreter, which stops its thread when dropped.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Config` for a link that will not bind; an I/O error where
+    /// a bound socket's address or the stop descriptor cannot be had.
     pub fn start(
         ci: &CIConfig,
         states: Arc<NodeStates>,
@@ -222,7 +253,7 @@ impl Commands {
         self.nodes_at
     }
 
-    /// Stop answering, and wait for the thread to finish what it is doing.
+    /// Stops answering, and waits for the thread to finish what it is doing.
     ///
     /// The flag down and then a byte, which is the order that matters: a
     /// thread woken before the flag was down would look up, find itself still
@@ -245,7 +276,21 @@ impl Drop for Commands {
     }
 }
 
-/// Bind one link, saying which it was if it will not bind.
+/// Binds one link, saying which it was if it will not bind.
+///
+/// # Arguments
+///
+/// * `which` - The link's name, for the message.
+/// * `at`    - Where to bind it.
+///
+/// # Returns
+///
+/// The bound socket.
+///
+/// # Errors
+///
+/// `TcsError::Config`, naming the link and the address, where it will not
+/// bind.
 fn bound(which: &str, at: &HostPort) -> TcsResult<UdpSocket> {
     UdpSocket::bind(at.to_string()).map_err(|e| {
         TcsError::Config(format!(
@@ -302,7 +347,13 @@ struct Serving {
 }
 
 impl Serving {
-    /// Wait for a command on either link, answer it, and wait again.
+    /// Waits for a command on either link, answers it, and waits again,
+    /// until told to stop or the wait itself fails.
+    ///
+    /// # Arguments
+    ///
+    /// * `spacecraft` - The spacecraft command link.
+    /// * `nodes`      - The link commands about nodes arrive on.
     fn run(mut self, spacecraft: Link, nodes: Link) {
         let links = [spacecraft, nodes];
         let mut buffer = vec![0u8; COMMAND_BYTES];
@@ -355,7 +406,16 @@ impl Serving {
         }
     }
 
-    /// Take one datagram from this link and answer it.
+    /// Takes one datagram from this link and answers it.
+    ///
+    /// A datagram from anywhere but the link's one address, or one that is
+    /// not a command, is logged and not answered. An armed RESTART is
+    /// carried out once its answer has gone.
+    ///
+    /// # Arguments
+    ///
+    /// * `link`   - The link the poll said is readable.
+    /// * `buffer` - Room for the datagram, as long as the longest one.
     fn take_one(&mut self, link: &Link, buffer: &mut [u8]) {
         let (size, from) = match link.socket.recv_from(buffer) {
             Ok(got) => got,
@@ -430,11 +490,23 @@ impl Serving {
         }
     }
 
-    /// What this vehicle answers that command with.
+    /// Acts on a command and says what this vehicle answers it with.
     ///
     /// A match over every kind rather than a rule with an exception, so that a
     /// command added later is answered deliberately -- by someone who had to
     /// decide -- rather than by whichever side of a default it fell on.
+    ///
+    /// A command on the wrong link, for another generation or older than one
+    /// already taken is refused before anything in it is acted on.
+    ///
+    /// # Arguments
+    ///
+    /// * `arrived` - The link the command arrived on.
+    /// * `command` - The command.
+    ///
+    /// # Returns
+    ///
+    /// The answer, not yet stamped with the generation.
     fn answer(&mut self, arrived: CommandLink, command: &Command) -> Telemetry {
         let sequence = command.sequence();
 
@@ -641,9 +713,19 @@ impl Serving {
         }
     }
 
-    /// Say in the state file that the next start is one the ground
+    /// Says in the state file that the next start is one the ground
     /// commanded. See [`crate::state::commanded_restart`], which says why it
     /// allocates, here in the loop.
+    ///
+    /// Nothing is written where the configuration gave no state file.
+    ///
+    /// # Returns
+    ///
+    /// Nothing, once the state file says it.
+    ///
+    /// # Errors
+    ///
+    /// Why the state file could not be written, as a message.
     fn say_next_start_commanded(&self) -> Result<(), String> {
         if self.state_file.as_os_str().is_empty() {
             return Ok(());
@@ -654,11 +736,15 @@ impl Serving {
         )
     }
 
-    /// Say that the ground named a node this configuration has not got.
+    /// Logs that the ground named a node this configuration has not got.
     ///
     /// One wording, because the news is the same whichever command carried
     /// the id: the ground is reading a configuration this vehicle is not
     /// flying, and the id it sent means a node of that one.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The id the ground sent.
     fn no_such_node(&self, node: tcslibgs::NodeId) {
         error!(
             "there is no node {node} in this configuration, which has {}: the \
@@ -667,7 +753,7 @@ impl Serving {
         );
     }
 
-    /// Enable or disable the node with that id, and say how it went.
+    /// Enables or disables the node with that id, and says how it went.
     ///
     /// An id the configuration does not have is `NotFound` and says which id
     /// and how many nodes there are: a fixed-length field holds any number, so
@@ -683,6 +769,17 @@ impl Serving {
     /// Allocates nothing of its own: the work is handed over by the node's
     /// shared name. What starting the node again takes is the pass's -- see
     /// `System::reopen` -- and a failure is logged in words, which are made.
+    ///
+    /// # Arguments
+    ///
+    /// * `node`    - The node's id, as the command gave it.
+    /// * `enabled` - `true` to start the node, `false` to stop it.
+    ///
+    /// # Returns
+    ///
+    /// `Success`; `NotFound` for an id the configuration has not got;
+    /// `InvalidCommand` for a node the ground may not start or stop;
+    /// `Failure` where the pass could not do the work.
     fn set_state(
         &self,
         node: tcslibgs::NodeId,
@@ -737,7 +834,7 @@ impl Serving {
         }
     }
 
-    /// Set an attribute of the node with that id, and say how it went.
+    /// Sets an attribute of the node with that id, and says how it went.
     ///
     /// The work is the pass's, as enabling and releasing are: what this
     /// changes is the node's configuration, and a node whose setpoint moved
@@ -760,6 +857,17 @@ impl Serving {
     /// attribute and the value in the room the SET_NODE was read into, and
     /// the reason is written into room the answer holds. What says why a
     /// node refused is the node's own message, made where it refused.
+    ///
+    /// # Arguments
+    ///
+    /// * `node`      - The node's id, as the command gave it.
+    /// * `attribute` - The attribute to set.
+    /// * `value`     - What to set it to.
+    ///
+    /// # Returns
+    ///
+    /// The status -- `Success`, `NotFound` or `InvalidParameter` -- and the
+    /// reason for a refusal, empty on success.
     fn set_attribute(
         &self,
         node: tcslibgs::NodeId,
@@ -803,6 +911,18 @@ mod tests {
     ///
     /// Port 0 throughout: a test that named ports would fail whenever anything
     /// else on the machine held them, and the sockets say where they landed.
+    ///
+    /// # Arguments
+    ///
+    /// * `ground` - The test's socket, which both links take commands from.
+    ///
+    /// # Returns
+    ///
+    /// The configuration, with no log directory and no state file.
+    ///
+    /// # Panics
+    ///
+    /// If `ground` has no local address.
     fn links_for(ground: &UdpSocket) -> CIConfig {
         let at = ground.local_addr().expect("where the ground is");
         let here = |port| HostPort {
@@ -834,7 +954,18 @@ mod tests {
         }
     }
 
-    /// Two nodes, so that an id can be right and an id can be out of range.
+    /// Makes a graph of two nodes, so that an id can be right and an id can
+    /// be out of range.
+    ///
+    /// # Returns
+    ///
+    /// The graph: an I2C payload, `inside`, feeding a computation,
+    /// `average`.
+    ///
+    /// # Panics
+    ///
+    /// If the configuration cannot be written to a temporary file or read
+    /// back.
     fn two_nodes() -> Graph {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("two.yaml");
@@ -854,6 +985,11 @@ mod tests {
     /// The generation the vehicle in these tests is flying.
     const GENERATION: u32 = 3;
 
+    /// Says what the vehicle in these tests is flying.
+    ///
+    /// # Returns
+    ///
+    /// This build's version, a made-up digest and [`GENERATION`].
     fn flying() -> Flying {
         Flying {
             version: ConfigVersion::of_this_build(),
@@ -862,7 +998,21 @@ mod tests {
         }
     }
 
-    /// Ask on a link and read the answer, or say nothing came.
+    /// Asks on a link and reads the answer, or says nothing came.
+    ///
+    /// # Arguments
+    ///
+    /// * `ground`  - The test's socket, which sends and receives.
+    /// * `at`      - The link's address.
+    /// * `command` - What to send.
+    ///
+    /// # Returns
+    ///
+    /// The answer, or `None` where none came before the socket's timeout.
+    ///
+    /// # Panics
+    ///
+    /// If the command cannot be sent or the answer is not telemetry.
     fn ask(
         ground: &UdpSocket,
         at: SocketAddr,
@@ -889,12 +1039,26 @@ mod tests {
         }
     }
 
-    /// Stand in for the pass, doing whatever work the interpreter hands over.
+    /// Stands in for the pass, doing whatever work the interpreter hands
+    /// over, on a thread of its own.
     ///
     /// `how` says what each job comes to, so a test can have an opening fail
     /// with no device to fail on. The work is recorded as well as answered,
     /// because a test wants to say that a command caused the right work and
     /// not only that it got the right answer back.
+    ///
+    /// # Arguments
+    ///
+    /// * `how` - What each job comes to: its answer to the interpreter.
+    ///
+    /// # Returns
+    ///
+    /// The workbench to give the interpreter, and the record of every job
+    /// done, in order.
+    ///
+    /// # Panics
+    ///
+    /// If the workbench cannot be made.
     fn a_pass_answering(
         how: impl Fn(&Work) -> Result<(), String> + Send + 'static,
     ) -> (Workbench, Arc<std::sync::Mutex<Vec<Work>>>) {
@@ -915,6 +1079,22 @@ mod tests {
         started_with(states, bench)
     }
 
+    /// Starts the command interpreter with links on loopback, and a ground
+    /// socket to command it from.
+    ///
+    /// # Arguments
+    ///
+    /// * `states` - Every node's state.
+    /// * `bench`  - How the interpreter hands work to the pass.
+    ///
+    /// # Returns
+    ///
+    /// The ground's socket, with a five-second read timeout, and the
+    /// running interpreter.
+    ///
+    /// # Panics
+    ///
+    /// If either socket cannot be bound.
     fn started_with(
         states: Arc<NodeStates>,
         bench: Workbench,

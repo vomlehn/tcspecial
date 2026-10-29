@@ -13,3 +13,6 @@ show on them"""
 tcslib = { path = "../tcslib" }
 # For Color alone, which is what a stage of staleness is turned into here.
 slint = "1.3"
+
+[lints]
+workspace = true

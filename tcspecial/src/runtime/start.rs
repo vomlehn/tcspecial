@@ -51,7 +51,7 @@ pub fn mode() -> Mode {
 /// Whether the startup summary is left unsaid: `-q` or `--quiet`.
 static QUIET: AtomicBool = AtomicBool::new(false);
 
-/// Leave the startup summary unsaid, for the rest of this process.
+/// Leaves the startup summary unsaid, for the rest of this process.
 ///
 /// For `main`, once, before anything starts: a program that starts tcspecial
 /// to show something else -- the examples' ground stations -- has its own
@@ -62,23 +62,46 @@ pub fn be_quiet() {
     QUIET.store(true, Ordering::Relaxed);
 }
 
-/// Say one line of the startup summary on stderr, unless told to be quiet.
+/// Says one line of the startup summary on stderr, unless told to be quiet.
 ///
 /// The summary is what somebody watching a vehicle start compares against
 /// the file they think is flying: the shape of the graph, the build and the
 /// digest, the log, the beacon and the command addresses. One place that
 /// says them, so that quiet means all of them.
+///
+/// # Arguments
+///
+/// * `line` - The line, without its newline.
 pub fn summary(line: impl std::fmt::Display) {
     if !QUIET.load(Ordering::Relaxed) {
         eprintln!("{line}");
     }
 }
 
-/// Read, check and run the configuration in `path` under the simulation mode
-/// `mode`, until asked to stop.
+/// Reads, checks and runs the configuration in `path` under the simulation
+/// mode `mode`, until asked to stop.
 ///
 /// Every reason it could not start, rather than the first: a file with three
 /// problems in it is one trip to a desk, where one problem at a time is three.
+///
+/// The first mode given in the process is the one [`mode`] says from then
+/// on: a RESTART runs this again with the same one.
+///
+/// # Arguments
+///
+/// * `path` - The configuration file.
+/// * `mode` - The run's simulation mode, `--simulate`.
+///
+/// # Returns
+///
+/// Nothing, once the vehicle has stopped and its telemetry log is flushed.
+///
+/// # Errors
+///
+/// Every reason the configuration could not start, each a line beginning
+/// with `path`: a file that does not load, the checks' problems, types this
+/// build lacks, payloads the mode refuses, and anything that could not be
+/// opened, bound or started.
 pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
     // Set once: a RESTART runs this again in the same process, with the mode
     // it was started with, and the first is the one that holds.
@@ -202,8 +225,18 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
     Ok(())
 }
 
-/// Judge each payload of `graph`, say what each was found to be, and give
-/// whatever `mode` forbids of them: see `tcslibgs::simulate`.
+/// Judges each payload of `graph`, says in the summary what each was found
+/// to be, and gives whatever `mode` forbids of them: see
+/// `tcslibgs::simulate`.
+///
+/// # Arguments
+///
+/// * `graph` - The checked configuration.
+/// * `mode`  - The run's simulation mode.
+///
+/// # Returns
+///
+/// A line for each payload the mode refuses; empty when the run may go on.
 fn judged_against(graph: &Graph, mode: Mode) -> Vec<String> {
     let host = Host::this();
     let judged: Vec<(&str, Judged)> = graph
@@ -222,10 +255,18 @@ fn judged_against(graph: &Graph, mode: Mode) -> Vec<String> {
     refusals(mode, &pairs)
 }
 
-/// What a configuration is, in a line: how many nodes, groups and logs, each
-/// counted in words -- `1 node, no groups, no logs`, `11 nodes, 1 group, 1 log
-/// (housekeeping)` -- and the logs named, a log being where to look for what
-/// the vehicle kept.
+/// Says what a configuration is, in a line: how many nodes, groups and
+/// logs, each counted in words -- `1 node, no groups, no logs`, `11 nodes, 1
+/// group, 1 log (housekeeping)` -- and the logs named, a log being where to
+/// look for what the vehicle kept.
+///
+/// # Arguments
+///
+/// * `graph` - The configuration.
+///
+/// # Returns
+///
+/// The line.
 fn shape_of(graph: &Graph) -> String {
     let counted = |n: usize, one: &str, many: &str| match n {
         0 => format!("no {many}"),
@@ -250,7 +291,8 @@ fn shape_of(graph: &Graph) -> String {
     said
 }
 
-/// The telemetry log the configuration's `tcspecial` section describes.
+/// Opens the telemetry log the configuration's `tcspecial` section
+/// describes.
 ///
 /// One log for everything the vehicle sends to the ground, which is what
 /// makes the downlink reconstructable afterwards: the ground has only what
@@ -264,6 +306,21 @@ fn shape_of(graph: &Graph) -> String {
 ///
 /// A configuration with no `tcspecial` section, or one naming no log
 /// directory, records nothing: see `TelemetryLog::open`.
+///
+/// # Arguments
+///
+/// * `graph`   - The checked configuration.
+/// * `segsend` - What the log hands its filled segments to.
+///
+/// # Returns
+///
+/// The log, which is a disabled one that records nothing where the
+/// configuration names no log directory.
+///
+/// # Errors
+///
+/// The section's parameters not making a configuration, or the log not
+/// opening, as a message.
 fn telemetry_log(
     graph: &Graph,
     segsend: &SegSend,
@@ -286,14 +343,28 @@ fn telemetry_log(
     Ok(log)
 }
 
-/// Start the thread that hands every log's filled segments to `segsend`, if
-/// this configuration keeps a log.
+/// Starts the thread that hands every log's filled segments to `segsend`,
+/// if this configuration keeps a log.
 ///
 /// A configuration that keeps one -- a `log.directory` in its `tcspecial`
 /// section, or a `log` node -- does not start without a `segsend` beside
 /// tcspecial: a vehicle that found out at its first full segment that it had
 /// nothing to hand it to would fill its log directory without a word. One
 /// that keeps none has nothing to hand over, and does not need one.
+///
+/// # Arguments
+///
+/// * `graph` - The checked configuration.
+///
+/// # Returns
+///
+/// The started handover, or [`SegSend::none`] for a configuration that
+/// keeps no log.
+///
+/// # Errors
+///
+/// The section's parameters not making a configuration, no `segsend`
+/// beside this program, or its not starting, as a message.
 fn segsend_for(graph: &Graph) -> Result<SegSend, String> {
     let telemetry = match graph.tcspecial.as_ref() {
         Some(section) => tcslibgs::graph::parameters::ci_config_of(
@@ -314,7 +385,8 @@ fn segsend_for(graph: &Graph) -> Result<SegSend, String> {
     Ok(started)
 }
 
-/// Start sending beacons where the configuration's `tcspecial` section says.
+/// Starts sending beacons where the configuration's `tcspecial` section
+/// says.
 ///
 /// From `beacon.send` to `beacon.recv`, carrying this build's version, the
 /// configuration's digest and whether this start was commanded -- read from
@@ -325,13 +397,29 @@ fn segsend_for(graph: &Graph) -> Result<SegSend, String> {
 /// An interval of nought sends none. Recorded in the telemetry log, which is
 /// the vehicle's own account of what it sent.
 ///
-/// Returns the generation as well, which every answer carries. Nought, which
-/// no start is, where there is no `tcspecial` section, which takes no
-/// commands either.
-///
 /// A `beacon.send` that cannot be bound, or a `beacon.recv` that does not
 /// resolve, stops the start: a vehicle flying without beacons is one the
 /// ground cannot tell from a dead one.
+///
+/// # Arguments
+///
+/// * `graph`         - The checked configuration.
+/// * `digest`        - The configuration's digest, which every beacon
+///                     carries.
+/// * `telemetry_log` - Where each beacon sent is recorded.
+///
+/// # Returns
+///
+/// The beacon sender, `None` where none is sent, and this start's
+/// generation, which every answer carries. The generation is nought, which
+/// no start is, where there is no `tcspecial` section, which takes no
+/// commands either.
+///
+/// # Errors
+///
+/// The section's parameters not making a configuration, the state file not
+/// being written, or the beacon socket not binding or its destination not
+/// resolving, as a message.
 fn beacons(
     graph: &Graph,
     digest: ConfigDigest,
@@ -387,8 +475,8 @@ fn beacons(
     Ok((sending, started.generation))
 }
 
-/// Take the ground's commands where the configuration's `tcspecial` section
-/// says.
+/// Starts taking the ground's commands where the configuration's
+/// `tcspecial` section says.
 ///
 /// Two links: the spacecraft's at `tcs_cmd.recv`, and the one commands about
 /// nodes arrive on at `payload_command.dest_base`. See
@@ -398,6 +486,25 @@ fn beacons(
 /// A configuration with no `tcspecial` section takes no commands, as it sends
 /// no beacons: the section is where the ports are written down, and a vehicle
 /// that chose its own would be a vehicle no ground station could find.
+///
+/// # Arguments
+///
+/// * `graph`         - The checked configuration.
+/// * `states`        - Every node's state, which commands change.
+/// * `bench`         - Where the interpreter queues work for the pass.
+/// * `flying`        - What the vehicle is flying, for commands that ask.
+/// * `beacon`        - The beacon sender, which a CONFIG retimes.
+/// * `telemetry_log` - Where answers to the ground are recorded.
+///
+/// # Returns
+///
+/// The running command links, or `None` for a configuration with no
+/// `tcspecial` section.
+///
+/// # Errors
+///
+/// The section's parameters not making a configuration, or a link not
+/// binding or its thread not starting, as a message.
 fn command_links(
     graph: &Graph,
     states: std::sync::Arc<crate::runtime::node_state::NodeStates>,
@@ -441,7 +548,7 @@ pub fn asked_to_stop() -> bool {
     STOPPING.load(Ordering::Relaxed)
 }
 
-/// Stop, as a signal stops the vehicle: the pass finished, the links closed,
+/// Stops, as a signal stops the vehicle: the pass finished, the links closed,
 /// the log flushed.
 ///
 /// For the visual window, whose close box stops the tcspecial it shows. The
@@ -451,7 +558,7 @@ pub fn stop_as_signalled() {
     STOPPING.store(true, Ordering::Relaxed);
 }
 
-/// Stop, as a signal stops the vehicle, and then run again.
+/// Stops, as a signal stops the vehicle, and then runs again.
 ///
 /// What an armed RESTART asks for. The vehicle stops the way it always does
 /// -- the pass finished, the links closed, the log flushed -- because a
@@ -462,11 +569,15 @@ fn restart_when_stopped() {
     STOPPING.store(true, Ordering::Relaxed);
 }
 
-/// What a pass did, where anything went wrong with it.
+/// Logs what a pass did, where anything went wrong with it.
 ///
-/// Every refusal, named. A pass that delivered everything says nothing: a
-/// vehicle reading three sensors every three seconds would otherwise fill a
-/// log with the news that it is working.
+/// Every refusal, named, as a warning. A pass that delivered everything says
+/// nothing: a vehicle reading three sensors every three seconds would
+/// otherwise fill a log with the news that it is working.
+///
+/// # Arguments
+///
+/// * `moved` - What the pass moved and what it was refused.
 fn report(moved: &Moved) {
     for (node, why) in &moved.refused {
         // The node once. A refusal from a port already opens with the node's
@@ -481,7 +592,7 @@ fn report(moved: &Moved) {
     }
 }
 
-/// Ask the kernel to tell us about an interrupt and a termination.
+/// Asks the kernel to tell us about an interrupt and a termination.
 ///
 /// Both of them, because the two ways a vehicle is stopped are a person at a
 /// console and a service manager: a loop that answered only one of them would
@@ -507,10 +618,23 @@ extern "C" fn stop(_signal: libc::c_int) {
     STOPPING.store(true, Ordering::Relaxed);
 }
 
-/// Run the configuration in `path` under `mode` and say what to exit with.
+/// Runs the configuration in `path` under `mode` and says what to exit
+/// with.
 ///
 /// For `main`, which has one more thing to do than report: a vehicle that
-/// could not start must not look as though it is running.
+/// could not start must not look as though it is running. Every reason it
+/// could not start is logged and said on stderr. Where a RESTART was asked
+/// for, this does not return: see `restart::if_asked`.
+///
+/// # Arguments
+///
+/// * `path` - The configuration file.
+/// * `mode` - The run's simulation mode, `--simulate`.
+///
+/// # Returns
+///
+/// The exit status: 0 for a vehicle that ran and stopped, 1 for one that
+/// could not start.
 pub fn run_or_report(path: &str, mode: Mode) -> i32 {
     match run_graph(path, mode) {
         Ok(()) => {

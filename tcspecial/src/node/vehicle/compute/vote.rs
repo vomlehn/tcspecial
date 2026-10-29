@@ -63,7 +63,7 @@ pub struct Vote {
 }
 
 impl Vote {
-    /// A vote over the inputs the node declares.
+    /// Makes a vote over the inputs the node declares.
     ///
     /// The declared names, which `Graph::check` has compared with the links
     /// that arrive: a vote over three sensors whose third link was deleted has
@@ -72,6 +72,14 @@ impl Vote {
     /// refuse here -- that a vote is over at least three inputs, each named
     /// once, and names an algorithm it knows, is
     /// `tcslibgs::node::vehicle::compute`'s rule.
+    ///
+    /// # Arguments
+    ///
+    /// * `params` - The inputs' names and the algorithm to vote by.
+    ///
+    /// # Returns
+    ///
+    /// The vote, with no input reported yet.
     pub fn of(params: VoteParams) -> Vote {
         let inputs = params.inputs.len();
         Vote {
@@ -92,10 +100,20 @@ impl Vote {
         self.expected.len() - self.reported
     }
 
-    /// The value this set of readings comes to.
+    /// Works out the value this set of readings comes to.
     ///
     /// Taken in sorted order, which is what both algorithms are about: the
     /// middle of them, or the closest pair.
+    ///
+    /// # Returns
+    ///
+    /// The value the vote's algorithm picks from the latest readings.
+    ///
+    /// # Panics
+    ///
+    /// If fewer readings have arrived than the algorithm needs: one for a
+    /// median, two for a closest mean. `give` asks only once every input
+    /// has reported, and a vote is over at least three.
     fn verdict(&mut self) -> f64 {
         self.sorted.clear();
         self.sorted.extend(self.latest.iter().flatten().copied());
@@ -116,11 +134,23 @@ impl Vote {
     }
 }
 
-/// The middle of a sorted set of readings.
+/// Finds the middle of a sorted set of readings.
 ///
 /// For an even count, the mean of the two in the middle. An odd count is what
 /// a vote wants -- three readings have a middle one and four do not -- and the
 /// even case is defined rather than refused so that the arithmetic is total.
+///
+/// # Arguments
+///
+/// * `sorted` - The readings, in ascending order.
+///
+/// # Returns
+///
+/// The middle reading, or the mean of the middle two.
+///
+/// # Panics
+///
+/// If `sorted` is empty.
 fn middle(sorted: &[f64]) -> f64 {
     let n = sorted.len();
     if n % 2 == 1 {
@@ -130,13 +160,25 @@ fn middle(sorted: &[f64]) -> f64 {
     }
 }
 
-/// The mean of the two readings closest to each other.
+/// Finds the mean of the two readings closest to each other.
 ///
 /// In sorted order the closest pair is always adjacent, so this is one walk
 /// along the readings looking for the smallest gap. The first smallest gap
 /// wins where two gaps are equal, which only matters for readings that are
 /// equally spaced -- and then every pair gives the same answer as the median
 /// anyway.
+///
+/// # Arguments
+///
+/// * `sorted` - The readings, in ascending order.
+///
+/// # Returns
+///
+/// The mean of the closest adjacent pair.
+///
+/// # Panics
+///
+/// If `sorted` holds fewer than two readings.
 fn closest_pair_mean(sorted: &[f64]) -> f64 {
     let mut best = 0;
     let mut gap = f64::INFINITY;
@@ -209,7 +251,15 @@ mod tests {
         as_value(number).expect("a temperature a value carries")
     }
 
-    /// A vote over three inputs, by the algorithm named.
+    /// Makes a vote over three inputs, `in0` to `in2`.
+    ///
+    /// # Arguments
+    ///
+    /// * `algorithm` - The algorithm to vote by.
+    ///
+    /// # Returns
+    ///
+    /// The vote.
     fn vote(algorithm: Algorithm) -> Vote {
         Vote::of(VoteParams {
             inputs: vec![

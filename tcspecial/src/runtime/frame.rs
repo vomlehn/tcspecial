@@ -63,7 +63,15 @@ pub struct LetGo {
 }
 
 impl Framer {
-    /// Nothing held yet, under this rule.
+    /// Makes a framer holding nothing yet.
+    ///
+    /// # Arguments
+    ///
+    /// * `rule` - Where each read ends.
+    ///
+    /// # Returns
+    ///
+    /// The framer, with room for `rule.max_length` bytes made.
     pub fn new(rule: StreamParams) -> Framer {
         Framer {
             held: Vec::with_capacity(rule.max_length as usize),
@@ -74,11 +82,16 @@ impl Framer {
         }
     }
 
-    /// How many bytes to ask the line for: what would fill the read.
+    /// Says how many bytes to ask the line for: what would fill the read.
     ///
     /// For a prefixed read, no more than the prefix until it is whole, and
     /// then no more than the frame it gives -- so that the next frame's
     /// prefix stays in the line until this frame is done with.
+    ///
+    /// # Returns
+    ///
+    /// The most bytes [`Framer::took`] will take now; while a frame too long
+    /// to hold is being let go, what is left of it, up to `max_length`.
     pub fn room(&self) -> usize {
         let most = self.rule.max_length as usize;
         let Some(prefix) = self.rule.length_prefix else {
@@ -93,10 +106,16 @@ impl Framer {
         }
     }
 
-    /// Hold these, which arrived at `now`.
+    /// Holds these, which arrived at `now`.
     ///
     /// No more than [`Framer::room`] -- what has not been asked for is not
     /// handed over -- and the clock starts at the first of them.
+    ///
+    /// # Arguments
+    ///
+    /// * `bytes` - What the line handed over; anything past the room is
+    ///             ignored.
+    /// * `now`   - When they arrived.
     pub fn took(&mut self, bytes: &[u8], now: Instant) {
         let fits = bytes.len().min(self.room());
         if fits == 0 {
@@ -128,19 +147,37 @@ impl Framer {
         }
     }
 
-    /// What has been let go since this was last asked, which starts the
-    /// count again.
+    /// Says what has been let go since this was last asked, which starts
+    /// the count again.
+    ///
+    /// # Returns
+    ///
+    /// The frames let go, by why.
     pub fn let_go(&mut self) -> LetGo {
         std::mem::take(&mut self.let_go)
     }
 
-    /// A read that has ended by `now`, if one has, copied into `out`.
+    /// Copies a read that has ended by `now`, if one has, into `out`.
     ///
-    /// Its length, or `None` while the read is still under way. Whatever
+    /// Whatever
     /// arrived after the end of it -- the bytes past a terminator -- is kept
     /// as the start of the next one, whose clock starts now: those bytes have
     /// been waiting since they arrived, but counting from then would end a
     /// read before the pass that took them had looked at it.
+    ///
+    /// A prefixed frame its timeout has ended before it was whole is let go
+    /// first: see [`Framer::let_go`].
+    ///
+    /// # Arguments
+    ///
+    /// * `now` - The time the read is judged at.
+    /// * `out` - Where the read is copied; what of it does not fit is
+    ///           dropped.
+    ///
+    /// # Returns
+    ///
+    /// How many bytes were copied into `out`, or `None` while the read is
+    /// still under way.
     pub fn frame(&mut self, now: Instant, out: &mut [u8]) -> Option<usize> {
         if self.rule.length_prefix.is_some() {
             self.give_up_on_a_late_frame(now);
@@ -157,9 +194,13 @@ impl Framer {
         Some(length)
     }
 
-    /// Let go of a prefixed frame its timeout has ended before it was whole,
-    /// or stop letting go of one too long to hold, so that the next byte is
-    /// read as a prefix.
+    /// Lets go of a prefixed frame its timeout has ended before it was
+    /// whole, or stops letting go of one too long to hold, so that the next
+    /// byte is read as a prefix.
+    ///
+    /// # Arguments
+    ///
+    /// * `now` - The time the timeout is judged at.
     fn give_up_on_a_late_frame(&mut self, now: Instant) {
         let (Some(timeout), Some(began)) = (self.rule.timeout, self.began)
         else {
@@ -181,7 +222,16 @@ impl Framer {
         self.began = None;
     }
 
-    /// Where the read that is under way ends, if it has ended by `now`.
+    /// Says where the read that is under way ends, if it has ended by `now`.
+    ///
+    /// # Arguments
+    ///
+    /// * `now` - The time the timeout is judged at.
+    ///
+    /// # Returns
+    ///
+    /// The read's length in what is held, or `None` while it is still under
+    /// way. A prefixed read ends only when it is whole.
     fn ends(&self, now: Instant) -> Option<usize> {
         if let Some(prefix) = self.rule.length_prefix {
             // Only ever whole: what the timeout ends is let go, not
@@ -205,12 +255,18 @@ impl Framer {
 }
 
 impl Framer {
-    /// Where the earliest terminator held ends, if one has arrived whole.
+    /// Finds where the earliest terminator held ends, if one has arrived
+    /// whole.
     ///
     /// The earliest to end rather than the earliest to begin: a read ends as
     /// soon as any of its terminators has arrived, which is the moment it
     /// would have ended had the bytes come one at a time. Looked for in what
     /// is held, which is at most max_length, by comparing in place.
+    ///
+    /// # Returns
+    ///
+    /// The offset just past that terminator, or `None` where none has
+    /// arrived whole.
     fn terminated(&self) -> Option<usize> {
         self.rule
             .terminators
@@ -239,7 +295,17 @@ fn timed_out(began: Instant, now: Instant, timeout: Duration) -> bool {
 mod tests {
     use super::*;
 
-    /// A rule whose terminators are each one of these bytes.
+    /// Makes a rule whose terminators are each one of these bytes.
+    ///
+    /// # Arguments
+    ///
+    /// * `max_length`  - The longest read.
+    /// * `timeout`     - How long a read may take; `None` for no limit.
+    /// * `terminators` - The bytes each of which ends a read.
+    ///
+    /// # Returns
+    ///
+    /// The rule, with no length prefix.
     fn rule(
         max_length: u32,
         timeout: Option<Duration>,
@@ -253,7 +319,16 @@ mod tests {
         }
     }
 
-    /// A rule whose terminators are these sequences.
+    /// Makes a rule whose terminators are these sequences.
+    ///
+    /// # Arguments
+    ///
+    /// * `max_length`  - The longest read.
+    /// * `terminators` - The sequences each of which ends a read.
+    ///
+    /// # Returns
+    ///
+    /// The rule, with no timeout and no length prefix.
     fn ended_by(max_length: u32, terminators: &[&[u8]]) -> StreamParams {
         StreamParams {
             terminators: terminators.iter().map(|t| t.to_vec()).collect(),
@@ -261,6 +336,17 @@ mod tests {
         }
     }
 
+    /// Makes a rule for reads that begin with a length prefix.
+    ///
+    /// # Arguments
+    ///
+    /// * `max_length` - The longest read, prefix and all.
+    /// * `timeout`    - How long a read may take; `None` for no limit.
+    /// * `prefix`     - What the prefix is.
+    ///
+    /// # Returns
+    ///
+    /// The rule, with no terminators.
     fn prefixed(
         max_length: u32,
         timeout: Option<Duration>,
@@ -272,9 +358,19 @@ mod tests {
         }
     }
 
-    /// Hold as much of `bytes` as is asked for, as a line would hand them
-    /// over, and say what read, if any, has ended by then. What is not asked
-    /// for is dropped, as though it were left in the line.
+    /// Holds as much of `bytes` as is asked for, as a line would hand them
+    /// over, and says what read, if any, has ended by then. What is not
+    /// asked for is dropped, as though it were left in the line.
+    ///
+    /// # Arguments
+    ///
+    /// * `framer` - The framer to hand them to.
+    /// * `bytes`  - What the line has.
+    /// * `now`    - When they arrived, and when the read is judged.
+    ///
+    /// # Returns
+    ///
+    /// The read that has ended, up to 64 bytes of it, or `None`.
     fn after(
         framer: &mut Framer,
         bytes: &[u8],
@@ -285,8 +381,14 @@ mod tests {
         framer.frame(now, &mut out).map(|n| out[..n].to_vec())
     }
 
-    /// Hand over `bytes` for as long as the framer asks for more: a prefix,
-    /// and then the frame it gives.
+    /// Hands over `bytes` for as long as the framer asks for more: a
+    /// prefix, and then the frame it gives.
+    ///
+    /// # Arguments
+    ///
+    /// * `framer` - The framer to hand them to.
+    /// * `bytes`  - What the line has.
+    /// * `now`    - When they arrived.
     fn feed(framer: &mut Framer, bytes: &[u8], now: Instant) {
         let mut from = 0;
         while from < bytes.len() {

@@ -16,6 +16,16 @@ const A_BEACON: &str = "tcspecial v0.1.0 md5 e2dd2b9ec2b0b8b0a8607777639ceac1";
 /// The window's contents reach to within one border of its right and bottom
 /// edges: no less, which would cut them off, and no more, which would be a
 /// window larger than it need be.
+///
+/// # Arguments
+///
+/// * `window` - The window, shown.
+/// * `what`   - What the window has in it, to say in a failure.
+///
+/// # Panics
+///
+/// The window has no panel or button, or does not fit them to within a
+/// pixel.
 fn fits_exactly(window: &WatchWindow, what: &str) {
     let border = window.get_border();
     let panel = ElementHandle::find_by_element_id(window, "WatchWindow::panel")

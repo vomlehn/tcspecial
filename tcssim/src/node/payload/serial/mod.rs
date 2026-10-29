@@ -34,12 +34,18 @@ use crate::payload::{
 };
 use crate::pty::SimulatedNode;
 
-/// Run serial device simulation
+/// Runs a simulated device on a serial line.
 ///
 /// As every other kind: a packet every packet interval, in segments, from
 /// Start until Stop. What a handler reads is the slave side of the pty, which
 /// is a device file with a line discipline -- so the bytes arrive as bytes on
 /// a port, not as datagrams with edges.
+///
+/// # Arguments
+///
+/// * `config`  - The payload's configuration.
+/// * `running` - Cleared to stop it; the function returns soon after.
+/// * `stats`   - Where it counts what it sends and receives.
 pub fn run_serial_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
@@ -135,6 +141,16 @@ mod tests {
     use std::sync::atomic::AtomicU32;
     use std::time::Duration;
 
+    /// Makes a path in the temporary directory unique to this process and
+    /// test thread.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - What the path is for, which is part of its name.
+    ///
+    /// # Returns
+    ///
+    /// The path, which nothing has made yet.
     fn a_path(name: &str) -> PathBuf {
         std::env::temp_dir().join(format!(
             "tcssim-{name}-{}-{:?}",
@@ -143,6 +159,19 @@ mod tests {
         ))
     }
 
+    /// Makes a simulated serial device that sends a packet every 200 ms in
+    /// segments 40 ms apart.
+    ///
+    /// # Arguments
+    ///
+    /// * `path`    - The path a handler opens, which the device makes lead
+    ///               to its pty.
+    /// * `packet`  - Its packet size in bytes.
+    /// * `segment` - Its segment size in bytes.
+    ///
+    /// # Returns
+    ///
+    /// The device, not yet started.
     fn device_at(path: &Path, packet: u32, segment: u32) -> SimulatedPayload {
         SimulatedPayload::new(PayloadConfig {
             thermal: None,

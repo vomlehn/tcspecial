@@ -5,6 +5,19 @@
 
 use std::process::Command;
 
+/// Runs tcssim from the top of the tree, without `PAYLOAD_SIM_YAML`.
+///
+/// # Arguments
+///
+/// * `args` - Its command-line arguments.
+///
+/// # Returns
+///
+/// Whether it succeeded, and what it wrote to standard error.
+///
+/// # Panics
+///
+/// If tcssim cannot be run.
 fn tcssim(args: &[&str]) -> (bool, String) {
     let root = concat!(env!("CARGO_MANIFEST_DIR"), "/..");
     let ran = Command::new(env!("CARGO_BIN_EXE_tcssim"))

@@ -49,7 +49,7 @@ pub enum LogFormat {
 }
 
 impl LogFormat {
-    /// The format this word asks for.
+    /// Reads the format a log's `format` asks for.
     ///
     /// Three spellings, and `fixed` carries the length: `fixed:16`, or
     /// `fixed: 16` with as much space as somebody feels like. The length is
@@ -57,6 +57,19 @@ impl LogFormat {
     /// whose record length changed would be a file nothing could read back --
     /// so it belongs where the format is stated rather than in an attribute
     /// beside it that could disagree with it.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The `format` attribute as the file wrote it.
+    ///
+    /// # Returns
+    ///
+    /// The format.
+    ///
+    /// # Errors
+    ///
+    /// A message for a `fixed` with no length, a length that is not a whole
+    /// number or is nought, and a word that is no format.
     pub fn of(text: &str) -> Result<LogFormat, String> {
         if let Some(rest) = text.strip_prefix("fixed") {
             let length = rest.trim_start().strip_prefix(':').ok_or_else(|| {
@@ -88,10 +101,13 @@ impl LogFormat {
         }
     }
 
-    /// How long every record must be, for a format that insists.
+    /// Says how long every record must be, for a format that insists.
     ///
-    /// `None` for the two variable formats, which take a record of any length
-    /// -- so a source needs nothing said about its records to feed one.
+    /// # Returns
+    ///
+    /// The length in bytes of a fixed-length log's records. `None` for the
+    /// two variable formats, which take a record of any length -- so a
+    /// source needs nothing said about its records to feed one.
     pub fn exactly(self) -> Option<u32> {
         match self {
             LogFormat::Fixed(bytes) => Some(bytes),
@@ -111,12 +127,27 @@ pub struct LogParams {
     pub segment_bytes: u32,
 }
 
-/// What this log node says, or what is wrong with what it says.
+/// Reads what this log node says, or what is wrong with what it says.
 ///
 /// Every attribute is checked, including the ones that are not a log's: one
 /// nothing reads is refused rather than ignored, because a log whose `fromat`
 /// was misspelled would be opened in whichever format the default happens to
 /// be and would look exactly like a configured log.
+///
+/// # Arguments
+///
+/// * `what`       - The node's name, for the messages.
+/// * `attributes` - The node's attributes as the file states them.
+///
+/// # Returns
+///
+/// The log's directory, format and segment size.
+///
+/// # Errors
+///
+/// A message naming the node for an attribute that is not a log's, a
+/// missing `directory` or `format`, a format [`LogFormat::of`] refuses, and
+/// a `segment_bytes` that is not a whole number or is smaller than a record.
 pub fn params_of(
     what: &str,
     attributes: &BTreeMap<String, Scalar>,
@@ -201,6 +232,15 @@ pub fn params_of(
 mod tests {
     use super::*;
 
+    /// Makes a node's attributes as a file states them.
+    ///
+    /// # Arguments
+    ///
+    /// * `stated` - Each attribute, with its value as written.
+    ///
+    /// # Returns
+    ///
+    /// The attributes, by name.
     fn attributes(stated: &[(&str, &str)]) -> BTreeMap<String, Scalar> {
         stated
             .iter()

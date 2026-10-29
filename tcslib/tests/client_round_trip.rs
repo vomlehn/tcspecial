@@ -29,10 +29,25 @@ fn stub_sample(first: u8) -> DHSample {
     sample
 }
 
-/// Answer `count` commands as tcspecial would, then stop.
+/// Starts a stand-in spacecraft that answers commands as tcspecial would,
+/// on a thread of its own, then stops.
 ///
 /// Every answer carries the command's own sequence number, which is what lets
 /// a caller match one to the other.
+///
+/// # Arguments
+///
+/// * `count` - How many commands it answers before it stops. It stops
+///             sooner if nothing arrives for ten seconds.
+///
+/// # Returns
+///
+/// The `host:port` it answers at, and its thread, to be joined.
+///
+/// # Panics
+///
+/// If its socket cannot be made, or the thread does if what arrives is not
+/// a valid command or the answer cannot be sent.
 fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
     let socket = UdpSocket::bind("127.0.0.1:0").expect("bind");
     let addr = socket.local_addr().expect("addr").to_string();
@@ -136,14 +151,26 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
     (addr, handle)
 }
 
-/// A client whose links all go to the one stub.
+/// Makes a client whose links all go to the one stub: the spacecraft's link
+/// and the one link every node is commanded on.
 ///
 /// The stub answers whatever arrives, so one socket stands in for every link
 /// here. What the links are for is tested where they are served; this is
 /// about every operation reaching the far end and coming back. The one
 /// payload is DH2, which is the payload the operations below ask about.
-/// A client: the spacecraft's link and the one link every node is commanded
-/// on.
+///
+/// # Arguments
+///
+/// * `addr` - The `host:port` the stub answers at.
+///
+/// # Returns
+///
+/// The client, with a ten-second timeout and a beacon of generation 1
+/// already heard.
+///
+/// # Panics
+///
+/// If a connection cannot be made.
 fn client_to(addr: &str) -> TcsClient {
     let spacecraft =
         UdpConnection::new("127.0.0.1:0", addr).expect("connection");
@@ -159,7 +186,11 @@ fn client_to(addr: &str) -> TcsClient {
     client
 }
 
-/// What a stand-in vehicle says a node has moved.
+/// Makes the counts a stand-in vehicle says a node has moved.
+///
+/// # Returns
+///
+/// The same counts each time, none of them zero but one.
 fn stub_counts() -> NodeCounts {
     NodeCounts {
         taken_bytes: 480,

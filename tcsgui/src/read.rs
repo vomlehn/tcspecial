@@ -33,10 +33,24 @@ use crate::document::{Command, Document, Node};
 use crate::journal::Link;
 use crate::subdiagram::Qualified;
 
-/// Read the configuration at `path`, with everything it includes.
+/// Reads the configuration at `path`, with everything it includes.
 ///
 /// A file that is not there is not an error: a name that does not exist yet is
 /// how a new configuration is begun, and an empty document is what that is.
+///
+/// # Arguments
+///
+/// * `path` - The top configuration file, YAML or XML by its extension.
+///
+/// # Returns
+///
+/// The document, with the nodes of every subdiagram it includes and the
+/// comments above each entry; an empty document for a file that is not there.
+///
+/// # Errors
+///
+/// The loader's message, as text, for a file that cannot be read, parsed or
+/// included.
 pub fn read(path: &Path) -> Result<Document, String> {
     if !path.exists() {
         return Ok(Document::default());
@@ -187,6 +201,16 @@ struct Said {
 /// Both languages, since a configuration may be written in either, and the
 /// scan is the same shape for both: find the lines that are comments, find the
 /// entry that follows, and pair them.
+///
+/// # Arguments
+///
+/// * `path` - The configuration file to scan, XML if its extension says so and
+///            YAML otherwise.
+///
+/// # Returns
+///
+/// The comments found, by node, by link and by command; none for a file that
+/// cannot be read.
 fn comments_of(path: &Path) -> Said {
     let mut said = Said::default();
     let Ok(text) = std::fs::read_to_string(path) else {
@@ -274,6 +298,16 @@ fn line_opens_an_entry(line: &str) -> bool {
 /// and the list form too, a comment above `payload-out: [a, b]` being about
 /// both of them. The two names are the schema's: see
 /// `tcslibgs::graph::terminals`.
+///
+/// # Arguments
+///
+/// * `line` - The line, trimmed.
+/// * `xml`  - Whether the file is XML rather than YAML.
+///
+/// # Returns
+///
+/// The terminal's name, `payload-out` or `moc-out`, or `None` if the line
+/// writes neither.
 fn source_named(line: &str, xml: bool) -> Option<String> {
     for terminal in ["payload-out", "moc-out"] {
         let is = if xml {
@@ -289,6 +323,16 @@ fn source_named(line: &str, xml: bool) -> Option<String> {
 }
 
 /// The text of a comment line, if this line is one.
+///
+/// # Arguments
+///
+/// * `line` - The line, trimmed.
+/// * `xml`  - Whether the file is XML, whose comments are `<!-- -->`, rather
+///            than YAML, whose comments start with `#`.
+///
+/// # Returns
+///
+/// The comment's text, trimmed, or `None` if the line is not a comment.
 fn comment_in(line: &str, xml: bool) -> Option<String> {
     if xml {
         let body = line.strip_prefix("<!--")?.strip_suffix("-->")?;
@@ -300,6 +344,16 @@ fn comment_in(line: &str, xml: bool) -> Option<String> {
 }
 
 /// The name of the node this line starts, if it starts one.
+///
+/// # Arguments
+///
+/// * `line` - The line, trimmed.
+/// * `xml`  - Whether the file is XML, where the name is a `<name>` element,
+///            rather than YAML, where it is a `- name:` entry.
+///
+/// # Returns
+///
+/// The node's name, unquoted, or `None` if the line does not start a node.
 fn node_named(line: &str, xml: bool) -> Option<String> {
     if xml {
         // `<nodes>` opens an entry and `<name>` is its first child, so the
@@ -316,6 +370,17 @@ fn node_named(line: &str, xml: bool) -> Option<String> {
 }
 
 /// What the command binding this line starts sets, if it starts one.
+///
+/// # Arguments
+///
+/// * `line`  - The line, trimmed.
+/// * `xml`   - Whether the file is XML rather than YAML.
+/// * `lines` - The lines after it. For XML the `<from>` and `<sets>` lines that
+///             follow `<commands>` are taken from it.
+///
+/// # Returns
+///
+/// What the binding sets, or `None` if the line does not start a binding.
 fn command_in<'a, I: Iterator<Item = &'a str>>(
     line: &str,
     xml: bool,
@@ -340,6 +405,15 @@ fn command_in<'a, I: Iterator<Item = &'a str>>(
 }
 
 /// The text of a one-line XML element, if this line is one.
+///
+/// # Arguments
+///
+/// * `line` - The line, which may have spaces round it.
+/// * `name` - The element's tag name.
+///
+/// # Returns
+///
+/// The element's text, unescaped, or `None` if the line is not that element.
 fn element(line: &str, name: &str) -> Option<String> {
     let line = line.trim();
     let body = line
@@ -349,6 +423,15 @@ fn element(line: &str, name: &str) -> Option<String> {
 }
 
 /// A value without the quotes a writer puts round it.
+///
+/// # Arguments
+///
+/// * `value` - The value as written.
+///
+/// # Returns
+///
+/// The value trimmed, and if double-quoted, without its quotes and with `\"`
+/// and `\\` unescaped.
 fn unquoted(value: &str) -> String {
     let value = value.trim();
     value
@@ -359,6 +442,14 @@ fn unquoted(value: &str) -> String {
 }
 
 /// XML's five, back the way they were written.
+///
+/// # Arguments
+///
+/// * `text` - XML character data.
+///
+/// # Returns
+///
+/// The text with `&lt;`, `&gt;`, `&quot;`, `&apos;` and `&amp;` replaced.
 fn unescape(text: &str) -> String {
     text.replace("&lt;", "<")
         .replace("&gt;", ">")

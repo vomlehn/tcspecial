@@ -167,10 +167,12 @@ impl Report {
         !self.findings.is_empty()
     }
 
-    /// The status a program exits with after this.
+    /// Gives the status a program exits with after this.
     ///
-    /// Nought when the files are good, so that `make` and a shell `&&` can be
-    /// told by it.
+    /// # Returns
+    ///
+    /// Nought when no error was found, so that `make` and a shell `&&` can
+    /// be told by it, and 1 when one was.
     pub fn status(&self) -> i32 {
         if self.found_errors() {
             1
@@ -179,12 +181,20 @@ impl Report {
         }
     }
 
-    /// Write every finding, in the order it was found.
+    /// Writes every finding, in the order it was found, one per line.
     ///
     /// All of them: how many is the run's limit, applied while it looked --
     /// see [`Report::limits`] -- so there is nothing left over to count. And
     /// errors and warnings as they came rather than errors first, so that a
     /// run stopped by its limit ends on the finding that stopped it.
+    ///
+    /// # Arguments
+    ///
+    /// * `out` - Where the lines are written.
+    ///
+    /// # Errors
+    ///
+    /// Whatever writing to `out` fails with.
     pub fn write(&self, out: &mut impl Write) -> io::Result<()> {
         for line in self.said() {
             writeln!(out, "{line}")?;
@@ -201,7 +211,12 @@ impl Report {
         self.lines().into_iter().map(|(_, line)| line).collect()
     }
 
-    /// The same lines, each with whether it is about an error.
+    /// Gives the lines [`Report::write`] prints, each with whether it is
+    /// about an error.
+    ///
+    /// # Returns
+    ///
+    /// One `(is an error, line)` pair per finding, in the order found.
     pub fn lines(&self) -> Vec<(bool, String)> {
         self.findings
             .iter()
@@ -226,6 +241,16 @@ impl Report {
         self.found(file, line, message, Severity::Error, None)
     }
 
+    /// Records a finding, unless the run has stopped or it is a warning and
+    /// warnings are off, and stops the run if it reaches the limit.
+    ///
+    /// # Arguments
+    ///
+    /// * `file`     - The file the finding is about.
+    /// * `line`     - The line in it, from 1.
+    /// * `message`  - What is wrong, as it is printed.
+    /// * `severity` - Whether it is an error or a warning.
+    /// * `problem`  - The graph's problem it came from, where it came from one.
     fn found(
         &mut self,
         file: &Path,
@@ -260,7 +285,12 @@ impl Report {
         }
     }
 
-    /// How many of the findings count against the limit.
+    /// Counts the findings that count against the limit.
+    ///
+    /// # Returns
+    ///
+    /// How many errors were found, and warnings too under
+    /// [`Warnings::Errors`].
     fn counted(&self) -> usize {
         let errors_only = self.limits.warnings != Warnings::Errors;
         self.findings
@@ -271,8 +301,16 @@ impl Report {
             .count()
     }
 
-    /// An empty report for a run under these limits. A limit of nought is
-    /// reached before anything is looked at.
+    /// Makes an empty report for a run under these limits. A limit of nought
+    /// is reached before anything is looked at.
+    ///
+    /// # Arguments
+    ///
+    /// * `limits` - The run's limits.
+    ///
+    /// # Returns
+    ///
+    /// The report, with nothing found.
     fn under(limits: Limits) -> Report {
         Report {
             halted: limits.error_limit == Some(0),
@@ -286,15 +324,25 @@ impl Report {
     }
 }
 
-/// Check a tcspecial configuration file, and a simulator file if there is one.
+/// Checks a tcspecial configuration file, and a simulator file if there is
+/// one.
 ///
 /// A configuration is a graph of nodes, and is checked as one -- with the
 /// rules tcspecial runs again aboard -- and the simulator file against the
 /// graph's payloads by name.
 ///
-/// `limits` are tcsverify's `--error-limit` and `--warnings`, and the report
-/// passes or fails -- [`Report::status`] -- as tcsverify would under them.
-/// [`Limits::EVERYTHING`] looks at everything.
+/// # Arguments
+///
+/// * `payload_path` - The configuration.
+/// * `sim_path`     - The simulator file, if there is one.
+/// * `limits`       - tcsverify's `--error-limit` and `--warnings`, and the
+///                    report passes or fails -- [`Report::status`] -- as
+///                    tcsverify would under them. [`Limits::EVERYTHING`]
+///                    looks at everything.
+///
+/// # Returns
+///
+/// Everything found, with its file and line.
 pub fn verify(
     payload_path: &Path,
     sim_path: Option<&Path>,
@@ -308,7 +356,7 @@ pub fn verify(
     )
 }
 
-/// Check a configuration as [`verify`] does, for a tcspecial containing only
+/// Checks a configuration as [`verify`] does, for a tcspecial containing only
 /// the optional payload types `built` names.
 ///
 /// Each node of a type `built` leaves out is reported as that tcspecial would
@@ -316,6 +364,17 @@ pub fn verify(
 /// asks this with the types it was built with, and tcsverify with the types
 /// `--types` names, so a configuration can be held to a vehicle's build on
 /// the ground. [`verify`] is this with every type.
+///
+/// # Arguments
+///
+/// * `payload_path` - The configuration.
+/// * `sim_path`     - The simulator file, if there is one.
+/// * `limits`       - The run's limits, as for [`verify`].
+/// * `built`        - The optional payload types the tcspecial has.
+///
+/// # Returns
+///
+/// Everything found, with its file and line.
 pub fn verify_built(
     payload_path: &Path,
     sim_path: Option<&Path>,
@@ -335,7 +394,7 @@ pub fn verify_built(
     report
 }
 
-/// Check two spellings of one configuration -- one XML, one YAML -- each
+/// Checks two spellings of one configuration -- one XML, one YAML -- each
 /// against the same simulator file, and then that they say the same thing.
 ///
 /// Each is verified as [`verify`] verifies one, the first named first. Then
@@ -351,10 +410,20 @@ pub fn verify_built(
 /// says. A file that cannot be read at all has nothing to compare, which is
 /// said once and is already among its own findings.
 ///
-/// `limits` are the whole run's, both files and the comparison together: a
-/// run that reaches its limit on the first file looks no further. `built` is
-/// the optional payload types of the tcspecial the two are checked for, as in
-/// [`verify_built`].
+/// # Arguments
+///
+/// * `first`    - The first spelling, verified first.
+/// * `second`   - The second, which differences are reported against.
+/// * `sim_path` - The simulator file both are checked with.
+/// * `limits`   - The whole run's, both files and the comparison together:
+///                a run that reaches its limit on the first file looks no
+///                further.
+/// * `built`    - The optional payload types of the tcspecial the two are
+///                checked for, as in [`verify_built`].
+///
+/// # Returns
+///
+/// Everything found in either file and every difference between them.
 pub fn verify_pair(
     first: &Path,
     second: &Path,
@@ -390,8 +459,16 @@ pub fn verify_pair(
     report
 }
 
-/// Whether two files are read as one configuration, every difference found
-/// added to `report`. See [`verify_pair`].
+/// Checks whether two files are read as one configuration, every difference
+/// found added to `report`. See [`verify_pair`].
+///
+/// # Arguments
+///
+/// * `first`  - One file.
+/// * `second` - The other, which each difference is reported against, at
+///              the line the thing that differs is written on.
+/// * `report` - Where the differences, or that either file cannot be read,
+///              are added.
 pub fn compare(first: &Path, second: &Path, report: &mut Report) {
     use tcslibgs::config_digest::interpretation_of_file;
 
@@ -469,7 +546,15 @@ enum Said {
     Order(String, String),
 }
 
-/// A value as a reader would write it in a message.
+/// Shows a value as a reader would write it in a message.
+///
+/// # Arguments
+///
+/// * `value` - The value.
+///
+/// # Returns
+///
+/// A string in double quotes, anything else as JSON.
 fn shown(value: &serde_json::Value) -> String {
     match value {
         serde_json::Value::String(text) => format!("\"{text}\""),
@@ -477,8 +562,16 @@ fn shown(value: &serde_json::Value) -> String {
     }
 }
 
-/// A value said by one file only: itself where it is one, nothing where it is
-/// a whole entry.
+/// Shows a value said by one file only: itself where it is one, nothing
+/// where it is a whole entry.
+///
+/// # Arguments
+///
+/// * `value` - The value.
+///
+/// # Returns
+///
+/// The value as [`shown`] gives it, or `None` for an object or a list.
 fn alone(value: &serde_json::Value) -> Option<String> {
     match value {
         serde_json::Value::Object(_) | serde_json::Value::Array(_) => None,
@@ -486,10 +579,18 @@ fn alone(value: &serde_json::Value) -> Option<String> {
     }
 }
 
-/// What tells the entries of a list apart, where something does: a node by
-/// its name, a link by where it leaves from. `None` for a list whose entries
-/// have no such key, or whose keys repeat, which is then compared place by
-/// place.
+/// Finds what tells the entries of a list apart, where something does: a
+/// node by its name, a link by where it leaves from.
+///
+/// # Arguments
+///
+/// * `list` - The list's entries.
+///
+/// # Returns
+///
+/// Each entry's `name`, or failing that its `from`, in order; `None` for a
+/// list whose entries have no such key, or whose keys repeat, which is then
+/// compared place by place.
 fn keys_of(list: &[serde_json::Value]) -> Option<Vec<String>> {
     for key in ["name", "from"] {
         let keys: Option<Vec<String>> = list
@@ -510,7 +611,19 @@ fn keys_of(list: &[serde_json::Value]) -> Option<Vec<String>> {
     None
 }
 
-/// Every place two value trees differ, each with the path to it.
+/// Finds every place two value trees differ, each with the path to it.
+///
+/// Objects are compared key by key, lists of named entries name by name and
+/// then for order, other lists place by place. A key that is null on one
+/// side and missing on the other is no difference.
+///
+/// # Arguments
+///
+/// * `one`  - What the first file is read as.
+/// * `two`  - What the second is read as.
+/// * `path` - The path to `one` and `two`, as it is built up; left as it was
+///            found.
+/// * `out`  - Where each difference is added, with its path.
 fn differences_between(
     one: &serde_json::Value,
     two: &serde_json::Value,
@@ -601,9 +714,9 @@ fn differences_between(
     }
 }
 
-/// The line a path's last named part is written on, searching from where each
-/// part before it was found -- the node, then the attribute under it. The
-/// file's first line where nothing is found.
+/// Finds the line a path's last named part is written on, searching from
+/// where each part before it was found -- the node, then the attribute under
+/// it.
 ///
 /// Only the parts a file writes are searched for: a node's name, an
 /// attribute's, a section's. The comparison's own words for where it is --
@@ -611,6 +724,15 @@ fn differences_between(
 /// somewhere else (the editor's own section has `nodes`), and finding one
 /// would send a reader to the wrong line. A link's `node.terminal` is the node
 /// and then the terminal under it, which is how both formats write it.
+///
+/// # Arguments
+///
+/// * `text` - The file's text.
+/// * `path` - The path to the thing, as [`differences_between`] gives it.
+///
+/// # Returns
+///
+/// The line, from 1; the file's first line where nothing is found.
 fn line_of_path(text: &str, path: &[String]) -> usize {
     const NOT_WRITTEN: [&str; 4] = ["nodes", "attributes", "links", "to"];
     let lines: Vec<&str> = text.lines().collect();
@@ -650,14 +772,21 @@ fn line_of_path(text: &str, path: &[String]) -> usize {
     found.unwrap_or(THE_FILE_ITSELF)
 }
 
-/// Check a configuration: read it, then ask what is wrong with it.
+/// Checks a configuration: reads it, then asks what is wrong with it.
 ///
 /// The checking is `tcslibgs::graph::Graph::check`, which is the same code
 /// tcspecial runs aboard. This adds only the line numbers, which it gets by
 /// scanning the text for the name the problem is about.
 ///
-/// Hands back the graph, for a simulator file to be joined to, when it read at
-/// all.
+/// # Arguments
+///
+/// * `path`   - The configuration's top file.
+/// * `built`  - The optional payload types of the tcspecial it is checked for.
+/// * `report` - Where each problem is added, at its own file and line.
+///
+/// # Returns
+///
+/// The graph, for a simulator file to be joined to, when it read at all.
 fn check_graph(
     path: &Path,
     built: &[&str],
@@ -726,7 +855,7 @@ fn check_graph(
     Some(graph)
 }
 
-/// Check a configuration's simulator file, against the configuration's
+/// Checks a configuration's simulator file, against the configuration's
 /// payloads if the configuration read.
 ///
 /// By name first: see `tcslibgs::SimConfigFile::problems_by_name`. Then, where
@@ -735,6 +864,13 @@ fn check_graph(
 /// each payload's settings against its handler,
 /// `tcslibgs::SimConfigFile::problems`: a file that passed here and was refused
 /// there would be a verifier saying yes to a run that fails.
+///
+/// # Arguments
+///
+/// * `path`   - The simulator file.
+/// * `graph`  - The configuration, or `None` if it did not read, when the
+///              file is only parsed.
+/// * `report` - Where each problem is added.
 fn check_graph_simulator(
     path: &Path,
     graph: Option<&tcslibgs::graph::Graph>,
@@ -803,7 +939,16 @@ fn check_graph_simulator(
     }
 }
 
-/// The text of a file and the format its name says it is written in.
+/// Reads a file, and the format its name says it is written in.
+///
+/// # Arguments
+///
+/// * `path`   - The file.
+/// * `report` - Where it is reported if either cannot be had.
+///
+/// # Returns
+///
+/// The file's text and its format, or `None` (with the reason in `report`).
 fn read(path: &Path, report: &mut Report) -> Option<(String, ConfigFormat)> {
     let format = match ConfigFormat::of_file(path) {
         Ok(format) => format,
@@ -822,13 +967,22 @@ fn read(path: &Path, report: &mut Report) -> Option<(String, ConfigFormat)> {
     }
 }
 
-/// The line a message mentions, if it mentions one.
+/// Finds the line a message mentions, if it mentions one.
 ///
 /// A parse error carries its location in a field, and `line_of` reads it
 /// there. A graph that would not load reports through `TcsError::Config`,
 /// which is a sentence -- the path has been put in front of the parser's own
 /// words, which is worth more than the field was -- so the line is read back
 /// out of the text. "at line 7 column 5" is what both parsers write.
+///
+/// # Arguments
+///
+/// * `message` - The message.
+///
+/// # Returns
+///
+/// The number after the first "at line ", or the file's first line where
+/// there is none.
 fn line_in_message(message: &str) -> usize {
     message
         .split("at line ")
@@ -841,12 +995,20 @@ fn line_in_message(message: &str) -> usize {
         .unwrap_or(THE_FILE_ITSELF)
 }
 
-/// Where a parser stopped.
+/// Finds where a parser stopped.
 ///
 /// That is the line a reader has to look at: the file does not parse, so
 /// nothing in it has a name yet to be found by. Both parsers say -- YAML in
 /// its error, XML by the reader's position, which `ConfigFormat::parse` puts
 /// in its error -- and anything else is reported from the first line.
+///
+/// # Arguments
+///
+/// * `e` - The parser's error.
+///
+/// # Returns
+///
+/// The line, from 1.
 fn line_of(e: &TcsError) -> usize {
     match e {
         TcsError::Yaml(e) => {
@@ -862,8 +1024,17 @@ mod tests {
     use super::*;
     use tcslibgs::graph::built::OPTIONAL_TYPES as ALL;
 
-    /// The thermostat example's two spellings and its simulator file, copied
+    /// Copies the thermostat example's two spellings and its simulator file
     /// to a directory of their own, with `change` made to the XML.
+    ///
+    /// # Arguments
+    ///
+    /// * `change` - Takes the XML's text and gives what is written instead.
+    ///
+    /// # Returns
+    ///
+    /// The directory, which is removed when dropped, and the paths of the
+    /// XML, the YAML and the simulator file in it.
     fn thermostat_pair(
         change: impl Fn(String) -> String,
     ) -> (tempfile::TempDir, PathBuf, PathBuf, PathBuf) {
@@ -1036,6 +1207,18 @@ mod tests {
         sim: PathBuf,
     }
 
+    /// Writes a configuration and a simulator file to a temporary directory.
+    ///
+    /// # Arguments
+    ///
+    /// * `payload_ext` - The configuration's extension, with its dot, which
+    ///                   says its format.
+    /// * `payload`     - The configuration's text.
+    /// * `sim`         - The simulator file's text, written as YAML.
+    ///
+    /// # Returns
+    ///
+    /// The two paths, and the directory they are in.
     fn written(payload_ext: &str, payload: &str, sim: &str) -> Set {
         let dir = tempfile::tempdir().expect("a directory");
         let payload_path = dir.path().join(format!("set{payload_ext}"));
@@ -1055,7 +1238,17 @@ mod tests {
         }
     }
 
-    /// A configuration in a temporary directory.
+    /// Writes a configuration to a temporary directory.
+    ///
+    /// # Arguments
+    ///
+    /// * `extension` - The file's extension, with its dot, which says its
+    ///                 format.
+    /// * `text`      - What it says.
+    ///
+    /// # Returns
+    ///
+    /// The directory, which is removed when dropped, and the file's path.
     fn graph_written(
         extension: &str,
         text: &str,
@@ -1747,8 +1940,17 @@ simulated_payloads:
         );
     }
 
-    /// A configuration with this many errors in it, one per payload: each
-    /// states a port a device file cannot have.
+    /// Writes a configuration with this many errors in it, one per payload:
+    /// each links to a node that is not there.
+    ///
+    /// # Arguments
+    ///
+    /// * `count` - How many errors.
+    ///
+    /// # Returns
+    ///
+    /// The configuration and a good simulator file, in a directory of their
+    /// own.
     fn with_errors(count: usize) -> Set {
         let mut payloads = "payloads:\n".to_string();
         for id in 0..count {
@@ -1766,7 +1968,16 @@ simulated_payloads:
         written(".yaml", &format!("{head}{payloads}"), GOOD_SIM)
     }
 
-    /// A sound graph with unfinished payloads added: warnings, and no errors.
+    /// Writes a sound graph with unfinished payloads added: warnings, and no
+    /// errors.
+    ///
+    /// # Arguments
+    ///
+    /// * `spares` - How many unfinished payloads, one warning each.
+    ///
+    /// # Returns
+    ///
+    /// The directory, which is removed when dropped, and the file's path.
     fn with_warnings(spares: usize) -> (tempfile::TempDir, PathBuf) {
         let mut extra = String::new();
         for id in 0..spares {
@@ -1781,6 +1992,17 @@ simulated_payloads:
         )
     }
 
+    /// Makes the limits for a run.
+    ///
+    /// # Arguments
+    ///
+    /// * `error_limit` - How many counted findings stop the run; `None` for
+    ///                   no limit.
+    /// * `warnings`    - What is done with warnings.
+    ///
+    /// # Returns
+    ///
+    /// The limits.
     fn limited(error_limit: Option<usize>, warnings: Warnings) -> Limits {
         Limits {
             error_limit,

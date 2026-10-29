@@ -18,6 +18,9 @@ def use_in(window):
     Called once, on the root window, before anything is put in it: the named
     fonts are the application's, so every window it opens after that has
     them too. A positive size is points to Tk, as it is to Slint.
+
+    Args:
+        window: The root window.
     """
     for name in tkinter.font.names(window):
         tkinter.font.Font(root=window, name=name, exists=True).configure(

@@ -57,13 +57,21 @@ pub struct Route {
     pub moc: String,
 }
 
-/// The first `ping` node in the configuration the ground can reach both ways,
-/// in the order the file writes them.
+/// Finds the first `ping` node in the configuration the ground can reach
+/// both ways, in the order the file writes them.
 ///
 /// Both ways: a `moc` node that binds an address and port aboard -- somewhere
 /// for a ping to go up to -- with a link to the `ping` node, and a link from
-/// the `ping` node back down to that same `moc` node. `None` where there is no
-/// such node, which is a configuration with nothing to ping; a ping node
+/// the `ping` node back down to that same `moc` node.
+///
+/// # Arguments
+///
+/// * `graph` - The configuration's graph.
+///
+/// # Returns
+///
+/// The `ping` node and its `moc` node, or `None` where there is no such
+/// node, which is a configuration with nothing to ping; a ping node
 /// reachable one way only is one a ping would vanish into.
 pub fn route_of(graph: &Graph) -> Option<Route> {
     let down = telemetry::of(graph).ok()?;
@@ -89,7 +97,17 @@ pub fn route_of(graph: &Graph) -> Option<Route> {
         })
 }
 
-/// Whether a link leaves `from` for `to`.
+/// Tells whether a link leaves one node for another.
+///
+/// # Arguments
+///
+/// * `graph` - The configuration's graph.
+/// * `from`  - The name of the node the link leaves.
+/// * `to`    - The name of the node it goes to, among its destinations.
+///
+/// # Returns
+///
+/// `true` if some link leaves `from` for `to`.
 fn feeds(graph: &Graph, from: &str, to: &str) -> bool {
     graph.links.iter().any(|link| {
         link.origin().node == from
@@ -114,12 +132,24 @@ pub struct Uplink {
 }
 
 impl Uplink {
-    /// Open the way up to the `moc` node of this name: where it binds aboard,
-    /// which the configuration says.
+    /// Opens the way up to a `moc` node: where it binds aboard, which the
+    /// configuration says.
     ///
-    /// Refused for a node that is not a `moc` node, and for one that binds
-    /// nothing -- it only sends, to its `ground_base`, and has nowhere for the
-    /// ground to send to.
+    /// # Arguments
+    ///
+    /// * `graph` - The configuration's graph.
+    /// * `moc`   - The name of the `moc` node.
+    ///
+    /// # Returns
+    ///
+    /// The uplink, with a socket of the address's family to send from.
+    ///
+    /// # Errors
+    ///
+    /// A message saying why, for a node that does not exist, is not a
+    /// gateway node, or binds nothing -- it only sends, to its
+    /// `ground_base`, and has nowhere for the ground to send to -- and for
+    /// an address that does not resolve or a socket that cannot be made.
     pub fn open(graph: &Graph, moc: &str) -> Result<Uplink, String> {
         let node = graph
             .node(moc)
@@ -161,7 +191,19 @@ impl Uplink {
         self.to
     }
 
-    /// Send these bytes up.
+    /// Sends bytes up, in one datagram.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - What to send.
+    ///
+    /// # Returns
+    ///
+    /// Nothing, once it has gone.
+    ///
+    /// # Errors
+    ///
+    /// A message saying where it could not be sent, and why.
     pub fn send(&self, data: &[u8]) -> Result<(), String> {
         self.socket
             .send_to(data, self.to)
@@ -237,7 +279,12 @@ impl Default for Pinger {
 const RECEIVED_BYTES: usize = 256;
 
 impl Pinger {
-    /// No ping sent yet.
+    /// Makes a pinger that has sent no ping yet, with the room its text is
+    /// kept in.
+    ///
+    /// # Returns
+    ///
+    /// The pinger.
     pub fn new() -> Pinger {
         Pinger {
             count: 0,
@@ -253,10 +300,21 @@ impl Pinger {
         &self.exchange
     }
 
-    /// The next ping, sent at `at`: the count goes up by one, from one, and
-    /// the time received is cleared. What was received last is kept.
+    /// Makes the next ping: the count goes up by one, from one, and the
+    /// time received is cleared. What was received last is kept.
     ///
-    /// What comes back is the ping to send, which is the exchange's `sent`.
+    /// # Arguments
+    ///
+    /// * `at` - When it is sent, since the epoch, by the ground's clock.
+    ///
+    /// # Returns
+    ///
+    /// The ping to send, which is the exchange's `sent`.
+    ///
+    /// # Errors
+    ///
+    /// A message if the count has run out or the ping cannot be written;
+    /// the last ping is then left as it was sent.
     pub fn ping(&mut self, at: Duration) -> Result<&str, String> {
         let count = self
             .count
@@ -289,6 +347,11 @@ impl Pinger {
     ///
     /// Allocates where what arrived is not an answer, to say why: something
     /// is sending the ground what the ping node would not.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - What arrived.
+    /// * `at`   - When it arrived, since the epoch, by the ground's clock.
     pub fn answered(&mut self, data: &[u8], at: Duration) {
         use std::fmt::Write;
 
@@ -326,9 +389,16 @@ pub const NO_PRECISE_TIME: &str = "--:--:--.---------";
 /// [`NO_PRECISE_TIME`] is the shape of a time.
 pub const NO_INTERVAL: &str = "--.------ ms";
 
-/// A time of day to the nanosecond, UTC, as a ping is timed: the panels'
-/// `HH:MM:SS` with the fraction a ping is about. [`NO_PRECISE_TIME`] for no
-/// time.
+/// Shows a time of day to the nanosecond, UTC, as a ping is timed: the
+/// panels' `HH:MM:SS` with the fraction a ping is about.
+///
+/// # Arguments
+///
+/// * `since_epoch` - The time, since the epoch, or `None` for no time.
+///
+/// # Returns
+///
+/// The time as `HH:MM:SS.nnnnnnnnn`, or [`NO_PRECISE_TIME`] for no time.
 pub fn precise_time(since_epoch: Option<Duration>) -> String {
     let Some(at) = since_epoch else {
         return NO_PRECISE_TIME.to_string();
@@ -343,8 +413,17 @@ pub fn precise_time(since_epoch: Option<Duration>) -> String {
     )
 }
 
-/// A length of time between two of a ping's times, in milliseconds to the
-/// nanosecond, with its sign. [`NO_INTERVAL`] for none.
+/// Shows a length of time between two of a ping's times, in milliseconds
+/// to the nanosecond, with its sign.
+///
+/// # Arguments
+///
+/// * `nanoseconds` - The length of time, which may be negative, or `None`
+///                   for none.
+///
+/// # Returns
+///
+/// The length as `[-]M.mmmmmm ms`, or [`NO_INTERVAL`] for none.
 pub fn interval(nanoseconds: Option<i128>) -> String {
     let Some(nanoseconds) = nanoseconds else {
         return NO_INTERVAL.to_string();

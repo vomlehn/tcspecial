@@ -68,6 +68,19 @@ pub struct NodeLook {
 ///
 /// `faulty` paints it in the error colour; `summary` is what a closed
 /// subdiagram holds, and nothing for any other type.
+///
+/// # Arguments
+///
+/// * `name`      - The node's name, as its label shows it.
+/// * `node_type` - The node type's spelling; a type this build does not
+///                 know is drawn as a small square in the error colour.
+/// * `at`        - Where the node's upper left corner is, in pixels.
+/// * `faulty`    - Whether the node is marked faulty.
+/// * `summary`   - What a closed subdiagram holds, or `None`.
+///
+/// # Returns
+///
+/// Everything the markup needs to draw the node.
 pub fn node_look(
     name: &str,
     node_type: &str,
@@ -183,13 +196,25 @@ pub fn node_look(
 /// `style`'s to say -- see [`style::corner_of`] -- so that the rule "the
 /// vehicleward stream along the top going right, the groundward stream along
 /// the bottom going left" is stated once and tested where it is stated.
+///
+/// # Arguments
+///
+/// * `terminal`  - The terminal's name.
+/// * `terminals` - The terminals the node's type has.
+/// * `outline`   - The node's outline.
+/// * `size`      - The node's width and height, in pixels.
+/// * `at`        - Where the node is, in pixels, which is what puts each
+///                 terminal on the grid: see `style::terminal_at`.
+///
+/// # Returns
+///
+/// Whether the terminal is shown, where its box goes relative to the
+/// node, and whether its arrow points right.
 fn terminal_look(
     terminal: &str,
     terminals: style::Terminals,
     outline: Outline,
     size: (u32, u32),
-    // Where the node is, which is what puts each terminal on the grid: see
-    // `style::terminal_at`.
     at: (i32, i32),
 ) -> TerminalLook {
     let corner = style::corner_of(terminal);
@@ -260,6 +285,14 @@ pub struct LinkLook {
 /// Here as well as in the markup so that a window drawing something in
 /// proportion to a line -- tcspecial's lit line, three times as wide -- has
 /// the line's width to be in proportion to.
+///
+/// # Arguments
+///
+/// * `wide` - Whether the line goes into a named input.
+///
+/// # Returns
+///
+/// The line's width, in pixels.
 pub fn line_width(wide: bool) -> f32 {
     if wide {
         WIDE_LINE
@@ -292,6 +325,16 @@ fn node<'a>(nodes: &'a [OnSheet<'a>], name: &str) -> Option<&'a OnSheet<'a>> {
 ///
 /// An end on another page is a stub: at the left edge for a line arriving
 /// from elsewhere, and to the right of its source for one leaving.
+///
+/// # Arguments
+///
+/// * `nodes` - Every node the page's lines may reach, on this page or
+///             another.
+/// * `line`  - The line.
+///
+/// # Returns
+///
+/// The line's two ends and the way it points at each.
 pub fn ends(nodes: &[OnSheet], line: &LineOnSheet) -> route::Ends {
     let from = node(nodes, line.from);
     let to = node(nodes, line.to);
@@ -375,6 +418,15 @@ fn here(nodes: &[OnSheet], name: &str) -> bool {
 /// `lines` is the lines of this page: each has at least one end on it, and
 /// one whose other end is elsewhere is drawn to a stub, labelled with the far
 /// node's name.
+///
+/// # Arguments
+///
+/// * `nodes` - Every node the lines may reach, on this page or another.
+/// * `lines` - The page's lines, in the file's order.
+///
+/// # Returns
+///
+/// Each line's look, in the same order.
 pub fn link_looks(nodes: &[OnSheet], lines: &[LineOnSheet]) -> Vec<LinkLook> {
     // What a line may not run through: every node on this page, where it is
     // and how big it is. Worked out once for the page rather than once per

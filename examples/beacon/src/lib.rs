@@ -20,6 +20,15 @@ slint::include_modules!();
 ///
 /// Written by [`tcslib::beacon::what_it_read`], which writes every beacon's
 /// message, so a change to the format changes the width with it.
+///
+/// # Returns
+///
+/// The sixteen widest beacon messages, one for each hex digit, and the
+/// message shown before any beacon.
+///
+/// # Panics
+///
+/// Never in practice: only if `255.255.255` were not a version.
 pub fn widest_messages() -> Vec<String> {
     use tcslibgs::config_digest::{ConfigDigest, ConfigVersion};
 
@@ -48,6 +57,12 @@ pub fn prepare(window: &WatchWindow) {
 /// All four at once, from the one reading: an indicator that said beacons
 /// were arriving beside a time that said none had would be two answers to one
 /// question. The window passes them down to the panel, which is `tcsui`'s.
+///
+/// # Arguments
+///
+/// * `window` - The window.
+/// * `shown`  - What the pass reported: the indicator's colour, when the last
+///              beacon arrived, what it said and its stage.
 pub fn show(window: &WatchWindow, shown: &Shown) {
     window.set_indicator_color(shown.indicator);
     window.set_last_received(shown.received.clone().into());
@@ -56,7 +71,14 @@ pub fn show(window: &WatchWindow, shown: &Shown) {
 }
 
 /// And the same for a window this does not own, which is what a background
-/// thread has.
+/// thread has: [`show`], run on the window's event loop.
+///
+/// Nothing happens if the event loop or the window has gone.
+///
+/// # Arguments
+///
+/// * `window` - A weak handle on the window.
+/// * `shown`  - What the pass reported.
 pub fn show_on(window: &slint::Weak<WatchWindow>, shown: Shown) {
     let window = window.clone();
     let _ = slint::invoke_from_event_loop(move || {
@@ -92,6 +114,15 @@ pub struct Vehicle {
 
 impl Vehicle {
     /// A vehicle that is this program with these arguments, not running yet.
+    ///
+    /// # Arguments
+    ///
+    /// * `program` - The program to run.
+    /// * `args`    - Its arguments.
+    ///
+    /// # Returns
+    ///
+    /// The vehicle, stopped.
     pub fn new(
         program: impl Into<std::path::PathBuf>,
         args: &[&str],
@@ -108,7 +139,23 @@ impl Vehicle {
     ///
     /// Told `--quiet` unless `verbose`, so that the console is this
     /// program's: tcspecial's startup summary is for somebody watching the
-    /// vehicle start, and what stops it starting it says either way.
+    /// vehicle start, and what stops it starting it says either way. Run with
+    /// `--simulate=all`, because the example's payload is a stand-in.
+    ///
+    /// # Arguments
+    ///
+    /// * `configuration` - The configuration file tcspecial is to read.
+    /// * `verbose`       - Whether to let tcspecial print its startup
+    ///                     summary.
+    ///
+    /// # Returns
+    ///
+    /// The vehicle, not running yet.
+    ///
+    /// # Errors
+    ///
+    /// A message saying where this program is cannot be told, or that there
+    /// is no tcspecial beside it and how to build one.
     pub fn beside_this_program(
         configuration: &str,
         verbose: bool,
@@ -145,6 +192,10 @@ impl Vehicle {
     }
 
     /// What the button says now.
+    ///
+    /// # Returns
+    ///
+    /// [`STOP`] while the vehicle is running, [`START`] while it is not.
     pub fn label(&self) -> &'static str {
         if self.is_running() {
             STOP
@@ -155,6 +206,10 @@ impl Vehicle {
 
     /// What a click does: start it if it is not running, and stop it if it
     /// is.
+    ///
+    /// # Errors
+    ///
+    /// What [`Vehicle::start`] or [`Vehicle::stop`] says went wrong.
     pub fn toggle(&mut self) -> Result<(), String> {
         if self.is_running() {
             self.stop()
@@ -168,7 +223,11 @@ impl Vehicle {
     /// Told to die with this program, by the kernel: a window closed is
     /// stopped by [`Drop`], but one killed or crashed runs no code at all,
     /// and the vehicle it left would go on beaconing with no button to stop
-    /// it.
+    /// it. A vehicle already running is left as it is.
+    ///
+    /// # Errors
+    ///
+    /// A message saying the program cannot be started, and why.
     pub fn start(&mut self) -> Result<(), String> {
         use std::os::unix::process::CommandExt;
 
@@ -207,7 +266,12 @@ impl Vehicle {
     ///
     /// Waited for, so that it is reaped rather than left a zombie, and so
     /// that the beacon port is free by the time the button offers to start it
-    /// again.
+    /// again. A vehicle not running is left as it is.
+    ///
+    /// # Errors
+    ///
+    /// A message saying it cannot be killed, or was killed and cannot be
+    /// waited for.
     pub fn stop(&mut self) -> Result<(), String> {
         let Some(mut child) = self.running.take() else {
             return Ok(());
@@ -227,9 +291,12 @@ impl Vehicle {
     /// already taken -- leaves this as it was before it was started, so the
     /// button does not go on offering to stop something that is not there.
     ///
-    /// `Ok` is the vehicle having stopped, which is news; `Err` is its state
-    /// being unknowable, which is a fault, so that a quiet program can still
-    /// say the one and not the other.
+    /// # Returns
+    ///
+    /// `None` while it is running or was never started. Otherwise `Ok` is the
+    /// vehicle having stopped, with how, which is news; `Err` is its state
+    /// being unknowable, which is a fault, and it is then stopped, so that a
+    /// quiet program can still say the one and not the other.
     pub fn exited(&mut self) -> Option<Result<String, String>> {
         let child = self.running.as_mut()?;
         match child.try_wait() {
@@ -262,6 +329,12 @@ impl Drop for Vehicle {
 /// Here rather than in the program so that a test can press the button.
 /// Something that cannot be done is said on stderr, and the button says
 /// what is true afterwards whichever way it went.
+///
+/// # Arguments
+///
+/// * `window`  - The window whose button is joined.
+/// * `vehicle` - The vehicle the button starts and stops, shared with the
+///               rest of the program.
 pub fn wire(
     window: &WatchWindow,
     vehicle: std::rc::Rc<std::cell::RefCell<Vehicle>>,
@@ -287,6 +360,12 @@ pub fn wire(
 /// That it stopped is said only when `verbose`: the button already says so,
 /// and tcspecial says why on its own stderr. That it could not be asked is
 /// said always, being a fault.
+///
+/// # Arguments
+///
+/// * `window`  - The window whose button is put back.
+/// * `vehicle` - The vehicle to look at.
+/// * `verbose` - Whether to say that it stopped.
 pub fn notice_exit(window: &WatchWindow, vehicle: &mut Vehicle, verbose: bool) {
     if let Some(how) = vehicle.exited() {
         match how {

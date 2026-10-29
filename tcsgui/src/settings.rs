@@ -12,6 +12,11 @@ pub use tcsdiagram::settings::*;
 ///
 /// Made on the way in rather than on the first write, so that somebody who
 /// wants to look at the file or put one there finds the directory waiting.
+///
+/// # Returns
+///
+/// The directory, or `None` if there is no home directory or the directory
+/// cannot be made, which is reported on standard error.
 pub fn directory() -> Option<std::path::PathBuf> {
     let directory = home()?;
     if let Err(why) = std::fs::create_dir_all(&directory) {
@@ -24,12 +29,17 @@ pub fn directory() -> Option<std::path::PathBuf> {
     Some(directory)
 }
 
-/// Read the settings, or the defaults.
+/// Reads the settings, or the defaults.
 ///
 /// A file that is not there yet is written, with the defaults in it. So the
 /// first run leaves a settings file whose comments say what may be put in it,
 /// which is a better answer to "where do I set this" than an empty directory
 /// and a manual. See [`read`] for what is read.
+///
+/// # Returns
+///
+/// The settings read, or the defaults where the file is missing or does not
+/// say.
 pub fn load() -> Settings {
     directory();
     let found = read();
@@ -39,11 +49,16 @@ pub fn load() -> Settings {
     found.settings
 }
 
-/// Write the settings.
+/// Writes the settings.
 ///
 /// Atomically, with the same writer the configuration is written with: a
 /// settings file half replaced by a crash would be a file the next session
 /// complains about, and the complaint would be the editor's own doing.
+///
+/// # Arguments
+///
+/// * `settings` - The settings to write. The pane shares are evened out with
+///                `shares` before they are written.
 pub fn save(settings: Settings) {
     if directory().is_none() {
         return;

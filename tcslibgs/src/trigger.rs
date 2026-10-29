@@ -32,8 +32,7 @@
 /// Bytes and not text: [`trigger_bytes`] is where a file's `55` or
 /// `"READ\r"` becomes what this answers with.
 pub trait Triggered {
-    /// What to write to make it answer, or `None` for a node that is only
-    /// read.
+    /// Gives what to write to make the node answer.
     ///
     /// An `Option` because being triggered is a property of the node and not
     /// of its kind: every i2c node may be asked, and one is asked only if
@@ -43,6 +42,10 @@ pub trait Triggered {
     /// holds its trigger in a field called `trigger` -- which is what the
     /// configuration calls it -- would have that field shadow a method of the
     /// same name, and the method would be unreachable through a value.
+    ///
+    /// # Returns
+    ///
+    /// The trigger's bytes, or `None` for a node that is only read.
     fn trigger_bytes(&self) -> Option<&[u8]>;
 }
 
@@ -106,14 +109,29 @@ pub const TERMINATOR: Named = Named {
     bare_was_decimal: true,
 };
 
-/// The bytes a file wrote in the attribute `named`, or what is wrong with
-/// them: see [`trigger_bytes`] for the two notations.
+/// Reads the bytes a file wrote in an attribute: see [`trigger_bytes`] for
+/// the two notations.
 ///
 /// The parts may stand with space between them or none: `"AT"[0D]` and
 /// `"AT" [0D]` are the same three bytes. What stands outside a part is
 /// refused, and the spelling this replaced -- one bare byte, `55` or `0x55`
 /// -- is refused by name, with the brackets it wants: a file written for the
 /// old rule is told what to say rather than read as something else.
+///
+/// # Arguments
+///
+/// * `named`   - Which attribute it is, for what is said about it.
+/// * `written` - The attribute as the file wrote it.
+///
+/// # Returns
+///
+/// The bytes, every part's one after another.
+///
+/// # Errors
+///
+/// A message in the attribute's words for bytes written bare, a quote or
+/// bracket that does not close, anything outside a part, a part that does
+/// not read, and no bytes at all.
 pub fn bytes_of(named: &Named, written: &str) -> Result<Vec<u8>, String> {
     let Named { word, a, empty, .. } = named;
     let written = written.trim();
@@ -174,14 +192,27 @@ pub fn bytes_of(named: &Named, written: &str) -> Result<Vec<u8>, String> {
     Ok(bytes)
 }
 
-/// Each of the sequences a file wrote, where several are written as one
-/// value with commas between them: `"\r\n", [03]`.
+/// Reads each of the sequences a file wrote, where several are written as
+/// one value with commas between them: `"\r\n", [03]`.
 ///
 /// For terminators, of which a stream may have several, any one of which ends
 /// a packet. A comma inside a C string or between brackets is part of what it
 /// is in, so only a comma between parts separates sequences; each sequence is
 /// read by [`bytes_of`], and an empty one -- two commas together, or one at
 /// either end -- is refused as no bytes at all.
+///
+/// # Arguments
+///
+/// * `named`   - Which attribute it is, for what is said about it.
+/// * `written` - The attribute as the file wrote it.
+///
+/// # Returns
+///
+/// Each sequence's bytes, in the order written.
+///
+/// # Errors
+///
+/// The first thing [`bytes_of`] refuses in any of them.
 pub fn sequences_of(
     named: &Named,
     written: &str,
@@ -192,11 +223,19 @@ pub fn sequences_of(
         .collect()
 }
 
-/// The text of each sequence in `written`, split at the commas that stand
-/// between parts and not inside one.
+/// Splits a value at the commas that stand between parts and not inside
+/// one.
 ///
 /// A quote or a bracket that does not close is left for [`bytes_of`] to
 /// refuse in its own words, so this only has to find the commas.
+///
+/// # Arguments
+///
+/// * `written` - The value as the file wrote it.
+///
+/// # Returns
+///
+/// The text of each sequence, untrimmed; one for a value with no comma.
 pub fn split_sequences(written: &str) -> Vec<&str> {
     let mut sequences = Vec::new();
     let mut start = 0;
@@ -228,10 +267,18 @@ pub fn split_sequences(written: &str) -> Vec<&str> {
     sequences
 }
 
-/// The text of a C string at the front of `rest`, which opens with its
-/// quote, and what follows its closing quote: `None` if it does not close.
+/// Finds the C string at the front of `rest`.
 ///
 /// The closing quote is the first one no backslash escapes, as in C.
+///
+/// # Arguments
+///
+/// * `rest` - What is left of the value, opening with the string's quote.
+///
+/// # Returns
+///
+/// The string's text between its quotes and what follows its closing quote,
+/// or `None` if it does not close.
 fn c_string_part(rest: &str) -> Option<(&str, &str)> {
     let mut escaped = false;
     for (at, c) in rest.char_indices().skip(1) {
@@ -245,8 +292,8 @@ fn c_string_part(rest: &str) -> Option<(&str, &str)> {
     None
 }
 
-/// The bytes between a pair of square brackets: each one or two hexadecimal
-/// digits, with space between one and the next.
+/// Reads the bytes between a pair of square brackets: each one or two
+/// hexadecimal digits, with space between one and the next.
 ///
 /// Space between them, so that how many bytes a run of digits is never has
 /// to be counted: `[0D 0A]` is two bytes, and `[0D0A]` is refused rather than
@@ -254,6 +301,20 @@ fn c_string_part(rest: &str) -> Option<(&str, &str)> {
 /// where it means `05`. No `0x`: everything between the brackets is
 /// hexadecimal, so a prefix saying so would be saying it for a notation that
 /// has no alternative.
+///
+/// # Arguments
+///
+/// * `named`  - Which attribute it is, for what is said about it.
+/// * `inside` - What is between the brackets.
+///
+/// # Returns
+///
+/// The bytes.
+///
+/// # Errors
+///
+/// A message for a `0x`, a character that is not a hexadecimal digit, more
+/// than two digits together, and no byte at all.
 fn hex_bytes(named: &Named, inside: &str) -> Result<Vec<u8>, String> {
     let Named { a, .. } = named;
     let mut bytes = Vec::new();
@@ -288,9 +349,19 @@ fn hex_bytes(named: &Named, inside: &str) -> Result<Vec<u8>, String> {
     Ok(bytes)
 }
 
-/// How bytes written bare in the spelling this replaced are written now, if
-/// `written` is that: `55`, `0x55` or `55 AA` becomes `[55]` or `[55 AA]`,
-/// and a terminator's decimal `13` becomes `[0D]`.
+/// Says how bytes written bare in the spelling this replaced are written
+/// now: `55`, `0x55` or `55 AA` becomes `[55]` or `[55 AA]`, and a
+/// terminator's decimal `13` becomes `[0D]`.
+///
+/// # Arguments
+///
+/// * `named`   - Which attribute it is, which says whether bare bytes were
+///               decimal.
+/// * `written` - The attribute as the file wrote it.
+///
+/// # Returns
+///
+/// The bytes in brackets, or `None` when `written` is not bare bytes.
 fn bare_bytes(named: &Named, written: &str) -> Option<String> {
     let mut each = Vec::new();
     for byte in written.split_whitespace() {
@@ -305,7 +376,7 @@ fn bare_bytes(named: &Named, written: &str) -> Option<String> {
     (!each.is_empty()).then(|| format!("[{}]", each.join(" ")))
 }
 
-/// A string in C's notation: its characters, with C's escapes.
+/// Reads a string in C's notation: its characters, with C's escapes.
 ///
 /// The escapes are C's own, including `\xNN`, which is how a value that is
 /// mostly text says the one byte that is not -- `"READ\r"` and
@@ -315,6 +386,20 @@ fn bare_bytes(named: &Named, written: &str) -> Option<String> {
 ///
 /// What the characters themselves become is their UTF-8, so a trigger of
 /// plain text is the bytes that text is.
+///
+/// # Arguments
+///
+/// * `named`   - Which attribute it is, for what is said about it.
+/// * `written` - The string's text, between its quotes.
+///
+/// # Returns
+///
+/// The bytes it stands for.
+///
+/// # Errors
+///
+/// A message for a backslash at the end, a `\x` without two hexadecimal
+/// digits, and an escape C does not have.
 fn c_string_bytes(named: &Named, written: &str) -> Result<Vec<u8>, String> {
     let Named { a, .. } = named;
     let mut bytes = Vec::with_capacity(written.len());
@@ -382,7 +467,7 @@ fn c_string_bytes(named: &Named, written: &str) -> Result<Vec<u8>, String> {
     Ok(bytes)
 }
 
-/// Bytes as a file could write them.
+/// Writes bytes as a file could write them.
 ///
 /// The notation a file would use for these bytes, so that what is shown can be
 /// copied back into one. Text as the C string it is -- which is what makes a
@@ -392,6 +477,14 @@ fn c_string_bytes(named: &Named, written: &str) -> Result<Vec<u8>, String> {
 /// two characters a C string cannot hold plainly, the quote and the
 /// backslash, are escaped as C escapes them. See [`trigger_bytes`], which
 /// reads what this writes.
+///
+/// # Arguments
+///
+/// * `bytes` - The bytes.
+///
+/// # Returns
+///
+/// A C string in quotes for text, and bytes in brackets otherwise.
 pub fn trigger_as_written(bytes: &[u8]) -> String {
     let text = bytes
         .iter()

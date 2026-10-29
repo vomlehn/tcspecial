@@ -63,6 +63,12 @@ const char *outcome(tcs_status status)
 
 } // namespace
 
+/** Runs the ground station's steps in order, printing a line for each.
+ *
+ * @param argc  How many arguments there are, the program's name included.
+ * @param argv  The arguments, as the comment at the top of this file says.
+ * @return      0 when every step was done, 1 when one failed (after saying
+ *              why on standard error), 2 when the arguments are wrong. */
 int main(int argc, char **argv)
 {
 	std::string spelling;

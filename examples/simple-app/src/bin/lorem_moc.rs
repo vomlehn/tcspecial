@@ -48,8 +48,23 @@ struct Arguments {
 }
 
 impl Arguments {
-    /// The arguments, or what is wrong with them, said for the person who
-    /// typed them: the two names in order, and the flag anywhere.
+    /// Reads the command line's arguments: the two names in order, and the
+    /// flags anywhere.
+    ///
+    /// # Arguments
+    ///
+    /// * `args` - The arguments, without the program's name.
+    ///
+    /// # Returns
+    ///
+    /// The configuration, chosen by `--yaml` or `--xml` where none is named;
+    /// the `moc` node, [`MOC`] where none is named; and whether to talk.
+    ///
+    /// # Errors
+    ///
+    /// What is wrong with them, said for the person who typed them: an
+    /// option that is not one, more than two names, both spellings, or a
+    /// named file whose extension disagrees with the spelling asked for.
     fn of(args: impl Iterator<Item = String>) -> Result<Arguments, String> {
         let mut names = Vec::new();
         let mut verbose = false;
@@ -88,6 +103,14 @@ impl Arguments {
     }
 }
 
+/// Prints the line the vehicle sends, a word to a datum, and stops at its
+/// end.
+///
+/// # Returns
+///
+/// Success once the line has ended; 2 for a command line that is wrong; and
+/// failure for a node that cannot be opened or data that cannot be received,
+/// each said on stderr.
 fn main() -> ExitCode {
     let Arguments {
         configuration,

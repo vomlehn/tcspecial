@@ -53,7 +53,7 @@ struct Group {
 }
 
 impl Schedule {
-    /// Build the schedule for a configuration, starting now.
+    /// Builds the schedule for a configuration, starting now.
     ///
     /// Every group is due immediately, so a vehicle that has just started
     /// reads everything once before settling into its intervals rather than
@@ -64,6 +64,16 @@ impl Schedule {
     /// interval that will not parse cannot arrive here. One that does anyway
     /// is left out, with the group, rather than panicking in flight -- a
     /// group that does not run is better than a vehicle that stops.
+    ///
+    /// # Arguments
+    ///
+    /// * `graph` - The configuration, already checked.
+    /// * `now`   - The time every group is first due.
+    ///
+    /// # Returns
+    ///
+    /// The schedule, with each group's members in the order the
+    /// configuration names them.
     pub fn of(graph: &Graph, now: Instant) -> Schedule {
         let mut groups: Vec<Group> = Vec::new();
         let mut index: BTreeMap<String, usize> = BTreeMap::new();
@@ -91,8 +101,7 @@ impl Schedule {
         Schedule { groups, index }
     }
 
-    /// The group that has waited longest of those due at `now`, by its
-    /// place, or `None` where none is due.
+    /// Finds the group that has waited longest of those due at `now`.
     ///
     /// Several may be due at once -- two groups on the same interval, or a
     /// run that fell behind -- and the one that has waited longest is read
@@ -100,6 +109,14 @@ impl Schedule {
     /// due again until its interval has passed (see [`Schedule::read_at`]),
     /// so asking again after each read goes through all that are due, each
     /// once. Allocates nothing.
+    ///
+    /// # Arguments
+    ///
+    /// * `now` - The time it is judged at.
+    ///
+    /// # Returns
+    ///
+    /// The group's place, or `None` where none is due.
     pub fn most_overdue(&self, now: Instant) -> Option<usize> {
         self.groups
             .iter()
@@ -109,11 +126,19 @@ impl Schedule {
             .map(|(at, _)| at)
     }
 
-    /// Which groups are due at `now`, soonest first.
+    /// Lists the groups due at `now`, soonest first.
     ///
     /// The same answer as asking [`Schedule::most_overdue`] after each read,
     /// all at once and as a list -- which allocates, so the pass does not ask
     /// it this way.
+    ///
+    /// # Arguments
+    ///
+    /// * `now` - The time it is judged at.
+    ///
+    /// # Returns
+    ///
+    /// Each group due and when it came due, soonest first.
     pub fn due(&self, now: Instant) -> Vec<Due> {
         let mut due: Vec<Due> = self
             .groups
@@ -128,14 +153,24 @@ impl Schedule {
         due
     }
 
-    /// Record that the group at `at` has been read, and say when it is next
-    /// due.
+    /// Records that the group at `at` has been read, and says when it is
+    /// next due.
     ///
     /// From the time it was *due* and not from now: a group read every three
     /// seconds whose reads take a moment is still read every three seconds.
     /// A group so far behind that the next time is already past is pushed to
     /// now rather than to a time in the past -- otherwise one slow pass would
     /// leave it due for ever and starve everything else.
+    ///
+    /// # Arguments
+    ///
+    /// * `at`  - The group's place.
+    /// * `now` - When it was read.
+    ///
+    /// # Returns
+    ///
+    /// When it is next due, or `None` where there is no group at `at` or the
+    /// next time is past what an `Instant` can hold.
     pub fn read_at(&mut self, at: usize, now: Instant) -> Option<Instant> {
         let group = self.groups.get_mut(at)?;
         let then = group.next.checked_add(group.interval)?;
@@ -167,13 +202,21 @@ impl Schedule {
         self.index.get(group).map_or(&[], |&at| self.members_at(at))
     }
 
-    /// How long until something is due, or nothing if there is nothing to
-    /// wait for.
+    /// Says how long until something is due.
     ///
     /// What the run loop waits on: a poll with this timeout wakes either
     /// because a device had something to say or because a group came due.
     /// `None` is a configuration with no groups in it, where the loop waits
     /// on its devices alone.
+    ///
+    /// # Arguments
+    ///
+    /// * `now` - The time it is judged from.
+    ///
+    /// # Returns
+    ///
+    /// How long until the soonest group is due, nought where one already
+    /// is, or `None` where there is nothing to wait for.
     pub fn until_next(&self, now: Instant) -> Option<Duration> {
         self.groups
             .iter()
@@ -182,7 +225,11 @@ impl Schedule {
             .map(|at| at.saturating_duration_since(now))
     }
 
-    /// Every group, by name.
+    /// Lists every group, by name.
+    ///
+    /// # Returns
+    ///
+    /// The groups' names, in the order the configuration writes them.
     pub fn groups(&self) -> Vec<&str> {
         self.groups
             .iter()

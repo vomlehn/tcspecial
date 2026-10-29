@@ -43,6 +43,11 @@ pub struct Request {
 }
 
 impl Request {
+    /// Writes the request as it is sent.
+    ///
+    /// # Returns
+    ///
+    /// The magic and the sequence number, most significant byte first.
     pub fn encode(&self) -> [u8; REQUEST_BYTES] {
         let mut out = [0u8; REQUEST_BYTES];
         out[..4].copy_from_slice(&REQUEST_MAGIC);
@@ -50,7 +55,15 @@ impl Request {
         out
     }
 
-    /// A request, or `None` for a datagram that is not one: something else
+    /// Reads a request.
+    ///
+    /// # Arguments
+    ///
+    /// * `bytes` - The datagram received.
+    ///
+    /// # Returns
+    ///
+    /// The request, or `None` for a datagram that is not one: something else
     /// sent to the address is ignored rather than answered.
     pub fn decode(bytes: &[u8]) -> Option<Request> {
         if bytes.len() != REQUEST_BYTES || bytes[..4] != REQUEST_MAGIC {
@@ -79,6 +92,11 @@ pub enum State {
 }
 
 impl State {
+    /// Gives the byte that says this state in an answer.
+    ///
+    /// # Returns
+    ///
+    /// 0 for starting, 1 for ready, 2 for failed.
     fn code(self) -> u8 {
         match self {
             State::Starting => 0,
@@ -87,6 +105,15 @@ impl State {
         }
     }
 
+    /// Reads the state an answer's byte says: [`State::code`] the other way.
+    ///
+    /// # Arguments
+    ///
+    /// * `code` - The byte.
+    ///
+    /// # Returns
+    ///
+    /// The state, or `None` for a byte that says none.
     fn of(code: u8) -> Option<State> {
         match code {
             0 => Some(State::Starting),
@@ -96,6 +123,11 @@ impl State {
         }
     }
 
+    /// Names the state, for a person.
+    ///
+    /// # Returns
+    ///
+    /// `starting`, `ready` or `failed`.
     pub fn name(self) -> &'static str {
         match self {
             State::Starting => "starting",
@@ -105,6 +137,15 @@ impl State {
     }
 }
 
+/// Gives the byte that says a `--simulate` mode in an answer.
+///
+/// # Arguments
+///
+/// * `mode` - The mode.
+///
+/// # Returns
+///
+/// 0 for `none`, 1 for `some`, 2 for `all`.
 fn mode_code(mode: Mode) -> u8 {
     match mode {
         Mode::None => 0,
@@ -113,6 +154,15 @@ fn mode_code(mode: Mode) -> u8 {
     }
 }
 
+/// Reads the mode an answer's byte says: [`mode_code`] the other way.
+///
+/// # Arguments
+///
+/// * `code` - The byte.
+///
+/// # Returns
+///
+/// The mode, or `None` for a byte that says none.
 fn mode_of(code: u8) -> Option<Mode> {
     match code {
         0 => Some(Mode::None),
@@ -135,7 +185,16 @@ impl Reason {
         len: 0,
     };
 
-    /// `text`, cut short at a character where it would not fit.
+    /// Makes a reason of some text, cut short at a character where it would
+    /// not fit.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The reason.
+    ///
+    /// # Returns
+    ///
+    /// At most [`REASON_BYTES`] bytes of it.
     pub fn of(text: &str) -> Reason {
         let mut len = text.len().min(REASON_BYTES);
         while !text.is_char_boundary(len) {
@@ -175,8 +234,16 @@ pub struct SetUpFor {
 }
 
 impl SetUpFor {
-    /// Each way this differs from `theirs`, which is the simulator's, named
-    /// with what each side has: empty where the two agree.
+    /// Lists each way this differs from the simulator's, named with what
+    /// each side has.
+    ///
+    /// # Arguments
+    ///
+    /// * `theirs` - What the simulator is set up for.
+    ///
+    /// # Returns
+    ///
+    /// A sentence for each difference: empty where the two agree.
     pub fn differences(&self, theirs: &SetUpFor) -> Vec<String> {
         let mut differ = Vec::new();
         if self.configuration != theirs.configuration {
@@ -213,7 +280,11 @@ pub struct Answer {
 }
 
 impl Answer {
-    /// Written into `out`, whose first [`ANSWER_BYTES`] bytes it fills.
+    /// Writes the answer as it is sent.
+    ///
+    /// # Arguments
+    ///
+    /// * `out` - Where it is written, all [`ANSWER_BYTES`] of it.
     pub fn encode(&self, out: &mut [u8; ANSWER_BYTES]) {
         out.fill(0);
         out[..4].copy_from_slice(&ANSWER_MAGIC);
@@ -227,7 +298,15 @@ impl Answer {
             .copy_from_slice(&self.reason.bytes[..self.reason.len]);
     }
 
-    /// An answer, or `None` for a datagram that is not one.
+    /// Reads an answer.
+    ///
+    /// # Arguments
+    ///
+    /// * `bytes` - The datagram received.
+    ///
+    /// # Returns
+    ///
+    /// The answer, or `None` for a datagram that is not one.
     pub fn decode(bytes: &[u8]) -> Option<Answer> {
         if bytes.len() != ANSWER_BYTES || bytes[..4] != ANSWER_MAGIC {
             return None;
@@ -261,6 +340,16 @@ impl Answer {
 mod tests {
     use super::*;
 
+    /// Makes an answer with fixed digests and sequence number.
+    ///
+    /// # Arguments
+    ///
+    /// * `state`  - The simulator's state.
+    /// * `reason` - Why, for a failure.
+    ///
+    /// # Returns
+    ///
+    /// The answer.
     fn answer(state: State, reason: &str) -> Answer {
         Answer {
             sequence: 0xdead_beef,

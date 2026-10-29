@@ -25,14 +25,23 @@ use crate::segsend::{Handoff, SegSend};
 #[derive(Clone)]
 pub struct TelemetryLog(Option<Arc<Mutex<LogWrite<Handoff>>>>);
 
-/// What is wrong with `dir` as the place the log is kept, said in the
-/// configuration's terms, or `None` where there is a directory there.
+/// Says what is wrong with `dir` as the place the log is kept, in the
+/// configuration's terms.
 ///
 /// Asked before the log is opened because what `tcslog` says of a directory
 /// that is not there -- "invalid path name" -- names neither the directory nor
 /// the setting. tcspecial makes no directory of its own: one named wrongly
 /// would be a log kept somewhere nobody looks, and a vehicle refused at the
 /// start is the one told so while somebody is watching.
+///
+/// # Arguments
+///
+/// * `dir` - The log directory the configuration names.
+///
+/// # Returns
+///
+/// What is wrong, naming `dir` and the setting to change, or `None` where
+/// there is a directory there.
 fn unusable(dir: &str) -> Option<String> {
     let fix =
         "create it, or change log.directory in the configuration's tcspecial \
@@ -53,7 +62,7 @@ fn unusable(dir: &str) -> Option<String> {
 }
 
 impl TelemetryLog {
-    /// Open the log the configuration describes.
+    /// Opens the log the configuration describes.
     ///
     /// Call this before the main loop. `LogWrite::new` enumerates the log
     /// directory and is the one part of tcslog that allocates; recording a
@@ -62,6 +71,23 @@ impl TelemetryLog {
     ///
     /// Each segment it fills is handed to `segsend`, and so are the ones a
     /// previous run left in the directory.
+    ///
+    /// # Arguments
+    ///
+    /// * `config`  - The configuration, whose log directory and segment size
+    ///               say where the log is kept and how big a segment grows.
+    /// * `segsend` - What each filled segment is handed to.
+    ///
+    /// # Returns
+    ///
+    /// A handle on the log, or one that records nothing where the
+    /// configuration names no log directory.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Log` for a log directory that is missing or not a
+    /// directory, for segments left there that cannot be handed off, and for
+    /// a log `tcslog` cannot open.
     pub fn open(config: &CIConfig, segsend: &SegSend) -> TcsResult<Self> {
         let Some(dir) = config.log_dir.as_deref() else {
             return Ok(TelemetryLog(None));
@@ -103,11 +129,15 @@ impl TelemetryLog {
         self.0.is_some()
     }
 
-    /// Record one serialized telemetry message.
+    /// Records one serialized telemetry message.
     ///
     /// Never fails the caller: losing a record is better than dropping the
     /// telemetry the ground is waiting on, so a failed write is reported and
     /// otherwise ignored.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The serialized message.
     pub fn record(&self, data: &[u8]) {
         self.with(|log| {
             if let Err(e) = log.write(data) {
@@ -116,7 +146,7 @@ impl TelemetryLog {
         });
     }
 
-    /// Flush what has been recorded.
+    /// Flushes what has been recorded.
     pub fn flush(&self) {
         self.with(|log| {
             if let Err(e) = log.flush() {
@@ -125,7 +155,14 @@ impl TelemetryLog {
         });
     }
 
-    /// Run `f` against the log, if there is one and it is still usable.
+    /// Runs `f` against the log, if there is one and it is still usable.
+    ///
+    /// A log whose lock was poisoned by a panicking writer is reported and
+    /// left alone.
+    ///
+    /// # Arguments
+    ///
+    /// * `f` - What to do with the log.
     fn with<F: FnOnce(&mut LogWrite<Handoff>)>(&self, f: F) {
         let Some(log) = self.0.as_ref() else {
             return;

@@ -85,7 +85,20 @@ impl fmt::Display for LinkError {
 
 impl std::error::Error for LinkError {}
 
-/// The one packet `datagram` holds, as `P` unpacks it, or why it is not one.
+/// Unpacks the one packet a datagram holds, as `P` unpacks it.
+///
+/// # Arguments
+///
+/// * `datagram` - The datagram received.
+///
+/// # Returns
+///
+/// The packet.
+///
+/// # Errors
+///
+/// [`LinkError::Packet`] if it does not start with a packet of the layout,
+/// and [`LinkError::Trailing`] if there are bytes after the packet.
 fn whole<P: Packet>(datagram: &[u8]) -> Result<P, LinkError> {
     let (read, used) = P::decode_prefix(datagram).map_err(LinkError::Packet)?;
     if used != datagram.len() {
@@ -103,6 +116,16 @@ fn seq_count(sequence: u32) -> u16 {
     (sequence & 0x3fff) as u16
 }
 
+/// Makes the header of a command read from the link.
+///
+/// # Arguments
+///
+/// * `sequence` - The command's sequence number.
+/// * `cmd_type` - Which kind of command it is.
+///
+/// # Returns
+///
+/// The header.
 fn header(sequence: u32, cmd_type: CommandType) -> CommandHeader {
     CommandHeader { sequence, cmd_type }
 }
@@ -127,11 +150,24 @@ fn text<const N: usize>(said: &str) -> FixedString<N> {
 }
 
 impl Command {
-    /// The command a datagram holds, or why it holds none.
+    /// Reads the command a datagram holds.
     ///
     /// Allocates nothing: the packet is unpacked into fixed buffers, and the
     /// attribute and value of a SET_NODE are copied into the room the command
     /// holds for them.
+    ///
+    /// # Arguments
+    ///
+    /// * `datagram` - The datagram received.
+    ///
+    /// # Returns
+    ///
+    /// The command.
+    ///
+    /// # Errors
+    ///
+    /// What [`whole`] refuses, and [`LinkError::Value`] for a SET_NODE
+    /// attribute or value too long for the command to hold.
     pub fn read(datagram: &[u8]) -> Result<Command, LinkError> {
         use packet::CommandKind as K;
         Ok(match whole::<K>(datagram)? {
@@ -195,7 +231,11 @@ impl Command {
         CommandPacker::new().pack(self).to_vec()
     }
 
-    /// The generated packet that says this command.
+    /// Makes the generated packet that says this command.
+    ///
+    /// # Returns
+    ///
+    /// The packet, its CCSDS sequence count taken from the sequence number.
     fn packet(&self) -> packet::CommandKind {
         use packet::CommandKind as K;
         let sequence = self.sequence();
@@ -291,7 +331,15 @@ impl Default for CommandPacker {
     }
 }
 
-/// A status as the link carries it.
+/// Gives a status as the link carries it.
+///
+/// # Arguments
+///
+/// * `status` - The status.
+///
+/// # Returns
+///
+/// Its value on the link.
 fn status_of(status: CommandStatus) -> StatusType {
     match status {
         CommandStatus::Success => StatusType::SUCCESS,
@@ -306,7 +354,19 @@ fn status_of(status: CommandStatus) -> StatusType {
     }
 }
 
-/// And back, refusing one no build has.
+/// Reads a status from the link: the inverse of [`status_of`].
+///
+/// # Arguments
+///
+/// * `status` - The status as the link carries it.
+///
+/// # Returns
+///
+/// The status.
+///
+/// # Errors
+///
+/// [`LinkError::Value`] for a status no build has.
 fn status_from(status: StatusType) -> Result<CommandStatus, LinkError> {
     Ok(match status {
         StatusType::SUCCESS => CommandStatus::Success,
@@ -322,8 +382,16 @@ fn status_from(status: StatusType) -> Result<CommandStatus, LinkError> {
     })
 }
 
-/// A time that may not have happened, as the link carries it: whether it
-/// has, and when, nought where it has not.
+/// Gives a time that may not have happened as the link carries it.
+///
+/// # Arguments
+///
+/// * `time` - The time, or `None` where it has not happened.
+///
+/// # Returns
+///
+/// Whether it has happened, and when in microseconds, nought where it has
+/// not.
 fn when_of(time: Option<Timestamp>) -> (bool, u64) {
     match time {
         Some(time) => (true, time.micros),
@@ -335,7 +403,28 @@ fn when_from(known: bool, micros: u64) -> Option<Timestamp> {
     known.then_some(Timestamp { micros })
 }
 
-/// What a sample says, from the fields the link carries it in.
+/// Reads what a sample says, from the fields the link carries it in.
+///
+/// # Arguments
+///
+/// * `known` - Whether the sample's time is known.
+/// * `time`  - Its time in microseconds, meaningless unless `known`.
+/// * `len`   - How many of the bytes shown are the sample's.
+/// * `total` - How many bytes the datum held, of which these are the first.
+/// * `shown` - The bytes shown, at least [`DH_SAMPLE_BYTES`] of them.
+///
+/// # Returns
+///
+/// The sample.
+///
+/// # Errors
+///
+/// [`LinkError::Value`] when `len` is more than [`DH_SAMPLE_BYTES`].
+///
+/// # Panics
+///
+/// If `shown` is shorter than [`DH_SAMPLE_BYTES`], which the layout does
+/// not allow.
 fn sample_from(
     known: bool,
     time: u64,
@@ -357,7 +446,20 @@ fn sample_from(
 }
 
 impl Telemetry {
-    /// The answer a datagram holds, or why it holds none.
+    /// Reads the answer a datagram holds.
+    ///
+    /// # Arguments
+    ///
+    /// * `datagram` - The datagram received.
+    ///
+    /// # Returns
+    ///
+    /// The answer.
+    ///
+    /// # Errors
+    ///
+    /// What [`whole`] refuses, a status no build has, and a sample longer
+    /// than one is shown.
     pub fn read(datagram: &[u8]) -> Result<Telemetry, LinkError> {
         use packet::AnswerLayoutKind as K;
         // The header every answer starts with, from the fields every packet
@@ -460,7 +562,11 @@ impl Telemetry {
         AnswerPacker::new().pack(self).to_vec()
     }
 
-    /// The generated packet that says this answer.
+    /// Makes the generated packet that says this answer.
+    ///
+    /// # Returns
+    ///
+    /// The packet, its CCSDS sequence count taken from the sequence number.
     fn packet(&self) -> packet::AnswerLayoutKind {
         use packet::AnswerLayoutKind as K;
         macro_rules! fill {
@@ -587,6 +693,11 @@ impl Default for AnswerPacker {
 mod tests {
     use super::*;
 
+    /// Makes one command of every kind, and a SET_NODE as long as one can be.
+    ///
+    /// # Returns
+    ///
+    /// The commands.
     fn every_command() -> Vec<Command> {
         vec![
             Command::Ping(PingCommand::new(1)),
@@ -618,6 +729,11 @@ mod tests {
         ]
     }
 
+    /// Makes answers of every kind, with every field given a value.
+    ///
+    /// # Returns
+    ///
+    /// The answers.
     fn every_answer() -> Vec<Telemetry> {
         let mut taken = DHSample::new();
         taken.record(b"hello, world");

@@ -122,11 +122,20 @@ impl<'de> Deserialize<'de> for Parameter {
     }
 }
 
-/// The section as one flat set of names, a subsection's written `parent.child`.
+/// Flattens the section into one set of names, a subsection's written
+/// `parent.child`.
 ///
 /// What the rules and the editor work in: a complaint names the attribute the
 /// way the manual does, and a field in a window is one name. The file's shape
 /// is the file's business, and [`nest`] puts it back.
+///
+/// # Arguments
+///
+/// * `said` - The section as the file nests it.
+///
+/// # Returns
+///
+/// Every value in it, by its flat name.
 pub fn flatten(said: &BTreeMap<String, Parameter>) -> BTreeMap<String, Scalar> {
     let mut flat = BTreeMap::new();
     for (name, parameter) in said {
@@ -144,10 +153,19 @@ pub fn flatten(said: &BTreeMap<String, Parameter>) -> BTreeMap<String, Scalar> {
     flat
 }
 
-/// And the other way, for writing a section back out.
+/// Nests a flat section again, for writing it back out: [`flatten`] the
+/// other way.
 ///
 /// Split at the first dot, so a name with none is a value at the top of the
 /// section and `beacon.send` is `send` under `beacon`.
+///
+/// # Arguments
+///
+/// * `flat` - Every value, by its flat name.
+///
+/// # Returns
+///
+/// The section as a file nests it.
 pub fn nest(flat: &BTreeMap<String, Scalar>) -> BTreeMap<String, Parameter> {
     let mut said: BTreeMap<String, Parameter> = BTreeMap::new();
     for (name, value) in flat {
@@ -199,7 +217,7 @@ pub const ATTRIBUTES: &[(&str, bool)] = &[
     ("restart_arm_valid", false),
 ];
 
-/// What a new configuration is given, where anything.
+/// Gives what a new configuration is given for an attribute, where anything.
 ///
 /// Almost nothing, and that is the editor's whole argument about laziness: a
 /// configuration that was silently given an answer looks as answered as one
@@ -212,6 +230,14 @@ pub const ATTRIBUTES: &[(&str, bool)] = &[
 /// the vehicle say it is alive" has an answer that is right until somebody has
 /// a reason: once a second. A new configuration starts with that and can be
 /// argued with.
+///
+/// # Arguments
+///
+/// * `attribute` - The attribute's flat name.
+///
+/// # Returns
+///
+/// Its value in a new configuration, or `None` for one that starts blank.
 pub fn default_of(attribute: &str) -> Option<&'static str> {
     match attribute {
         "beacon.default_interval" => Some("1 s"),
@@ -222,12 +248,20 @@ pub fn default_of(attribute: &str) -> Option<&'static str> {
     }
 }
 
-/// An attribute this section used to have, and what to write instead.
+/// Says what to write instead of an attribute this section used to have.
 ///
-/// `None` for a name that was never one. Said by name rather than refused as
-/// a word nothing knows, because the value has to change with the name: a
-/// file that says `interval_ms: 5000` is not a file with a misspelling in it,
-/// it is a file written for the spelling before this one.
+/// Said by name rather than refused as a word nothing knows, because the
+/// value has to change with the name: a file that says `interval_ms: 5000`
+/// is not a file with a misspelling in it, it is a file written for the
+/// spelling before this one.
+///
+/// # Arguments
+///
+/// * `attribute` - The attribute's flat name.
+///
+/// # Returns
+///
+/// What to write instead, or `None` for a name that was never one.
 pub fn retired(attribute: &str) -> Option<&'static str> {
     match attribute {
         "beacon.interval" => Some(
@@ -241,7 +275,7 @@ pub fn retired(attribute: &str) -> Option<&'static str> {
     }
 }
 
-/// The section as the command interpreter wants it, or what is wrong with it.
+/// Reads the section as the command interpreter wants it.
 ///
 /// Every attribute of the section is one the interpreter reads: the section
 /// says what tcspecial is configured with, a configuration is read when
@@ -249,6 +283,23 @@ pub fn retired(attribute: &str) -> Option<&'static str> {
 ///
 /// Every complaint names the attribute, because a configuration is read by
 /// somebody who needs to know which of ten words to change.
+///
+/// # Arguments
+///
+/// * `said` - The section, flattened.
+///
+/// # Returns
+///
+/// The section, every value as the file wrote it.
+///
+/// # Errors
+///
+/// A message naming the attribute for one the section does not have, one
+/// that is required and not stated, a gateway [`GatewayKind::of`] refuses,
+/// an interval that is not a length of time, and a segment size that is not
+/// a whole number.
+///
+/// [`GatewayKind::of`]: crate::gateway::GatewayKind::of
 pub fn ci_config_of(
     said: &BTreeMap<String, Scalar>,
 ) -> Result<CIConfigJson, String> {
@@ -388,24 +439,29 @@ pub fn ci_config_of(
     })
 }
 
-/// The section as a graph would write it, for a configuration being started.
-///
-/// Every attribute and not one value. An editor that filled in a protocol or a
-/// beacon interval on the grounds that they are the same on every vehicle
-/// until somebody has a reason would be making a configuration that looks as
-/// answered as one somebody thought about -- which is the argument the schema
-/// itself makes for requiring these at all.
-/// Where a configuration says its beacons are: both ends of the link.
-///
-/// The `tcspecial` section's `beacon.send` and `beacon.recv`. `None` for a
-/// configuration with no section, which sends no beacons -- the section is
-/// where the two addresses are written down.
+/// Finds where a configuration says its beacons are: both ends of the link,
+/// the `tcspecial` section's `beacon.send` and `beacon.recv`.
 ///
 /// Here rather than in each ground program because every ground program needs
 /// it and the answer is the file's: tcsmoc reads it to put a beacon panel in
 /// its window, the `beacon` example reads it to show the same panel, and a
 /// station that worked the pair out for itself would be a second reading of
 /// one file.
+///
+/// # Arguments
+///
+/// * `graph` - The configuration.
+///
+/// # Returns
+///
+/// Both ends of the beacon link. `None` for a configuration with no
+/// section, which sends no beacons -- the section is where the two
+/// addresses are written down.
+///
+/// # Errors
+///
+/// What [`ci_config_of`] and the conversion to the interpreter's settings
+/// refuse in the section.
 pub fn beacon_of(graph: &Graph) -> Result<Option<crate::BeaconLink>, String> {
     let Some(section) = graph.tcspecial.as_ref() else {
         return Ok(None);
@@ -414,15 +470,28 @@ pub fn beacon_of(graph: &Graph) -> Result<Option<crate::BeaconLink>, String> {
     Ok(Some(crate::BeaconLink::of(&ci)))
 }
 
-/// How often tcspecial beacons: the `tcspecial` section's `beacon.default_interval`,
-/// as a length of time. `None` for a configuration with no section, as
-/// [`beacon_of`] is.
+/// Finds how often tcspecial beacons: the `tcspecial` section's
+/// `beacon.default_interval`, as a length of time.
 ///
 /// What a ground station ages each beacon against -- see
 /// `tcslib::beacon::Schedule::for_interval` -- so it is read here, from the
 /// same section the link is, rather than assumed: a station that took every
 /// vehicle to beacon every five seconds would call a ten-second beacon late
 /// when it was on time.
+///
+/// # Arguments
+///
+/// * `graph` - The configuration.
+///
+/// # Returns
+///
+/// The interval. `None` for a configuration with no section, as
+/// [`beacon_of`] is.
+///
+/// # Errors
+///
+/// What [`ci_config_of`] and the conversion to the interpreter's settings
+/// refuse in the section.
 pub fn beacon_interval_of(
     graph: &Graph,
 ) -> Result<Option<std::time::Duration>, String> {
@@ -436,6 +505,18 @@ pub fn beacon_interval_of(
     ))
 }
 
+/// Makes the section as a graph would write it, for a configuration being
+/// started.
+///
+/// Every attribute and not one value. An editor that filled in a protocol or a
+/// beacon interval on the grounds that they are the same on every vehicle
+/// until somebody has a reason would be making a configuration that looks as
+/// answered as one somebody thought about -- which is the argument the schema
+/// itself makes for requiring these at all.
+///
+/// # Returns
+///
+/// Every attribute, by flat name, each empty.
 pub fn blank() -> BTreeMap<String, Scalar> {
     let mut said = BTreeMap::new();
     for (name, _) in ATTRIBUTES {
@@ -449,6 +530,15 @@ mod tests {
     use super::*;
     use std::time::Duration;
 
+    /// Makes a flattened section as a file states it.
+    ///
+    /// # Arguments
+    ///
+    /// * `pairs` - Each attribute's flat name, with its value as written.
+    ///
+    /// # Returns
+    ///
+    /// The section.
     fn said(pairs: &[(&str, &str)]) -> BTreeMap<String, Scalar> {
         pairs
             .iter()
@@ -456,6 +546,11 @@ mod tests {
             .collect()
     }
 
+    /// Gives a section that states every attribute.
+    ///
+    /// # Returns
+    ///
+    /// Each attribute's flat name, with a value that reads.
     fn whole() -> Vec<(&'static str, &'static str)> {
         vec![
             ("gateway", "radio"),

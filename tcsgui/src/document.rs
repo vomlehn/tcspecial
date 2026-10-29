@@ -106,6 +106,10 @@ pub enum Concern {
 
 impl Concern {
     /// Which node this is about.
+    ///
+    /// # Returns
+    ///
+    /// The node's absolute name.
     pub fn node(&self) -> &str {
         match self {
             Concern::GoesNowhere { node, .. }
@@ -118,6 +122,10 @@ impl Concern {
     ///
     /// Part of what a set-aside is remembered by, so it has to be stable: a
     /// word changed here is a decision somebody made and lost.
+    ///
+    /// # Returns
+    ///
+    /// `<terminal>-goes-nowhere`, `nothing-leaves` or `nothing-arrives`.
     pub fn kind(&self) -> String {
         match self {
             Concern::GoesNowhere { terminal, .. } => {
@@ -134,6 +142,10 @@ impl Concern {
     }
 
     /// What the button's menu says about it, in one line.
+    ///
+    /// # Returns
+    ///
+    /// The line, naming the node.
     pub fn describe(&self) -> String {
         match self {
             Concern::GoesNowhere { node, terminal } => {
@@ -249,6 +261,15 @@ pub struct GroupField {
 /// rules: a bus address is refused here for exactly what it would be refused
 /// for aboard, in the same words, which is the whole reason the editor can say
 /// anything useful about a value at all.
+///
+/// # Arguments
+///
+/// * `node` - The node, as the editor holds it.
+///
+/// # Errors
+///
+/// The rules' own words for what is wrong: what an app node lacks, or why a
+/// payload's or the MOC link's way of being reached is refused.
 fn reach_of_node(node: &Node) -> Result<(), String> {
     let theirs = tcslibgs::graph::Node {
         name: node.name.clone(),
@@ -357,6 +378,11 @@ pub enum Fault {
 
 impl Fault {
     /// What the window shows beside the thing it is attached to.
+    ///
+    /// # Returns
+    ///
+    /// The text, in the words `tcsverify` would use where the fault is a
+    /// rule's.
     pub fn describe(&self) -> String {
         match self {
             Fault::DuplicateName { name } => {
@@ -398,6 +424,11 @@ impl Fault {
     }
 
     /// The node this fault should be drawn on, where it belongs to one.
+    ///
+    /// # Returns
+    ///
+    /// The node's name, or `None` for a fault about a nameless node, an empty
+    /// group or the tcspecial section.
     pub fn node(&self) -> Option<&str> {
         match self {
             Fault::DuplicateName { name } => Some(name),
@@ -431,6 +462,14 @@ impl Document {
     /// `cabin/temp_1` for one inside a subdiagram. That is how the editor
     /// holds a name everywhere except in a file, where it is written relative
     /// to the file it is in -- see [`Qualified::written_from`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The node's absolute name.
+    ///
+    /// # Returns
+    ///
+    /// The node, or `None` if there is none of that name.
     pub fn node(&self, name: &str) -> Option<&Node> {
         let wanted = Qualified::parse(name);
         self.nodes
@@ -438,6 +477,15 @@ impl Document {
             .find(|n| n.name == wanted.node && n.home == wanted.in_)
     }
 
+    /// Finds the node an absolute name refers to, to be changed.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The node's absolute name, as for [`Document::node`].
+    ///
+    /// # Returns
+    ///
+    /// The node, or `None` if there is none of that name.
     fn node_mut(&mut self, name: &str) -> Option<&mut Node> {
         let wanted = Qualified::parse(name);
         self.nodes
@@ -450,6 +498,10 @@ impl Document {
     /// Taken from the nodes rather than kept in a list beside them: a list
     /// could disagree with the nodes, and there is nothing a subdiagram is
     /// except where some nodes live.
+    ///
+    /// # Returns
+    ///
+    /// The subdiagrams' names.
     pub fn subdiagrams(&self) -> Vec<String> {
         let mut found: Vec<String> = Vec::new();
         for node in &self.nodes {
@@ -487,6 +539,11 @@ impl Document {
     /// flat and dotted -- one name per field and per complaint -- and this is
     /// where the file's shape comes back. The attributes are sorted, so a
     /// subsection's members are already together.
+    ///
+    /// # Returns
+    ///
+    /// Each subsection's name, empty for the top of the section, with the
+    /// stated attributes under it and their values.
     fn tcspecial_stated(&self) -> Vec<(String, Vec<(String, String)>)> {
         let mut out: Vec<(String, Vec<(String, String)>)> = Vec::new();
         for (attribute, value) in &self.tcspecial {
@@ -509,7 +566,7 @@ impl Document {
         out
     }
 
-    /// Put every node inside the pane its type belongs to.
+    /// Puts every node inside the pane its type belongs to.
     ///
     /// Called when a configuration is read and not at any other time. What it
     /// is for is the file somebody wrote before the canvas was divided, or
@@ -535,7 +592,13 @@ impl Document {
     /// clear: a payload column read out of a file where the payloads were in a
     /// row would otherwise become one node with eleven behind it.
     ///
-    /// Returns how many were moved, which is what a caller would log.
+    /// # Arguments
+    ///
+    /// * `dividers` - Where the three working panes meet.
+    ///
+    /// # Returns
+    ///
+    /// How many nodes were moved, which is what a caller would log.
     pub fn settle(&mut self, dividers: crate::pane::Dividers) -> usize {
         // The rule is tcsdiagram's, which tcspecial's visual window draws by
         // as well: see pane::settle.
@@ -587,6 +650,10 @@ impl Document {
     /// about the editor's own first act, and it cannot be acted on until
     /// there is a second node -- so it is not raised. The rules come back as
     /// soon as there is a graph to apply them to.
+    ///
+    /// # Returns
+    ///
+    /// The concerns, in the document's order; none for fewer than two nodes.
     pub fn concerns(&self) -> Vec<Concern> {
         if self.nodes.len() < 2 {
             return Vec::new();
@@ -595,6 +662,10 @@ impl Document {
     }
 
     /// The rules themselves, once there is a graph to apply them to.
+    ///
+    /// # Returns
+    ///
+    /// The concerns, in the document's order.
     fn concerns_in_a_graph(&self) -> Vec<Concern> {
         let mut concerns = Vec::new();
 
@@ -677,14 +748,6 @@ impl Document {
             .partition(|concern| !self.aside.contains(&concern.key()))
     }
 
-    /// The edit that takes this node away, with everything that goes with it.
-    ///
-    /// A removal carries the node's own words and every line that touches it,
-    /// at either end, because that is what undo has to put back: the links go
-    /// when the node does -- a line to a node that is not there would dangle
-    /// -- and an undo that restored the node without them would be an undo
-    /// that did half of what was undone.
-    ///
     /// Which nodes share a name with another node, in the order the file holds
     /// them.
     ///
@@ -696,6 +759,11 @@ impl Document {
     /// By the whole name, which includes the subdiagram a node lives in: two
     /// pages of one configuration may each have a `temp_1`, and that is not
     /// a duplicate -- see [`Node::home`].
+    ///
+    /// # Returns
+    ///
+    /// The indices, in the document's list of nodes, of every node whose
+    /// absolute name another node also has.
     pub fn sharing_a_name(&self) -> Vec<usize> {
         let mut count: BTreeMap<&str, usize> = BTreeMap::new();
         let whole: Vec<String> = self
@@ -716,7 +784,7 @@ impl Document {
             .collect()
     }
 
-    /// Rename the node in this position.
+    /// Renames the node in this position.
     ///
     /// By position and not by name, which is the whole point: a name two nodes
     /// share cannot say which of them to rename, and
@@ -732,6 +800,11 @@ impl Document {
     ///
     /// Nothing happens for a position that is not there or a name that is
     /// already this node's.
+    ///
+    /// # Arguments
+    ///
+    /// * `at`  - The node's index in the document's list of nodes.
+    /// * `now` - Its new name, within its own subdiagram.
     pub fn rename_at(&mut self, at: usize, now: &str) {
         let Some(node) = self.nodes.get(at) else {
             return;
@@ -778,6 +851,20 @@ impl Document {
     ///
     /// Within the home of the node at `at`, since that is where it has to be
     /// free.
+    ///
+    /// # Arguments
+    ///
+    /// * `at` - The index, in the document's list of nodes, of the node whose
+    ///          name is taken.
+    ///
+    /// # Returns
+    ///
+    /// The name, such as `i2c-2`; empty if there is no node at `at`.
+    ///
+    /// # Panics
+    ///
+    /// Never in practice: the search for a free number cannot run out before
+    /// the nodes do.
     pub fn spare_name(&self, at: usize) -> String {
         let Some(node) = self.nodes.get(at) else {
             return String::new();
@@ -811,8 +898,22 @@ impl Document {
             .expect("a free name exists")
     }
 
-    /// `None` for a node that is not here, which is a window asking about one
-    /// somebody has already deleted.
+    /// The edit that takes this node away, with everything that goes with it.
+    ///
+    /// A removal carries the node's own words and every line that touches it,
+    /// at either end, because that is what undo has to put back: the links go
+    /// when the node does -- a line to a node that is not there would dangle
+    /// -- and an undo that restored the node without them would be an undo
+    /// that did half of what was undone.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The node's absolute name.
+    ///
+    /// # Returns
+    ///
+    /// The removal, or `None` for a node that is not here, which is a window
+    /// asking about one somebody has already deleted.
     pub fn removal_of(&self, name: &str) -> Option<Edit> {
         let node = self.node(name)?;
         Some(Edit::RemoveNode {
@@ -835,6 +936,14 @@ impl Document {
 
     /// How many lines touch this node, which is what a question about
     /// deleting it has to say.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The node's absolute name.
+    ///
+    /// # Returns
+    ///
+    /// How many links start or end at it.
     pub fn lines_touching(&self, name: &str) -> usize {
         self.links
             .iter()
@@ -862,6 +971,15 @@ impl Document {
     /// whole sheet from the top, because arranging is what a person does to
     /// bring everything into view rather than to fit it around what they are
     /// looking at now.
+    ///
+    /// # Arguments
+    ///
+    /// * `dividers` - Where the working panes meet, which says how wide each
+    ///                pane is.
+    ///
+    /// # Returns
+    ///
+    /// The name of each node that would move, with its new upper left corner.
     pub fn arranged(
         &self,
         dividers: crate::pane::Dividers,
@@ -887,6 +1005,15 @@ impl Document {
     }
 
     /// Where each of these nodes is now, for the undo of an arrangement.
+    ///
+    /// # Arguments
+    ///
+    /// * `named` - The nodes, by name, with where they would go; where they
+    ///             would go is not used.
+    ///
+    /// # Returns
+    ///
+    /// Each of those nodes that is here, with its upper left corner now.
     pub fn where_each_is(
         &self,
         named: &[(String, (i32, i32))],
@@ -905,6 +1032,15 @@ impl Document {
     /// is read on, and it is what the vehicle carries that gets read. A
     /// computation or a log naming a group is an oddity the configuration
     /// checker has words for; it is not something to set a bus address on.
+    ///
+    /// # Arguments
+    ///
+    /// * `group` - The group's name.
+    ///
+    /// # Returns
+    ///
+    /// The payload nodes whose `group` attribute names it, in the document's
+    /// order.
     pub fn payloads_of(&self, group: &str) -> Vec<&Node> {
         self.nodes
             .iter()
@@ -936,6 +1072,15 @@ impl Document {
     /// to the group and not to its members -- a member stating one is a fault
     /// the flight reader refuses -- so it is offered as the group's own value
     /// and never propagated.
+    ///
+    /// # Arguments
+    ///
+    /// * `group` - The group's name.
+    ///
+    /// # Returns
+    ///
+    /// One field per shared attribute, in the first payload's type's order;
+    /// none for a group with no payloads.
     pub fn group_fields(&self, group: &str) -> Vec<GroupField> {
         let payloads = self.payloads_of(group);
         if payloads.is_empty() {
@@ -983,6 +1128,14 @@ impl Document {
     /// What a closed box shows instead of its contents: the count of nodes
     /// inside it and the count of connections that cross its edge are the two
     /// things worth knowing about a diagram you are not looking at.
+    ///
+    /// # Arguments
+    ///
+    /// * `subdiagram` - The subdiagram's name.
+    ///
+    /// # Returns
+    ///
+    /// How many links have one end inside it and the other outside.
     pub fn crossings(&self, subdiagram: &str) -> usize {
         let inside = |name: &str| {
             Qualified::parse(name).in_.as_deref() == Some(subdiagram)
@@ -993,7 +1146,7 @@ impl Document {
             .count()
     }
 
-    /// Apply an edit.
+    /// Applies an edit.
     ///
     /// Every edit is applied the same way whether it came from a person, from
     /// an undo, or from replaying a journal after a crash. That is what makes
@@ -1005,6 +1158,10 @@ impl Document {
     /// through a journal that disagrees with its document, which is a damaged
     /// pair of files, and the useful response to that is to recover as much as
     /// can be recovered.
+    ///
+    /// # Arguments
+    ///
+    /// * `edit` - The edit to apply.
     pub fn apply(&mut self, edit: &Edit) {
         match edit {
             Edit::AddNode {
@@ -1315,6 +1472,10 @@ impl Document {
     /// log's sources suit its format, whether every input of a mean is bound --
     /// belong to the flight-side validation and are reported by `tcsverify`,
     /// which the editor runs rather than reimplements.
+    ///
+    /// # Returns
+    ///
+    /// The faults, each attached to the node or link it is about.
     pub fn faults(&self) -> Vec<Fault> {
         let mut faults = Vec::new();
 
@@ -1516,6 +1677,22 @@ impl Document {
     /// its source lives in, with names qualified only where they have to
     /// travel, so a subdiagram's internal links read as plainly inside it as
     /// they would if it were the whole configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The top diagram's file, whose extension says which format
+    ///            every file but the simulator's is written in.
+    ///
+    /// # Returns
+    ///
+    /// Each file's path with its contents: the top diagram, its other spelling
+    /// where one exists, each subdiagram, and the simulator configuration where
+    /// there is one.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the file if its extension is not `.yaml`, `.yml` or
+    /// `.xml`.
     pub fn files(
         &self,
         path: &std::path::Path,
@@ -1574,6 +1751,20 @@ impl Document {
     }
 
     /// One file's worth: the nodes at `home` and the links that start there.
+    ///
+    /// # Arguments
+    ///
+    /// * `home` - The subdiagram to write, or `None` for the top diagram.
+    /// * `path` - Where the text is going, whose extension says the format.
+    ///
+    /// # Returns
+    ///
+    /// The file's text.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the file if its extension is not `.yaml`, `.yml` or
+    /// `.xml`.
     fn text_for(
         &self,
         home: &Home,
@@ -1611,6 +1802,15 @@ impl Document {
     /// `path` is where the text is going, which the file needs to know only
     /// to say where its schema is relative to itself. See
     /// [`crate::nodes::schema_reference`].
+    ///
+    /// # Arguments
+    ///
+    /// * `home` - The subdiagram to write, or `None` for the top diagram.
+    /// * `path` - Where the text is going.
+    ///
+    /// # Returns
+    ///
+    /// The file's text.
     fn to_xml_for(&self, home: &Home, path: &std::path::Path) -> String {
         let mut out = String::new();
         out.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
@@ -1847,6 +2047,15 @@ impl Document {
     /// `path` is where the text is going, which the file needs to know only
     /// to say where its schema is relative to itself. See
     /// [`crate::nodes::schema_reference`].
+    ///
+    /// # Arguments
+    ///
+    /// * `home` - The subdiagram to write, or `None` for the top diagram.
+    /// * `path` - Where the text is going.
+    ///
+    /// # Returns
+    ///
+    /// The file's text.
     fn to_yaml_for(&self, home: &Home, path: &std::path::Path) -> String {
         let mut out = String::new();
         // Which schema describes this file, in the spelling a YAML language
@@ -2092,6 +2301,14 @@ impl Document {
     /// `vehicle.yaml` beside `vehicle.xml`, in either direction, and `None`
     /// where the sibling is not there -- which is every ordinary
     /// configuration. See [`Document::files`], which writes it.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The configuration file being written.
+    ///
+    /// # Returns
+    ///
+    /// The other spelling's path, if that file exists.
     fn other_spelling(
         &self,
         path: &std::path::Path,
@@ -2131,6 +2348,18 @@ impl Document {
     /// several entries, so nothing in a file pairs by position: two lists read
     /// against each other, one of them a name short, would be a configuration
     /// that reads as valid and delivers a reading to the wrong input.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The node the links leave.
+    /// * `home` - The subdiagram the node is in, which the targets' names are
+    ///            written from.
+    ///
+    /// # Returns
+    ///
+    /// For each data source with something on it, `payload-out` then `moc-out`:
+    /// the terminal's name, an entry per link, and the first comment found on
+    /// any of them.
     fn leaving(
         &self,
         node: &Node,
@@ -2193,6 +2422,15 @@ impl Document {
     /// destination that named an input -- `cabin_temp.in0` -- counts at the
     /// stream's sink. Only the sinks something arrives at are written, as a
     /// node with nothing leaving it writes no `payload-out`.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The node the links arrive at.
+    /// * `home` - The subdiagram the node is in.
+    ///
+    /// # Returns
+    ///
+    /// The sinks something arrives at, `payload-in` then `moc-in`.
     fn arriving(&self, node: &Node, home: &Home) -> Vec<&'static str> {
         let mut arriving: Vec<&'static str> = Vec::new();
         let ours = Qualified::of(&node.name, home).absolute();
@@ -2245,6 +2483,19 @@ enum Format {
 /// project follows: anything that is neither .yaml, .yml nor .xml is refused
 /// rather than guessed at, because a guess is how a misspelled extension
 /// becomes a file parsed as the wrong language.
+///
+/// # Arguments
+///
+/// * `path` - The file's path.
+///
+/// # Returns
+///
+/// The format its extension names.
+///
+/// # Errors
+///
+/// A message naming the file if it has no extension or one that is not `.yaml`,
+/// `.yml` or `.xml`.
 fn format_of(path: &std::path::Path) -> Result<Format, String> {
     match path
         .extension()
@@ -2293,6 +2544,14 @@ fn quoted(value: &str) -> String {
 /// safe in both formats and in every YAML reader, and a name this quotes
 /// unnecessarily is a name with quotes round it rather than a file that is
 /// wrong.
+///
+/// # Arguments
+///
+/// * `value` - The name or type.
+///
+/// # Returns
+///
+/// The value bare, or quoted as [`quoted`] quotes it.
 fn plain(value: &str) -> String {
     const RESERVED: &[&str] = &[
         "null", "Null", "NULL", "~", "true", "True", "TRUE", "false", "False",
@@ -2323,6 +2582,14 @@ fn plain(value: &str) -> String {
 /// A name with an ampersand in it is unlikely and a comment with one is not:
 /// "sampled at 1Hz & logged" is the sort of thing somebody writes, and an
 /// unescaped ampersand makes the file unreadable rather than merely wrong.
+///
+/// # Arguments
+///
+/// * `text` - The text to write in an XML file.
+///
+/// # Returns
+///
+/// The text with `&`, `<`, `>`, `"` and `'` replaced by their entities.
 fn escape(text: &str) -> String {
     text.replace('&', "&amp;")
         .replace('<', "&lt;")
@@ -2343,6 +2610,15 @@ fn escape(text: &str) -> String {
 /// A run of hyphens becomes one, which reads as the dash it was and is the
 /// smallest change that makes the file legal. It is a thing the XML spelling
 /// does not preserve, and is listed with the others in `docs/design.rst`.
+///
+/// # Arguments
+///
+/// * `line` - One line of a comment.
+///
+/// # Returns
+///
+/// The line with each run of hyphens made one, and with trailing hyphens and
+/// white space removed.
 pub(crate) fn comment_safe(line: &str) -> String {
     let mut out = String::with_capacity(line.len());
     let mut hyphen = false;
@@ -2383,6 +2659,15 @@ fn comment_room(indent: usize) -> usize {
 /// nowhere else, so a word longer than a line is a long line rather than a
 /// word cut in two. A line's own indent is carried on to the lines it is
 /// broken into, so an indented list in a comment stays one.
+///
+/// # Arguments
+///
+/// * `comment` - The comment, which may have several lines.
+/// * `indent`  - How many columns the comment's marks are indented.
+///
+/// # Returns
+///
+/// The lines to write, without marks or indent.
 pub(crate) fn comment_lines(comment: &str, indent: usize) -> Vec<String> {
     let room = comment_room(indent);
     let width = |text: &str| escape(&comment_safe(text)).chars().count();
@@ -2419,6 +2704,10 @@ pub(crate) fn comment_lines(comment: &str, indent: usize) -> Vec<String> {
 /// writes and not an approximation of it.
 /// `the_shipped_example_is_what_the_editor_writes` is what keeps the files and
 /// this agreeing.
+///
+/// # Returns
+///
+/// The thermostat's document.
 #[cfg(test)]
 pub fn thermostat_example() -> Document {
     let mut document = Document::new();
@@ -2686,6 +2975,16 @@ pub fn thermostat_example() -> Document {
 mod tests {
     use super::*;
 
+    /// Makes the edit that adds a node to the top diagram.
+    ///
+    /// # Arguments
+    ///
+    /// * `name`      - The new node's name.
+    /// * `node_type` - Its type, as the configuration spells it.
+    ///
+    /// # Returns
+    ///
+    /// The edit.
     fn add(name: &str, node_type: &str) -> Edit {
         Edit::AddNode {
             name: name.to_string(),
@@ -3627,6 +3926,12 @@ mod tests {
     /// that enumerated the variants in a list would simply go quiet instead.
     #[test]
     fn every_kind_of_edit_undoes_itself() {
+        /// Names every variant of [`Edit`], so that a variant left out of the
+        /// test stops the build.
+        ///
+        /// # Arguments
+        ///
+        /// * `edit` - An edit of any kind; nothing is done with it.
         fn exhaustive(edit: &Edit) {
             match edit {
                 Edit::AddNode { .. } => (),

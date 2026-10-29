@@ -77,7 +77,15 @@ pub struct Refused {
     pub why: String,
 }
 
-/// Every node's device id, by name.
+/// Gives every node's device id, which is its place in the configuration.
+///
+/// # Arguments
+///
+/// * `graph` - The configuration.
+///
+/// # Returns
+///
+/// Each node's device id, by name.
 pub fn ids(graph: &Graph) -> BTreeMap<String, usize> {
     graph
         .nodes
@@ -97,11 +105,26 @@ pub fn payload_link_name(payload: &str) -> String {
     format!("{payload} telemetry")
 }
 
-/// Every link to the ground this configuration has.
+/// Finds every link to the ground this configuration has.
 ///
 /// A `moc` node with no `ground_base`, or one that does not read, contributes
 /// nothing here: [`crate::graph::reach::reach_of`] says what is wrong with it,
 /// and says it once.
+///
+/// # Arguments
+///
+/// * `graph` - The configuration.
+///
+/// # Returns
+///
+/// The links: those drawn into a gateway node, in the order they are drawn,
+/// then one for each payload nothing touches.
+///
+/// # Errors
+///
+/// [`Refused`] when a link's port cannot be counted on to from its base, the
+/// `tcspecial` section does not read, or two links land on one port of one
+/// host.
 pub fn of(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
     let ids = ids(graph);
     let mut links = Vec::new();
@@ -204,7 +227,16 @@ pub fn of(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
     Ok(links)
 }
 
-/// Every node the drawing touches: an end of a link, or of a command binding.
+/// Finds every node the drawing touches: an end of a link, or of a command
+/// binding.
+///
+/// # Arguments
+///
+/// * `graph` - The configuration.
+///
+/// # Returns
+///
+/// The nodes' names.
 fn touched(graph: &Graph) -> BTreeSet<String> {
     let mut touched = BTreeSet::new();
     for link in &graph.links {
@@ -231,6 +263,15 @@ mod tests {
             .expect("the example reads")
     }
 
+    /// Sums up links to the ground for comparison.
+    ///
+    /// # Arguments
+    ///
+    /// * `links` - The links.
+    ///
+    /// # Returns
+    ///
+    /// Each link's source, device id, and ground address and port.
     fn summary(links: &[Telemetered]) -> Vec<(&str, usize, &str, u16)> {
         links
             .iter()

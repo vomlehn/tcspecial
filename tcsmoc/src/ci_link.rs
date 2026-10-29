@@ -72,9 +72,20 @@ pub struct CiLink {
 }
 
 impl CiLink {
-    /// And one whose second link is whatever `commanded` says.
+    /// Makes a link that is down, with no address yet, whose second link
+    /// is whatever `commanded` says.
     ///
     /// What a configuration's node commands go on: see [`Commanded`].
+    ///
+    /// # Arguments
+    ///
+    /// * `from`      - The local address the spacecraft link binds, which
+    ///                 is `tcs_cmd.send`.
+    /// * `commanded` - Where every node's commands are sent from and to.
+    ///
+    /// # Returns
+    ///
+    /// The link, down until [`CiLink::connect`] brings it up.
     pub fn down_commanding(from: &str, commanded: Commanded) -> Self {
         Self {
             address: String::new(),
@@ -89,10 +100,6 @@ impl CiLink {
         &self.address
     }
 
-    /// The client to send with, or `None` if the link is down.
-    ///
-    /// Asked for one command at a time rather than kept, so that a caller
-    /// cannot go on using a client the link no longer has.
     /// When the last command went out and when its answer came back, if the
     /// link is up and has carried one.
     ///
@@ -108,11 +115,15 @@ impl CiLink {
             .map(|client| (client.last_sent(), client.last_received()))
     }
 
+    /// The client to send with, or `None` if the link is down.
+    ///
+    /// Asked for one command at a time rather than kept, so that a caller
+    /// cannot go on using a client the link no longer has.
     pub fn client(&mut self) -> Option<&mut TcsClient> {
         self.client.as_mut()
     }
 
-    /// Bring the link up at `address`, replacing whatever it had.
+    /// Brings the link up at `address`, replacing whatever it had.
     ///
     /// Any existing connection is closed first, so pressing Connect with a
     /// new address in the box moves the link rather than leaving two. A
@@ -122,6 +133,20 @@ impl CiLink {
     /// Both links are opened, or neither: a client with one of them could
     /// send only half of what there is to send, and the half it could not
     /// send is the half the panels use.
+    ///
+    /// # Arguments
+    ///
+    /// * `address` - The command interpreter's host and port.
+    ///
+    /// # Returns
+    ///
+    /// Nothing, once both links are open.
+    ///
+    /// # Errors
+    ///
+    /// Whatever opening either UDP link gives, such as an address that
+    /// does not resolve or a local socket that cannot be bound; the link
+    /// is then left down.
     pub fn connect(&mut self, address: &str) -> TcsResult<()> {
         self.disconnect();
         self.address = address.to_string();
@@ -134,7 +159,7 @@ impl CiLink {
         Ok(())
     }
 
-    /// Take the link down.
+    /// Takes the link down.
     ///
     /// The close error is not returned, and deliberately: this is what
     /// Disconnect does, and a link whose close complained is down either way.
@@ -218,6 +243,10 @@ mod tests {
     /// the operator controls, and the node link is opened beside it by the
     /// same call. Its own end is a port of the system's choosing, so that two
     /// tests running at once do not want one socket.
+    ///
+    /// # Returns
+    ///
+    /// A node link from any local port to port 4200 on the loopback.
     fn commanding() -> Commanded {
         Commanded {
             from: HostPort {

@@ -21,7 +21,20 @@ use crate::endpoint_config::{
 };
 use crate::endpoint_config::{validate_stream, StreamParams};
 
-/// Which parity a file's word names, for an asynchronous line.
+/// Reads which parity a file's word names, for an asynchronous line.
+///
+/// # Arguments
+///
+/// * `group` - The node's name, for the message.
+/// * `s`     - The `parity` attribute as the file wrote it, in any case.
+///
+/// # Returns
+///
+/// The parity.
+///
+/// # Errors
+///
+/// A word that is not one of the five parities.
 fn parse_parity(group: &str, s: &Scalar) -> EndpointConfigResult<Parity> {
     Parity::from_spelling(&s.as_str().to_ascii_lowercase()).ok_or_else(|| {
         bad(
@@ -70,7 +83,11 @@ pub enum Parity {
 }
 
 impl Parity {
-    /// How this value is spelled in a configuration file.
+    /// Spells this value as a configuration file does.
+    ///
+    /// # Returns
+    ///
+    /// `none`, `even`, `odd`, `mark` or `space`.
     pub fn as_str(&self) -> &'static str {
         match self {
             Parity::None => "none",
@@ -81,9 +98,17 @@ impl Parity {
         }
     }
 
-    /// Which parity a file's word names, if it names one. Named as the
-    /// other spellings in this library are, and not `from_str`, which reads
-    /// as the standard trait's method and is not one.
+    /// Reads which parity a file's word names. Named as the other spellings
+    /// in this library are, and not `from_str`, which reads as the standard
+    /// trait's method and is not one.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The word, in lower case.
+    ///
+    /// # Returns
+    ///
+    /// The parity, or `None` for a word that names none.
     pub fn from_spelling(text: &str) -> Option<Parity> {
         [
             Parity::None,
@@ -112,7 +137,11 @@ pub enum StopBits {
 }
 
 impl StopBits {
-    /// How this value is spelled in a configuration file.
+    /// Spells this value as a configuration file does.
+    ///
+    /// # Returns
+    ///
+    /// `1`, `1.5` or `2`.
     pub fn as_str(&self) -> &'static str {
         match self {
             StopBits::One => "1",
@@ -138,7 +167,19 @@ impl ByteLength {
     /// Largest byte length a UART offers.
     pub const MAX: u8 = 8;
 
-    /// Build a byte length, rejecting one no UART can produce.
+    /// Builds a byte length, rejecting one no UART can produce.
+    ///
+    /// # Arguments
+    ///
+    /// * `bits` - The data bits in a character.
+    ///
+    /// # Returns
+    ///
+    /// The byte length.
+    ///
+    /// # Errors
+    ///
+    /// A message when `bits` is outside `MIN` to `MAX`.
     pub fn new(bits: u8) -> Result<Self, String> {
         if (Self::MIN..=Self::MAX).contains(&bits) {
             Ok(ByteLength(bits))
@@ -157,6 +198,20 @@ impl ByteLength {
     }
 }
 
+/// Reads how many stop bits a file's word names.
+///
+/// # Arguments
+///
+/// * `group` - The node's name, for the message.
+/// * `s`     - The `stop_bits` attribute as the file wrote it.
+///
+/// # Returns
+///
+/// The stop bits.
+///
+/// # Errors
+///
+/// A word that is not 1, 1.0, 1.5, 2 or 2.0.
 fn parse_stop_bits(group: &str, s: &Scalar) -> EndpointConfigResult<StopBits> {
     match s.as_str() {
         "1" | "1.0" => Ok(StopBits::One),
@@ -169,12 +224,28 @@ fn parse_stop_bits(group: &str, s: &Scalar) -> EndpointConfigResult<StopBits> {
     }
 }
 
-/// What a serial group says, and what it must say.
+/// Reads what a serial group says, and what it must say.
 ///
 /// A serial line is a stream, so a stream section is required: a read of one
 /// needs a rule for where it ends. The framing attributes are required too --
 /// no default data rate or byte length is right for a line somebody else's
 /// hardware is at the other end of.
+///
+/// # Arguments
+///
+/// * `name` - The node's name, for the messages.
+/// * `g`    - The node's terms as the file states them.
+///
+/// # Returns
+///
+/// The line's framing, stream rule and RS-485 settings.
+///
+/// # Errors
+///
+/// A term that does not belong to a serial line; a missing `datarate`,
+/// `stop_bits`, `byte_length` or stream section; a data rate of nought; a
+/// value that does not read; and what the RS-485 terms and the stream
+/// section are refused for.
 pub(crate) fn group_kind_of(
     name: &str,
     g: LinkTerms,
@@ -246,8 +317,16 @@ pub(crate) fn group_kind_of(
     }))
 }
 
-/// Whether the device at `path` is a stand-in: a pseudo-terminal, which is
+/// Judges whether a serial device is a stand-in: a pseudo-terminal, which is
 /// what tcssim makes for a serial payload. See [`crate::simulate`].
+///
+/// # Arguments
+///
+/// * `path` - The device's path, from the node's `path`.
+///
+/// # Returns
+///
+/// The judgement, with what to change if it is not a stand-in.
 pub fn judged(path: &str) -> crate::simulate::Judged {
     crate::simulate::pseudo_terminal(
         path,

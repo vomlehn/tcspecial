@@ -29,8 +29,19 @@ class NotReady(Exception):
 
 
 def ask(at, patience):
-    """Ask the simulator at ``at``, a (host, port) pair, once, giving it
-    ``patience`` seconds: its answer, or ``None`` where nothing answered."""
+    """Ask the simulator at ``at`` once, giving it ``patience`` seconds.
+
+    The request is sent again every ``RESEND_EVERY`` seconds until it is
+    answered or the time is up.
+
+    Args:
+        at:       The simulator's (host, port) pair.
+        patience: How long to wait for an answer, in seconds.
+
+    Returns:
+        Its :class:`tcslibgs.ready.Answer`, or ``None`` where nothing
+        answered.
+    """
     family = socket.AF_INET6 if ":" in at[0] else socket.AF_INET
     with socket.socket(family, socket.SOCK_DGRAM) as sock:
         started = time.monotonic()
@@ -69,7 +80,18 @@ def ask(at, patience):
 
 def wait(at, ours, patience):
     """Wait up to ``patience`` seconds for the simulator at ``at`` to be ready
-    for the run ``ours``, a ``SetUpFor``, describes."""
+    for the run ``ours`` describes.
+
+    Args:
+        at:       The simulator's (host, port) pair.
+        ours:     The ``SetUpFor`` of this run.
+        patience: How long to wait, in seconds.
+
+    Raises:
+        NotReady: Nothing answered (``silent``), it was still making its
+                  stand-ins (``starting``), it is set up for another run
+                  (``differs``), or it could not stand in (``failed``).
+    """
     started = time.monotonic()
     heard = False
     while True:

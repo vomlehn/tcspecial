@@ -69,12 +69,21 @@ const TO_STAND_IN: &str =
     "point path at the iio_dummy sensor, which bin/mkiio makes, or at a \
      pseudo-terminal tcssim makes";
 
-/// Whether the device at `path` is a stand-in: a sensor of the kernel's
+/// Judges whether an IIO device is a stand-in: a sensor of the kernel's
 /// `iio_dummy`, or a pseudo-terminal. See [`crate::simulate`].
 ///
 /// A dummy sensor is made through configfs, under
 /// `kernel/config/iio/devices/dummy`, and the directory made there is the
 /// device's name; a real sensor's name is its part's.
+///
+/// # Arguments
+///
+/// * `host` - The host, whose `/sys` is read.
+/// * `path` - The device's path, from the node's `path`.
+///
+/// # Returns
+///
+/// The judgement, with what to change if it is not a stand-in.
 pub fn judged(
     host: &crate::simulate::Host,
     path: &str,
@@ -90,9 +99,19 @@ pub fn judged(
     }
 }
 
-/// Whether the device at `path` is a sensor of the kernel's `iio_dummy`, made
-/// by `bin/mkiio`: a stand-in the kernel makes, which the simulator finds
-/// rather than makes, as it finds an I2C stub.
+/// Tells whether a device is a sensor of the kernel's `iio_dummy`, made by
+/// `bin/mkiio`: a stand-in the kernel makes, which the simulator finds rather
+/// than makes, as it finds an I2C stub.
+///
+/// # Arguments
+///
+/// * `host` - The host, whose `/sys` is read.
+/// * `path` - The device's path.
+///
+/// # Returns
+///
+/// `true` if it is a dummy sensor; `false` if it is anything else or its
+/// kernel directory cannot be found.
 pub fn is_dummy(host: &crate::simulate::Host, path: &str) -> bool {
     match host.device_of(path) {
         Ok(device) => sensor_judged(host, path, &device).is_stand_in(),
@@ -100,7 +119,18 @@ pub fn is_dummy(host: &crate::simulate::Host, path: &str) -> bool {
     }
 }
 
-/// The judgement of a sensor whose kernel directory is `device`.
+/// Judges a sensor by the name in its kernel directory.
+///
+/// # Arguments
+///
+/// * `host`   - The host, whose `/sys` is read.
+/// * `path`   - The device's path, for the messages.
+/// * `device` - The sensor's directory under `/sys`.
+///
+/// # Returns
+///
+/// A stand-in when a dummy of its name is in configfs, cannot-tell when it
+/// has no name, and hardware otherwise.
 fn sensor_judged(
     host: &crate::simulate::Host,
     path: &str,
@@ -168,6 +198,19 @@ mod tests {
     use super::*;
     use crate::endpoint_config::Scalar;
 
+    /// Makes terms as a file states them, with everything else absent.
+    ///
+    /// # Arguments
+    ///
+    /// * `stated` - Each term stated, with its value as written.
+    ///
+    /// # Returns
+    ///
+    /// The terms.
+    ///
+    /// # Panics
+    ///
+    /// If a term is not `datarate`.
     fn terms(stated: &[(&str, &str)]) -> LinkTerms {
         let mut g = LinkTerms::default();
         for (field, value) in stated {

@@ -87,7 +87,12 @@ impl<const N: usize> Text<N> {
         full: false,
     };
 
-    /// Say `text`, in place of what was said before.
+    /// Says `text`, in place of what was said before.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - What to hold, cut short at a character, ending "...",
+    ///            where it does not fit.
     fn set(&mut self, text: impl Display) {
         self.len = 0;
         self.full = false;
@@ -160,7 +165,13 @@ impl Notes {
         count: 0,
     };
 
-    /// Hold `said`, in place of what was held before.
+    /// Holds `said`, in place of what was held before.
+    ///
+    /// # Arguments
+    ///
+    /// * `said` - The lines to hold. Where there are more than
+    ///            [`MAX_REMARKS`], the first `MAX_REMARKS - 1` are kept and
+    ///            the last line says how many more there were.
     fn set(&mut self, said: &[String]) {
         if said.len() <= MAX_REMARKS {
             for (line, text) in self.lines.iter_mut().zip(said) {
@@ -200,7 +211,18 @@ fn fail(why: impl Display) -> Failed {
     Failed
 }
 
-/// Run `body`, turning a panic into a failure and a failure into `otherwise`.
+/// Runs `body`, turning a panic into a failure and a failure into
+/// `otherwise`.
+///
+/// # Arguments
+///
+/// * `otherwise` - What to return where `body` fails or panics.
+/// * `body`      - The work, which leaves the reason for
+///                 [`tcs_last_error`] where it fails.
+///
+/// # Returns
+///
+/// What `body` returned, or `otherwise`.
 fn guard<T>(otherwise: T, body: impl FnOnce() -> Result<T, Failed>) -> T {
     match catch_unwind(AssertUnwindSafe(body)) {
         Ok(Ok(value)) => value,
@@ -215,7 +237,21 @@ fn guard<T>(otherwise: T, body: impl FnOnce() -> Result<T, Failed>) -> T {
     }
 }
 
-/// A string from C, or why not.
+/// Reads a string from C.
+///
+/// # Arguments
+///
+/// * `text` - The string.
+/// * `what` - What the string is, as an error names it: "the path".
+///
+/// # Returns
+///
+/// The string, borrowed from C.
+///
+/// # Errors
+///
+/// `Failed`, its reason left for [`tcs_last_error`], where `text` is NULL or
+/// not UTF-8.
 ///
 /// # Safety
 ///
@@ -297,7 +333,16 @@ pub struct tcs_configuration {
     digest_text: Text<33>,
 }
 
-/// Read and check the configuration at `path`.
+/// Reads and checks the configuration at `path`, as the vehicle does.
+///
+/// # Arguments
+///
+/// * `path` - The configuration file, YAML or XML by its extension.
+///
+/// # Returns
+///
+/// The configuration, or NULL where it cannot be read, its digest cannot be
+/// taken, or the vehicle would refuse it.
 ///
 /// # Safety
 ///
@@ -352,7 +397,16 @@ pub unsafe extern "C" fn tcs_configuration_close(
     }
 }
 
-/// The configuration's digest, as thirty-two hex digits.
+/// Gives the configuration's digest, as thirty-two hex digits.
+///
+/// # Arguments
+///
+/// * `configuration` - The configuration.
+///
+/// # Returns
+///
+/// The digest, held by the configuration, or NULL where `configuration` is
+/// NULL.
 ///
 /// # Safety
 ///
@@ -368,7 +422,18 @@ pub unsafe extern "C" fn tcs_configuration_digest(
     })
 }
 
-/// The id of the node called `name`, into `*id`.
+/// Finds the id of the node called `name`.
+///
+/// # Arguments
+///
+/// * `configuration` - The configuration.
+/// * `name`          - The node's name.
+/// * `id`            - Where the id is written.
+///
+/// # Returns
+///
+/// 0, or -1 where there is no such node, its id does not fit in 32 bits, or
+/// an argument is NULL.
 ///
 /// # Safety
 ///
@@ -401,7 +466,15 @@ pub unsafe extern "C" fn tcs_configuration_node_id(
 
 // ---- Beacons ----------------------------------------------------------------
 
-/// `tcs_stage`, as the header numbers it.
+/// Numbers a stage as the header's `tcs_stage` does.
+///
+/// # Arguments
+///
+/// * `stage` - The stage.
+///
+/// # Returns
+///
+/// Its number, 0 to 3.
 fn stage_number(stage: Stage) -> c_int {
     match stage {
         Stage::Unheard => 0,
@@ -424,7 +497,16 @@ pub struct tcs_pass {
     commanded_restart: c_int,
 }
 
-/// What a stage is called where a person reads it.
+/// Names a stage as a person reads it.
+///
+/// # Arguments
+///
+/// * `stage` - The stage's number, as `tcs_stage` numbers it.
+///
+/// # Returns
+///
+/// "Unheard", "Heard", "Aging" or "Waiting", or "" for a number that is no
+/// stage; static.
 #[no_mangle]
 pub extern "C" fn tcs_stage_label(stage: c_int) -> *const c_char {
     let label: &'static CStr = match stage {
@@ -450,7 +532,17 @@ pub struct tcs_beacons {
     last: Option<(bool, bool)>,
 }
 
-/// Listen where the configuration says beacons arrive.
+/// Listens where the configuration says beacons arrive.
+///
+/// # Arguments
+///
+/// * `configuration` - The configuration, which must have a tcspecial
+///                     section.
+///
+/// # Returns
+///
+/// The beacon watch, or NULL where the configuration states no beacon link
+/// or beacons cannot be received.
 ///
 /// # Safety
 ///
@@ -495,7 +587,17 @@ pub unsafe extern "C" fn tcs_beacons_listen(
     })
 }
 
-/// One pass of the beacon watch, into `*pass`.
+/// Runs one pass of the beacon watch, waiting for a beacon or for the stage
+/// to change by itself, and keeps what it said for the calls that ask.
+///
+/// # Arguments
+///
+/// * `beacons` - The beacon watch.
+/// * `pass`    - Where what the pass found is written.
+///
+/// # Returns
+///
+/// 0, or -1 where either argument is NULL.
 ///
 /// # Safety
 ///
@@ -562,7 +664,16 @@ pub unsafe extern "C" fn tcs_beacons_remark_count(
     guard(0, || Ok(handle_of(beacons, "the beacons")?.remarks.count))
 }
 
-/// The last pass's remark at `index`, or NULL past the end.
+/// Gives one of the last pass's remarks.
+///
+/// # Arguments
+///
+/// * `beacons` - The beacon watch.
+/// * `index`   - Which remark, counted from 0.
+///
+/// # Returns
+///
+/// The remark, held by the watch, or NULL past the end.
 ///
 /// # Safety
 ///
@@ -596,7 +707,16 @@ pub unsafe extern "C" fn tcs_beacons_warning_count(
     guard(0, || Ok(handle_of(beacons, "the beacons")?.warnings.count))
 }
 
-/// The last pass's warning at `index`, or NULL past the end.
+/// Gives one of the last pass's warnings.
+///
+/// # Arguments
+///
+/// * `beacons` - The beacon watch.
+/// * `index`   - Which warning, counted from 0.
+///
+/// # Returns
+///
+/// The warning, held by the watch, or NULL past the end.
 ///
 /// # Safety
 ///
@@ -652,7 +772,16 @@ pub struct tcs_datum {
     length: usize,
 }
 
-/// Open the `moc` node called `moc`.
+/// Opens the `moc` node called `moc`.
+///
+/// # Arguments
+///
+/// * `configuration` - The configuration.
+/// * `moc`           - The moc node's name.
+///
+/// # Returns
+///
+/// The moc node, or NULL where it cannot be opened.
 ///
 /// # Safety
 ///
@@ -687,7 +816,19 @@ pub unsafe extern "C" fn tcs_moc_open(
     })
 }
 
-/// The next datum, waiting up to `wait_ms`, or for ever where it is negative.
+/// Takes the next datum from any of the node's sources.
+///
+/// # Arguments
+///
+/// * `moc`     - The moc node.
+/// * `wait_ms` - How long to wait, in milliseconds, or for ever where it is
+///               negative.
+/// * `datum`   - Where the datum is written; its source and bytes are the
+///               node's, good until the next receive.
+///
+/// # Returns
+///
+/// 1 for a datum, 0 for none in that time, -1 on an error.
 ///
 /// # Safety
 ///
@@ -738,7 +879,15 @@ pub unsafe extern "C" fn tcs_moc_close(moc: *mut tcs_moc) {
 
 // ---- Commands ---------------------------------------------------------------
 
-/// `tcs_status`, as the header numbers it.
+/// Numbers a status as the header's `tcs_status` does.
+///
+/// # Arguments
+///
+/// * `status` - The status.
+///
+/// # Returns
+///
+/// Its number, 0 to 9.
 fn status_number(status: CommandStatus) -> c_int {
     match status {
         CommandStatus::Success => 0,
@@ -753,7 +902,16 @@ fn status_number(status: CommandStatus) -> c_int {
     }
 }
 
-/// A status's name.
+/// Names a status.
+///
+/// # Arguments
+///
+/// * `status` - The status's number, as `tcs_status` numbers it.
+///
+/// # Returns
+///
+/// "Success", "NotFound" and so on, or "" for a number that is no status;
+/// static.
 #[no_mangle]
 pub extern "C" fn tcs_status_name(status: c_int) -> *const c_char {
     let name: &'static CStr = match status {
@@ -781,7 +939,17 @@ pub struct tcs_client {
     reason: Text<TEXT_BYTES>,
 }
 
-/// Open the command links the configuration states.
+/// Opens the command links the configuration states.
+///
+/// # Arguments
+///
+/// * `configuration` - The configuration, which must have a tcspecial
+///                     section.
+///
+/// # Returns
+///
+/// The client, or NULL where the configuration names no command link or the
+/// links cannot be opened.
 ///
 /// # Safety
 ///
@@ -817,8 +985,18 @@ pub unsafe extern "C" fn tcs_client_open(
 // the link's packets are. What allocates is the error message, where there
 // is one.
 
-/// Send CONNECT, and say in `*agrees` whether the vehicle is flying this
+/// Sends CONNECT, and says whether the vehicle is flying this
 /// configuration.
+///
+/// # Arguments
+///
+/// * `client` - The client.
+/// * `agrees` - Where 1 is written when the vehicle's digest is this
+///              configuration's, 0 when it is not.
+///
+/// # Returns
+///
+/// 0, or -1 on an error.
 ///
 /// # Safety
 ///
@@ -841,7 +1019,15 @@ pub unsafe extern "C" fn tcs_client_connect(
     })
 }
 
-/// Send PING.
+/// Sends PING.
+///
+/// # Arguments
+///
+/// * `client` - The client.
+///
+/// # Returns
+///
+/// 0 when it was answered, or -1 on an error.
 ///
 /// # Safety
 ///
@@ -857,7 +1043,19 @@ pub unsafe extern "C" fn tcs_client_ping(client: *mut tcs_client) -> c_int {
     })
 }
 
-/// Start (`start`) or stop a node, the answer's status into `*status`.
+/// Starts or stops a node, with START_NODE or STOP_NODE.
+///
+/// # Arguments
+///
+/// * `client` - The client.
+/// * `node`   - The node's id.
+/// * `status` - Where what the vehicle answered is written.
+/// * `start`  - Whether to start the node; it is stopped where not.
+///
+/// # Returns
+///
+/// 0, or -1 on an error, among them an answer about another node than the
+/// one asked about.
 ///
 /// # Safety
 ///
@@ -920,8 +1118,18 @@ pub unsafe extern "C" fn tcs_client_stop_node(
     command_a_node(client, node, status, false)
 }
 
-/// Ask what a node is doing: the status into `*status`, and into `*enabled`
-/// whether it is running.
+/// Sends QUERY_NODE, to ask what a node is doing.
+///
+/// # Arguments
+///
+/// * `client`  - The client.
+/// * `node`    - The node's id.
+/// * `status`  - Where what the vehicle answered is written.
+/// * `enabled` - Where 1 is written when the node is running, 0 when not.
+///
+/// # Returns
+///
+/// 0, or -1 on an error.
 ///
 /// # Safety
 ///
@@ -947,7 +1155,11 @@ pub unsafe extern "C" fn tcs_client_query_node(
     })
 }
 
-/// Close the command links.
+/// Closes the command links and frees the client.
+///
+/// # Arguments
+///
+/// * `client` - The client, or NULL to do nothing.
 ///
 /// # Safety
 ///
@@ -960,7 +1172,17 @@ pub unsafe extern "C" fn tcs_client_close(client: *mut tcs_client) {
     }
 }
 
-/// Arm a restart.
+/// Sends RESTART_ARM, to arm a restart.
+///
+/// # Arguments
+///
+/// * `client` - The client.
+/// * `key`    - The key, which the RESTART that follows must carry.
+/// * `status` - Where what the vehicle answered is written.
+///
+/// # Returns
+///
+/// 0, or -1 on an error.
 ///
 /// # Safety
 ///
@@ -983,7 +1205,17 @@ pub unsafe extern "C" fn tcs_client_restart_arm(
     })
 }
 
-/// Restart the vehicle.
+/// Sends RESTART, to restart the vehicle.
+///
+/// # Arguments
+///
+/// * `client` - The client.
+/// * `key`    - The key the last RESTART_ARM armed the restart with.
+/// * `status` - Where what the vehicle answered is written.
+///
+/// # Returns
+///
+/// 0, or -1 on an error.
 ///
 /// # Safety
 ///
@@ -1006,10 +1238,19 @@ pub unsafe extern "C" fn tcs_client_restart(
     })
 }
 
-/// Hand the client what the last pass of `beacons` heard, so that a wait
-/// begun by a RESTART can end: 1 when this ended one with the start the
-/// RESTART commanded, 2 when it ended one with a start nobody commanded, 0
-/// when it did not end one, -1 on an error.
+/// Hands the client what the last pass of `beacons` heard, so that a wait
+/// begun by a RESTART can end.
+///
+/// # Arguments
+///
+/// * `client`  - The client.
+/// * `beacons` - The beacon watch, just passed.
+///
+/// # Returns
+///
+/// 1 when this ended a wait with the start the RESTART commanded, 2 when it
+/// ended one with a start nobody commanded, 0 when it did not end one, -1 on
+/// an error.
 ///
 /// # Safety
 ///
@@ -1034,9 +1275,17 @@ pub unsafe extern "C" fn tcs_client_beacon_heard(
     })
 }
 
-/// Whether the client is waiting for a beacon to say a RESTART is done: 1
-/// when it is, and every command but this is refused; 0 when it is not; -1
-/// on an error.
+/// Says whether the client is waiting for a beacon to say a RESTART is
+/// done.
+///
+/// # Arguments
+///
+/// * `client` - The client.
+///
+/// # Returns
+///
+/// 1 when it is, and every command but this is refused; 0 when it is not;
+/// -1 on an error.
 ///
 /// # Safety
 ///
@@ -1051,9 +1300,16 @@ pub unsafe extern "C" fn tcs_client_awaiting_restart(
     })
 }
 
-/// End a wait by hand, for an operator who knows the RESTART was never
-/// taken: 1 when there was one to end, 0 when there was not, -1 on an
-/// error.
+/// Ends a wait for a RESTART by hand, for an operator who knows the RESTART
+/// was never taken.
+///
+/// # Arguments
+///
+/// * `client` - The client.
+///
+/// # Returns
+///
+/// 1 when there was one to end, 0 when there was not, -1 on an error.
 ///
 /// # Safety
 ///
@@ -1068,7 +1324,17 @@ pub unsafe extern "C" fn tcs_client_end_restart_wait(
     })
 }
 
-/// Change how often the vehicle beacons, in microseconds.
+/// Sends CONFIG, to change how often the vehicle beacons.
+///
+/// # Arguments
+///
+/// * `client`             - The client.
+/// * `beacon_interval_us` - The new interval, in microseconds.
+/// * `status`             - Where what the vehicle answered is written.
+///
+/// # Returns
+///
+/// 0, or -1 on an error.
 ///
 /// # Safety
 ///
@@ -1091,7 +1357,22 @@ pub unsafe extern "C" fn tcs_client_configure(
     })
 }
 
-/// Set an attribute of a node.
+/// Sends SET_NODE, to set an attribute of a node, and keeps the vehicle's
+/// reason for [`tcs_client_reason`].
+///
+/// # Arguments
+///
+/// * `client`    - The client.
+/// * `node`      - The node's id.
+/// * `attribute` - The attribute's name.
+/// * `value`     - The value's bytes.
+/// * `length`    - How many bytes `value` holds.
+/// * `status`    - Where what the vehicle answered is written.
+///
+/// # Returns
+///
+/// 0, or -1 on an error, among them an answer about another node than the
+/// one asked about.
 ///
 /// # Safety
 ///
@@ -1166,6 +1447,16 @@ pub struct tcs_sample {
 }
 
 impl tcs_sample {
+    /// Copies a sample into the header's form.
+    ///
+    /// # Arguments
+    ///
+    /// * `sample` - The sample, as the vehicle answered it.
+    ///
+    /// # Returns
+    ///
+    /// The same sample, with its time in microseconds since 1970 or 0 where
+    /// nothing has moved.
     fn of(sample: &DHSample) -> tcs_sample {
         tcs_sample {
             moved: c_int::from(sample.time.is_some()),
@@ -1179,7 +1470,20 @@ impl tcs_sample {
     }
 }
 
-/// The last datum a node took, and the last it gave.
+/// Sends QUERY_NODE_SAMPLE, to ask for the last datum a node took and the
+/// last it gave.
+///
+/// # Arguments
+///
+/// * `client` - The client.
+/// * `node`   - The node's id.
+/// * `status` - Where what the vehicle answered is written.
+/// * `taken`  - Where the last datum the node took is written.
+/// * `given`  - Where the last datum the node gave is written.
+///
+/// # Returns
+///
+/// 0, or -1 on an error.
 ///
 /// # Safety
 ///
@@ -1253,7 +1557,17 @@ fn now() -> Result<Duration, Failed> {
         .map_err(|_| fail("this machine's clock reads before 1970"))
 }
 
-/// Ping the configuration's first ping node the ground can reach both ways.
+/// Opens a way to ping the configuration's first ping node the ground can
+/// reach both ways.
+///
+/// # Arguments
+///
+/// * `configuration` - The configuration.
+///
+/// # Returns
+///
+/// The pinger, or NULL where there is no such ping node or its moc node's
+/// uplink cannot be opened.
 ///
 /// # Safety
 ///
@@ -1318,7 +1632,15 @@ pub unsafe extern "C" fn tcs_pinger_moc(
     })
 }
 
-/// Send the next ping.
+/// Sends the next ping, stamped with this machine's clock.
+///
+/// # Arguments
+///
+/// * `pinger` - The pinger.
+///
+/// # Returns
+///
+/// 0, or -1 on an error.
 ///
 /// # Safety
 ///
@@ -1334,7 +1656,17 @@ pub unsafe extern "C" fn tcs_pinger_ping(pinger: *mut tcs_pinger) -> c_int {
     })
 }
 
-/// Fold in what the ping node sent down.
+/// Folds in what the ping node sent down.
+///
+/// # Arguments
+///
+/// * `pinger` - The pinger.
+/// * `data`   - The datum's bytes.
+/// * `length` - How many bytes `data` holds.
+///
+/// # Returns
+///
+/// 0, or -1 on an error.
 ///
 /// # Safety
 ///
@@ -1369,7 +1701,16 @@ pub unsafe extern "C" fn tcs_pinger_answered(
     })
 }
 
-/// What there is to know of the pings now.
+/// Says what there is to know of the pings now.
+///
+/// # Arguments
+///
+/// * `pinger`   - The pinger.
+/// * `exchange` - Where it is written.
+///
+/// # Returns
+///
+/// 0, or -1 on an error.
 ///
 /// # Safety
 ///

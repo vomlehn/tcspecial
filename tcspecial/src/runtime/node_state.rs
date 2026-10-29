@@ -53,7 +53,15 @@ pub struct Wakeup {
 }
 
 impl Wakeup {
-    /// A new pipe, both ends non-blocking.
+    /// Makes a new pipe, both ends non-blocking.
+    ///
+    /// # Returns
+    ///
+    /// The wakeup, owning both ends.
+    ///
+    /// # Errors
+    ///
+    /// The error `pipe2` reported, such as running out of descriptors.
     pub fn new() -> std::io::Result<Wakeup> {
         let mut fds = [0i32; 2];
         // SAFETY: `fds` is two ints, which is what pipe2 writes, and the flag
@@ -73,7 +81,7 @@ impl Wakeup {
         self.read_fd
     }
 
-    /// Wake whatever is waiting on this node.
+    /// Wakes whatever is waiting on this node.
     ///
     /// One byte, and a failure is ignored on purpose. The two ways it can fail
     /// are a full pipe -- which already holds a byte nobody has read, so the
@@ -89,7 +97,7 @@ impl Wakeup {
         }
     }
 
-    /// Take whatever pokes are waiting in the pipe.
+    /// Takes whatever pokes are waiting in the pipe.
     ///
     /// So that a wait woken by one disable does not return at once for ever
     /// after. Non-blocking, and an empty pipe is the ordinary answer.
@@ -167,10 +175,10 @@ impl Abandon {
         self.wakeup.as_ref().map(|wakeup| wakeup.io_fd())
     }
 
-    /// Wait `how_long`, or until the node is disabled, and say which happened.
+    /// Waits `how_long`, or until the node is disabled, and says which
+    /// happened.
     ///
-    /// `true` is "give up": the node has been disabled and the operation stops
-    /// where it stands. A disable that waited out a delay would arrive up to
+    /// A disable that waited out a delay would arrive up to
     /// that delay late, which on a part that has stopped answering is exactly
     /// when it is wanted.
     ///
@@ -178,6 +186,18 @@ impl Abandon {
     /// poll's own -- a descriptor this closed, which cannot happen while the
     /// Arc above is held -- and abandoning the operation over it would stop a
     /// node nobody asked to stop.
+    ///
+    /// With no wakeup, as from [`Abandon::nothing`], this sleeps the whole
+    /// `how_long` and never gives up.
+    ///
+    /// # Arguments
+    ///
+    /// * `how_long` - The longest to wait; zero asks without waiting.
+    ///
+    /// # Returns
+    ///
+    /// `true` for "give up": the node has been disabled and the operation
+    /// stops where it stands. `false` when the time ran out first.
     pub fn wait(&self, how_long: Duration) -> bool {
         use nix::poll::{poll, PollFd, PollFlags};
 
@@ -218,16 +238,20 @@ impl Nudge {
         Ok(Nudge(Arc::new(Wakeup::new()?)))
     }
 
-    /// Ask for the wait to end now.
+    /// Asks for the wait to end now.
     pub fn poke(&self) {
         self.0.poke();
     }
 
-    /// Wait up to `how_long`, or until something pokes this.
+    /// Waits up to `how_long`, or until something pokes this.
     ///
     /// A poll rather than a sleep, which is the whole point, and the pipe is
     /// drained afterwards whether it was the poke or the clock that ended the
     /// wait: anything in it has been dealt with by the pass that follows.
+    ///
+    /// # Arguments
+    ///
+    /// * `how_long` - The longest to wait; zero only drains the pipe.
     pub fn wait(&self, how_long: Duration) {
         use nix::poll::{poll, PollFd, PollFlags};
 
@@ -296,7 +320,12 @@ impl Counters {
         self.last_moved.store(at.micros(), Ordering::Relaxed);
     }
 
-    /// What they say, as the ground is told it.
+    /// Reads the counts, as the ground is told them.
+    ///
+    /// # Returns
+    ///
+    /// Every count, and the time of the last move or `None` for a node that
+    /// has moved nothing.
     pub fn counts(&self) -> NodeCounts {
         let read = |counter: &AtomicU64| counter.load(Ordering::Relaxed);
         NodeCounts {
@@ -363,7 +392,7 @@ pub struct NodeState {
 }
 
 impl NodeState {
-    /// A node as it comes up: enabled.
+    /// Makes a node's state as it comes up: enabled.
     ///
     /// Every node of a checked configuration is opened when the vehicle starts
     /// and runs until it is stopped, because what a graph describes is a
@@ -372,6 +401,19 @@ impl NodeState {
     /// contact has to do. Nodes that came up idle and were told which to start
     /// would suit a set of separately useful payloads, and do not suit a graph
     /// whose links describe one machine.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - What the node is called, for messages about it.
+    /// * `id`   - Its node id, which commands name it by.
+    ///
+    /// # Returns
+    ///
+    /// The state, enabled and switchable, with nothing counted.
+    ///
+    /// # Errors
+    ///
+    /// The error making its [`Wakeup`]'s pipe failed with.
     pub fn new(name: &str, id: NodeId) -> std::io::Result<NodeState> {
         Ok(NodeState {
             name: name.into(),
@@ -440,11 +482,15 @@ impl NodeState {
         self.counters.counts()
     }
 
-    /// The last datum each way, for an operator who wants the bytes.
+    /// Gives the last datum each way, for an operator who wants the bytes.
     ///
     /// A lock that cannot be had gives nothing rather than waiting: the
     /// samples are best effort, and a reader is not a reason to hold up the
     /// pass that is writing them.
+    ///
+    /// # Returns
+    ///
+    /// A copy of the samples, or empty ones when the lock was held.
     pub fn samples(&self) -> Samples {
         match self.samples.try_lock() {
             Ok(held) => Samples {
@@ -455,7 +501,11 @@ impl NodeState {
         }
     }
 
-    /// Record what the vehicle took from this node.
+    /// Records what the vehicle took from this node.
+    ///
+    /// # Arguments
+    ///
+    /// * `how` - The read's outcome: the bytes it moved, or a failure.
     pub fn took(&self, how: Outcome) {
         match how {
             Outcome::Moved(bytes) => {
@@ -471,7 +521,11 @@ impl NodeState {
         }
     }
 
-    /// And what it gave it.
+    /// Records what the vehicle gave this node.
+    ///
+    /// # Arguments
+    ///
+    /// * `how` - The write's outcome: the bytes it moved, or a failure.
     pub fn gave(&self, how: Outcome) {
         match how {
             Outcome::Moved(bytes) => {
@@ -497,7 +551,12 @@ impl NodeState {
         self.counters.dropped.fetch_add(1, Ordering::Relaxed);
     }
 
-    /// A trigger sent to it, or one it would not take.
+    /// Counts a trigger sent to this node, or one it would not take.
+    ///
+    /// # Arguments
+    ///
+    /// * `how` - Whether the trigger went (its size is not counted) or
+    ///           failed.
     pub fn asked(&self, how: Outcome) {
         match how {
             Outcome::Moved(_) => {
@@ -509,14 +568,14 @@ impl NodeState {
         }
     }
 
-    /// Keep the last datum taken from this node.
+    /// Keeps the last datum taken from this node.
     pub fn sample_taken(&self, data: &[u8]) {
         if let Ok(mut held) = self.samples.try_lock() {
             held.taken.record(data);
         }
     }
 
-    /// And the last given it.
+    /// Keeps the last datum given this node.
     pub fn sample_given(&self, data: &[u8]) {
         if let Ok(mut held) = self.samples.try_lock() {
             held.given.record(data);
@@ -548,11 +607,23 @@ pub struct NodeStates {
 }
 
 impl NodeStates {
-    /// A state for every node of this configuration.
+    /// Makes a state for every node of this configuration.
     ///
     /// Ids from `telemetry::ids`, which is the one algorithm that gives them:
     /// two tables computed separately could drift apart, and the drift would
     /// show as commands about the wrong node rather than as an error.
+    ///
+    /// # Arguments
+    ///
+    /// * `graph` - The configuration whose nodes are given states.
+    ///
+    /// # Returns
+    ///
+    /// The states, each enabled, switchable as its node's type says.
+    ///
+    /// # Errors
+    ///
+    /// The error making a node's [`Wakeup`] failed with.
     pub fn of(graph: &Graph) -> std::io::Result<NodeStates> {
         let ids = tcslibgs::graph::telemetry::ids(graph);
         let mut states = NodeStates::default();
@@ -612,7 +683,11 @@ impl NodeStates {
             .is_none_or(|state| state.is_enabled())
     }
 
-    /// The names of the nodes that are disabled, in order, for a message.
+    /// Lists the nodes that are disabled, for a message.
+    ///
+    /// # Returns
+    ///
+    /// Their names, in node id order.
     pub fn disabled(&self) -> Vec<&str> {
         self.by_id
             .iter()

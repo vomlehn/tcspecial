@@ -12,6 +12,13 @@
 
 use std::process::ExitCode;
 
+/// Deletes the one file named on the command line, the filled segment.
+///
+/// # Returns
+///
+/// Success once the file is deleted; 2 for a command line that does not
+/// name exactly one file, and failure for a file that cannot be deleted,
+/// each said on stderr.
 fn main() -> ExitCode {
     let mut args = std::env::args_os().skip(1);
     let (Some(file), None) = (args.next(), args.next()) else {

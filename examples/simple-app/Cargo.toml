@@ -15,3 +15,6 @@ tcslib = { path = "../../tcslib" }
 [dev-dependencies]
 tcsapp = { path = "../../tcsapp" }
 tempfile = "3"
+
+[lints]
+workspace = true

@@ -36,7 +36,7 @@ pub struct AppPayloadVeh {
 }
 
 impl AppPayloadVeh {
-    /// Start the program this node names.
+    /// Starts the program this node names.
     ///
     /// Started when the configuration is loaded rather than at the first
     /// datum, which is the rule a computation's `process` is held to as well:
@@ -47,6 +47,21 @@ impl AppPayloadVeh {
     /// because nothing here is driving it: the policy is read and checked so
     /// that a configuration can state it, and what acts on it is the fabric
     /// work this node is waiting for.
+    ///
+    /// # Arguments
+    ///
+    /// * `params` - The node's attributes: its kind, which must be
+    ///              `Kind::PayloadVeh`, its program and that program's
+    ///              arguments.
+    ///
+    /// # Returns
+    ///
+    /// The node, its program running.
+    ///
+    /// # Errors
+    ///
+    /// A message saying why, if `params` is of another kind, or the
+    /// program cannot be found or started.
     pub fn of(params: &AppParams) -> Result<AppPayloadVeh, String> {
         if params.kind != Kind::PayloadVeh {
             return Err(format!(
@@ -122,7 +137,7 @@ mod tests {
 
     use tcslibgs::node::vehicle::Restart;
 
-    /// A program standing in for an app of this kind.
+    /// Writes a program standing in for an app of this kind.
     ///
     /// `cat`, with its output sent to the one interface this kind is given: it
     /// reads payload data at descriptor 0 and writes what it read back to the
@@ -130,6 +145,18 @@ mod tests {
     /// than a crate of its own, because what is tested here is this node and
     /// not an app -- the apps are `app_payload_veh`, `app_moc_veh` and
     /// `app_all_veh`, which are crates and have tests of their own.
+    ///
+    /// # Arguments
+    ///
+    /// * `where_` - The directory to write it in.
+    ///
+    /// # Returns
+    ///
+    /// The program's path.
+    ///
+    /// # Panics
+    ///
+    /// If it cannot be written or made executable.
     fn stands_in(where_: &std::path::Path) -> PathBuf {
         let path = where_.join("stands_in");
         let mut file = std::fs::File::create(&path).expect("a program");
@@ -140,7 +167,15 @@ mod tests {
         path
     }
 
-    /// What such a node is told, for a program at `executable`.
+    /// Makes the attributes such a node is given.
+    ///
+    /// # Arguments
+    ///
+    /// * `executable` - Where its program is.
+    ///
+    /// # Returns
+    ///
+    /// The attributes of a node of this kind that never restarts.
     fn says(executable: &std::path::Path) -> AppParams {
         AppParams {
             name: "fore".to_string(),

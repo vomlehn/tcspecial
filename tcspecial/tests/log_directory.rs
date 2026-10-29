@@ -7,8 +7,16 @@
 use std::net::UdpSocket;
 use std::process::Command;
 
-/// A port nothing holds: the configuration check refuses port 0, a link
-/// nobody can predict the port of.
+/// Finds a loopback port nothing holds: the configuration check refuses
+/// port 0, a link nobody can predict the port of.
+///
+/// # Returns
+///
+/// The port.
+///
+/// # Panics
+///
+/// If no port can be bound.
 fn free() -> u16 {
     UdpSocket::bind("127.0.0.1:0")
         .and_then(|socket| socket.local_addr())

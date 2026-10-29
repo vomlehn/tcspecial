@@ -44,10 +44,20 @@ pub struct TelemetryHeader {
 }
 
 impl TelemetryHeader {
-    /// A header for an answer being made now.
+    /// Makes a header for an answer being made now.
     ///
     /// The only way one is built, so that a telemetry type added later cannot
     /// forget the time: there is nowhere to leave it out.
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence` - The sequence number of the command it answers.
+    /// * `tm_type`  - What kind of answer it is.
+    /// * `status`   - How the command went.
+    ///
+    /// # Returns
+    ///
+    /// The header, stamped with the time now and with generation nought.
     pub fn new(
         sequence: u32,
         tm_type: TelemetryType,
@@ -84,9 +94,13 @@ pub enum TelemetryType {
 }
 
 impl TelemetryType {
-    /// The kind an answer of this type carries. What goes on the link is
-    /// stated in `xtce/link.xml`, and a test in [`crate::link`] holds this to
-    /// it, so the two cannot come to differ.
+    /// Gives the kind an answer of this type carries. What goes on the link
+    /// is stated in `xtce/link.xml`, and a test in [`crate::link`] holds this
+    /// to it, so the two cannot come to differ.
+    ///
+    /// # Returns
+    ///
+    /// The kind's byte on the link.
     pub fn to_u8(&self) -> u8 {
         match self {
             TelemetryType::Ping => 0x81,
@@ -102,6 +116,16 @@ impl TelemetryType {
         }
     }
 
+    /// Reads the type an answer's kind byte names: [`TelemetryType::to_u8`]
+    /// the other way.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The kind's byte on the link.
+    ///
+    /// # Returns
+    ///
+    /// The type, or `None` for a byte that names none.
     pub fn from_u8(value: u8) -> Option<Self> {
         match value {
             0x81 => Some(TelemetryType::Ping),
@@ -140,6 +164,16 @@ pub struct RestartArmTelemetry {
 }
 
 impl RestartArmTelemetry {
+    /// Makes the answer to a RESTART_ARM, made now.
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence` - The sequence number of the command it answers.
+    /// * `status`   - How the command went.
+    ///
+    /// # Returns
+    ///
+    /// The answer.
     pub fn new(sequence: u32, status: CommandStatus) -> Self {
         Self {
             header: TelemetryHeader::new(
@@ -158,6 +192,16 @@ pub struct RestartTelemetry {
 }
 
 impl RestartTelemetry {
+    /// Makes the answer to a RESTART, made now.
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence` - The sequence number of the command it answers.
+    /// * `status`   - How the command went.
+    ///
+    /// # Returns
+    ///
+    /// The answer.
     pub fn new(sequence: u32, status: CommandStatus) -> Self {
         Self {
             header: TelemetryHeader::new(
@@ -186,6 +230,18 @@ pub struct ConnectTelemetry {
 }
 
 impl ConnectTelemetry {
+    /// Makes a successful answer to a CONNECT, made now.
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence`     - The sequence number of the CONNECT.
+    /// * `version`      - The version of this end's build.
+    /// * `digest`       - The digest of the configuration this end read.
+    /// * `newest_taken` - The newest command sequence this start has taken.
+    ///
+    /// # Returns
+    ///
+    /// The answer.
     pub fn new(
         sequence: u32,
         version: ConfigVersion,
@@ -204,12 +260,20 @@ impl ConnectTelemetry {
         }
     }
 
-    /// The same answer, with a status other than success.
+    /// Makes the same answer with a status other than success.
     ///
     /// For a CONNECT that is refused rather than answered -- one that arrived
     /// on a payload's link, which is not what a connection to the vehicle is
     /// asked on. The facts are this end's all the same, so the ground
     /// is told what it asked as well as that it asked in the wrong place.
+    ///
+    /// # Arguments
+    ///
+    /// * `status` - Why it is refused.
+    ///
+    /// # Returns
+    ///
+    /// The answer, with a fresh header carrying `status`.
     pub fn refused(self, status: CommandStatus) -> Self {
         Self {
             header: TelemetryHeader::new(
@@ -228,6 +292,16 @@ pub struct ConfigTelemetry {
 }
 
 impl ConfigTelemetry {
+    /// Makes the answer to a CONFIG, made now.
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence` - The sequence number of the command it answers.
+    /// * `status`   - How the command went.
+    ///
+    /// # Returns
+    ///
+    /// The answer.
     pub fn new(sequence: u32, status: CommandStatus) -> Self {
         Self {
             header: TelemetryHeader::new(
@@ -265,6 +339,18 @@ impl NodeTelemetry {
         Self::of(sequence, TelemetryType::StopNode, status, node)
     }
 
+    /// Makes an answer about one node, made now.
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence` - The sequence number of the command it answers.
+    /// * `tm_type`  - Which command it answers: START_NODE or STOP_NODE.
+    /// * `status`   - How the command went.
+    /// * `node`     - The node the command named.
+    ///
+    /// # Returns
+    ///
+    /// The answer.
     fn of(
         sequence: u32,
         tm_type: TelemetryType,
@@ -300,7 +386,18 @@ pub struct SetNodeTelemetry {
 }
 
 impl SetNodeTelemetry {
-    /// The answer, with no reason: see [`SetNodeTelemetry::because`].
+    /// Makes the answer to a SET_NODE, made now, with no reason: see
+    /// [`SetNodeTelemetry::because`].
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence` - The sequence number of the command it answers.
+    /// * `status`   - How the command went.
+    /// * `node`     - The node the command named.
+    ///
+    /// # Returns
+    ///
+    /// The answer.
     pub fn new(sequence: u32, status: CommandStatus, node: NodeId) -> Self {
         Self {
             header: TelemetryHeader::new(
@@ -441,6 +538,19 @@ pub struct QueryNodeTelemetry {
 }
 
 impl QueryNodeTelemetry {
+    /// Makes the answer to a QUERY_NODE, made now.
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence` - The sequence number of the command it answers.
+    /// * `status`   - How the command went.
+    /// * `node`     - The node the command named.
+    /// * `enabled`  - Whether the pass may touch it.
+    /// * `counts`   - What it has moved since the vehicle started.
+    ///
+    /// # Returns
+    ///
+    /// The answer.
     pub fn new(
         sequence: u32,
         status: CommandStatus,
@@ -487,6 +597,19 @@ pub struct QueryNodeSampleTelemetry {
 }
 
 impl QueryNodeSampleTelemetry {
+    /// Makes the answer to a QUERY_NODE_SAMPLE, made now.
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence` - The sequence number of the command it answers.
+    /// * `status`   - How the command went.
+    /// * `node`     - The node the command named.
+    /// * `taken`    - The last datum the vehicle took from it.
+    /// * `given`    - The last datum the vehicle gave it.
+    ///
+    /// # Returns
+    ///
+    /// The answer.
     pub fn new(
         sequence: u32,
         status: CommandStatus,
@@ -507,7 +630,7 @@ impl QueryNodeSampleTelemetry {
     }
 }
 
-/// An answer of this status to a command of that kind.
+/// Makes an answer of this status to a command of that kind.
 ///
 /// The telemetry type has to match the command, because that is how the ground
 /// pairs an answer with what it asked: a refusal of the wrong type is an
@@ -517,6 +640,15 @@ impl QueryNodeSampleTelemetry {
 /// For the answers that carry nothing but a status. The ones that carry
 /// measurements -- a handler's statistics, a handler's last transfers -- are
 /// given empty ones here: a refused command measured nothing.
+///
+/// # Arguments
+///
+/// * `command` - The command answered.
+/// * `status`  - How it went.
+///
+/// # Returns
+///
+/// The answer, of the type that pairs with the command.
 pub fn answer_to(
     command: &crate::commands::Command,
     status: CommandStatus,
@@ -595,7 +727,11 @@ pub enum Telemetry {
 }
 
 impl Telemetry {
-    /// The header every answer starts with.
+    /// Gives the header every answer starts with.
+    ///
+    /// # Returns
+    ///
+    /// This answer's header.
     pub fn header(&self) -> &TelemetryHeader {
         match self {
             Telemetry::Ping(tm) => &tm.header,
@@ -610,6 +746,11 @@ impl Telemetry {
         }
     }
 
+    /// Gives the header every answer starts with, to change.
+    ///
+    /// # Returns
+    ///
+    /// This answer's header.
     fn header_mut(&mut self) -> &mut TelemetryHeader {
         match self {
             Telemetry::Ping(tm) => &mut tm.header,

@@ -26,11 +26,15 @@ pub struct Startup {
 }
 
 impl Startup {
-    /// What the verifier found, said in its words.
+    /// Adds what the verifier found, said in its words.
     ///
-    /// `fatal` says whether its errors stop this program, which is a question
-    /// about the program and not about the files: tcsmoc reads a simulator
-    /// file only to show it, and goes on without one that is wrong.
+    /// # Arguments
+    ///
+    /// * `report` - What the verifier found.
+    /// * `fatal`  - Whether its errors stop this program, which is a question
+    ///              about the program and not about the files: tcsmoc reads
+    ///              a simulator file only to show it, and goes on without one
+    ///              that is wrong.
     pub fn report(&mut self, report: &Report, fatal: bool) {
         self.lines.extend(report.lines());
         if fatal && report.found_errors() {
@@ -38,8 +42,14 @@ impl Startup {
         }
     }
 
-    /// The same, with one file read loosely: errors in `loose` are said and
-    /// do not stop the program, and errors anywhere else do.
+    /// Adds what the verifier found, with one file read loosely: errors in
+    /// `loose` are said and do not stop the program, and errors anywhere else
+    /// do.
+    ///
+    /// # Arguments
+    ///
+    /// * `report` - What the verifier found.
+    /// * `loose`  - The file whose errors do not stop the program.
     pub fn report_loosely(&mut self, report: &Report, loose: &Path) {
         self.lines.extend(report.lines());
         if report.findings.iter().any(|finding| {
@@ -101,6 +111,16 @@ mod tests {
     use std::path::PathBuf;
     use tcslibgs::graph::check::Severity;
 
+    /// Makes a finding of "wrong" at line 1 of a file.
+    ///
+    /// # Arguments
+    ///
+    /// * `file`     - The file it is about.
+    /// * `severity` - Whether it is an error or a warning.
+    ///
+    /// # Returns
+    ///
+    /// The finding.
     fn finding(file: &str, severity: Severity) -> Finding {
         Finding {
             file: PathBuf::from(file),

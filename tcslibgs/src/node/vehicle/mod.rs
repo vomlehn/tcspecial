@@ -45,13 +45,11 @@ pub enum Restart {
 }
 
 impl Restart {
-    /// What a `restart` says, or what is wrong with what it says.
+    /// Reads what a `restart` attribute says.
     ///
-    /// `said` is the attribute as the file wrote it, and `None` is a file
-    /// that did not write it at all. The one place the two spellings are
-    /// read: an app node and a `process` computation take the same attribute,
-    /// and two readings of it would be two answers on the day one of them
-    /// learned a third spelling.
+    /// The one place the two spellings are read: an app node and a `process`
+    /// computation take the same attribute, and two readings of it would be
+    /// two answers on the day one of them learned a third spelling.
     ///
     /// Nothing else is accepted, a number of times included. A bound on the
     /// restarts is a thing somebody would have to choose, and a configuration
@@ -62,6 +60,20 @@ impl Restart {
     /// An empty value is a file that says nothing, which is what the editor
     /// writes when somebody empties the field: a cleared box should leave the
     /// node as it was before anybody typed in it, not make it faulty.
+    ///
+    /// # Arguments
+    ///
+    /// * `said` - The attribute as the file wrote it, `None` for a file that
+    ///            did not write it at all.
+    ///
+    /// # Returns
+    ///
+    /// [`Restart::WhenItStops`] for `true`, and [`Restart::Never`] for
+    /// `false`, an empty value or none.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the attribute for any other value.
     pub fn of(said: Option<&str>) -> Result<Restart, String> {
         match said.map(str::trim) {
             None | Some("") | Some("false") => Ok(Restart::Never),

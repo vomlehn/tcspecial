@@ -66,7 +66,15 @@ pub const LARGEST_BASE_ID: u32 = 0x7FF;
 /// As above, for an extended identifier.
 pub const LARGEST_EXTENDED_ID: u32 = 0x1FFF_FFFF;
 
-/// How many bytes a payload's frames may carry, by what kind they are.
+/// Says how many bytes a payload's frames may carry, by what kind they are.
+///
+/// # Arguments
+///
+/// * `fd` - Whether the frames are CAN FD rather than classic.
+///
+/// # Returns
+///
+/// The largest payload of one frame, in bytes.
 pub fn frame_bytes(fd: bool) -> usize {
     if fd {
         FD_FRAME_BYTES
@@ -85,7 +93,20 @@ pub fn is_extended(can_id: u32) -> bool {
     can_id > LARGEST_BASE_ID
 }
 
-/// Check an identifier a file stated, by the ranges CAN has.
+/// Checks an identifier a file stated, by the ranges CAN has.
+///
+/// # Arguments
+///
+/// * `name`   - The node's name, for the message.
+/// * `can_id` - The identifier.
+///
+/// # Returns
+///
+/// The identifier.
+///
+/// # Errors
+///
+/// An identifier above the largest extended, 29-bit, one.
 pub fn check_can_id(name: &str, can_id: u32) -> EndpointConfigResult<u32> {
     if can_id > LARGEST_EXTENDED_ID {
         return Err(bad(
@@ -101,12 +122,26 @@ pub fn check_can_id(name: &str, can_id: u32) -> EndpointConfigResult<u32> {
     Ok(can_id)
 }
 
-/// What a CAN payload says about its bus, and what it must say.
+/// Reads what a CAN payload says about its bus, and what it must say.
 ///
 /// Nothing is required but the kind itself: a bus that states no bitrate is
 /// one whose rate is set where it is brought up, which is every bus the
 /// simulator uses, and classic frames and loopback are what a bus does
 /// unless a file says otherwise.
+///
+/// # Arguments
+///
+/// * `name` - The node's name, for the messages.
+/// * `g`    - The node's terms as the file states them.
+///
+/// # Returns
+///
+/// Whether the bus carries CAN FD frames and whether it loops back.
+///
+/// # Errors
+///
+/// A term that does not belong to CAN, a `stream`, and a flag that is not a
+/// boolean.
 pub(crate) fn group_kind_of(
     name: &str,
     g: LinkTerms,
@@ -134,12 +169,22 @@ const TO_STAND_IN: &str =
 /// The type the kernel gives a CAN interface, `ARPHRD_CAN`.
 const ARPHRD_CAN: &str = "280";
 
-/// Whether `interface` is a virtual CAN interface, from the kernel's account
-/// of it. See [`crate::simulate`].
+/// Judges whether a network interface is a virtual CAN interface, from the
+/// kernel's account of it. See [`crate::simulate`].
 ///
 /// A `vcan` has no device behind it, so the kernel keeps it under
 /// `devices/virtual/net`; a controller is kept under the bus it is on. The
 /// interface's name is anyone's to choose and says nothing.
+///
+/// # Arguments
+///
+/// * `host`      - The host, whose `/sys` is read.
+/// * `interface` - The interface's name, such as `vcan0`.
+///
+/// # Returns
+///
+/// Absent when there is no such interface, cannot-tell when it is not CAN,
+/// a stand-in when it is virtual, and hardware otherwise.
 pub fn judged(
     host: &crate::simulate::Host,
     interface: &str,
@@ -188,6 +233,18 @@ mod stand_in_tests {
     use super::*;
     use crate::simulate::{Host, Verdict};
 
+    /// Makes a network interface in a stand-in for `/sys`.
+    ///
+    /// # Arguments
+    ///
+    /// * `sys`   - The stand-in for `/sys`.
+    /// * `name`  - The interface's name.
+    /// * `under` - The directory under `sys` its device is kept in.
+    /// * `kind`  - What its `type` file says.
+    ///
+    /// # Panics
+    ///
+    /// If any of it cannot be made.
     fn interface(sys: &std::path::Path, name: &str, under: &str, kind: &str) {
         let device = sys.join(under).join(name);
         std::fs::create_dir_all(&device).unwrap();
@@ -224,6 +281,19 @@ mod tests {
     use super::*;
     use crate::endpoint_config::Scalar;
 
+    /// Makes terms as a file states them, with everything else absent.
+    ///
+    /// # Arguments
+    ///
+    /// * `stated` - Each term stated, with its value as written.
+    ///
+    /// # Returns
+    ///
+    /// The terms.
+    ///
+    /// # Panics
+    ///
+    /// If a term is not `can_fd`, `loopback` or `datarate`.
     fn terms(stated: &[(&str, &str)]) -> LinkTerms {
         let mut g = LinkTerms::default();
         for (field, value) in stated {
@@ -238,6 +308,19 @@ mod tests {
         g
     }
 
+    /// Reads the bus a node named `payload` states.
+    ///
+    /// # Arguments
+    ///
+    /// * `stated` - Each term stated, with its value as written.
+    ///
+    /// # Returns
+    ///
+    /// The bus's parameters.
+    ///
+    /// # Panics
+    ///
+    /// If the terms are refused, or are not a CAN bus.
     fn params(stated: &[(&str, &str)]) -> CanParams {
         match group_kind_of("payload", terms(stated)).expect("a bus") {
             GroupKind::Can(can) => can,

@@ -84,7 +84,16 @@ pub struct Editor {
 }
 
 impl Editor {
-    /// Start a session on `path`, which need not exist yet.
+    /// Starts a session on `path`, which need not exist yet.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The configuration file the session writes to.
+    ///
+    /// # Returns
+    ///
+    /// The session, with an empty document and history, nothing unsaved and
+    /// nothing wrong.
     pub fn new(path: &Path) -> Self {
         Editor {
             document: Document::new(),
@@ -110,7 +119,7 @@ impl Editor {
         self.read_only = read_only;
     }
 
-    /// Open a configuration: the document from the file, the history from
+    /// Opens a configuration: the document from the file, the history from
     /// beside it.
     ///
     /// Two files and two different questions. *What is the configuration* is
@@ -148,6 +157,16 @@ impl Editor {
     /// because what is read has to obey the rule the editor enforces: a
     /// payload the file draws in the vehicle working pane is brought into its
     /// own. See [`Document::settle`], which says what that is and is not.
+    ///
+    /// # Arguments
+    ///
+    /// * `path`     - The configuration file, which need not exist yet.
+    /// * `dividers` - Where the three working panes meet.
+    ///
+    /// # Returns
+    ///
+    /// The session. What stopped the file being read, if anything, is in its
+    /// trouble.
     pub fn open(path: &Path, dividers: crate::pane::Dividers) -> Self {
         let mut editor = Editor::new(path);
 
@@ -176,7 +195,7 @@ impl Editor {
         editor
     }
 
-    /// Also open the simulator's configuration, from a second file.
+    /// Also opens the simulator's configuration, from a second file.
     ///
     /// Part of the same session on purpose: the two files are edited
     /// together, checked together and must agree, so one Save writes both and
@@ -184,6 +203,11 @@ impl Editor {
     /// that cannot be read is said so and opened as nothing, as the
     /// configuration is: an editor that refused to start on a damaged file
     /// would be an editor that cannot be used to fix one.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The simulator configuration file, which must be named `.yaml`
+    ///            and need not exist yet.
     pub fn open_simulator(&mut self, path: &Path) {
         self.simulator_path = Some(path.to_path_buf());
 
@@ -321,12 +345,16 @@ impl Editor {
         self.persist();
     }
 
-    /// Apply an edit, record it, and write both files.
+    /// Applies an edit, records it, and writes both files.
     ///
     /// The document is changed whether or not the write succeeds: refusing the
     /// edit would mean a full device makes the editor unusable rather than
     /// unable to save, and the person at the keyboard is better served by
     /// being told plainly and allowed to carry on until they can fix it.
+    ///
+    /// # Arguments
+    ///
+    /// * `edit` - The edit to make. Ignored in a read-only session.
     pub fn edit(&mut self, edit: Edit) {
         // A session that may not change anything takes no edit, whatever
         // asked for it: the window greys what would make one, and this is
@@ -339,7 +367,7 @@ impl Editor {
         self.persist();
     }
 
-    /// Rename the node in this position, as a repair rather than an edit.
+    /// Renames the node in this position, as a repair rather than an edit.
     ///
     /// For the one thing that cannot be done by [`Edit::RenameNode`]: telling
     /// two nodes that share a name apart. A name is how an edit says which
@@ -357,6 +385,11 @@ impl Editor {
     ///
     /// Written at once, for the same reason: the document and the file must
     /// not disagree about a name while the session carries on.
+    ///
+    /// # Arguments
+    ///
+    /// * `at`  - The node's index in the document's list of nodes.
+    /// * `now` - Its new name, within its own subdiagram.
     pub fn settle_name(&mut self, at: usize, now: &str) {
         if self.read_only {
             return;
@@ -365,7 +398,7 @@ impl Editor {
         self.persist();
     }
 
-    /// Lay every node out afresh: each at the top of its own pane, nothing
+    /// Lays every node out afresh: each at the top of its own pane, nothing
     /// covering anything.
     ///
     /// One edit, so one undo puts the whole layout back -- see
@@ -375,6 +408,10 @@ impl Editor {
     ///
     /// `dividers` is where the panes meet in the window asking, since that is
     /// what says how wide a pane is.
+    ///
+    /// # Arguments
+    ///
+    /// * `dividers` - Where the working panes meet in the window asking.
     pub fn arrange(&mut self, dividers: crate::pane::Dividers) {
         let now = self.document.arranged(dividers);
         if now.is_empty() {
@@ -384,7 +421,12 @@ impl Editor {
         self.edit(Edit::Arrange { was, now });
     }
 
-    /// Take back the last edit.
+    /// Takes back the last edit.
+    ///
+    /// # Returns
+    ///
+    /// Whether an edit was undone: false at the start of the history or in a
+    /// read-only session.
     pub fn undo(&mut self) -> bool {
         if self.read_only {
             return false;
@@ -399,7 +441,12 @@ impl Editor {
         }
     }
 
-    /// Put back an edit that was taken off.
+    /// Puts back an edit that was taken off.
+    ///
+    /// # Returns
+    ///
+    /// Whether an edit was redone: false at the end of the history or in a
+    /// read-only session.
     pub fn redo(&mut self) -> bool {
         if self.read_only {
             return false;
@@ -502,6 +549,14 @@ fn describe(why: &SaveError) -> String {
 /// One name is quoted; two are joined by "and"; more are a comma list with an
 /// "and" before the last. A message that said `["a", "b"]` would be a message
 /// written for a programmer.
+///
+/// # Arguments
+///
+/// * `names` - The names, in the order they are to be said.
+///
+/// # Returns
+///
+/// The names quoted and joined; empty for no names.
 fn said_list(names: &[&String]) -> String {
     let quoted: Vec<String> =
         names.iter().map(|name| format!("\"{name}\"")).collect();
@@ -521,6 +576,16 @@ fn said_list(names: &[&String]) -> String {
 mod tests {
     use super::*;
 
+    /// Makes the edit that adds a node to the top diagram.
+    ///
+    /// # Arguments
+    ///
+    /// * `name`      - The new node's name.
+    /// * `node_type` - Its type, as the configuration spells it.
+    ///
+    /// # Returns
+    ///
+    /// The edit.
     fn add(name: &str, node_type: &str) -> Edit {
         Edit::AddNode {
             name: name.to_string(),

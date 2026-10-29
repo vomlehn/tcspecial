@@ -23,13 +23,24 @@ def set_up(mode):
 
 
 def playing(mode, state):
-    """A simulator answering with ``state[0]``, until the test ends."""
+    """A simulator answering with ``state[0]``, until the test ends.
+
+    Args:
+        mode:  The mode, as ``--simulate`` names it, it says it is set up for.
+        state: A one-element list holding the state it answers with, which the
+               test may change while it runs.
+
+    Returns:
+        A pair: the (host, port) it listens at, and the event that stops it.
+    """
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(("127.0.0.1", 0))
     sock.settimeout(0.1)
     stop = threading.Event()
 
     def serve():
+        """Answer every request on the socket until ``stop`` is set, then
+        close it."""
         while not stop.is_set():
             try:
                 data, came = sock.recvfrom(64)

@@ -216,6 +216,14 @@ pub fn lines() -> Lines {
 /// `None` for a number the paragraph has no line for, nought included: a
 /// caller asking for line nought has counted from the wrong end, and answering
 /// with the first line would hide that.
+///
+/// # Arguments
+///
+/// * `number` - The line's number, counting from one.
+///
+/// # Returns
+///
+/// The line, or `None` for a number the paragraph has no line for.
 pub fn line(number: usize) -> Option<Line> {
     number
         .checked_sub(1)

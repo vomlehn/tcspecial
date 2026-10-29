@@ -136,7 +136,7 @@ impl Desk {
         self.jobs.recv().ok()
     }
 
-    /// Say how a job went.
+    /// Says how a job went.
     ///
     /// Never waits: an answer with no room is one to a job nobody is waiting
     /// for any longer, which is not a reason to hold up the pass, and the
@@ -180,6 +180,14 @@ impl Workbench {
     /// command interpreter wants to see which work a command caused, and a
     /// program that drives the pass some other way wants the same handover
     /// without this module's loop.
+    ///
+    /// # Returns
+    ///
+    /// The command interpreter's end and the pass's end of one handover.
+    ///
+    /// # Errors
+    ///
+    /// Why the nudge's descriptors could not be made.
     pub fn in_two() -> std::io::Result<(Workbench, Desk)> {
         let (jobs, taken) = std::sync::mpsc::sync_channel(JOBS_AT_ONCE);
         let (answering, answers) = std::sync::mpsc::sync_channel(JOBS_AT_ONCE);
@@ -197,7 +205,7 @@ impl Workbench {
         ))
     }
 
-    /// Ask the pass to do this, and wait until it has.
+    /// Asks the pass to do this, and waits until it has.
     ///
     /// The nudge is poked after the job is queued, so a pass waiting for the
     /// next group to come due takes the work now rather than when the group
@@ -210,6 +218,20 @@ impl Workbench {
     /// An answer to an earlier job, whose asker gave up waiting, is passed
     /// over: each answer carries its job's ticket, so a late one cannot be
     /// taken for this one's.
+    ///
+    /// # Arguments
+    ///
+    /// * `work` - What the pass is to do.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` once the pass has done it.
+    ///
+    /// # Errors
+    ///
+    /// Why the work was refused or failed, as the pass answered; or that the
+    /// answers are lost (a lock poisoned), that the pass is no longer taking
+    /// work, or that it did not answer within [`WORK_DEADLINE`].
     pub fn ask(&self, work: Work) -> Result<(), String> {
         let answers = self.answers.lock().map_err(|_| {
             "the command interpreter's answers are lost".to_string()
@@ -235,7 +257,6 @@ impl Workbench {
     }
 }
 
-/// Everything a configuration needs in order to run.
 /// How a node is opened: the same call that opened everything at startup.
 ///
 /// A type of its own because it is written down twice -- the field that holds
@@ -249,6 +270,7 @@ type Opener = Box<
     ) -> Result<Box<dyn Port>, String>,
 >;
 
+/// Everything a configuration needs in order to run.
 pub struct System {
     /// The nodes, and the table saying how they are joined.
     fabric: Fabric,
@@ -289,7 +311,7 @@ pub struct System {
 }
 
 impl System {
-    /// Open everything this configuration describes.
+    /// Opens everything this configuration describes.
     ///
     /// The graph is expected checked -- `Graph::check` first, or `tcsverify`
     /// on the ground -- so what fails here is the hardware rather than the
@@ -299,6 +321,22 @@ impl System {
     ///
     /// Every log is opened with `segsend`, which is what its filled segments
     /// are handed to.
+    ///
+    /// # Arguments
+    ///
+    /// * `graph`   - The configuration, already checked.
+    /// * `now`     - When the vehicle starts, from which every group and
+    ///               paced node is first due.
+    /// * `segsend` - What each log hands its filled segments to.
+    ///
+    /// # Returns
+    ///
+    /// The system, every node and every payload's link to the ground open.
+    ///
+    /// # Errors
+    ///
+    /// Every reason a node or ground link would not open, or why a node's
+    /// or the loop's wakeup descriptor could not be made.
     pub fn of(
         graph: &Graph,
         now: Instant,
@@ -312,12 +350,31 @@ impl System {
         )
     }
 
-    /// Open everything, with `opener` deciding what a node becomes and
+    /// Opens everything, with `opener` deciding what a node becomes and
     /// `ground` what a payload's link to the ground becomes.
     ///
     /// For the tests, which have no bus, no chip and no ground station: the
     /// assembly and the loop are what is worth testing here, and testing them
     /// against real hardware would be testing the hardware.
+    ///
+    /// # Arguments
+    ///
+    /// * `graph`  - The configuration, already checked.
+    /// * `now`    - When the vehicle starts, from which every group and paced
+    ///              node is first due.
+    /// * `opener` - What a node becomes, given the node, the routing and the
+    ///              descriptor that abandons its waits; kept, to open a node
+    ///              again when the ground enables it.
+    /// * `ground` - What a payload's link to the ground becomes.
+    ///
+    /// # Returns
+    ///
+    /// The system, every node and every ground link held.
+    ///
+    /// # Errors
+    ///
+    /// Every reason `opener` or `ground` gave for refusing, or why a node's
+    /// or the loop's wakeup descriptor could not be made.
     pub fn of_opening(
         graph: &Graph,
         now: Instant,
@@ -418,6 +475,18 @@ impl System {
     /// then delivered a wave at a time, so everything downstream of a group --
     /// a conversion, a mean, a decision, a command to a heater -- happens
     /// inside the pass that read it. See [`Fabric::read_stage`].
+    ///
+    /// The command interpreter's work is done before the first stage and
+    /// between each pair of them.
+    ///
+    /// # Arguments
+    ///
+    /// * `now` - The time of the pass, which decides what is due.
+    ///
+    /// # Returns
+    ///
+    /// What the whole pass moved, with every refusal, a failed log flush
+    /// among them.
     pub fn pass(&mut self, now: Instant) -> Moved {
         let mut moved = Moved::default();
 
@@ -482,13 +551,22 @@ impl System {
         moved
     }
 
-    /// How long until the next pass is worth making.
+    /// Says how long until the next pass is worth making.
     ///
     /// The next group's due time, the next paced node's, or the polling pause
     /// where a node is polled on every pass -- whichever is sooner. A
     /// configuration whose nodes are all in groups, or all state their
     /// intervals, waits exactly until the next one is due and wakes for
     /// nothing else.
+    ///
+    /// # Arguments
+    ///
+    /// * `now` - The time from which to count.
+    ///
+    /// # Returns
+    ///
+    /// How long to wait; [`POLL_PAUSE`] at most where any node is read on
+    /// every pass, and [`POLL_PAUSE`] where nothing is scheduled at all.
     pub fn until_next_pass(&self, now: Instant) -> Duration {
         let groups = self.schedule.until_next(now);
         let paced = self
@@ -521,7 +599,7 @@ impl System {
         }
     }
 
-    /// Run until `stop` says otherwise, telling `report` about each pass.
+    /// Runs until `stop` says otherwise, telling `report` about each pass.
     ///
     /// The whole of the loop. Passes are made when something is due and the
     /// time between them is spent waiting, which is also what makes a stop
@@ -529,6 +607,14 @@ impl System {
     ///
     /// Nothing is reported for a pass that moved nothing and refused nothing,
     /// which is most of them.
+    ///
+    /// # Arguments
+    ///
+    /// * `stop`   - Asked before each pass; true ends the loop.
+    /// * `report` - Told what each pass moved, where it moved or refused
+    ///              anything.
+    /// * `pause`  - Waits the time given, until the next pass is worth
+    ///              making.
     pub fn run(
         &mut self,
         stop: &dyn Fn() -> bool,
@@ -574,7 +660,7 @@ impl System {
         self.bench.nudge.clone()
     }
 
-    /// Do whatever the command interpreter has handed over.
+    /// Does whatever the command interpreter has handed over.
     ///
     /// Between stages and never inside one, which is the rule: a node whose
     /// configuration changed in the middle of an operation would be a node
@@ -598,7 +684,7 @@ impl System {
         }
     }
 
-    /// Open a node again and let the pass touch it.
+    /// Opens a node again and lets the pass touch it.
     ///
     /// The same work as starting it at startup, by the same function, so it
     /// can fail the same ways: a device that is gone, an address already
@@ -613,6 +699,18 @@ impl System {
     /// port, the device's handles and buffers -- and the node's description
     /// is copied to open it from. Done for a START_NODE the ground sends,
     /// and never by a pass of its own accord.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - What the configuration calls the node.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` once the node is open and enabled.
+    ///
+    /// # Errors
+    ///
+    /// That the configuration has no such node, or why it would not open.
     pub fn reopen(&mut self, name: &str) -> Result<(), String> {
         let Some(node) = self.nodes.get(name).cloned() else {
             return Err(format!("there is no node called \"{name}\" here"));
@@ -638,7 +736,7 @@ impl System {
         Ok(())
     }
 
-    /// Release what a node held, the ground having stopped it.
+    /// Releases what a node held, the ground having stopped it.
     ///
     /// The endpoint is closed and the device, bus address or socket is free. A
     /// node held open but idle looks from outside like a node that is running,
@@ -649,6 +747,18 @@ impl System {
     /// this is what the pass does about it between stages. Releasing a node
     /// that holds nothing is success: a stop that arrives twice is the
     /// ordinary case on a link with latency.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - What the configuration calls the node.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` once nothing is held for the node.
+    ///
+    /// # Errors
+    ///
+    /// That the configuration has no such node.
     pub fn release(&mut self, name: &str) -> Result<(), String> {
         if !self.nodes.contains_key(name) {
             return Err(format!("there is no node called \"{name}\" here"));
@@ -658,7 +768,7 @@ impl System {
         Ok(())
     }
 
-    /// Let the pass touch this node again.
+    /// Lets the pass touch this node again.
     fn enable(&self, name: &str) {
         if let Some(state) = self.states.named(name) {
             state.enable();
@@ -675,7 +785,7 @@ impl System {
         self.states.clone()
     }
 
-    /// Apply a command from the ground.
+    /// Applies a command from the ground.
     ///
     /// Passed through so that whatever reads commands does not have to know
     /// how the nodes are held: see [`Fabric::set`].
@@ -731,12 +841,21 @@ enum Pace {
 }
 
 impl Pace {
-    /// When a node read or asked at `now`, having been due at `due`, is next
-    /// due.
+    /// Says when a node read or asked at `now`, having been due at `due`, is
+    /// next due.
     ///
     /// A rate from when it was due, so it does not drift -- and one so far
     /// behind that the next time is already past is put an interval from now
     /// rather than left due for ever. A floor from now.
+    ///
+    /// # Arguments
+    ///
+    /// * `due` - When the node was due.
+    /// * `now` - When it was read or asked.
+    ///
+    /// # Returns
+    ///
+    /// When it is next due.
     fn next(self, due: Instant, now: Instant) -> Instant {
         match self {
             Pace::Exchange(interval) | Pace::Ask(interval) => {
@@ -752,13 +871,22 @@ impl Pace {
     }
 }
 
-/// How a polled node is paced, where it says how often: see [`Pace`]. `None`
-/// is a node read on every pass.
+/// Says how a polled node is paced, where it says how often: see [`Pace`].
 ///
 /// The graph is checked before this -- `Graph::check` refuses both intervals
 /// on one node, either in a group, and a value that is not a length of time
 /// -- so a value that will not read here is a node read on every pass rather
 /// than a vehicle that stops.
+///
+/// # Arguments
+///
+/// * `node` - The node, whose `trigger_interval` or `poll_interval` is read.
+///
+/// # Returns
+///
+/// Its pace: a `trigger_interval` is [`Pace::Ask`] on a part that sends and
+/// [`Pace::Exchange`] otherwise, a `poll_interval` is [`Pace::Floor`];
+/// `None` is a node read on every pass.
 fn pace_of(node: &tcslibgs::graph::Node) -> Option<Pace> {
     let read = |name: &str| {
         node.attributes.get(name).and_then(|said| {
@@ -775,7 +903,7 @@ fn pace_of(node: &tcslibgs::graph::Node) -> Option<Pace> {
     read("poll_interval").map(Pace::Floor)
 }
 
-/// Whether this node is read by being asked on every pass.
+/// Says whether this node is read by being asked on every pass.
 ///
 /// Three things have to be true, and each of them rules out a node that would
 /// otherwise be read for nothing.
@@ -794,6 +922,16 @@ fn pace_of(node: &tcslibgs::graph::Node) -> Option<Pace> {
 /// because something was delivered to it, and the fabric passes that on in the
 /// same pass -- see [`Port::ready`]. Polling one would be asking a question
 /// whose answer has already been taken.
+///
+/// # Arguments
+///
+/// * `node`   - The node as the configuration describes it.
+/// * `routes` - The routing, which says whether its output goes anywhere.
+/// * `port`   - What it was opened as, which says whether it produces.
+///
+/// # Returns
+///
+/// True if the node is polled.
 fn is_polled(
     node: &tcslibgs::graph::Node,
     routes: &Routes,
@@ -817,6 +955,18 @@ fn is_polled(
 ///
 /// Written to and never read. The ground's end is written down, so this sends
 /// there from the first reading rather than waiting to be spoken to.
+///
+/// # Arguments
+///
+/// * `link` - The link: its name and its vehicle and ground addresses.
+///
+/// # Returns
+///
+/// The link opened, as a port the pass drives.
+///
+/// # Errors
+///
+/// Why tcspecial's end could not be bound to send to the ground's.
 pub fn open_ground_link(link: &Telemetered) -> Result<Box<dyn Port>, String> {
     let what = link.name.as_str();
     let (reader, writer) =
@@ -843,6 +993,23 @@ pub fn open_ground_link(link: &Telemetered) -> Result<Box<dyn Port>, String> {
 /// written. A type this does not know is a type `Graph::check` should have
 /// refused, and it is refused again here rather than skipped: a node nothing
 /// holds is a link that delivers nowhere.
+///
+/// # Arguments
+///
+/// * `node`    - The node as the configuration describes it.
+/// * `routes`  - The routing, which says how its links use it and which
+///               inputs a computation has.
+/// * `abandon` - What ends a wait inside one of its operations when the
+///               ground disables it.
+/// * `segsend` - What a log hands its filled segments to.
+///
+/// # Returns
+///
+/// The port the node is.
+///
+/// # Errors
+///
+/// Why the node would not open, as its kind of port says.
 pub fn open(
     node: &tcslibgs::graph::Node,
     routes: &Routes,
@@ -892,6 +1059,15 @@ pub fn open(
 /// describes: the type and which way the links use it -- `i2c, read` -- or the
 /// type alone where it says everything, as a computation's and a log's do.
 /// Nothing is opened, so this answers for a vehicle that is not there.
+///
+/// # Arguments
+///
+/// * `graph` - The configuration.
+///
+/// # Returns
+///
+/// Each node's description, by its name; where how the links use a node
+/// cannot be worked out, the reason why.
 pub fn described(graph: &Graph) -> BTreeMap<String, String> {
     let routes = Routes::of(graph);
     graph
@@ -1103,6 +1279,20 @@ mod tests {
     /// 100 ms in one of the three ways -- `exchanged`, an I2C part that is
     /// asked; `asked`, a socket that is asked; `floored`, a socket with a poll
     /// interval -- and, where `every_pass`, `always`, which states no interval.
+    ///
+    /// # Arguments
+    ///
+    /// * `now`        - When the system starts.
+    /// * `every_pass` - Whether to add `always`, read on every pass.
+    ///
+    /// # Returns
+    ///
+    /// The system, every node a [`Counted`], and the read and ask counts of
+    /// each node by name.
+    ///
+    /// # Panics
+    ///
+    /// If the configuration cannot be written, read or opened.
     fn paced(now: Instant, every_pass: bool) -> (System, Counts) {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("paced.yaml");
@@ -1771,7 +1961,16 @@ vehicle:
     }
 
     impl Vehicle {
-        /// Give one sensor another reading, for the next pass to take.
+        /// Gives one sensor another reading, for the next pass to take.
+        ///
+        /// # Arguments
+        ///
+        /// * `name`  - The sensor, as the configuration calls it.
+        /// * `datum` - The reading, added after any it has not yet said.
+        ///
+        /// # Panics
+        ///
+        /// If there is no sensor called `name`.
         fn scripted(&self, name: &str, datum: &[u8]) {
             self.sensors
                 .get(name)
@@ -1784,6 +1983,25 @@ vehicle:
         }
     }
 
+    /// Opens the shipped thermostat example with its hardware stood in for.
+    ///
+    /// Its sensors are scripted, its heaters, its ground link and each
+    /// source's link to the ground are watched, and its log writes into a
+    /// directory of the test's own; every other node is opened for real.
+    ///
+    /// # Arguments
+    ///
+    /// * `now`      - When the system starts.
+    /// * `readings` - Each sensor's first reading, by its name; a sensor
+    ///                not named has nothing to say.
+    ///
+    /// # Returns
+    ///
+    /// The vehicle, with what the test watches.
+    ///
+    /// # Panics
+    ///
+    /// If the example cannot be read or opened.
     fn vehicle(now: Instant, readings: &[(&str, &[u8])]) -> Vehicle {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let mut graph = Graph::load(root.join("tests/manual/thermostat.yaml"))
@@ -1938,7 +2156,16 @@ vehicle:
         #[global_allocator]
         static ALLOCATOR: Counting = Counting;
 
-        /// How many allocations `work` makes on this thread.
+        /// Counts how many allocations `work` makes on this thread.
+        ///
+        /// # Arguments
+        ///
+        /// * `work` - What to count, run once.
+        ///
+        /// # Returns
+        ///
+        /// How many allocations, zeroed allocations and reallocations it
+        /// made.
         pub fn allocations_in(work: impl FnOnce()) -> usize {
             COUNT.with(|count| count.set(0));
             COUNTING.with(|on| on.set(true));
@@ -2134,6 +2361,21 @@ vehicle:
     /// The shipped thermostat, with its sensors steady, its heaters and the
     /// ground counting what reaches them, and its log in `log_in`: a vehicle
     /// that can be made to pass for ever.
+    ///
+    /// # Arguments
+    ///
+    /// * `log_in`    - The directory the log writes into.
+    /// * `delivered` - Counts every datum that reaches a heater, the ground
+    ///                 link or a source's link to the ground.
+    /// * `start`     - When the system starts.
+    ///
+    /// # Returns
+    ///
+    /// The system, open.
+    ///
+    /// # Panics
+    ///
+    /// If the example cannot be read or opened.
     fn steady_thermostat(
         log_in: &Path,
         delivered: &Tally,

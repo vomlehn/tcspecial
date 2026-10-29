@@ -33,9 +33,23 @@ AT = 1_000_000 * SECOND
 
 def a_beacon(sequence=2, digest=None, version=(0, 1, 0), commanded=False,
              interface_digest=None):
-    """A beacon, as tcspecial sends one: the name, the version, the digest,
-    the number, the commanded-restart flag and the interface's digest, as
-    text, a colon between each."""
+    """A beacon, as tcspecial sends one.
+
+    The name, the version, the digest, the number, the commanded-restart flag
+    and the interface's digest, as text, a colon between each.
+
+    Args:
+        sequence:         The beacon's number.
+        digest:           The configuration's digest, sixteen byte values;
+                          ``None`` for a fixed one.
+        version:          The version, major, minor and patch.
+        commanded:        Whether the start was commanded.
+        interface_digest: The interface's digest, sixteen bytes; ``None`` for
+                          this tree's.
+
+    Returns:
+        The beacon's bytes.
+    """
     digest = digest or [36, 195, 155, 114, 7, 4, 241, 185,
                         121, 87, 153, 67, 108, 53, 167, 176]
     interface_digest = interface_digest or interface.of_this_tree()
@@ -47,6 +61,11 @@ def a_beacon(sequence=2, digest=None, version=(0, 1, 0), commanded=False,
 
 
 def schedule():
+    """A short schedule for the tests: four seconds heard, then waiting.
+
+    Returns:
+        The :class:`Schedule`.
+    """
     return Schedule([
         Step(holds=4 * SECOND, stage=Stage.HEARD),
         Step(holds=beacon.FOREVER, stage=Stage.WAITING),
@@ -140,6 +159,14 @@ class ScheduleTest(unittest.TestCase):
 
     def test_the_stage_is_the_number_of_beacons_missed(self):
         def stage_for(count):
+            """The stage for a number of beacons missed, by the thresholds.
+
+            Args:
+                count: How many beacons in a row have gone missing.
+
+            Returns:
+                The :class:`Stage`.
+            """
             if count >= beacon.WAITING_AFTER_MISSED:
                 return Stage.WAITING
             if count >= beacon.AGING_AFTER_MISSED:

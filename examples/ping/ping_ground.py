@@ -95,7 +95,14 @@ class Exchange:
 class Pinger:
     """The ground's end of the ping link: a ping goes up to ``uplink``, which
     the ``moc`` node binds aboard, and its answer comes down to ``downlink``,
-    which this binds."""
+    which this binds.
+
+    Args:
+        uplink:   Where pings are sent: the ``HostPort`` the ``moc`` node
+                  binds aboard.
+        downlink: Where answers are received: the ``HostPort`` this binds.
+        clock:    What gives the time now, in nanoseconds since the epoch.
+    """
 
     def __init__(self, uplink, downlink, clock=time.time_ns):
         self._uplink = (uplink.address, uplink.port)
@@ -116,6 +123,9 @@ class Pinger:
         The count goes up by one each time, from one, and the time it carries
         is the ground's, now. What was received last is kept, and when its
         answer arrived is cleared.
+
+        Returns:
+            The ping sent, as text.
         """
         self._count += 1
         at = self._clock()
@@ -129,8 +139,14 @@ class Pinger:
         return message
 
     def receive(self, timeout):
-        """Take one datagram from the answer link, waiting no longer than
-        ``timeout`` seconds, and say whether one arrived."""
+        """Take one datagram from the answer link.
+
+        Args:
+            timeout: How long to wait for one, in seconds.
+
+        Returns:
+            Whether one arrived.
+        """
         self._down.settimeout(timeout)
         try:
             datagram, _ = self._down.recvfrom(ping.REPLY_BYTES + 1)
@@ -141,7 +157,15 @@ class Pinger:
 
     def answered(self, datagram, at):
         """Fold in a datagram that arrived at ``at``: apart from the socket so
-        that it can be exercised without one."""
+        that it can be exercised without one.
+
+        Only an answer to the latest ping is timed; anything that is not an
+        answer is shown as such and timed never.
+
+        Args:
+            datagram: The bytes that arrived.
+            at:       When they arrived, in nanoseconds since the epoch.
+        """
         text = datagram.decode("utf-8", errors="replace")
         try:
             pong = ping.read_reply(datagram)
@@ -172,9 +196,15 @@ class Pinger:
 
 
 def precise_time(since_epoch):
-    """A time of day to the nanosecond, UTC, as a ping is timed: the beacon
-    panel's ``HH:MM:SS`` with the fraction a ping is about;
-    :data:`NO_PRECISE_TIME` for none."""
+    """A time of day to the nanosecond, UTC, as a ping is timed.
+
+    Args:
+        since_epoch: The time, in nanoseconds since the epoch, or ``None``.
+
+    Returns:
+        The beacon panel's ``HH:MM:SS`` with the fraction a ping is about;
+        :data:`NO_PRECISE_TIME` for ``None``.
+    """
     if since_epoch is None:
         return NO_PRECISE_TIME
     seconds, nanoseconds = divmod(since_epoch, NANOS)
@@ -186,9 +216,16 @@ def precise_time(since_epoch):
 
 
 def interval(nanoseconds):
-    """A length of time between two of a ping's times, in milliseconds to the
-    nanosecond, with its sign: either one-way time may be negative;
-    :data:`NO_INTERVAL` for none."""
+    """A length of time between two of a ping's times, as text.
+
+    Args:
+        nanoseconds: The length, in nanoseconds, or ``None``. Either one-way
+                     time may be negative.
+
+    Returns:
+        The length in milliseconds to the nanosecond, with its sign;
+        :data:`NO_INTERVAL` for ``None``.
+    """
     if nanoseconds is None:
         return NO_INTERVAL
     sign = "-" if nanoseconds < 0 else ""

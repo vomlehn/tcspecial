@@ -67,13 +67,26 @@ impl std::fmt::Display for NotReady {
     }
 }
 
-/// Ask the simulator at `at` once, giving it `patience` to answer, and give
-/// what it said, or `None` where nothing answered.
+/// Asks the simulator once what state it is in.
 ///
 /// Requests go every [`RESEND_EVERY`] until one is answered or the time is
 /// up; each carries its own number, and an answer to an earlier one counts,
 /// since the state it gives is the state then and the next answer would say
 /// the same or later.
+///
+/// # Arguments
+///
+/// * `at`       - Where the simulator answers, its `tcssim.ready`.
+/// * `patience` - How long it is given to answer.
+///
+/// # Returns
+///
+/// What it said, or `None` where nothing answered in time.
+///
+/// # Errors
+///
+/// `NotReady::Socket` if the harness's own socket cannot be made or set
+/// up.
 pub fn ask(
     at: SocketAddr,
     patience: Duration,
@@ -142,13 +155,26 @@ pub fn ask(
     }
 }
 
-/// Wait for the simulator at `at` to be ready for the run `ours` describes,
-/// for as long as `patience`.
+/// Waits for the simulator to be ready for this run.
 ///
-/// Ready, set up for this run, is `Ok`. A difference and a failure are said
-/// at once, being things more waiting does not mend; silence and a simulator
-/// still starting are said when the time is up, and are told apart, being
-/// different faults with different remedies.
+/// # Arguments
+///
+/// * `at`       - Where the simulator answers, its `tcssim.ready`.
+/// * `ours`     - The run the simulator must be set up for.
+/// * `patience` - How long to wait in all.
+///
+/// # Returns
+///
+/// `Ok` once the simulator is ready and set up for this run.
+///
+/// # Errors
+///
+/// A difference (`NotReady::Differs`) and a failure (`NotReady::Failed`)
+/// are said at once, being things more waiting does not mend; silence
+/// (`NotReady::Silent`) and a simulator still starting
+/// (`NotReady::StillStarting`) are said when the time is up, and are told
+/// apart, being different faults with different remedies.
+/// `NotReady::Socket` if the harness's own socket cannot be made.
 pub fn wait(
     at: SocketAddr,
     ours: &SetUpFor,
@@ -196,6 +222,15 @@ mod tests {
     use tcslibgs::ready::{Reason, Request};
     use tcslibgs::simulate::Mode;
 
+    /// Makes the run a test's simulator is set up for.
+    ///
+    /// # Arguments
+    ///
+    /// * `mode` - How much of the run is simulated.
+    ///
+    /// # Returns
+    ///
+    /// The run, with fixed digests that differ from each other.
     fn set_up(mode: Mode) -> SetUpFor {
         SetUpFor {
             configuration: ConfigDigest([3; 16]),
@@ -204,8 +239,18 @@ mod tests {
         }
     }
 
-    /// A simulator that answers with whatever state `state` holds, as tcssim
-    /// does: 0 starting, 1 ready, 2 failed.
+    /// Starts a simulator that answers with whatever state `state` holds, as
+    /// tcssim does, on a thread of its own.
+    ///
+    /// # Arguments
+    ///
+    /// * `mode`  - What its answers say it is set up for.
+    /// * `state` - The state it answers with: 0 starting, 1 ready, anything
+    ///             else failed. Changed by the test while it runs.
+    ///
+    /// # Returns
+    ///
+    /// Where it answers.
     fn simulator(mode: Mode, state: Arc<AtomicU8>) -> SocketAddr {
         let socket = UdpSocket::bind("127.0.0.1:0").unwrap();
         let at = socket.local_addr().unwrap();

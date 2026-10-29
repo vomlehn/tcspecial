@@ -52,8 +52,25 @@ pub struct CanEndpoint {
 }
 
 impl CanEndpoint {
-    /// Open a socket on the configured interface and filter it to the
+    /// Opens a socket on the configured interface and filters it to the
     /// configured identifier.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`   - The handler this endpoint belongs to, as the device
+    ///              configuration names it, for what a complaint says.
+    /// * `config` - The interface, the identifier, whether frames are CAN
+    ///              FD and whether the socket's own frames loop back.
+    ///
+    /// # Returns
+    ///
+    /// The endpoint, its socket bound to the bus and non-blocking.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Config` if there is no such interface or its name is
+    /// not one an interface can have; `TcsError::Endpoint` if the socket
+    /// cannot be opened, filtered, flagged, bound or made non-blocking.
     pub fn new(what: &str, config: &CanConfig) -> TcsResult<Self> {
         let index = interface_index(what, &config.interface)?;
 
@@ -121,6 +138,14 @@ impl CanEndpoint {
     /// One socket, as the other kinds do it: a conduit pair reads and writes
     /// one endpoint, and a second socket would be a second member of the bus
     /// with its own filter.
+    ///
+    /// # Returns
+    ///
+    /// The second endpoint, on a duplicate of this one's descriptor.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Io` if the descriptor cannot be duplicated.
     pub fn try_clone(&self) -> TcsResult<Self> {
         Ok(Self {
             what: self.what.clone(),
@@ -136,13 +161,27 @@ impl CanEndpoint {
     }
 }
 
-/// The kernel's index for a named interface.
+/// Finds the kernel's index for a named interface.
 ///
 /// A socket is bound to an index rather than to a name, and the name is what a
 /// file states. A name the kernel does not know is the common failure -- a bus
 /// that has not been brought up, or a virtual one that was never created --
 /// and the error says so, with the command that would make one, as the I2C
 /// stand-in does for its module.
+///
+/// # Arguments
+///
+/// * `what`      - The handler, for what a complaint says.
+/// * `interface` - The interface's name, such as `vcan0`.
+///
+/// # Returns
+///
+/// The interface's index.
+///
+/// # Errors
+///
+/// `TcsError::Config` if the name holds a NUL or this host has no
+/// interface by that name.
 fn interface_index(what: &str, interface: &str) -> TcsResult<libc::c_uint> {
     let name = std::ffi::CString::new(interface).map_err(|_| {
         TcsError::Config(format!(
@@ -164,12 +203,22 @@ fn interface_index(what: &str, interface: &str) -> TcsResult<libc::c_uint> {
     Ok(index)
 }
 
-/// Accept this device's frames and nothing else on the bus.
+/// Accepts this device's frames and nothing else on the bus.
 ///
 /// One filter, on the identifier and every bit of it. The extended-format
 /// flag is part of the identifier the kernel compares, so it goes in the mask
 /// as well: without it a base identifier would also match the extended frame
 /// with the same number, which is a different frame.
+///
+/// # Arguments
+///
+/// * `what`   - The handler, for what a complaint says.
+/// * `fd`     - The raw CAN socket to filter.
+/// * `can_id` - The identifier to accept, base or extended.
+///
+/// # Errors
+///
+/// `TcsError::Endpoint` if the kernel refuses the filter.
 fn set_filter(what: &str, fd: RawFd, can_id: u32) -> TcsResult<()> {
     let id = if tcslibgs::node::payload::can::is_extended(can_id) {
         can_id | libc::CAN_EFF_FLAG
@@ -204,7 +253,19 @@ fn set_filter(what: &str, fd: RawFd, can_id: u32) -> TcsResult<()> {
     Ok(())
 }
 
-/// Set one of the raw socket's flags, naming it if the kernel refuses.
+/// Sets one of the raw socket's flags, naming it if the kernel refuses.
+///
+/// # Arguments
+///
+/// * `what`   - The handler, for what a complaint says.
+/// * `fd`     - The raw CAN socket.
+/// * `option` - The `CAN_RAW_*` option to set.
+/// * `to`     - Its value, 1 for on and 0 for off.
+/// * `name`   - What the option is called in a complaint.
+///
+/// # Errors
+///
+/// `TcsError::Endpoint` if the kernel refuses the option.
 fn set_flag(
     what: &str,
     fd: RawFd,
@@ -234,7 +295,18 @@ fn set_flag(
     Ok(())
 }
 
-/// Bind the socket to the interface, which is what puts it on that bus.
+/// Binds the socket to the interface, which is what puts it on that bus.
+///
+/// # Arguments
+///
+/// * `what`      - The handler, for what a complaint says.
+/// * `fd`        - The raw CAN socket to bind.
+/// * `interface` - The interface's name, for what a complaint says.
+/// * `index`     - The interface's index, which the address carries.
+///
+/// # Errors
+///
+/// `TcsError::Endpoint` if the bind fails.
 fn bind_to(
     what: &str,
     fd: RawFd,
@@ -267,7 +339,16 @@ fn bind_to(
     Ok(())
 }
 
-/// A socket a conduit can poll and then read without waiting.
+/// Makes a socket one a conduit can poll and then read without waiting.
+///
+/// # Arguments
+///
+/// * `what` - The handler, for what a complaint says.
+/// * `fd`   - The socket to make non-blocking.
+///
+/// # Errors
+///
+/// `TcsError::Endpoint` if its flags cannot be read or set.
 fn set_nonblocking(what: &str, fd: RawFd) -> TcsResult<()> {
     // SAFETY: both calls take the descriptor by value and return a status.
     let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
@@ -286,11 +367,21 @@ fn set_nonblocking(what: &str, fd: RawFd) -> TcsResult<()> {
     Ok(())
 }
 
-/// What a frame carries, as the bytes a conduit moves.
+/// Says what a frame carries, as the bytes a conduit moves.
 ///
 /// Classic and FD frames differ in their structure and in the length field's
 /// name, and in nothing else that matters here: an identifier, a length, and
 /// that many bytes.
+///
+/// # Arguments
+///
+/// * `frame` - The bytes the kernel delivered.
+/// * `fd`    - Whether they are a `canfd_frame` rather than a `can_frame`.
+///
+/// # Returns
+///
+/// The frame's identifier, flags included, and its data's length; `None`
+/// if `frame` is shorter than the structure.
 fn data_of(frame: &[u8], fd: bool) -> Option<(u32, usize)> {
     if fd {
         if frame.len() < mem::size_of::<libc::canfd_frame>() {
@@ -567,12 +658,24 @@ mod tests {
         assert_eq!(&buffer[..got], &[1, 2, 3, 4]);
     }
 
-    /// An endpoint whose socket is not a bus at all.
+    /// Makes an endpoint whose socket is not a bus at all.
     ///
     /// For the checks that happen before anything is written, which need a
     /// constructed endpoint and not a bus. They were gated on a virtual bus
     /// because they were written beside the test above, and so ran on no
     /// machine that had not been set up by hand -- which is most of them.
+    ///
+    /// # Arguments
+    ///
+    /// * `fd` - Whether the endpoint sends CAN FD frames.
+    ///
+    /// # Returns
+    ///
+    /// An endpoint for identifier 1 whose descriptor is `/dev/null`.
+    ///
+    /// # Panics
+    ///
+    /// If `/dev/null` cannot be opened for writing.
     fn not_on_a_bus(fd: bool) -> CanEndpoint {
         CanEndpoint {
             what: "device".to_string(),
@@ -630,7 +733,8 @@ mod tests {
         );
     }
 
-    /// Whether an interface is up, from the flags the kernel keeps for it.
+    /// Says whether an interface is up, from the flags the kernel keeps for
+    /// it.
     ///
     /// An interface that exists is not one a frame can go out on: `ip link
     /// add` makes a virtual bus and leaves it down, and a socket bound to a
@@ -638,6 +742,14 @@ mod tests {
     /// `ENETDOWN`. The operational state says nothing either -- a virtual bus
     /// has no carrier and reports "unknown" whether it is up or not -- so
     /// this reads `IFF_UP` itself.
+    ///
+    /// # Arguments
+    ///
+    /// * `interface` - The interface's name.
+    ///
+    /// # Returns
+    ///
+    /// Whether `IFF_UP` is set; false if the flags cannot be read.
     fn is_up(interface: &str) -> bool {
         let Ok(flags) = std::fs::read_to_string(format!(
             "/sys/class/net/{interface}/flags"

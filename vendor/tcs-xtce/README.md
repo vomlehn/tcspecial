@@ -1,7 +1,7 @@
 # tcs-xtce, vendored
 
 A copy of the parts of tcs-xtce this tree uses, taken from
-`github.com:vomlehn/tcs-xtce` (commit 59facf3, of 2026-10-28) because
+`github.com:vomlehn/tcs-xtce` (commit 59f49d3, of 2026-10-29) because
 tcs-xtce is not yet published. **When tcs-xtce is on crates.io, replace this
 directory with a dependency on it**: `tcs-xtce = "<version>"` in
 `tcslibgs/Cargo.toml` in place of the path, the `exclude` in the workspace's

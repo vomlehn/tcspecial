@@ -58,7 +58,7 @@ pub struct LogNode {
 }
 
 impl LogNode {
-    /// Open the log this node describes.
+    /// Opens the log this node describes.
     ///
     /// The directory must exist: a log node is not the thing to be creating
     /// directories on a vehicle, where a mistyped path would become a log
@@ -66,6 +66,21 @@ impl LogNode {
     ///
     /// Each segment it fills is handed to `segsend`, and so are the ones a
     /// previous run left in the directory.
+    ///
+    /// # Arguments
+    ///
+    /// * `node`    - The log node, whose attributes say where, in what
+    ///               format and in segments of what size.
+    /// * `segsend` - What each filled segment is handed to.
+    ///
+    /// # Returns
+    ///
+    /// The open log.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the node if its attributes are wrong, the segments
+    /// cannot be handed off, or the log cannot be opened in its directory.
     pub fn of(node: &Node, segsend: &SegSend) -> Result<LogNode, String> {
         let what = node.name.as_str();
 
@@ -103,12 +118,25 @@ impl LogNode {
         })
     }
 
-    /// Write one record.
+    /// Writes one record.
     ///
     /// Reported rather than swallowed. The fabric counts a refused delivery
     /// and carries on to the next destination -- a log that cannot be written
     /// must not stop the ground getting its telemetry -- so what this owes its
     /// caller is the truth about what happened, not an attempt to carry on.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The record.
+    ///
+    /// # Returns
+    ///
+    /// Nothing, once the record is written.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the log, the record's size and the directory if it
+    /// cannot be written.
     pub fn record(&mut self, data: &[u8]) -> Result<(), String> {
         self.log.write(data).map(|_| ()).map_err(|e| {
             format!(
@@ -120,12 +148,20 @@ impl LogNode {
         })
     }
 
-    /// Push what has been written to the file.
+    /// Pushes what has been written to the file.
     ///
     /// Not after every record: a log flushed per arrival is a vehicle doing a
     /// write system call per reading, and the records are in the kernel's hands
     /// either way. Called when a pass is over, and whenever something is about
     /// to happen that the log should be on the far side of.
+    ///
+    /// # Returns
+    ///
+    /// Nothing, once the log is flushed.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the log and its directory if the flush fails.
     pub fn flush(&mut self) -> Result<(), String> {
         self.log.flush().map_err(|e| {
             format!(
@@ -162,12 +198,20 @@ impl std::fmt::Debug for LogNode {
     }
 }
 
-/// The `tcslog` format these records are written in.
+/// Gives the `tcslog` format these records are written in.
 ///
 /// The one place the two spellings meet. A configuration states a format by
 /// the rules in `tcslibgs::node::vehicle::log`, which the ground tool checks
 /// without `tcslog` in it at all; this is where what it settled becomes what
 /// the library takes.
+///
+/// # Arguments
+///
+/// * `format` - The format as the configuration settled it.
+///
+/// # Returns
+///
+/// The same format, as `tcslog` spells it.
 fn tcslog_format(format: LogFormat) -> Format {
     match format {
         LogFormat::Fixed(bytes) => Format::Fixed(bytes),
@@ -183,12 +227,22 @@ mod tests {
     use tcslibgs::graph::Graph;
     use tcslibgs::Scalar;
 
-    /// A node built here rather than read, so a test can make one wrong.
+    /// Builds a log node here rather than reading one, so a test can make
+    /// one wrong.
     ///
     /// What a log node may say is checked in `tcslibgs::node::vehicle::log`,
     /// where the ground tool checks it too. What is tested here is the other
     /// half: that a log opens where the node said, writes what arrives, and
     /// reports what it could not write.
+    ///
+    /// # Arguments
+    ///
+    /// * `name`       - The node's name.
+    /// * `attributes` - Its attributes, as names and values.
+    ///
+    /// # Returns
+    ///
+    /// The node, of type `log` and in no group.
     fn node(name: &str, attributes: &[(&str, &str)]) -> Node {
         Node {
             name: name.to_string(),

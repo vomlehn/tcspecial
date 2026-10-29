@@ -34,11 +34,15 @@ pub struct ConfigVersion {
 }
 
 impl ConfigVersion {
-    /// What this build is.
+    /// Says what version this build is.
     ///
     /// From the crate version of this library rather than of the program, so
     /// that both ends name the same thing: what has to match is the shared
     /// understanding of commands and configuration, which is what lives here.
+    ///
+    /// # Returns
+    ///
+    /// The version, any part that does not read as a byte being nought.
     pub fn of_this_build() -> Self {
         fn part(text: &str) -> u8 {
             text.parse().unwrap_or(0)
@@ -51,17 +55,24 @@ impl ConfigVersion {
         }
     }
 
-    /// The version a configuration file states, if it states one of these.
+    /// Reads the version a configuration file states, if it states one of
+    /// these.
     ///
     /// One, two or three decimal parts: a file saying `1.0` means 1.0.0, the
     /// part it leaves off being nought. Nothing else -- a part above 255 does
     /// not fit the byte it goes on the link in, and a word is not a version
     /// at all.
     ///
-    /// `None` rather than a guess, because this goes on the wire: a file
-    /// whose version cannot be read as three bytes would otherwise be
-    /// announced as 0.0.0 to every ground station listening, which is a
-    /// version some other file might really have.
+    /// # Arguments
+    ///
+    /// * `text` - The version as the file wrote it.
+    ///
+    /// # Returns
+    ///
+    /// The version, or `None` rather than a guess, because this goes on the
+    /// wire: a file whose version cannot be read as three bytes would
+    /// otherwise be announced as 0.0.0 to every ground station listening,
+    /// which is a version some other file might really have.
     pub fn of_text(text: &str) -> Option<Self> {
         let mut parts = [0u8; 3];
         let mut count = 0;
@@ -167,8 +178,17 @@ pub fn interpretation_of_file<P: AsRef<Path>>(
     )?))
 }
 
-/// What a configuration is read as: see [`digest_of_graph`], which
-/// says what is in it and what is not.
+/// Writes out what a configuration is read as: see [`digest_of_graph`],
+/// which says what is in it and what is not.
+///
+/// # Arguments
+///
+/// * `graph` - The configuration.
+///
+/// # Returns
+///
+/// Its `tcspecial` section, groups, nodes, links and command bindings as a
+/// value tree, with every scalar as its text.
 pub fn interpretation_of_graph(
     graph: &crate::graph::Graph,
 ) -> serde_json::Value {
@@ -229,7 +249,19 @@ pub fn interpretation_of_graph(
     })
 }
 
-/// The digest of any document that can be written out as a value tree.
+/// Digests any document that can be written out as a value tree.
+///
+/// # Arguments
+///
+/// * `document` - The document.
+///
+/// # Returns
+///
+/// The MD5 digest of its canonical bytes.
+///
+/// # Errors
+///
+/// [`TcsError::Config`] if it cannot be written out as a value tree.
 fn digest_of_value<T: Serialize>(document: &T) -> TcsResult<ConfigDigest> {
     let value = serde_json::to_value(document).map_err(|e| {
         TcsError::Config(format!("cannot digest the configuration: {e}"))
@@ -240,7 +272,7 @@ fn digest_of_value<T: Serialize>(document: &T) -> TcsResult<ConfigDigest> {
     Ok(ConfigDigest(md5::compute(&canonical).0))
 }
 
-/// The bytes a value contributes to the digest.
+/// Writes the bytes a value contributes to the digest.
 ///
 /// One rule, which is three rules to read:
 ///
@@ -260,6 +292,11 @@ fn digest_of_value<T: Serialize>(document: &T) -> TcsResult<ConfigDigest> {
 /// true of anything that is a map rather than a struct, and of a `serde_json`
 /// built to preserve insertion order rather than to sort. Removing it does not
 /// fail a test today; it would fail one the day a configuration grows a map.
+///
+/// # Arguments
+///
+/// * `value` - The value.
+/// * `out`   - Where its bytes are appended.
 fn write_canonical(value: &serde_json::Value, out: &mut Vec<u8>) {
     match value {
         serde_json::Value::Object(map) => {
@@ -344,6 +381,21 @@ mod tests {
 
     use super::*;
 
+    /// Loads one of the examples.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The example's directory under `examples/`, which is also
+    ///            its file's stem.
+    /// * `ext`  - Which spelling to load: `yaml` or `xml`.
+    ///
+    /// # Returns
+    ///
+    /// The configuration.
+    ///
+    /// # Panics
+    ///
+    /// If it does not read.
     fn example_graph(name: &str, ext: &str) -> crate::graph::Graph {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         crate::graph::Graph::load(

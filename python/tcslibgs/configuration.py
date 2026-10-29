@@ -57,9 +57,22 @@ class HostPort:
 
     @staticmethod
     def of(attribute, stated):
-        """``stated`` as a host and a port, or a ``ValueError`` naming
-        ``attribute``. Split at the last colon, so that whatever a host is
-        called the port is the part after it."""
+        """``stated`` as a host and a port.
+
+        Split at the last colon, so that whatever a host is called the port is
+        the part after it.
+
+        Args:
+            attribute: The attribute it was stated as, for the error message.
+            stated:    What the configuration says, as ``address:port``.
+
+        Returns:
+            The :class:`HostPort`, its address with surrounding space removed.
+
+        Raises:
+            ValueError: ``stated`` has no colon, no address, a port that is
+                        not a number, or a port outside 1 to 65535.
+        """
         said = stated.strip()
         if ":" not in said:
             raise ValueError(
@@ -110,32 +123,59 @@ class Configuration:
     nodes: list
 
     def node(self, name):
-        """The node called ``name``, or a ``ValueError`` saying there is
-        none."""
+        """The node called ``name``.
+
+        Args:
+            name: The node's name.
+
+        Returns:
+            The :class:`Node`.
+
+        Raises:
+            ValueError: There is no node called ``name``.
+        """
         for node in self.nodes:
             if node.name == name:
                 return node
         raise ValueError(f'{self.path}: there is no node called "{name}"')
 
     def device_id(self, name):
-        """A node's device id: its position among the configuration's nodes,
-        counting from nought, in the order the file writes them."""
+        """A node's device id.
+
+        Args:
+            name: The node's name.
+
+        Returns:
+            Its position among the configuration's nodes, counting from
+            nought, in the order the file writes them.
+
+        Raises:
+            ValueError: There is no node called ``name``.
+        """
         for at, node in enumerate(self.nodes):
             if node.name == name:
                 return at
         raise ValueError(f'{self.path}: there is no node called "{name}"')
 
     def beacon_link(self):
-        """Where tcspecial's beacons go from and to."""
+        """Where tcspecial's beacons go from and to.
+
+        Returns:
+            The :class:`BeaconLink` of ``beacon.send`` and ``beacon.recv``.
+
+        Raises:
+            ValueError: Either is missing or is not an address and a port.
+        """
         return BeaconLink(
             send=HostPort.of("beacon.send", self._said("beacon.send")),
             recv=HostPort.of("beacon.recv", self._said("beacon.recv")),
         )
 
     def beacon_interval(self):
-        """How often tcspecial beacons, in nanoseconds: ``beacon.default_interval``,
-        read as :func:`parse_interval` reads it. What the beacon indicator
-        ages against -- see ``tcslib.beacon.Schedule.for_interval``."""
+        """How often tcspecial beacons, in nanoseconds:
+        ``beacon.default_interval``, read as :func:`parse_interval` reads it.
+        What the beacon indicator ages against -- see
+        ``tcslib.beacon.Schedule.for_interval``."""
         return parse_interval(self._said("beacon.default_interval"))
 
     def moc_nodes(self):
@@ -144,9 +184,19 @@ class Configuration:
         return [node for node in self.nodes if node.node_type in GATEWAY_BASES]
 
     def uplink(self, moc):
-        """Where the ground sends to the ``moc`` node called ``moc``: the
-        address and port it binds aboard, which is what leaves it by its
-        ``moc-out`` links."""
+        """Where the ground sends to the ``moc`` node called ``moc``.
+
+        Args:
+            moc: The gateway node's name.
+
+        Returns:
+            The :class:`HostPort` it binds aboard, which is what leaves it by
+            its ``moc-out`` links.
+
+        Raises:
+            ValueError: There is no such gateway node, or it states no address
+                        and port, or they are not a valid address and port.
+        """
         node = self._moc(moc)
         address = node.attributes.get("address")
         port = node.attributes.get("port")
@@ -159,9 +209,24 @@ class Configuration:
 
     def downlink(self, moc, source):
         """Where the ground receives what ``source`` sends to the gateway node
-        called ``moc``: that node's ``ground_base`` -- or ``bridge_base``, for
-        an F´ gateway -- its port counted on by the source's device id, so that
-        each source arrives on a port of its own."""
+        called ``moc``.
+
+        Args:
+            moc:    The gateway node's name.
+            source: The name of the node whose data is received.
+
+        Returns:
+            The :class:`HostPort`: the gateway's ``ground_base`` -- or
+            ``bridge_base``, for an F´ gateway -- its port counted on by the
+            source's device id, so that each source arrives on a port of its
+            own.
+
+        Raises:
+            ValueError: Either node is missing, ``moc`` is not a gateway,
+                        ``source`` has no ``payload-out`` link to it, the base
+                        is not an address and a port, or the port counted on
+                        is past 65535.
+        """
         node = self._moc(moc)
         attribute = GATEWAY_BASES[node.node_type]
         if moc not in self.node(source).links.get("payload-out", []):
@@ -181,6 +246,17 @@ class Configuration:
         return HostPort(base.address, port)
 
     def _moc(self, name):
+        """The gateway node called ``name``.
+
+        Args:
+            name: The node's name.
+
+        Returns:
+            The :class:`Node`.
+
+        Raises:
+            ValueError: There is no such node, or it is not a gateway node.
+        """
         node = self.node(name)
         if node.node_type not in GATEWAY_BASES:
             raise ValueError(
@@ -190,6 +266,17 @@ class Configuration:
         return node
 
     def _said(self, attribute):
+        """What the ``tcspecial`` section says of ``attribute``.
+
+        Args:
+            attribute: The attribute's flat name, as ``beacon.recv``.
+
+        Returns:
+            Its value, as text.
+
+        Raises:
+            ValueError: The section does not state it.
+        """
         value = self.tcspecial.get(attribute)
         if value is None:
             raise ValueError(f"{self.path}: tcspecial states no {attribute}")
@@ -209,13 +296,23 @@ INTERVAL_UNITS = {
 
 
 def parse_interval(text):
-    """A length of time as a configuration writes one -- a number, a space and
-    a unit, as ``500 ms`` or ``1.5 s`` -- in nanoseconds, or a ``ValueError``.
+    """A length of time as a configuration writes one, in nanoseconds.
 
     The Python spelling of ``tcslibgs::graph::parse_interval``: the same units,
     underscores among the digits meaning nothing, a decimal fraction kept to
     the nearest whole microsecond, and nought refused. Its messages are
     shorter; what it takes and refuses is the same.
+
+    Args:
+        text: The length of time: a number, a space and a unit, as ``500 ms``
+              or ``1.5 s``.
+
+    Returns:
+        The length of time in nanoseconds, a whole number of microseconds.
+
+    Raises:
+        ValueError: ``text`` is not a number and a unit, the unit is not one
+                    of time, or the length is nought.
     """
     said = text.strip()
     parts = said.split()
@@ -258,6 +355,21 @@ def choose(named, stem, default, chosen=None):
     without an extension, in the spelling chosen, or in ``default`` where
     neither flag was given. The two flags together are refused before this,
     by the parser that reads them.
+
+    Args:
+        named:   The configuration named on the command line, or ``None``.
+        stem:    The example's own configuration's path, without an
+                 extension.
+        default: The spelling, ``"yaml"`` or ``"xml"``, to read where no flag
+                 chose one.
+        chosen:  The spelling a flag chose, or ``None``.
+
+    Returns:
+        The path of the configuration to read, as text.
+
+    Raises:
+        ValueError: ``named``'s extension says one spelling and ``chosen``
+                    the other.
     """
     if named is not None:
         named = str(named)
@@ -283,6 +395,18 @@ def load(path):
     part: its nodes' device ids depend on the files it includes, and a station
     that counted only the top file's would receive on the wrong ports and say
     nothing about why.
+
+    Args:
+        path: The configuration file, named ``.yaml``, ``.yml`` or ``.xml``.
+
+    Returns:
+        The :class:`Configuration` it says.
+
+    Raises:
+        ValueError: The extension is none of those, the file includes
+                    others, it is not a map of sections, or it is YAML and
+                    PyYAML is not installed.
+        OSError: The file cannot be read.
     """
     path = Path(path)
     suffix = path.suffix.lower()
@@ -297,6 +421,14 @@ def load(path):
 
 
 def _includes(path):
+    """The error for a configuration that includes other files.
+
+    Args:
+        path: The configuration file.
+
+    Returns:
+        The ``ValueError`` to raise.
+    """
     return ValueError(
         f"{path} includes other files, which this does not read: their nodes' "
         "device ids would be counted wrong"
@@ -304,6 +436,18 @@ def _includes(path):
 
 
 def _load_xml(path):
+    """Read a configuration written in XML.
+
+    Args:
+        path: The configuration file.
+
+    Returns:
+        The :class:`Configuration` it says.
+
+    Raises:
+        ValueError: The file includes others.
+        xml.etree.ElementTree.ParseError: The file is not well-formed XML.
+    """
     root = ElementTree.parse(path).getroot()
     if root.find("include") is not None:
         raise _includes(path)
@@ -352,6 +496,19 @@ def _scalar(value):
 
 
 def _load_yaml(path):
+    """Read a configuration written in YAML, with PyYAML.
+
+    Args:
+        path: The configuration file.
+
+    Returns:
+        The :class:`Configuration` it says.
+
+    Raises:
+        ValueError: PyYAML is not installed, the file is not a map of
+                    sections, or it includes others.
+        yaml.YAMLError: The file is not well-formed YAML.
+    """
     try:
         import yaml
     except ImportError as why:
@@ -415,13 +572,20 @@ def binds_every_interface(address):
 
 
 def came_from(stated, sender):
-    """Whether a datagram from ``sender``, an ``(address, port)`` pair, came
-    from the socket the configuration names as ``stated``.
+    """Whether a datagram from ``sender`` came from the socket the
+    configuration names as ``stated``.
 
     The port must match. The address must too, unless the configuration names
     every interface, in which case the address a datagram carries is whichever
     interface the route chose and there is nothing written down to compare it
     with.
+
+    Args:
+        stated: The :class:`HostPort` the configuration names.
+        sender: The ``(address, port)`` pair the datagram came from.
+
+    Returns:
+        ``True`` if it came from there.
     """
     address, port = sender[0], sender[1]
     if port != stated.port:
@@ -433,13 +597,19 @@ def came_from(stated, sender):
 
 def find_built(program):
     """Where one of the repository's programs is: its own build first, then
-    the path. ``None`` where it is in neither.
+    the path.
 
     Its own build is where cargo put it: the directory ``CARGO_TARGET_DIR``
     names, where that is set -- a relative one read from the repository's
     root, which is where cargo is run -- and ``target`` otherwise. A build
     sent elsewhere and looked for in ``target`` is a program that is not
     there, or worse, an older one that is.
+
+    Args:
+        program: The program's file name, as ``tcsverify``.
+
+    Returns:
+        Its path, or ``None`` where it is in neither.
     """
     root = Path(__file__).resolve().parents[2]
     targets = [root / "target"]
@@ -459,12 +629,20 @@ def find_tcsverify():
 
 
 def digest(path, tcsverify=None):
-    """The configuration's digest, as tcsverify works it out: thirty-two hex
-    digits, or ``None`` with the reason where it cannot be had.
+    """The configuration's digest, as tcsverify works it out.
 
     ``None`` is not a failure. A station that cannot digest its own
     configuration compares nothing, as the Rust ground programs do, and says
     so rather than claiming every beacon agrees.
+
+    Args:
+        path:      The configuration file.
+        tcsverify: The tcsverify program to run, or ``None`` to find one with
+                   :func:`find_tcsverify`.
+
+    Returns:
+        A pair: the digest, as thirty-two hex digits, and ``None``; or
+        ``None`` and the reason it cannot be had.
     """
     program = tcsverify or find_tcsverify()
     if program is None:

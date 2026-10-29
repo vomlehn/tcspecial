@@ -64,7 +64,22 @@ pub struct Moc {
 }
 
 impl Moc {
-    /// Open the `moc` node of this name in the configuration at `path`.
+    /// Opens a `moc` node of the configuration in a file, as [`Moc::open`]
+    /// does.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The configuration file.
+    /// * `moc`  - The `moc` node's name.
+    ///
+    /// # Returns
+    ///
+    /// The open node.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the file where it cannot be loaded, and whatever
+    /// [`Moc::open`] refuses.
     pub fn open_file(path: impl AsRef<Path>, moc: &str) -> Result<Moc, String> {
         let path = path.as_ref();
         let graph = Graph::load(path)
@@ -72,8 +87,18 @@ impl Moc {
         Moc::open(&graph, moc)
     }
 
-    /// Open the `moc` node of this name: bind the port each source's data
-    /// arrives at.
+    /// Opens a `moc` node: binds the port each source's data arrives at.
+    ///
+    /// # Arguments
+    ///
+    /// * `graph` - The configuration's graph.
+    /// * `moc`   - The `moc` node's name.
+    ///
+    /// # Returns
+    ///
+    /// The open node, with a hold of its own.
+    ///
+    /// # Errors
     ///
     /// Refused for a name that is not a `moc` node, for one nothing is drawn
     /// into -- it would receive nothing, and a caller waiting on it would wait
@@ -109,8 +134,21 @@ impl Moc {
     /// drawing touches, each at `dest_base` plus its device id.
     ///
     /// Gathered as one, named for the section, because it is the same thing to
-    /// a caller: data, and which node it came from. `None` where no payload
-    /// reports that way.
+    /// a caller: data, and which node it came from.
+    ///
+    /// # Arguments
+    ///
+    /// * `graph` - The configuration's graph.
+    ///
+    /// # Returns
+    ///
+    /// The ports gathered as one node, or `None` where no payload reports
+    /// that way.
+    ///
+    /// # Errors
+    ///
+    /// A message saying what is wrong with the telemetry links, or which
+    /// port cannot be bound.
     pub fn open_payload_telemetry(
         graph: &Graph,
     ) -> Result<Option<Moc>, String> {
@@ -125,7 +163,20 @@ impl Moc {
         Moc::binding(PAYLOAD_TELEMETRY, ours).map(Some)
     }
 
-    /// Bind each link's ground end.
+    /// Binds each link's ground end, as one node.
+    ///
+    /// # Arguments
+    ///
+    /// * `name`  - What the node is called.
+    /// * `links` - The links whose ground ends it binds.
+    ///
+    /// # Returns
+    ///
+    /// The open node.
+    ///
+    /// # Errors
+    ///
+    /// A message saying which source's port cannot be bound.
     fn binding(name: &str, links: Vec<Telemetered>) -> Result<Moc, String> {
         let mut ports = Vec::new();
         for link in links {
@@ -159,7 +210,11 @@ impl Moc {
         &self.name
     }
 
-    /// The nodes whose data arrives here, in the order they are drawn.
+    /// Lists the nodes whose data arrives here, in the order they are drawn.
+    ///
+    /// # Returns
+    ///
+    /// Their names.
     pub fn sources(&self) -> Vec<&str> {
         self.ports
             .iter()
@@ -181,6 +236,19 @@ impl Moc {
     /// Allocates the datum and its source's name, each time: for a caller
     /// that keeps what it receives. A loop that does not, [`Moc::receive_into`]
     /// a buffer it made before it started.
+    ///
+    /// # Arguments
+    ///
+    /// * `wait` - How long to wait for a datum, or `None` for ever.
+    ///
+    /// # Returns
+    ///
+    /// The datum, its source and whether it is held, or `None` where the
+    /// wait ran out with nothing arrived.
+    ///
+    /// # Errors
+    ///
+    /// What [`Moc::receive_into`] refuses.
     pub fn receive(
         &mut self,
         wait: Option<Duration>,
@@ -199,8 +267,21 @@ impl Moc {
     /// [`Moc::receive`], into `out`, allocating nothing: where the datum was
     /// put, and which source sent it.
     ///
-    /// A datum longer than `out` is refused, saying how long it was, rather
-    /// than cut short: a buffer of [`DATUM_BYTES`] holds any.
+    /// # Arguments
+    ///
+    /// * `wait` - How long to wait for a datum, or `None` for ever.
+    /// * `out`  - Where the datum is put, from its start.
+    ///
+    /// # Returns
+    ///
+    /// Which source sent the datum, how long it is and whether it is held,
+    /// or `None` where the wait ran out with nothing arrived.
+    ///
+    /// # Errors
+    ///
+    /// A message where waiting or reading fails. A datum longer than `out`
+    /// is refused, saying how long it was, rather than cut short: a buffer
+    /// of [`DATUM_BYTES`] holds any.
     pub fn receive_into(
         &mut self,
         wait: Option<Duration>,
@@ -293,7 +374,12 @@ impl Moc {
 mod tests {
     use super::*;
 
-    /// A port nothing holds, for a base that puts a source's port on it.
+    /// Finds a port nothing holds, for a base that puts a source's port on
+    /// it.
+    ///
+    /// # Returns
+    ///
+    /// The port, free when it was looked at.
     fn a_free_port() -> u16 {
         UdpSocket::bind("127.0.0.1:0")
             .expect("a port")
@@ -302,8 +388,16 @@ mod tests {
             .port()
     }
 
-    /// Two sources drawn into one moc node, whose ground_base puts the first
-    /// source -- device id 1 -- on `port` and the second on the one after.
+    /// Makes a configuration of two sources drawn into one moc node.
+    ///
+    /// # Arguments
+    ///
+    /// * `port` - Where the `ground_base` puts the first source -- device
+    ///            id 1; the second goes on the one after.
+    ///
+    /// # Returns
+    ///
+    /// The configuration's graph.
     fn graph(port: u16) -> Graph {
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("vehicle.yaml");

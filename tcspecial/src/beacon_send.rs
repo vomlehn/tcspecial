@@ -26,10 +26,10 @@ use crate::telemetry_log::TelemetryLog;
 /// restart" in `docs/design.rst`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BeaconTiming {
-    /// `beacon.default_interval`: once the MOC has been heard from.
+    /// `beacon.default_interval`: once the MOC has connected.
     pub default_interval: Duration,
     /// `beacon.reset_interval`: from a restart's being initiated, and
-    /// from every start until the MOC is heard from.
+    /// from every start until the MOC connects.
     pub reset_interval: Duration,
 }
 
@@ -37,26 +37,26 @@ pub struct BeaconTiming {
 pub struct BeaconSend {
     pair: ArcCondPair<SystemTime>,
     /// How long until the next beacon: `reset_interval` as the process
-    /// starts and once a restart is initiated, the timing's `interval` once
-    /// the MOC is heard from, and what a CONFIG says after that.
+    /// starts and once a restart is initiated, `normal` once the MOC
+    /// connects.
     interval: Arc<Mutex<Duration>>,
     timing: BeaconTiming,
-    /// Whether the beacons are still going every `reset_interval`
-    /// because nothing valid has come from the MOC since this process
-    /// started. Shared, so that the command interpreter's copy clears it for
-    /// all of them, and asked without a lock, because it is asked of every
-    /// command that arrives.
-    awaiting_moc: Arc<AtomicBool>,
+    /// The interval the beacons go at once the MOC has connected:
+    /// `default_interval` until a CONFIG says another.
+    normal: Arc<Mutex<Duration>>,
+    /// Whether the beacons are still going every `reset_interval` because
+    /// no CONNECT has come from the MOC since this process started. Shared,
+    /// so that the command interpreter's copy clears it for all of them.
+    awaiting_connect: Arc<AtomicBool>,
     /// Whether a restart has been initiated, from which the beacons go
-    /// every `reset_interval` until the process ends. Not on the wire: the
-    /// beacon says whether this start was commanded, not whether the next
-    /// one is coming. See [`BeaconSend::restart_initiated`].
+    /// every `reset_interval`, the commanded-restart bit set, until the
+    /// process ends. See [`BeaconSend::restart_initiated`].
     ending: Arc<AtomicBool>,
-    /// This start's generation, from the state file: see [`crate::state`].
-    generation: u32,
-    /// Whether the ground commanded this start, which every beacon of it
-    /// says: see [`crate::state::Started::commanded`].
-    commanded: bool,
+    /// The commanded-restart bit every beacon carries: set from a RESTART
+    /// being taken, through the start it asked for -- which begins with it
+    /// set, from [`crate::state::Started::commanded`] -- until that start
+    /// takes a CONNECT. Asked without a lock, as each beacon is packed.
+    commanded: Arc<AtomicBool>,
     /// Where beacons go: `beacon_recv`, which is what tcsmoc makes its
     /// receiving socket out of.
     dest_addr: tcslibgs::HostPort,
@@ -104,9 +104,9 @@ impl BeaconSend {
     /// An interval of nought sends none, and is `Ok(None)`.
     ///
     /// The first beacon goes at once, and the next every
-    /// `reset_interval` until [`BeaconSend::heard_from_moc`] is
-    /// called: every start is a restart as far as the ground can tell, and is
-    /// beaconed as one.
+    /// `reset_interval` until [`BeaconSend::connected`] is called: every
+    /// start is a restart as far as the ground can tell, and is beaconed as
+    /// one.
     pub fn new(
         timing: BeaconTiming,
         from_addr: tcslibgs::HostPort,
@@ -116,7 +116,6 @@ impl BeaconSend {
         digest: ConfigDigest,
         started: &crate::state::Started,
     ) -> TcsResult<Option<BeaconSend>> {
-        let generation = started.generation;
         let commanded = started.commanded;
         if timing.default_interval == Duration::from_secs(0) {
             return Ok(None);
@@ -164,10 +163,10 @@ impl BeaconSend {
             pair,
             interval: Arc::new(Mutex::new(interval)),
             timing,
-            awaiting_moc: Arc::new(AtomicBool::new(true)),
+            normal: Arc::new(Mutex::new(timing.default_interval)),
+            awaiting_connect: Arc::new(AtomicBool::new(true)),
             ending: Arc::new(AtomicBool::new(false)),
-            generation,
-            commanded,
+            commanded: Arc::new(AtomicBool::new(commanded)),
             dest_addr,
             from_addr,
             log,
@@ -237,9 +236,8 @@ impl BeaconSend {
         // every beacon used to carry.
         let sequence =
             self.sent.fetch_add(1, Ordering::Relaxed).wrapping_add(1);
-        let beacon =
-            Beacon::new(sequence, self.version, self.digest, self.generation)
-                .commanded_restart(self.commanded);
+        let beacon = Beacon::new(sequence, self.version, self.digest)
+            .commanded_restart(self.commanded.load(Ordering::SeqCst));
         let data = packer.pack(&beacon);
         trace!("send_beacon: sending to {dest}");
         // Recorded before it is sent, as a command response is, so that a
@@ -249,50 +247,50 @@ impl BeaconSend {
         Ok(())
     }
 
-    /// Reset the interval to the given value. This will result in the immediate
-    /// sending of a beacon message
+    /// A CONFIG has set the interval the beacons go at once the MOC has
+    /// connected. Where it has, and no restart is under way, they go at it
+    /// from now, starting with one at once; otherwise from the next CONNECT.
     pub fn set_interval(&mut self, interval: Duration) {
         if interval == Duration::from_secs(0) {
             return;
         }
-
-        self.retime(interval);
+        *self.normal.lock().unwrap() = interval;
+        if !self.awaiting_connect.load(Ordering::SeqCst)
+            && !self.ending.load(Ordering::SeqCst)
+        {
+            self.retime(interval);
+        }
     }
 
-    /// A valid packet has arrived from the MOC: the beacons go back to
-    /// `beacon.default_interval`, if they were going every `reset_interval`
-    /// because nothing had.
+    /// A CONNECT has been taken from the MOC: the commanded-restart bit is
+    /// cleared, and the beacons go back to their normal interval, starting
+    /// with one at once so that the ground sees the bit clear.
     ///
-    /// Called for every packet the command interpreter takes, so the case
-    /// that matters -- every one after the first -- is one atomic swap. Not
-    /// once a restart has been initiated: from then until the process ends,
-    /// the beacons are the ground's news of the restart, and they stay fast.
-    pub fn heard_from_moc(&self) {
+    /// Not once a restart has been initiated: from then until the process
+    /// ends, the beacons are the ground's news of the restart, and they stay
+    /// fast, with the bit set.
+    pub fn connected(&self) {
         if self.ending.load(Ordering::SeqCst) {
             return;
         }
-        if self.awaiting_moc.swap(false, Ordering::SeqCst) {
-            // Slower from the next beacon on, and not one sent now: the
-            // ground has just been heard from, and a beacon now would say
-            // nothing it was not told a moment ago.
-            *self.interval.lock().unwrap() = self.timing.default_interval;
+        self.commanded.store(false, Ordering::SeqCst);
+        let normal = *self.normal.lock().unwrap();
+        if self.awaiting_connect.swap(false, Ordering::SeqCst) {
             // The one allocation this makes in the command loop, where the
-            // log formats the line: once a start, on the first packet, and
-            // worth it for the record of when the ground was first heard.
-            info!(
-                "the MOC has been heard from: beacons every {:?} again",
-                self.timing.default_interval
-            );
+            // log formats the line: once a start, at the first CONNECT, and
+            // worth it for the record of when the ground connected.
+            info!("the MOC has connected: beacons every {normal:?}");
         }
+        self.retime(normal);
     }
 
-    /// A restart has been initiated: one beacon goes at once, and the rest
-    /// every `reset_interval` until the process ends. The beacons say
-    /// nothing new -- the start that comes back says it was commanded, in a
-    /// generation of its own -- but they come fast, because the ground is
-    /// waiting for that start's first one.
+    /// A restart has been initiated: the commanded-restart bit is set, one
+    /// beacon goes at once, and the rest every `reset_interval` until the
+    /// process ends. They come fast, because the ground is waiting for the
+    /// first one of the start that comes back.
     pub fn restart_initiated(&self) {
         self.ending.store(true, Ordering::SeqCst);
+        self.commanded.store(true, Ordering::SeqCst);
         self.retime(self.timing.reset_interval);
     }
 
@@ -493,7 +491,7 @@ mod tests {
     /// made, naming the setting, and is not left to a thread that would end
     /// without a word.
     /// A ground socket, and a sender beaconing to it from a port of its own
-    /// with `timing`, as generation 7, commanded or not.
+    /// with `timing`, from a start commanded or not.
     fn sending(
         timing: BeaconTiming,
         commanded: bool,
@@ -538,16 +536,14 @@ mod tests {
         }
     }
 
-    /// Every start beacons fast, with its generation, until the MOC is heard
-    /// from; then at the interval. A restart initiated sends one at once,
-    /// fast again, and being heard from does not slow them after that. None
-    /// of them says the start was commanded, because this one was not, and a
-    /// restart's being initiated does not change that: it is the next start
-    /// that is commanded.
+    /// Every start beacons fast until the MOC connects; then at the
+    /// interval, and a CONFIG's interval from the next CONNECT. A restart
+    /// initiated sets the commanded-restart bit and sends one at once, fast
+    /// again, and a CONNECT does not slow them or clear the bit after that.
     #[test]
-    fn beacons_go_fast_across_a_restart_and_slow_when_the_moc_is_heard() {
+    fn beacons_go_fast_across_a_restart_and_slow_when_the_moc_connects() {
         let fast = Duration::from_millis(20);
-        let (ground, sender) = sending(
+        let (ground, mut sender) = sending(
             BeaconTiming {
                 default_interval: Duration::from_secs(60),
                 reset_interval: fast,
@@ -558,33 +554,38 @@ mod tests {
         for _ in 0..3 {
             let beacon =
                 next(&ground, wait).expect("fast beacons as it starts");
-            assert_eq!(beacon.generation, 7);
             assert!(!beacon.commanded_restart, "nobody commanded this start");
         }
+        // A CONFIG before a CONNECT changes nothing yet.
+        sender.set_interval(Duration::from_secs(120));
+        next(&ground, wait).expect("still fast");
 
-        sender.heard_from_moc();
-        // One may already have been on its way; after that, none for a
-        // minute, and a quarter of a second is a dozen fast ones.
+        sender.connected();
+        // One goes at once, and one may already have been on its way; after
+        // that, none for two minutes, and a quarter of a second is a dozen
+        // fast ones.
+        let _ = next(&ground, Duration::from_millis(100));
         let _ = next(&ground, Duration::from_millis(100));
         assert_eq!(
             next(&ground, Duration::from_millis(250)),
             None,
-            "the beacons slowed when the MOC was heard from"
+            "the beacons slowed when the MOC connected"
         );
 
         sender.restart_initiated();
         let beacon = next(&ground, wait).expect("one at once");
-        assert!(!beacon.commanded_restart, "still this start's beacon");
-        sender.heard_from_moc();
+        assert!(beacon.commanded_restart, "set as the restart is taken");
+        sender.connected();
         for _ in 0..3 {
             let beacon = next(&ground, wait).expect("fast until it ends");
-            assert!(!beacon.commanded_restart);
+            assert!(beacon.commanded_restart, "until the process ends");
         }
     }
 
-    /// Every beacon of a commanded start says it was.
+    /// A commanded start beacons with the bit set until the MOC connects,
+    /// and with it clear after.
     #[test]
-    fn every_beacon_of_a_commanded_start_says_so() {
+    fn a_commanded_start_says_so_until_the_moc_connects() {
         let (ground, sender) = sending(
             BeaconTiming {
                 default_interval: Duration::from_millis(20),
@@ -597,9 +598,12 @@ mod tests {
             let beacon = next(&ground, wait).expect("a beacon");
             assert!(beacon.commanded_restart);
         }
-        sender.heard_from_moc();
+        sender.connected();
+        // The one already on its way may still carry it; the one after
+        // does not.
+        let _ = next(&ground, wait);
         let beacon = next(&ground, wait).expect("a beacon");
-        assert!(beacon.commanded_restart, "however long the start runs");
+        assert!(!beacon.commanded_restart, "cleared by the CONNECT");
     }
 
     #[test]

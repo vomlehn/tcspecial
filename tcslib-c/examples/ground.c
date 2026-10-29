@@ -190,10 +190,10 @@ int main(int argc, char **argv)
 		}
 		printf("restart: armed %s, restarted %s\n", outcome(armed),
 		       outcome(restarted));
-		/* Nothing more goes to the vehicle until a beacon of its next
-		 * generation says it is back: the beacon is the restart's
+		/* Nothing more goes to the vehicle until a beacon whose number
+		 * starts again says it is back: the beacon is the restart's
 		 * acknowledgement. */
-		printf("restart: awaiting a beacon of the next generation: "
+		printf("restart: awaiting a beacon that starts again: "
 		       "%s\n",
 		       tcs_client_awaiting_restart(client) == 1 ? "yes" : "no");
 	}

@@ -157,8 +157,6 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
     let before = beacon(&beacons);
     assert!(before.sequence >= 2, "beacon #{}", before.sequence);
     assert!(!before.commanded_restart, "nobody commanded a first start");
-    // The first start this state file has seen.
-    assert_eq!(before.generation, 1);
     let open_before = descriptors(pid);
     assert!(
         open_before.contains(&handed),
@@ -172,7 +170,6 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
             &commands,
             take_at,
             &tcslibgs::Command::RestartArm(RestartArmCommand::new(1, key))
-                .for_generation(before.generation)
         ),
         CommandStatus::Success
     );
@@ -181,25 +178,33 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
             &commands,
             take_at,
             &tcslibgs::Command::Restart(RestartCommand::new(2, key))
-                .for_generation(before.generation)
         ),
         CommandStatus::Success
     );
 
-    // Back, numbering its beacons from one again, in the next generation,
-    // and saying it is a commanded start -- the first beacon of the new
-    // start already says so -- where the old start's never did.
+    // The old start's beacons carry the commanded-restart bit from the
+    // moment the RESTART is taken; the new start's number from one again,
+    // and the first of them already carries it too.
     let by = Instant::now() + Duration::from_secs(10);
+    let mut last = before.sequence;
+    let mut ending = false;
     let back = loop {
         assert!(Instant::now() < by, "tcspecial did not come back");
         let heard = beacon(&beacons);
-        if heard.generation == before.generation {
-            assert!(!heard.commanded_restart, "the old start's beacon");
+        if heard.sequence > last {
+            // One sent before the RESTART was taken may still be arriving;
+            // once one carries the bit, every one after it does.
+            assert!(
+                heard.commanded_restart || !ending,
+                "the old start, ending"
+            );
+            ending |= heard.commanded_restart;
+            last = heard.sequence;
             continue;
         }
         break heard;
     };
-    assert_eq!(back.generation, before.generation + 1);
+    assert!(ending, "the old start's last beacons carried the bit");
     assert_eq!(back.sequence, 1, "the first beacon of the new start");
     assert!(back.commanded_restart, "the start the RESTART asked for");
     // Said once, and no more: a crash of this start would not be commanded.
@@ -209,6 +214,21 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
     // And settled again, as it was when it was counted the first time.
     beacon(&beacons);
     beacon(&beacons);
+
+    // A CONNECT clears the bit: the first beacon after its answer may have
+    // been on its way, and the one after does not carry it. Whatever the
+    // digests say, the ground has connected.
+    let connect = tcslibgs::Command::Connect(tcslibgs::ConnectCommand::new(
+        3,
+        tcslibgs::ConfigVersion::of_this_build(),
+        tcslibgs::ConfigDigest([0; 16]),
+    ));
+    assert_eq!(ask(&commands, take_at, &connect), CommandStatus::Success);
+    beacon(&beacons);
+    assert!(
+        !beacon(&beacons).commanded_restart,
+        "cleared by the CONNECT"
+    );
 
     assert_eq!(
         vehicle.0.id(),

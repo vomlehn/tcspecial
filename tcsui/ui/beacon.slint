@@ -47,6 +47,12 @@ export component BeaconPanel inherits TitledBox {
     // width, and wraps the message where the panel is narrower than it, as
     // tcsmoc's is.
     in property <string> messages: "";
+    // What the field to the right of the indicator says of a restart --
+    // tcsui::RESTARTED_CONNECT while the last beacon carried the
+    // commanded-restart bit, empty while it did not -- and whether the
+    // window shows the field at all. Read-only: it is the beacon's to say.
+    in property <string> restart: "";
+    in property <bool> shows-restart: false;
 
     // Titled and boxed, because this is not part of whatever sits beside it:
     // the beacon has a socket of its own and keeps arriving after a
@@ -88,6 +94,27 @@ export component BeaconPanel inherits TitledBox {
                     min-width: widest-stage.preferred-width;
                     vertical-alignment: center;
                 }
+                // A field that can be read and not typed in, drawn rather
+                // than a LineEdit, which would take focus and a cursor. As
+                // wide as what it can say, so the row does not change width
+                // as it fills and empties.
+                if root.shows-restart: Rectangle {
+                    min-width: widest-restart.preferred-width + 12px;
+                    horizontal-stretch: 0;
+                    border-color: #808080;
+                    border-width: 1px;
+                    border-radius: 2px;
+                    HorizontalLayout {
+                        padding-left: 6px;
+                        padding-right: 6px;
+                        padding-top: 2px;
+                        padding-bottom: 2px;
+                        Text {
+                            text: root.restart;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
                 // What the values are held to: the widest each will be,
                 // measured rather than stated in pixels, the text being
                 // whatever size Fonts.window makes it. Each is one Text
@@ -112,6 +139,10 @@ export component BeaconPanel inherits TitledBox {
                     widest-message := Text {
                         visible: false;
                         text: root.messages;
+                    }
+                    widest-restart := Text {
+                        visible: false;
+                        text: "Restarted\u{2014}connect";
                     }
                 }
             }

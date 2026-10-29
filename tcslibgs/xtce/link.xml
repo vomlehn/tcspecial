@@ -15,13 +15,11 @@
                         carries back; a command older than one this start
                         of tcspecial has taken, PING and CONNECT aside, is
                         answered Stale and not acted on
-       generation       4 bytes. In a command, the generation of
-                        tcspecial the ground last heard, from a beacon or
-                        an answer; a command of any generation but the one
-                        flying, PING and CONNECT aside, is refused with
-                        WrongGeneration. In an answer, the generation that
-                        made it, so that the ground hears of a restart from
-                        any answer, a refusal among them
+       generation       4 bytes, an answer only: the generation of
+                        tcspecial that made it, so that the ground hears of
+                        a restart from any answer, a refusal among them. A
+                        command carries no generation: its sequence is all
+                        that numbers it
        status           1 byte, an answer only: how the command went
        timestamp        8 bytes, an answer only: microseconds since the UNIX
                         epoch when the answer was made, all ones where the
@@ -105,7 +103,8 @@
           <Enumeration value="5" label="NotFound"/>
           <Enumeration value="6" label="AlreadyExists"/>
           <Enumeration value="7" label="Timeout"/>
-          <Enumeration value="8" label="WrongGeneration"/>
+          <!-- 8 is not used: it was WrongGeneration, when a command
+               carried a generation. -->
           <!-- Older than a command this start has already taken, and
                not acted on. -->
           <Enumeration value="9" label="Stale"/>
@@ -407,7 +406,6 @@
           </Argument>
           <Argument name="Opcode" argumentTypeRef="U8Arg"/>
           <Argument name="Sequence" argumentTypeRef="U32Arg"/>
-          <Argument name="Generation" argumentTypeRef="U32Arg"/>
         </ArgumentList>
         <CommandContainer name="CommandContainer">
           <EntryList>
@@ -420,7 +418,6 @@
             <ArgumentRefEntry argumentRef="PacketLength"/>
             <ArgumentRefEntry argumentRef="Opcode"/>
             <ArgumentRefEntry argumentRef="Sequence"/>
-            <ArgumentRefEntry argumentRef="Generation"/>
           </EntryList>
         </CommandContainer>
       </MetaCommand>

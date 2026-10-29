@@ -125,7 +125,7 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
             while !stop.load(Ordering::Relaxed) {
                 sequence += 1;
                 let datagram =
-                    Beacon::new(sequence, version, digest, 1).to_bytes();
+                    Beacon::new(sequence, version, digest).to_bytes();
                 let _ = beacon.send_to(&datagram, ("127.0.0.1", beacons));
                 std::thread::sleep(Duration::from_millis(100));
             }

@@ -1,41 +1,74 @@
 """The beacon, as it goes on the link.
 
-The Python spelling of ``tcslibgs/src/beacon.rs``. The layout is stated once,
-in XTCE, in ``tcslibgs/xtce/beacon.xml``, and packed and unpacked here by the
-code tcs-xtce generates from it, ``beacon_packet.py``, as the Rust packs and
-unpacks it with the Rust tcs-xtce generates from the same file::
+The Python spelling of ``tcslibgs/src/beacon.rs``. A beacon is text, and
+nothing but text: its fields in order, a colon between each, so that a person
+reading a packet capture or a log reads it as it is, with no decoder::
 
-    "tcspecial " major minor patch " " digest[16] sequence[4] generation[4]
-    commanded_restart:1 spare:7 interface[16]
+    tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:42:normal:0123...cdef
 
-Fifty-five bytes, every one of them, the numbers most significant byte
-first. A beacon carries no CRC of its own: the transport under it checks it,
-as UDP's checksum does here.
+which is the name, the version, the configuration's digest, the beacon's
+number, ``restart`` or ``normal`` for the commanded-restart flag, and the
+interface's digest, numbers in decimal and digests in lower-case hex. It is
+read strictly, as the Rust reads it. A beacon carries no check of its own:
+the transport under it checks it, as UDP's checksum does here.
 """
 
-import sys
 from dataclasses import dataclass
-from pathlib import Path
 
-# tcs-xtce's Python runtime, which beacon_packet.py imports as ``xtce``. It is
-# vendored in this tree until tcs-xtce is published: see
-# vendor/tcs-xtce/README.md. Found from here, so that a ground station need not
-# be run with a path of its own.
-_XTCE = Path(__file__).resolve().parents[2] / "vendor" / "tcs-xtce" / "python"
-if str(_XTCE) not in sys.path:
-    sys.path.insert(0, str(_XTCE))
+from . import interface as _interface
 
-from xtce import packet as _pk  # noqa: E402
+#: The name every beacon starts with.
+BEACON_NAME = "tcspecial"
+#: What the commanded-restart field says when a commanded restart is under
+#: way, and when none is.
+RESTART_FLAG = "restart"
+NORMAL_FLAG = "normal"
+#: The longest a beacon is: the name, a version of three parts of up to three
+#: digits, two digests of thirty-two hex digits, a number of up to ten digits
+#: and the longer flag, with the five colons between them.
+BEACON_BYTES = 9 + 11 + 32 + 10 + 7 + 32 + 5
 
-from . import beacon_packet as _packet  # noqa: E402
-from . import interface as _interface  # noqa: E402
-
-#: How long a beacon is: every one is exactly this long.
-BEACON_BYTES = _packet.Beacon.MAX_BYTES
+_HEX = set("0123456789abcdef")
 
 
 class BeaconError(ValueError):
     """Why a datagram is not a beacon."""
+
+
+def _decimal(text):
+    """A number written in decimal digits and nothing else, that fits 32
+    bits, or ``None``."""
+    if not text or not all("0" <= c <= "9" for c in text):
+        return None
+    number = int(text)
+    return number if number < 2 ** 32 else None
+
+
+def _hex(text):
+    """Sixteen bytes written as thirty-two lower-case hex digits, or
+    ``None``."""
+    if len(text) != 32 or not set(text) <= _HEX:
+        return None
+    return bytes.fromhex(text)
+
+
+def _version(text):
+    """A version written ``major.minor.patch``, each part decimal digits
+    that fit a byte, or ``None``."""
+    parts = text.split(".")
+    if len(parts) != 3:
+        return None
+    numbers = [_decimal(part) for part in parts]
+    if any(n is None or n > 255 for n in numbers):
+        return None
+    return tuple(numbers)
+
+
+def _refused(why):
+    return BeaconError(
+        f"not a beacon ({why}): something other than tcspecial, or a "
+        "tcspecial of another layout, is sending to the beacon port"
+    )
 
 
 @dataclass(frozen=True)
@@ -48,12 +81,10 @@ class Beacon:
     version: tuple
     #: The digest of the configuration file the sender read: sixteen bytes.
     digest: bytes
-    #: How many times tcspecial has started on this vehicle, kept in its
-    #: state file. A change of it, either way, is a restart.
-    generation: int = 1
-    #: Whether the ground commanded the start of tcspecial that sent it:
-    #: one a RESTART asked for. A start nobody commanded runs with the
-    #: definitions it had.
+    #: Whether a restart the ground commanded is under way: set from an armed
+    #: RESTART being taken, through the start it asked for, until that start
+    #: takes a CONNECT. A start nobody commanded begins with it clear, and
+    #: runs with the definitions it had.
     commanded_restart: bool = False
     #: The interface the sender speaks: the digest of the XTCE documents it
     #: was built from, sixteen bytes. This tree's, where none is given.
@@ -66,42 +97,53 @@ class Beacon:
     @staticmethod
     def read(datagram):
         """The beacon a datagram holds, or ``BeaconError`` saying why it holds
-        none. A datagram of any length but a beacon's is refused rather than
-        read as far as a beacon goes."""
-        if len(datagram) != BEACON_BYTES:
+        none. A datagram that is longer than a beacon, is not text, or has a
+        field out of its form is refused rather than read as far as it
+        goes."""
+        if len(datagram) > BEACON_BYTES:
             raise BeaconError(
-                f"{len(datagram)} bytes, where a beacon is {BEACON_BYTES}: "
-                "something other than tcspecial, or a tcspecial of another "
-                "layout, is sending to the beacon port"
+                f"{len(datagram)} bytes, where a beacon is at most "
+                f"{BEACON_BYTES}: something other than tcspecial, or a "
+                "tcspecial of another layout, is sending to the beacon port"
             )
         try:
-            packet = _packet.Beacon.decode(datagram)
-        except _pk.PacketError as why:
-            raise BeaconError(
-                f"not a beacon ({why}): something other than tcspecial is "
-                "sending to the beacon port"
-            ) from why
+            text = datagram.decode("utf-8")
+        except UnicodeDecodeError:
+            raise _refused("it is not text") from None
+        fields = text.split(":")
+        if len(fields) != 6:
+            raise _refused(f"it has {len(fields)} fields, not six")
+        name, version, digest, sequence, flag, interface = fields
+        if name != BEACON_NAME:
+            raise _refused('it does not start "tcspecial:"')
+        version = _version(version)
+        if version is None:
+            raise _refused("the version is not three numbers")
+        digest = _hex(digest)
+        if digest is None:
+            raise _refused("the configuration digest is not 32 hex digits")
+        sequence = _decimal(sequence)
+        if sequence is None:
+            raise _refused("the number is not a number")
+        if flag not in (RESTART_FLAG, NORMAL_FLAG):
+            raise _refused(
+                'the restart flag is neither "restart" nor "normal"')
+        interface = _hex(interface)
+        if interface is None:
+            raise _refused("the interface digest is not 32 hex digits")
         return Beacon(
-            sequence=packet.sequence,
-            version=(packet.major, packet.minor, packet.patch),
-            digest=bytes(packet.digest),
-            generation=packet.generation,
-            commanded_restart=bool(packet.commanded_restart),
-            interface=bytes(packet.interface),
+            sequence=sequence,
+            version=version,
+            digest=digest,
+            commanded_restart=flag == RESTART_FLAG,
+            interface=interface,
         )
 
     def to_bytes(self):
         """This beacon as it goes on the link."""
         major, minor, patch = self.version
-        return bytes(
-            _packet.Beacon(
-                major=major,
-                minor=minor,
-                patch=patch,
-                digest=self.digest,
-                sequence=self.sequence,
-                generation=self.generation,
-                commanded_restart=self.commanded_restart,
-                interface=self.interface,
-            ).to_bytes()
-        )
+        flag = RESTART_FLAG if self.commanded_restart else NORMAL_FLAG
+        return (
+            f"{BEACON_NAME}:{major}.{minor}.{patch}:{self.digest.hex()}:"
+            f"{self.sequence}:{flag}:{self.interface.hex()}"
+        ).encode("ascii")

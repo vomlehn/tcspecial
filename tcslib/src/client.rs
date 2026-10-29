@@ -103,15 +103,14 @@ pub struct TcsClient {
     /// How many commands have gone out, so that a caller can tell whether
     /// the one it asked for did.
     sent: u64,
-    /// The last beacon's generation and whether it said its start was
-    /// commanded, as the station passed them on: see
-    /// [`TcsClient::beacon_heard`].
-    beacon: Option<(u32, bool)>,
-    /// The generation every command is sent for: the one the last beacon or
-    /// CONNECT's answer said is flying. `None` until one has, and again once
-    /// the vehicle has refused a command as of another generation, when
-    /// every command but PING and CONNECT is refused here until one says
-    /// again. See [`tcslibgs::CommandType::always_taken`].
+    /// The generation this station knows is flying: the one the last
+    /// CONNECT's answer said. `None` until one has, and again once a beacon
+    /// says tcspecial has started again or an answer has come from another
+    /// start, when every command but PING and CONNECT is refused here until a
+    /// CONNECT says again. A command carries no
+    /// generation, only its sequence; this is what keeps a station from
+    /// sending one to a start whose definitions it has not seen. See
+    /// [`tcslibgs::CommandType::always_taken`].
     generation: Option<u32>,
     /// What a RESTART that went out is waiting for, until a beacon says it
     /// came: see [`RestartWait`].
@@ -127,23 +126,13 @@ pub struct TcsClient {
 /// between would be read by whichever of the two it reached. See "What the
 /// ground may send meanwhile" in `docs/design.rst`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct RestartWait {
-    /// The generation flying when the RESTART went out, which the beacon
-    /// that ends the wait must not carry: the last beacon's, or the one the
-    /// RESTART was sent for where the station had heard no beacon. A RESTART
-    /// is sent only for a generation, so there is always one.
-    pub before: u32,
-}
+pub struct RestartWait;
 
-/// How a wait for a restart ended: which start of tcspecial came back, and
-/// whether it was the one the RESTART commanded.
+/// How a wait for a restart ended: whether the start of tcspecial that came
+/// back was the one the RESTART commanded.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RestartEnded {
-    /// The generation the wait was waiting to see change.
-    pub before: u32,
-    /// The generation that came back.
-    pub generation: u32,
-    /// Whether its beacon said the ground commanded it. Where it did not,
+    /// Whether its beacon said a commanded restart is under way. Where it did not,
     /// the vehicle started again for some other reason -- it crashed, or lost
     /// power -- before the RESTART was taken, and is running with the
     /// definitions it had: the RESTART did not happen, and may be sent again
@@ -152,21 +141,14 @@ pub struct RestartEnded {
 }
 
 impl RestartWait {
-    /// Whether a beacon of `generation` ends this wait: any start other than
-    /// the one the RESTART went to, commanded or not. Down as well as up,
-    /// because a damaged state file starts the count again from one.
-    fn ended_by(&self, generation: u32) -> bool {
-        generation != self.before
-    }
-
     /// Why a command is refused while this lasts.
     fn refusal(&self) -> TcsError {
-        TcsError::AwaitingRestart(format!(
+        TcsError::AwaitingRestart(
             "not sent: a RESTART went out, and nothing may follow it until a \
-             beacon of a generation other than {}, says tcspecial has started \
-             again",
-            self.before
-        ))
+             beacon whose number starts again says tcspecial has started \
+             again"
+                .to_string(),
+        )
     }
 }
 
@@ -195,7 +177,6 @@ impl TcsClient {
             last_sent: None,
             last_received: None,
             sent: 0,
-            beacon: None,
             generation: None,
             restart_wait: None,
         }
@@ -226,36 +207,31 @@ impl TcsClient {
             last_sent: None,
             last_received: None,
             sent: 0,
-            beacon: None,
             generation: None,
             restart_wait: None,
         }
     }
 
-    /// A beacon has arrived, of `generation` and saying whether the ground
-    /// commanded the start that sent it: what [`crate::beacon::Pass`] says of
-    /// the last one.
+    /// A beacon has arrived: whether its number says tcspecial has started
+    /// again since the one before it, and whether it says a commanded
+    /// restart is under way -- what [`crate::beacon::Pass`] says of it.
     ///
     /// A station that sends RESTART passes on every beacon it hears, because
-    /// a beacon is what ends the wait a RESTART begins. Returns how the wait
-    /// ended, if this ended one, for the station to say so.
+    /// a beacon is what ends the wait a RESTART begins. A start, waited for or
+    /// not, also makes this station forget which generation is flying, so
+    /// that nothing but PING and CONNECT goes until a CONNECT says. Returns
+    /// how the wait ended, if this ended one, for the station to say so.
     pub fn beacon_heard(
         &mut self,
-        generation: u32,
+        restarted: bool,
         commanded: bool,
     ) -> Option<RestartEnded> {
-        self.beacon = Some((generation, commanded));
-        self.generation = Some(generation);
-        let wait = self.restart_wait?;
-        if !wait.ended_by(generation) {
+        if !restarted {
             return None;
         }
-        self.restart_wait = None;
-        Some(RestartEnded {
-            before: wait.before,
-            generation,
-            commanded,
-        })
+        self.generation = None;
+        self.restart_wait.take()?;
+        Some(RestartEnded { commanded })
     }
 
     /// What a RESTART that went out is waiting for, if one is.
@@ -264,9 +240,9 @@ impl TcsClient {
     }
 
     /// End a wait by hand, for an operator who knows the RESTART was never
-    /// taken -- the beacons go on in the old generation, at their interval --
-    /// and returns it so that the station can record which generation it
-    /// was waiting on. Nothing else ends a wait but a beacon or a refusal.
+    /// taken -- the beacons go on counting up, at their interval, with the
+    /// commanded-restart bit clear -- and returns it so that the station can
+    /// record that it did. Nothing else ends a wait but a beacon or a refusal.
     pub fn end_restart_wait(&mut self) -> Option<RestartWait> {
         self.restart_wait.take()
     }
@@ -319,21 +295,19 @@ impl TcsClient {
         }
     }
 
-    /// The generation every command is sent for, as the last beacon or
-    /// CONNECT's answer said, or `None` where neither has.
+    /// The generation this station knows is flying, as the last CONNECT's
+    /// answer said, or `None` where none has since the last start.
     pub fn generation(&self) -> Option<u32> {
         self.generation
     }
 
-    /// `command`, sent for the generation flying, or why it is not sent.
-    ///
-    /// A PING or a CONNECT goes whether or not this station knows which
-    /// generation that is, because that is how it finds out. Nought, which no
-    /// start is, is what such a command says where it does not.
-    fn for_generation(&self, command: Command) -> TcsResult<Command> {
+    /// Whether `command` may go: only where this station knows which
+    /// generation is flying, but for a PING or a CONNECT, which go either
+    /// way because they are how it finds out.
+    fn may_send(&self, command: &Command) -> TcsResult<()> {
         match self.generation {
-            Some(generation) => Ok(command.for_generation(generation)),
-            None if command.cmd_type().always_taken() => Ok(command),
+            Some(_) => Ok(()),
+            None if command.cmd_type().always_taken() => Ok(()),
             None => Err(TcsError::GenerationUnknown(command.cmd_type())),
         }
     }
@@ -344,10 +318,10 @@ impl TcsClient {
             return Err(wait.refusal());
         }
         // A command with no link to go on says so before anything is said
-        // of its generation: that is the client's own configuration, and no
+        // of the generation: that is the client's own configuration, and no
         // beacon would change it.
         self.link_for(&command)?;
-        let command = self.for_generation(command)?;
+        self.may_send(&command)?;
         let timeout = self.timeout;
         let link = self.link_for(&command)?;
 
@@ -369,9 +343,8 @@ impl TcsClient {
 
     /// What an answer says of the generation flying.
     ///
-    /// A vehicle that refused a command as of another generation, or that
-    /// answered as one other than the start this station thought it was, has
-    /// started again since: nothing more goes until a beacon or a CONNECT
+    /// A vehicle that answered as another start than the one this station
+    /// thought it was has started again since: nothing more goes until a beacon or a CONNECT
     /// says which start it is, because the definitions it started with may
     /// not be the ones this station is reading. Learning the generation from
     /// the answer instead would carry on as though nothing had happened. An
@@ -379,7 +352,7 @@ impl TcsClient {
     fn heard_generation_of(&mut self, answer: &Telemetry) {
         let other = answer.generation() != 0
             && Some(answer.generation()) != self.generation;
-        if other || answer.status() == CommandStatus::WrongGeneration {
+        if other {
             self.generation = None;
         }
     }
@@ -448,7 +421,7 @@ impl TcsClient {
         if let Some(wait) = &self.restart_wait {
             return Err(wait.refusal());
         }
-        let command = self.for_generation(command)?;
+        self.may_send(&command)?;
 
         // The spacecraft's own link, and only that one. A CONNECT is about
         // having a connection to the vehicle, which is what this link is; a
@@ -462,8 +435,8 @@ impl TcsClient {
         self.last_received = Some(Timestamp::now());
 
         match answer {
-            // The generation it answers with is the one commands are sent
-            // for from here on, where it answered at all, and the count goes
+            // The generation it answers with is the one this station knows
+            // is flying from here on, where it answered at all, and the count goes
             // on from past the newest command it has taken.
             Telemetry::Connect(tm) => {
                 if tm.header.status.is_success() {
@@ -489,17 +462,11 @@ impl TcsClient {
         let seq = self.next_sequence();
         let cmd = Command::Restart(RestartCommand::new(seq, arm_key));
         let sent = self.sent;
-        // Asked before it goes: the answer may make the station forget it.
-        let flying = self
-            .beacon
-            .map(|(generation, _)| generation)
-            .or(self.generation);
         let response = self.send_command(cmd);
         // Begun once it has gone, whatever comes back -- an answer lost is a
-        // RESTART that may have been taken -- and not where it never went,
-        // which is also where no generation was known to send it for.
-        if let (true, Some(before)) = (self.sent != sent, flying) {
-            self.restart_wait = Some(RestartWait { before });
+        // RESTART that may have been taken -- and not where it never went.
+        if self.sent != sent {
+            self.restart_wait = Some(RestartWait);
         }
 
         match response? {
@@ -738,29 +705,21 @@ impl Default for TcsClientBuilder {
 mod tests {
     use super::*;
 
-    /// A wait ends at a beacon of another generation than the one the
-    /// RESTART went to, and says whether that start was commanded.
+    /// A wait ends at a beacon whose number says tcspecial has started
+    /// again, and says whether that start was commanded; a beacon of the
+    /// old start, commanded bit and all, does not end it.
     #[test]
     fn a_restart_wait_ends_at_the_next_start() {
-        let wait = RestartWait { before: 7 };
-        assert!(!wait.ended_by(7));
-        assert!(wait.ended_by(8));
-        // Down as well as up: a damaged state file starts again from one.
-        assert!(wait.ended_by(1));
-
         let mut client =
             TcsClient::spacecraft_only(Canned::answering(Telemetry::Ping(
                 tcslibgs::PingTelemetry::new(1, CommandStatus::Success),
             )));
-        client.restart_wait = Some(wait);
-        assert_eq!(client.beacon_heard(7, false), None, "the old start");
+        client.restart_wait = Some(RestartWait);
+        assert_eq!(client.beacon_heard(false, true), None, "the old start");
+        assert_eq!(client.restart_wait(), Some(RestartWait));
         assert_eq!(
-            client.beacon_heard(8, false),
-            Some(RestartEnded {
-                before: 7,
-                generation: 8,
-                commanded: false,
-            }),
+            client.beacon_heard(true, false),
+            Some(RestartEnded { commanded: false }),
             "a start nobody commanded ends it, and says so"
         );
         assert_eq!(client.restart_wait(), None);
@@ -899,11 +858,11 @@ mod tests {
     }
 
     /// A node command waits for the station to know which generation is
-    /// flying, and is sent for it once a CONNECT's answer or a beacon has
-    /// said. A vehicle that answers that it is another generation is one the
-    /// station no longer knows, until it is told again.
+    /// flying, and goes once a CONNECT's answer has said. A vehicle that
+    /// answers as another start, or whose beacons start again, is one the
+    /// station no longer knows, until a CONNECT says again.
     #[test]
-    fn a_command_is_sent_for_the_generation_last_heard() {
+    fn a_command_waits_for_the_station_to_know_the_generation() {
         let stopped = |status| {
             Telemetry::StopNode(tcslibgs::NodeTelemetry::stopped(
                 1,
@@ -911,7 +870,9 @@ mod tests {
                 NodeId(2),
             ))
         };
-        let (nodes, asked) = Canned::recording(stopped(CommandStatus::Success));
+        let (nodes, asked) = Canned::recording(
+            stopped(CommandStatus::Success).for_generation(7),
+        );
         let mut client = TcsClient::of_a_graph(
             Canned::answering(an_answer(a_version(1))),
             nodes,
@@ -929,37 +890,31 @@ mod tests {
             .expect("connected");
         assert_eq!(client.generation(), Some(7), "the CONNECT's answer");
         client.stop_node(NodeId(2)).expect("sent");
-        assert_eq!(asked.lock().unwrap()[0].generation(), 7);
-
-        client.beacon_heard(9, false);
-        client.stop_node(NodeId(2)).expect("sent");
-        assert_eq!(asked.lock().unwrap()[1].generation(), 9, "the beacon's");
-
-        // Told it is the wrong one: forgotten, and nothing more goes.
-        let (nodes, _) =
-            Canned::recording(stopped(CommandStatus::WrongGeneration));
-        client.nodes = Some(nodes);
-        let (status, _) = client.stop_node(NodeId(2)).expect("answered");
-        assert_eq!(status, CommandStatus::WrongGeneration);
-        assert_eq!(client.generation(), None);
-        assert!(matches!(
-            client.stop_node(NodeId(2)),
-            Err(TcsError::GenerationUnknown(_))
-        ));
-        // But a CONNECT still goes, and says again.
-        client
-            .connect(ConfigVersion::of_this_build(), ConfigDigest([0x5A; 16]))
-            .expect("connected");
-        assert_eq!(client.generation(), Some(7));
+        assert_eq!(asked.lock().unwrap().len(), 1);
+        assert_eq!(client.generation(), Some(7), "an answer of the same");
 
         // An answer made by another start, done or not, is a vehicle that
-        // has started again since: forgotten as well.
+        // has started again since: forgotten, and nothing more goes.
         let (nodes, _) = Canned::recording(
             stopped(CommandStatus::Success).for_generation(8),
         );
         client.nodes = Some(nodes);
         client.stop_node(NodeId(2)).expect("answered");
         assert_eq!(client.generation(), None);
+        assert!(matches!(
+            client.stop_node(NodeId(2)),
+            Err(TcsError::GenerationUnknown(_))
+        ));
+
+        // A CONNECT says again, and a beacon that starts again forgets.
+        client
+            .connect(ConfigVersion::of_this_build(), ConfigDigest([0x5A; 16]))
+            .expect("connected");
+        assert_eq!(client.generation(), Some(7));
+        client.beacon_heard(false, false);
+        assert_eq!(client.generation(), Some(7), "the same start goes on");
+        client.beacon_heard(true, true);
+        assert_eq!(client.generation(), None, "a start");
     }
 
     /// A CONNECT's answer says the newest command the vehicle has taken, and

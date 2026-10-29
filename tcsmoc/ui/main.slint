@@ -570,14 +570,9 @@ export component MainWindow inherits Window {
     // left empty so that an unfilled line reads as the spacecraft not having
     // spoken rather than as the window not having been written.
     in-out property <string> beacon-last-msg: "<none>";
-
-    // Whether data from the vehicle is being held, and why, or why Path
-    // purged was refused: see `tcslib::moc::DataHold`. A held datum is not
-    // put in any panel, because which node sent it, and in what format, is
-    // not known.
-    in-out property <bool> data-held: false;
-    in-out property <string> data-held-why: "";
-    callback path-purged();
+    // What the field beside the indicator says of a restart: see
+    // `tcsui::RESTARTED_CONNECT`.
+    in-out property <string> beacon-restart: "";
 
     callback link-clicked();
     callback ping-clicked();
@@ -707,36 +702,12 @@ export component MainWindow inherits Window {
                     // The panel is tcsui's, so that this window and the
                     // beacon example show an operator the same thing: see
                     // ../../tcsui/ui/beacon.slint.
-                    VerticalLayout {
-                        spacing: 4px;
-                        alignment: center;
-
-                        BeaconPanel {
-                            indicator-color: root.indicator-color;
-                            last-received: root.beacon-last-recv;
-                            last-message: root.beacon-last-msg;
-                        }
-
-                        // Under the beacon, because the beacons are what
-                        // began the hold: a change of configuration, or one
-                        // this window did not read. Shown only while there
-                        // is one, with the one thing the operator can do
-                        // about it once the path is purged.
-                        if root.data-held : HorizontalLayout {
-                            spacing: 8px;
-
-                            Text {
-                                text: "Data held: " + root.data-held-why;
-                                color: #ff0000;
-                                wrap: word-wrap;
-                                min-width: 240px;
-                                vertical-alignment: center;
-                            }
-                            Button {
-                                text: "Path purged";
-                                clicked => { root.path-purged(); }
-                            }
-                        }
+                    BeaconPanel {
+                        indicator-color: root.indicator-color;
+                        last-received: root.beacon-last-recv;
+                        last-message: root.beacon-last-msg;
+                        restart: root.beacon-restart;
+                        shows-restart: true;
                     }
                 }
 
@@ -776,7 +747,7 @@ export component MainWindow inherits Window {
                                     } 
                                 }
                                 Button {
-                                    text: "Restart";
+                                    text: "Initiate restart";
                                     clicked => {
                                         menu-action(MenuAction.restart);
                                         popup.close();

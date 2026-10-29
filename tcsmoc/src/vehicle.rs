@@ -948,6 +948,10 @@ pub(crate) fn command_buttons(
         let link = link.clone();
         let agreed = agreed.clone();
         let model = model.clone();
+        // The key this window arms with, and restarts with: one of its own,
+        // made as it starts, so that its Restart is taken only after its own
+        // ARM Restart and not after one some other station sent.
+        let key = window_arm_key();
         ui.on_menu_action(move |action| {
             let Some(ui) = weak.upgrade() else {
                 return;
@@ -976,8 +980,44 @@ pub(crate) fn command_buttons(
                         None => crate::ci_link::NOT_CONNECTED.to_string(),
                     }));
                 }
-                // The rest are not answered: the vehicle does not answer a
-                // restart yet, and the three DH items name a data
+                MenuAction::ArmRestart => {
+                    let answer = link
+                        .lock()
+                        .unwrap()
+                        .client()
+                        .map(|client| client.restart_arm(key));
+                    ui.set_last_response(SharedString::from(match answer {
+                        Some(Ok(status)) => format!("ARM Restart: {status:?}"),
+                        Some(Err(e)) => format!("ARM Restart failed: {e}"),
+                        None => crate::ci_link::NOT_CONNECTED.to_string(),
+                    }));
+                }
+                // Answered, if the answer comes, before the vehicle goes;
+                // the beacons say when it is back, and until then the
+                // window's commands are refused unsent.
+                MenuAction::Restart => {
+                    let answer = link
+                        .lock()
+                        .unwrap()
+                        .client()
+                        .map(|client| client.restart(key));
+                    ui.set_last_response(SharedString::from(match answer {
+                        Some(Ok(status)) if status.is_success() => {
+                            "Initiate restart: Success -- waiting for a beacon \
+                             of the next generation"
+                                .to_string()
+                        }
+                        Some(Ok(status)) => {
+                            format!("Initiate restart: {status:?}")
+                        }
+                        Some(Err(e)) => format!(
+                            "Initiate restart: no answer ({e}) -- waiting for \
+                             a beacon of the next generation"
+                        ),
+                        None => crate::ci_link::NOT_CONNECTED.to_string(),
+                    }));
+                }
+                // The rest are not answered: the three DH items name a data
                 // handler where a graph has nodes -- which the panels'
                 // buttons command.
                 other => ui.set_last_response(SharedString::from(format!(
@@ -1109,6 +1149,51 @@ fn no_command_link(ui: &MainWindow) {
     });
 }
 
+/// Hand a beacon to the window's commands, and say so in Last Response
+/// where it ends the wait an Initiate restart began: whether the start that
+/// came back was the one it commanded.
+fn beacon_to_commands(
+    weak: &slint::Weak<MainWindow>,
+    link: &Arc<Mutex<CiLink>>,
+    restarted: bool,
+    commanded: bool,
+) {
+    let ended = link
+        .lock()
+        .ok()
+        .and_then(|mut link| {
+            link.client()
+                .map(|client| client.beacon_heard(restarted, commanded))
+        })
+        .flatten();
+    let Some(ended) = ended else {
+        return;
+    };
+    let said = if ended.commanded {
+        "tcspecial has started again as commanded: Connect before anything \
+         else"
+    } else {
+        "tcspecial started again without being commanded to, so the restart \
+         initiated here did not happen: Connect before anything else"
+    };
+    let weak = weak.clone();
+    let _ = slint::invoke_from_event_loop(move || {
+        if let Some(ui) = weak.upgrade() {
+            ui.set_last_response(SharedString::from(said));
+        }
+    });
+}
+
+/// The key a window arms a restart with: made from the time and the process
+/// as the window starts, so that two windows on one vehicle do not share one,
+/// and so that a key is never one written down.
+fn window_arm_key() -> tcslibgs::ArmKey {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_nanos() as u64);
+    tcslibgs::ArmKey(nanos ^ (u64::from(std::process::id()) << 32))
+}
+
 /// The ping node's answers, on their way to the pinger and its window.
 ///
 /// A ping node is a source like any other, so its answers arrive at its `moc`
@@ -1225,12 +1310,6 @@ fn serve(
                 continue;
             }
         };
-        // Held: which node sent it, and in what format, is not known, so
-        // no panel is given it and no ping answer is timed by it. The window
-        // says data is held, beside the beacon.
-        if arrival.held {
-            continue;
-        }
         let data = &datum[..arrival.length];
         let Some(source) = sources.get_mut(arrival.source) else {
             continue;
@@ -1492,29 +1571,6 @@ pub fn run(
             tcslib::beacon::STANDARD_INTERVAL
         }
     };
-    // Whether data from the vehicle is held, which the beacons decide and
-    // every receiver asks: one for the window, shared by them all. Path
-    // purged is the one thing that ends it, and it says why where it cannot.
-    let data_hold = tcslib::moc::DataHold::new();
-    {
-        let hold = data_hold.clone();
-        let weak = ui.as_weak();
-        ui.on_path_purged(move || {
-            let Some(ui) = weak.upgrade() else {
-                return;
-            };
-            match hold.purged() {
-                Ok(()) => {
-                    eprintln!("the path is purged: data is attributed again");
-                    crate::beacon_receive::show_hold(&ui, None);
-                }
-                Err(why) => {
-                    eprintln!("{why}");
-                    ui.set_data_held_why(SharedString::from(why));
-                }
-            }
-        });
-    }
     let _beacon_receive = match tcslibgs::graph::parameters::beacon_of(&graph) {
         Ok(Some(beacon)) => {
             eprintln!(
@@ -1527,7 +1583,15 @@ pub fn run(
                 crate::config::constants::beacon_schedule(interval),
                 crate::beacon_receive::Decided {
                     contact: contact.clone(),
-                    hold: data_hold.clone(),
+                    heard: link.clone().map(|link| {
+                        let weak = ui.as_weak();
+                        Arc::new(move |restarted, commanded| {
+                            beacon_to_commands(
+                                &weak, &link, restarted, commanded,
+                            )
+                        })
+                            as crate::beacon_receive::OnBeacon
+                    }),
                 },
                 digest,
                 Some(crate::ask_whether_to_continue(
@@ -1617,18 +1681,12 @@ pub fn run(
     let mut receivers = Vec::new();
     for name in mocs {
         match Moc::open(&graph, name) {
-            Ok(mut moc) => {
-                moc.share(&data_hold);
-                receivers.push(moc);
-            }
+            Ok(moc) => receivers.push(moc),
             Err(e) => startup.warning(e),
         }
     }
     match Moc::open_payload_telemetry(&graph) {
-        Ok(Some(mut moc)) => {
-            moc.share(&data_hold);
-            receivers.push(moc);
-        }
+        Ok(Some(moc)) => receivers.push(moc),
         Ok(None) => {}
         Err(e) => startup.warning(e),
     }

@@ -195,9 +195,11 @@ the configuration's.
 -------------------------------
 
 * **A Rust decoder that does not allocate.** It decodes fixed-size strings and
-  binary into ``String`` and ``Vec``, which is three allocations for every
-  beacon tcspecial's ground hears; ``tcslib/src/running.rs`` counts them. The C
-  decoder already uses fixed arrays, and the Rust should do the same.
+  binary into ``String`` and ``Vec`` unless asked for fixed buffers, which
+  tcspecial asks for, for the commands it decodes in its main loop. The C
+  decoder always uses fixed arrays, and the Rust should by default. (The
+  beacon, whose decoding this item was first written about, is now text
+  read by hand, and no longer passes through tcs-xtce.)
 * **cFS output.** Message structures with the cFE headers and message IDs, or
   the C codec wrapped for use on the Software Bus. On a cFS release that uses
   EDS, a path between EDS and XTCE may be the better way to do this.

@@ -31,13 +31,14 @@ the editor is the one the vehicle would have refused the file with.
   described in XTCE in `xtce/link.xml`. The code that packs and
   unpacks them, `src/link_packet.rs`, is generated from that file: run `make
   link-packet` here after changing it, and `make interface-digest`.
-- `beacon`: the beacon, 55 bytes in a fixed layout, described in XTCE in `xtce/beacon.xml`. The code
-  that packs and unpacks it, `src/beacon_packet.rs` and
-  `../python/tcslibgs/beacon_packet.py`, is generated from that file by
-  tcs-xtce (vendored in `../vendor/tcs-xtce`): run `make beacon-packet` here
-  after changing it.
-- `interface`: the digest of the XTCE documents every packet on the link is
-  stated in, which every beacon carries so that a ground station can tell
+- `beacon`: the beacon, a line of text with six fields between colons,
+  `tcspecial:1.2.3:<md5>:42:normal:<interface>`, at most 106 bytes, so that
+  a person can read it in a capture or a log with no decoder. It is written
+  and read by hand, here and in `../python/tcslibgs/beacon.py`, and the two
+  are held to each other by the same examples in their tests; it has no
+  XTCE.
+- `interface`: the digest of the XTCE documents the commands and answers
+  are stated in, which every beacon carries so that a ground station can tell
   whether it read the documents tcspecial was built from. `make
   interface-digest` here regenerates `src/interface_digest.rs` after an
   XTCE document changes.

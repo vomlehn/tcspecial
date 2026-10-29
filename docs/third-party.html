@@ -570,9 +570,11 @@ devices.</li>
 <h2><a class="toc-backref" href="#toc-entry-11">2. tcs-xtce Fits the Frameworks</a></h2>
 <ul class="simple">
 <li><strong>A Rust decoder that does not allocate.</strong> It decodes fixed-size strings and
-binary into <tt class="docutils literal">String</tt> and <tt class="docutils literal">Vec</tt>, which is three allocations for every
-beacon tcspecial's ground hears; <tt class="docutils literal">tcslib/src/running.rs</tt> counts them. The C
-decoder already uses fixed arrays, and the Rust should do the same.</li>
+binary into <tt class="docutils literal">String</tt> and <tt class="docutils literal">Vec</tt> unless asked for fixed buffers, which
+tcspecial asks for, for the commands it decodes in its main loop. The C
+decoder always uses fixed arrays, and the Rust should by default. (The
+beacon, whose decoding this item was first written about, is now text
+read by hand, and no longer passes through tcs-xtce.)</li>
 <li><strong>cFS output.</strong> Message structures with the cFE headers and message IDs, or
 the C codec wrapped for use on the Software Bus. On a cFS release that uses
 EDS, a path between EDS and XTCE may be the better way to do this.</li>

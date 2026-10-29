@@ -192,9 +192,12 @@ where the configuration says beacons arrive, and each
 <code>tcs_beacons_pass</code> says how long since the last one: the
 stage (Unheard, Heard, Aging or Waiting), whether an indicator showing
 it is lit, whether the spacecraft is being heard from, when the last
-beacon arrived and what it said. Each pass also gives remarks, which are
-news, and warnings, which are to be said whether or not anybody
-asked.</li>
+beacon arrived and what it said. It also says whether this pass’s beacon
+started the count again, which is how a restart is known, and whether
+its commanded-restart flag said <code>restart</code>, which it does from
+a restart the ground commanded until the MOC connects. Each pass also
+gives remarks, which are news, and warnings, which are to be said
+whether or not anybody asked.</li>
 <li><strong>The vehicle’s data.</strong> <code>tcs_moc_open</code> opens
 a <code>moc</code> node, and each <code>tcs_moc_receive</code> returns
 one datum and the name of the node that produced it.</li>
@@ -203,7 +206,13 @@ two command links the configuration states.
 <code>tcs_client_connect</code> says whether the vehicle is flying this
 configuration; then ping; start, stop or query a node by its id, set one
 of its attributes, or ask for the last datum it moved each way; retime
-the beacon; and arm a restart and restart the vehicle.</li>
+the beacon; and arm a restart and restart the vehicle. The client learns
+which generation of tcspecial is flying from the answer to connect, so
+until one is answered, and again after a beacon whose number went back
+or an answer from another generation, it refuses every command but ping
+and connect, unsent. <code>tcs_client_beacon_heard</code> tells it of
+each pass’s beacon; after a restart is sent it is what ends the wait for
+the vehicle to come back.</li>
 <li><strong>Pinging a ping node.</strong> <code>tcs_pinger_open</code>
 finds the first <code>ping</code> node the ground can reach both ways
 and its <code>moc</code> node. <code>tcs_pinger_ping</code> sends a ping

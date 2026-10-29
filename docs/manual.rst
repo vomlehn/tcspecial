@@ -3686,17 +3686,26 @@ Restart
   when it exits.
 
   The beacons are how the ground learns the restart happened. From the
-  moment the restart is taken, every beacon carries a *restarting* flag --
-  the panel's line ends ``, RESTARTING`` -- and one goes at once, the rest
-  every ``beacon.reset_interval``. The tcspecial that comes back counts
-  itself a new *generation*, one more than the last, which it keeps in the
-  file the ``tcspecial`` section's ``state_file`` names; its beacons start
-  again at #1, say the new generation and have the flag clear. They go
-  every ``beacon.reset_interval`` until the first command from the MOC
-  arrives, and every ``beacon.default_interval`` after that.
+  moment the restart is taken one beacon goes at once, and the rest every
+  ``beacon.reset_interval``. The tcspecial that comes back counts itself a
+  new *generation*, one more than the last, which it keeps in the file the
+  ``tcspecial`` section's ``state_file`` names; its beacons start again at
+  #1, say the new generation, and carry a *commanded restart* flag -- the
+  panel's line ends ``, COMMANDED RESTART`` -- saying it is the start the
+  restart asked for. They go every ``beacon.reset_interval`` until the
+  first command from the MOC arrives, and every ``beacon.default_interval``
+  after that.
+
+  A tcspecial that starts again for any other reason -- it crashed and its
+  supervisor started it, or the vehicle lost power -- also counts a new
+  generation, but its beacons do not carry the flag, and it runs with the
+  configuration it had. A station waiting on a restart that sees a new
+  generation without the flag says so: the restart it sent did not happen,
+  and the vehicle restarted for a reason of its own, which is worth finding
+  out before the restart is sent again.
 
   Once a station has sent a restart it sends nothing more to the vehicle
-  until a beacon of the new generation, not restarting, arrives: the
+  until a beacon of a new generation arrives: the
   vehicle that comes back may read packets differently from the one that
   went, and the beacon -- not the answer to the restart, which may never
   arrive -- is what says it is back. A command tried in between is refused

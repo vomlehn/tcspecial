@@ -2,8 +2,8 @@
 //!
 //! What tcspecial sends every `beacon.default_interval`, whether or not anything has
 //! connected to it: the build it is, the digest of the configuration it read,
-//! the beacon's own number, how many times tcspecial has started, whether a
-//! restart is under way, and which interface it speaks. A ground station that
+//! the beacon's own number, how many times tcspecial has started, whether the
+//! ground commanded this start, and which interface it speaks. A ground station that
 //! is only listening can then see which software is flying, which payload set
 //! it is serving and whether it has just come back, rather than having to ask
 //! before it can know.
@@ -16,7 +16,7 @@
 //!
 //! ```text
 //! "tcspecial " major minor patch " " digest[16] sequence[4] generation[4]
-//! restarting:1 spare:7 interface[16]
+//! commanded_restart:1 spare:7 interface[16]
 //! ```
 //!
 //! The numbers are most significant byte first. A beacon carries no CRC of
@@ -58,20 +58,23 @@ pub struct Beacon {
     /// state file that was damaged starts the count again from one, and a
     /// count that went down is a restart as surely as one that went up.
     pub generation: u32,
-    /// Whether a restart has been initiated: an armed RESTART was taken, and
-    /// the process is about to end and run again.
+    /// Whether this start of tcspecial is one the ground commanded: an armed
+    /// RESTART -- or, once there are load sets, a SWITCH -- was taken by the
+    /// start before, which is how a new set of definitions is taken up.
     ///
-    /// Set from then until the process ends, and clear in every beacon of a
-    /// process that has just started.
-    pub restarting: bool,
+    /// Set in every beacon of such a start, and clear in every beacon of one
+    /// nobody commanded -- a crash the supervisor restarted, a power cycle --
+    /// which runs with the definitions it had, so that the interface does not
+    /// change under a ground station that did not ask for it to.
+    pub commanded_restart: bool,
     /// The interface the sender speaks: the digest of the XTCE documents it
     /// was built from. See [`crate::interface`].
     pub interface: InterfaceDigest,
 }
 
 impl Beacon {
-    /// A beacon from a process that is running normally: not restarting, and
-    /// speaking the interface this build was generated from.
+    /// A beacon from a start nobody commanded, speaking the interface this
+    /// build was generated from.
     pub fn new(
         sequence: u32,
         version: ConfigVersion,
@@ -83,14 +86,17 @@ impl Beacon {
             version,
             digest,
             generation,
-            restarting: false,
+            commanded_restart: false,
             interface: InterfaceDigest::of_this_build(),
         }
     }
 
-    /// This beacon, saying whether a restart has been initiated.
-    pub fn restarting(self, restarting: bool) -> Self {
-        Self { restarting, ..self }
+    /// This beacon, saying whether the ground commanded this start.
+    pub fn commanded_restart(self, commanded_restart: bool) -> Self {
+        Self {
+            commanded_restart,
+            ..self
+        }
     }
 
     /// The beacon a datagram holds, or why it holds none.
@@ -119,7 +125,7 @@ impl Beacon {
             },
             digest: ConfigDigest(digest),
             generation: packet.generation,
-            restarting: packet.restarting,
+            commanded_restart: packet.commanded_restart,
             interface: InterfaceDigest(interface),
         })
     }
@@ -159,7 +165,7 @@ impl BeaconPacker {
         self.packet.minor = beacon.version.minor;
         self.packet.patch = beacon.version.patch;
         self.packet.generation = beacon.generation;
-        self.packet.restarting = beacon.restarting;
+        self.packet.commanded_restart = beacon.commanded_restart;
         // Every field is a fixed size and every value fits it, so there is
         // nothing a beacon can hold that does not pack: the digests are
         // sixteen bytes into buffers of sixteen.
@@ -226,7 +232,7 @@ mod tests {
     #[test]
     fn a_beacon_is_its_fields_in_order() {
         let beacon = Beacon::new(0x01020304, version(), digest(), 0x0a0b0c0d)
-            .restarting(true);
+            .commanded_restart(true);
         let packed = beacon.to_bytes();
         let mut want = b"tcspecial ".to_vec();
         want.extend([1, 2, 3]);
@@ -245,8 +251,8 @@ mod tests {
     fn a_beacon_reads_back_as_itself() {
         let beacon = Beacon::new(7, version(), digest(), 3);
         assert_eq!(Beacon::read(&beacon.to_bytes()), Ok(beacon));
-        let restarting = beacon.restarting(true);
-        assert_eq!(Beacon::read(&restarting.to_bytes()), Ok(restarting));
+        let commanded = beacon.commanded_restart(true);
+        assert_eq!(Beacon::read(&commanded.to_bytes()), Ok(commanded));
     }
 
     #[test]

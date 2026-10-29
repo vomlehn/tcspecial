@@ -421,7 +421,7 @@ pub struct tcs_pass {
     at_seconds: i64,
     at_nanos: u32,
     generation: u32,
-    restarting: c_int,
+    commanded_restart: c_int,
 }
 
 /// What a stage is called where a person reads it.
@@ -444,7 +444,7 @@ pub struct tcs_beacons {
     said: Text<TEXT_BYTES>,
     remarks: Notes,
     warnings: Notes,
-    /// The last beacon's generation and restarting bit, for
+    /// The last beacon's generation and whether its start was commanded, for
     /// `tcs_client_beacon_heard`: `None` before one has arrived.
     last: Option<(u32, bool)>,
 }
@@ -524,9 +524,9 @@ pub unsafe extern "C" fn tcs_beacons_pass(
             at_seconds: i64::try_from(at.as_secs()).unwrap_or(i64::MAX),
             at_nanos: at.subsec_nanos(),
             generation: found.generation.unwrap_or(0),
-            restarting: c_int::from(found.restarting),
+            commanded_restart: c_int::from(found.commanded_restart),
         };
-        watch.last = found.generation.map(|g| (g, found.restarting));
+        watch.last = found.generation.map(|g| (g, found.commanded_restart));
         watch.said.set(&found.said);
         watch.remarks.set(&found.remarks);
         watch.warnings.set(&found.warnings);
@@ -1007,8 +1007,9 @@ pub unsafe extern "C" fn tcs_client_restart(
 }
 
 /// Hand the client what the last pass of `beacons` heard, so that a wait
-/// begun by a RESTART can end: 1 when this ended one, 0 when it did not,
-/// -1 on an error.
+/// begun by a RESTART can end: 1 when this ended one with the start the
+/// RESTART commanded, 2 when it ended one with a start nobody commanded, 0
+/// when it did not end one, -1 on an error.
 ///
 /// # Safety
 ///
@@ -1022,12 +1023,14 @@ pub unsafe extern "C" fn tcs_client_beacon_heard(
     guard(-1, || {
         let link = handle_of_mut(client, "the client")?;
         let watch = handle_of(beacons, "the beacons")?;
-        let Some((generation, restarting)) = watch.last else {
+        let Some((generation, commanded)) = watch.last else {
             return Ok(0);
         };
-        Ok(c_int::from(
-            link.client.beacon_heard(generation, restarting).is_some(),
-        ))
+        Ok(match link.client.beacon_heard(generation, commanded) {
+            Some(ended) if ended.commanded => 1,
+            Some(_) => 2,
+            None => 0,
+        })
     })
 }
 

@@ -47,11 +47,16 @@ pub struct BeaconSend {
     /// all of them, and asked without a lock, because it is asked of every
     /// command that arrives.
     awaiting_moc: Arc<AtomicBool>,
-    /// Whether a restart has been initiated, which every beacon from then
-    /// until the process ends says.
-    restarting: Arc<AtomicBool>,
+    /// Whether a restart has been initiated, from which the beacons go
+    /// every `reset_interval` until the process ends. Not on the wire: the
+    /// beacon says whether this start was commanded, not whether the next
+    /// one is coming. See [`BeaconSend::restart_initiated`].
+    ending: Arc<AtomicBool>,
     /// This start's generation, from the state file: see [`crate::state`].
     generation: u32,
+    /// Whether the ground commanded this start, which every beacon of it
+    /// says: see [`crate::state::Started::commanded`].
+    commanded: bool,
     /// Where beacons go: `beacon_recv`, which is what tcsmoc makes its
     /// receiving socket out of.
     dest_addr: tcslibgs::HostPort,
@@ -109,8 +114,10 @@ impl BeaconSend {
         log: TelemetryLog,
         version: ConfigVersion,
         digest: ConfigDigest,
-        generation: u32,
+        started: &crate::state::Started,
     ) -> TcsResult<Option<BeaconSend>> {
+        let generation = started.generation;
+        let commanded = started.commanded;
         if timing.default_interval == Duration::from_secs(0) {
             return Ok(None);
         }
@@ -158,8 +165,9 @@ impl BeaconSend {
             interval: Arc::new(Mutex::new(interval)),
             timing,
             awaiting_moc: Arc::new(AtomicBool::new(true)),
-            restarting: Arc::new(AtomicBool::new(false)),
+            ending: Arc::new(AtomicBool::new(false)),
             generation,
+            commanded,
             dest_addr,
             from_addr,
             log,
@@ -231,7 +239,7 @@ impl BeaconSend {
             self.sent.fetch_add(1, Ordering::Relaxed).wrapping_add(1);
         let beacon =
             Beacon::new(sequence, self.version, self.digest, self.generation)
-                .restarting(self.restarting.load(Ordering::SeqCst));
+                .commanded_restart(self.commanded);
         let data = packer.pack(&beacon);
         trace!("send_beacon: sending to {dest}");
         // Recorded before it is sent, as a command response is, so that a
@@ -260,7 +268,7 @@ impl BeaconSend {
     /// once a restart has been initiated: from then until the process ends,
     /// the beacons are the ground's news of the restart, and they stay fast.
     pub fn heard_from_moc(&self) {
-        if self.restarting.load(Ordering::SeqCst) {
+        if self.ending.load(Ordering::SeqCst) {
             return;
         }
         if self.awaiting_moc.swap(false, Ordering::SeqCst) {
@@ -278,11 +286,13 @@ impl BeaconSend {
         }
     }
 
-    /// A restart has been initiated: from now until the process ends, every
-    /// beacon says so, one goes at once, and the rest every
-    /// `reset_interval`.
+    /// A restart has been initiated: one beacon goes at once, and the rest
+    /// every `reset_interval` until the process ends. The beacons say
+    /// nothing new -- the start that comes back says it was commanded, in a
+    /// generation of its own -- but they come fast, because the ground is
+    /// waiting for that start's first one.
     pub fn restart_initiated(&self) {
-        self.restarting.store(true, Ordering::SeqCst);
+        self.ending.store(true, Ordering::SeqCst);
         self.retime(self.timing.reset_interval);
     }
 
@@ -348,6 +358,15 @@ impl Failing {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A start of tcspecial as the state file counted it.
+    fn a_start(generation: u32, commanded: bool) -> crate::state::Started {
+        crate::state::Started {
+            generation,
+            commanded,
+            damaged: None,
+        }
+    }
     use tcslibgs::CIConfig;
 
     /// Beacons every fifty milliseconds, across a restart or not.
@@ -439,7 +458,7 @@ mod tests {
             log,
             ConfigVersion::of_this_build(),
             ConfigDigest([0u8; 16]),
-            1,
+            &a_start(1, false),
         )
         .expect("a sender")
         .expect("an interval that sends");
@@ -474,8 +493,11 @@ mod tests {
     /// made, naming the setting, and is not left to a thread that would end
     /// without a word.
     /// A ground socket, and a sender beaconing to it from a port of its own
-    /// with `timing`, as generation 7.
-    fn sending(timing: BeaconTiming) -> (std::net::UdpSocket, BeaconSend) {
+    /// with `timing`, as generation 7, commanded or not.
+    fn sending(
+        timing: BeaconTiming,
+        commanded: bool,
+    ) -> (std::net::UdpSocket, BeaconSend) {
         let ground =
             std::net::UdpSocket::bind("127.0.0.1:0").expect("a ground socket");
         let at = ground.local_addr().expect("where it is");
@@ -492,7 +514,7 @@ mod tests {
             TelemetryLog::disabled(),
             ConfigVersion::of_this_build(),
             ConfigDigest([0u8; 16]),
-            7,
+            &a_start(7, commanded),
         )
         .expect("a sender")
         .expect("an interval that sends");
@@ -516,23 +538,28 @@ mod tests {
         }
     }
 
-    /// Every start beacons fast, with its generation and the restarting bit
-    /// clear, until the MOC is heard from; then at the interval. A restart
-    /// initiated sends one at once with the bit set, fast again, and being
-    /// heard from does not slow them after that.
+    /// Every start beacons fast, with its generation, until the MOC is heard
+    /// from; then at the interval. A restart initiated sends one at once,
+    /// fast again, and being heard from does not slow them after that. None
+    /// of them says the start was commanded, because this one was not, and a
+    /// restart's being initiated does not change that: it is the next start
+    /// that is commanded.
     #[test]
     fn beacons_go_fast_across_a_restart_and_slow_when_the_moc_is_heard() {
         let fast = Duration::from_millis(20);
-        let (ground, sender) = sending(BeaconTiming {
-            default_interval: Duration::from_secs(60),
-            reset_interval: fast,
-        });
+        let (ground, sender) = sending(
+            BeaconTiming {
+                default_interval: Duration::from_secs(60),
+                reset_interval: fast,
+            },
+            false,
+        );
         let wait = Duration::from_secs(5);
         for _ in 0..3 {
             let beacon =
                 next(&ground, wait).expect("fast beacons as it starts");
             assert_eq!(beacon.generation, 7);
-            assert!(!beacon.restarting, "a process that has just started");
+            assert!(!beacon.commanded_restart, "nobody commanded this start");
         }
 
         sender.heard_from_moc();
@@ -547,12 +574,32 @@ mod tests {
 
         sender.restart_initiated();
         let beacon = next(&ground, wait).expect("one at once");
-        assert!(beacon.restarting, "it says the restart was initiated");
+        assert!(!beacon.commanded_restart, "still this start's beacon");
         sender.heard_from_moc();
         for _ in 0..3 {
             let beacon = next(&ground, wait).expect("fast until it ends");
-            assert!(beacon.restarting);
+            assert!(!beacon.commanded_restart);
         }
+    }
+
+    /// Every beacon of a commanded start says it was.
+    #[test]
+    fn every_beacon_of_a_commanded_start_says_so() {
+        let (ground, sender) = sending(
+            BeaconTiming {
+                default_interval: Duration::from_millis(20),
+                reset_interval: Duration::from_millis(20),
+            },
+            true,
+        );
+        let wait = Duration::from_secs(5);
+        for _ in 0..2 {
+            let beacon = next(&ground, wait).expect("a beacon");
+            assert!(beacon.commanded_restart);
+        }
+        sender.heard_from_moc();
+        let beacon = next(&ground, wait).expect("a beacon");
+        assert!(beacon.commanded_restart, "however long the start runs");
     }
 
     #[test]
@@ -573,7 +620,7 @@ mod tests {
             TelemetryLog::disabled(),
             ConfigVersion::of_this_build(),
             ConfigDigest([0u8; 16]),
-            1,
+            &a_start(1, false),
         );
         let said = match refused {
             Err(e) => e.to_string(),
@@ -599,7 +646,7 @@ mod tests {
             TelemetryLog::disabled(),
             ConfigVersion::of_this_build(),
             ConfigDigest([0u8; 16]),
-            1,
+            &a_start(1, false),
         );
         let said = match refused {
             Err(e) => e.to_string(),

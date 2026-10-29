@@ -6,7 +6,7 @@ code tcs-xtce generates from it, ``beacon_packet.py``, as the Rust packs and
 unpacks it with the Rust tcs-xtce generates from the same file::
 
     "tcspecial " major minor patch " " digest[16] sequence[4] generation[4]
-    restarting:1 spare:7 interface[16]
+    commanded_restart:1 spare:7 interface[16]
 
 Fifty-five bytes, every one of them, the numbers most significant byte
 first. A beacon carries no CRC of its own: the transport under it checks it,
@@ -51,8 +51,10 @@ class Beacon:
     #: How many times tcspecial has started on this vehicle, kept in its
     #: state file. A change of it, either way, is a restart.
     generation: int = 1
-    #: Whether a restart has been initiated and the sender is about to end.
-    restarting: bool = False
+    #: Whether the ground commanded the start of tcspecial that sent it:
+    #: one a RESTART asked for. A start nobody commanded runs with the
+    #: definitions it had.
+    commanded_restart: bool = False
     #: The interface the sender speaks: the digest of the XTCE documents it
     #: was built from, sixteen bytes. This tree's, where none is given.
     interface: bytes = None
@@ -84,7 +86,7 @@ class Beacon:
             version=(packet.major, packet.minor, packet.patch),
             digest=bytes(packet.digest),
             generation=packet.generation,
-            restarting=bool(packet.restarting),
+            commanded_restart=bool(packet.commanded_restart),
             interface=bytes(packet.interface),
         )
 
@@ -99,7 +101,7 @@ class Beacon:
                 digest=self.digest,
                 sequence=self.sequence,
                 generation=self.generation,
-                restarting=self.restarting,
+                commanded_restart=self.commanded_restart,
                 interface=self.interface,
             ).to_bytes()
         )

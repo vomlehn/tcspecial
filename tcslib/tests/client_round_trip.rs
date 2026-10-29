@@ -312,15 +312,13 @@ fn every_operation_reaches_the_spacecraft_and_comes_back() {
         "{refused:?}"
     );
     assert!(refused.to_string().contains("generation other than 4"));
-    // Not by the old generation's beacons, restarting or not, nor by the
-    // new one's while it says it is restarting.
-    assert_eq!(client.beacon_heard(4, true), None);
+    // Not by the old generation's beacons.
     assert_eq!(client.beacon_heard(4, false), None);
-    assert_eq!(client.beacon_heard(5, true), None);
     assert!(client.restart_wait().is_some());
-    // By a new generation that is not restarting.
-    let ended = client.beacon_heard(5, false).expect("it ends the wait");
-    assert_eq!(ended.before, Some(4));
+    // By the next start, which says it was the one commanded.
+    let ended = client.beacon_heard(5, true).expect("it ends the wait");
+    assert_eq!((ended.before, ended.generation), (4, 5));
+    assert!(ended.commanded);
     assert!(client.restart_wait().is_none());
     assert_eq!(configure(&mut client).unwrap(), CommandStatus::Success);
 

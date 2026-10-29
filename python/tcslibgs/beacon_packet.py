@@ -60,8 +60,8 @@ class Beacon(pk.Packet):
     """``/TcsBeacon/Sequence`` (/TcsBeacon/U32Type)"""
     generation: int = 0
     """``/TcsBeacon/Generation`` (/TcsBeacon/U32Type)"""
-    restarting: bool = False
-    """``/TcsBeacon/Restarting`` (/TcsBeacon/FlagType)"""
+    commanded_restart: bool = False
+    """``/TcsBeacon/CommandedRestart`` (/TcsBeacon/FlagType)"""
     interface: bytes = b""
     """``/TcsBeacon/Interface`` (/TcsBeacon/DigestType)"""
 
@@ -78,7 +78,7 @@ class Beacon(pk.Packet):
         v6 = r.bytes(16, "Digest")
         v7 = r.uint_order(32, False, "Sequence")
         v8 = r.uint_order(32, False, "Generation")
-        v9 = r.uint_order(1, False, "Restarting") != 0
+        v9 = r.uint_order(1, False, "CommandedRestart") != 0
         v10 = r.uint_order(7, False, "Spare")
         v11 = r.bytes(16, "Interface")
         if not (v1 == "tcspecial "):
@@ -91,7 +91,8 @@ class Beacon(pk.Packet):
             raise pk.PacketError("Mismatch", "/TcsBeacon/Beacon",
                                  "/TcsBeacon/Spare == 0")
         return (Beacon(major=v2, minor=v3, patch=v4, digest=v6, sequence=v7,
-                       generation=v8, restarting=v9, interface=v11), r.used())
+                       generation=v8, commanded_restart=v9, interface=v11),
+                r.used())
 
     def encode_into(self, w: pk.BitWriter) -> None:
         pk.write_string(w, (80, 80, b"\x00", 0, "US-ASCII"), "tcspecial ",
@@ -109,7 +110,7 @@ class Beacon(pk.Packet):
         w.uint_order(32, False,
                      pk.from_signed(self.generation, 32, "unsigned",
                                     "Generation"))
-        w.uint_order(1, False, 1 if self.restarting else 0)
+        w.uint_order(1, False, 1 if self.commanded_restart else 0)
         w.uint_order(7, False, pk.from_signed(0, 7, 'unsigned', "Spare"))
         pk.write_binary(w, self.interface, 16, "Interface")
 
@@ -134,16 +135,14 @@ class Beacon(pk.Packet):
 
     def describe(self) -> str:
         """Canonical text form, identical in every generated language."""
-        return ("Beacon{"
-                + ", ".join(("major=" + str(self.major),
-                             "minor=" + str(self.minor),
-                             "patch=" + str(self.patch),
-                             "digest=" + pk.describe_bytes(self.digest),
-                             "sequence=" + str(self.sequence),
-                             "generation=" + str(self.generation),
-                             "restarting=" + _describe_bool(self.restarting),
-                             "interface=" + pk.describe_bytes(self.interface)))
-                + "}")
+        return "Beacon{" + ", ".join(
+            ("major=" + str(self.major), "minor=" + str(self.minor),
+             "patch=" + str(self.patch),
+             "digest=" + pk.describe_bytes(self.digest),
+             "sequence=" + str(self.sequence),
+             "generation=" + str(self.generation),
+             "commanded_restart=" + _describe_bool(self.commanded_restart),
+             "interface=" + pk.describe_bytes(self.interface))) + "}"
 
 
 class BeaconLayoutKind(pk.PacketKind):
@@ -167,10 +166,11 @@ class BeaconLayoutKind(pk.PacketKind):
         v6 = r.bytes(16, "Digest")
         v7 = r.uint_order(32, False, "Sequence")
         v8 = r.uint_order(32, False, "Generation")
-        v9 = r.uint_order(1, False, "Restarting") != 0
+        v9 = r.uint_order(1, False, "CommandedRestart") != 0
         v10 = r.uint_order(7, False, "Spare")
         v11 = r.bytes(16, "Interface")
         if (v1 == "tcspecial ") and (v5 == " ") and (v10 == 0):
-            return Beacon(major=v2, minor=v3, patch=v4, digest=v6, sequence=v7,
-                          generation=v8, restarting=v9, interface=v11), r.used()
+            return (Beacon(major=v2, minor=v3, patch=v4, digest=v6, sequence=v7,
+                           generation=v8, commanded_restart=v9, interface=v11),
+                    r.used())
         raise pk.PacketError("NoMatch", "/TcsBeacon/BeaconLayout")

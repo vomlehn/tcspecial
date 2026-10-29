@@ -12,7 +12,8 @@
        digest          16 bytes, the MD5 of the configuration tcspecial read
        sequence        4 bytes, unsigned, most significant byte first
        generation      4 bytes, unsigned, most significant byte first
-       restarting      1 bit, the most significant of its byte
+       commanded       1 bit, the most significant of its byte: this start
+                       of tcspecial was commanded
        spare           7 bits, nought
        interface       16 bytes, the digest of the interface tcspecial speaks
 
@@ -22,9 +23,12 @@
      a beacon is refused for if it is not nought. The sequence counts the
      beacons this tcspecial has sent, from one, so that the ground can tell a
      beacon it missed from a vehicle that restarted. The generation counts the
-     times tcspecial has started, kept in its state file, and the restarting
-     bit says a restart has been initiated and the process is about to end:
-     see "The generation number and the state file" in docs/design.rst. A
+     times tcspecial has started, kept in its state file, and the commanded
+     bit says this start is one the ground commanded, with RESTART or
+     SWITCH, to take up a new set of definitions; a start nobody commanded,
+     after a crash or a power cycle, leaves it clear, and runs with the
+     definitions it had: see "The generation number and the state file" in
+     docs/design.rst. A
      beacon carries no CRC of its own: the transport under it, UDP's
      checksum on this link, refuses a damaged datagram before it is read.
 
@@ -81,7 +85,7 @@
       <Parameter name="Digest" parameterTypeRef="DigestType"/>
       <Parameter name="Sequence" parameterTypeRef="U32Type"/>
       <Parameter name="Generation" parameterTypeRef="U32Type"/>
-      <Parameter name="Restarting" parameterTypeRef="FlagType"/>
+      <Parameter name="CommandedRestart" parameterTypeRef="FlagType"/>
       <Parameter name="Spare" parameterTypeRef="SpareType"/>
       <Parameter name="Interface" parameterTypeRef="DigestType"/>
     </ParameterSet>
@@ -99,7 +103,7 @@
           <ParameterRefEntry parameterRef="Digest"/>
           <ParameterRefEntry parameterRef="Sequence"/>
           <ParameterRefEntry parameterRef="Generation"/>
-          <ParameterRefEntry parameterRef="Restarting"/>
+          <ParameterRefEntry parameterRef="CommandedRestart"/>
           <ParameterRefEntry parameterRef="Spare"/>
           <ParameterRefEntry parameterRef="Interface"/>
         </EntryList>

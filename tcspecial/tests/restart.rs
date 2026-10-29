@@ -156,7 +156,7 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
     beacon(&beacons);
     let before = beacon(&beacons);
     assert!(before.sequence >= 2, "beacon #{}", before.sequence);
-    assert!(!before.restarting, "nothing has been restarted yet");
+    assert!(!before.commanded_restart, "nobody commanded a first start");
     // The first start this state file has seen.
     assert_eq!(before.generation, 1);
     let open_before = descriptors(pid);
@@ -186,26 +186,26 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
         CommandStatus::Success
     );
 
-    // Back, numbering its beacons from one again, in the next generation
-    // and not restarting -- the first beacon of the new start already says
-    // so -- having said it was restarting before it went.
+    // Back, numbering its beacons from one again, in the next generation,
+    // and saying it is a commanded start -- the first beacon of the new
+    // start already says so -- where the old start's never did.
     let by = Instant::now() + Duration::from_secs(10);
-    let mut said_restarting = false;
     let back = loop {
         assert!(Instant::now() < by, "tcspecial did not come back");
         let heard = beacon(&beacons);
         if heard.generation == before.generation {
-            said_restarting |= heard.restarting;
+            assert!(!heard.commanded_restart, "the old start's beacon");
             continue;
         }
         break heard;
     };
-    assert!(said_restarting, "no beacon said the restart was initiated");
     assert_eq!(back.generation, before.generation + 1);
     assert_eq!(back.sequence, 1, "the first beacon of the new start");
-    assert!(!back.restarting, "the new start's first beacon is not");
+    assert!(back.commanded_restart, "the start the RESTART asked for");
+    // Said once, and no more: a crash of this start would not be commanded.
     let kept = std::fs::read_to_string(&state).expect("the state file");
     assert!(kept.contains("\ngeneration 2\n"), "{kept}");
+    assert!(!kept.contains("next_start"), "{kept}");
     // And settled again, as it was when it was counted the first time.
     beacon(&beacons);
     beacon(&beacons);

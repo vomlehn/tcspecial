@@ -418,6 +418,7 @@ fn ask_for_lines(
     // and `lines` keeps it open across them.
     let flags = unsafe { libc::fcntl(lines.as_raw_fd(), libc::F_GETFL) };
     if flags < 0
+        // SAFETY: as for F_GETFL: `lines` keeps the descriptor open.
         || unsafe {
             libc::fcntl(
                 lines.as_raw_fd(),
@@ -833,6 +834,8 @@ mod tests {
     #[test]
     fn a_set_of_input_lines_refuses_a_write() {
         let mut fds = [0 as RawFd; 2];
+        // SAFETY: pipe needs room for two descriptors to write, which `fds`
+        // is: a local array of two.
         assert_eq!(unsafe { libc::pipe(fds.as_mut_ptr()) }, 0, "a pipe");
 
         let mut endpoint = GpioEndpoint {
@@ -840,6 +843,7 @@ mod tests {
             // SAFETY: both descriptors are the pipe's, just made, and owned
             // by the endpoint from here.
             _chip: unsafe { File::from_raw_fd(fds[1]) },
+            // SAFETY: as for `_chip`.
             lines: unsafe { File::from_raw_fd(fds[0]) },
             direction: Direction::Input,
             count: 1,
@@ -868,6 +872,8 @@ mod tests {
     #[test]
     fn every_event_waiting_becomes_a_record() {
         let mut fds = [0 as RawFd; 2];
+        // SAFETY: pipe needs room for two descriptors to write, which `fds`
+        // is: a local array of two.
         assert_eq!(unsafe { libc::pipe(fds.as_mut_ptr()) }, 0, "a pipe");
 
         // Non-blocking, as the kernel's own descriptor is made in
@@ -886,6 +892,8 @@ mod tests {
             what: "discretes".to_string(),
             // SAFETY: the copy was just made and nothing else owns it.
             _chip: unsafe { File::from_raw_fd(chip) },
+            // SAFETY: the pipe's read end, just made, owned by the endpoint
+            // from here and not used through `fds[0]` again.
             lines: unsafe { File::from_raw_fd(fds[0]) },
             direction: Direction::Input,
             count: 1,
@@ -931,6 +939,9 @@ mod tests {
             0
         );
 
+        // SAFETY: close needs a descriptor nothing else owns or will use.
+        // `fds[1]` is the pipe's write end, which only this test holds -- the
+        // endpoint owns a dup of it -- and is not used after this.
         unsafe {
             libc::close(fds[1]);
         }
@@ -1017,6 +1028,8 @@ mod tests {
     #[test]
     fn a_set_of_driven_lines_refuses_a_read() {
         let mut fds = [0 as RawFd; 2];
+        // SAFETY: pipe needs room for two descriptors to write, which `fds`
+        // is: a local array of two.
         assert_eq!(unsafe { libc::pipe(fds.as_mut_ptr()) }, 0, "a pipe");
 
         let mut endpoint = GpioEndpoint {
@@ -1024,6 +1037,7 @@ mod tests {
             // SAFETY: both descriptors are the pipe's, just made, and owned
             // by the endpoint from here.
             _chip: unsafe { File::from_raw_fd(fds[1]) },
+            // SAFETY: as for `_chip`.
             lines: unsafe { File::from_raw_fd(fds[0]) },
             direction: Direction::Output,
             count: 3,
@@ -1052,12 +1066,15 @@ mod tests {
     #[test]
     fn a_write_to_driven_lines_is_attempted() {
         let mut fds = [0 as RawFd; 2];
+        // SAFETY: pipe needs room for two descriptors to write, which `fds`
+        // is: a local array of two.
         assert_eq!(unsafe { libc::pipe(fds.as_mut_ptr()) }, 0, "a pipe");
 
         let mut endpoint = GpioEndpoint {
             what: "heaters".to_string(),
             // SAFETY: as above.
             _chip: unsafe { File::from_raw_fd(fds[1]) },
+            // SAFETY: as above.
             lines: unsafe { File::from_raw_fd(fds[0]) },
             direction: Direction::Output,
             count: 3,

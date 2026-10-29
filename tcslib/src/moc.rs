@@ -215,6 +215,11 @@ impl Moc {
         };
 
         let ready = loop {
+            // SAFETY: poll needs an array of as many pollfds as it is told,
+            // writable for the call: the count is the Vec's own length. Each
+            // descriptor is one of `self.ports`' sockets, which `fds` was
+            // built from in `binding` and which nothing replaces or closes
+            // while `self` lives.
             let ready = unsafe {
                 libc::poll(
                     self.fds.as_mut_ptr(),
@@ -248,6 +253,11 @@ impl Moc {
             // MSG_TRUNC, so that what comes back is the datagram's length
             // and not what fitted: one cut short is told from one that
             // happened to fill the buffer.
+            //
+            // SAFETY: recv needs an open socket and a buffer writable for the
+            // length it is given: the socket is borrowed from `self.ports`,
+            // and the buffer and its length are both `out`'s. MSG_TRUNC
+            // changes what is returned, not how much is written.
             let got = unsafe {
                 libc::recv(
                     socket.as_raw_fd(),

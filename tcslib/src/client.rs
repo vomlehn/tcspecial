@@ -19,10 +19,11 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 use tcslibgs::{
-    ArmKey, BeaconInterval, Command, CommandLink, CommandStatus, ConfigCommand,
-    ConfigDigest, ConfigVersion, ConnectCommand, DHSample, NodeCommand,
-    NodeCounts, NodeId, PingCommand, Reason, RestartArmCommand, RestartCommand,
-    SetNodeCommand, TcsError, TcsResult, Telemetry, Timestamp,
+    sequence_is_before, ArmKey, BeaconInterval, Command, CommandLink,
+    CommandStatus, ConfigCommand, ConfigDigest, ConfigVersion, ConnectCommand,
+    DHSample, NodeCommand, NodeCounts, NodeId, PingCommand, Reason,
+    RestartArmCommand, RestartCommand, SetNodeCommand, TcsError, TcsResult,
+    Telemetry, Timestamp,
 };
 
 use crate::connection::Connection;
@@ -109,7 +110,7 @@ pub struct TcsClient {
     /// CONNECT's answer said is flying. `None` until one has, and again once
     /// the vehicle has refused a command as of another generation, when
     /// every command but PING and CONNECT is refused here until one says
-    /// again. See [`tcslibgs::CommandType::takes_any_generation`].
+    /// again. See [`tcslibgs::CommandType::always_taken`].
     generation: Option<u32>,
     /// What a RESTART that went out is waiting for, until a beacon says it
     /// came: see [`RestartWait`].
@@ -325,7 +326,7 @@ impl TcsClient {
     fn for_generation(&self, command: Command) -> TcsResult<Command> {
         match self.generation {
             Some(generation) => Ok(command.for_generation(generation)),
-            None if command.cmd_type().takes_any_generation() => Ok(command),
+            None if command.cmd_type().always_taken() => Ok(command),
             None => Err(TcsError::GenerationUnknown(command.cmd_type())),
         }
     }
@@ -354,13 +355,41 @@ impl TcsClient {
         let answer = self.link_for(&command)?.receive_timeout(timeout);
         if let Ok(answer) = &answer {
             self.last_received = Some(Timestamp::now());
-            // The vehicle is not the start this station thought it was:
-            // nothing more goes until a beacon or a CONNECT says which is.
-            if answer.status() == CommandStatus::WrongGeneration {
-                self.generation = None;
-            }
+            self.heard_generation_of(answer);
         }
         answer
+    }
+
+    /// What an answer says of the generation flying.
+    ///
+    /// A vehicle that refused a command as of another generation, or that
+    /// answered as one other than the start this station thought it was, has
+    /// started again since: nothing more goes until a beacon or a CONNECT
+    /// says which start it is, because the definitions it started with may
+    /// not be the ones this station is reading. Learning the generation from
+    /// the answer instead would carry on as though nothing had happened. An
+    /// answer of generation nought, which no start is, says nothing of it.
+    fn heard_generation_of(&mut self, answer: &Telemetry) {
+        let other = answer.generation() != 0
+            && Some(answer.generation()) != self.generation;
+        if other || answer.status() == CommandStatus::WrongGeneration {
+            self.generation = None;
+        }
+    }
+
+    /// Start the count again past `newest`, the newest command the vehicle
+    /// says it has taken, unless it is already past it.
+    ///
+    /// A station whose count has gone back -- started again, or a second
+    /// station -- would otherwise have every command it sends answered
+    /// `Stale`. Forward only, so that a CONNECT answered late cannot take
+    /// the count back to where it was.
+    fn count_past(&self, newest: u32) {
+        let next = self.sequence.load(Ordering::SeqCst);
+        if !sequence_is_before(newest, next) {
+            self.sequence
+                .store(newest.wrapping_add(1), Ordering::SeqCst);
+        }
     }
 
     // -- global control and status ----------------------------------------
@@ -427,10 +456,12 @@ impl TcsClient {
 
         match answer {
             // The generation it answers with is the one commands are sent
-            // for from here on, where it answered at all.
+            // for from here on, where it answered at all, and the count goes
+            // on from past the newest command it has taken.
             Telemetry::Connect(tm) => {
                 if tm.header.status.is_success() {
-                    self.generation = Some(tm.generation);
+                    self.generation = Some(tm.header.generation);
+                    self.count_past(tm.newest_taken);
                 }
                 Ok((tm.version, tm.digest))
             }
@@ -785,12 +816,14 @@ mod tests {
     }
 
     fn an_answer(version: ConfigVersion) -> Telemetry {
+        // Generation 7, which has taken up to command 40.
         Telemetry::Connect(tcslibgs::ConnectTelemetry::new(
             1,
             version,
             ConfigDigest([0x5A; 16]),
-            7,
+            40,
         ))
+        .for_generation(7)
     }
 
     fn a_version(major: u8) -> ConfigVersion {
@@ -909,5 +942,41 @@ mod tests {
             .connect(ConfigVersion::of_this_build(), ConfigDigest([0x5A; 16]))
             .expect("connected");
         assert_eq!(client.generation(), Some(7));
+
+        // An answer made by another start, done or not, is a vehicle that
+        // has started again since: forgotten as well.
+        let (nodes, _) = Canned::recording(
+            stopped(CommandStatus::Success).for_generation(8),
+        );
+        client.nodes = Some(nodes);
+        client.stop_node(NodeId(2)).expect("answered");
+        assert_eq!(client.generation(), None);
+    }
+
+    /// A CONNECT's answer says the newest command the vehicle has taken, and
+    /// the count goes on from past it -- forward only, so that a station
+    /// already past it stays where it is.
+    #[test]
+    fn the_count_goes_on_from_past_the_newest_the_vehicle_took() {
+        let (connection, asked) = Canned::recording(an_answer(a_version(1)));
+        let mut client = TcsClient::spacecraft_only(connection);
+        client
+            .connect(ConfigVersion::of_this_build(), ConfigDigest([0x5A; 16]))
+            .expect("connected");
+        // Answered with the canned CONNECT, which a PING takes for an
+        // answer of the wrong kind: what is asked here is what was sent.
+        let _ = client.ping();
+        assert_eq!(
+            asked.lock().unwrap()[1].sequence(),
+            41,
+            "past the 40 the vehicle took"
+        );
+
+        client.sequence.store(100, Ordering::SeqCst);
+        client
+            .connect(ConfigVersion::of_this_build(), ConfigDigest([0x5A; 16]))
+            .expect("connected");
+        let _ = client.ping();
+        assert_eq!(asked.lock().unwrap()[3].sequence(), 101, "not back");
     }
 }

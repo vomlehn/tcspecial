@@ -12,12 +12,16 @@
                         low 14 bits of the sequence below), packet length
        opcode or kind   1 byte: which command, or which answer
        sequence         4 bytes: the command's number, which its answer
-                        carries back
-       generation       4 bytes, a command only: the generation of
+                        carries back; a command older than one this start
+                        of tcspecial has taken, PING and CONNECT aside, is
+                        answered Stale and not acted on
+       generation       4 bytes. In a command, the generation of
                         tcspecial the ground last heard, from a beacon or
-                        a CONNECT's answer; a command of any generation but
-                        the one flying, PING and CONNECT aside, is refused
-                        with WrongGeneration
+                        an answer; a command of any generation but the one
+                        flying, PING and CONNECT aside, is refused with
+                        WrongGeneration. In an answer, the generation that
+                        made it, so that the ground hears of a restart from
+                        any answer, a refusal among them
        status           1 byte, an answer only: how the command went
        timestamp        8 bytes, an answer only: microseconds since the UNIX
                         epoch when the answer was made, all ones where the
@@ -102,6 +106,9 @@
           <Enumeration value="6" label="AlreadyExists"/>
           <Enumeration value="7" label="Timeout"/>
           <Enumeration value="8" label="WrongGeneration"/>
+          <!-- Older than a command this start has already taken, and
+               not acted on. -->
+          <Enumeration value="9" label="Stale"/>
         </EnumerationList>
       </EnumeratedParameterType>
     </ParameterTypeSet>
@@ -127,6 +134,10 @@
       <Parameter name="Patch" parameterTypeRef="U8Type"/>
       <Parameter name="Digest" parameterTypeRef="DigestType"/>
       <Parameter name="Generation" parameterTypeRef="U32Type"/>
+      <!-- The newest command sequence this start has taken, or the
+           CONNECT's own where it has taken none: where a ground station
+           whose count has gone back starts again. -->
+      <Parameter name="NewestTaken" parameterTypeRef="U32Type"/>
       <Parameter name="Node" parameterTypeRef="U32Type"/>
       <Parameter name="Reason" parameterTypeRef="ReasonType"/>
       <Parameter name="Enabled" parameterTypeRef="FlagType"/>
@@ -172,6 +183,7 @@
           <ParameterRefEntry parameterRef="PacketLength"/>
           <ParameterRefEntry parameterRef="Kind"/>
           <ParameterRefEntry parameterRef="Sequence"/>
+          <ParameterRefEntry parameterRef="Generation"/>
           <ParameterRefEntry parameterRef="Status"/>
           <ParameterRefEntry parameterRef="Timestamp"/>
         </EntryList>
@@ -221,7 +233,7 @@
           <ParameterRefEntry parameterRef="Minor"/>
           <ParameterRefEntry parameterRef="Patch"/>
           <ParameterRefEntry parameterRef="Digest"/>
-          <ParameterRefEntry parameterRef="Generation"/>
+          <ParameterRefEntry parameterRef="NewestTaken"/>
         </EntryList>
         <BaseContainer containerRef="Answer">
           <RestrictionCriteria>

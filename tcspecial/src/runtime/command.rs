@@ -59,10 +59,11 @@ use std::os::fd::BorrowedFd;
 
 use tcslibgs::config_digest::{ConfigDigest, ConfigVersion};
 use tcslibgs::{
-    answer_to, came_from, AnswerPacker, ArmKey, CIConfig, Command, CommandLink,
-    CommandStatus, ConfigTelemetry, ConnectTelemetry, HostPort, NodeTelemetry,
-    PingTelemetry, QueryNodeSampleTelemetry, QueryNodeTelemetry, Reason,
-    SetNodeTelemetry, TcsError, TcsResult, Telemetry,
+    answer_to, came_from, sequence_is_before, AnswerPacker, ArmKey, CIConfig,
+    Command, CommandLink, CommandStatus, ConfigTelemetry, ConnectTelemetry,
+    HostPort, NodeTelemetry, PingTelemetry, QueryNodeSampleTelemetry,
+    QueryNodeTelemetry, Reason, SetNodeTelemetry, TcsError, TcsResult,
+    Telemetry,
 };
 
 use crate::beacon_send::BeaconSend;
@@ -117,7 +118,7 @@ pub struct Flying {
     pub digest: ConfigDigest,
     /// This start's generation, from the state file: a command sent for
     /// any other is refused, but for PING and CONNECT. See
-    /// [`tcslibgs::CommandType::takes_any_generation`].
+    /// [`tcslibgs::CommandType::always_taken`].
     pub generation: u32,
 }
 
@@ -198,6 +199,7 @@ impl Commands {
             arm_valid: ci.restart_arm_valid,
             restart,
             restarting: false,
+            newest: None,
         };
         let thread = std::thread::spawn(move || serving.run(spacecraft, nodes));
 
@@ -283,6 +285,13 @@ struct Serving {
     /// Whether the command just answered was an armed RESTART, so that the
     /// restart is asked for once its answer has gone.
     restarting: bool,
+    /// The newest command sequence this start has taken, on either link, or
+    /// none before the first. A command older than it is answered `Stale`
+    /// and not acted on: see [`tcslibgs::CommandType::always_taken`].
+    ///
+    /// Not kept across a restart, because it need not be: a command sent
+    /// before one is of the generation before, and refused for that.
+    newest: Option<u32>,
 }
 
 impl Serving {
@@ -392,7 +401,11 @@ impl Serving {
         }
 
         trace!("{}: {command:?}", spelling(link.which));
-        let answer = self.answer(link.which, &command);
+        // Every answer says which start of tcspecial made it, stamped here,
+        // where every answer goes out, so that none can be sent without it.
+        let answer = self
+            .answer(link.which, &command)
+            .for_generation(self.flying.generation);
 
         // Into the thread's own packer, which keeps its buffer.
         let data = self.answer.pack(&answer);
@@ -445,7 +458,7 @@ impl Serving {
         // restart and delivered after it, or by a station that has not heard
         // which generation is flying. Refused rather than read, because the
         // definitions it was written for may not be this start's.
-        if !command.cmd_type().takes_any_generation()
+        if !command.cmd_type().always_taken()
             && command.generation() != self.flying.generation
         {
             warn!(
@@ -459,6 +472,25 @@ impl Serving {
             return answer_to(command, CommandStatus::WrongGeneration);
         }
 
+        // Older than one already taken: overtaken on the link by a later
+        // command, which is what the ground meant last, or sent by a station
+        // whose count has gone back. Answered, so that the station hears why
+        // nothing happened, and not acted on.
+        let always = command.cmd_type().always_taken();
+        match self.newest {
+            Some(newest) if !always && sequence_is_before(sequence, newest) => {
+                warn!(
+                    "{:?} {sequence} is older than {newest}, which this \
+                     start has already taken: answered Stale, and nothing \
+                     in it acted on",
+                    command.cmd_type()
+                );
+                return answer_to(command, CommandStatus::Stale);
+            }
+            Some(newest) if !sequence_is_before(newest, sequence) => {}
+            _ => self.newest = Some(sequence),
+        }
+
         match command {
             Command::Ping(_) => Telemetry::Ping(PingTelemetry::new(
                 sequence,
@@ -468,11 +500,13 @@ impl Serving {
             // What this vehicle is flying, which is what licenses every
             // command that carries a node id: a ground station whose digest
             // does not match does not send them.
+            // And the newest command taken, which is where a station whose
+            // count has gone back starts it again.
             Command::Connect(_) => Telemetry::Connect(ConnectTelemetry::new(
                 sequence,
                 self.flying.version,
                 self.flying.digest,
-                self.flying.generation,
+                self.newest.unwrap_or(sequence),
             )),
 
             // The beacon thread is retimed where it waits, so the next beacon
@@ -556,10 +590,23 @@ impl Serving {
             },
 
             // Armed for the next restart_arm_valid, with this key. A second
-            // arm replaces the first, so the arm that counts is the one the
-            // operator gave last.
+            // arm with another key replaces the first, so the arm that counts
+            // is the one the operator gave last. One with the same key, while
+            // that arm stands, is a repeat -- the ground sends a command again
+            // when its answer is lost -- and leaves the arm as it was: a
+            // repeat changes nothing aboard, and one that started the arm's
+            // time again would hold the vehicle open to a RESTART for longer
+            // than anybody asked.
             Command::RestartArm(cmd) => {
-                self.armed = Some((cmd.arm_key, Instant::now()));
+                let standing = matches!(
+                    self.armed,
+                    Some((key, taken))
+                        if key == cmd.arm_key
+                            && taken.elapsed() < self.arm_valid
+                );
+                if !standing {
+                    self.armed = Some((cmd.arm_key, Instant::now()));
+                }
                 answer_to(command, CommandStatus::Success)
             }
 
@@ -927,7 +974,7 @@ mod tests {
                     ConfigVersion::of_this_build(),
                     "this build"
                 );
-                assert_eq!(tm.generation, GENERATION, "this start");
+                assert_eq!(tm.header.generation, GENERATION, "this start");
             }
             other => panic!("expected a connect answer, got {other:?}"),
         }
@@ -991,11 +1038,89 @@ mod tests {
             match ask(&ground, at, &connect) {
                 Some(Telemetry::Connect(tm)) => {
                     assert_eq!(tm.header.status, CommandStatus::Success);
-                    assert_eq!(tm.generation, GENERATION);
+                    assert_eq!(tm.header.generation, GENERATION);
                 }
                 other => panic!("expected a connect answer, got {other:?}"),
             }
         }
+    }
+
+    /// A command older than one already taken is answered `Stale` and not
+    /// acted on, whichever link either came on, but a PING and a CONNECT are
+    /// answered however old they are, and a CONNECT says the newest taken:
+    /// which is where a station whose count has gone back starts again.
+    #[test]
+    fn a_command_older_than_one_taken_is_stale() {
+        let graph = two_nodes();
+        let states = Arc::new(NodeStates::of(&graph).expect("states"));
+        let ids = tcslibgs::graph::telemetry::ids(&graph);
+        let inside = NodeId::of(ids["inside"]);
+        let (bench, done) = a_pass_answering(|_| Ok(()));
+        let (ground, commands) = started_with(states.clone(), bench);
+        let node_at = commands.node_address();
+        let at = commands.spacecraft_address();
+        let handed_over = || done.lock().expect("the record").clone();
+        let status = |answer: Option<Telemetry>| {
+            let answer = answer.expect("an answer");
+            assert_eq!(
+                answer.generation(),
+                GENERATION,
+                "every answer says which start made it"
+            );
+            answer.status()
+        };
+
+        let stop = Command::StopNode(NodeCommand::stop(10, inside));
+        assert_eq!(
+            status(ask(&ground, node_at, &stop)),
+            CommandStatus::Success
+        );
+        assert!(!states.is_enabled("inside"));
+
+        // Sent before the STOP_NODE and delivered after it: the STOP_NODE
+        // is what the ground meant last, so the node stays stopped.
+        let start = Command::StartNode(NodeCommand::start(9, inside));
+        assert_eq!(status(ask(&ground, node_at, &start)), CommandStatus::Stale);
+        assert!(!states.is_enabled("inside"), "a stale start starts nothing");
+        assert_eq!(
+            handed_over(),
+            vec![Work::Disable("inside".into())],
+            "and asks the pass for nothing"
+        );
+
+        // The same sequence again is a repeat, not an older command, and a
+        // repeat is safe to take.
+        assert_eq!(
+            status(ask(&ground, node_at, &stop)),
+            CommandStatus::Success
+        );
+
+        let ping = Command::Ping(tcslibgs::PingCommand::new(3));
+        assert_eq!(status(ask(&ground, at, &ping)), CommandStatus::Success);
+        let connect = Command::Connect(tcslibgs::ConnectCommand::new(
+            2,
+            ConfigVersion::of_this_build(),
+            ConfigDigest([0x5Au8; 16]),
+        ));
+        match ask(&ground, at, &connect) {
+            Some(Telemetry::Connect(tm)) => {
+                assert_eq!(tm.header.status, CommandStatus::Success);
+                assert_eq!(tm.newest_taken, 10, "the STOP_NODE's");
+            }
+            other => panic!("expected a connect answer, got {other:?}"),
+        }
+
+        // And a later command is taken as ever.
+        let start = Command::StartNode(NodeCommand::start(11, inside));
+        assert_eq!(
+            status(ask(&ground, node_at, &start)),
+            CommandStatus::Success
+        );
+        assert_eq!(
+            handed_over().last(),
+            Some(&Work::Enable("inside".into())),
+            "the pass is asked to open it again"
+        );
     }
 
     /// A STOP_NODE stops that node at once and has the pass release what it
@@ -1504,6 +1629,7 @@ mod tests {
                 arm_valid: valid,
                 restart: || {},
                 restarting: false,
+                newest: None,
             }
         };
         let restart = |serving: &mut Serving, ago: Duration| {
@@ -1538,5 +1664,39 @@ mod tests {
             CommandStatus::Success
         );
         assert!(long.restarting, "an arm within its time restarts");
+
+        // A RESTART_ARM sent again with the same key, as the ground sends a
+        // command whose answer was lost, leaves the arm's time where it was;
+        // one with another key replaces it.
+        let arm = |serving: &mut Serving, sequence, key| {
+            serving
+                .answer(
+                    CommandLink::Spacecraft,
+                    &Command::RestartArm(tcslibgs::RestartArmCommand::new(
+                        sequence,
+                        ArmKey(key),
+                    ))
+                    .for_generation(GENERATION),
+                )
+                .status()
+        };
+        let mut repeated = serving(Duration::from_secs(60));
+        let taken = Instant::now()
+            .checked_sub(Duration::from_secs(50))
+            .expect("a machine up longer than a minute");
+        repeated.armed = Some((ArmKey(7), taken));
+        assert_eq!(arm(&mut repeated, 2, 7), CommandStatus::Success);
+        assert_eq!(
+            repeated.armed,
+            Some((ArmKey(7), taken)),
+            "a repeat changes nothing aboard"
+        );
+        assert_eq!(arm(&mut repeated, 3, 8), CommandStatus::Success);
+        match repeated.armed {
+            Some((ArmKey(8), now)) => {
+                assert!(now.elapsed() < Duration::from_secs(10))
+            }
+            other => panic!("expected the new arm, got {other:?}"),
+        }
     }
 }

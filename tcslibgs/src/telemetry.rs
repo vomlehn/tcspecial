@@ -14,6 +14,16 @@ use crate::types::{CommandStatus, DHSample, NodeCounts, NodeId, Timestamp};
 pub struct TelemetryHeader {
     /// Sequence number matching the command that generated this response
     pub sequence: u32,
+    /// The generation of tcspecial that made this answer: how many times it
+    /// has started, from its state file, as the beacon says it.
+    ///
+    /// In every answer, refusals among them, so that a ground station hears
+    /// of a restart from whatever answer reaches it first, and can tell
+    /// which start of tcspecial took the command it is answering. Stamped as
+    /// the answer goes -- see [`Telemetry::for_generation`] -- by the one
+    /// place that sends answers, which is what knows it; nought until then,
+    /// which no start is.
+    pub generation: u32,
     /// Telemetry type identifier
     pub tm_type: TelemetryType,
     /// Command status
@@ -45,6 +55,7 @@ impl TelemetryHeader {
     ) -> Self {
         Self {
             sequence,
+            generation: 0,
             tm_type,
             status,
             timestamp: Timestamp::now(),
@@ -166,11 +177,12 @@ pub struct ConnectTelemetry {
     /// The digest of the configuration this end read, which says which set
     /// it is serving: see `crate::config_digest`.
     pub digest: ConfigDigest,
-    /// The generation flying: how many times tcspecial has started, from
-    /// its state file, as the beacon says it. A ground station that has
-    /// heard no beacon learns from this which generation to send its
-    /// commands for. Nought in a refusal, which knows none.
-    pub generation: u32,
+    /// The newest command sequence this start of tcspecial has taken, or
+    /// the CONNECT's own where it has taken none. A ground station whose
+    /// count has gone back -- a station started again, or a second one --
+    /// would otherwise have every command answered `Stale`; this is where
+    /// it starts its count again. Nought in a refusal, which knows none.
+    pub newest_taken: u32,
 }
 
 impl ConnectTelemetry {
@@ -178,7 +190,7 @@ impl ConnectTelemetry {
         sequence: u32,
         version: ConfigVersion,
         digest: ConfigDigest,
-        generation: u32,
+        newest_taken: u32,
     ) -> Self {
         Self {
             header: TelemetryHeader::new(
@@ -188,7 +200,7 @@ impl ConnectTelemetry {
             ),
             version,
             digest,
-            generation,
+            newest_taken,
         }
     }
 
@@ -583,71 +595,66 @@ pub enum Telemetry {
 }
 
 impl Telemetry {
-    pub fn sequence(&self) -> u32 {
+    /// The header every answer starts with.
+    pub fn header(&self) -> &TelemetryHeader {
         match self {
-            Telemetry::Ping(tm) => tm.header.sequence,
-            Telemetry::Connect(tm) => tm.header.sequence,
-            Telemetry::RestartArm(tm) => tm.header.sequence,
-            Telemetry::Restart(tm) => tm.header.sequence,
-            Telemetry::Config(tm) => tm.header.sequence,
-            Telemetry::StartNode(tm) | Telemetry::StopNode(tm) => {
-                tm.header.sequence
-            }
-            Telemetry::SetNode(tm) => tm.header.sequence,
-            Telemetry::QueryNode(tm) => tm.header.sequence,
-            Telemetry::QueryNodeSample(tm) => tm.header.sequence,
+            Telemetry::Ping(tm) => &tm.header,
+            Telemetry::Connect(tm) => &tm.header,
+            Telemetry::RestartArm(tm) => &tm.header,
+            Telemetry::Restart(tm) => &tm.header,
+            Telemetry::Config(tm) => &tm.header,
+            Telemetry::StartNode(tm) | Telemetry::StopNode(tm) => &tm.header,
+            Telemetry::SetNode(tm) => &tm.header,
+            Telemetry::QueryNode(tm) => &tm.header,
+            Telemetry::QueryNodeSample(tm) => &tm.header,
         }
+    }
+
+    fn header_mut(&mut self) -> &mut TelemetryHeader {
+        match self {
+            Telemetry::Ping(tm) => &mut tm.header,
+            Telemetry::Connect(tm) => &mut tm.header,
+            Telemetry::RestartArm(tm) => &mut tm.header,
+            Telemetry::Restart(tm) => &mut tm.header,
+            Telemetry::Config(tm) => &mut tm.header,
+            Telemetry::StartNode(tm) | Telemetry::StopNode(tm) => {
+                &mut tm.header
+            }
+            Telemetry::SetNode(tm) => &mut tm.header,
+            Telemetry::QueryNode(tm) => &mut tm.header,
+            Telemetry::QueryNodeSample(tm) => &mut tm.header,
+        }
+    }
+
+    pub fn sequence(&self) -> u32 {
+        self.header().sequence
+    }
+
+    /// The generation that made this answer: see
+    /// [`TelemetryHeader::generation`].
+    pub fn generation(&self) -> u32 {
+        self.header().generation
+    }
+
+    /// This answer, made by `generation`.
+    pub fn for_generation(mut self, generation: u32) -> Self {
+        self.header_mut().generation = generation;
+        self
     }
 
     pub fn tm_type(&self) -> TelemetryType {
-        match self {
-            Telemetry::Ping(tm) => tm.header.tm_type,
-            Telemetry::Connect(tm) => tm.header.tm_type,
-            Telemetry::RestartArm(tm) => tm.header.tm_type,
-            Telemetry::Restart(tm) => tm.header.tm_type,
-            Telemetry::Config(tm) => tm.header.tm_type,
-            Telemetry::StartNode(tm) | Telemetry::StopNode(tm) => {
-                tm.header.tm_type
-            }
-            Telemetry::SetNode(tm) => tm.header.tm_type,
-            Telemetry::QueryNode(tm) => tm.header.tm_type,
-            Telemetry::QueryNodeSample(tm) => tm.header.tm_type,
-        }
+        self.header().tm_type
     }
 
     pub fn status(&self) -> CommandStatus {
-        match self {
-            Telemetry::Ping(tm) => tm.header.status,
-            Telemetry::Connect(tm) => tm.header.status,
-            Telemetry::RestartArm(tm) => tm.header.status,
-            Telemetry::Restart(tm) => tm.header.status,
-            Telemetry::Config(tm) => tm.header.status,
-            Telemetry::StartNode(tm) | Telemetry::StopNode(tm) => {
-                tm.header.status
-            }
-            Telemetry::SetNode(tm) => tm.header.status,
-            Telemetry::QueryNode(tm) => tm.header.status,
-            Telemetry::QueryNodeSample(tm) => tm.header.status,
-        }
+        self.header().status
     }
 
     /// When the spacecraft made this answer.
     ///
     /// Every kind carries it, in the header; see [`TelemetryHeader`].
     pub fn timestamp(&self) -> Timestamp {
-        match self {
-            Telemetry::Ping(tm) => tm.header.timestamp,
-            Telemetry::Connect(tm) => tm.header.timestamp,
-            Telemetry::RestartArm(tm) => tm.header.timestamp,
-            Telemetry::Restart(tm) => tm.header.timestamp,
-            Telemetry::Config(tm) => tm.header.timestamp,
-            Telemetry::StartNode(tm) | Telemetry::StopNode(tm) => {
-                tm.header.timestamp
-            }
-            Telemetry::SetNode(tm) => tm.header.timestamp,
-            Telemetry::QueryNode(tm) => tm.header.timestamp,
-            Telemetry::QueryNodeSample(tm) => tm.header.timestamp,
-        }
+        self.header().timestamp
     }
 }
 

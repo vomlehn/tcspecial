@@ -176,7 +176,13 @@ typedef enum tcs_status {
 	 * not acted on: the vehicle restarted since this client last heard
 	 * which generation it is. Connect again, or hand the client the next
 	 * pass's beacon, before the next command. */
-	TCS_STATUS_WRONG_GENERATION = 8
+	TCS_STATUS_WRONG_GENERATION = 8,
+	/* Older than a command the vehicle has already taken since it last
+	 * started, and not acted on: overtaken on the link by a later one, or
+	 * sent by a client whose count has gone back. The client starts its
+	 * count again past the newest the vehicle has taken at its next
+	 * Connect. */
+	TCS_STATUS_STALE = 9
 } tcs_status;
 
 /* A status's name: "Success", "NotFound" and so on. */

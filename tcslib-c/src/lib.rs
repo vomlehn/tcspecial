@@ -748,6 +748,7 @@ fn status_number(status: CommandStatus) -> c_int {
         CommandStatus::AlreadyExists => 6,
         CommandStatus::Timeout => 7,
         CommandStatus::WrongGeneration => 8,
+        CommandStatus::Stale => 9,
     }
 }
 
@@ -764,6 +765,7 @@ pub extern "C" fn tcs_status_name(status: c_int) -> *const c_char {
         6 => c"AlreadyExists",
         7 => c"Timeout",
         8 => c"WrongGeneration",
+        9 => c"Stale",
         _ => c"",
     };
     name.as_ptr()

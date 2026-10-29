@@ -278,16 +278,11 @@ impl Ends {
 /// A box a line may not cross, as two corners.
 type Box = (f32, f32, f32, f32);
 
-/// What makes one route better than another, worst thing first.
-///
-/// How many nodes it crosses, how many times it turns, and how far it runs.
-/// Compared in that order, which is what the ordering of a tuple does: a route
-/// that crosses nothing beats one that crosses something however long it is,
-/// and length only settles a tie between two routes that turn as often as each
-/// other.
 /// What a route costs, in the order the terms are weighed: how many nodes it
 /// runs through, how far it runs along a line already drawn, how many times it
-/// bends, and how far it goes.
+/// bends, and how far it goes. Compared in that order, which is what the
+/// ordering of a tuple does: a route that runs through nothing beats one that
+/// runs through something however long it is.
 ///
 /// Nodes first, because a line through a node is a lie about the graph.
 /// Overlap next, ahead of bends: a line that cannot be seen is worse than a

@@ -2027,9 +2027,6 @@ impl CIConfigJson {
             );
         }
 
-        // One socket cannot be two links. A file that gave both the same port
-        // would describe a split it has not made, and the half of it that
-        // bound second would fail at startup with the other half's address.
         // One socket cannot be two links. A file that put both at the same
         // place would describe a split it has not made, and the half that
         // bound second would fail at startup with the other half's address.

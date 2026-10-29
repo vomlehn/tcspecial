@@ -1587,7 +1587,8 @@ mod tests {
         /// What was written, in order.
         written: Vec<Vec<u8>>,
         /// What a write answers: the bytes it claims to have moved, or a
-        /// failure. `None` is "all of them", which is the ordinary case.
+        /// failure. Once the list is empty a write moves all of its bytes,
+        /// which is the ordinary case.
         write_answers: Vec<TcsResult<usize>>,
     }
 

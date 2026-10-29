@@ -7,8 +7,9 @@
 //!
 //! What is left here is this window's own: a thread to run the loop on, the
 //! window to put the answers in, the question to ask the operator when the
-//! beacons announce a configuration this MOC did not read, and the contact
-//! flag the panels act on.
+//! beacons announce a configuration this MOC did not read, the contact flag
+//! the panels act on, and handing each beacon to the station's
+//! [`DataHold`], whose state the window shows beside the beacon.
 //!
 //! It used to be the whole of it -- the socket, the digest comparison, the
 //! sequence counting, the colours and the blink schedule, in one file with
@@ -23,6 +24,7 @@ use std::thread;
 use slint::{SharedString, Weak};
 
 use tcslib::beacon::{Beacons, Contact, Link, Schedule};
+use tcslib::moc::DataHold;
 use tcslibgs::ConfigDigest;
 use tcsui::Shown;
 
@@ -38,6 +40,14 @@ pub type Ask = Arc<dyn Fn(String) + Send + Sync>;
 /// it, which are the same state going on. What it does with the window is
 /// its own business, and it has to take that to the window's thread itself.
 pub type OnContact = Arc<dyn Fn() + Send + Sync>;
+
+/// What the beacons decide and the rest of the window reads: whether the
+/// spacecraft is being heard from, which the panels act on, and whether its
+/// data is held, which every receiver asks.
+pub struct Decided {
+    pub contact: Arc<Mutex<Contact>>,
+    pub hold: DataHold,
+}
 
 /// What the window does as contact is lost and as it is made.
 #[derive(Clone, Default)]
@@ -84,11 +94,12 @@ impl BeaconReceive {
         ui_weak: Weak<MainWindow>,
         link: Link,
         schedule: Schedule,
-        contact: Arc<Mutex<Contact>>,
+        decided: Decided,
         expected: Option<ConfigDigest>,
         ask: Option<Ask>,
         contacts: Contacts,
     ) -> Option<BeaconReceive> {
+        let Decided { contact, hold } = decided;
         let mut beacons = match Beacons::listening(link, schedule, expected) {
             Ok(beacons) => beacons,
             Err(e) => {
@@ -98,8 +109,28 @@ impl BeaconReceive {
         };
 
         let held = contact.clone();
+        // Whether the window was last told the data is held: told again only
+        // when that changes, so that a refusal Path purged put in its place
+        // stays there until there is something new to say.
+        let mut shown_held = None;
         thread::spawn(move || loop {
             let pass = beacons.pass();
+
+            // Every beacon to the hold, which is what stops the panels from
+            // being given data whose format is not known.
+            if let Some(why) = hold.pass_heard(pass) {
+                eprintln!("data from the vehicle is held: {}", why.why());
+            }
+            let now_held = hold.held();
+            if now_held != shown_held {
+                shown_held = now_held;
+                let ui_weak = ui_weak.clone();
+                let _ = slint::invoke_from_event_loop(move || {
+                    if let Some(ui) = ui_weak.upgrade() {
+                        show_hold(&ui, now_held);
+                    }
+                });
+            }
 
             // Said on the console: a configuration that differs, beacons that
             // did not arrive, a spacecraft that has restarted. The window has
@@ -166,6 +197,15 @@ pub(crate) fn show_beacon(ui: &MainWindow, shown: &Shown) {
     ui.set_indicator_color(shown.indicator);
     ui.set_beacon_last_recv(SharedString::from(shown.received.clone()));
     ui.set_beacon_last_msg(SharedString::from(shown.message.clone()));
+}
+
+/// Put whether the station's data is held in the window, and why: the line
+/// beside the beacon, with the Path purged button that ends it.
+pub(crate) fn show_hold(ui: &MainWindow, held: Option<tcslib::moc::Hold>) {
+    ui.set_data_held(held.is_some());
+    ui.set_data_held_why(SharedString::from(
+        held.map_or("", tcslib::moc::Hold::why),
+    ));
 }
 
 #[cfg(test)]

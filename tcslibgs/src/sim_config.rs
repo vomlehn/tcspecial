@@ -401,6 +401,11 @@ impl SimConfigError {
     /// A handler nothing simulates is the one that is about no entry: there
     /// is nothing in the file to point at, the mistake being that an entry is
     /// missing, so it is reported against the section the entry belongs in.
+    ///
+    /// # Returns
+    ///
+    /// The payload, group or section of the simulator file the problem is
+    /// about.
     pub fn about(&self) -> About {
         // Two of these name a payload or a group according to what they were
         // asked about, the rule being the same for both.
@@ -483,6 +488,16 @@ pub const CONTINUOUS: &str = "continuous";
 /// this adds what the file probably meant, which depends on the setting: the
 /// word for a payload driven as fast as it can be, and nothing at all for a
 /// fault that is no fault.
+///
+/// # Arguments
+///
+/// * `e`       - The complaint about the setting.
+/// * `instead` - What the file probably meant, for a nought.
+///
+/// # Returns
+///
+/// `e` with `instead` added, if it is a complaint about a nought interval;
+/// `e` as it was otherwise.
 fn nought_says(e: SimConfigError, instead: &str) -> SimConfigError {
     match e {
         SimConfigError::NotAnInterval {
@@ -501,6 +516,20 @@ fn nought_says(e: SimConfigError, instead: &str) -> SimConfigError {
 }
 
 /// A percentage, or the complaint that it is not one.
+///
+/// # Arguments
+///
+/// * `payload` - The payload's name, for the complaint.
+/// * `setting` - The setting's name, for the complaint.
+/// * `given`   - The percentage, if the file stated one.
+///
+/// # Returns
+///
+/// The percentage, or 0 where none was stated.
+///
+/// # Errors
+///
+/// [`SimConfigError::NotAPercentage`] if it is more than 100.
 fn a_percentage(
     payload: &str,
     setting: &'static str,
@@ -525,6 +554,19 @@ fn a_percentage(
 /// starts, and `tcsverify` and tcsmoc through [`SimConfigFile::problems`].
 /// A pair the verifier passed and the simulator refused would be a verifier
 /// nobody could trust.
+///
+/// # Arguments
+///
+/// * `dh` - The payload's data handler, as the tcspecial configuration has it.
+///
+/// # Returns
+///
+/// `Ok(())` if the simulator can stand in for it.
+///
+/// # Errors
+///
+/// What to say, if it is on a synchronous line with no `stand_in`, on a raw
+/// socket, too large a packet, or triggered on a device file or an I2C bus.
 pub fn simulable(dh: &DHConfig) -> Result<(), String> {
     // The one type nothing here can stand in for. Every other has something
     // in the kernel to be: vcan for a CAN bus, i2c-stub for a bus device,
@@ -608,6 +650,14 @@ pub fn simulable(dh: &DHConfig) -> Result<(), String> {
 /// A stream has one: the handler connects and the payload may hang up. A
 /// datagram socket has none, and the kinds the handler opens rather than
 /// connects to -- a device, a bus, a line -- have nothing to hang up either.
+///
+/// # Arguments
+///
+/// * `endpoint` - The payload's endpoint.
+///
+/// # Returns
+///
+/// Whether it is a TCP or Unix stream socket.
 fn has_a_connection(endpoint: &EndpointConfig) -> bool {
     matches!(
         endpoint,
@@ -624,6 +674,22 @@ fn has_a_connection(endpoint: &EndpointConfig) -> bool {
 /// The settings are flattened into the group and the payload that carry them,
 /// and serde cannot refuse an unknown field of a flattened structure, so what
 /// is left over is collected and reported here instead.
+///
+/// # Arguments
+///
+/// * `what`    - What the entry is, for the complaint: "simulated payload" or
+///               "simulated payload group".
+/// * `name`    - The entry's name.
+/// * `unknown` - The words the entry states that serde left over.
+///
+/// # Returns
+///
+/// `Ok(())` if there are none.
+///
+/// # Errors
+///
+/// [`SimConfigError::TheOtherFilesBusiness`] for the first if it belongs to
+/// another file, and [`SimConfigError::NoSuchSetting`] if it is no setting.
 fn nothing_unknown(
     what: &'static str,
     name: &str,
@@ -633,13 +699,8 @@ fn nothing_unknown(
         return Ok(());
     };
 
-    // The two the tcspecial configuration spells without a prefix. Someone
-    // writing a simulator file beside a tcspecial configuration, or copying
-    // from one, writes them the way the tcspecial configuration does -- so they
-    // are named here and answered with the name this file uses, rather than
-    // reported as words nothing knows. The two the payload configuration
-    // states. Someone writing a simulator file beside one, or copying from it,
-    // writes them the way that file does
+    // What the payload configuration states. Someone writing a simulator
+    // file beside one, or copying from it, writes them the way that file does
     // -- so they are named here and answered with the file they belong in,
     // rather than reported as words nothing knows.
     if let Some(given) = ["address", "port", "payload_interface"]
@@ -666,6 +727,25 @@ fn nothing_unknown(
 /// in a simulator file is a property of the simulation and so is this file's
 /// to decide; these two are the payload's own and are stated here only to be
 /// compared, which is why a disagreement is an error rather than an override.
+///
+/// # Arguments
+///
+/// * `name`       - The payload's name.
+/// * `settings`   - What this file says of it, laid over its group's.
+/// * `endpoint`   - Its endpoint, from the tcspecial configuration.
+/// * `triggered`  - Whether it is a payload that is asked.
+/// * `sends_from` - Its node's `sends_from`, if it states one.
+///
+/// # Returns
+///
+/// `Ok(())` if the entry agrees with the payload.
+///
+/// # Errors
+///
+/// A [`SimConfigError`] if the entry states no kind, a kind that is not one
+/// or not the payload's, a transport or address for a kind that has none, a
+/// transport that is not the payload's, or an address of its own where the
+/// payload is the end that waits or its node states `sends_from`.
 fn what_it_is(
     name: &str,
     settings: &SimSettings,
@@ -1022,6 +1102,18 @@ pub struct SimSettings {
 /// The value is taken as the text a file wrote, number or string alike, and
 /// parsed from that: see [`crate::Scalar`]. A value that is not empty and not
 /// what the setting takes is refused here, as it was before.
+///
+/// # Arguments
+///
+/// * `d` - The deserializer the setting is read from.
+///
+/// # Returns
+///
+/// The setting's value, or `None` where it is absent or empty.
+///
+/// # Errors
+///
+/// `d`'s error, or one naming the text if it does not parse as a `T`.
 fn blank_is_unstated<'de, D, T>(d: D) -> Result<Option<T>, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -1086,6 +1178,14 @@ pub const MASS_SETTINGS: &[&str] = &["environment", "time_constant"];
 impl SimSettings {
     /// This settings' values, falling back to `base` for whatever it does not
     /// state. Used to lay a simulated payload over the group it names.
+    ///
+    /// # Arguments
+    ///
+    /// * `base` - The group's settings.
+    ///
+    /// # Returns
+    ///
+    /// The settings laid over `base`.
     fn over(&self, base: &SimSettings) -> SimSettings {
         SimSettings {
             // From one of the two and never both, which is checked where
@@ -1308,6 +1408,15 @@ impl SimConfigFile {
     ///
     /// Required, and with no default, so that the harness and the simulator
     /// read it from the one place and cannot each assume a different one.
+    ///
+    /// # Returns
+    ///
+    /// The address tcssim answers at.
+    ///
+    /// # Errors
+    ///
+    /// A message if there is no `tcssim` section, or its `ready` is not an
+    /// `address:port`.
     pub fn ready(&self) -> Result<std::net::SocketAddr, String> {
         let wanted = "the simulator file needs a tcssim section saying where \
                       tcssim answers whether it is ready, as an address:port \
@@ -1325,19 +1434,22 @@ impl SimConfigFile {
         })
     }
 
-    /// Settle every data handler's simulation settings.
-    ///
-    /// The handlers come from the tcspecial configuration file and this file
-    /// adds to them, so the result has one entry per handler, in the order the
-    /// tcspecial configuration gave them. Both directions of the join are
-    /// checked: a handler nothing simulates is as much an error as a simulated
-    /// payload naming no handler.
     /// The thermal masses this file declares, with their figures read.
     ///
     /// A mass nothing is attached to is refused: a model nobody reads and
     /// nothing warms is arithmetic running for no reason, and the likeliest
     /// cause is a payload whose `reads` was misspelled -- which is the fault
     /// this would hide.
+    ///
+    /// # Returns
+    ///
+    /// Every thermal mass, in the order the file declares them.
+    ///
+    /// # Errors
+    ///
+    /// [`SimConfigError::BadThermalMass`] for the first mass whose
+    /// environment is not a number, whose time constant is not a length of
+    /// time, or that no payload reads or heats.
     pub fn masses(&self) -> Result<Vec<ResolvedMass>, SimConfigError> {
         let mut masses = Vec::new();
         for mass in &self.thermal_mass {
@@ -1387,7 +1499,6 @@ impl SimConfigFile {
         Ok(masses)
     }
 
-    /// One payload's settings laid over its group's, where it names one.
     /// Whether `payload` is simulated, from the one place it says: itself or
     /// the group it names.
     ///
@@ -1395,6 +1506,20 @@ impl SimConfigFile {
     /// to a default; both is refused, whether or not they agree, because a
     /// payload does not override its group's `simulate` -- the group says it
     /// for every payload in it, and a reader of the group has read the answer.
+    ///
+    /// # Arguments
+    ///
+    /// * `payload` - The payload's entry.
+    ///
+    /// # Returns
+    ///
+    /// Whether it is simulated.
+    ///
+    /// # Errors
+    ///
+    /// [`SimConfigError::SimulateTwice`] if it and its group both say,
+    /// [`SimConfigError::UnknownGroup`] if it names a group not declared, and
+    /// [`SimConfigError::SimulateUnstated`] if neither says.
     pub fn simulate_of(
         &self,
         payload: &SimPayload,
@@ -1441,6 +1566,15 @@ impl SimConfigFile {
         })
     }
 
+    /// One payload's settings laid over its group's, where it names one.
+    ///
+    /// # Arguments
+    ///
+    /// * `payload` - The payload's entry.
+    ///
+    /// # Returns
+    ///
+    /// Its settings, laid over its group's where it names a declared one.
     fn settings_of(&self, payload: &SimPayload) -> SimSettings {
         match payload.group.as_ref().and_then(|name| {
             self.simulated_payload_groups
@@ -1454,6 +1588,21 @@ impl SimConfigFile {
 
     /// What this payload is to a thermal mass, or what is wrong with what it
     /// says.
+    ///
+    /// # Arguments
+    ///
+    /// * `payload`  - The payload's name, for the complaint.
+    /// * `settings` - Its settings, laid over its group's.
+    ///
+    /// # Returns
+    ///
+    /// Whether it reads a mass or heats one, and which, or `None` if neither.
+    ///
+    /// # Errors
+    ///
+    /// [`SimConfigError::BadAttachment`] if it both reads and heats, names a
+    /// mass not declared, states a `rate` where it heats nothing, or heats
+    /// with no `rate` or one that is not a positive number.
     fn attachment(
         &self,
         payload: &str,
@@ -1535,6 +1684,25 @@ impl SimConfigFile {
         }
     }
 
+    /// Settle every data handler's simulation settings.
+    ///
+    /// The handlers come from the tcspecial configuration file and this file
+    /// adds to them, so the result has one entry per handler, in the order the
+    /// tcspecial configuration gave them. Both directions of the join are
+    /// checked: a handler nothing simulates is as much an error as a simulated
+    /// payload naming no handler.
+    ///
+    /// # Arguments
+    ///
+    /// * `handlers` - The data handlers of the tcspecial configuration.
+    ///
+    /// # Returns
+    ///
+    /// Each handler's settled simulation settings, in their order.
+    ///
+    /// # Errors
+    ///
+    /// The first problem [`Self::problems`] would report.
     pub fn resolve(
         &self,
         handlers: &[DHConfig],
@@ -1559,6 +1727,14 @@ impl SimConfigFile {
     ///
     /// The settings are the ones that settled, so a file with a problem still
     /// yields the payloads that have none.
+    ///
+    /// # Arguments
+    ///
+    /// * `handlers` - The data handlers of the tcspecial configuration.
+    ///
+    /// # Returns
+    ///
+    /// The settings of every handler that settled, and every problem found.
     fn check(
         &self,
         handlers: &[DHConfig],
@@ -1862,6 +2038,14 @@ impl SimConfigFile {
     /// A payload with no entry is not one of them. A graph's simulator file
     /// says which of its payloads are simulated -- the one a bench has for
     /// real is left out on purpose.
+    ///
+    /// # Arguments
+    ///
+    /// * `payloads` - The names of the configuration's payloads.
+    ///
+    /// # Returns
+    ///
+    /// Every problem found, in the order the file meets them.
     pub fn problems_by_name(&self, payloads: &[&str]) -> Vec<SimConfigError> {
         let mut problems: Vec<SimConfigError> = Vec::new();
         let (groups, entries) = self.entries(payloads, &mut problems);
@@ -1882,6 +2066,15 @@ impl SimConfigFile {
     /// The groups and the simulated payloads by name, and what is wrong with
     /// the entries themselves: a setting that is not one, a name
     /// used twice, and a payload `names` does not hold.
+    ///
+    /// # Arguments
+    ///
+    /// * `names`    - The names of the configuration's payloads.
+    /// * `problems` - Where the problems with the entries are added.
+    ///
+    /// # Returns
+    ///
+    /// The groups' settings and the simulated payloads, each by name.
     fn entries(
         &self,
         names: &[&str],
@@ -1963,6 +2156,11 @@ impl SimConfigFile {
     /// Asked after the payloads, so that a reader following the problems in
     /// order meets the misspelling at the payload's end first, where the name
     /// actually is.
+    ///
+    /// # Arguments
+    ///
+    /// * `problems` - Where a [`SimConfigError::UnusedGroup`] is added for
+    ///                each.
     fn unused_groups(&self, problems: &mut Vec<SimConfigError>) {
         let named: BTreeSet<&str> = self
             .simulated_payloads
@@ -1989,6 +2187,16 @@ mod tests {
         NetworkProtocol,
     };
 
+    /// A periodic UDP handler at `localhost:5000`.
+    ///
+    /// # Arguments
+    ///
+    /// * `name`        - The handler's name.
+    /// * `packet_size` - Its packet size, in bytes.
+    ///
+    /// # Returns
+    ///
+    /// The handler.
     fn handler(name: &str, packet_size: usize) -> DHConfig {
         DHConfig {
             name: DHName::new(name),
@@ -2380,6 +2588,14 @@ simulated_payloads:
     }
 
     /// A device handler, for the tests that need a kind that is not network.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The handler's name.
+    ///
+    /// # Returns
+    ///
+    /// A periodic handler of `/dev/urandom`, with four-byte packets.
     fn device(name: &str) -> DHConfig {
         let mut dh = handler(name, 4);
         dh.endpoint = EndpointConfig::Device(DeviceConfig {

@@ -40,8 +40,15 @@ pub struct I2cParams {
 }
 
 impl I2cParams {
+    /// Gives the timeout the bus driver will actually keep.
+    ///
     /// The bus driver keeps a timeout in units of 10 ms, so a timeout that is
     /// not a whole number of them takes the next one up.
+    ///
+    /// # Returns
+    ///
+    /// The timeout rounded up to a whole number of 10 ms units, at least one,
+    /// or `None` when no timeout is set.
     pub fn effective_timeout(&self) -> Option<Duration> {
         self.timeout.map(|t| {
             let units = t.as_millis().div_ceil(10).max(1);
@@ -64,11 +71,26 @@ impl I2cParams {
 const I2C_RESERVED_LOW: std::ops::RangeInclusive<u32> = 0x00..=0x07;
 const I2C_RESERVED_HIGH: std::ops::RangeInclusive<u32> = 0x78..=0x7F;
 
-/// Parse an I2C slave address, in decimal or in hex with an `0x` prefix.
+/// Parses an I2C slave address, in decimal or in hex with an `0x` prefix.
 ///
 /// How wide an address may be follows from the group's addressing mode, so
 /// a file that writes a 10-bit address in a 7-bit group is told which of the
 /// two it got wrong.
+///
+/// # Arguments
+///
+/// * `group`   - The group's name, for the messages.
+/// * `text`    - The address as the file wrote it.
+/// * `ten_bit` - Whether the group addresses its devices with ten bits.
+///
+/// # Returns
+///
+/// The address.
+///
+/// # Errors
+///
+/// An address that is not a whole number, does not fit the group's width,
+/// or, in a 7-bit group, is one the I2C specification reserves.
 pub(crate) fn parse_i2c_address(
     group: &str,
     text: &str,
@@ -125,12 +147,26 @@ pub(crate) fn parse_i2c_address(
     Ok(value as u16)
 }
 
-/// What an I2C group says, and what it must say.
+/// Reads what an I2C group says, and what it must say.
 ///
 /// Nothing is required: a bus with no attributes stated is a 7-bit bus with
 /// no packet error check, no retries, and whatever rate the platform has it
 /// at. There is no stream section, because a transfer on a bus is delimited
 /// by the transfer itself rather than by anything in the data.
+///
+/// # Arguments
+///
+/// * `name` - The group's name, for the messages.
+/// * `g`    - The group's terms as the file states them.
+///
+/// # Returns
+///
+/// The bus's addressing mode, packet error check, retries and timeout.
+///
+/// # Errors
+///
+/// A term that does not belong to I2C, a `stream`, a flag that is not a
+/// boolean, and `retries` or `timeout` that does not read.
 pub(crate) fn group_kind_of(
     name: &str,
     g: LinkTerms,
@@ -173,12 +209,21 @@ pub const STUB_ADAPTER: &str = "SMBus stub driver";
 const TO_STAND_IN: &str =
     "point path at the i2c-stub bus, which bin/mki2c makes";
 
-/// Whether the bus at `bus` is the kernel's `i2c-stub`, from the name of the
+/// Judges whether a bus is the kernel's `i2c-stub`, from the name of the
 /// adapter behind it. See [`crate::simulate`].
 ///
 /// By the adapter's name and not the bus number, which is given out as
 /// adapters appear: `/dev/i2c-7` is the stub on one host and a display's
 /// gmbus on the next.
+///
+/// # Arguments
+///
+/// * `host` - The host, whose `/sys` is read.
+/// * `bus`  - The bus's device path, such as `/dev/i2c-1`.
+///
+/// # Returns
+///
+/// The judgement, with what to change if it is not a stand-in.
 pub fn judged(
     host: &crate::simulate::Host,
     bus: &str,
@@ -189,8 +234,18 @@ pub fn judged(
     }
 }
 
-/// The judgement of a bus whose kernel directory is `device`: an i2c-dev
-/// class device, whose `name` is its adapter's.
+/// Judges a bus by its adapter's name.
+///
+/// # Arguments
+///
+/// * `bus`    - The bus's device path, for the messages.
+/// * `device` - Its kernel directory: an i2c-dev class device, whose `name`
+///              is its adapter's.
+///
+/// # Returns
+///
+/// A stand-in for the i2c-stub's adapter, hardware for any other name, and
+/// cannot-tell when there is no name.
 fn adapter_judged(
     bus: &str,
     device: &std::path::Path,
@@ -220,6 +275,20 @@ mod stand_in_tests {
     use super::*;
     use crate::simulate::Verdict;
 
+    /// Makes a stand-in for an adapter's kernel directory.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The adapter's name, or `None` for a directory with no
+    ///            `name` file.
+    ///
+    /// # Returns
+    ///
+    /// The directory, removed when dropped.
+    ///
+    /// # Panics
+    ///
+    /// If the directory or its file cannot be made.
     fn adapter(name: Option<&str>) -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();
         if let Some(name) = name {

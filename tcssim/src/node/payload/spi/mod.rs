@@ -32,12 +32,18 @@ use crate::payload::{
 };
 use crate::pty::SimulatedNode;
 
-/// Run a simulated device on a SPI link.
+/// Runs a simulated device on a SPI link.
 ///
 /// As every other kind: a packet every packet interval, in segments, from
 /// Start until Stop. A segment is one write, which is as near as a stand-in
 /// gets to a transfer: a real peripheral answers a transfer the controller
 /// starts, and this one simply has the bytes ready.
+///
+/// # Arguments
+///
+/// * `config`  - The payload's configuration.
+/// * `running` - Cleared to stop it; the function returns soon after.
+/// * `stats`   - Where it counts what it sends and receives.
 pub fn run_spi_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
@@ -127,6 +133,12 @@ mod tests {
     use std::sync::atomic::AtomicU32;
     use std::time::Duration;
 
+    /// Makes a path in the temporary directory unique to this process and
+    /// test thread.
+    ///
+    /// # Returns
+    ///
+    /// The path, which nothing has made yet.
     fn a_path() -> PathBuf {
         std::env::temp_dir().join(format!(
             "tcssim-spi-{}-{:?}",

@@ -105,6 +105,16 @@ fn on_mm(v: f32) -> f32 {
 /// The millimetre at or beyond `v` going the way `sign` says: out from a node,
 /// so a run moved onto the grid is never moved nearer to the node it is
 /// keeping clear of.
+///
+/// # Arguments
+///
+/// * `v`    - A position, in pixels.
+/// * `sign` - Which way is out: positive for increasing positions,
+///            anything else for decreasing.
+///
+/// # Returns
+///
+/// The grid point, in pixels.
 fn mm_out(v: f32, sign: f32) -> f32 {
     let at = v.round() as i32;
     if sign > 0.0 {
@@ -143,6 +153,17 @@ pub struct Obstacle {
 
 impl Obstacle {
     /// A node of this size at this place.
+    ///
+    /// # Arguments
+    ///
+    /// * `x`      - Its left edge, in pixels.
+    /// * `y`      - Its top edge, in pixels.
+    /// * `width`  - Its width, in pixels.
+    /// * `height` - Its height, in pixels.
+    ///
+    /// # Returns
+    ///
+    /// The obstacle.
     pub fn new(x: f32, y: f32, width: f32, height: f32) -> Self {
         Obstacle {
             x,
@@ -184,6 +205,17 @@ impl Ends {
     /// not about which corner a stream leaves by. Every line the canvas draws
     /// leaves a terminal and arrives at one, so every line it draws says which
     /// way each of its ends points.
+    ///
+    /// # Arguments
+    ///
+    /// * `x1` - The source end's x, in pixels.
+    /// * `y1` - The source end's y, in pixels.
+    /// * `x2` - The target end's x, in pixels.
+    /// * `y2` - The target end's y, in pixels.
+    ///
+    /// # Returns
+    ///
+    /// The ends, leaving and arriving rightward.
     pub fn forward(x1: f32, y1: f32, x2: f32, y2: f32) -> Ends {
         Ends {
             from: (x1, y1),
@@ -194,6 +226,18 @@ impl Ends {
     }
 
     /// Both ends as the terminals put them.
+    ///
+    /// # Arguments
+    ///
+    /// * `from`          - Where the line starts, on the source's edge, in
+    ///                     pixels.
+    /// * `to`            - Where it finishes, on the target's edge, in pixels.
+    /// * `leaves_right`  - Whether it goes right as it leaves the source.
+    /// * `arrives_right` - Whether it is going right as it reaches the target.
+    ///
+    /// # Returns
+    ///
+    /// The ends.
     pub fn new(
         from: (f32, f32),
         to: (f32, f32),
@@ -234,16 +278,11 @@ impl Ends {
 /// A box a line may not cross, as two corners.
 type Box = (f32, f32, f32, f32);
 
-/// What makes one route better than another, worst thing first.
-///
-/// How many nodes it crosses, how many times it turns, and how far it runs.
-/// Compared in that order, which is what the ordering of a tuple does: a route
-/// that crosses nothing beats one that crosses something however long it is,
-/// and length only settles a tie between two routes that turn as often as each
-/// other.
 /// What a route costs, in the order the terms are weighed: how many nodes it
 /// runs through, how far it runs along a line already drawn, how many times it
-/// bends, and how far it goes.
+/// bends, and how far it goes. Compared in that order, which is what the
+/// ordering of a tuple does: a route that runs through nothing beats one that
+/// runs through something however long it is.
 ///
 /// Nodes first, because a line through a node is a lie about the graph.
 /// Overlap next, ahead of bends: a line that cannot be seen is worse than a
@@ -296,6 +335,14 @@ pub fn drawn_route(points: &[(f32, f32)]) -> String {
 /// always horizontal -- and which way along it is [`Ends::arrives_right`]: a
 /// groundward link arrives at its target's right side travelling left, and an
 /// arrowhead that pointed right there would point back up its own line.
+///
+/// # Arguments
+///
+/// * `ends` - The link's ends; only `to` and `arrives_right` are used.
+///
+/// # Returns
+///
+/// The triangle as SVG path data.
 pub fn arrow(ends: Ends) -> String {
     let (length, half) = HEAD;
     let (x2, y2) = ends.to;
@@ -329,6 +376,15 @@ pub fn marker(ends: Ends, around: &[Obstacle]) -> String {
 
 /// The same, on a route already laid: see [`lay`]. Which way it points is the
 /// run's own direction, so the route's ends are not asked.
+///
+/// # Arguments
+///
+/// * `points` - The route's points, as [`lay`] gives them.
+///
+/// # Returns
+///
+/// The marker as SVG path data, or an empty string when the longest run
+/// is shorter than [`ROOM`] or there is no run at all.
 pub fn marker_on(points: &[(f32, f32)]) -> String {
     let (from, to) = match longest(points) {
         Some(run) => run,
@@ -363,6 +419,16 @@ pub fn label_at(ends: Ends, around: &[Obstacle]) -> (f32, f32) {
 }
 
 /// The same, on a route already laid: see [`lay`].
+///
+/// # Arguments
+///
+/// * `ends`   - The link's ends, whose midpoint is the answer for a
+///              route with no run.
+/// * `points` - The route's points, as [`lay`] gives them.
+///
+/// # Returns
+///
+/// The point the label is centred on, in pixels.
 pub fn label_on(ends: Ends, points: &[(f32, f32)]) -> (f32, f32) {
     match longest(points) {
         Some((from, to)) => ((from.0 + to.0) / 2.0, (from.1 + to.1) / 2.0),
@@ -373,13 +439,6 @@ pub fn label_on(ends: Ends, points: &[(f32, f32)]) -> (f32, f32) {
     }
 }
 
-/// How many of `around` a route between these points runs through.
-///
-/// For the tests of the window, which have a whole configuration -- nodes,
-/// links and all -- but not the shapes between them. The rules here are
-/// checked against four numbers and a box or two, which is how a rule should
-/// be checked; this is how a test of a real configuration asks the same
-/// question of every link in it at once.
 /// The line a gesture is drawing, from where it started to where the pointer
 /// is, as a dashed path.
 ///
@@ -393,6 +452,16 @@ pub fn label_on(ends: Ends, points: &[(f32, f32)]) -> (f32, f32) {
 /// The anchor is the end that is staying put: the terminal the gesture started
 /// at when a line is being drawn, and the far end of the line when one is
 /// being carried by its end.
+///
+/// # Arguments
+///
+/// * `anchor` - The end that is staying put, in pixels.
+/// * `at`     - Where the pointer is, in pixels.
+///
+/// # Returns
+///
+/// The dashes as SVG path data, or an empty string when the two points
+/// are less than a pixel apart.
 pub fn drawing(anchor: (f32, f32), at: (f32, f32)) -> String {
     /// How long a dash is, and the gap after it.
     const DASH: f32 = 6.0;
@@ -442,6 +511,22 @@ pub fn drawing(anchor: (f32, f32), at: (f32, f32)) -> String {
 /// node's box -- a slanted outline does not reach its own box at the row a
 /// terminal sits in, so the line stops where the shape is, which is in from
 /// the side. See `style::room_at`.
+///
+/// For the tests of the window, which have a whole configuration -- nodes,
+/// links and all -- but not the shapes between them. The rules here are
+/// checked against four numbers and a box or two, which is how a rule should
+/// be checked; this is how a test of a real configuration asks the same
+/// question of every link in it at once.
+///
+/// # Arguments
+///
+/// * `ends`   - The link's ends.
+/// * `around` - Every node on the page.
+///
+/// # Returns
+///
+/// How many of `around` the line runs through, not counting a node that
+/// holds either end.
 pub fn runs_through(ends: Ends, around: &[Obstacle]) -> usize {
     let (from, to) = (ends.from, ends.to);
     let points = way(ends, around, &[]);
@@ -466,6 +551,17 @@ pub fn runs_through(ends: Ends, around: &[Obstacle]) -> usize {
 /// visible; bends before length because the lengths of two orthogonal routes
 /// between one pair of points are usually equal, and of two equal routes the
 /// one with fewer turns is the one that can be followed.
+///
+/// # Arguments
+///
+/// * `ends`   - The link's ends.
+/// * `around` - Every node on the page, its own two included.
+/// * `taken`  - The points of every route already laid on the canvas.
+///
+/// # Returns
+///
+/// The best route's points, from the source to the target; the two ends
+/// alone if no shape was offered.
 fn way(
     ends: Ends,
     around: &[Obstacle],
@@ -494,6 +590,17 @@ fn way(
 }
 
 /// Every route worth considering, in the order they are preferred.
+///
+/// # Arguments
+///
+/// * `ends`   - The link's ends.
+/// * `around` - Every node on the page, which gives the columns and rows
+///              a run may be moved to.
+///
+/// # Returns
+///
+/// The routes, each as its points with the stops that are not turns
+/// taken out.
 fn shapes(ends: Ends, around: &[Obstacle]) -> Vec<Vec<(f32, f32)>> {
     let ((x1, y1), (x2, y2)) = (ends.from, ends.to);
     let (out, in_) = (ends.out(), ends.in_());
@@ -566,6 +673,18 @@ fn shapes(ends: Ends, around: &[Obstacle]) -> Vec<Vec<(f32, f32)>> {
 }
 
 /// Where a vertical run might go: down the middle, and beside each node.
+///
+/// # Arguments
+///
+/// * `out`    - Where the line turns after leaving the source, in pixels.
+/// * `in_`    - Where it makes its last turn before the target, in
+///              pixels.
+/// * `around` - Every node on the page.
+///
+/// # Returns
+///
+/// The x of each column, in the order they are preferred, all between
+/// `out` and `in_`.
 fn columns(out: f32, in_: f32, around: &[Obstacle]) -> Vec<f32> {
     // On the millimetre grid, each beside a node taken out from it so it
     // keeps its clearance: see `on_mm`.
@@ -589,6 +708,17 @@ fn columns(out: f32, in_: f32, around: &[Obstacle]) -> Vec<f32> {
 
 /// Where a horizontal run might go: between the two ends, level with either
 /// of them, beside each node, and clear above and below everything.
+///
+/// # Arguments
+///
+/// * `y1`     - The source end's y, in pixels.
+/// * `y2`     - The target end's y, in pixels.
+/// * `around` - Every node on the page.
+///
+/// # Returns
+///
+/// The y of each row, in the order they are preferred, none above
+/// [`CLEAR`].
 fn rows(y1: f32, y2: f32, around: &[Obstacle]) -> Vec<f32> {
     // On the millimetre grid, as the columns are, but for the two rows level
     // with the line's own ends: those are where its terminals are, and a run
@@ -623,6 +753,14 @@ fn rows(y1: f32, y2: f32, around: &[Obstacle]) -> Vec<f32> {
 ///
 /// Order kept because it is the order the shapes are preferred in: the middle
 /// first, and whatever a node pushed the line to after it.
+///
+/// # Arguments
+///
+/// * `values` - The numbers, in the order they are preferred.
+///
+/// # Returns
+///
+/// The first of each group of numbers less than half a pixel apart.
 fn tidy_numbers(values: Vec<f32>) -> Vec<f32> {
     let mut kept: Vec<f32> = Vec::with_capacity(values.len());
     for v in values {
@@ -639,6 +777,14 @@ fn tidy_numbers(values: Vec<f32>) -> Vec<f32> {
 /// of the ends gives a corner with nothing either side of it -- and can leave
 /// three points in a line. Both would be drawn as corners that do not turn,
 /// and both would count against the shape when the turns are counted.
+///
+/// # Arguments
+///
+/// * `points` - The shape's points, in order.
+///
+/// # Returns
+///
+/// The points that are turns, and the two ends.
 fn tidied(points: &[(f32, f32)]) -> Vec<(f32, f32)> {
     let mut kept: Vec<(f32, f32)> = Vec::with_capacity(points.len());
     for p in points {
@@ -683,6 +829,17 @@ fn tidied(points: &[(f32, f32)]) -> Vec<(f32, f32)> {
 /// Which two is not told but worked out, from the ends of the route lying on
 /// their boundaries -- so the caller hands over the page and not a list with
 /// two holes in it.
+///
+/// # Arguments
+///
+/// * `around` - Every node on the page.
+/// * `from`   - Where the line starts, in pixels.
+/// * `to`     - Where it finishes, in pixels.
+///
+/// # Returns
+///
+/// Each node's box, as its left, top, right and bottom, grown by
+/// [`CLEAR`] on every side unless it holds `from` or `to`.
 fn blocking(around: &[Obstacle], from: (f32, f32), to: (f32, f32)) -> Vec<Box> {
     around
         .iter()
@@ -695,6 +852,16 @@ fn blocking(around: &[Obstacle], from: (f32, f32), to: (f32, f32)) -> Vec<Box> {
 }
 
 /// Whether a point is on or inside a node.
+///
+/// # Arguments
+///
+/// * `b`      - The node.
+/// * `(x, y)` - The point, in pixels; within half a pixel of the node's
+///              edge counts as on it.
+///
+/// # Returns
+///
+/// Whether the node holds the point.
 fn holds(b: &Obstacle, (x, y): (f32, f32)) -> bool {
     x >= b.x - 0.5
         && x <= b.x + b.width + 0.5
@@ -711,6 +878,14 @@ fn holds(b: &Obstacle, (x, y): (f32, f32)) -> bool {
 /// is eight millimetres, thirty pixels, which is as far as a line can be
 /// moved and still read as the line between those two nodes; a ninth line
 /// through one gap is a diagram with something else wrong with it.
+///
+/// # Arguments
+///
+/// * `tracks` - The positions of the tracks, in pixels.
+///
+/// # Returns
+///
+/// The tracks, followed by each moved one to four lanes either way.
 fn laned(tracks: Vec<f32>) -> Vec<f32> {
     let mut out = tracks.clone();
     for step in [
@@ -740,6 +915,15 @@ fn laned(tracks: Vec<f32>) -> Vec<f32> {
 ///
 /// In lane-widths rather than pixels so that the number is comparable with the
 /// bends it is weighed against: see [`Cost`].
+///
+/// # Arguments
+///
+/// * `points` - The route's points.
+/// * `taken`  - The points of every route already drawn.
+///
+/// # Returns
+///
+/// The length shared, in whole lane-widths.
 pub fn shared(points: &[(f32, f32)], taken: &[Vec<(f32, f32)>]) -> u32 {
     let mut along = 0.0;
     for mine in points.windows(2) {
@@ -751,6 +935,19 @@ pub fn shared(points: &[(f32, f32)], taken: &[Vec<(f32, f32)>]) -> u32 {
 }
 
 /// How far two segments run along one another, in pixels.
+///
+/// # Arguments
+///
+/// * `a1` - One end of the first segment, in pixels.
+/// * `a2` - The other end of the first segment.
+/// * `b1` - One end of the second segment.
+/// * `b2` - The other end of the second segment.
+///
+/// # Returns
+///
+/// The length the two run along one another when both are horizontal or
+/// both vertical, no more than a lane apart, and share more than
+/// [`TOUCH`]; otherwise 0.
 fn together(
     a1: (f32, f32),
     a2: (f32, f32),
@@ -788,6 +985,15 @@ fn together(
 }
 
 /// How many nodes a route runs through.
+///
+/// # Arguments
+///
+/// * `points` - The route's points.
+/// * `boxes`  - The boxes it may not cross, as [`blocking`] gives them.
+///
+/// # Returns
+///
+/// How many of `boxes` some segment of the route crosses.
 fn crossings(points: &[(f32, f32)], boxes: &[Box]) -> usize {
     boxes
         .iter()
@@ -810,6 +1016,14 @@ fn crosses(
 }
 
 /// How far a route runs, in whole pixels.
+///
+/// # Arguments
+///
+/// * `points` - The route's points.
+///
+/// # Returns
+///
+/// The sum of its segments' lengths, rounded to whole pixels.
 fn walked(points: &[(f32, f32)]) -> u32 {
     points
         .windows(2)
@@ -824,6 +1038,15 @@ fn length(from: (f32, f32), to: (f32, f32)) -> f32 {
 }
 
 /// The longest straight run of a route.
+///
+/// # Arguments
+///
+/// * `points` - The route's points.
+///
+/// # Returns
+///
+/// The two ends of its longest segment, or `None` if it has fewer than
+/// two points.
 fn longest(points: &[(f32, f32)]) -> Option<((f32, f32), (f32, f32))> {
     points
         .windows(2)
@@ -841,6 +1064,15 @@ fn longest(points: &[(f32, f32)]) -> Option<((f32, f32), (f32, f32))> {
 /// through it, and the next run from where the quadratic left off. The radius
 /// is cut down to fit the shorter of the two segments, so a corner never
 /// bulges past the point it is meant to bend at.
+///
+/// # Arguments
+///
+/// * `points` - The route's points.
+///
+/// # Returns
+///
+/// The route as SVG path data, or an empty string if it has fewer than
+/// two points.
 fn drawn(points: &[(f32, f32)]) -> String {
     if points.len() < 2 {
         return String::new();
@@ -863,6 +1095,16 @@ fn drawn(points: &[(f32, f32)]) -> String {
 }
 
 /// The point `by` pixels from `at` in the direction of `toward`.
+///
+/// # Arguments
+///
+/// * `at`     - The point to start from, in pixels.
+/// * `toward` - The point to go towards.
+/// * `by`     - How far to go, in pixels.
+///
+/// # Returns
+///
+/// The point reached, or `at` itself when `toward` is on top of it.
 fn toward(at: (f32, f32), toward: (f32, f32), by: f32) -> (f32, f32) {
     let run = length(at, toward);
     if run < 0.05 {
@@ -892,6 +1134,18 @@ enum Way {
 }
 
 /// A filled triangle at `(cx, cy)`, pointing this way.
+///
+/// # Arguments
+///
+/// * `cx`   - The x of the triangle's centre, in pixels.
+/// * `cy`   - The y of its centre, in pixels.
+/// * `way`  - Which way it points.
+/// * `size` - Its length along the way it points and its half-width
+///            across it, in pixels.
+///
+/// # Returns
+///
+/// The triangle as SVG path data.
 fn triangle(cx: f32, cy: f32, way: Way, size: (f32, f32)) -> String {
     let (length, half) = size;
     let (tip, back) = (length / 2.0, length / 2.0);

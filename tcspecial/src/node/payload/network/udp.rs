@@ -73,8 +73,8 @@ impl UdpEndpoint {
         Self::bound(what, config, None)
     }
 
-    /// An endpoint for a payload that is spoken to first: a heater, a valve,
-    /// or a sensor that is asked.
+    /// Makes an endpoint for a payload that is spoken to first: a heater, a
+    /// valve, or a sensor that is asked.
     ///
     /// Such a payload says nothing until it is spoken to, so there is nothing
     /// to learn from it first, and the arrangement for a payload that speaks
@@ -89,6 +89,24 @@ impl UdpEndpoint {
     /// the device waits there and this sends to it. The local port is
     /// whatever is free, because nothing has to find this end before it has
     /// spoken, and an answer comes back to it.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`   - The handler's name, for what the endpoint says of
+    ///              itself.
+    /// * `config` - The node's network configuration: where the payload
+    ///              waits, an IP address (not a host name) and a port.
+    ///
+    /// # Returns
+    ///
+    /// The endpoint, bound to any free port of the device's family, sending
+    /// to the device and reading only what comes from it.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Config` if the configured address is not an IP address
+    /// and port, or the socket cannot be bound; `TcsError::Io` if it cannot
+    /// be made non-blocking.
     pub fn reaching(what: &str, config: &NetworkConfig) -> TcsResult<Self> {
         let told = format!("{}:{}", config.address, config.port)
             .parse::<SocketAddr>()
@@ -111,11 +129,29 @@ impl UdpEndpoint {
         Ok(reaching)
     }
 
-    /// An endpoint that sends where the configuration says, not where it was
-    /// last spoken to from.
+    /// Makes an endpoint that sends where the configuration says, not where
+    /// it was last spoken to from.
     ///
     /// For a link whose far end is written down: a payload's ground link, both
     /// ends of which come out of `payload_telemetry`. `dest` is that far end.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`   - The handler's name, for what the endpoint says of
+    ///              itself.
+    /// * `config` - The address and port this end binds.
+    /// * `dest`   - The far end, which every write goes to: an IP address
+    ///              (not a host name) and a port.
+    ///
+    /// # Returns
+    ///
+    /// The endpoint, bound and told where to send.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Config` if `dest` is not an IP address and port, or the
+    /// socket cannot be bound; `TcsError::Io` if it cannot be made
+    /// non-blocking.
     pub fn sending_to(
         what: &str,
         config: &NetworkConfig,
@@ -133,6 +169,26 @@ impl UdpEndpoint {
         Self::bound(what, config, Some(told))
     }
 
+    /// Binds a non-blocking socket to the configured address and makes the
+    /// endpoint on it, with no peer learnt yet and nobody turned away.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`   - The handler's name, for what the endpoint says of
+    ///              itself.
+    /// * `config` - The address and port to bind.
+    /// * `told`   - Where every write goes, if the configuration says;
+    ///              `None` to send to wherever the far end last spoke from.
+    ///
+    /// # Returns
+    ///
+    /// The endpoint.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Config` if the address cannot be bound, saying so plainly
+    /// when something else holds it; `TcsError::Io` if the socket cannot be
+    /// made non-blocking.
     fn bound(
         what: &str,
         config: &NetworkConfig,
@@ -160,8 +216,19 @@ impl UdpEndpoint {
         Ok(())
     }
 
-    /// Read datagrams from this sender and turn every other away, for a
+    /// Reads datagrams from this sender and turns every other away, for a
     /// payload that speaks first and whose node says where from.
+    ///
+    /// # Arguments
+    ///
+    /// * `what` - The handler's name, for the error.
+    /// * `from` - Where the payload sends from, which must be a socket
+    ///            address.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Config` if `from` is a path, which no UDP payload sends
+    /// from.
     pub fn hear_only(&mut self, what: &str, from: &SendsFrom) -> TcsResult<()> {
         match from {
             SendsFrom::Socket(at) => {
@@ -175,10 +242,19 @@ impl UdpEndpoint {
         }
     }
 
-    /// A second endpoint on the same socket.
+    /// Makes a second endpoint on the same socket.
     ///
     /// An address can be bound once, so a conduit pair reading and writing one
     /// endpoint shares the socket rather than binding it twice.
+    ///
+    /// # Returns
+    ///
+    /// The new endpoint, sharing this one's socket and learnt peer, with its
+    /// own count of strangers, starting at none.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Io` if the socket cannot be duplicated.
     pub fn try_clone(&self) -> TcsResult<Self> {
         Ok(Self {
             what: self.what.clone(),
@@ -496,8 +572,22 @@ mod tests {
         assert_eq!(reader.strangers(), 0, "counted once, and asked once");
     }
 
-    /// What arrives within two seconds: a datagram sent over the loopback is
-    /// readable at once, nearly always, and the test is not about when.
+    /// Reads what arrives within two seconds: a datagram sent over the
+    /// loopback is readable at once, nearly always, and the test is not about
+    /// when.
+    ///
+    /// # Arguments
+    ///
+    /// * `reader` - The endpoint to read.
+    /// * `into`   - Where the datagram is put.
+    ///
+    /// # Returns
+    ///
+    /// The datagram's length, or 0 if nothing arrived in time.
+    ///
+    /// # Panics
+    ///
+    /// If a read fails.
     fn read_soon(reader: &mut UdpEndpoint, into: &mut [u8]) -> usize {
         let deadline =
             std::time::Instant::now() + std::time::Duration::from_secs(2);

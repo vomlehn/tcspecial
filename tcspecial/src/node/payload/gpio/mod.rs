@@ -200,12 +200,27 @@ pub struct GpioEndpoint {
     next_report: Option<Instant>,
 }
 
-/// What every line of the request is, now.
+/// Reads what every line of the request is, now.
 ///
 /// One ioctl on the descriptor the events are read from: the request is
 /// already open and already names the lines, so nothing is opened and nothing
 /// is asked twice. The kernel answers with a bit per line, in the order the
 /// lines were asked for.
+///
+/// # Arguments
+///
+/// * `what`  - The handler, for what a complaint says.
+/// * `fd`    - The line request's descriptor.
+/// * `count` - How many lines the request holds.
+///
+/// # Returns
+///
+/// A bit per line, bit 0 the first line asked for, set where the line is
+/// asserted.
+///
+/// # Errors
+///
+/// `TcsError::Endpoint` if the kernel will not say.
 fn levels_of(what: &str, fd: RawFd, count: usize) -> TcsResult<u64> {
     let mut values = LineValues {
         bits: 0,
@@ -235,13 +250,24 @@ fn levels_of(what: &str, fd: RawFd, count: usize) -> TcsResult<u64> {
     Ok(values.bits)
 }
 
-/// One line's level as the bytes a conduit carries.
+/// Gives one line's level as the bytes a conduit carries.
 ///
 /// The record an event becomes -- the time, the line, the value -- said of a
 /// line that has not changed: what it is now, observed now. Both kinds say
 /// "this line had this value at this time", which is what a ground station
 /// plots; the difference is that an event's time is the kernel's for the edge
 /// and this one's is when the vehicle looked.
+///
+/// # Arguments
+///
+/// * `offset` - The line's offset on the chip.
+/// * `high`   - Whether the line is asserted.
+/// * `now`    - When the vehicle looked.
+///
+/// # Returns
+///
+/// The record: the time as a [`Timestamp`], the offset and the value (1 or
+/// 0) as a 32-bit word, each most significant byte first.
 fn level_record(offset: u32, high: bool, now: SystemTime) -> [u8; EVENT_BYTES] {
     let mut record = [0u8; EVENT_BYTES];
     record[..8].copy_from_slice(&Timestamp::at(now).to_be_bytes());
@@ -251,7 +277,26 @@ fn level_record(offset: u32, high: bool, now: SystemTime) -> [u8; EVENT_BYTES] {
 }
 
 impl GpioEndpoint {
-    /// Ask the chip for the configured lines, with edge detection.
+    /// Asks the chip for the configured lines, with edge detection.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`   - The handler this endpoint belongs to, as the device
+    ///              configuration names it; also the consumer the lines
+    ///              are held under.
+    /// * `config` - The chip, the lines, their direction, edges, bias and
+    ///              debounce, and how often their state is reported.
+    ///
+    /// # Returns
+    ///
+    /// The endpoint, holding the lines, with its first state report (if
+    /// any) due at once.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Config` if the number of lines is not one a request can
+    /// hold; `TcsError::Endpoint` if the chip cannot be opened or will not
+    /// give up the lines.
     pub fn new(what: &str, config: &GpioConfig) -> TcsResult<Self> {
         let chip = OpenOptions::new()
             .read(true)
@@ -291,6 +336,14 @@ impl GpioEndpoint {
     /// The request's descriptor is duplicated rather than the request made
     /// again: the kernel gives a line to one request at a time, so a second
     /// request for the same lines would be refused.
+    ///
+    /// # Returns
+    ///
+    /// The second endpoint, on duplicates of this one's descriptors.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Io` if a descriptor cannot be duplicated.
     pub fn try_clone(&self) -> TcsResult<Self> {
         Ok(Self {
             what: self.what.clone(),
@@ -306,7 +359,22 @@ impl GpioEndpoint {
     }
 }
 
-/// The request this configuration asks for.
+/// Builds the request this configuration asks for.
+///
+/// # Arguments
+///
+/// * `what`   - The handler, for what a complaint says and as the
+///              consumer the lines are held under.
+/// * `config` - The lines and how they are to be configured.
+///
+/// # Returns
+///
+/// The request, ready for `GPIO_V2_GET_LINE_IOCTL`.
+///
+/// # Errors
+///
+/// `TcsError::Config` if there are no lines or more than
+/// `GPIO_V2_LINES_MAX`.
 fn request_for(what: &str, config: &GpioConfig) -> TcsResult<LineRequest> {
     if config.lines.is_empty() || config.lines.len() > GPIO_V2_LINES_MAX {
         return Err(TcsError::Config(format!(
@@ -376,7 +444,23 @@ fn request_for(what: &str, config: &GpioConfig) -> TcsResult<LineRequest> {
     Ok(request)
 }
 
-/// Make the request, and hand back the descriptor the events arrive on.
+/// Makes the request, and hands back the descriptor the events arrive on.
+///
+/// # Arguments
+///
+/// * `what`    - The handler, for what a complaint says.
+/// * `chip`    - The chip's open character device.
+/// * `request` - The request, which the kernel fills with the descriptor.
+/// * `path`    - Where the chip is, for what a complaint says.
+///
+/// # Returns
+///
+/// The line request's descriptor, non-blocking.
+///
+/// # Errors
+///
+/// `TcsError::Endpoint` if the chip refuses the request, gives no
+/// descriptor, or the descriptor cannot be made non-blocking.
 fn ask_for_lines(
     what: &str,
     chip: RawFd,
@@ -436,13 +520,26 @@ fn ask_for_lines(
     Ok(lines)
 }
 
-/// What arrived, as the state the lines are to be driven to.
+/// Reads what arrived as the state the lines are to be driven to.
 ///
 /// The text `1` to assert and `0` to unassert, which is what a compute
 /// element's decision looks like on a link, and what a ground station can
 /// send by hand. Anything else is refused rather than taken for one of them:
 /// the thing on the other end of this is a heater or a valve, and a datum
 /// that cannot be read is not guessed at.
+///
+/// # Arguments
+///
+/// * `what` - The handler, for what a complaint says.
+/// * `data` - What arrived, surrounding white space allowed.
+///
+/// # Returns
+///
+/// True to assert the lines, false to unassert them.
+///
+/// # Errors
+///
+/// `TcsError::Endpoint` if `data` is not the text `1` or `0`.
 fn state_of(what: &str, data: &[u8]) -> TcsResult<bool> {
     match std::str::from_utf8(data).map(str::trim) {
         Ok("1") => Ok(true),
@@ -457,12 +554,22 @@ fn state_of(what: &str, data: &[u8]) -> TcsResult<bool> {
     }
 }
 
-/// What the kernel is asked for: every line of the request at the one state.
+/// Builds what the kernel is asked for: every line of the request at the one
+/// state.
 ///
 /// Indexed by a line's place in the request and not by its offset on the
 /// chip, which is how the v2 interface counts: lines 3, 7 and 11 asked for in
 /// that order are bits 0, 1 and 2 here. The mask says which bits were meant,
 /// so every line of the request is set in it whichever way they are going.
+///
+/// # Arguments
+///
+/// * `count`  - How many lines the request holds.
+/// * `wanted` - Whether they are to be asserted.
+///
+/// # Returns
+///
+/// The values, with a mask covering every line.
 fn values_for(count: usize, wanted: bool) -> LineValues {
     let mask = if count >= u64::BITS as usize {
         u64::MAX
@@ -475,12 +582,24 @@ fn values_for(count: usize, wanted: bool) -> LineValues {
     }
 }
 
-/// One event as the bytes a conduit carries: the time, the line, the value.
+/// Gives one event as the bytes a conduit carries: the time, the line, the
+/// value.
 ///
 /// Most significant byte first, as everything this software puts on the
 /// network is unless the protocol it goes in says otherwise. That is the
 /// order a [`Timestamp`] goes on the wire in, so the eight bytes of time
 /// here are the eight bytes of time in a telemetry response.
+///
+/// # Arguments
+///
+/// * `event` - The event the kernel reported.
+/// * `now`   - The time to give it, in place of the kernel's monotonic
+///             one.
+///
+/// # Returns
+///
+/// The record: the time, the line's offset, and 1 for a rising edge or 0
+/// for a falling one.
 fn record_of(event: &LineEvent, now: SystemTime) -> [u8; EVENT_BYTES] {
     let mut record = [0u8; EVENT_BYTES];
 

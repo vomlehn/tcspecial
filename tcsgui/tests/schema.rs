@@ -34,7 +34,33 @@ fn root() -> PathBuf {
 /// in a directory of `examples/`, each example having one of its own.
 /// Discovered, so that an example added there is held against the schemas
 /// without anyone naming it here.
+///
+/// # Arguments
+///
+/// * `ending` - The end of the file names wanted, such as `.yaml`.
+///
+/// # Returns
+///
+/// The paths, `examples/<example>/<file>`, sorted.
+///
+/// # Panics
+///
+/// If a directory of `examples/` cannot be read.
 fn examples(ending: &str) -> Vec<String> {
+    /// Lists the names of the entries in a directory.
+    ///
+    /// # Arguments
+    ///
+    /// * `dir` - The directory.
+    ///
+    /// # Returns
+    ///
+    /// The entries' names that are UTF-8, in the order the directory gives
+    /// them.
+    ///
+    /// # Panics
+    ///
+    /// If the directory or one of its entries cannot be read.
     fn names(dir: &Path) -> Vec<String> {
         std::fs::read_dir(dir)
             .unwrap_or_else(|e| panic!("{}: {e}", dir.display()))
@@ -59,6 +85,10 @@ fn examples(ending: &str) -> Vec<String> {
 
 /// The examples' tcspecial configurations in YAML, which is every YAML file
 /// there but the simulator's.
+///
+/// # Returns
+///
+/// The paths, from the root, sorted.
 fn example_configurations() -> Vec<String> {
     examples(".yaml")
         .into_iter()
@@ -67,6 +97,18 @@ fn example_configurations() -> Vec<String> {
 }
 
 /// One schema, read.
+///
+/// # Arguments
+///
+/// * `name` - The schema's file name, under `share/schema`.
+///
+/// # Returns
+///
+/// The schema as JSON.
+///
+/// # Panics
+///
+/// If the file cannot be read or is not JSON.
 fn read(name: &str) -> serde_json::Value {
     let path = schema().join(name);
     let text = std::fs::read_to_string(&path)
@@ -76,6 +118,20 @@ fn read(name: &str) -> serde_json::Value {
 }
 
 /// The property names of an object in a schema, at a path of keys.
+///
+/// # Arguments
+///
+/// * `schema` - The JSON Schema.
+/// * `at`     - The keys of the nested properties to descend through, from the
+///              top; an array is taken as its items.
+///
+/// # Returns
+///
+/// The names of the object's properties; none if it lists none.
+///
+/// # Panics
+///
+/// If a key on the path is not a property.
 fn properties(schema: &serde_json::Value, at: &[&str]) -> BTreeSet<String> {
     let mut here = schema;
     for key in at {
@@ -136,6 +192,19 @@ fn the_configuration_schema_has_the_sections_the_reader_reads() {
 }
 
 /// The values an XSD's simple type enumerates, in the order it lists them.
+///
+/// # Arguments
+///
+/// * `xsd`         - The XSD's text.
+/// * `simple_type` - The simple type's name.
+///
+/// # Returns
+///
+/// The values of its `xs:enumeration` elements.
+///
+/// # Panics
+///
+/// If the XSD has no such simple type or it is not closed.
 fn enumerated(xsd: &str, simple_type: &str) -> Vec<String> {
     let opens = format!("<xs:simpleType name=\"{simple_type}\">");
     let start = xsd
@@ -575,7 +644,26 @@ fn nodes() -> PathBuf {
 }
 
 /// Every description in the tree, by path relative to its root.
+///
+/// # Returns
+///
+/// The YAML and XML files under `share/nodes`, sorted, relative to it.
+///
+/// # Panics
+///
+/// If the tree cannot be read or holds no descriptions.
 fn described() -> Vec<PathBuf> {
+    /// Adds every YAML and XML file under a directory, in sorted order.
+    ///
+    /// # Arguments
+    ///
+    /// * `root`  - The top of the tree, which the paths are made relative to.
+    /// * `here`  - The directory to search, recursively.
+    /// * `found` - Where each file's path is added.
+    ///
+    /// # Panics
+    ///
+    /// If a directory or one of its entries cannot be read.
     fn walk(root: &Path, here: &Path, found: &mut Vec<PathBuf>) {
         let mut entries: Vec<PathBuf> = std::fs::read_dir(here)
             .unwrap_or_else(|e| panic!("{}: {e}", here.display()))

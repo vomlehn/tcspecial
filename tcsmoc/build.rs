@@ -1,3 +1,8 @@
+/// Compiles the window's Slint markup, keeping its debug info.
+///
+/// # Panics
+///
+/// If `ui/main.slint` does not compile.
 fn main() {
     // With debug info the compiled window keeps the names of its elements,
     // which is how the layout tests find them: they open the window

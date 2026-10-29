@@ -14,7 +14,7 @@ use tcslibgs::node::vehicle::compute::{Format, ToKelvinParams};
 
 use super::{Function, Out};
 
-/// The number these bytes hold.
+/// Reads the number these bytes hold.
 ///
 /// Exactly the width and no more: a reading longer than the format is a
 /// sensor that was read wrongly or a bus that returned something else, and
@@ -23,6 +23,20 @@ use super::{Function, Out};
 ///
 /// The format itself is `tcslibgs::node::vehicle::compute::Format`, where the
 /// ground tool can see it; what a byte means is arithmetic and lives here.
+///
+/// # Arguments
+///
+/// * `format` - How the sensor lays out its counts.
+/// * `data`   - The reading, which must be exactly `format`'s width.
+///
+/// # Returns
+///
+/// The counts.
+///
+/// # Errors
+///
+/// A message saying how long the reading should be if `data` is longer or
+/// shorter.
 fn read(format: Format, data: &[u8]) -> Result<f64, String> {
     if data.len() != format.width() {
         return Err(format!(
@@ -52,10 +66,19 @@ pub struct ToKelvin {
 }
 
 impl ToKelvin {
-    /// The conversion these settled parameters describe.
+    /// Makes the conversion these settled parameters describe.
     ///
     /// Nothing to refuse: what a file may say and what each value may be are
     /// `tcslibgs::node::vehicle::compute`'s, where the ground tool checks them.
+    ///
+    /// # Arguments
+    ///
+    /// * `params` - The reading's format, and the scale and offset that take
+    ///              its counts to kelvin.
+    ///
+    /// # Returns
+    ///
+    /// The conversion.
     pub fn of(params: ToKelvinParams) -> ToKelvin {
         ToKelvin {
             format: params.format,
@@ -89,12 +112,22 @@ mod tests {
     use super::*;
     use crate::node::vehicle::compute::from_value;
 
-    /// A conversion of these parameters.
+    /// Makes a conversion of these parameters.
     ///
     /// What a file may say -- that the format is one of four, that a scale of
     /// nought is refused, that an offset has no default -- is
     /// `tcslibgs::node::vehicle::compute`'s rule, where the ground tool applies
     /// it. These tests are about the arithmetic.
+    ///
+    /// # Arguments
+    ///
+    /// * `format` - How the reading lays out its counts.
+    /// * `scale`  - Kelvin per count.
+    /// * `offset` - Kelvin at nought counts.
+    ///
+    /// # Returns
+    ///
+    /// The conversion.
     fn conversion(format: Format, scale: f64, offset: f64) -> ToKelvin {
         ToKelvin::of(ToKelvinParams {
             format,

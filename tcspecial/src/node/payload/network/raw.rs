@@ -52,7 +52,24 @@ pub struct RawEndpoint {
 }
 
 impl RawEndpoint {
-    /// Open a raw socket of the node's protocol, connected to its address.
+    /// Opens a raw socket of the node's protocol, connected to its address.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`   - The node's name, which every complaint names.
+    /// * `config` - The node's network configuration: a `raw` protocol with
+    ///              its IP protocol number, and the payload's address.
+    ///
+    /// # Returns
+    ///
+    /// The endpoint, its socket connected and non-blocking.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Config` if the protocol is not `raw`, if the address does
+    /// not resolve, if the socket cannot be opened (for want of
+    /// `CAP_NET_RAW` among other reasons) or if it cannot be connected;
+    /// `TcsError::Io` if it cannot be made non-blocking.
     pub fn connect(what: &str, config: &NetworkConfig) -> TcsResult<Self> {
         let NetworkProtocol::Raw(protocol) = config.protocol else {
             return Err(TcsError::Config(format!(
@@ -109,7 +126,16 @@ impl RawEndpoint {
         })
     }
 
-    /// A second endpoint on the same socket, for the other half of the pair.
+    /// Makes a second endpoint on the same socket, for the other half of the
+    /// pair.
+    ///
+    /// # Returns
+    ///
+    /// The new endpoint, sharing this one's socket.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Io` if the socket cannot be duplicated.
     pub fn try_clone(&self) -> TcsResult<Self> {
         Ok(Self {
             what: self.what.clone(),
@@ -119,13 +145,30 @@ impl RawEndpoint {
     }
 }
 
-/// Take the IPv4 header off the `got` bytes of a datagram at the front of
-/// `buffer`, leaving its payload at the front, and say how long that is.
+/// Takes the IPv4 header off the `got` bytes of a datagram at the front of
+/// `buffer`, leaving its payload at the front, and says how long that is.
 ///
 /// The header's length is in it -- the low four bits of its first byte, in
 /// words of four bytes -- since options make it longer than twenty. A
 /// datagram shorter than the header it claims is refused rather than handed
 /// on as data.
+///
+/// # Arguments
+///
+/// * `what`   - The node's name, for the error.
+/// * `buffer` - The datagram as read, header first; its payload is moved
+///              to the front.
+/// * `got`    - How many bytes of `buffer` the read filled.
+///
+/// # Returns
+///
+/// The length of the payload now at the front of `buffer`; 0 if nothing
+/// was read.
+///
+/// # Errors
+///
+/// `TcsError::Endpoint` if the header claims fewer than twenty bytes or
+/// more than were read.
 fn without_ipv4_header(
     what: &str,
     buffer: &mut [u8],
@@ -188,6 +231,20 @@ mod tests {
     use super::*;
     use tcslibgs::IpProtocol;
 
+    /// Makes the network configuration of a node reached over raw IP on
+    /// protocol 253, one of the two set aside for experiments.
+    ///
+    /// # Arguments
+    ///
+    /// * `address` - The payload's address.
+    ///
+    /// # Returns
+    ///
+    /// The configuration.
+    ///
+    /// # Panics
+    ///
+    /// If 253 is not taken as an IP protocol number, which it always is.
     fn raw(address: &str) -> NetworkConfig {
         NetworkConfig {
             protocol: NetworkProtocol::Raw(

@@ -49,6 +49,10 @@ pub enum Severity {
 
 impl Severity {
     /// What this is called in a report.
+    ///
+    /// # Returns
+    ///
+    /// "error" or "warning".
     pub fn label(self) -> &'static str {
         match self {
             Severity::Error => "error",
@@ -299,6 +303,10 @@ impl Problem {
     /// document, and carrying one through every struct here would put the
     /// file's shape into types that exist so two formats can describe one
     /// thing.
+    ///
+    /// # Returns
+    ///
+    /// The node, group or section the problem is reported on.
     pub fn about(&self) -> About {
         match self {
             Problem::DuplicateNode { name } => About::Node(name.clone()),
@@ -369,6 +377,11 @@ impl Problem {
 
     /// Whether this is a configuration that is wrong or one that is
     /// unfinished. See [`Severity`], which has the argument.
+    ///
+    /// # Returns
+    ///
+    /// [`Severity::Warning`] for a node's attributes not all in yet or a node
+    /// with nothing joined to it, and [`Severity::Error`] for everything else.
     pub fn severity(&self) -> Severity {
         match self {
             // The attributes of a node: not all in yet is what an editor
@@ -389,6 +402,10 @@ impl Problem {
     }
 
     /// What to print, one problem per line.
+    ///
+    /// # Returns
+    ///
+    /// The problem, as a sentence for a reader of the configuration.
     pub fn describe(&self) -> String {
         match self {
             Problem::DuplicateNode { name } => {
@@ -616,6 +633,14 @@ impl Problem {
 /// "in0, in1 and in2", and "nothing" for an empty list: a sentence that said
 /// "the links bind " and stopped would read as a sentence that had lost a
 /// word.
+///
+/// # Arguments
+///
+/// * `names` - The names, in the order to list them.
+///
+/// # Returns
+///
+/// The names quoted and joined with commas and "and", or "nothing".
 fn said(names: &[String]) -> String {
     match names.len() {
         0 => "nothing".to_string(),
@@ -643,6 +668,19 @@ fn said(names: &[String]) -> String {
 /// Flat, prefixes and all, which is how the rules and the complaints name an
 /// attribute: the file's shape is the file's business. See
 /// `parameters::flatten`.
+///
+/// # Arguments
+///
+/// * `said` - The section's attributes, as the file nests them.
+///
+/// # Returns
+///
+/// The kind of gateway the vehicle answers to, where the section reads.
+///
+/// # Errors
+///
+/// What is wrong with the section: an attribute missing, misplaced or
+/// unknown, or a value the command interpreter's configuration refuses.
 fn section_refusal(
     said: &BTreeMap<String, crate::graph::parameters::Parameter>,
 ) -> Result<crate::gateway::GatewayKind, String> {
@@ -655,6 +693,16 @@ fn section_refusal(
 /// What is wrong with a node of `node_type` in a configuration that answers to
 /// `kind`, or `None` where nothing is: a type that is no gateway's, or one of
 /// the kind's own.
+///
+/// # Arguments
+///
+/// * `kind`      - The kind of gateway the configuration answers to.
+/// * `node_type` - The node's type.
+///
+/// # Returns
+///
+/// What to say, if `node_type` is a gateway of another kind; `None`
+/// otherwise.
 fn gateway_stray(
     kind: crate::gateway::GatewayKind,
     node_type: &str,
@@ -685,6 +733,10 @@ impl Graph {
     /// tell is whatever depends on a node type's own rules -- whether a log's
     /// sources suit its format, whether a compute function has the parameters
     /// it wants -- which belong to the type and are checked where the type is.
+    ///
+    /// # Returns
+    ///
+    /// Every problem found, errors and warnings alike.
     pub fn check(&self) -> Vec<Problem> {
         let mut problems = Vec::new();
 
@@ -1509,6 +1561,15 @@ impl Graph {
     /// any other type. Counting one as an input would make a mean over `in0`
     /// and `in1` look like a mean over three things the moment somebody drew a
     /// line from the ground to it.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The node's name.
+    ///
+    /// # Returns
+    ///
+    /// The inputs links name on it, terminals left out, in the links' order and
+    /// once for each link that names one.
     fn inputs_bound_at(&self, node: &str) -> Vec<String> {
         let mut inputs = Vec::new();
         for link in &self.links {
@@ -1535,6 +1596,14 @@ impl Graph {
     /// Named as the node, whatever terminal the link left by: a complaint that
     /// said `"n.payload-out" produces records of three bytes` would be naming a
     /// thing the file has no entry for.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The node's name.
+    ///
+    /// # Returns
+    ///
+    /// The names of the nodes linked into it, each once, in the links' order.
     fn sources_of(&self, node: &str) -> Vec<&str> {
         let mut sources: Vec<&str> = Vec::new();
         for link in &self.links {
@@ -1561,6 +1630,15 @@ impl Graph {
     /// change to tcspecial, which is not something a file can be checked
     /// against. `None` is "not knowable from this configuration", which is
     /// different from a length that disagrees and is reported differently.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The node's name.
+    ///
+    /// # Returns
+    ///
+    /// Its `read_size`, or `None` for a node not there, a compute or log node,
+    /// or one that states no `read_size` or one that is not a number.
     fn record_bytes_of(&self, node: &str) -> Option<u32> {
         let node = self.node(node)?;
         if node.node_type == "compute" || node.node_type == "log" {
@@ -1605,6 +1683,16 @@ enum Claim {
 /// A list because a set of discrete lines claims a line at a time: several
 /// nodes commonly watch lines of one chip, and the kernel gives a line to one
 /// request at a time, so the chip is not the claim.
+///
+/// # Arguments
+///
+/// * `name`     - The node's name.
+/// * `endpoint` - What the node opens.
+///
+/// # Returns
+///
+/// Each claim, with the quoted node name a complaint calls it by: one for
+/// each line of a set of discrete lines, and one for any other endpoint.
 fn claims_of(name: &str, endpoint: &EndpointConfig) -> Vec<(Claim, String)> {
     let mut claims = Vec::new();
 
@@ -1665,6 +1753,15 @@ fn claims_of(name: &str, endpoint: &EndpointConfig) -> Vec<(Claim, String)> {
 }
 
 /// How a claim reads in a complaint.
+///
+/// # Arguments
+///
+/// * `claim` - The claim.
+///
+/// # Returns
+///
+/// The thing claimed, as a complaint names it: a host and port, a path, an
+/// address on a bus and so on.
 fn claim_text(claim: &Claim) -> String {
     match claim {
         Claim::Port { host, port } => format!("{host}:{port}"),
@@ -1698,6 +1795,10 @@ mod tests {
     /// else has to have one: a graph without it is refused, and a test that
     /// read `check() == []` would be reading the wrong refusal. The values are
     /// the shipped examples'.
+    ///
+    /// # Returns
+    ///
+    /// The section's attributes, nested as a file has them.
     fn tcspecial() -> BTreeMap<String, crate::graph::parameters::Parameter> {
         // Written flat and nested here, which is the arrangement everything
         // but the file itself works in: `parameters::nest` is what puts the
@@ -1760,6 +1861,15 @@ mod tests {
     }
 
     /// A graph built here rather than read, so a test can make one wrong.
+    ///
+    /// # Arguments
+    ///
+    /// * `nodes` - Its nodes.
+    /// * `links` - Its links.
+    ///
+    /// # Returns
+    ///
+    /// The graph, with a sound `tcspecial` section and nothing else.
     fn graph(nodes: Vec<Node>, links: Vec<Link>) -> Graph {
         Graph {
             description: None,
@@ -1775,15 +1885,6 @@ mod tests {
         }
     }
 
-    /// A node of this type, with whatever its type cannot do without.
-    ///
-    /// Every type is given the minimum it is opened with, because a node that
-    /// says less than that is refused here now -- and these tests are about
-    /// the shape of a graph rather than about which bus anything is on. A
-    /// compute node gets a conversion for the same reason, and a conversion
-    /// rather than a mean: a mean's inputs are checked against the links,
-    /// which is the one computation whose attributes depend on the shape
-    /// around it.
     /// Two raw nodes reading one protocol from one host claim one thing; a
     /// different protocol, or a different host, is a different claim.
     #[test]
@@ -1814,6 +1915,24 @@ mod tests {
         );
     }
 
+    /// A node of this type, with whatever its type cannot do without.
+    ///
+    /// Every type is given the minimum it is opened with, because a node that
+    /// says less than that is refused here now -- and these tests are about
+    /// the shape of a graph rather than about which bus anything is on. A
+    /// compute node gets a conversion for the same reason, and a conversion
+    /// rather than a mean: a mean's inputs are checked against the links,
+    /// which is the one computation whose attributes depend on the shape
+    /// around it.
+    ///
+    /// # Arguments
+    ///
+    /// * `name`      - The node's name.
+    /// * `node_type` - Its type, as a configuration spells it.
+    ///
+    /// # Returns
+    ///
+    /// The node, in no group.
     fn node(name: &str, node_type: &str) -> Node {
         let mut attributes = BTreeMap::new();
         let minimum: &[(&str, &str)] = match node_type {
@@ -1884,6 +2003,16 @@ mod tests {
         }
     }
 
+    /// A link with no comment.
+    ///
+    /// # Arguments
+    ///
+    /// * `from` - What it leaves.
+    /// * `to`   - Where it goes.
+    ///
+    /// # Returns
+    ///
+    /// The link.
     fn link(from: &str, to: &[&str]) -> Link {
         Link {
             from: from.to_string(),
@@ -1893,6 +2022,15 @@ mod tests {
     }
 
     /// A graph that answers to an F´ bridge rather than to the ground.
+    ///
+    /// # Arguments
+    ///
+    /// * `nodes` - Its nodes.
+    /// * `links` - Its links.
+    ///
+    /// # Returns
+    ///
+    /// The graph, its `tcspecial.gateway` being `fprime`.
     fn answering_fprime(nodes: Vec<Node>, links: Vec<Link>) -> Graph {
         let mut said = crate::graph::parameters::flatten(&tcspecial());
         said.insert("gateway".to_string(), Scalar::of("fprime"));
@@ -2235,6 +2373,14 @@ mod tests {
     }
 
     /// How many complaints there are about the section.
+    ///
+    /// # Arguments
+    ///
+    /// * `problems` - What `check` found.
+    ///
+    /// # Returns
+    ///
+    /// How many of them are [`Problem::BadTcspecial`].
     fn bad_tcspecial(problems: &[Problem]) -> usize {
         problems
             .iter()
@@ -2346,6 +2492,18 @@ mod tests {
     /// graph are several devices at one place, which is refused -- see
     /// `two_nodes_may_not_want_one_thing`. A test about something else wants
     /// them apart, and `which` is what tells them apart.
+    ///
+    /// # Arguments
+    ///
+    /// * `name`      - The node's name.
+    /// * `node_type` - Its type, as a configuration spells it.
+    /// * `which`     - What sets it apart: added to the address of a bus
+    ///                 device or the port of a network node, and in the
+    ///                 path of anything else.
+    ///
+    /// # Returns
+    ///
+    /// The node.
     fn node_at(name: &str, node_type: &str, which: u16) -> Node {
         let mut made = node(name, node_type);
         match node_type {

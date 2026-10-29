@@ -19,6 +19,14 @@ use tcslibgs::NO_TRANSFER_TIME;
 use tcsui::{palette, Shown};
 
 /// What the window has on it, as an operator would read it.
+///
+/// # Arguments
+///
+/// * `window` - The window, shown.
+///
+/// # Returns
+///
+/// The accessible label of every text element on it.
 fn on_screen(window: &WatchWindow) -> Vec<String> {
     ElementHandle::find_by_element_type_name(window, "Text")
         .filter_map(|element| element.accessible_label())

@@ -40,10 +40,23 @@
 //! counting. The second names the limit, since "65536 is not a port" is only
 //! useful beside "a port is 1 to 65535".
 
-/// A whole number, as large as any of these files needs.
+/// Reads a whole number, as large as any of these files needs.
 ///
 /// The grammar is the module's: decimal or `0x` hexadecimal, underscores
 /// allowed among the digits. Everything else here is this with a range check.
+///
+/// # Arguments
+///
+/// * `text` - The number as the file wrote it.
+///
+/// # Returns
+///
+/// Its value.
+///
+/// # Errors
+///
+/// A message quoting `text` when it has no digits, is not a number in its
+/// radix or does not fit in 64 bits.
 pub fn whole(text: &str) -> Result<u64, String> {
     let said = text.trim();
     let (digits, radix, how) =
@@ -79,11 +92,24 @@ pub fn whole_u8(text: &str) -> Result<u8, String> {
     fits(text, u8::MAX as u64).map(|n| n as u8)
 }
 
-/// A whole number no larger than `most`.
+/// Reads a whole number no larger than a limit.
 ///
 /// Said as its own complaint, naming the limit: "4294967296 is not a whole
 /// number" would be a lie about a number that is perfectly whole and merely
 /// too big for what it is counting.
+///
+/// # Arguments
+///
+/// * `text` - The number as the file wrote it.
+/// * `most` - The largest value the field holds.
+///
+/// # Returns
+///
+/// Its value.
+///
+/// # Errors
+///
+/// What [`whole`] refuses, and a number larger than `most`.
 fn fits(text: &str, most: u64) -> Result<u64, String> {
     let n = whole(text)?;
     if n > most {

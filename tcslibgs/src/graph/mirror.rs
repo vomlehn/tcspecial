@@ -60,7 +60,12 @@ struct Recorded {
 }
 
 impl Mirror {
-    /// Take in what one node's entry said about its sinks.
+    /// Takes in what one node's entry said about its sinks.
+    ///
+    /// # Arguments
+    ///
+    /// * `from` - The file the entry is in.
+    /// * `said` - The entry.
     pub fn record(&mut self, from: &Path, said: &NodeFile) {
         for (sink, arrives) in said.arriving() {
             let Some(arrives) = arrives else { continue };
@@ -81,6 +86,19 @@ impl Mirror {
     /// that says none does where one is written. The configuration is refused
     /// for either, because a file that contradicts itself about its own graph
     /// is a file whose other half may be the wrong one.
+    ///
+    /// # Arguments
+    ///
+    /// * `graph` - The configuration the flags were read from.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` when every flag agrees.
+    ///
+    /// # Errors
+    ///
+    /// [`TcsError::Config`], naming the file, for a flag on a sink the node's
+    /// type does not have, or one that disagrees with the links.
     pub fn check(&self, graph: &Graph) -> TcsResult<()> {
         let arriving = arrivals(graph);
 
@@ -128,7 +146,7 @@ impl Mirror {
     }
 }
 
-/// What arrives at each sink: by node and sink, the nodes that send there.
+/// Finds what arrives at each sink.
 ///
 /// Derived from the links, which are the configuration. The sink a link
 /// arrives at is the one the destination named, where it named one of the
@@ -139,6 +157,14 @@ impl Mirror {
 /// The names are here for the complaint rather than for the comparison: what
 /// a flag is checked against is whether this is empty, and what a person needs
 /// told is which node they forgot.
+///
+/// # Arguments
+///
+/// * `graph` - The configuration.
+///
+/// # Returns
+///
+/// By node and sink, the nodes that send there.
 fn arrivals(graph: &Graph) -> BTreeMap<(String, String), BTreeSet<String>> {
     let mut arriving: BTreeMap<(String, String), BTreeSet<String>> =
         BTreeMap::new();
@@ -174,13 +200,30 @@ fn arrivals(graph: &Graph) -> BTreeMap<(String, String), BTreeSet<String>> {
 mod tests {
     use super::*;
 
-    /// A configuration of one payload and the ground, with whatever the two
-    /// entries are given to say about their own data sinks.
+    /// Loads a configuration of one payload and the ground, with whatever the
+    /// two entries are given to say about their own data sinks.
     ///
     /// The groundward link is the payload's `payload-out: moc` and the
     /// vehicleward one is the ground's `moc-out: payload`, so the flags that
     /// agree with them are `payload-in: true` on the ground and `moc-in: true`
     /// on the payload.
+    ///
+    /// # Arguments
+    ///
+    /// * `moc_says`     - Lines added to the ground's entry.
+    /// * `payload_says` - Lines added to the payload's entry.
+    ///
+    /// # Returns
+    ///
+    /// The configuration.
+    ///
+    /// # Errors
+    ///
+    /// Whatever [`Graph::load`] refuses in it.
+    ///
+    /// # Panics
+    ///
+    /// If the file cannot be written.
     fn pair(moc_says: &str, payload_says: &str) -> TcsResult<Graph> {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("vehicle.yaml");

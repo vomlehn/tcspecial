@@ -48,8 +48,8 @@ pub struct Started {
     pub damaged: Option<String>,
 }
 
-/// Count this start: read the generation the state file at `path` holds, add
-/// one, and write it back before anything is sent.
+/// Counts this start: reads the generation the state file at `path` holds,
+/// adds one, and writes it back before anything is sent.
 ///
 /// A file that does not exist is a first start, generation 1. One that
 /// exists and cannot be read, or fails its CRC, is reported in
@@ -69,6 +69,20 @@ pub struct Started {
 /// the start is then taken for one nobody commanded: a vehicle that claimed a
 /// commanded start it could not vouch for would be telling the ground its
 /// definitions had changed when they might not have.
+///
+/// # Arguments
+///
+/// * `path` - The state file, which the configuration's `state_file` names.
+///
+/// # Returns
+///
+/// This start's generation, whether the ground commanded it, and what was
+/// wrong with the file that was there.
+///
+/// # Errors
+///
+/// What is wrong, naming the file and the setting to change, where the new
+/// count cannot be written.
 pub fn start(path: &Path) -> Result<Started, String> {
     let ((before, commanded), damaged) = match std::fs::read(path) {
         Ok(text) => match state_in(&text) {
@@ -99,7 +113,7 @@ pub fn start(path: &Path) -> Result<Started, String> {
     })
 }
 
-/// Say in the state file at `path` that the next start is one the ground
+/// Says in the state file at `path` that the next start is one the ground
 /// commanded: an armed RESTART has been taken by `generation`, the start
 /// running now.
 ///
@@ -115,8 +129,16 @@ pub fn commanded_restart(path: &Path, generation: u32) -> Result<(), String> {
     write(path, generation, true)
 }
 
-/// The file's text for `generation`, saying whether the next start is
-/// commanded, its CRC last.
+/// Makes the state file's text.
+///
+/// # Arguments
+///
+/// * `generation` - The generation it holds.
+/// * `commanded`  - Whether it says the next start is commanded.
+///
+/// # Returns
+///
+/// The text, its CRC line last.
 fn text_of(generation: u32, commanded: bool) -> Vec<u8> {
     let next = if commanded {
         "next_start commanded\n"
@@ -133,8 +155,21 @@ fn text_of(generation: u32, commanded: bool) -> Vec<u8> {
     text
 }
 
-/// The generation a state file's text holds and whether the next start is
-/// commanded, or why it holds no state.
+/// Reads the state a state file's text holds.
+///
+/// # Arguments
+///
+/// * `text` - The file's text, CRC line and all.
+///
+/// # Returns
+///
+/// The generation it holds and whether the next start is commanded.
+///
+/// # Errors
+///
+/// Why it holds no state, said in words: no CRC line last, a CRC that is
+/// not one or does not match, text that is not UTF-8, a line that is not
+/// state, or no generation.
 fn state_in(text: &[u8]) -> Result<(u32, bool), String> {
     const CRC: &[u8] = b"crc16 ";
     // The CRC's line is the last, and covers every byte before it.
@@ -186,8 +221,26 @@ fn state_in(text: &[u8]) -> Result<(u32, bool), String> {
     Ok((generation, commanded))
 }
 
-/// Write `generation` to the state file at `path`, and whether the next start
-/// is commanded, whole or not at all.
+/// Writes `generation` to the state file at `path`, and whether the next
+/// start is commanded, whole or not at all.
+///
+/// Written to a file beside it, flushed and renamed over it, and the
+/// directory flushed after.
+///
+/// # Arguments
+///
+/// * `path`       - The state file.
+/// * `generation` - The generation to write.
+/// * `commanded`  - Whether to say the next start is commanded.
+///
+/// # Returns
+///
+/// Nothing, once the file and its directory have reached storage.
+///
+/// # Errors
+///
+/// What could not be done, naming the file and the setting to change, where
+/// it cannot be written, renamed or flushed.
 fn write(path: &Path, generation: u32, commanded: bool) -> Result<(), String> {
     let cannot = |what: &str, e: std::io::Error| {
         format!(

@@ -15,7 +15,15 @@ use std::time::{Duration, Instant};
 use tcslibgs::graph::telemetry;
 use tcslibgs::graph::Graph;
 
-/// A socket on a port nothing holds.
+/// Binds a socket on a loopback port nothing holds.
+///
+/// # Returns
+///
+/// The socket, with a read timeout of 100 ms.
+///
+/// # Panics
+///
+/// If no port can be bound or the timeout cannot be set.
 fn bound() -> UdpSocket {
     let socket = UdpSocket::bind("127.0.0.1:0").expect("a port of its own");
     socket
@@ -44,9 +52,23 @@ impl Drop for Flying {
     }
 }
 
-/// `text` with `was` written as `now`, where it appears exactly once: a
+/// Writes `was` as `now` in `text`, where it appears exactly once: a
 /// socket the example stops naming is a test that no longer moves it, and
 /// would bind the example's own port.
+///
+/// # Arguments
+///
+/// * `text` - The example's configuration.
+/// * `was`  - What it says now, which must appear exactly once.
+/// * `now`  - What to say instead.
+///
+/// # Returns
+///
+/// `text` with the one `was` replaced by `now`.
+///
+/// # Panics
+///
+/// If `text` does not say `was` exactly once.
 fn moved(text: &str, was: &str, now: &str) -> String {
     assert_eq!(
         text.matches(was).count(),
@@ -56,8 +78,23 @@ fn moved(text: &str, was: &str, now: &str) -> String {
     text.replace(was, now)
 }
 
-/// Send `datum` to `to` until something arrives at `at`, which is how long
-/// tcspecial takes to start; what arrived, and nothing but it, is returned.
+/// Sends `datum` to `to` until something arrives at `at`, which is how
+/// long tcspecial takes to start.
+///
+/// # Arguments
+///
+/// * `from`  - The socket to send from.
+/// * `to`    - Where to send `datum`.
+/// * `datum` - What to send, again each time nothing has arrived.
+/// * `at`    - The socket to listen on.
+///
+/// # Returns
+///
+/// What arrived at `at`, and nothing but it.
+///
+/// # Panics
+///
+/// If a send fails, or nothing arrives within 20 seconds.
 fn until_heard(
     from: &UdpSocket,
     to: SocketAddr,
@@ -75,7 +112,15 @@ fn until_heard(
     panic!("nothing arrived at {:?}", at.local_addr());
 }
 
-/// What arrives at `at` within a few seconds, or `None`.
+/// Listens on `at` for a few seconds.
+///
+/// # Arguments
+///
+/// * `at` - The socket to listen on.
+///
+/// # Returns
+///
+/// The first datagram to arrive within five seconds, or `None`.
 fn heard(at: &UdpSocket) -> Option<Vec<u8>> {
     let deadline = Instant::now() + Duration::from_secs(5);
     let mut buffer = [0u8; 256];

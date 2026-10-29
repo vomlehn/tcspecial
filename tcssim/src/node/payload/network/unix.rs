@@ -63,11 +63,25 @@ impl Drop for BoundPath {
     }
 }
 
-/// Make a path available to bind, or say what is in the way.
+/// Makes a path available to bind, or says what is in the way.
 ///
 /// See the module comment. This is tcssim's copy of a rule tcspecial applies
 /// to its own binds; the two crates share no code and the rule is four lines,
 /// so it is written twice rather than made into a dependency.
+///
+/// # Arguments
+///
+/// * `path` - The path to be bound.
+///
+/// # Returns
+///
+/// Nothing, once the path is free: nothing was there, or a socket nothing
+/// answered on has been removed.
+///
+/// # Errors
+///
+/// A message if something other than a socket is there, a live socket is,
+/// or a dead one cannot be removed.
 fn clear_a_dead_socket(path: &Path) -> Result<(), String> {
     let found = match std::fs::symlink_metadata(path) {
         Ok(found) => found,
@@ -107,12 +121,18 @@ fn clear_a_dead_socket(path: &Path) -> Result<(), String> {
     }
 }
 
-/// Run Unix-domain stream device simulation
+/// Runs a simulated Unix-domain stream device.
 ///
 /// The simulator listens at the configured path and the handler connects to
 /// it, as for TCP. Nothing is sent until there is a connection to send it on,
 /// and from then on a packet goes every packet interval whether anything has
 /// been received or not.
+///
+/// # Arguments
+///
+/// * `config`  - The payload's configuration.
+/// * `running` - Cleared to stop it; the function returns soon after.
+/// * `stats`   - Where it counts what it sends and receives.
 pub fn run_unix_stream_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
@@ -222,7 +242,7 @@ pub fn run_unix_stream_node(
     }
 }
 
-/// Run Unix-domain datagram device simulation
+/// Runs a simulated Unix-domain datagram device.
 ///
 /// The handler binds the configured path and this end sends to it, as for UDP
 /// and for the same reason: a datagram connect tells the far end nothing, and
@@ -231,6 +251,12 @@ pub fn run_unix_stream_node(
 ///
 /// A device that is asked is the other way round: the vehicle speaks first,
 /// so this end binds the configured path and answers whoever asked.
+///
+/// # Arguments
+///
+/// * `config`  - The payload's configuration.
+/// * `running` - Cleared to stop it; the function returns soon after.
+/// * `stats`   - Where it counts what it sends and receives.
 pub fn run_unix_dgram_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
@@ -371,7 +397,7 @@ pub fn run_unix_dgram_node(
     }
 }
 
-/// Stand in for a datagram payload the vehicle drives and never reads.
+/// Stands in for a datagram payload the vehicle drives and never reads.
 ///
 /// The mirror of `run_driven_udp_node`, and the same loop with the sending
 /// taken out: whatever the vehicle writes is counted and acted on, and
@@ -383,6 +409,13 @@ pub fn run_unix_dgram_node(
 /// vehicle's end sends. The dead-socket rule applies to it as it does to
 /// every path this crate binds, and the path is unlinked when the device
 /// goes.
+///
+/// # Arguments
+///
+/// * `config`  - The payload's configuration.
+/// * `running` - Cleared to stop it; the function returns soon after.
+/// * `stats`   - Where it counts what it sends and receives.
+/// * `at`      - The path to bind, which the vehicle's end sends to.
 fn run_driven_unix_dgram_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
@@ -469,6 +502,16 @@ mod tests {
     use std::sync::atomic::AtomicU32;
     use std::time::Duration;
 
+    /// Makes a path in the temporary directory unique to this process and
+    /// test thread.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - What the path is for, which is part of its name.
+    ///
+    /// # Returns
+    ///
+    /// The path, which nothing has made yet.
     fn a_path(name: &str) -> PathBuf {
         std::env::temp_dir().join(format!(
             "tcssim-unix-{name}-{}-{:?}",
@@ -477,6 +520,17 @@ mod tests {
         ))
     }
 
+    /// Makes a simulated Unix-domain device sending twelve-byte packets every
+    /// 100 ms, in five-byte segments 20 ms apart.
+    ///
+    /// # Arguments
+    ///
+    /// * `path`     - The configured path.
+    /// * `protocol` - Stream or datagram.
+    ///
+    /// # Returns
+    ///
+    /// The device, not yet started.
     fn device_at(path: &Path, protocol: PayloadProtocol) -> SimulatedPayload {
         SimulatedPayload::new(PayloadConfig {
             thermal: None,

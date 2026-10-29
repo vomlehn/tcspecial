@@ -15,6 +15,15 @@ use std::process::{Child, Command, Stdio};
 /// A configuration whose `moc` node takes `lorem`'s words on a port nothing
 /// holds, and that port: `lorem` is the second node read, device id 1, so it
 /// is the base plus one.
+///
+/// # Returns
+///
+/// The directory the configuration is in, which removes it when dropped; the
+/// configuration's path; and the port `lorem`'s words arrive at.
+///
+/// # Panics
+///
+/// No port can be had, or the file cannot be written.
 fn configuration() -> (tempfile::TempDir, PathBuf, u16) {
     let port = UdpSocket::bind("127.0.0.1:0")
         .expect("a port of its own")
@@ -44,6 +53,18 @@ port: \"7001\", payload-out: moc }}
 ///
 /// Waiting for it to say so is what makes the test sound: a word sent before
 /// the ground has its port is a word nobody will ever read.
+///
+/// # Arguments
+///
+/// * `configuration` - The configuration file to give it.
+///
+/// # Returns
+///
+/// The ground station's process, its standard output still to be read.
+///
+/// # Panics
+///
+/// It cannot be started, or what it first says is not that it is listening.
 fn ground(configuration: &PathBuf) -> Child {
     let mut ground = Command::new(env!("CARGO_BIN_EXE_lorem_moc"))
         .arg(configuration)
@@ -63,6 +84,19 @@ fn ground(configuration: &PathBuf) -> Child {
 }
 
 /// What the ground station printed, all of it.
+///
+/// # Arguments
+///
+/// * `ground` - The ground station's process, whose standard output is taken
+///              and read to its end.
+///
+/// # Returns
+///
+/// Everything it printed on standard output.
+///
+/// # Panics
+///
+/// Its output was taken already, or is not UTF-8.
 fn printed(ground: &mut Child) -> String {
     let mut said = String::new();
     ground

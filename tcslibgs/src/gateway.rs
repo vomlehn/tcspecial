@@ -44,7 +44,11 @@ impl GatewayKind {
     pub const ALL: [GatewayKind; 3] =
         [GatewayKind::Radio, GatewayKind::Cfs, GatewayKind::Fprime];
 
-    /// The kind as a configuration writes it.
+    /// Names the kind as a configuration writes it.
+    ///
+    /// # Returns
+    ///
+    /// `radio`, `cfs` or `fprime`.
     pub fn name(self) -> &'static str {
         match self {
             GatewayKind::Radio => "radio",
@@ -61,7 +65,11 @@ impl GatewayKind {
         matches!(self, GatewayKind::Radio | GatewayKind::Fprime)
     }
 
-    /// The node type of the kind's gateway nodes, where it has one.
+    /// Names the node type of the kind's gateway nodes.
+    ///
+    /// # Returns
+    ///
+    /// The node type, or `None` for a kind that has no gateway nodes.
     pub fn node_type(self) -> Option<&'static str> {
         match self {
             GatewayKind::Radio => Some("moc"),
@@ -70,11 +78,15 @@ impl GatewayKind {
         }
     }
 
-    /// The attribute a gateway node of the kind says where its data goes
-    /// with: an `address:port`, counted on by each source's device id.
+    /// Names the attribute a gateway node of the kind says where its data
+    /// goes with: an `address:port`, counted on by each source's device id.
     ///
     /// Named for what is there: the ground for a radio, the bridge
     /// component for F´. One rule counts on from either.
+    ///
+    /// # Returns
+    ///
+    /// The attribute's name.
     pub fn base_attribute(self) -> &'static str {
         match self {
             GatewayKind::Radio => "ground_base",
@@ -83,7 +95,11 @@ impl GatewayKind {
         }
     }
 
-    /// What is at the far end, in words a complaint can use.
+    /// Says what is at the far end, in words a complaint can use.
+    ///
+    /// # Returns
+    ///
+    /// The far end, such as "the ground station".
     pub fn far_end(self) -> &'static str {
         match self {
             GatewayKind::Radio => "the ground station",
@@ -92,11 +108,24 @@ impl GatewayKind {
         }
     }
 
-    /// The kind a file named, if it is one this build answers to.
+    /// Reads the kind a file named, if it is one this build answers to.
     ///
     /// A kind that is specified and not built is refused by name, rather
     /// than as a word nothing knows: the file is right about what the kind is
     /// called and early about when it can be flown.
+    ///
+    /// # Arguments
+    ///
+    /// * `said` - The `gateway` attribute as the file wrote it.
+    ///
+    /// # Returns
+    ///
+    /// The kind.
+    ///
+    /// # Errors
+    ///
+    /// A message offering the kinds that are built, when `said` is no kind
+    /// or a kind this build does not have.
     pub fn of(said: &str) -> Result<GatewayKind, String> {
         let said = said.trim();
         let Some(kind) =
@@ -129,8 +158,12 @@ impl GatewayKind {
             .find(|kind| kind.node_type() == Some(node_type))
     }
 
-    /// The kinds this build answers to, as a file would write them, for a
-    /// complaint to offer.
+    /// Lists the kinds this build answers to, as a file would write them, for
+    /// a complaint to offer.
+    ///
+    /// # Returns
+    ///
+    /// Their names, joined with "or".
     fn built_names() -> String {
         GatewayKind::ALL
             .into_iter()

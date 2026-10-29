@@ -37,6 +37,24 @@ pub struct TcpEndpoint {
 }
 
 impl TcpEndpoint {
+    /// Listens on the configured address and port, for a stream to be
+    /// accepted later with [`Self::accept`].
+    ///
+    /// # Arguments
+    ///
+    /// * `what`   - The handler's name, for the error if the bind fails.
+    /// * `config` - The network configuration: the address and port to
+    ///              listen on.
+    ///
+    /// # Returns
+    ///
+    /// The endpoint, with a non-blocking listener and no stream yet.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Config` if the address cannot be bound, saying so plainly
+    /// when something else holds it; `TcsError::Io` if the listener cannot
+    /// be made non-blocking.
     pub fn new_server(what: &str, config: &NetworkConfig) -> TcsResult<Self> {
         let addr = format!("{}:{}", config.address, config.port);
         let listener = TcpListener::bind(&addr).map_err(|e| {
@@ -52,9 +70,18 @@ impl TcpEndpoint {
         })
     }
 
-    /// A second endpoint on the same listener or stream.
+    /// Makes a second endpoint on the same listener or stream.
     ///
     /// See [`super::udp::UdpEndpoint::try_clone`]: one bind, two handles.
+    ///
+    /// # Returns
+    ///
+    /// The new endpoint, sharing whichever of the listener and the stream
+    /// this one has.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Io` if a socket cannot be duplicated.
     pub fn try_clone(&self) -> TcsResult<Self> {
         Ok(Self {
             stream: match &self.stream {
@@ -70,6 +97,22 @@ impl TcpEndpoint {
         })
     }
 
+    /// Connects as a client, once, without retrying.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`   - The handler's name, for the error.
+    /// * `config` - The network configuration: the address and port to
+    ///              connect to.
+    ///
+    /// # Returns
+    ///
+    /// The endpoint, with a non-blocking connected stream.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Config` if the connection cannot be made; `TcsError::Io`
+    /// if the stream cannot be made non-blocking.
     pub fn new_client(what: &str, config: &NetworkConfig) -> TcsResult<Self> {
         let addr = format!("{}:{}", config.address, config.port);
         let stream = TcpStream::connect(&addr).map_err(|e| {
@@ -85,11 +128,27 @@ impl TcpEndpoint {
         })
     }
 
-    /// Connect as a client, retrying while refused.
+    /// Connects as a client, retrying while refused.
     ///
     /// See this module's `connect_retrying`. A node may be started before
     /// the device it reaches, and a device that is not listening yet refuses
     /// rather than failing in any way that waiting cannot fix.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`   - The handler's name, for the log and the error.
+    /// * `config` - The network configuration: the address and port to
+    ///              connect to.
+    ///
+    /// # Returns
+    ///
+    /// The endpoint, with a non-blocking connected stream.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Config` if the connection is still refused when
+    /// `ENDPOINT_CONNECT_BUDGET` is spent, or fails in any other way;
+    /// `TcsError::Io` if the stream cannot be made non-blocking.
     pub fn connect_retrying(
         what: &str,
         config: &NetworkConfig,
@@ -107,6 +166,18 @@ impl TcpEndpoint {
         })
     }
 
+    /// Accepts a waiting connection on the listener, if there is one, and
+    /// makes it this endpoint's stream.
+    ///
+    /// # Returns
+    ///
+    /// Whether a connection was accepted: false if none was waiting or
+    /// this endpoint has no listener.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Io` if the accept fails other than for want of a
+    /// connection, or the stream cannot be made non-blocking.
     pub fn accept(&mut self) -> TcsResult<bool> {
         if let Some(ref listener) = self.listener {
             match listener.accept() {
@@ -178,7 +249,7 @@ impl EndpointWritable for TcpEndpoint {
     }
 }
 
-/// Reach `addr`, retrying while the connection is refused.
+/// Reaches `addr`, retrying while the connection is refused.
 ///
 /// A refusal means nothing is listening yet, which is the ordinary case when a
 /// handler is started before the device it serves: the simulated device is a
@@ -194,6 +265,22 @@ impl EndpointWritable for TcpEndpoint {
 /// names it: several handlers wait for several devices at once, and an
 /// address on its own leaves the log saying which address was refused without
 /// saying whose device is missing.
+///
+/// # Arguments
+///
+/// * `what`    - The handler this is being done for, as above.
+/// * `addr`    - The address being reached, for the log and the errors.
+/// * `attempt` - Makes one attempt to connect, returning what it opened.
+///
+/// # Returns
+///
+/// What the first successful attempt opened.
+///
+/// # Errors
+///
+/// `TcsError::Config` if the attempts are still refused when
+/// [`ENDPOINT_CONNECT_BUDGET`] is spent, or an attempt fails other than by
+/// refusal.
 pub(crate) fn connect_retrying<T>(
     what: &str,
     addr: &str,

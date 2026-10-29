@@ -51,7 +51,15 @@ pub struct Problem {
 }
 
 impl Problem {
-    /// A problem with the file itself.
+    /// Makes a problem with the file itself.
+    ///
+    /// # Arguments
+    ///
+    /// * `message` - What is wrong.
+    ///
+    /// # Returns
+    ///
+    /// The problem.
     pub fn file(message: impl Into<String>) -> Self {
         Problem {
             about: About::File,
@@ -59,7 +67,16 @@ impl Problem {
         }
     }
 
-    /// A problem with one of its sections.
+    /// Makes a problem with one of the file's sections.
+    ///
+    /// # Arguments
+    ///
+    /// * `section` - The section's name.
+    /// * `message` - What is wrong.
+    ///
+    /// # Returns
+    ///
+    /// The problem.
     pub fn section(section: &'static str, message: impl Into<String>) -> Self {
         Problem {
             about: About::Section(section),

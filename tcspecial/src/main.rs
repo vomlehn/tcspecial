@@ -32,6 +32,9 @@ use log::{debug, error, trace};
 use tcslibgs::config::{payload_path_from_args, PAYLOAD_CONFIG_PATH_VAR};
 use tcspecial::runtime;
 
+/// Runs tcspecial as the command line asks, as the module documentation
+/// says, and exits with the run's status; 1 for a command line,
+/// configuration or build that refuses it, with the reason said.
 fn main() {
     // Before anything is opened, so that what a RESTART keeps is what this
     // process was started with and nothing it opened itself.

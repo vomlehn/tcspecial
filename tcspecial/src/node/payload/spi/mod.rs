@@ -66,14 +66,25 @@ enum Clocking {
     StandIn,
 }
 
-/// Take a terminal's line discipline out of the way, so that what it carries
-/// is bytes: no editing, no echo, no translation of what looks like a line.
+/// Takes a terminal's line discipline out of the way, so that what it
+/// carries is bytes: no editing, no echo, no translation of what looks like
+/// a line.
 ///
 /// The same thing the serial endpoint does to a port, and for the same reason,
 /// but not for the same purpose: there it is part of setting the line to the
 /// terms the configuration gives, and here there are no terms -- it is only
 /// the discipline that would otherwise sit between the two ends of a link
 /// carrying device data.
+///
+/// # Arguments
+///
+/// * `fd` - The open terminal.
+/// * `on` - The handler's name and the terminal's path, for what a
+///          complaint says.
+///
+/// # Errors
+///
+/// `TcsError::Endpoint` if the terminal's terms cannot be read or set.
 fn make_raw(fd: RawFd, on: &str) -> TcsResult<()> {
     // SAFETY: termios is a C struct of integers and arrays of integers, for
     // which all zeroes is a valid value; tcgetattr overwrites it anyway.
@@ -120,7 +131,26 @@ pub struct SpiEndpoint {
 }
 
 impl SpiEndpoint {
-    /// Open the device and set the controller to the configured terms.
+    /// Opens the device and sets the controller to the configured terms.
+    ///
+    /// A terminal, which is what stands in for a peripheral, is made raw
+    /// instead and said so in the log; nothing else that refuses the mode
+    /// is accepted.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`   - The handler's name, for what a complaint says.
+    /// * `config` - The node's path and the terms to clock it on.
+    ///
+    /// # Returns
+    ///
+    /// The endpoint, a peripheral set to those terms or a raw stand-in.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Endpoint` if the node cannot be opened, refuses a term
+    /// (the mode, unless it is a terminal), or is a terminal that cannot be
+    /// made raw.
     pub fn new(what: &str, config: &SpiConfig) -> TcsResult<Self> {
         // The handler's name and its node together, because every complaint
         // below is about both: which device could not be reached, and the
@@ -207,6 +237,14 @@ impl SpiEndpoint {
     ///
     /// The terms belong to the description, as an I2C address does, so the
     /// duplicate carries what was set rather than setting it again.
+    ///
+    /// # Returns
+    ///
+    /// The second endpoint, on a duplicate of this one's descriptor.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Io` if the descriptor cannot be duplicated.
     pub fn try_clone(&self) -> TcsResult<Self> {
         Ok(Self {
             device: self.device.try_clone()?,
@@ -216,7 +254,16 @@ impl SpiEndpoint {
     }
 }
 
-/// The mode byte: the clock terms, and the chip select polarity beside them.
+/// Builds the mode byte: the clock terms, and the chip select polarity
+/// beside them.
+///
+/// # Arguments
+///
+/// * `config` - The SPI mode and chip select polarity.
+///
+/// # Returns
+///
+/// The byte `SPI_IOC_WR_MODE` takes.
 fn mode_bits(config: &SpiConfig) -> u8 {
     let mut bits = match config.mode {
         SpiMode::Mode0 => 0,
@@ -230,6 +277,20 @@ fn mode_bits(config: &SpiConfig) -> u8 {
     bits
 }
 
+/// Makes a request of the open device that takes a byte.
+///
+/// # Arguments
+///
+/// * `fd`      - The open spidev node.
+/// * `request` - The `SPI_IOC_WR_*` request, one whose argument is a `u8`.
+/// * `value`   - What to set.
+/// * `on`      - The handler's name and the node's path, for what a
+///               complaint says.
+/// * `wanted`  - What was being set, for what a complaint says.
+///
+/// # Errors
+///
+/// `TcsError::Endpoint` if the node refuses the request.
 fn set_u8(
     fd: RawFd,
     request: libc::c_ulong,
@@ -240,6 +301,20 @@ fn set_u8(
     set(fd, request, &value, on, wanted)
 }
 
+/// Makes a request of the open device that takes a 32-bit word.
+///
+/// # Arguments
+///
+/// * `fd`      - The open spidev node.
+/// * `request` - The `SPI_IOC_WR_*` request, one whose argument is a `u32`.
+/// * `value`   - What to set.
+/// * `on`      - The handler's name and the node's path, for what a
+///               complaint says.
+/// * `wanted`  - What was being set, for what a complaint says.
+///
+/// # Errors
+///
+/// `TcsError::Endpoint` if the node refuses the request.
 fn set_u32(
     fd: RawFd,
     request: libc::c_ulong,
@@ -258,7 +333,8 @@ fn argument_bytes(request: libc::c_ulong) -> usize {
     ((request >> 16) & 0x1fff) as usize
 }
 
-/// Make one request of the open device, saying what was being set if it fails.
+/// Makes one request of the open device, saying what was being set if it
+/// fails.
 ///
 /// A node that is not a spidev answers `ENOTTY`, which says nothing on its
 /// own about what was attempted.
@@ -266,6 +342,20 @@ fn argument_bytes(request: libc::c_ulong) -> usize {
 /// The value is checked against the size the request's number gives before
 /// it is passed, so a request and a value that disagree are refused rather
 /// than letting the kernel read past the value.
+///
+/// # Arguments
+///
+/// * `fd`      - The open spidev node.
+/// * `request` - The `SPI_IOC_WR_*` request.
+/// * `value`   - The value to set, as wide as the request encodes.
+/// * `on`      - The handler's name and the node's path, for what a
+///               complaint says.
+/// * `wanted`  - What was being set, for what a complaint says.
+///
+/// # Errors
+///
+/// `TcsError::Endpoint` if the value is not as wide as the request says, or
+/// the node refuses the request.
 fn set<T>(
     fd: RawFd,
     request: libc::c_ulong,

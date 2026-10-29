@@ -75,8 +75,17 @@ struct Name {
 }
 
 impl Name {
-    /// `path` with `suffix` put on its end, or `None` where that is longer
-    /// than a path may be or has a nul in it.
+    /// Makes the name of `path` with `suffix` put on its end.
+    ///
+    /// # Arguments
+    ///
+    /// * `path`   - The path to name.
+    /// * `suffix` - What to put on its end; empty for the path as it is.
+    ///
+    /// # Returns
+    ///
+    /// The name, nul-terminated, or `None` where it is longer than a path may
+    /// be or has a nul in it.
     fn of(path: &Path, suffix: &str) -> Option<Name> {
         let path = path.as_os_str().as_bytes();
         let suffix = suffix.as_bytes();
@@ -118,9 +127,22 @@ pub struct SegSend {
 }
 
 impl SegSend {
-    /// Start the thread that hands segments to `program`.
+    /// Starts the thread that hands segments to `program`.
     ///
     /// For startup: it allocates.
+    ///
+    /// # Arguments
+    ///
+    /// * `program` - The `segsend` to run on each filled segment.
+    ///
+    /// # Returns
+    ///
+    /// A handle on the queue the thread takes segments from.
+    ///
+    /// # Errors
+    ///
+    /// What is wrong, said in words, where `program`'s name has a nul in it
+    /// or the thread cannot be started.
     pub fn start(program: &Path) -> Result<SegSend, String> {
         let program_c =
             CString::new(program.as_os_str().as_bytes()).map_err(|_| {
@@ -140,11 +162,16 @@ impl SegSend {
         })
     }
 
-    /// Nothing started, and filled segments left where they are.
+    /// Makes a handle that starts nothing and leaves filled segments where
+    /// they are.
     ///
     /// For a vehicle that keeps no log -- no `log.directory` and no `log`
     /// node -- which has nothing to hand over and so does not need `segsend`
     /// to be there; and for the tests, which fill no segments.
+    ///
+    /// # Returns
+    ///
+    /// The handle, with no queue.
     pub fn none() -> SegSend {
         SegSend {
             queue: None,
@@ -152,12 +179,29 @@ impl SegSend {
         }
     }
 
-    /// What a log kept in `dir` is opened with, having first handed over
-    /// every segment a previous run left pending there.
+    /// Makes what a log kept in `dir` is opened with, having first handed
+    /// over every segment a previous run left pending there.
     ///
     /// For startup, before the log is opened: it reads the directory, and
     /// opening the log hands over the segments it finds, which should go
     /// after the ones renamed before them.
+    ///
+    /// A directory already swept, by another log kept in it, is not swept
+    /// again. A pending segment whose name is too long is said and left.
+    ///
+    /// # Arguments
+    ///
+    /// * `dir` - The directory the log is kept in.
+    ///
+    /// # Returns
+    ///
+    /// The log's end of the queue, which hands over nothing where this
+    /// handle was made by [`SegSend::none`].
+    ///
+    /// # Errors
+    ///
+    /// What is wrong, said in words, where `dir` cannot be read or the
+    /// thread that runs `segsend` has stopped.
     pub fn handoff(&self, dir: &Path) -> Result<Handoff, String> {
         if let Some(queue) = &self.queue {
             let key = dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf());
@@ -259,10 +303,21 @@ impl tcslog::WriteCallbacks for Handoff {
     }
 }
 
-/// The segments a previous run renamed and did not hand over, oldest first.
+/// Finds the segments a previous run renamed and did not hand over.
 ///
-/// Oldest by name, which is how tcslog names segments: by the time each was
-/// begun.
+/// # Arguments
+///
+/// * `dir` - The log directory to look in.
+///
+/// # Returns
+///
+/// The paths of the files in `dir` whose names end in [`PENDING_SUFFIX`],
+/// oldest first. Oldest by name, which is how tcslog names segments: by the
+/// time each was begun.
+///
+/// # Errors
+///
+/// What is wrong, naming `dir`, where it cannot be read.
 fn left_pending(dir: &Path) -> Result<Vec<PathBuf>, String> {
     let entries = std::fs::read_dir(dir).map_err(|e| {
         format!("the telemetry log directory, {}: {e}", dir.display())
@@ -280,8 +335,17 @@ fn left_pending(dir: &Path) -> Result<Vec<PathBuf>, String> {
     Ok(pending)
 }
 
-/// Hand each name that arrives to `program`, one at a time, until the queue
+/// Hands each name that arrives to `program`, one at a time, until the queue
 /// is closed.
+///
+/// A `program` that cannot be run, or ends with a status other than 0, is
+/// reported and the next name handed over.
+///
+/// # Arguments
+///
+/// * `program` - The `segsend` to run.
+/// * `shown`   - Its path, for saying what went wrong with it.
+/// * `waiting` - The queue the names arrive on.
 fn send_each(program: &CStr, shown: &str, waiting: Receiver<Name>) {
     while let Ok(name) = waiting.recv() {
         match run(program, &name) {
@@ -302,9 +366,21 @@ extern "C" {
     static environ: *const *mut libc::c_char;
 }
 
-/// Run `program` with `name` as its one argument and wait for it, saying how
-/// it ended: its exit status, or 128 and the signal that ended it, as a shell
-/// would.
+/// Runs `program` with `name` as its one argument and waits for it.
+///
+/// # Arguments
+///
+/// * `program` - The program to run.
+/// * `name`    - Its one argument, the segment to hand over.
+///
+/// # Returns
+///
+/// How it ended, as a shell would say: its exit status, or 128 and the
+/// signal that ended it.
+///
+/// # Errors
+///
+/// What `posix_spawn` or `waitpid` failed with.
 fn run(program: &CStr, name: &Name) -> std::io::Result<i32> {
     let argv: [*mut libc::c_char; 3] = [
         program.as_ptr() as *mut libc::c_char,
@@ -350,12 +426,21 @@ fn run(program: &CStr, name: &Name) -> std::io::Result<i32> {
     }
 }
 
-/// Where `segsend` is: beside tcspecial's own executable, where a build puts
+/// Finds `segsend`: beside tcspecial's own executable, where a build puts
 /// both and where tcsmoc finds tcspecial.
 ///
 /// Found once, as the vehicle starts, and refused then if it is not there: a
 /// vehicle that discovered at its first full segment that it had nothing to
 /// hand it to would fill its log directory without a word.
+///
+/// # Returns
+///
+/// The path of `segsend`.
+///
+/// # Errors
+///
+/// What is wrong, said in the user's terms, where this program's own path
+/// cannot be found or `segsend` is not a program this process may run.
 pub fn beside_this_program() -> Result<PathBuf, String> {
     let here = std::env::current_exe().map_err(|e| {
         format!("where tcspecial is cannot be found, to find {SEGSEND}: {e}")
@@ -365,8 +450,21 @@ pub fn beside_this_program() -> Result<PathBuf, String> {
     Ok(program)
 }
 
-/// Whether `program` is a file this process may run, said in the user's
-/// terms where it is not.
+/// Checks that `program` is a file this process may run.
+///
+/// # Arguments
+///
+/// * `program` - The path of `segsend`.
+///
+/// # Returns
+///
+/// Nothing, where it may be run.
+///
+/// # Errors
+///
+/// What is wrong, said in the user's terms with how to put it right, where
+/// `program` has a nul in its name, is not there, is not a file or is not
+/// executable by this user.
 fn usable(program: &Path) -> Result<(), String> {
     let fix = format!(
         "put the program that takes filled telemetry log segments there, named \
@@ -411,6 +509,18 @@ mod tests {
     /// Run once with no name before it is returned, which it ignores: see
     /// `crate::when_not_busy`, which is why a program a test has just written
     /// cannot be relied on to start the first time.
+    ///
+    /// # Arguments
+    ///
+    /// * `dir` - Where to put it, and the file of names it records.
+    ///
+    /// # Returns
+    ///
+    /// The stand-in's path.
+    ///
+    /// # Panics
+    ///
+    /// If it cannot be written, made executable or run.
     fn recording(dir: &Path) -> PathBuf {
         let program = dir.join("segsend");
         let record = dir.join("handed");
@@ -437,6 +547,15 @@ mod tests {
         program
     }
 
+    /// Reads what the stand-in made by `recording` has been handed.
+    ///
+    /// # Arguments
+    ///
+    /// * `dir` - The directory the stand-in is in.
+    ///
+    /// # Returns
+    ///
+    /// The names it was given, in order; none where it has been given none.
     fn handed(dir: &Path) -> Vec<String> {
         std::fs::read_to_string(dir.join("handed"))
             .unwrap_or_default()
@@ -445,6 +564,15 @@ mod tests {
             .collect()
     }
 
+    /// Waits, for up to ten seconds, for something to come true.
+    ///
+    /// # Arguments
+    ///
+    /// * `what` - Whether it has, asked every 10 ms.
+    ///
+    /// # Returns
+    ///
+    /// Whether it came true in time.
     fn until(what: impl Fn() -> bool) -> bool {
         let by = Instant::now() + Duration::from_secs(10);
         while Instant::now() < by {

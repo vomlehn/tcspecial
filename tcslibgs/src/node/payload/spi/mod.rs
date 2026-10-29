@@ -51,6 +51,10 @@ pub enum SpiMode {
 }
 
 impl SpiMode {
+    /// Gives the mode's number.
+    ///
+    /// # Returns
+    ///
     /// The mode number, 0 to 3.
     pub fn number(&self) -> u8 {
         match self {
@@ -104,7 +108,19 @@ impl BitsPerWord {
     /// The width nearly every peripheral uses.
     pub const DEFAULT: u8 = 8;
 
-    /// Build a word width, rejecting one no controller can produce.
+    /// Builds a word width, rejecting one no controller can produce.
+    ///
+    /// # Arguments
+    ///
+    /// * `bits` - The width in bits.
+    ///
+    /// # Returns
+    ///
+    /// The width.
+    ///
+    /// # Errors
+    ///
+    /// A message giving the range when `bits` is outside `MIN` to `MAX`.
     pub fn new(bits: u8) -> Result<Self, String> {
         if (Self::MIN..=Self::MAX).contains(&bits) {
             Ok(BitsPerWord(bits))
@@ -129,6 +145,20 @@ impl Default for BitsPerWord {
     }
 }
 
+/// Parses a SPI mode, written as its number.
+///
+/// # Arguments
+///
+/// * `group` - The group's name, for the message.
+/// * `s`     - The mode as the file wrote it.
+///
+/// # Returns
+///
+/// The mode.
+///
+/// # Errors
+///
+/// Anything but 0, 1, 2 or 3.
 fn parse_spi_mode(group: &str, s: &Scalar) -> EndpointConfigResult<SpiMode> {
     match s.as_str() {
         "0" => Ok(SpiMode::Mode0),
@@ -142,6 +172,21 @@ fn parse_spi_mode(group: &str, s: &Scalar) -> EndpointConfigResult<SpiMode> {
     }
 }
 
+/// Parses a bit order, in any case: `msb` or `lsb`, alone or followed by
+/// `_first` or `-first`.
+///
+/// # Arguments
+///
+/// * `group` - The group's name, for the message.
+/// * `s`     - The bit order as the file wrote it.
+///
+/// # Returns
+///
+/// The bit order.
+///
+/// # Errors
+///
+/// Any other word.
 fn parse_bit_order(group: &str, s: &Scalar) -> EndpointConfigResult<BitOrder> {
     match s.as_str().to_ascii_lowercase().as_str() {
         "msb" | "msb_first" | "msb-first" => Ok(BitOrder::MsbFirst),
@@ -153,6 +198,20 @@ fn parse_bit_order(group: &str, s: &Scalar) -> EndpointConfigResult<BitOrder> {
     }
 }
 
+/// Parses the level chip select is active at, `low` or `high` in any case.
+///
+/// # Arguments
+///
+/// * `group` - The group's name, for the message.
+/// * `s`     - The level as the file wrote it.
+///
+/// # Returns
+///
+/// The level.
+///
+/// # Errors
+///
+/// Any other word.
 fn parse_cs_active(group: &str, s: &Scalar) -> EndpointConfigResult<CsActive> {
     match s.as_str().to_ascii_lowercase().as_str() {
         "low" => Ok(CsActive::Low),
@@ -164,12 +223,26 @@ fn parse_cs_active(group: &str, s: &Scalar) -> EndpointConfigResult<CsActive> {
     }
 }
 
-/// What a SPI group says, and what it must say.
+/// Reads what a SPI group says, and what it must say.
 ///
 /// The clock rate and the mode are required: no controller default is right
 /// for every peripheral, and a mismatched mode fails the way a mismatched
 /// data rate fails on a serial line. The rest have usual values and default
 /// to them. There is no stream section, for the reason an I2C group has none.
+///
+/// # Arguments
+///
+/// * `name` - The group's name, for the messages.
+/// * `g`    - The group's terms as the file states them.
+///
+/// # Returns
+///
+/// The bus's clock rate, mode, word width, bit order and chip-select level.
+///
+/// # Errors
+///
+/// A term that does not belong to SPI, a `stream`, a missing `max_speed` or
+/// `spi_mode`, a `max_speed` of nought, and any value that does not read.
 pub(crate) fn group_kind_of(
     name: &str,
     g: LinkTerms,
@@ -228,8 +301,16 @@ pub(crate) fn group_kind_of(
     }))
 }
 
-/// Whether the device at `path` is a stand-in: a pseudo-terminal, which is
+/// Judges whether a SPI device is a stand-in: a pseudo-terminal, which is
 /// what tcssim makes for a spi payload. See [`crate::simulate`].
+///
+/// # Arguments
+///
+/// * `path` - The device's path, from the node's `path`.
+///
+/// # Returns
+///
+/// The judgement, with what to change if it is not a stand-in.
 pub fn judged(path: &str) -> crate::simulate::Judged {
     crate::simulate::pseudo_terminal(
         path,

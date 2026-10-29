@@ -66,8 +66,21 @@ pub struct Out {
 }
 
 impl Out {
-    /// A value, as every computation's result over temperatures is: see
-    /// `tcslibgs::node::vehicle::compute::as_value`.
+    /// Makes a value, as every computation's result over temperatures is:
+    /// see `tcslibgs::node::vehicle::compute::as_value`.
+    ///
+    /// # Arguments
+    ///
+    /// * `number` - The number to carry, in kelvin for a temperature.
+    ///
+    /// # Returns
+    ///
+    /// The value, in the form it takes on a link.
+    ///
+    /// # Errors
+    ///
+    /// A message saying so if `number` is outside the range a value can
+    /// carry.
     pub fn value(number: f64) -> Result<Out, String> {
         let value = value_bytes(number)?;
         let mut bytes = [0u8; OUT_BYTES];
@@ -117,19 +130,31 @@ impl PartialEq<Vec<u8>> for Out {
 /// Given what arrived and told which input it arrived at; hands back what to
 /// send on, if anything is ready to send.
 pub trait Function: Send {
-    /// Take one arrival.
+    /// Takes one arrival.
     ///
-    /// `Ok(None)` means "nothing to send yet", which is the ordinary answer
-    /// from a function waiting for the rest of its inputs, and from one that
-    /// decided nothing needs to change. An error is a datum the function
-    /// cannot use, and is reported rather than guessed at.
+    /// # Arguments
+    ///
+    /// * `input` - The input it arrived at, by name, or `None` where the
+    ///             node's link names none.
+    /// * `data`  - What arrived.
+    ///
+    /// # Returns
+    ///
+    /// What to send on, or `None`, meaning "nothing to send yet", which is
+    /// the ordinary answer from a function waiting for the rest of its
+    /// inputs, and from one that decided nothing needs to change.
+    ///
+    /// # Errors
+    ///
+    /// A message saying why `data` is a datum the function cannot use,
+    /// which is reported rather than guessed at.
     fn give(
         &mut self,
         input: Option<&str>,
         data: &[u8],
     ) -> Result<Option<Out>, String>;
 
-    /// Set one of this function's parameters, as a command from the ground
+    /// Sets one of this function's parameters, as a command from the ground
     /// does.
     ///
     /// A setpoint arrives this way, and the value is text as everything on a
@@ -142,6 +167,20 @@ pub trait Function: Send {
     /// checking refuses one naming an attribute its node will not accept. This
     /// is where that promise is kept: an attribute no function accepts is
     /// refused here however it was reached.
+    ///
+    /// # Arguments
+    ///
+    /// * `attribute` - The parameter's name.
+    /// * `_value`    - Its new value, as text.
+    ///
+    /// # Returns
+    ///
+    /// Nothing, once the parameter is set.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the function and `attribute` if the function has
+    /// no such parameter, or saying why `_value` is not one it can take.
     fn set(&mut self, attribute: &str, _value: &[u8]) -> Result<(), String> {
         Err(format!(
             "{} has nothing called \"{attribute}\" to set, and takes no \
@@ -171,15 +210,35 @@ pub trait Function: Send {
         None
     }
 
-    /// What this function is called, for a complaint to name.
+    /// Names this function, for a complaint to name.
+    ///
+    /// # Returns
+    ///
+    /// The function's name.
     fn name(&self) -> &'static str;
 }
 
-/// Build the function a node's configuration asks for.
+/// Builds the function a node's configuration asks for.
 ///
-/// `inputs` is what the routing found bound to this node, which a function
-/// over several of them needs: a vote cannot know it is waiting for three
-/// until something tells it how many links arrive.
+/// # Arguments
+///
+/// * `node`    - The compute node, whose attributes say which function.
+/// * `inputs`  - What the routing found bound to this node, which a function
+///               over several of them needs: a vote cannot know it is
+///               waiting for three until something tells it how many links
+///               arrive.
+/// * `abandon` - The node's own wakeup, which a `process` gives up its wait
+///               for an answer on when the node is disabled.
+///
+/// # Returns
+///
+/// The function, a `process`'s program already started.
+///
+/// # Errors
+///
+/// A message naming the node if its attributes are wrong, a vote's
+/// declared inputs are not the ones bound to it, or a `process`'s program
+/// cannot be started.
 pub fn make(
     node: &Node,
     inputs: &[&str],
@@ -300,7 +359,18 @@ mod tests {
             },
         );
 
-        /// One pass: three readings in, a decision out if there is one.
+        /// Runs one pass: three readings in, a decision out if there is one.
+        ///
+        /// # Arguments
+        ///
+        /// * `converters` - The three sensors' conversions.
+        /// * `voted`      - The vote over them.
+        /// * `thermostat` - The hysteresis the vote feeds.
+        /// * `counts`     - The three sensors' raw counts.
+        ///
+        /// # Returns
+        ///
+        /// The thermostat's decision, or `None` if it made none.
         fn pass(
             converters: &mut [to_kelvin::ToKelvin; 3],
             voted: &mut vote::Vote,

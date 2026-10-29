@@ -9,19 +9,71 @@ use tcslibgs::{
 
 /// Connection to the spacecraft
 pub trait Connection: Send {
-    /// Send a command to the spacecraft
+    /// Sends a command to the spacecraft.
+    ///
+    /// # Arguments
+    ///
+    /// * `command` - The command to pack and send.
+    ///
+    /// # Returns
+    ///
+    /// Nothing, once the command has gone.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Io` if the datagram cannot be sent.
     fn send(&mut self, command: &Command) -> TcsResult<()>;
 
-    /// Receive telemetry from the spacecraft
+    /// Waits, without limit, for the spacecraft's next answer.
+    ///
+    /// # Returns
+    ///
+    /// The telemetry the spacecraft sent.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Io` if the socket fails, or the error from reading an
+    /// answer that is not one of the link's packets.
     fn receive(&mut self) -> TcsResult<Telemetry>;
 
-    /// Receive telemetry with a timeout
+    /// Waits for the spacecraft's next answer, for at most `timeout`.
+    ///
+    /// # Arguments
+    ///
+    /// * `timeout` - How long to wait for the answer in all.
+    ///
+    /// # Returns
+    ///
+    /// The telemetry the spacecraft sent.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Io` if the socket fails or nothing answers in time, or
+    /// the error from reading an answer that is not one of the link's
+    /// packets.
     fn receive_timeout(&mut self, timeout: Duration) -> TcsResult<Telemetry>;
 
-    /// Check if there is data available to read
+    /// Tells whether a datagram is waiting to be read, without reading it.
+    ///
+    /// # Returns
+    ///
+    /// `true` if a datagram is waiting.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Io` if the socket cannot be looked at.
     fn has_data(&self) -> TcsResult<bool>;
 
-    /// Close the connection
+    /// Closes the connection.
+    ///
+    /// # Returns
+    ///
+    /// Nothing, once it is closed.
+    ///
+    /// # Errors
+    ///
+    /// Whatever the connection's kind may fail with in closing; a UDP
+    /// connection never fails.
     fn close(&mut self) -> TcsResult<()>;
 }
 
@@ -37,7 +89,23 @@ pub struct UdpConnection {
 }
 
 impl UdpConnection {
-    /// Create a new UDP connection
+    /// Creates a UDP connection to the spacecraft.
+    ///
+    /// # Arguments
+    ///
+    /// * `local_addr`  - The `host:port` this end binds.
+    /// * `remote_addr` - The `host:port` of the spacecraft's command
+    ///                   socket, which commands go to and answers must
+    ///                   come from.
+    ///
+    /// # Returns
+    ///
+    /// The connection, blocking on reads.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Io` if `local_addr` cannot be bound, and
+    /// `TcsError::Config` if `remote_addr` is not a socket address.
     pub fn new(local_addr: &str, remote_addr: &str) -> TcsResult<Self> {
         let socket = UdpSocket::bind(local_addr)?;
         let remote: SocketAddr = remote_addr.parse().map_err(|e| {
@@ -93,7 +161,18 @@ impl UdpConnection {
     /// asked for, or a command would hang on traffic that has nothing to do
     /// with it.
     ///
-    /// An answer that is not one of this link's packets is an error saying
+    /// # Arguments
+    ///
+    /// * `deadline` - When to give up waiting, or `None` to wait for ever.
+    ///
+    /// # Returns
+    ///
+    /// The answer.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Io` if the socket fails or the deadline passes. An
+    /// answer that is not one of this link's packets is an error saying
     /// so: it came from where the command went, so it is the answer, and
     /// it cannot be read.
     fn answer(&mut self, deadline: Option<Instant>) -> TcsResult<Telemetry> {

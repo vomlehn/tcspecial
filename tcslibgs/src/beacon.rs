@@ -80,8 +80,18 @@ pub struct Beacon {
 }
 
 impl Beacon {
-    /// A beacon with no commanded restart under way, speaking the interface
-    /// this build was generated from.
+    /// Makes a beacon with no commanded restart under way, speaking the
+    /// interface this build was generated from.
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence` - Which beacon this is, counted from one.
+    /// * `version`  - The version of the build that sends it.
+    /// * `digest`   - The digest of the configuration the sender read.
+    ///
+    /// # Returns
+    ///
+    /// The beacon, with `commanded_restart` clear.
     pub fn new(
         sequence: u32,
         version: ConfigVersion,
@@ -96,7 +106,16 @@ impl Beacon {
         }
     }
 
-    /// This beacon, saying whether a commanded restart is under way.
+    /// Says whether a commanded restart is under way.
+    ///
+    /// # Arguments
+    ///
+    /// * `commanded_restart` - Whether an armed RESTART has been taken and no
+    ///                         Connect has followed it.
+    ///
+    /// # Returns
+    ///
+    /// This beacon, with `commanded_restart` set to the value given.
     pub fn commanded_restart(self, commanded_restart: bool) -> Self {
         Self {
             commanded_restart,
@@ -104,13 +123,27 @@ impl Beacon {
         }
     }
 
-    /// The beacon a datagram holds, or why it holds none.
+    /// Reads the beacon a datagram holds.
     ///
     /// A datagram must be a beacon and nothing else, field for field: one
     /// that is longer, is not text, has another number of fields or a
     /// field out of its form is refused rather than read as far as it goes,
     /// so that something else sending to the beacon port is seen for what
     /// it is. Allocates nothing.
+    ///
+    /// # Arguments
+    ///
+    /// * `datagram` - The datagram received on the beacon port.
+    ///
+    /// # Returns
+    ///
+    /// The beacon it holds.
+    ///
+    /// # Errors
+    ///
+    /// [`BeaconError::Length`] if the datagram is longer than
+    /// [`BEACON_BYTES`], and [`BeaconError::Field`] if it is not text or a
+    /// field is not what a beacon says.
     pub fn read(datagram: &[u8]) -> Result<Beacon, BeaconError> {
         if datagram.len() > BEACON_BYTES {
             return Err(BeaconError::Length(datagram.len()));
@@ -163,8 +196,16 @@ impl Beacon {
     }
 }
 
-/// A version written `major.minor.patch`, each part decimal digits that fit
-/// a byte, and nothing else.
+/// Reads a version written `major.minor.patch`, each part decimal digits
+/// that fit a byte, and nothing else.
+///
+/// # Arguments
+///
+/// * `text` - The version.
+///
+/// # Returns
+///
+/// The version, or `None` where the text is not one.
 fn version_of(text: &str) -> Option<ConfigVersion> {
     let mut parts = text.split('.');
     let mut part = || -> Option<u8> {
@@ -179,8 +220,16 @@ fn version_of(text: &str) -> Option<ConfigVersion> {
     parts.next().is_none().then_some(version)
 }
 
-/// A number written in decimal digits, and nothing else -- no sign, no
+/// Reads a number written in decimal digits, and nothing else -- no sign, no
 /// space -- that fits 32 bits.
+///
+/// # Arguments
+///
+/// * `text` - The digits.
+///
+/// # Returns
+///
+/// The number, or `None` where the text is not that.
 fn decimal_of(text: &str) -> Option<u32> {
     if text.is_empty() || !text.bytes().all(|b| b.is_ascii_digit()) {
         return None;
@@ -188,8 +237,16 @@ fn decimal_of(text: &str) -> Option<u32> {
     text.parse().ok()
 }
 
-/// Sixteen bytes written as thirty-two lower-case hex digits, as the
+/// Reads sixteen bytes written as thirty-two lower-case hex digits, as the
 /// digests' own `Display` writes them.
+///
+/// # Arguments
+///
+/// * `text` - The digits.
+///
+/// # Returns
+///
+/// The bytes, or `None` where the text is not that.
 fn hex_of(text: &str) -> Option<[u8; 16]> {
     let text = text.as_bytes();
     if text.len() != 32 {
@@ -217,13 +274,26 @@ pub struct BeaconPacker {
 }
 
 impl BeaconPacker {
+    /// Makes a packer, with its buffer and packet, ready to pack beacons.
+    ///
+    /// # Returns
+    ///
+    /// The packer.
     pub fn new() -> Self {
         Self {
             buffer: [0u8; BEACON_BYTES],
         }
     }
 
-    /// `beacon`, written: its text, in the packer's own buffer.
+    /// Writes `beacon`: its text, in the packer's own buffer.
+    ///
+    /// # Arguments
+    ///
+    /// * `beacon` - The beacon to write.
+    ///
+    /// # Returns
+    ///
+    /// The beacon's text, in the packer's buffer, good until the next call.
     pub fn pack(&mut self, beacon: &Beacon) -> &[u8] {
         let mut out = Cursor {
             buffer: &mut self.buffer,
@@ -312,6 +382,11 @@ mod tests {
         ConfigVersion::of_text("1.2.3").expect("1.2.3 is a version")
     }
 
+    /// Gives the digest the tests' beacons carry.
+    ///
+    /// # Returns
+    ///
+    /// A fixed, recognizable digest.
     fn digest() -> ConfigDigest {
         ConfigDigest([
             0xd4, 0x1d, 0x8c, 0xd9, 0x8f, 0x00, 0xb2, 0x04, 0xe9, 0x80, 0x09,

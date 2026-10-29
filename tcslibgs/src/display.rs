@@ -30,20 +30,29 @@ pub enum Edge {
     Bottom,
 }
 
-/// Where to put a window of `window_height` physical pixels on a display
-/// `screen_height` tall.
+/// Works out where to put a window on a display.
 ///
 /// Physical pixels, because that is what a window reports its size in and
 /// what a position is read in: going through logical pixels would mean
 /// knowing the scale factor, which is the display's business and not this
 /// program's.
 ///
-/// `None` when the display's height is unknown -- then nothing is asked for,
-/// rather than a position guessed at from a height nobody measured.
-///
 /// A window taller than the display sits at the top whichever edge it asked
 /// for: there is no position that shows the bottom of it, and the top is
 /// where its name and its controls are.
+///
+/// # Arguments
+///
+/// * `edge`          - Which edge of the display the window asks for.
+/// * `screen_height` - The display's height in physical pixels, `None` when
+///                     it is unknown.
+/// * `window_height` - The window's height in physical pixels.
+///
+/// # Returns
+///
+/// The window's top edge, in physical pixels from the top of the display.
+/// `None` when the display's height is unknown -- then nothing is asked for,
+/// rather than a position guessed at from a height nobody measured.
 pub fn top_of(
     edge: Edge,
     screen_height: Option<u32>,
@@ -76,6 +85,11 @@ pub fn top_of(
 /// which one the windows are on -- nothing here can know that -- and the
 /// tallest is the one that makes a window asking for the bottom land on the
 /// display rather than above it.
+///
+/// # Returns
+///
+/// The height of the tallest connected output, in physical pixels, or
+/// `None` if no connected output says how tall it is.
 pub fn screen_height() -> Option<u32> {
     let mut tallest = None;
 

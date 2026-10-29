@@ -91,11 +91,34 @@ pub fn contact_made(was: Contact, now: Contact) -> bool {
 pub struct BeaconReceive;
 
 impl BeaconReceive {
-    /// Start watching, and return nothing where the socket cannot be bound.
+    /// Starts watching, on a thread of its own, and returns nothing where
+    /// the socket cannot be bound.
     ///
     /// A ground station that cannot bind where beacons arrive is a ground
     /// station that will never hear one, which is said here rather than left
     /// to look like a spacecraft that is not beaconing.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui_weak`  - The window each pass's reading and the hold are shown
+    ///                in.
+    /// * `link`     - Where the beacons arrive.
+    /// * `schedule` - How often beacons are expected, and so when one is
+    ///                late.
+    /// * `decided`  - The contact flag each pass writes and the hold each
+    ///                beacon is handed to.
+    /// * `expected` - The digest of the configuration this MOC read, which
+    ///                each beacon's is compared with; `None` compares
+    ///                nothing.
+    /// * `ask`      - Asks the operator whether to continue when the beacons
+    ///                announce a configuration that differs; `None` only
+    ///                says so on the console.
+    /// * `contacts` - What to do as contact is lost and as it is made.
+    ///
+    /// # Returns
+    ///
+    /// The watch, or `None` if the beacon socket could not be bound, which
+    /// is said on standard error.
     pub fn new(
         ui_weak: Weak<MainWindow>,
         link: Link,
@@ -187,6 +210,11 @@ impl BeaconReceive {
 /// All three at once, from the one reading of what the last beacon was: a
 /// colour that said beacons were arriving beside a time that said none had
 /// would be two answers to one question.
+///
+/// # Arguments
+///
+/// * `ui`    - The window.
+/// * `shown` - What the panel is to show.
 pub(crate) fn show_beacon(ui: &MainWindow, shown: &Shown) {
     ui.set_indicator_color(shown.indicator);
     ui.set_beacon_restart(SharedString::from(shown.restart));

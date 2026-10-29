@@ -36,8 +36,15 @@ class BeaconError(ValueError):
 
 
 def _decimal(text):
-    """A number written in decimal digits and nothing else, that fits 32
-    bits, or ``None``."""
+    """Reads a number written in decimal digits and nothing else.
+
+    Args:
+        text: The digits.
+
+    Returns:
+        The number, or ``None`` where the text is not digits or the number
+        does not fit 32 bits.
+    """
     if not text or not all("0" <= c <= "9" for c in text):
         return None
     number = int(text)
@@ -45,16 +52,29 @@ def _decimal(text):
 
 
 def _hex(text):
-    """Sixteen bytes written as thirty-two lower-case hex digits, or
-    ``None``."""
+    """Reads sixteen bytes written as thirty-two lower-case hex digits.
+
+    Args:
+        text: The digits.
+
+    Returns:
+        The bytes, or ``None`` where the text is not that.
+    """
     if len(text) != 32 or not set(text) <= _HEX:
         return None
     return bytes.fromhex(text)
 
 
 def _version(text):
-    """A version written ``major.minor.patch``, each part decimal digits
-    that fit a byte, or ``None``."""
+    """Reads a version written ``major.minor.patch``.
+
+    Args:
+        text: The version, each part decimal digits that fit a byte.
+
+    Returns:
+        The major, minor and patch numbers, or ``None`` where the text is
+        not a version.
+    """
     parts = text.split(".")
     if len(parts) != 3:
         return None
@@ -65,6 +85,14 @@ def _version(text):
 
 
 def _refused(why):
+    """Says that a datagram is not a beacon.
+
+    Args:
+        why: The first thing wrong with it.
+
+    Returns:
+        The :class:`BeaconError` to raise.
+    """
     return BeaconError(
         f"not a beacon ({why}): something other than tcspecial, or a "
         "tcspecial of another layout, is sending to the beacon port"
@@ -96,10 +124,20 @@ class Beacon:
 
     @staticmethod
     def read(datagram):
-        """The beacon a datagram holds, or ``BeaconError`` saying why it holds
-        none. A datagram that is longer than a beacon, is not text, or has a
-        field out of its form is refused rather than read as far as it
-        goes."""
+        """The beacon a datagram holds.
+
+        A datagram that is longer than a beacon, is not text, or has a field
+        out of its form is refused rather than read as far as it goes.
+
+        Args:
+            datagram: The bytes that arrived on the beacon link.
+
+        Returns:
+            The :class:`Beacon`.
+
+        Raises:
+            BeaconError: The datagram holds no beacon; the message says why.
+        """
         if len(datagram) > BEACON_BYTES:
             raise BeaconError(
                 f"{len(datagram)} bytes, where a beacon is at most "
@@ -140,7 +178,11 @@ class Beacon:
         )
 
     def to_bytes(self):
-        """This beacon as it goes on the link."""
+        """This beacon as it goes on the link.
+
+        Returns:
+            The beacon packed as tcspecial packs it, ``BEACON_BYTES`` long.
+        """
         major, minor, patch = self.version
         flag = RESTART_FLAG if self.commanded_restart else NORMAL_FLAG
         return (

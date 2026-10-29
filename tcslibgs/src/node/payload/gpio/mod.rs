@@ -99,7 +99,19 @@ pub enum Direction {
 }
 
 impl Direction {
-    /// The direction this word asks for.
+    /// Reads the direction a `direction` attribute asks for.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The word as the file wrote it, in lower case.
+    ///
+    /// # Returns
+    ///
+    /// The direction.
+    ///
+    /// # Errors
+    ///
+    /// A message for a word that is neither `input` nor `output`.
     pub fn of(name: &str) -> Result<Direction, String> {
         match name {
             "input" => Ok(Direction::Input),
@@ -158,11 +170,25 @@ fn length_of_time(
         .map_err(|why| bad(name, &format!("{term}: {why}")))
 }
 
-/// Read a list of line offsets as a file writes one: `0, 1, 5` or `0 1 5`.
+/// Reads a list of line offsets as a file writes one: `0, 1, 5` or `0 1 5`.
 ///
 /// Commas or spaces, decimal or hexadecimal, because a file written for a
 /// board commonly copies the offsets out of a schematic in whichever form the
 /// schematic used.
+///
+/// # Arguments
+///
+/// * `name`   - The node's name, for the messages.
+/// * `stated` - The `lines` attribute as the file wrote it.
+///
+/// # Returns
+///
+/// The offsets, in the order given.
+///
+/// # Errors
+///
+/// An offset that is not a whole number or is named twice, and a list that
+/// names no line or more than `MOST_LINES`.
 pub fn lines_of(name: &str, stated: &Scalar) -> EndpointConfigResult<Vec<u32>> {
     let mut lines = Vec::new();
 
@@ -205,7 +231,22 @@ pub fn lines_of(name: &str, stated: &Scalar) -> EndpointConfigResult<Vec<u32>> {
     Ok(lines)
 }
 
-/// What a GPIO payload says about its lines, and what it must say.
+/// Reads what a GPIO payload says about its lines, and what it must say.
+///
+/// # Arguments
+///
+/// * `name` - The node's name, for the messages.
+/// * `g`    - The node's terms as the file states them.
+///
+/// # Returns
+///
+/// The lines, their direction, and how inputs are watched.
+///
+/// # Errors
+///
+/// A term that does not belong to GPIO, a `stream`, a missing or bad
+/// `lines`, a value that does not read, a watching term on output lines,
+/// and input lines watched for no edge and reported at no interval.
 pub(crate) fn group_kind_of(
     name: &str,
     g: LinkTerms,
@@ -336,12 +377,21 @@ pub(crate) fn group_kind_of(
 const TO_STAND_IN: &str =
     "point path at the gpio-sim chip, which bin/mkgpio makes";
 
-/// Whether the chip at `path` belongs to the kernel's `gpio-sim`, from where
+/// Judges whether a GPIO chip belongs to the kernel's `gpio-sim`, from where
 /// the kernel puts it. See [`crate::simulate`].
 ///
 /// A simulated chip is a child of a `gpio-sim.<n>` platform device, and a
 /// real one the child of whatever controller it is on; the chip's number is
 /// given out as chips appear and says nothing.
+///
+/// # Arguments
+///
+/// * `host` - The host, whose `/sys` is read.
+/// * `path` - The chip's device path, such as `/dev/gpiochip0`.
+///
+/// # Returns
+///
+/// The judgement, with what to change if it is not a stand-in.
 pub fn judged(
     host: &crate::simulate::Host,
     path: &str,
@@ -352,7 +402,17 @@ pub fn judged(
     }
 }
 
-/// The judgement of a chip whose kernel directory is `device`.
+/// Judges a chip by where its kernel directory is.
+///
+/// # Arguments
+///
+/// * `path`   - The chip's device path, for the messages.
+/// * `device` - Its kernel directory, with links resolved.
+///
+/// # Returns
+///
+/// A stand-in when the directory is under a `gpio-sim` device, and hardware
+/// otherwise.
 fn chip_judged(
     path: &str,
     device: &std::path::Path,
@@ -410,6 +470,19 @@ mod stand_in_tests {
 mod tests {
     use super::*;
 
+    /// Makes terms as a file states them, with everything else absent.
+    ///
+    /// # Arguments
+    ///
+    /// * `stated` - Each term stated, with its value as written.
+    ///
+    /// # Returns
+    ///
+    /// The terms.
+    ///
+    /// # Panics
+    ///
+    /// If a term is not one of GPIO's or `datarate`.
     fn terms(stated: &[(&str, &str)]) -> LinkTerms {
         let mut g = LinkTerms::default();
         for (field, value) in stated {
@@ -428,6 +501,19 @@ mod tests {
         g
     }
 
+    /// Reads the lines a node named `discretes` states.
+    ///
+    /// # Arguments
+    ///
+    /// * `stated` - Each term stated, with its value as written.
+    ///
+    /// # Returns
+    ///
+    /// The lines' parameters.
+    ///
+    /// # Panics
+    ///
+    /// If the terms are refused, or are not GPIO lines.
     fn params(stated: &[(&str, &str)]) -> GpioParams {
         match group_kind_of("discretes", terms(stated)).expect("lines") {
             GroupKind::Gpio(gpio) => gpio,

@@ -82,6 +82,10 @@ pub struct Kept {
 /// `None` where neither `XDG_STATE_HOME` nor `HOME` says: an editor with
 /// nowhere to put a history still edits, and what is lost is undo across a
 /// crash. Saying so would be saying it to somebody who cannot act on it.
+///
+/// # Returns
+///
+/// The directory, or `None` where the environment does not say.
 pub fn state_dir() -> Option<PathBuf> {
     // Under test, a directory of this process's own, whatever the environment
     // says. The editor writes a history on every edit, so a test run that used
@@ -109,6 +113,15 @@ pub fn state_dir() -> Option<PathBuf> {
 ///
 /// An `XDG_STATE_HOME` that is not absolute is ignored rather than resolved,
 /// which is what the specification says to do with a relative one.
+///
+/// # Arguments
+///
+/// * `xdg`  - The value of `XDG_STATE_HOME`, if it is set.
+/// * `home` - The value of `HOME`, if it is set.
+///
+/// # Returns
+///
+/// The state directory, or `None` where neither says.
 fn said_by(
     xdg: Option<std::ffi::OsString>,
     home: Option<std::ffi::OsString>,
@@ -137,6 +150,16 @@ pub fn journal_for(configuration: &Path) -> Option<PathBuf> {
 /// it for every other test in the process, and the editor writes a history on
 /// every edit, so the tests would be writing into each other's directories as
 /// they were being deleted.
+///
+/// # Arguments
+///
+/// * `directory`     - The state directory.
+/// * `configuration` - The configuration's path, relative or absolute.
+///
+/// # Returns
+///
+/// The history file: the configuration's stem with anything not alphanumeric,
+/// `-` or `_` made `_`, and a digest of its absolute path.
 pub fn journal_in(directory: &Path, configuration: &Path) -> PathBuf {
     let whole = absolute(configuration);
     let stem = whole
@@ -165,6 +188,15 @@ pub fn journal_in(directory: &Path, configuration: &Path) -> PathBuf {
 /// configuration and must find one history. Not canonicalised, which would
 /// ask the disk and fail for a configuration that does not exist yet -- which
 /// is exactly the case of a new one.
+///
+/// # Arguments
+///
+/// * `path` - The configuration's path, relative to the working directory or
+///            absolute.
+///
+/// # Returns
+///
+/// The absolute path, with `.` and `..` resolved by the text alone.
 fn absolute(path: &Path) -> PathBuf {
     let whole = if path.is_absolute() {
         path.to_path_buf()
@@ -203,6 +235,14 @@ fn absolute(path: &Path) -> PathBuf {
 ///
 /// Written out rather than taken from the standard library on purpose: see the
 /// module comment. It has to give the same answer next year.
+///
+/// # Arguments
+///
+/// * `path` - The path to digest.
+///
+/// # Returns
+///
+/// The 64-bit FNV-1a hash of the path's text.
 fn digest(path: &Path) -> u64 {
     let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
     for byte in path.as_os_str().to_string_lossy().as_bytes() {
@@ -212,7 +252,7 @@ fn digest(path: &Path) -> u64 {
     hash
 }
 
-/// Read this configuration's history, where there is one.
+/// Reads this configuration's history, where there is one.
 ///
 /// `None` for every way of not having one, and none of them is worth a word to
 /// the person at the keyboard: no state directory, no file, a file that cannot
@@ -225,6 +265,15 @@ pub fn read(configuration: &Path) -> Option<Journal> {
 }
 
 /// The same, in a directory given rather than found.
+///
+/// # Arguments
+///
+/// * `directory`     - The state directory.
+/// * `configuration` - The configuration whose history is wanted.
+///
+/// # Returns
+///
+/// The journal, or `None` if there is no history for this configuration.
 pub fn read_in(directory: &Path, configuration: &Path) -> Option<Journal> {
     let text =
         std::fs::read_to_string(journal_in(directory, configuration)).ok()?;
@@ -232,10 +281,19 @@ pub fn read_in(directory: &Path, configuration: &Path) -> Option<Journal> {
     (kept.configuration == absolute(configuration)).then_some(kept.journal)
 }
 
-/// Write this configuration's history, or say what stopped it.
+/// Writes this configuration's history, or says what stopped it.
 ///
 /// The directory is made if it is not there, this being the first thing to use
 /// it.
+///
+/// # Arguments
+///
+/// * `configuration` - The configuration the history is of.
+/// * `journal`       - The history.
+///
+/// # Errors
+///
+/// A message if there is no state directory, or as for [`write_in`].
 pub fn write(configuration: &Path, journal: &Journal) -> Result<(), String> {
     let Some(directory) = state_dir() else {
         return Err(
@@ -248,6 +306,17 @@ pub fn write(configuration: &Path, journal: &Journal) -> Result<(), String> {
 }
 
 /// The same, in a directory given rather than found.
+///
+/// # Arguments
+///
+/// * `directory`     - The state directory, made if it is not there.
+/// * `configuration` - The configuration the history is of.
+/// * `journal`       - The history.
+///
+/// # Errors
+///
+/// A message if the directory cannot be made, the history cannot be serialised,
+/// or the file cannot be written.
 pub fn write_in(
     directory: &Path,
     configuration: &Path,
@@ -268,7 +337,7 @@ pub fn write_in(
         .map_err(|why| why.to_string())
 }
 
-/// Throw this configuration's history away.
+/// Throws this configuration's history away.
 ///
 /// For a clean exit. Nothing is said about a failure: the session is over, the
 /// configuration is written, and a message nobody will read is a message.
@@ -283,7 +352,7 @@ pub fn forget_in(directory: &Path, configuration: &Path) {
     let _ = std::fs::remove_file(journal_in(directory, configuration));
 }
 
-/// Delete the histories that have outlived their use.
+/// Deletes the histories that have outlived their use.
 ///
 /// Two kinds, and the second is the one nothing else would do: a history older
 /// than a week, and one whose configuration is no longer where it was. A
@@ -291,8 +360,16 @@ pub fn forget_in(directory: &Path, configuration: &Path) {
 /// editor is the only thing that would ever notice its history was left
 /// behind.
 ///
-/// Returns how many went, which is what a caller would log. Silent about
-/// failures for the reason [`forget`] is: nobody can act on them.
+/// Silent about failures for the reason [`forget`] is: nobody can act on
+/// them.
+///
+/// # Arguments
+///
+/// * `now` - The time to measure a history's age from.
+///
+/// # Returns
+///
+/// How many histories were deleted, which is what a caller would log.
 pub fn prune(now: SystemTime) -> usize {
     match state_dir() {
         Some(directory) => prune_in(&directory, now),
@@ -301,6 +378,15 @@ pub fn prune(now: SystemTime) -> usize {
 }
 
 /// The same, in a directory given rather than found.
+///
+/// # Arguments
+///
+/// * `directory` - The state directory.
+/// * `now`       - The time to measure a history's age from.
+///
+/// # Returns
+///
+/// How many histories were deleted.
 pub fn prune_in(directory: &Path, now: SystemTime) -> usize {
     let Ok(entries) = std::fs::read_dir(directory) else {
         return 0;

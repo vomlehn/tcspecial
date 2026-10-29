@@ -23,7 +23,15 @@ fn entries(dir: &Path) -> impl Iterator<Item = PathBuf> {
         .map(|entry| entry.expect("a readable directory entry").path())
 }
 
-/// Every file of every example directory with the given extension.
+/// Finds every file of every example directory with the given extension.
+///
+/// # Arguments
+///
+/// * `extension` - The extension, without its dot.
+///
+/// # Returns
+///
+/// The files' paths, sorted.
 fn example_files(extension: &str) -> Vec<PathBuf> {
     let mut files: Vec<PathBuf> = entries(&examples_dir())
         .filter(|path| path.is_dir())
@@ -271,7 +279,20 @@ fn every_node_in_the_manual_verifies() {
     );
 }
 
-/// One top-level section of a YAML file, its key line included.
+/// Cuts one top-level section out of a YAML file, its key line included.
+///
+/// # Arguments
+///
+/// * `yaml` - The file's text.
+/// * `key`  - The section's key.
+///
+/// # Returns
+///
+/// The section's lines, each ending in a newline.
+///
+/// # Panics
+///
+/// If there is no such section.
 fn top_level_section(yaml: &str, key: &str) -> String {
     let mut lines = yaml.lines().skip_while(|l| *l != format!("{key}:"));
     let mut section: String =
@@ -284,8 +305,16 @@ fn top_level_section(yaml: &str, key: &str) -> String {
     section
 }
 
-/// Each `.. code-block:: yaml` of an RST text, unindented, with the line its
-/// body starts on.
+/// Finds each `.. code-block:: yaml` of an RST text.
+///
+/// # Arguments
+///
+/// * `text` - The RST text.
+///
+/// # Returns
+///
+/// Each block's body, unindented and ending in one newline, with the line
+/// it starts on, from 1.
 fn yaml_blocks(text: &str) -> Vec<(usize, String)> {
     let lines: Vec<&str> = text.lines().collect();
     let indent = |l: &str| l.len() - l.trim_start().len();

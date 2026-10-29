@@ -34,7 +34,15 @@ pub enum AddressFamily {
 }
 
 impl AddressFamily {
-    /// Convert from OS-specific value to canonical value
+    /// Converts from the OS's address family number to the canonical value.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The OS's `AF_*` number.
+    ///
+    /// # Returns
+    ///
+    /// The address family, or `None` for a number this does not know.
     pub fn from_os(value: i32) -> Option<Self> {
         match value {
             libc::AF_UNIX => Some(AddressFamily::Unix),
@@ -63,7 +71,11 @@ impl AddressFamily {
         }
     }
 
-    /// Convert from canonical value to OS-specific value
+    /// Converts from the canonical value to the OS's address family number.
+    ///
+    /// # Returns
+    ///
+    /// The OS's `AF_*` number.
     pub fn to_os(&self) -> i32 {
         match self {
             AddressFamily::Unix => libc::AF_UNIX,
@@ -103,7 +115,15 @@ pub enum SocketType {
 }
 
 impl SocketType {
-    /// Convert from OS-specific value to canonical value
+    /// Converts from the OS's socket type number to the canonical value.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The OS's `SOCK_*` number.
+    ///
+    /// # Returns
+    ///
+    /// The socket type, or `None` for a number this does not know.
     pub fn from_os(value: i32) -> Option<Self> {
         match value {
             libc::SOCK_STREAM => Some(SocketType::Stream),
@@ -114,7 +134,11 @@ impl SocketType {
         }
     }
 
-    /// Convert from canonical value to OS-specific value
+    /// Converts from the canonical value to the OS's socket type number.
+    ///
+    /// # Returns
+    ///
+    /// The OS's `SOCK_*` number.
     pub fn to_os(&self) -> i32 {
         match self {
             SocketType::Stream => libc::SOCK_STREAM,
@@ -144,6 +168,11 @@ pub struct SocketConfig {
 }
 
 impl SocketConfig {
+    /// Gives the socket configuration for TCP over IPv4.
+    ///
+    /// # Returns
+    ///
+    /// The configuration, with the family's default protocol.
     pub fn tcp_v4() -> Self {
         Self {
             family: AddressFamily::Inet,
@@ -152,6 +181,11 @@ impl SocketConfig {
         }
     }
 
+    /// Gives the socket configuration for UDP over IPv4.
+    ///
+    /// # Returns
+    ///
+    /// The configuration, with the family's default protocol.
     pub fn udp_v4() -> Self {
         Self {
             family: AddressFamily::Inet,
@@ -160,6 +194,11 @@ impl SocketConfig {
         }
     }
 
+    /// Gives the socket configuration for TCP over IPv6.
+    ///
+    /// # Returns
+    ///
+    /// The configuration, with the family's default protocol.
     pub fn tcp_v6() -> Self {
         Self {
             family: AddressFamily::Inet6,
@@ -168,6 +207,11 @@ impl SocketConfig {
         }
     }
 
+    /// Gives the socket configuration for UDP over IPv6.
+    ///
+    /// # Returns
+    ///
+    /// The configuration, with the family's default protocol.
     pub fn udp_v6() -> Self {
         Self {
             family: AddressFamily::Inet6,
@@ -176,6 +220,11 @@ impl SocketConfig {
         }
     }
 
+    /// Gives the socket configuration for a Unix-domain stream socket.
+    ///
+    /// # Returns
+    ///
+    /// The configuration, with the family's default protocol.
     pub fn unix_stream() -> Self {
         Self {
             family: AddressFamily::Unix,
@@ -184,6 +233,11 @@ impl SocketConfig {
         }
     }
 
+    /// Gives the socket configuration for a Unix-domain datagram socket.
+    ///
+    /// # Returns
+    ///
+    /// The configuration, with the family's default protocol.
     pub fn unix_dgram() -> Self {
         Self {
             family: AddressFamily::Unix,
@@ -203,6 +257,15 @@ pub struct MessageFrame {
 }
 
 impl MessageFrame {
+    /// Frames a message.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The message.
+    ///
+    /// # Returns
+    ///
+    /// The frame, its length that of `data`.
     pub fn new(data: Vec<u8>) -> Self {
         Self {
             length: data.len() as u32,
@@ -210,7 +273,11 @@ impl MessageFrame {
         }
     }
 
-    /// Serialize the frame to bytes (length prefix + data)
+    /// Serializes the frame to bytes.
+    ///
+    /// # Returns
+    ///
+    /// The length, four bytes most significant first, then the data.
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(4 + self.data.len());
         bytes.extend_from_slice(&self.length.to_be_bytes());
@@ -218,7 +285,16 @@ impl MessageFrame {
         bytes
     }
 
-    /// Deserialize a frame from bytes
+    /// Deserializes a frame from bytes.
+    ///
+    /// # Arguments
+    ///
+    /// * `bytes` - A length prefix and at least that many bytes after it;
+    ///             any more are ignored.
+    ///
+    /// # Returns
+    ///
+    /// The frame, or `None` if the bytes are shorter than the frame.
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
         if bytes.len() < 4 {
             return None;

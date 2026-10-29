@@ -22,6 +22,15 @@ fn here() -> PathBuf {
 }
 
 /// What `ping_moc.py --describe` says, as `name value` pairs.
+///
+/// # Returns
+///
+/// Each line's name and value, in the order printed.
+///
+/// # Panics
+///
+/// python3 cannot be run, the program fails, or a line is not a name and a
+/// value.
 fn described() -> Vec<(String, String)> {
     let ran = Command::new("python3")
         .arg(here().join("ping_moc.py"))
@@ -46,6 +55,15 @@ fn described() -> Vec<(String, String)> {
 }
 
 /// The Rust's answers to the same questions, from the YAML spelling.
+///
+/// # Returns
+///
+/// The beacon link, its interval in nanoseconds, the uplink, the downlink
+/// and the digest, as `ping_moc.py --describe` names them.
+///
+/// # Panics
+///
+/// The example's configuration does not read or lacks any of these.
 fn worked_out() -> Vec<(String, String)> {
     let path = here().join("ping.yaml");
     let graph = Graph::load(&path).expect("the example reads");

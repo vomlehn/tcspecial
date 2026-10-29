@@ -2,10 +2,10 @@
 //!
 //! A beacon says that tcspecial is running, which build it is, which version
 //! of a configuration it is serving and the digest of the files it read. It
-//! arrives on its own, every `beacon.default_interval`, over a socket of its own, and
-//! it keeps arriving whether or not a ground station has connected -- so it is
-//! the one thing a ground station can know about a spacecraft without having
-//! asked it anything.
+//! arrives on its own, every `beacon.default_interval`, over a socket of its
+//! own, and it keeps arriving whether or not a ground station has connected --
+//! so it is the one thing a ground station can know about a spacecraft without
+//! having asked it anything.
 //!
 //! What a ground station does with that divides in two, and this is the half
 //! that is not a window.
@@ -75,13 +75,21 @@ pub const AGING_AFTER_MISSED: u32 = 4;
 /// [`Stage::Waiting`]: the spacecraft is not being heard from.
 pub const WAITING_AFTER_MISSED: u32 = 8;
 
-/// How many beacons have gone missing since the last one arrived, `elapsed`
-/// ago, for a vehicle that beacons every `interval`: one for each interval
-/// that has passed in full, a beacon being missed once the next one is due
-/// and has not come.
+/// Counts the beacons that have gone missing since the last one arrived:
+/// one for each interval that has passed in full, a beacon being missed
+/// once the next one is due and has not come.
 ///
-/// What [`Schedule::for_interval`] counts in. Nought for an interval of
-/// nought, which is no interval to count in.
+/// What [`Schedule::for_interval`] counts in.
+///
+/// # Arguments
+///
+/// * `elapsed`  - How long ago the last beacon arrived.
+/// * `interval` - How often the vehicle beacons.
+///
+/// # Returns
+///
+/// How many are missing; nought for an interval of nought, which is no
+/// interval to count in.
 pub fn missed(elapsed: Duration, interval: Duration) -> u128 {
     if interval.is_zero() {
         return 0;
@@ -135,9 +143,13 @@ impl Stage {
         matches!(self, Stage::Heard)
     }
 
-    /// What this stage is called where a person reads it: a window's line, a
-    /// log, the documentation. The one place the four words are written, so
-    /// that every station calls a stage the same thing.
+    /// Names this stage where a person reads it: a window's line, a log, the
+    /// documentation. The one place the four words are written, so that
+    /// every station calls a stage the same thing.
+    ///
+    /// # Returns
+    ///
+    /// The stage's name, capitalized.
     pub fn label(self) -> &'static str {
         match self {
             Stage::Unheard => "Unheard",
@@ -160,7 +172,16 @@ pub enum Contact {
 }
 
 impl Contact {
-    /// The contact a stage amounts to.
+    /// Tells what contact a stage amounts to.
+    ///
+    /// # Arguments
+    ///
+    /// * `stage` - How stale the last beacon is.
+    ///
+    /// # Returns
+    ///
+    /// `Contact::Made` for a stage of contact, `Contact::Lost` for any
+    /// other.
     pub fn at(stage: Stage) -> Contact {
         if stage.in_contact() {
             Contact::Made
@@ -259,13 +280,20 @@ impl Schedule {
     /// beacon, so a blinking indicator changes twice a second at every stage
     /// and the colour alone says which stage it is.
     ///
-    /// An interval of nought is no interval to count in, and gets the
-    /// standard schedule.
-    ///
     /// The last step never ends. A schedule whose steps ran out would leave
     /// the oldest reading looking like the newest -- see [`Schedule::at`] --
     /// so the last one holds for ever, and blinks, because an indicator that
     /// has stopped changing is one an operator stops reading.
+    ///
+    /// # Arguments
+    ///
+    /// * `interval` - How often the vehicle beacons. An interval of nought
+    ///                is no interval to count in, and gets the standard
+    ///                schedule.
+    ///
+    /// # Returns
+    ///
+    /// The schedule.
     pub fn for_interval(interval: Duration) -> Schedule {
         let interval = if interval.is_zero() {
             STANDARD_INTERVAL
@@ -318,6 +346,11 @@ impl Schedule {
     /// such a stage is not part of it and there is no sense in one: these are
     /// read in order and say how stale the last beacon is, so a stage
     /// returning after an older one would be an indicator going backwards.
+    ///
+    /// # Returns
+    ///
+    /// The sum of those steps' lengths, held at the longest a duration can
+    /// be.
     pub fn while_in_contact(&self) -> Duration {
         let mut held = Duration::ZERO;
         for step in &self.steps {
@@ -333,6 +366,15 @@ impl Schedule {
     ///
     /// An age past the last step is the last step, which the standard
     /// schedule makes unreachable by not ending.
+    ///
+    /// # Arguments
+    ///
+    /// * `elapsed` - How long ago the beacon was received.
+    ///
+    /// # Returns
+    ///
+    /// The stage, whether the indicator is lit, and how long until that
+    /// changes. A schedule of no steps shows nothing heard.
     pub fn at(&self, elapsed: Duration) -> Showing {
         let mut from = Duration::ZERO;
 
@@ -386,6 +428,15 @@ impl Schedule {
     /// Nothing heard is [`Stage::Unheard`], and so is a last beacon in the
     /// future: a clock that has moved leaves an age that cannot be worked
     /// out, and that is not a reason to claim anything about the spacecraft.
+    ///
+    /// # Arguments
+    ///
+    /// * `last` - When the last beacon arrived, or `None` if none has.
+    /// * `now`  - The time now.
+    ///
+    /// # Returns
+    ///
+    /// What to show, as [`Schedule::at`] gives it.
     pub fn after(&self, last: Option<SystemTime>, now: SystemTime) -> Showing {
         let Some(last) = last else {
             return Showing::UNHEARD;
@@ -403,6 +454,15 @@ impl Schedule {
     /// a schedule that returns to a stage of contact after leaving it, which
     /// is a schedule saying the spacecraft is heard from again because time
     /// has passed. The run is what contact means.
+    ///
+    /// # Arguments
+    ///
+    /// * `elapsed` - How long ago the beacon was received.
+    ///
+    /// # Returns
+    ///
+    /// `Contact::Made` within [`Schedule::while_in_contact`] of it, and
+    /// `Contact::Lost` after.
     pub fn contact(&self, elapsed: Duration) -> Contact {
         if elapsed < self.while_in_contact() {
             Contact::Made
@@ -416,6 +476,15 @@ impl Schedule {
     /// Nothing heard is [`Contact::Lost`], and so is a last beacon in the
     /// future: an age that cannot be worked out is not a reason to claim
     /// contact.
+    ///
+    /// # Arguments
+    ///
+    /// * `last` - When the last beacon arrived, or `None` if none has.
+    /// * `now`  - The time now.
+    ///
+    /// # Returns
+    ///
+    /// Whether contact is made, as [`Schedule::contact`] says.
     pub fn contact_at(
         &self,
         last: Option<SystemTime>,
@@ -438,13 +507,21 @@ impl Schedule {
 /// not.
 pub const NO_BEACON_MESSAGE: &str = "<none>";
 
-/// When a beacon arrived, as a window shows it.
+/// Shows when a beacon arrived, as a window shows it.
 ///
 /// The time it arrived at the ground station, not a time the spacecraft put in
 /// it: what the line is read for is whether beacons are still coming, and a
 /// spacecraft whose clock had stopped would otherwise look as though its
 /// beacons had. Shown the way every other time is, by the one function that
 /// shows them.
+///
+/// # Arguments
+///
+/// * `at` - When it arrived, or `None` if none has.
+///
+/// # Returns
+///
+/// The time of day, or the placeholder for no time.
 pub fn received_at(at: Option<SystemTime>) -> String {
     match at {
         Some(at) => Timestamp::at(at).time_of_day(),
@@ -513,8 +590,18 @@ pub struct Heard {
     pub differs: Option<String>,
 }
 
-/// Read a datagram from the beacon link, comparing the digest it carries with
-/// `expected`, this station's own.
+/// Reads a datagram from the beacon link, comparing the digest it carries
+/// with this station's own.
+///
+/// # Arguments
+///
+/// * `datagram` - What arrived on the beacon link.
+/// * `expected` - This station's own configuration digest, or `None`
+///                where it has none to compare with.
+///
+/// # Returns
+///
+/// What the datagram turned out to be, and what a window shows for it.
 pub fn hear(datagram: &[u8], expected: Option<ConfigDigest>) -> Heard {
     let mut message = String::new();
     let reading = read_into(datagram, expected, &mut message);
@@ -543,6 +630,18 @@ struct Reading {
 /// [`hear`], with the message written into `message` in place of what it
 /// held: how a pass hears a beacon allocating nothing of its own. Unpacking
 /// it does allocate, and says so: see [`Beacon::read`].
+///
+/// # Arguments
+///
+/// * `datagram` - What arrived on the beacon link.
+/// * `expected` - This station's own configuration digest, or `None`
+///                where it has none to compare with.
+/// * `message`  - Where what a window shows for it is written, cleared
+///                first.
+///
+/// # Returns
+///
+/// What else was found in the datagram.
 fn read_into(
     datagram: &[u8],
     expected: Option<ConfigDigest>,
@@ -569,14 +668,23 @@ fn read_into(
     }
 }
 
-/// Whether the configuration tcspecial announces is the one this station read.
+/// Tells whether the configuration tcspecial announces is the one this
+/// station read.
 ///
-/// `theirs` is the digest tcspecial computed from the files it read and sent in
-/// its beacon; `ours` is the one this station computed from the files it read.
 /// Different digests are different configurations -- a node, an attribute or a
 /// device id that is not the same -- so what this station says about where
-/// each source's data arrives may not be where the vehicle sends it. `None`
-/// when they agree.
+/// each source's data arrives may not be where the vehicle sends it.
+///
+/// # Arguments
+///
+/// * `theirs` - The digest tcspecial computed from the files it read and
+///              sent in its beacon.
+/// * `ours`   - The one this station computed from the files it read.
+///
+/// # Returns
+///
+/// What to say of the difference, naming both digests, or `None` when they
+/// agree.
 pub fn differs(theirs: ConfigDigest, ours: ConfigDigest) -> Option<String> {
     (theirs != ours).then(|| {
         let mut why = String::new();
@@ -615,6 +723,12 @@ const UNREADABLE_SHOWN: usize = 40;
 /// What cannot be read is shown as `String::from_utf8_lossy` would show it,
 /// a replacement character for each stretch that is not UTF-8, but a
 /// character at a time, so that nothing is made to show it.
+///
+/// # Arguments
+///
+/// * `datagram` - What arrived on the beacon link.
+/// * `read`     - What reading it as a beacon came to.
+/// * `out`      - What the message is written onto the end of.
 fn write_message(
     datagram: &[u8],
     read: &Result<Beacon, BeaconError>,
@@ -661,7 +775,7 @@ pub enum Counted {
     Repeated,
 }
 
-/// What a beacon numbered `now` says about the beacons since the one
+/// Tells what a beacon numbered `now` says about the beacons since the one
 /// numbered `last`.
 ///
 /// This is what the number is for. A beacon says nothing but that the
@@ -674,6 +788,15 @@ pub enum Counted {
 /// not a beacon delayed: see "What is assumed" in `docs/design.rst`. A count
 /// that wraps would also go back, after 2^32 beacons, which at five seconds
 /// each is six centuries.
+///
+/// # Arguments
+///
+/// * `last` - The last beacon's number, or `None` for none.
+/// * `now`  - This one's.
+///
+/// # Returns
+///
+/// What happened in between.
 pub fn counted(last: Option<u32>, now: u32) -> Counted {
     match last {
         None => Counted::First,
@@ -782,6 +905,21 @@ impl Beacons {
     /// that bought any number of ground stations hearing one beacon, and cost
     /// an address that was nobody's and an interface attribute whose being
     /// wrong lost every beacon in silence.
+    ///
+    /// # Arguments
+    ///
+    /// * `link`     - Where beacons are received, and where they come from.
+    /// * `schedule` - The stages the last beacon ages through.
+    /// * `expected` - This station's own configuration digest, which every
+    ///                beacon's is compared with, or `None` for none.
+    ///
+    /// # Returns
+    ///
+    /// The socket and what it has heard, which is nothing yet.
+    ///
+    /// # Errors
+    ///
+    /// The `io::Error` from binding the link's receiving address.
     pub fn listening(
         link: Link,
         schedule: Schedule,
@@ -832,8 +970,11 @@ impl Beacons {
     /// which is reported as [`Arrived::Broken`] and says nothing about the
     /// spacecraft.
     ///
-    /// The pass is the watcher's, kept from one pass to the next and made
-    /// again in its place; a caller that wants one to keep clones it.
+    /// # Returns
+    ///
+    /// What the pass found and what to show. The pass is the watcher's,
+    /// kept from one pass to the next and made again in its place; a caller
+    /// that wants one to keep clones it.
     pub fn pass(&mut self) -> &Pass {
         self.last.remarks.clear();
         self.last.warnings.clear();
@@ -938,6 +1079,14 @@ impl Beacons {
     /// Apart from the socket so that it can be exercised without one. What it
     /// keeps is the point: a pass that found nothing still has the beacon
     /// before it to show, and so does a pass whose socket broke.
+    ///
+    /// # Arguments
+    ///
+    /// * `arrived` - What the pass found.
+    ///
+    /// # Returns
+    ///
+    /// The pass, with what to show now.
     fn after(&mut self, arrived: Arrived) -> &Pass {
         let now = SystemTime::now();
 
@@ -965,12 +1114,21 @@ impl Beacons {
     }
 }
 
-/// What to say of a restart: the beacons start again at `now`.
+/// Says what to say of a restart: the beacons start again at `now`.
 ///
 /// And which kind of restart it was. A commanded one is the ground's own
 /// doing, and may have brought other definitions; one nobody commanded is a
 /// crash or a power cycle, which the ground has to look into, and which runs
 /// with the definitions it had.
+///
+/// # Arguments
+///
+/// * `now`       - The number the beacons start again at.
+/// * `commanded` - Whether the beacon says the ground commanded the start.
+///
+/// # Returns
+///
+/// The sentence.
 fn restarted(now: u32, commanded: bool) -> String {
     let how = if commanded {
         "as commanded"
@@ -1009,8 +1167,12 @@ mod tests {
     }
     use tcslibgs::{CommandStatus, HostPort, PingTelemetry, Telemetry};
 
-    /// A schedule with one stage of contact and one without, so that a test
-    /// can tell a fresh beacon from a stale one.
+    /// Makes a schedule with one stage of contact and one without, so that a
+    /// test can tell a fresh beacon from a stale one.
+    ///
+    /// # Returns
+    ///
+    /// Four seconds heard, then waiting for ever, neither blinking.
     fn schedule() -> Schedule {
         Schedule::of(vec![
             Step {

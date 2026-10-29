@@ -41,13 +41,29 @@ pub struct UnixStreamEndpoint {
 }
 
 impl UnixStreamEndpoint {
-    /// Connect to the device's path, retrying while refused.
+    /// Connects to the device's path, retrying while refused.
     ///
     /// A refusal means nothing is listening there yet, which is the ordinary
     /// case when a handler is started before its device; see
     /// `connect_retrying`. A path with no socket at all is a different
     /// matter and is not waited out: it will not become one by being asked
     /// again.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`   - The handler's name, for the log and the error.
+    /// * `config` - The network configuration, whose address is the path
+    ///              of the device's socket.
+    ///
+    /// # Returns
+    ///
+    /// The endpoint, with a non-blocking connected stream.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Config` if the connection is still refused when
+    /// `ENDPOINT_CONNECT_BUDGET` is spent, or fails in any other way;
+    /// `TcsError::Io` if the stream cannot be made non-blocking.
     pub fn connect_retrying(
         what: &str,
         config: &NetworkConfig,
@@ -63,7 +79,15 @@ impl UnixStreamEndpoint {
         })
     }
 
-    /// A second endpoint on the same connection.
+    /// Makes a second endpoint on the same connection.
+    ///
+    /// # Returns
+    ///
+    /// The second endpoint, on a duplicate of this one's descriptor.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Io` if the descriptor cannot be duplicated.
     pub fn try_clone(&self) -> TcsResult<Self> {
         Ok(Self {
             stream: self.stream.try_clone()?,
@@ -149,7 +173,25 @@ pub struct UnixDatagramEndpoint {
 }
 
 impl UnixDatagramEndpoint {
-    /// Bind the configured path, replacing a socket nothing answers.
+    /// Binds the configured path, replacing a socket nothing answers.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`   - The handler's name, for the log and the error.
+    /// * `config` - The network configuration, whose address is the path
+    ///              to bind.
+    ///
+    /// # Returns
+    ///
+    /// The endpoint, non-blocking, with no far end learnt yet and
+    /// datagrams heard from anywhere.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Endpoint` if a live socket already has the path;
+    /// `TcsError::Config` if the bind fails; `TcsError::Io` if a dead
+    /// socket cannot be removed or the socket cannot be made
+    /// non-blocking.
     pub fn bind(what: &str, config: &NetworkConfig) -> TcsResult<Self> {
         let path = config.address.clone();
         clear_a_dead_socket(what, Path::new(&path))?;
@@ -170,8 +212,8 @@ impl UnixDatagramEndpoint {
         })
     }
 
-    /// Send where the configuration says the device is, from a socket of this
-    /// end's own.
+    /// Sends where the configuration says the device is, from a socket of
+    /// this end's own.
     ///
     /// For a node that is spoken to first -- a heater, a valve, a latch, or a
     /// sensor that is asked -- which [`UnixDatagramEndpoint::bind`] cannot
@@ -186,6 +228,22 @@ impl UnixDatagramEndpoint {
     /// has somewhere to send its answer, and nothing is left behind to be
     /// cleared up when the node goes. A device that is only driven does not
     /// answer, and is none the worse for being able to.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`   - The handler's name, for the error.
+    /// * `config` - The network configuration, whose address is the path
+    ///              the device is bound to.
+    ///
+    /// # Returns
+    ///
+    /// The endpoint, non-blocking, sending to that path and hearing only
+    /// from it.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Endpoint` if the socket cannot be made or autobound;
+    /// `TcsError::Io` if it cannot be made non-blocking.
     pub fn reaching(what: &str, config: &NetworkConfig) -> TcsResult<Self> {
         let socket = UnixDatagram::unbound()
             .and_then(|socket| autobind(&socket).map(|()| socket))
@@ -209,8 +267,17 @@ impl UnixDatagramEndpoint {
         })
     }
 
-    /// Read datagrams from this path and turn every other away, for a device
-    /// that speaks first and whose node says where from.
+    /// Reads datagrams from this path and turns every other away, for a
+    /// device that speaks first and whose node says where from.
+    ///
+    /// # Arguments
+    ///
+    /// * `what` - The handler's name, for the error.
+    /// * `from` - Where the node says the device sends from.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Config` if `from` is a host and port rather than a path.
     pub fn hear_only(&mut self, what: &str, from: &SendsFrom) -> TcsResult<()> {
         match from {
             SendsFrom::Path(path) => {
@@ -224,7 +291,16 @@ impl UnixDatagramEndpoint {
         }
     }
 
-    /// A second endpoint on the same socket, sharing what it learns.
+    /// Makes a second endpoint on the same socket, sharing what it learns.
+    ///
+    /// # Returns
+    ///
+    /// The second endpoint, on a duplicate of this one's descriptor, with
+    /// its own count of strangers starting at nought.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Io` if the descriptor cannot be duplicated.
     pub fn try_clone(&self) -> TcsResult<Self> {
         Ok(Self {
             what: self.what.clone(),
@@ -336,11 +412,19 @@ impl EndpointWritable for UnixDatagramEndpoint {
     }
 }
 
-/// Bind a socket to a name the kernel chooses in the abstract namespace.
+/// Binds a socket to a name the kernel chooses in the abstract namespace.
 ///
 /// Linux's autobind: a bind that gives the address family and no name. The
 /// name is unique, so two nodes, or two runs, never contend for one, and it
 /// is not a file, so nothing outlives the socket. std has no call for it.
+///
+/// # Arguments
+///
+/// * `socket` - The unbound socket to bind.
+///
+/// # Errors
+///
+/// What `bind` failed with.
 fn autobind(socket: &UnixDatagram) -> io::Result<()> {
     // SAFETY: an all-zero sockaddr_un is a valid value of it, and bind reads
     // only the family from it, the length given covering nothing more.
@@ -363,8 +447,8 @@ fn autobind(socket: &UnixDatagram) -> io::Result<()> {
     }
 }
 
-/// Remove a socket file nothing is listening on, so that a bind can have the
-/// path.
+/// Removes a socket file nothing is listening on, so that a bind can have
+/// the path.
 ///
 /// A Unix socket's address is a file, and it outlives the process that bound
 /// it: a handler killed rather than stopped leaves one behind, and the next
@@ -375,6 +459,16 @@ fn autobind(socket: &UnixDatagram) -> io::Result<()> {
 /// socket that answers nothing is dead and is removed. Anything else at that
 /// path is not a socket and is left for the bind to refuse, which says so
 /// better than this could.
+///
+/// # Arguments
+///
+/// * `what` - The handler's name, for the log.
+/// * `path` - The path about to be bound.
+///
+/// # Errors
+///
+/// `TcsError::Endpoint` if a live socket is at the path; `TcsError::Io`
+/// if no probe socket can be made or a dead one cannot be removed.
 fn clear_a_dead_socket(what: &str, path: &Path) -> TcsResult<()> {
     let found = match std::fs::symlink_metadata(path) {
         Ok(found) => found,
@@ -419,6 +513,15 @@ mod tests {
     use std::os::unix::net::UnixListener;
     use tcslibgs::NetworkProtocol;
 
+    /// Gives a path for a test's socket, unique to the process and thread.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - What the test calls the socket.
+    ///
+    /// # Returns
+    ///
+    /// A path in the temporary directory; nothing is made there.
     fn a_path(name: &str) -> std::path::PathBuf {
         std::env::temp_dir().join(format!(
             "tcs-unix-{name}-{}-{:?}",
@@ -427,6 +530,16 @@ mod tests {
         ))
     }
 
+    /// Gives a network configuration for a socket at a path.
+    ///
+    /// # Arguments
+    ///
+    /// * `path`     - The socket's path.
+    /// * `protocol` - The Unix stream or datagram protocol.
+    ///
+    /// # Returns
+    ///
+    /// The configuration, its port nought.
     fn config_at(path: &Path, protocol: NetworkProtocol) -> NetworkConfig {
         NetworkConfig {
             protocol,

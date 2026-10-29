@@ -14,6 +14,13 @@ use std::process::ExitCode;
 
 use tcsapp::app::{complain, AppMocVeh};
 
+/// Writes every packet of MOC data that arrives back as payload data holding
+/// the same bytes, until the interface ends.
+///
+/// # Returns
+///
+/// Success when the interface ends, failure when the interfaces are not this
+/// kind's or a packet cannot be read or written.
 fn main() -> ExitCode {
     let app = match AppMocVeh::inherited() {
         Ok(app) => app,

@@ -102,11 +102,22 @@ impl std::fmt::Display for SaveError {
 
 impl std::error::Error for SaveError {}
 
-/// Write `contents` to `path`, replacing whatever is there atomically.
+/// Writes `contents` to `path`, replacing whatever is there atomically.
 ///
 /// Returns once the new contents are durable: a reader afterwards sees them,
 /// and a power failure afterwards does not take them away. On any error the
 /// previous contents are still there -- see [`SaveError`].
+///
+/// # Arguments
+///
+/// * `path`     - The file to write. Its directory is made if it is not there.
+/// * `contents` - What the file is to hold.
+///
+/// # Errors
+///
+/// A [`SaveError`] naming the step that failed: making the directory, creating
+/// the temporary, writing or syncing it, renaming it over `path`, or syncing
+/// the directory afterwards.
 pub fn write_atomically(path: &Path, contents: &[u8]) -> Result<(), SaveError> {
     let directory = path.parent().filter(|p| !p.as_os_str().is_empty());
     let directory = match directory {
@@ -205,11 +216,19 @@ fn write_all_and_sync(file: &mut File, contents: &[u8]) -> Result<(), Attempt> {
     file.sync_all().map_err(Attempt::Sync)
 }
 
-/// Force a directory's own contents -- its list of names -- to the device.
+/// Forces a directory's own contents -- its list of names -- to the device.
 ///
 /// There is no portable way to do this through `std`: a directory cannot be
 /// opened for writing, and `File::sync_all` on a read-only handle is what is
 /// left. It works, and it is what every database does for the same reason.
+///
+/// # Arguments
+///
+/// * `directory` - The directory to sync.
+///
+/// # Errors
+///
+/// The error from opening the directory or from `fsync`.
 fn sync_directory(directory: &Path) -> std::io::Result<()> {
     let handle = File::open(directory)?;
     // SAFETY: a valid descriptor from a handle that outlives the call.
@@ -227,6 +246,14 @@ fn sync_directory(directory: &Path) -> std::io::Result<()> {
 /// not write into one temporary. They would still race for the rename, and the
 /// loser's contents would be the ones that survive -- which is the behaviour of
 /// two editors on one file everywhere, and is not something this can fix.
+///
+/// # Arguments
+///
+/// * `path` - The file the temporary will replace.
+///
+/// # Returns
+///
+/// `.<name>.tcsgui-<pid>` in the same directory as `path`.
 fn temporary_beside(path: &Path) -> PathBuf {
     let name = path
         .file_name()

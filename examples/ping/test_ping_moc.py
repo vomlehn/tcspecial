@@ -24,6 +24,12 @@ def alive(pid):
     Gone either way it can be found gone: no entry to open, or -- reaped
     between the open and the read -- an entry that answers ESRCH, which
     reading raises as ProcessLookupError.
+
+    Args:
+        pid: The process id.
+
+    Returns:
+        ``True`` while the process is there and not a zombie.
     """
     try:
         with open(f"/proc/{pid}/stat") as stat:

@@ -51,8 +51,7 @@ class palette:
 
 
 def indicator(showing, heard):
-    """What an indicator shows for a stage of staleness, ``heard`` saying
-    whether a beacon has ever arrived.
+    """What an indicator shows for a stage of staleness.
 
     Green while the spacecraft is being heard from, yellow once it is late
     enough that contact is not claimed, red once nothing is being heard, and
@@ -60,8 +59,15 @@ def indicator(showing, heard):
     a beacon has arrived the indicator has shown a colour, and wherever it
     shows none after that it is white -- the dark half of a blink, a blinking
     indicator being one colour going dark and back, and a last beacon a moved
-    clock puts in the future. ``heard`` is a pass's ``at`` having a time in
-    it, which it keeps for good once a beacon arrives.
+    clock puts in the future.
+
+    Args:
+        showing: The ``tcslib.beacon.Showing`` for the last beacon's age.
+        heard:   Whether a beacon has ever arrived: a pass's ``at`` having a
+                 time in it, which it keeps for good once a beacon arrives.
+
+    Returns:
+        The indicator's colour, as ``#rrggbb``.
     """
     dark = palette.OFF if heard else palette.UNKNOWN
     if not showing.lit:
@@ -90,7 +96,14 @@ class Shown:
 
     @staticmethod
     def of(beacon_pass):
-        """What to show for a pass of the beacon loop."""
+        """What to show for a pass of the beacon loop.
+
+        Args:
+            beacon_pass: The ``tcslib.beacon.Pass`` the loop returned.
+
+        Returns:
+            The :class:`Shown`.
+        """
         return Shown(
             indicator=indicator(
                 beacon_pass.showing, beacon_pass.at is not None
@@ -119,6 +132,10 @@ class BeaconPanel(ttk.LabelFrame):
     beacon said under it, the two reading as one message received then and
     saying this. Drawn in ttk, so that it takes the window's theme: see
     :mod:`tcsui.theme`.
+
+    Args:
+        parent:    The widget the panel goes in.
+        **options: Further ``ttk.LabelFrame`` options.
     """
 
     def __init__(self, parent, **options):
@@ -170,7 +187,11 @@ class BeaconPanel(ttk.LabelFrame):
 
     def show(self, shown):
         """Put what a pass of the beacon loop reported on the panel: all three
-        at once, from the one reading."""
+        at once, from the one reading.
+
+        Args:
+            shown: The :class:`Shown` for the pass.
+        """
         self._indicator.itemconfigure(self._oval, fill=shown.indicator)
         self._received.configure(text=shown.received)
         self._message.configure(text=shown.message)
@@ -181,6 +202,9 @@ class BeaconPanel(ttk.LabelFrame):
         The stage is empty: this panel shows none, as ``beacon.slint`` shows
         none when its ``stage`` is empty -- tcsmoc's panel, which this one is
         the Python twin of, does not set it.
+
+        Returns:
+            The :class:`Shown` read from the panel's widgets.
         """
         return Shown(
             indicator=self._indicator.itemcget(self._oval, "fill"),

@@ -92,7 +92,8 @@ pub struct BeaconSend {
 }
 
 impl BeaconSend {
-    /// Bind where beacons come from, find where they go, and start sending.
+    /// Binds where beacons come from, finds where they go, and starts
+    /// sending.
     ///
     /// The socket is bound and the destination resolved here, on the caller's
     /// thread, and not on the thread that sends: a `beacon.send` some other
@@ -107,6 +108,28 @@ impl BeaconSend {
     /// `reset_interval` until [`BeaconSend::connected`] is called: every
     /// start is a restart as far as the ground can tell, and is beaconed as
     /// one.
+    ///
+    /// # Arguments
+    ///
+    /// * `timing`    - How often beacons go, normally and across a restart.
+    /// * `from_addr` - `beacon.send`, where beacons are sent from.
+    /// * `dest_addr` - `beacon.recv`, where they go.
+    /// * `log`       - The telemetry log every beacon is recorded in.
+    /// * `version`   - What this build is, carried in every beacon.
+    /// * `digest`    - The digest of the configuration read, carried in every
+    ///                 beacon.
+    /// * `started`   - This start, as the state file counted it, which says
+    ///                 whether the ground commanded it.
+    ///
+    /// # Returns
+    ///
+    /// The sender, whose thread is already sending; `None` where
+    /// `timing.default_interval` is nought.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Config`, naming the setting to change, where `from_addr`
+    /// cannot be bound or `dest_addr` does not resolve to an address.
     pub fn new(
         timing: BeaconTiming,
         from_addr: tcslibgs::HostPort,
@@ -180,7 +203,7 @@ impl BeaconSend {
         Ok(Some(b))
     }
 
-    /// Send a beacon now, and then one every interval, for as long as the
+    /// Sends a beacon now, and then one every interval, for as long as the
     /// process runs.
     ///
     /// Nothing here can end it: everything that could stop beacons for good
@@ -188,6 +211,12 @@ impl BeaconSend {
     /// is said once, when the beacons stop going, and once when they go again,
     /// rather than every interval: a vehicle that cannot reach the ground for
     /// an hour should leave a log that says so in two lines.
+    ///
+    /// # Arguments
+    ///
+    /// * `socket` - The socket bound to `beacon.send`, which beacons go out
+    ///              of.
+    /// * `dest`   - Where they go, already resolved.
     fn beacon_send(&self, socket: UdpSocket, dest: SocketAddr) {
         // What each beacon is packed with, buffer and all, made once.
         let mut packer = BeaconPacker::new();
@@ -224,8 +253,23 @@ impl BeaconSend {
         }
     }
 
-    /// Send the next beacon to `dest`, packed by `packer`, which is the
-    /// thread's own and is reused.
+    /// Sends the next beacon to `dest`, recording it in the telemetry log
+    /// first.
+    ///
+    /// # Arguments
+    ///
+    /// * `socket` - The socket the beacon goes out of.
+    /// * `dest`   - Where it goes.
+    /// * `packer` - What it is packed with, which is the thread's own and is
+    ///              reused.
+    ///
+    /// # Returns
+    ///
+    /// Nothing, once the beacon is sent.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Io` where the send fails.
     pub fn send_beacon(
         &self,
         socket: &UdpSocket,
@@ -247,9 +291,15 @@ impl BeaconSend {
         Ok(())
     }
 
-    /// A CONFIG has set the interval the beacons go at once the MOC has
-    /// connected. Where it has, and no restart is under way, they go at it
-    /// from now, starting with one at once; otherwise from the next CONNECT.
+    /// Takes the interval a CONFIG has set the beacons to go at once the
+    /// MOC has connected. Where it has, and no restart is under way, they go
+    /// at it from now, starting with one at once; otherwise from the next
+    /// CONNECT.
+    ///
+    /// # Arguments
+    ///
+    /// * `interval` - How long from one beacon to the next; nought is ignored
+    ///                and changes nothing.
     pub fn set_interval(&mut self, interval: Duration) {
         if interval == Duration::from_secs(0) {
             return;
@@ -294,7 +344,7 @@ impl BeaconSend {
         self.retime(self.timing.reset_interval);
     }
 
-    /// Beacon every `interval` from now on, starting with one now.
+    /// Beacons every `interval` from now on, starting with one now.
     fn retime(&self, interval: Duration) {
         // Update the interval
         *self.interval.lock().unwrap() = interval;
@@ -322,7 +372,14 @@ struct Failing {
 }
 
 impl Failing {
-    /// Take account of one beacon's send, saying what has changed.
+    /// Takes account of one beacon's send, saying what has changed: the
+    /// first failure of a run, and the first success after one.
+    ///
+    /// # Arguments
+    ///
+    /// * `outcome` - How the send went.
+    /// * `from`    - Where beacons are sent from, for saying so.
+    /// * `to`      - Where they go, for saying so.
     fn after(
         &mut self,
         outcome: TcsResult<()>,
@@ -357,7 +414,16 @@ impl Failing {
 mod tests {
     use super::*;
 
-    /// A start of tcspecial as the state file counted it.
+    /// Makes a start of tcspecial as the state file counted it.
+    ///
+    /// # Arguments
+    ///
+    /// * `generation` - Its generation.
+    /// * `commanded`  - Whether the ground commanded it.
+    ///
+    /// # Returns
+    ///
+    /// The start, with nothing damaged.
     fn a_start(generation: u32, commanded: bool) -> crate::state::Started {
         crate::state::Started {
             generation,
@@ -367,7 +433,12 @@ mod tests {
     }
     use tcslibgs::CIConfig;
 
-    /// Beacons every fifty milliseconds, across a restart or not.
+    /// Makes a timing that beacons every fifty milliseconds, across a
+    /// restart or not.
+    ///
+    /// # Returns
+    ///
+    /// The timing.
     fn fifty() -> BeaconTiming {
         BeaconTiming {
             default_interval: Duration::from_millis(50),
@@ -487,11 +558,21 @@ mod tests {
         }
     }
 
-    /// A `beacon.send` something else holds is refused when the sender is
-    /// made, naming the setting, and is not left to a thread that would end
-    /// without a word.
-    /// A ground socket, and a sender beaconing to it from a port of its own
-    /// with `timing`, from a start commanded or not.
+    /// Makes a ground socket, and a sender beaconing to it from a port of
+    /// its own with `timing`, from a start commanded or not.
+    ///
+    /// # Arguments
+    ///
+    /// * `timing`    - How often the sender beacons.
+    /// * `commanded` - Whether its start was commanded.
+    ///
+    /// # Returns
+    ///
+    /// The ground socket and the sender.
+    ///
+    /// # Panics
+    ///
+    /// If either socket cannot be made.
     fn sending(
         timing: BeaconTiming,
         commanded: bool,
@@ -519,7 +600,20 @@ mod tests {
         (ground, sender)
     }
 
-    /// The next beacon to arrive within `wait`, or `None`.
+    /// Reads the next beacon to arrive.
+    ///
+    /// # Arguments
+    ///
+    /// * `ground` - The socket it arrives at.
+    /// * `wait`   - How long to wait for it.
+    ///
+    /// # Returns
+    ///
+    /// The beacon, or `None` where none arrived within `wait`.
+    ///
+    /// # Panics
+    ///
+    /// If the timeout cannot be set or what arrives is not a beacon.
     fn next(ground: &std::net::UdpSocket, wait: Duration) -> Option<Beacon> {
         ground.set_read_timeout(Some(wait)).expect("a timeout");
         let mut buffer = [0u8; 512];
@@ -606,6 +700,9 @@ mod tests {
         assert!(!beacon.commanded_restart, "cleared by the CONNECT");
     }
 
+    /// A `beacon.send` something else holds is refused when the sender is
+    /// made, naming the setting, and is not left to a thread that would end
+    /// without a word.
     #[test]
     fn a_beacon_address_that_cannot_be_bound_is_refused_at_the_start() {
         let held = std::net::UdpSocket::bind("127.0.0.1:0").expect("a socket");

@@ -73,8 +73,12 @@ class Pong:
 def now():
     """The time now, in nanoseconds since the UNIX epoch.
 
-    A ``ValueError`` only for a clock set before 1970, which is a clock that
-    is wrong and that a ping exists to show.
+    Returns:
+        The time now, in nanoseconds since the UNIX epoch.
+
+    Raises:
+        ValueError: Only for a clock set before 1970, which is a clock that
+                    is wrong and that a ping exists to show.
     """
     at = time.time_ns()
     if at < 0:
@@ -103,7 +107,17 @@ def message(count, sent):
 
 
 def read_message(data):
-    """What a ping says, or a ``ValueError`` saying why it is not one."""
+    """What a ping says.
+
+    Args:
+        data: The datagram, as bytes.
+
+    Returns:
+        The :class:`Ping`: its count and when it was sent.
+
+    Raises:
+        ValueError: The datagram is not a ping; the message says why.
+    """
     if len(data) > MESSAGE_BYTES:
         raise ValueError(
             f"{len(data)} bytes is longer than any ping, which is at most "
@@ -140,7 +154,19 @@ def reply(data, answered):
 
 
 def read_reply(data):
-    """What an answer says, or a ``ValueError`` saying why it is not one."""
+    """What an answer to a ping says.
+
+    Args:
+        data: The datagram, as bytes: the ping, a space and the vehicle's
+              time.
+
+    Returns:
+        The :class:`Pong`: the ping it answers and when the vehicle had it.
+
+    Raises:
+        ValueError: The datagram is not an answer to a ping; the message says
+                    why.
+    """
     if len(data) > REPLY_BYTES:
         raise ValueError(
             f"{len(data)} bytes is longer than any answer to a ping, which is "
@@ -169,7 +195,18 @@ def read_reply(data):
 
 
 def _read_count(text):
-    """A count: decimal digits, from one, with no leading nought."""
+    """A ping's count.
+
+    Args:
+        text: The count as written: decimal digits, from one, with no leading
+              nought.
+
+    Returns:
+        The count.
+
+    Raises:
+        ValueError: ``text`` is not so written, or is larger than ``LARGEST``.
+    """
     if not text or not all("0" <= c <= "9" for c in text):
         raise ValueError(f'the count "{text}" is not a whole number')
     if text.startswith("0"):
@@ -190,6 +227,16 @@ def _read_time(text):
     as the same number, and the format promises nanoseconds. The whole seconds
     are held to the one spelling as well, no leading nought but in nought
     itself, so that a time has one way to be written.
+
+    Args:
+        text: The time as written.
+
+    Returns:
+        The time, in nanoseconds since the UNIX epoch.
+
+    Raises:
+        ValueError: ``text`` is not so written, or has more whole seconds
+                    than ``LARGEST``.
     """
     wrong = ValueError(
         f'the time "{text}" is not seconds since the UNIX epoch with nine '
@@ -216,8 +263,16 @@ def _read_time(text):
 
 
 def _said(data):
-    """A message, for a complaint: as text where it is text, and cut short
-    where it is long, so that one bad datagram cannot fill a log."""
+    """A message, for a complaint.
+
+    Args:
+        data: The datagram, as bytes.
+
+    Returns:
+        The datagram quoted, as text with anything unprintable escaped, and
+        cut short past ``REPLY_BYTES`` so that one bad datagram cannot fill a
+        log.
+    """
     shown = data[:REPLY_BYTES]
     more = "..." if len(data) > len(shown) else ""
     text = (

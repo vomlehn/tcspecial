@@ -92,6 +92,19 @@ slint::include_modules!();
 /// A node already on the wrong side of a divider holds nothing: it is a node a
 /// file put there, it comes home when it is next dragged, and letting it pin
 /// the divider would mean one such node froze the control.
+///
+/// # Arguments
+///
+/// * `document` - The configuration whose nodes the divider stops against.
+/// * `dividers` - Where both dividers are now, in working-pane units.
+/// * `which`    - The divider being dragged: `Pane::Payloads` for the one
+///                between the payload and vehicle panes, anything else for
+///                the one between the vehicle and moc panes.
+///
+/// # Returns
+///
+/// The least and greatest positions the divider may take, the second never
+/// below the first.
 fn divider_range(
     document: &Document,
     dividers: Dividers,
@@ -258,7 +271,7 @@ struct Views {
 }
 
 impl Views {
-    /// Say which node is drawn as chosen, and nothing else.
+    /// Says which node is drawn as chosen, and nothing else.
     ///
     /// Apart from [`Views::refresh`] because choosing a node must not rebuild
     /// the canvas. Rebuilding it replaces every element on it, including the
@@ -272,6 +285,11 @@ impl Views {
     /// so setting that one property is the whole of it. What a node says about
     /// itself is in a window of its own -- see [`show_node`] -- which is not
     /// touched by a press.
+    ///
+    /// # Arguments
+    ///
+    /// * `home` - The window to tell: `None` for the main window, or the
+    ///            name of the group an open subdiagram window shows.
     fn chose(&self, home: &Home) {
         let chosen = self.chosen.borrow();
         let said = |home: &str| chosen.get(home).cloned().unwrap_or_default();
@@ -289,8 +307,7 @@ impl Views {
         }
     }
 
-    /// Draw every window from the document as it now is.
-    /// What went wrong, said where it cannot be missed.
+    /// Says what went wrong where it cannot be missed.
     ///
     /// Once per thing that goes wrong, and that is what `alerted` is for:
     /// every edit redraws every window, so a window shown on each of them
@@ -302,6 +319,11 @@ impl Views {
     /// save -- and this is the moment it went wrong. An error nobody sees is
     /// an error that gets worse: a full device stays full while every edit
     /// after it is one more the files do not have.
+    ///
+    /// # Arguments
+    ///
+    /// * `editor` - The session whose trouble, and whose configuration's
+    ///              faults, are to be said.
     fn alert(&self, editor: &Editor) {
         let said = editor.trouble().unwrap_or_default().to_string();
         if said != *self.alerted.borrow() {
@@ -318,7 +340,8 @@ impl Views {
         self.alert_faults(editor);
     }
 
-    /// And what is wrong with the configuration, the first time it is wrong.
+    /// Says what is wrong with the configuration, the first time it is
+    /// wrong.
     ///
     /// A fault is an error: two nodes of one name, two lines into one input, a
     /// value a rule refuses. The configuration will not fly with one in it, so
@@ -331,6 +354,10 @@ impl Views {
     /// every window, and a window that came back on each of them would be one
     /// nobody could type past. The red on the node stays, and so does the
     /// sentence in the node's own window; this is the moment it appeared.
+    ///
+    /// # Arguments
+    ///
+    /// * `editor` - The session whose configuration's faults are said.
     fn alert_faults(&self, editor: &Editor) {
         let faults: Vec<String> = editor
             .faults()
@@ -367,7 +394,15 @@ impl Views {
         );
     }
 
-    /// Put one of those in front of somebody.
+    /// Puts an alert in front of somebody: inside the main window while it
+    /// is still inert at startup, and in the alert window of its own after.
+    ///
+    /// # Arguments
+    ///
+    /// * `heading` - The alert's first line, saying what kind of thing
+    ///               went wrong.
+    /// * `said`    - What went wrong.
+    /// * `advice`  - What to do about it.
     fn say(&self, heading: &str, said: &str, advice: &str) {
         // As the editor starts, in front of the main window's drawing and
         // inside it, as the question about the file's problems is: the main
@@ -392,7 +427,7 @@ impl Views {
         }
     }
 
-    /// The lines, redrawn, and nothing else.
+    /// Redraws the lines, and nothing else.
     ///
     /// For the moment a link's end is taken hold of: the line comes off the
     /// drawing while the hand is moving, and the nodes must not be touched.
@@ -400,6 +435,10 @@ impl Views {
     /// takes the rest of the gesture with it -- the fault this window has made
     /// once already, when the same press that chose a node rebuilt the canvas
     /// under it.
+    ///
+    /// # Arguments
+    ///
+    /// * `editor` - The session whose links are drawn.
     fn relink(&self, editor: &Editor) {
         let held = self
             .drawing
@@ -417,6 +456,12 @@ impl Views {
         }
     }
 
+    /// Draws every window from the document as it now is, and alerts on
+    /// whatever has newly gone wrong.
+    ///
+    /// # Arguments
+    ///
+    /// * `editor` - The session whose document is drawn.
     fn refresh(&self, editor: &Editor) {
         self.alert(editor);
         let chosen = self.chosen.borrow();
@@ -470,12 +515,6 @@ impl Views {
     }
 }
 
-/// Put into a window the things that never change while it is open.
-///
-/// The two selection panes, and how wide the working pane is. Apart from
-/// [`put`] because nothing here depends on the document or on what anybody has
-/// moved: a refresh after every edit would rebuild two models that cannot have
-/// changed. Where the divider is does change, so that is in `put`.
 /// Whether this session was started with `--read-only`: see `main`.
 ///
 /// Once, at startup, and then only read: a session is one or the other for
@@ -498,6 +537,12 @@ macro_rules! session {
     };
 }
 
+/// Put into a window the things that never change while it is open.
+///
+/// The two selection panes, and how wide the working pane is. Apart from
+/// [`put`] because nothing here depends on the document or on what anybody has
+/// moved: a refresh after every edit would rebuild two models that cannot have
+/// changed. Where the divider is does change, so that is in `put`.
 macro_rules! furnish {
     ($window:expr, $described:expr) => {{
         let window = $window;
@@ -518,13 +563,27 @@ macro_rules! furnish {
     }};
 }
 
-/// The files named on the command line, in order, and whether the session is
-/// to be read-only.
+/// Reads the command line: the files it names, in order, and whether the
+/// session is to be read-only.
 ///
 /// The flag wherever it is, in any of its three spellings. Any other word
 /// starting with a dash is refused rather than taken for a file name: a
 /// mistyped flag would otherwise be a configuration created under that name.
 /// More than two files is refused too, there being nothing for a third to be.
+///
+/// # Arguments
+///
+/// * `words` - The command line's words, without the program's name.
+///
+/// # Returns
+///
+/// The files named, in the order given, and whether `-r`, `--read-only` or
+/// `--readonly` was among the words.
+///
+/// # Errors
+///
+/// A sentence saying what is wrong, for a word that starts with a dash and
+/// is not the flag (a lone `-` is a file name), or for more than two files.
 fn command_line(
     words: impl Iterator<Item = String>,
 ) -> Result<(Vec<String>, bool), String> {
@@ -553,6 +612,21 @@ fn command_line(
 const USAGE: &str =
     "usage: tcsgui [-r | --read-only] <configuration file> [<simulator file>]";
 
+/// Runs the editor: reads the command line and the files it names, opens
+/// and wires the windows, runs the event loop, and on the way out writes
+/// anything the files do not have and removes the session's history.
+///
+/// A command line tcsgui does not take, or no configuration named, says why
+/// on standard error and exits with status 2.
+///
+/// # Returns
+///
+/// `Ok` once the event loop has ended.
+///
+/// # Errors
+///
+/// The toolkit's error when the main window cannot be made or shown, or the
+/// event loop cannot run.
 fn main() -> Result<(), slint::PlatformError> {
     // The flags, wherever they are, and the files in the order given. One
     // flag: `-r`, `--read-only` or `--readonly`, a session that shows a
@@ -1343,7 +1417,17 @@ macro_rules! wiring {
 wiring!(wire, MainWindow, put);
 wiring!(wire_sub_inner, SubWindow, put_sub);
 
-/// Wire a subdiagram's window, which edits that subdiagram.
+/// Wires a subdiagram's window, which edits that subdiagram.
+///
+/// # Arguments
+///
+/// * `window`  - The subdiagram's window.
+/// * `editor`  - The one editor every window edits.
+/// * `views`   - The windows, redrawn after each edit.
+/// * `drawing` - The link being drawn, while that gesture runs.
+/// * `chosen`  - Which node each window shows as chosen, by the group it
+///               shows (`""` for the main window).
+/// * `home`    - The name of the group the window shows.
 fn wire_sub(
     window: &SubWindow,
     editor: &Rc<RefCell<Editor>>,
@@ -1362,11 +1446,23 @@ fn wire_sub(
     );
 }
 
-/// Put the editor's state into the top window.
+/// Puts the editor's state into the top window.
 ///
 /// One function rather than a set of setters called from each place that
 /// changes something: a window refreshed in one place cannot be refreshed
 /// partly.
+///
+/// # Arguments
+///
+/// * `ui`       - The main window.
+/// * `editor`   - The session drawn.
+/// * `home`     - The group drawn: `None` for the top of the configuration.
+/// * `chosen`   - The name of the node drawn as chosen, if any.
+/// * `dividers` - Where the working pane's dividers are.
+/// * `lists`    - The moc and vehicle selection lists' shares of their
+///                column, in per cent.
+/// * `held`     - The link whose end is being dragged, which is drawn
+///                nowhere.
 fn put(
     ui: &MainWindow,
     editor: &Editor,
@@ -1398,7 +1494,20 @@ fn put(
     ui.set_aside_count(aside.len() as i32);
 }
 
-/// The same, for one open subdiagram.
+/// Puts the editor's state into one open subdiagram's window, as [`put`]
+/// does for the top window.
+///
+/// # Arguments
+///
+/// * `window`   - The subdiagram's window.
+/// * `editor`   - The session drawn.
+/// * `home`     - The name of the group the window shows.
+/// * `chosen`   - The name of the node drawn as chosen, if any.
+/// * `dividers` - Where the working pane's dividers are.
+/// * `lists`    - The moc and vehicle selection lists' shares of their
+///                column, in per cent.
+/// * `held`     - The link whose end is being dragged, which is drawn
+///                nowhere.
 fn put_sub(
     window: &SubWindow,
     editor: &Editor,
@@ -1426,11 +1535,17 @@ fn put_sub(
     window.set_said(editor.said().unwrap_or_default().into());
 }
 
-/// Put what a node says about itself into its own window.
+/// Puts what a node says about itself into its own window.
 ///
 /// Everything its type declares, whatever else it holds, and -- below a rule
 /// -- the settings the simulator file gives it. See [`panel_of`], which builds
 /// the rows; this is what hands them to a window.
+///
+/// # Arguments
+///
+/// * `window` - The node's window.
+/// * `editor` - The session the node is in.
+/// * `node`   - The node's qualified name.
 fn put_node(window: &NodeWindow, editor: &Editor, node: &str) {
     let (name, node_type, comment, fields, about) = panel_of(
         editor,
@@ -1458,10 +1573,17 @@ fn put_node(window: &NodeWindow, editor: &Editor, node: &str) {
     window.set_trouble(editor.trouble().unwrap_or_default().into());
 }
 
-/// Show what a node says about itself, making the window if there is not one.
+/// Shows what a node says about itself, making the window if there is not
+/// one.
 ///
 /// Made once per node and raised afterwards: pressing a node twice should
 /// bring its window forward, not make a second one saying the same thing.
+///
+/// # Arguments
+///
+/// * `editor` - The session the node is in.
+/// * `views`  - The windows, which keep the node's window once it is made.
+/// * `node`   - The node's qualified name.
 fn show_node(
     editor: &Rc<RefCell<Editor>>,
     views: &Rc<RefCell<Views>>,
@@ -1501,11 +1623,19 @@ fn show_node(
     }
 }
 
-/// Wire one node's window to the one editor.
+/// Wires one node's window to the one editor.
 ///
 /// `node` is the name a link would use, captured once: a window belongs to the
 /// node it was opened for, and goes on belonging to it however many others are
 /// opened afterwards.
+///
+/// # Arguments
+///
+/// * `window` - The node's window.
+/// * `editor` - The one editor every window edits.
+/// * `views`  - The windows, redrawn after each edit and which forget the
+///              node's window when it is closed.
+/// * `node`   - The node's qualified name.
 fn wire_node(
     window: &NodeWindow,
     editor: &Rc<RefCell<Editor>>,
@@ -1612,20 +1742,24 @@ fn wire_node(
     }
 }
 
-/// Leave, offering first to write anything the files do not have.
-///
-/// Normally there is nothing to offer: every edit is written as it is made, so
-/// the files are already the configuration in the window, and this quits. What
-/// it catches is the session where a write failed -- a full device, a
-/// directory made read-only -- because leaving a session's work in a process
-/// that is ending is the one way this editor could lose anything.
-///
-/// Settle one divider where a gesture left it.
+/// Settles one divider where a gesture left it.
 ///
 /// `which` is the pane on the divider's left -- `Pane::Payloads` for the line
 /// between the payload pane and the vehicle's, `Pane::Vehicle` for the one
 /// between the vehicle's and the moc pane. Both gestures are the same work, and
 /// writing it twice is two places for the clamping to be got wrong in.
+///
+/// The new place is snapped to the grid and kept inside [`divider_range`],
+/// saved as a preference, and every window redrawn; a divider that did not
+/// move writes and redraws nothing.
+///
+/// # Arguments
+///
+/// * `editor` - The session whose nodes the divider stops against.
+/// * `views`  - The windows, which hold where the dividers are.
+/// * `which`  - The pane on the divider's left.
+/// * `dx`     - How far the gesture moved the divider, in working-pane
+///              units, rightward positive.
 fn drag_divider(
     editor: &Rc<RefCell<Editor>>,
     views: &Rc<RefCell<Views>>,
@@ -1679,7 +1813,8 @@ fn drag_divider(
     views.borrow().refresh(&editor.borrow());
 }
 
-/// One of the two lines between the selection lists, dragged.
+/// Moves one of the two lines between the selection lists where a gesture
+/// dragged it.
 ///
 /// `dy` is how far it moved and `tall` how tall the whole column is, both in
 /// the window's own pixels: the share that changed is the one, over the other,
@@ -1695,6 +1830,16 @@ fn drag_divider(
 /// easy to do by accident and hard to understand afterwards.
 ///
 /// The arithmetic is [`list_shares_after`], which is the part worth testing.
+/// The new shares are saved as a preference and every window redrawn; a line
+/// that did not move writes and redraws nothing.
+///
+/// # Arguments
+///
+/// * `editor` - The session, for redrawing.
+/// * `views`  - The windows, which hold the lists' shares.
+/// * `which`  - The list above the line that moved.
+/// * `dy`     - How far the line moved, in pixels, downward positive.
+/// * `tall`   - How tall the whole column is, in pixels.
 fn drag_list_divider(
     editor: &Rc<RefCell<Editor>>,
     views: &Rc<RefCell<Views>>,
@@ -1723,7 +1868,7 @@ fn drag_list_divider(
     views.borrow().refresh(&editor.borrow());
 }
 
-/// What the two shares become when a line is dragged this far.
+/// Works out what the two shares become when a line is dragged this far.
 ///
 /// `was` is the moc list's share and the vehicle list's, the payload list
 /// taking what is left; `which` is the list above the line that moved -- the
@@ -1736,6 +1881,22 @@ fn drag_list_divider(
 /// pixel count is how this window happens to be sized today. And every share
 /// comes back inside [`settings::LEAST`] however far the line was dragged,
 /// which is the rule a test can hold this to and a markup cannot.
+///
+/// # Arguments
+///
+/// * `(moc, vehicle)` - The moc list's and the vehicle list's shares of the
+///                      column now, in per cent.
+/// * `which`          - The list above the line that moved:
+///                      `Pane::Payloads` for the upper line, anything else
+///                      for the lower.
+/// * `dy`             - How far the line went, in pixels, downward
+///                      positive.
+/// * `tall`           - How tall the column is, in pixels; under one pixel
+///                      changes nothing.
+///
+/// # Returns
+///
+/// The moc list's and the vehicle list's new shares, in per cent.
 fn list_shares_after(
     (moc, vehicle): (i32, i32),
     which: Pane,
@@ -1770,7 +1931,7 @@ fn list_shares_after(
     settings::shares(asked.0, asked.1)
 }
 
-/// Show what might be wrong, with somewhere to go and something to decide.
+/// Shows what might be wrong, with somewhere to go and something to decide.
 ///
 /// `aside` says which of the two lists: what has not been looked at, or what
 /// somebody looked at and left. One window, pointed at either -- two windows
@@ -1780,6 +1941,13 @@ fn list_shares_after(
 /// Rows are held by their place in the list, which is why the window is
 /// refreshed after every decision: a row acted on changes the list under it,
 /// and an index into a list that has moved is a decision about the wrong node.
+///
+/// # Arguments
+///
+/// * `editor` - The session whose concerns are listed and decided.
+/// * `views`  - The windows, which keep the list's window once it is made.
+/// * `aside`  - Whether to show what was set aside rather than what has not
+///              been looked at.
 fn show_concerns(
     editor: &Rc<RefCell<Editor>>,
     views: &Rc<RefCell<Views>>,
@@ -1878,7 +2046,15 @@ fn show_concerns(
     }
 }
 
-/// Write one of the two lists into the window.
+/// Writes one of the two lists of concerns into their window, if it is
+/// open.
+///
+/// # Arguments
+///
+/// * `editor` - The session whose concerns are listed.
+/// * `views`  - The windows, which hold the list's window.
+/// * `aside`  - Whether to list what was set aside rather than what has not
+///              been looked at.
 fn list_concerns(editor: &Editor, views: &Rc<RefCell<Views>>, aside: bool) {
     let (raised, set_aside) = editor.document().concerns_apart();
     let shown = if aside { set_aside } else { raised };
@@ -1901,12 +2077,18 @@ fn list_concerns(editor: &Editor, views: &Rc<RefCell<Views>>, aside: bool) {
     }
 }
 
-/// Show a node: chosen, in view, and with its window open.
+/// Shows a node: chosen, in view, and with its window open.
 ///
 /// What "go to it" means. The outline says which node the list was talking
 /// about, the scroll puts it where it can be seen -- a node named in a list
 /// and drawn eight hundred pixels below the fold is a list that points at
 /// nothing -- and the window is what somebody went there to look at.
+///
+/// # Arguments
+///
+/// * `editor` - The session the node is in.
+/// * `views`  - The windows, one of which shows the node.
+/// * `node`   - The node's qualified name, as a link would give it.
 fn go_to(editor: Rc<RefCell<Editor>>, views: Rc<RefCell<Views>>, node: &str) {
     let at = editor
         .borrow()
@@ -1930,7 +2112,7 @@ fn go_to(editor: Rc<RefCell<Editor>>, views: Rc<RefCell<Views>>, node: &str) {
     show_node(&editor, &views, node);
 }
 
-/// Ask whether a node should go, and take it away if the answer is yes.
+/// Asks whether a node should go, and takes it away if the answer is yes.
 ///
 /// A node's Delete asks first. It is next to Edit in a menu a click opens, so
 /// a press meant for Edit is a press away from it -- and a node is not one
@@ -1943,6 +2125,14 @@ fn go_to(editor: Rc<RefCell<Editor>>, views: Rc<RefCell<Views>>, node: &str) {
 /// was on top. Deleting is what the window's Delete does and nothing else
 /// here does it, so a window that cannot be made is a node that cannot be
 /// deleted -- said on the error output, rather than deleting it unasked.
+///
+/// # Arguments
+///
+/// * `editor` - The session the node is in.
+/// * `views`  - The windows, which keep the question's window once it is
+///              made.
+/// * `node`   - The qualified name of the node asked about; a node already
+///              gone asks nothing.
 fn confirm_delete(
     editor: &Rc<RefCell<Editor>>,
     views: &Rc<RefCell<Views>>,
@@ -2065,8 +2255,12 @@ impl Trouble {
         self.fix == Fix::Name && self.at.is_some()
     }
 
-    /// The label on the one button this kind of problem offers, over and above
-    /// opening or deleting the node. Empty where it offers none.
+    /// Names the one button this kind of problem offers, over and above
+    /// opening or deleting the node.
+    ///
+    /// # Returns
+    ///
+    /// The button's label, empty where it offers none.
     fn offer(&self) -> String {
         match &self.fix {
             Fix::Group(name) => format!("Delete the group \"{name}\""),
@@ -2077,7 +2271,8 @@ impl Trouble {
     }
 }
 
-/// Every problem a configuration opened with, and what is offered for each.
+/// Lists every problem a configuration opened with, and what is offered for
+/// each.
 ///
 /// In the order the document holds the nodes, so the list a person reads is
 /// the order the file is in rather than the order the checks happen to run.
@@ -2088,6 +2283,16 @@ impl Trouble {
 /// complaint rather than a question. What differs between them is the offer:
 /// a name for the ones a name mends, the node for the ones somebody has to
 /// look at, the group, the line, or the parameters window for the rest.
+///
+/// # Arguments
+///
+/// * `document` - The configuration as it was read.
+///
+/// # Returns
+///
+/// One row per fault: the duplicate names first, one per node, and then the
+/// rest in the order the document reports them. A node fault about a node
+/// the document does not hold has no row.
 fn troubles_of(document: &Document) -> Vec<Trouble> {
     let sharing = document.sharing_a_name();
     let mut out: Vec<Trouble> = Vec::new();
@@ -2233,11 +2438,21 @@ fn startup_troubles(editor: &Editor) -> Vec<Trouble> {
     troubles
 }
 
-/// What `tcsverify` finds in the files that the editor's own faults do not
-/// already say.
+/// Finds what `tcsverify` says of the files that the editor's own faults do
+/// not already say.
 ///
 /// Nothing for a file that is not there yet, which is how a new configuration
 /// is begun: an empty session is not one with a problem.
+///
+/// # Arguments
+///
+/// * `editor` - The session whose files, as they are on the disk, are
+///              checked.
+///
+/// # Returns
+///
+/// One row per finding not already said, warnings included, in the order
+/// tcsverify found them.
 fn verified(editor: &Editor) -> Vec<Trouble> {
     let (config, simulator) = editor.files();
     if !config.exists() {
@@ -2291,13 +2506,22 @@ fn verified(editor: &Editor) -> Vec<Trouble> {
         .collect()
 }
 
-/// Whether one of the editor's own faults already says what this problem
-/// says.
+/// Tells whether one of the editor's own faults already says what this
+/// problem says.
 ///
 /// By what each is about rather than by its words: the editor's sentences
 /// were written for a node's own window and the rules' for a file and a line,
 /// and the same mistake is said both ways. Saying it twice in one list would
 /// read as two mistakes.
+///
+/// # Arguments
+///
+/// * `problem` - What `tcsverify` found.
+/// * `faults`  - The editor's own faults in the same configuration.
+///
+/// # Returns
+///
+/// `true` if some fault is about the same thing as `problem`.
 fn said_already(problem: &Problem, faults: &[Fault]) -> bool {
     faults.iter().any(|fault| match (problem, fault) {
         (
@@ -2347,8 +2571,8 @@ fn said_already(problem: &Problem, faults: &[Fault]) -> bool {
     })
 }
 
-/// Whether a set of proposed names settles the duplicate, and what is wrong
-/// with it if not.
+/// Tells whether a set of proposed names settles the duplicate, and what is
+/// wrong with it if not.
 ///
 /// `proposed` is what the fields hold, by the position of the node each is
 /// for, and `document` is what else is in the configuration. Three things are
@@ -2360,6 +2584,21 @@ fn said_already(problem: &Problem, faults: &[Fault]) -> bool {
 ///
 /// Here rather than in the markup for the usual reason: the markup can compare
 /// two strings, this is a rule about a document, and a rule is worth a test.
+///
+/// # Arguments
+///
+/// * `document` - The configuration the nodes are in.
+/// * `proposed` - The names the fields hold, by the position in the document
+///                of the node each is for.
+///
+/// # Returns
+///
+/// `Ok` if the names settle the duplicate.
+///
+/// # Errors
+///
+/// A sentence for the person renaming, when a proposed name is blank, two
+/// proposed names are the same, or one is a name another node already has.
 fn names_settle(
     document: &Document,
     proposed: &BTreeMap<usize, String>,
@@ -2402,8 +2641,8 @@ fn names_settle(
     Ok(())
 }
 
-/// Ask about the problems a configuration opened with, and offer what can be
-/// done about each.
+/// Asks about the problems a configuration opened with, and offers what can
+/// be done about each.
 ///
 /// Shown once, at startup, when the editor has read a file the vehicle could
 /// not fly: a node named twice, a node with no name, a type this build does
@@ -2422,6 +2661,11 @@ fn names_settle(
 /// does is not an edit -- see `Editor::settle_name`, which says why a repair
 /// is written at once and kept out of the history. Everything else is
 /// somebody's decision, so the row offers to open the node or to take it out.
+///
+/// # Arguments
+///
+/// * `editor` - The session just opened.
+/// * `views`  - The windows, the main one of which asks.
 fn settle_problems(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
     let troubles = startup_troubles(&editor.borrow());
     if troubles.is_empty() {
@@ -2655,11 +2899,20 @@ fn settle_problems(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
     views.borrow_mut().names = Some(window.as_weak());
 }
 
-/// What is left to ask about after something was done about one of them.
+/// Asks again about what is left after something was done about one of the
+/// problems, or takes the question away if nothing is.
 ///
 /// The window stays open on the rest rather than closing: a file with four
 /// problems answered one at a time should not need opening four times, and a
 /// problem that has gone should leave the list rather than sit there answered.
+///
+/// # Arguments
+///
+/// * `editor`   - The session whose problems are asked about.
+/// * `views`    - The windows, the main one of which asks.
+/// * `showing`  - The rows the question shows, replaced with what is left.
+/// * `proposed` - The names the fields hold, by the position of the node
+///                each is for, reset to the nodes' own names.
 fn again(
     editor: &Rc<RefCell<Editor>>,
     views: &Rc<RefCell<Views>>,
@@ -2689,13 +2942,22 @@ fn again(
     views.borrow().refresh(&editor.borrow());
 }
 
-/// Put the problems into the window, and say whether the names settle what
+/// Puts the problems into the window, and says whether the names settle what
 /// they are offered for.
 ///
 /// `rows` says whether the list itself is rebuilt. It is not, for a letter
 /// somebody typed: replacing the model under a LineEdit takes the focus with
 /// it, and a field that had to be pressed again for every letter is the bug
 /// this editor has already had once. See `refilled`.
+///
+/// # Arguments
+///
+/// * `window`   - The main window, which asks the question.
+/// * `document` - The configuration the problems are in.
+/// * `showing`  - The problems, one row each.
+/// * `proposed` - The names the fields hold, by the position of the node
+///                each is for.
+/// * `rows`     - Whether to rebuild the list's rows as well.
 fn say_problems(
     window: &MainWindow,
     document: &Document,
@@ -2744,7 +3006,7 @@ fn say_problems(
     }
 }
 
-/// Count what the file arrived with as already said, so the alert leaves it
+/// Counts what the file arrived with as already said, so the alert leaves it
 /// to the window that asks about it.
 ///
 /// The same thing [`ignore_faults`] does, done before the first window is
@@ -2754,7 +3016,7 @@ fn settled(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
     ignore_faults(editor, views);
 }
 
-/// Say nothing further about what is wrong with the configuration as it
+/// Says nothing further about what is wrong with the configuration as it
 /// stands.
 ///
 /// Every fault the document has now is counted as said, so the alert does not
@@ -2773,6 +3035,11 @@ fn settled(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
 /// A fault that goes away and comes back is said again: the set is kept by
 /// what each one says, and `Views::alert_faults` drops what is no longer
 /// there.
+///
+/// # Arguments
+///
+/// * `editor` - The session whose faults are counted as said.
+/// * `views`  - The windows, which keep what has been said.
 fn ignore_faults(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
     let said: Vec<String> = editor
         .borrow()
@@ -2787,7 +3054,11 @@ fn ignore_faults(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
     }
 }
 
-/// Take the question away, however it was answered.
+/// Takes the question about the problems away, however it was answered.
+///
+/// # Arguments
+///
+/// * `views` - The windows, the main one of which asks it.
 fn hide_problems(views: &Rc<RefCell<Views>>) {
     listen_when_read(views, Some(Startup::Problems));
     let window = views.borrow_mut().names.take();
@@ -2796,7 +3067,7 @@ fn hide_problems(views: &Rc<RefCell<Views>>) {
     }
 }
 
-/// What the main window's close box does.
+/// Sets what the main window's close box does.
 ///
 /// Closed by the window manager, which is the end of the session: the windows
 /// that say what is wrong with the drawing go with it. Through the close box
@@ -2806,6 +3077,11 @@ fn hide_problems(views: &Rc<RefCell<Views>>) {
 ///
 /// Its own function so that the tests close a window the way the window
 /// manager closes it, rather than calling what the handler would have called.
+///
+/// # Arguments
+///
+/// * `ui`    - The main window.
+/// * `views` - The windows taken down with it.
 fn closing(ui: &MainWindow, views: &Rc<RefCell<Views>>) {
     let views = views.clone();
     ui.window().on_close_requested(move || {
@@ -2814,7 +3090,7 @@ fn closing(ui: &MainWindow, views: &Rc<RefCell<Views>>) {
     });
 }
 
-/// Take down the windows that say what is wrong, whichever are up.
+/// Takes down the windows that say what is wrong, whichever are up.
 ///
 /// What closing the main window comes to: the question about the state the
 /// file arrived in, the alert about something that failed, and the list of
@@ -2826,6 +3102,10 @@ fn closing(ui: &MainWindow, views: &Rc<RefCell<Views>>) {
 ///
 /// Taken out of `Views` as each window's own answer does, so nothing holds a
 /// window that is not there.
+///
+/// # Arguments
+///
+/// * `views` - The windows, which let go of the three taken down.
 fn hide_what_is_wrong(views: &Rc<RefCell<Views>>) {
     let (names, alert, concerns) = {
         let mut views = views.borrow_mut();
@@ -2865,8 +3145,18 @@ enum Startup {
     Alert,
 }
 
-/// Whether any window that came up as the editor started is still showing,
-/// leaving out `going`, which is on its way.
+/// Tells whether any window that came up as the editor started is still
+/// showing, leaving out `going`, which is on its way.
+///
+/// # Arguments
+///
+/// * `views` - The windows.
+/// * `going` - The window on its way, which does not count; `None` counts
+///             both.
+///
+/// # Returns
+///
+/// `true` while the question or the alert is still up.
 fn startup_waiting(views: &Rc<RefCell<Views>>, going: Option<Startup>) -> bool {
     let views = views.borrow();
     let problems = going != Some(Startup::Problems) && views.names.is_some();
@@ -2879,7 +3169,7 @@ fn startup_waiting(views: &Rc<RefCell<Views>>, going: Option<Startup>) -> bool {
     problems || alert
 }
 
-/// Give the main window its presses back, once what came up as the editor
+/// Gives the main window its presses back, once what came up as the editor
 /// started has been read and `going` was the last of it.
 ///
 /// Called as each of those windows goes, and before it goes, `going` being
@@ -2890,6 +3180,11 @@ fn startup_waiting(views: &Rc<RefCell<Views>>, going: Option<Startup>) -> bool {
 /// they are in front of it -- so this is about presses and not about showing.
 /// After the start it does nothing: nothing sets `inert` again, and the
 /// windows that come up while somebody works are their own business.
+///
+/// # Arguments
+///
+/// * `views` - The windows.
+/// * `going` - The window on its way, if any.
 fn listen_when_read(views: &Rc<RefCell<Views>>, going: Option<Startup>) {
     if startup_waiting(views, going) {
         return;
@@ -2903,8 +3198,8 @@ fn listen_when_read(views: &Rc<RefCell<Views>>, going: Option<Startup>) {
     on_top(views, false);
 }
 
-/// Keep the windows that came up as the editor started in front of the main
-/// window, or let them go.
+/// Keeps the windows that came up as the editor started in front of the
+/// main window, or lets them go.
 ///
 /// Shown after the main window, which puts them on top by the usual rule --
 /// but the rule is the window manager's, and one that gives the focus to the
@@ -2913,6 +3208,11 @@ fn listen_when_read(views: &Rc<RefCell<Views>>, going: Option<Startup>) {
 /// in front of them takes a press. So for as long as the main window waits,
 /// they are asked to stay on top; once it takes presses again they are
 /// ordinary windows, the alert coming back later as one among the others.
+///
+/// # Arguments
+///
+/// * `views`  - The windows, whose alert window is kept on top or let go.
+/// * `wanted` - Whether to keep it on top.
 fn on_top(views: &Rc<RefCell<Views>>, wanted: bool) {
     let views = views.borrow();
     if let Some(window) = views.alert.as_ref() {
@@ -2920,7 +3220,12 @@ fn on_top(views: &Rc<RefCell<Views>>, wanted: bool) {
     }
 }
 
-/// Take the question away, whichever way it was answered.
+/// Takes the question about deleting a node away, whichever way it was
+/// answered.
+///
+/// # Arguments
+///
+/// * `views` - The windows, which let go of the question's window.
 fn hide_deleting(views: &Rc<RefCell<Views>>) {
     let window = views.borrow_mut().deleting.take();
     if let Some(window) = window {
@@ -2928,7 +3233,7 @@ fn hide_deleting(views: &Rc<RefCell<Views>>) {
     }
 }
 
-/// The window that says what went wrong, made ready before anything does.
+/// Makes ready the window that says what went wrong, before anything does.
 ///
 /// Made once and kept hidden, rather than made when it is needed: the moment
 /// it is needed is the moment something has already failed, and a window that
@@ -2938,6 +3243,10 @@ fn hide_deleting(views: &Rc<RefCell<Views>>) {
 ///
 /// Without a window there is still the red line in the bar and the error
 /// output, so this failing is a quieter editor and not a broken one.
+///
+/// # Arguments
+///
+/// * `views` - The windows, which keep the alert window.
 fn alerting(views: &Rc<RefCell<Views>>) {
     let window = match AlertWindow::new() {
         Ok(window) => {
@@ -2988,9 +3297,22 @@ fn alerting(views: &Rc<RefCell<Views>>) {
     }
 }
 
+/// Leaves, offering first to write anything the files do not have.
+///
+/// Normally there is nothing to offer: every edit is written as it is made, so
+/// the files are already the configuration in the window, and this quits. What
+/// it catches is the session where a write failed -- a full device, a
+/// directory made read-only -- because leaving a session's work in a process
+/// that is ending is the one way this editor could lose anything.
+///
 /// The offer and not the saving: somebody who has been told the device is full
 /// may want to leave and deal with it, and a program that insisted on writing
 /// first would be a program they cannot get out of.
+///
+/// # Arguments
+///
+/// * `editor` - The session left.
+/// * `views`  - The windows, which keep the offer's window once it is made.
 fn leave(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
     if !editor.borrow().unsaved() {
         slint::quit_event_loop().ok();
@@ -3067,12 +3389,18 @@ fn leave(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
     }
 }
 
-/// Put a group's state into its window.
+/// Puts a group's state into its window.
 ///
 /// What a group is: a name, how often it is read, and the payloads that are in
 /// it. The fields below those are the attributes every one of those payloads
 /// declares -- see [`Document::group_fields`] -- which are the ones a value
 /// set here can mean anything on.
+///
+/// # Arguments
+///
+/// * `window` - The group's window.
+/// * `editor` - The session the group is in.
+/// * `group`  - The group's name.
 fn put_group(window: &GroupWindow, editor: &Editor, group: &str) {
     let document = editor.document();
 
@@ -3122,13 +3450,6 @@ fn put_group(window: &GroupWindow, editor: &Editor, group: &str) {
     window.set_trouble(editor.trouble().unwrap_or_default().into());
 }
 
-/// Put the tcspecial parameters into their window.
-///
-/// Every attribute the section may have, in the order `tcslibgs` lists them --
-/// the ones that must be stated first -- with the empty required ones marked.
-/// Built from that list rather than from what the document happens to hold, so
-/// that a section somebody has never filled in shows nine fields to fill
-/// rather than nothing at all.
 /// What tells one row of a window's fields from another.
 ///
 /// The name and whether it is a heading, which is what says two lists are the
@@ -3136,6 +3457,11 @@ fn put_group(window: &GroupWindow, editor: &Editor, group: &str) {
 /// repeater has already built elements for, and those elements are what the
 /// cursor lives in. See [`refilled`].
 trait Named {
+    /// Names a row.
+    ///
+    /// # Returns
+    ///
+    /// The row's name, and whether it is a heading.
     fn named(&self) -> (String, bool);
 }
 
@@ -3151,7 +3477,7 @@ impl Named for GroupFieldView {
     }
 }
 
-/// Put these rows into a window's fields without replacing the model.
+/// Puts these rows into a window's fields without replacing the model.
 ///
 /// Replacing it destroys every element the repeater built from it -- which
 /// includes the field somebody is typing in, and the cursor goes with it. That
@@ -3165,7 +3491,15 @@ impl Named for GroupFieldView {
 /// a different length, or different names in a different order -- is replaced,
 /// because then the elements are not the same elements anyway.
 ///
-/// Answers whether it managed it; the caller replaces the model if not.
+/// # Arguments
+///
+/// * `model` - The window's fields as they are.
+/// * `rows`  - The rows they are to hold.
+///
+/// # Returns
+///
+/// Whether it managed it: `false` when the model is not a `VecModel` or is
+/// a different list, and the caller replaces the model.
 fn refilled<Row>(model: &ModelRc<Row>, rows: &[Row]) -> bool
 where
     Row: Clone + PartialEq + Named + 'static,
@@ -3193,6 +3527,18 @@ where
     true
 }
 
+/// Puts the tcspecial parameters into their window.
+///
+/// Every attribute the section may have, in the order `tcslibgs` lists them --
+/// the ones that must be stated first -- with the empty required ones marked.
+/// Built from that list rather than from what the document happens to hold, so
+/// that a section somebody has never filled in shows nine fields to fill
+/// rather than nothing at all.
+///
+/// # Arguments
+///
+/// * `window` - The parameters' window.
+/// * `editor` - The session whose parameters are shown.
 fn put_parameters(window: &ParametersWindow, editor: &Editor) {
     let said = &editor.document().tcspecial;
     let fields: Vec<FieldView> = tcslibgs::graph::parameters::ATTRIBUTES
@@ -3233,7 +3579,14 @@ fn put_parameters(window: &ParametersWindow, editor: &Editor) {
     );
 }
 
-/// Put one of the simulator's groups of settings into its window.
+/// Puts one of the simulator's groups of settings into its window.
+///
+/// # Arguments
+///
+/// * `window` - The simulator groups' window.
+/// * `editor` - The session whose simulator file is shown.
+/// * `group`  - The name of the group shown; one the file does not hold
+///              shows every setting empty.
 fn put_sim_groups(window: &SimWindow, editor: &Editor, group: &str) {
     let document = editor.document();
     let choices: Vec<slint::SharedString> = document
@@ -3288,8 +3641,19 @@ fn settings_shown(
     ModelRc::from(Rc::new(VecModel::from(settings_of(fields, said))))
 }
 
-/// The same, as rows rather than as a model, for the panel to append to a
-/// node's own.
+/// Lists the fields a simulator window shows, as [`settings_shown`] does,
+/// but as rows rather than as a model, for the panel to append to a node's
+/// own.
+///
+/// # Arguments
+///
+/// * `fields` - Every setting there is, in the order shown.
+/// * `said`   - What the simulator file gives, by setting.
+///
+/// # Returns
+///
+/// A row for each of `fields`, then one for each setting in `said` that is
+/// not among them.
 fn settings_of(
     fields: &[&'static str],
     said: &BTreeMap<String, String>,
@@ -3330,7 +3694,13 @@ fn settings_of(
     shown
 }
 
-/// Show the tcspecial parameters, making the window if there is not one.
+/// Shows the tcspecial parameters, making the window if there is not one.
+///
+/// # Arguments
+///
+/// * `editor` - The session whose parameters are shown and edited.
+/// * `views`  - The windows, which keep the parameters' window once it is
+///              made.
 fn show_parameters(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
     if views.borrow().parameters.is_none() {
         let window = match ParametersWindow::new() {
@@ -3389,8 +3759,14 @@ fn show_parameters(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
     }
 }
 
-/// Show the simulator's groups of settings, making the window if there is not
-/// one.
+/// Shows the simulator's groups of settings, making the window if there is
+/// not one.
+///
+/// # Arguments
+///
+/// * `editor` - The session whose simulator file is shown and edited.
+/// * `views`  - The windows, which keep the simulator groups' window once it
+///              is made.
 fn show_sim_groups(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
     if views.borrow().sim_groups.is_none() {
         let window = match SimWindow::new() {
@@ -3438,7 +3814,14 @@ fn show_sim_groups(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
     }
 }
 
-/// Wire the groups window's four callbacks to the one editor.
+/// Wires the simulator groups window's four callbacks to the one editor.
+///
+/// # Arguments
+///
+/// * `window` - The simulator groups' window.
+/// * `editor` - The one editor every window edits.
+/// * `views`  - The windows, which say which group the window shows and are
+///              redrawn after each edit.
 fn wire_sim_groups(
     window: &SimWindow,
     editor: &Rc<RefCell<Editor>>,
@@ -3552,13 +3935,21 @@ fn wire_sim_groups(
     }
 }
 
-/// Show `group` in the group window, making the window if there is not one.
+/// Shows a group in the group window, making the window if there is not
+/// one: the group `Views::showing` names if the configuration declares it,
+/// and otherwise the first it declares.
 ///
 /// Made once and re-pointed afterwards, so choosing a second group does not
 /// leave a window per group behind. The handlers are wired when the window is
 /// made and read the group out of `Views::showing` as they run, which is what
 /// lets the same handlers go on working after the window is re-pointed -- or
 /// after the group it is showing is renamed from inside it.
+///
+/// # Arguments
+///
+/// * `editor` - The session whose groups are shown and edited.
+/// * `views`  - The windows, which keep the group window once it is made
+///              and say which group it shows.
 fn show_group(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
     // Whichever group was last looked at, or the first the configuration
     // declares: a window that opened on an invitation to choose would make
@@ -3608,13 +3999,20 @@ fn show_group(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
     }
 }
 
-/// Wire the group window's four callbacks to the one editor.
+/// Wires the group window's four callbacks to the one editor.
 ///
 /// Every one of them is an ordinary edit: recorded in the history, written as
 /// it is made, and taken back by Undo in the main window. The last is the one
 /// worth reading twice -- it sets one value on every payload of the group as a
 /// single edit, so that undo takes back the gesture rather than the first of a
 /// dozen consequences.
+///
+/// # Arguments
+///
+/// * `window` - The group window.
+/// * `editor` - The one editor every window edits.
+/// * `views`  - The windows, which say which group the window shows and are
+///              redrawn after each edit.
 fn wire_group(
     window: &GroupWindow,
     editor: &Rc<RefCell<Editor>>,
@@ -3776,13 +4174,28 @@ fn wire_group(
     }
 }
 
-/// What the panel shows: the chosen node, its type, its comment, its fields.
+/// Gathers what a node's panel shows: the chosen node, its type, its
+/// comment, its fields.
 ///
 /// The fields are the ones the type declares rather than the ones the node
 /// happens to hold, so a node just placed asks for what it needs instead of
 /// showing nothing -- and an attribute the configuration does not know about,
 /// which a file written by a later build may carry, is shown after them rather
 /// than hidden.
+///
+/// # Arguments
+///
+/// * `editor` - The session the node is in.
+/// * `home`   - The group the node is in: `None` for the top of the
+///              configuration.
+/// * `chosen` - The node's name within `home`, if one is chosen.
+///
+/// # Returns
+///
+/// The node's name, its type, its comment, its fields (followed, for a
+/// payload where there is a simulator file, by a heading row and the
+/// simulator's settings for it), and what its description says of it. All
+/// empty when nothing is chosen or the node is not there.
 fn panel_of(
     editor: &Editor,
     home: &Home,
@@ -3933,13 +4346,24 @@ fn label(edit: Option<&Edit>) -> slint::SharedString {
     edit.map(|e| e.describe()).unwrap_or_default().into()
 }
 
-/// What one window shows: the nodes that live in `home`, and the links
-/// between them.
+/// Builds what one window shows: the nodes that live in `home`, and the
+/// links between them.
 ///
 /// A link with one end outside this window is drawn to a stub at the canvas
 /// edge, labelled with the far node's full name. It cannot be drawn to the
 /// node itself -- that node is in another window -- and leaving it out
 /// altogether would make a subdiagram look unconnected when it is not.
+///
+/// # Arguments
+///
+/// * `editor` - The session drawn.
+/// * `home`   - The group the window shows: `None` for the top of the
+///              configuration.
+/// * `held`   - The link whose end is being dragged, which is left out.
+///
+/// # Returns
+///
+/// The nodes in `home`, and the lines with an end in it.
 fn views_of(
     editor: &Editor,
     home: &Home,
@@ -4028,8 +4452,17 @@ fn ends_of(document: &Document, link: &Link, home: &Home) -> route::Ends {
     tcsdiagram::view::ends(&on_sheet(document, home), &line_on_sheet(link))
 }
 
-/// Every node of the document as tcsdiagram draws it, each saying whether it
-/// is on `home`'s page.
+/// Lists every node of the document as tcsdiagram draws it, each saying
+/// whether it is on `home`'s page.
+///
+/// # Arguments
+///
+/// * `document` - The configuration.
+/// * `home`     - The page drawn: `None` for the top of the configuration.
+///
+/// # Returns
+///
+/// One entry per node, in the document's order, named as a line names it.
 fn on_sheet<'a>(
     document: &'a Document,
     home: &Home,
@@ -4047,7 +4480,15 @@ fn on_sheet<'a>(
         .collect()
 }
 
-/// One of the document's links as tcsdiagram draws it.
+/// Gives one of the document's links as tcsdiagram draws it.
+///
+/// # Arguments
+///
+/// * `link` - The link.
+///
+/// # Returns
+///
+/// The link's ends, origin, input and comment, borrowed from it.
 fn line_on_sheet(link: &Link) -> tcsdiagram::view::LineOnSheet<'_> {
     tcsdiagram::view::LineOnSheet {
         from: &link.from,
@@ -4087,7 +4528,7 @@ struct Drawing {
     holding: Option<Link>,
 }
 
-/// What becomes of a link whose end was dragged somewhere.
+/// Decides what becomes of a link whose end was dragged somewhere.
 ///
 /// `held` is the link and `pressed` is the end that was taken hold of; `(x, y)`
 /// is where the pointer was let go of. Four answers, which are the four things
@@ -4107,6 +4548,24 @@ struct Drawing {
 /// and let go of it over no node at all: the link is deleted. Which is the
 /// only way to delete one, and it is the gesture a person reaches for -- pull
 /// the wire out and drop it on the floor.
+///
+/// Let go of over a node that cannot take this end but could take the other,
+/// the gesture is read as drawing a new line from the pressed terminal
+/// instead: see [`joined`].
+///
+/// # Arguments
+///
+/// * `document` - The configuration.
+/// * `home`     - The page the gesture was on: `None` for the top.
+/// * `held`     - The link whose end was taken hold of.
+/// * `pressed`  - The node and terminal of the end taken hold of.
+/// * `(x, y)`   - Where the pointer was let go of, in the canvas's own
+///                coordinates.
+///
+/// # Returns
+///
+/// The edit to make -- the link moved, removed, or a new one added -- or
+/// `None` where nothing changes.
 fn dropped(
     document: &Document,
     home: &Home,
@@ -4212,11 +4671,22 @@ fn dropped(
     })
 }
 
-/// Which node is under this point, where one is.
+/// Finds which node is under this point, where one is.
 ///
 /// For telling "let go of over a node" from "let go of over the canvas", which
 /// are two different things: the first is a gesture that missed a terminal and
 /// the second is one that meant to put the line down.
+///
+/// # Arguments
+///
+/// * `document` - The configuration.
+/// * `home`     - The page looked at: `None` for the top.
+/// * `(x, y)`   - The point, in the canvas's own coordinates; a node's edges
+///                count as on it.
+///
+/// # Returns
+///
+/// The node's name within `home`, or `None` over the bare canvas.
 fn node_under(
     document: &Document,
     home: &Home,
@@ -4235,9 +4705,20 @@ fn node_under(
         .map(|node| node.name.clone())
 }
 
-/// The links attached to this terminal of this node.
+/// Lists the links attached to this terminal of this node.
 ///
 /// Both ends are asked: a line may be picked up by either of them.
+///
+/// # Arguments
+///
+/// * `document` - The configuration.
+/// * `at`       - The node and terminal.
+/// * `sink`     - Whether the terminal is one a line arrives at rather than
+///                one it leaves by.
+///
+/// # Returns
+///
+/// Every link with that end at that terminal, in the document's order.
 fn attached(document: &Document, at: &Drawing, sink: bool) -> Vec<Link> {
     document
         .links
@@ -4269,7 +4750,7 @@ fn attached(document: &Document, at: &Drawing, sink: bool) -> Vec<Link> {
         .collect()
 }
 
-/// The link a gesture made, where it made one.
+/// Works out the link a gesture made, where it made one.
 ///
 /// `pressed` is the terminal the line was drawn from and `(x, y)` is where the
 /// pointer was let go of, in the canvas's own coordinates. `None` for every
@@ -4293,6 +4774,19 @@ fn attached(document: &Document, at: &Drawing, sink: bool) -> Vec<Link> {
 ///
 /// and a link that is already there, which would otherwise be a second line
 /// on top of the first and two deliveries of every datum.
+///
+/// # Arguments
+///
+/// * `document` - The configuration.
+/// * `home`     - The page the gesture was on: `None` for the top.
+/// * `pressed`  - The node and terminal the line was drawn from.
+/// * `(x, y)`   - Where the pointer was let go of, in the canvas's own
+///                coordinates.
+///
+/// # Returns
+///
+/// The new link, from its source to its sink however it was drawn, or
+/// `None` for a gesture that makes none.
 fn joined(
     document: &Document,
     home: &Home,
@@ -4340,7 +4834,8 @@ fn joined(
     Some(link)
 }
 
-/// Where the line a gesture is drawing is anchored: the end that stays put.
+/// Finds where the line a gesture is drawing is anchored: the end that stays
+/// put.
 ///
 /// The terminal the gesture started at, where a line is being drawn from
 /// nothing. The *far* end of the line, where one is being carried by its end:
@@ -4351,6 +4846,17 @@ fn joined(
 /// `None` for a node or a terminal this page does not draw, which is what a
 /// gesture on another page looks like from here: no line, rather than a line
 /// from a guess.
+///
+/// # Arguments
+///
+/// * `document` - The configuration.
+/// * `home`     - The page the gesture is on: `None` for the top.
+/// * `from`     - The terminal the gesture started at, and the link it took
+///                hold of if any.
+///
+/// # Returns
+///
+/// The anchoring point, in the canvas's own coordinates.
 fn anchored(
     document: &Document,
     home: &Home,
@@ -4369,8 +4875,8 @@ fn anchored(
     Some(at)
 }
 
-/// Where a line being dragged has landed: the node under the pointer, and the
-/// terminal the line attaches to there.
+/// Finds where a line being dragged has landed: the node under the pointer,
+/// and the terminal the line attaches to there.
 ///
 /// Anywhere on the node will do -- its name, its middle, a corner box -- and
 /// `wanted` is the terminal it attaches to, which the gesture already knows.
@@ -4387,6 +4893,18 @@ fn anchored(
 /// carrying what the ground sends has nowhere to land on it. A gesture that
 /// cannot make a link still makes nothing; what has changed is how hard it is
 /// to aim, not what may be joined to what.
+///
+/// # Arguments
+///
+/// * `document` - The configuration.
+/// * `home`     - The page the gesture is on: `None` for the top.
+/// * `(x, y)`   - Where the pointer is, in the canvas's own coordinates.
+/// * `wanted`   - The terminal the line attaches to.
+///
+/// # Returns
+///
+/// The node under the pointer with `wanted` as its terminal, holding no
+/// link.
 fn landed(
     document: &Document,
     home: &Home,
@@ -4415,7 +4933,7 @@ fn landed(
     })
 }
 
-/// What to record about the end a line arrives at.
+/// Decides what to record about the end a line arrives at.
 ///
 /// Three answers, and the order is the order of authority:
 ///
@@ -4430,6 +4948,16 @@ fn landed(
 /// payload has one way in, and the schema reads an unnamed end as that one.
 /// Which is also what keeps the editor from writing a terminal into every
 /// link of every file it saves.
+///
+/// # Arguments
+///
+/// * `document` - The configuration.
+/// * `node`     - The qualified name of the node the line arrives at.
+/// * `terminal` - The terminal it was dropped on.
+///
+/// # Returns
+///
+/// The input to record, or `None` to record nothing.
 fn arriving_at(
     document: &Document,
     node: &str,
@@ -4450,11 +4978,21 @@ fn leaving_by(from: &Drawing) -> Option<String> {
     Some(from.terminal.clone())
 }
 
-/// Whether a link at this end of this node has to name its terminal.
+/// Tells whether a link at this end of this node has to name its terminal.
 ///
 /// The type's own answer -- see [`NodeType::must_name`] -- and `false` for a
 /// node that is not there or a type this build does not know: a name written
 /// on a type nothing can describe would be a guess recorded in a file.
+///
+/// # Arguments
+///
+/// * `document` - The configuration.
+/// * `node`     - The node's qualified name.
+/// * `sink`     - Whether the end is the one a link arrives at.
+///
+/// # Returns
+///
+/// `true` if the terminal must be named.
 fn must_name(document: &Document, node: &str, sink: bool) -> bool {
     document
         .node(node)
@@ -4477,6 +5015,17 @@ fn declares_inputs(document: &Document, node: &str) -> bool {
         .is_some_and(|node| node.attributes.contains_key("inputs"))
 }
 
+/// Finds the first of a node's declared inputs that no link arrives at yet.
+///
+/// # Arguments
+///
+/// * `document` - The configuration.
+/// * `node`     - The node's qualified name.
+///
+/// # Returns
+///
+/// The input's name, from the comma-separated list in the node's `inputs`
+/// attribute, or `None` for a node with no such attribute, or none free.
 fn free_input(document: &Document, node: &str) -> Option<String> {
     let inputs = document.node(node)?.attributes.get("inputs")?.clone();
     let taken: Vec<&str> = document
@@ -4492,7 +5041,7 @@ fn free_input(document: &Document, node: &str) -> Option<String> {
         .map(|i| i.to_string())
 }
 
-/// Put the ground station into a configuration that has nothing in it.
+/// Puts the ground station into a configuration that has nothing in it.
 ///
 /// Every graph has one: a vehicle whose telemetry reaches nobody is a vehicle
 /// nobody is operating, so the ground link is the one node a configuration
@@ -4508,6 +5057,10 @@ fn free_input(document: &Document, node: &str) -> Option<String> {
 /// has its own; one with a history behind it is a session being recovered, and
 /// an empty one there means somebody deleted what was in it; and a file that
 /// could not be read is a file to be repaired, not written over.
+///
+/// # Arguments
+///
+/// * `editor` - The session just opened.
 fn seed(editor: &mut Editor) {
     let fresh = editor.document().nodes.is_empty()
         && editor.undo_depth() == 0
@@ -4567,7 +5120,7 @@ fn seed(editor: &mut Editor) {
     editor.edit(Edit::Group { edits });
 }
 
-/// A name no node in the document has yet.
+/// Makes up a name no node in the document has yet.
 ///
 /// The type's own spelling, a hyphen, and the first number that is free: a
 /// person who places three i2c nodes gets i2c-1, i2c-2 and i2c-3 and renames
@@ -4579,6 +5132,16 @@ fn seed(editor: &mut Editor) {
 /// types rather than of nodes, and the moment a second one is placed the first
 /// one's name is the odd one out. A number on every one of them also says
 /// plainly that the name is the editor's suggestion and not a description.
+///
+/// # Arguments
+///
+/// * `document`  - The configuration.
+/// * `node_type` - The new node's type, as spelled in a file.
+/// * `home`      - The group the node goes in: `None` for the top.
+///
+/// # Returns
+///
+/// The name, unqualified.
 fn fresh_name(document: &Document, node_type: &str, home: &Home) -> String {
     let taken = |name: &str| {
         document
@@ -4597,11 +5160,19 @@ fn fresh_name(document: &Document, node_type: &str, home: &Home) -> String {
 /// somebody should look at rather than a default that happens to work.
 const FIRST_INTERVAL: &str = "1 s";
 
-/// A name no group in the document has yet.
+/// Makes up a name no group in the document has yet.
 ///
 /// The word itself, numbered if that is taken, as a node's fresh name is: a
 /// person who makes two groups gets `group` and `group-2` and renames them,
 /// rather than being made to name one before it can exist.
+///
+/// # Arguments
+///
+/// * `document` - The configuration.
+///
+/// # Returns
+///
+/// `group`, or `group-` and the first number from 2 that is free.
 fn fresh_group(document: &Document) -> String {
     if !document.groups.contains_key("group") {
         return "group".to_string();
@@ -4612,13 +5183,25 @@ fn fresh_group(document: &Document) -> String {
         .expect("a free name exists")
 }
 
-/// Where the next node placed should go.
+/// Finds where the next node placed should go.
 ///
 /// Counted within the home being edited and within the pane it is going into,
 /// so a subdiagram's first node lands where the top diagram's first one does
 /// rather than wherever the whole document's count happens to have reached --
 /// and a payload placed after three computations lands at the top of its own
 /// pane rather than three steps down a pane it was never in.
+///
+/// # Arguments
+///
+/// * `document`  - The configuration.
+/// * `home`      - The group the node goes in: `None` for the top.
+/// * `node_type` - The new node's type, which decides its pane and size.
+/// * `dividers`  - Where the working pane's dividers are.
+/// * `visible`   - The part of the sheet in view: see `pane::place_in`.
+///
+/// # Returns
+///
+/// The node's upper left corner, on the grid.
 fn next_place(
     document: &Document,
     home: &Home,
@@ -4653,8 +5236,8 @@ fn snap((x, y): (i32, i32)) -> (i32, i32) {
     (pane::on_node_grid(x), pane::on_node_grid(y))
 }
 
-/// One of every node type on one side of the canvas, under its family's
-/// heading.
+/// Builds the palette for one side of the canvas: one of every node type
+/// there, under its family's heading.
 ///
 /// Built from the same table the canvas uses, so a shape in the list is the
 /// shape on the canvas rather than a picture of one that may drift away from
@@ -4666,6 +5249,16 @@ fn snap((x, y): (i32, i32)) -> (i32, i32) {
 /// Three lists rather than one, because there are three working panes and a
 /// shape's pane follows from the list it came from. A single list would leave
 /// the rule to be found out by placing something and watching where it went.
+///
+/// # Arguments
+///
+/// * `pane`      - The working pane whose types are listed.
+/// * `described` - The description tree's entries, each offered in place of
+///                 the bare type it describes.
+///
+/// # Returns
+///
+/// The entries, each family's in alphabetical order under its heading.
 fn palette_of(
     pane: Pane,
     described: &[nodes::Described],
@@ -4741,7 +5334,7 @@ fn palette_of(
     ModelRc::from(Rc::new(VecModel::from(entries)))
 }
 
-/// Put each heading's entries in alphabetical order.
+/// Puts each heading's entries in alphabetical order.
 ///
 /// Within a heading and not across the panel, because a heading is a statement
 /// about the entries under it -- "Devices", "Ends of the graph" -- and a list
@@ -4754,6 +5347,10 @@ fn palette_of(
 /// headings themselves keep the order they are declared in, which is the one
 /// place the table's own order says something -- devices before the things
 /// that are driven, and the ends of the graph last.
+///
+/// # Arguments
+///
+/// * `entries` - The palette, sorted in place, ignoring case.
 fn alphabetical(entries: &mut [PaletteEntry]) {
     let mut at = 0;
     while at < entries.len() {
@@ -4774,7 +5371,7 @@ fn alphabetical(entries: &mut [PaletteEntry]) {
     }
 }
 
-/// Every description the editor found, read once.
+/// Gives every description the editor found, read once.
 ///
 /// Once because the tree is data on the disk and the same for every window:
 /// re-reading it per window would mean two windows of one session could offer
@@ -4782,6 +5379,10 @@ fn alphabetical(entries: &mut [PaletteEntry]) {
 /// preferences file that cannot be read does -- an editor that refused to start
 /// because one description has a typo in it would be an editor a typo turns
 /// off.
+///
+/// # Returns
+///
+/// The descriptions, kept for as long as the program runs.
 fn descriptions() -> &'static [nodes::Described] {
     static FOUND: std::sync::OnceLock<Vec<nodes::Described>> =
         std::sync::OnceLock::new();
@@ -4794,13 +5395,22 @@ fn descriptions() -> &'static [nodes::Described] {
     })
 }
 
-/// What a palette entry fills in, as the one string a callback can carry.
+/// Writes what a palette entry fills in as the one string a callback can
+/// carry.
 ///
 /// `name=value`, several of them separated by semicolons. Neither character
 /// can appear in an attribute's name, and a value that held one would be a
 /// value this could not carry -- so the pairs are the ones a *description*
 /// states, which are the ones that pick a variant of a type: a function's
 /// name, not a path or a program's arguments.
+///
+/// # Arguments
+///
+/// * `sets` - The attributes the entry fills in, by name.
+///
+/// # Returns
+///
+/// The pairs, in name order.
 fn written(sets: &BTreeMap<String, String>) -> String {
     sets.iter()
         .map(|(name, value)| format!("{name}={value}"))
@@ -4808,7 +5418,15 @@ fn written(sets: &BTreeMap<String, String>) -> String {
         .join(";")
 }
 
-/// And back: what a placed node is given.
+/// Reads back what [`written`] wrote: what a placed node is given.
+///
+/// # Arguments
+///
+/// * `sets` - The `name=value` pairs, separated by semicolons.
+///
+/// # Returns
+///
+/// Each pair, trimmed, in the order given; a piece with no `=` is dropped.
 fn stated(sets: &str) -> Vec<(String, String)> {
     sets.split(';')
         .filter(|pair| !pair.trim().is_empty())
@@ -4819,10 +5437,25 @@ fn stated(sets: &str) -> Vec<(String, String)> {
         .collect()
 }
 
-/// What a node of this type looks like, as the window wants it.
+/// Draws a node of this type as the window wants it.
 ///
 /// The look is tcsdiagram's, which tcspecial's visual window draws from too;
 /// this adds what only the editor has, which is whether it is selected.
+///
+/// # Arguments
+///
+/// * `name`      - The node's name, as drawn.
+/// * `node_type` - Its type, as spelled in a file.
+/// * `at`        - Its upper left corner.
+/// * `fault`     - What is wrong with it, if anything; only whether there is
+///                 something is drawn.
+/// * `selected`  - Whether it is drawn as chosen.
+/// * `summary`   - What a closed subdiagram holds, and nothing for any other
+///                 type.
+///
+/// # Returns
+///
+/// The node's look.
 fn view_of(
     name: &str,
     node_type: &str,
@@ -4845,7 +5478,16 @@ fn view_of(
     )
 }
 
-/// A node's look, as this window's markup takes it.
+/// Turns a node's look into what this window's markup takes.
+///
+/// # Arguments
+///
+/// * `look`     - The look tcsdiagram gives the node.
+/// * `selected` - Whether it is drawn as chosen.
+///
+/// # Returns
+///
+/// The look, as the markup's `NodeView`.
 fn node_view(look: tcsdiagram::view::NodeLook, selected: bool) -> NodeView {
     let terminal = |look: tcsdiagram::view::TerminalLook| TerminalView {
         shown: look.shown,
@@ -4884,10 +5526,18 @@ fn node_view(look: tcsdiagram::view::NodeLook, selected: bool) -> NodeView {
     }
 }
 
-/// A line's look, as this window's markup takes it.
+/// Turns a line's look into what this window's markup takes.
 ///
 /// Never lit: a line is lit while data crosses it, which is something only a
 /// running vehicle has. See tcspecial's visual window.
+///
+/// # Arguments
+///
+/// * `look` - The look tcsdiagram gives the line.
+///
+/// # Returns
+///
+/// The look, as the markup's `LinkView`.
 fn link_view(look: tcsdiagram::view::LinkLook) -> LinkView {
     LinkView {
         glow: colour(&look::lighter(&look.ink)),
@@ -4904,8 +5554,8 @@ fn link_view(look: tcsdiagram::view::LinkLook) -> LinkView {
     }
 }
 
-/// The hue each family of colours is built around, in degrees of the CIE
-/// wheel.
+/// Gives the hue each family of colours is built around, in degrees of the
+/// CIE wheel.
 ///
 /// Declared rather than read off the pane, which is the change the lilac-grey
 /// payload pane forced and an improvement on its own: the rule is that a
@@ -4922,6 +5572,14 @@ fn link_view(look: tcsdiagram::view::LinkLook) -> LinkView {
 ///
 /// For the tests, which hold the palette to these hues: the colours
 /// themselves are written down, in `tint_of` and `ground_of`.
+///
+/// # Arguments
+///
+/// * `pane` - The pane whose family is asked about.
+///
+/// # Returns
+///
+/// The family's hue, in degrees.
 #[cfg(test)]
 fn family_hue(pane: Pane) -> f64 {
     match pane {
@@ -4939,10 +5597,18 @@ fn colour(hex: &str) -> slint::Color {
 
 #[cfg(test)]
 mod tests {
-    /// The markup this binary was built from: its own window's, and the
-    /// drawing it shares with tcspecial's visual window, which the window
-    /// imports. One text, because a rule about the window is a rule about
-    /// what the two say together.
+    /// Reads the markup this binary was built from: its own window's, and
+    /// the drawing it shares with tcspecial's visual window, which the
+    /// window imports. One text, because a rule about the window is a rule
+    /// about what the two say together.
+    ///
+    /// # Returns
+    ///
+    /// The two files' text, the window's first.
+    ///
+    /// # Panics
+    ///
+    /// If either file cannot be read.
     fn markup() -> String {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
         let read = |path: std::path::PathBuf| {
@@ -4978,17 +5644,27 @@ mod tests {
         (settings::DEFAULT_LIST_MOC, settings::DEFAULT_LIST_VEHICLE)
     }
 
-    /// Every row of one selection pane.
     /// A screenful at the top of the sheet, which is what a window shows when
     /// a configuration is opened: the top of the view and how much of it
     /// there is.
     const IN_VIEW: (i32, i32) = (0, 700);
 
+    /// Every row of one selection pane.
     fn rows_of(pane: Pane) -> Vec<PaletteEntry> {
         rows_from(pane, descriptions())
     }
 
-    /// The same, from a tree given rather than found.
+    /// Lists every row of one selection pane, as [`rows_of`] does, from a
+    /// tree given rather than found.
+    ///
+    /// # Arguments
+    ///
+    /// * `pane`      - The pane whose palette is listed.
+    /// * `described` - The description tree to build it from.
+    ///
+    /// # Returns
+    ///
+    /// The palette's rows, headings included, in order.
     fn rows_from(
         pane: Pane,
         described: &[nodes::Described],
@@ -8940,11 +9616,20 @@ mod tests {
         );
     }
 
-    /// What the editor holds about its windows, for a test that drives one.
+    /// Builds what the editor holds about its windows, for a test that drives
+    /// one.
     ///
     /// The same structure `main` builds, with nothing open: the two tests
     /// about what comes up at startup both want it, and a second copy of
     /// twenty fields is a second place to add the twenty-first.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui` - The main window, the only one the views know of.
+    ///
+    /// # Returns
+    ///
+    /// The views, with the default dividers and lists.
     fn views_for(ui: &MainWindow) -> Rc<RefCell<Views>> {
         Rc::new(RefCell::new(Views {
             top: ui.as_weak(),

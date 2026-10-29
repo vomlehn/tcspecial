@@ -3,10 +3,10 @@
 //! What a ground station can know about a spacecraft without asking it
 //! anything. tcspecial beacons every `beacon.default_interval` for as long
 //! as it runs, over a socket of its own, whether or not anything has
-//! connected to it -- so this program commands nothing, connects to nothing, and still
-//! says whether the vehicle is alive, which build it is, which version of a
-//! configuration it is serving and whether that is the configuration this end
-//! read.
+//! connected to it -- so this program commands nothing, connects to nothing,
+//! and still says whether the vehicle is alive, which build it is, which
+//! version of a configuration it is serving and whether that is the
+//! configuration this end read.
 //!
 //! It is also the example of how the two halves fit together. Nothing about
 //! beacons is written here:
@@ -66,8 +66,22 @@ struct Arguments {
 }
 
 impl Arguments {
-    /// The arguments, or what is wrong with them, said for the person who
-    /// typed them.
+    /// Reads the command line's arguments.
+    ///
+    /// # Arguments
+    ///
+    /// * `args` - The arguments, without the program's name.
+    ///
+    /// # Returns
+    ///
+    /// The configuration to read, chosen by `--yaml` or `--xml` where none
+    /// is named, and whether to talk.
+    ///
+    /// # Errors
+    ///
+    /// What is wrong with them, said for the person who typed them: an
+    /// option that is not one, more than one configuration, both spellings,
+    /// or a named file whose extension disagrees with the spelling asked for.
     fn of(args: impl Iterator<Item = String>) -> Result<Arguments, String> {
         let mut path = None;
         let mut verbose = false;
@@ -99,6 +113,16 @@ impl Arguments {
     }
 }
 
+/// Runs the example: reads the configuration, listens for its beacons, and
+/// shows them in a window with a button that starts and stops tcspecial.
+///
+/// A command line that is wrong exits with status 2, and a configuration
+/// that cannot be read, has no beacon link or cannot be listened on, or a
+/// tcspecial that is not built, with status 1, each said on stderr.
+///
+/// # Errors
+///
+/// The window cannot be made or run.
 fn main() -> Result<(), slint::PlatformError> {
     let Arguments { path, verbose } =
         match Arguments::of(std::env::args().skip(1)) {

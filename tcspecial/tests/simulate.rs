@@ -9,6 +9,21 @@
 
 use std::process::Command;
 
+/// Writes the test's configuration: one payload that is a stand-in, and
+/// every address a port below 1024.
+///
+/// # Arguments
+///
+/// * `dir` - The directory to write it in; its log and state file are
+///           named there too.
+///
+/// # Returns
+///
+/// The configuration file's path.
+///
+/// # Panics
+///
+/// If the file cannot be written.
 fn configuration(dir: &std::path::Path) -> std::path::PathBuf {
     let path = dir.join("vehicle.yaml");
     let missing = dir.join("telemetry");
@@ -41,6 +56,19 @@ payloads:
     path
 }
 
+/// Runs tcspecial, which must fail, on a fresh copy of the configuration.
+///
+/// # Arguments
+///
+/// * `args` - The arguments to give before the configuration's path.
+///
+/// # Returns
+///
+/// What tcspecial wrote on stderr.
+///
+/// # Panics
+///
+/// If tcspecial cannot be run or exits successfully.
 fn run(args: &[&str]) -> String {
     let dir = tempfile::tempdir().expect("a directory");
     let path = configuration(dir.path());

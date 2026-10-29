@@ -293,6 +293,14 @@ impl Link {
     /// identified by what it joins. Equality, which does include the comment,
     /// is what the history compares -- an edit that changed a comment and an
     /// edit that did not are different edits.
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - The link to compare with.
+    ///
+    /// # Returns
+    ///
+    /// Whether the two have the same ends, data source and input.
     pub fn same_connection(&self, other: &Link) -> bool {
         self.from == other.from
             && self.origin == other.origin
@@ -315,6 +323,19 @@ impl Link {
     /// What the canvas makes when the line was dragged from the terminal of a
     /// node that has more than one -- a `null` node, whose links have to say
     /// which stream they carry.
+    ///
+    /// # Arguments
+    ///
+    /// * `from`   - The node the link leaves.
+    /// * `origin` - The data source it leaves by, or `None` for a node with
+    ///              only one.
+    /// * `to`     - The node it arrives at.
+    /// * `input`  - The input it arrives on, or `None` for a node with only
+    ///              one.
+    ///
+    /// # Returns
+    ///
+    /// The link, with no comment.
     pub fn joining(
         from: &str,
         origin: Option<&str>,
@@ -337,6 +358,11 @@ impl Edit {
     /// A total function with no reference to the document, which is the point:
     /// an inverse that consulted the document would be an inverse of the
     /// document's present state rather than of this edit.
+    ///
+    /// # Returns
+    ///
+    /// The inverse edit, which applied after this one leaves the document as it
+    /// was before.
     pub fn inverse(&self) -> Edit {
         match self {
             Edit::AddNode {
@@ -528,6 +554,10 @@ impl Edit {
 
     /// A short phrase for the undo menu, so that what a press will undo is
     /// readable before it is pressed.
+    ///
+    /// # Returns
+    ///
+    /// The phrase, such as `rename "a" to "b"`.
     pub fn describe(&self) -> String {
         match self {
             Edit::AddNode {
@@ -644,6 +674,11 @@ pub struct Journal {
 }
 
 impl Journal {
+    /// Makes an empty history, with nothing to undo or redo.
+    ///
+    /// # Returns
+    ///
+    /// The history.
     pub fn new() -> Self {
         Journal {
             done: Vec::new(),
@@ -675,7 +710,12 @@ impl Journal {
         self.done.get(self.cursor)
     }
 
-    /// Step back one edit, handing back the inverse to apply.
+    /// Steps back one edit, handing back the inverse to apply.
+    ///
+    /// # Returns
+    ///
+    /// The inverse of the edit stepped back over, or `None` at the start of the
+    /// history.
     pub fn undo(&mut self) -> Option<Edit> {
         let i = self.cursor.checked_sub(1)?;
         let inverse = self.done.get(i)?.inverse();
@@ -683,7 +723,7 @@ impl Journal {
         Some(inverse)
     }
 
-    /// Step forward one edit, handing back the edit to apply again.
+    /// Steps forward one edit, handing back the edit to apply again.
     pub fn redo(&mut self) -> Option<Edit> {
         let edit = self.done.get(self.cursor)?.clone();
         self.cursor += 1;
@@ -707,6 +747,15 @@ impl Journal {
 mod tests {
     use super::*;
 
+    /// Makes the edit that adds an `i2c` node to the top diagram.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The new node's name.
+    ///
+    /// # Returns
+    ///
+    /// The edit.
     fn add(name: &str) -> Edit {
         Edit::AddNode {
             name: name.to_string(),

@@ -120,6 +120,10 @@ impl Edge {
     }
 
     /// Whether the line is broken.
+    ///
+    /// # Returns
+    ///
+    /// `true` for a dashed or dotted edge, single or doubled.
     pub fn broken(self) -> bool {
         matches!(
             self,
@@ -132,6 +136,11 @@ impl Edge {
 
     /// The pattern a broken line is drawn in: how long a piece of it is, and
     /// the gap after it.
+    ///
+    /// # Returns
+    ///
+    /// The length of a piece and of the gap after it, in pixels: a dot's for
+    /// a dotted edge, a dash's for any other.
     fn pattern(self) -> (f32, f32) {
         match self {
             Edge::Dotted | Edge::DottedDouble => (DOT, DOT_GAP),
@@ -214,6 +223,14 @@ pub enum Ground {
 ///
 /// For the tests, which ask it of every pane; the window paints each pane's
 /// ground directly.
+///
+/// # Arguments
+///
+/// * `pane` - The working pane.
+///
+/// # Returns
+///
+/// The ground it is painted.
 pub fn ground_of(pane: crate::pane::Pane) -> Ground {
     match pane {
         crate::pane::Pane::Moc => Ground::Moc,
@@ -301,6 +318,15 @@ impl Terminals {
 ///
 /// `None` for a name that is not one of the four, which is a computation's
 /// own input: those are drawn where the link arrives and not as a terminal.
+///
+/// # Arguments
+///
+/// * `terminal` - The terminal's name.
+///
+/// # Returns
+///
+/// The corner and the arrow's direction, or `None` for a name that is not
+/// one of the four.
 pub fn corner_of(terminal: &str) -> Option<Corner> {
     match terminal {
         // The payload's own data along the top, travelling rightwards: it
@@ -370,6 +396,15 @@ pub struct Corner {
 /// stroke sits inside the node: a path drawn on the boundary is drawn half
 /// outside it, and a node that overhangs its own box by a pixel is a node
 /// whose terminals and lines are all a pixel out.
+///
+/// # Arguments
+///
+/// * `outline`         - The node's outline.
+/// * `(width, height)` - The node's size, in pixels.
+///
+/// # Returns
+///
+/// The corners, in pixels from the node's upper left corner.
 pub fn polygon_of(
     outline: Outline,
     (width, height): (u32, u32),
@@ -408,10 +443,19 @@ pub fn polygon_of(
 
 /// The shape to fill, as path data in the node's own coordinates.
 ///
-/// Closed, whatever the line does, and empty for a rounded outline -- which
-/// the markup fills with a Rectangle's own background. One pixel to one
-/// coordinate, so the markup draws it one to one and a stroke keeps its width:
-/// a viewbox stretched to fit would stretch the line with it.
+/// Closed, whatever the line does, and for every outline, a rounded one's
+/// arcs included: see [`polygon_of`]. One pixel to one coordinate, so the
+/// markup draws it one to one and a stroke keeps its width: a viewbox
+/// stretched to fit would stretch the line with it.
+///
+/// # Arguments
+///
+/// * `outline` - The node's outline.
+/// * `size`    - The node's width and height, in pixels.
+///
+/// # Returns
+///
+/// The closed shape as SVG path data.
 pub fn shape_of(outline: Outline, size: (u32, u32)) -> String {
     let points = polygon_of(outline, size);
     if points.is_empty() {
@@ -435,6 +479,18 @@ pub fn edge_of(outline: Outline, edge: Edge, size: (u32, u32)) -> String {
 /// rather than by moving the points, so that each shape insets the way it is
 /// shaped: a parallelogram's inner line leans by its own slant, and a rounded
 /// one's corners are rounded about their own centres.
+///
+/// # Arguments
+///
+/// * `outline`         - The node's outline.
+/// * `edge`            - The node's edge.
+/// * `(width, height)` - The node's size, in pixels.
+///
+/// # Returns
+///
+/// The inner line as SVG path data, dashed where the edge is broken; an
+/// empty string unless the edge is doubled and the node is more than
+/// twice [`DOUBLE`] in each direction.
 pub fn inner_of(
     outline: Outline,
     edge: Edge,
@@ -471,6 +527,17 @@ const DOT: f32 = 2.0;
 const DOT_GAP: f32 = 4.0;
 
 /// One polygon as a line, dashed or whole.
+///
+/// # Arguments
+///
+/// * `points` - The polygon's corners, in order.
+/// * `edge`   - The edge, which says whether the line is broken and in
+///              what pattern.
+///
+/// # Returns
+///
+/// The closed line, or its dashes, as SVG path data; an empty string for
+/// no points.
 fn line_of(points: &[(f32, f32)], edge: Edge) -> String {
     if points.is_empty() {
         return String::new();
@@ -484,6 +551,19 @@ fn line_of(points: &[(f32, f32)], edge: Edge) -> String {
 }
 
 /// A polygon's points as one move and a line to each of the rest.
+///
+/// # Arguments
+///
+/// * `points` - The polygon's corners, in order; there must be at least
+///              one.
+///
+/// # Returns
+///
+/// The SVG path data, not closed.
+///
+/// # Panics
+///
+/// If `points` is empty.
 fn run_of(points: &[(f32, f32)]) -> String {
     let mut out = format!("M {:.1} {:.1}", points[0].0, points[0].1);
     for (x, y) in &points[1..] {
@@ -503,6 +583,22 @@ fn run_of(points: &[(f32, f32)]) -> String {
 /// no dash pattern, so a broken line is drawn as the pieces that are there --
 /// which is what `route.rs` does for the line being dragged, and for the same
 /// reason.
+///
+/// # Arguments
+///
+/// * `points`      - The polygon's corners, in order.
+/// * `closes`      - Whether a side runs from the last corner back to the
+///                   first.
+/// * `(dash, gap)` - The length of a dash and of the gap after it, in
+///                   pixels.
+///
+/// # Returns
+///
+/// The dashes as SVG path data, one subpath each.
+///
+/// # Panics
+///
+/// If `closes` is `true` and `points` is empty.
 fn dashes_of(
     points: &[(f32, f32)],
     closes: bool,
@@ -558,6 +654,17 @@ fn dashes_of(
 ///
 /// The second line of a doubled edge needs none of this: it is inset as a
 /// smaller box and leans by its own slant. See [`inner_of`].
+///
+/// # Arguments
+///
+/// * `outline`          - The node's outline.
+/// * `(_width, height)` - The node's size, in pixels; only the height
+///                        matters.
+///
+/// # Returns
+///
+/// The most the shape is in from a side, in pixels: half the height,
+/// rounded up, for a parallelogram and 0 for every other outline.
 pub fn room_of(outline: Outline, (_width, height): (u32, u32)) -> i32 {
     match outline {
         Outline::Parallelogram => (height as f32 / 2.0).ceil() as i32,
@@ -575,6 +682,17 @@ pub fn room_of(outline: Outline, (_width, height): (u32, u32)) -> i32 {
 /// Measured at the edge of the terminal's box nearest the top or the bottom,
 /// which is where a leaning side is furthest in across the box's own height:
 /// the box has to clear the shape along all of it, not at its middle.
+///
+/// # Arguments
+///
+/// * `outline`         - The node's outline.
+/// * `(width, height)` - The node's size, in pixels.
+/// * `corner`          - The corner the terminal is in.
+///
+/// # Returns
+///
+/// How far in the shape is at the terminal's row, in whole pixels; 0 for
+/// an outline that is not slanted.
 pub fn room_at(
     outline: Outline,
     (width, height): (u32, u32),
@@ -649,6 +767,17 @@ pub const TERMINAL_INSET: u32 = 3;
 /// terminal is never pushed out of its node or across its slant and keeps at
 /// least its inset on every side. A node where a node may be -- a step of five
 /// millimetres -- has its two rows ten millimetres apart.
+///
+/// # Arguments
+///
+/// * `outline`         - The node's outline.
+/// * `corner`          - The corner the terminal is in.
+/// * `(width, height)` - The node's size, in pixels.
+/// * `at`              - Where the node's upper left corner is, in pixels.
+///
+/// # Returns
+///
+/// The terminal box's upper left corner, in pixels from the node's.
 pub fn terminal_at(
     outline: Outline,
     corner: Corner,
@@ -691,6 +820,17 @@ pub fn terminal_at(
 /// computation that named `in0` resolves here to the sink the line should be
 /// drawn to; what `in0` *means* is the computation's business, and
 /// [`tcslibgs::graph::terminals::terminal_at`] is what the checking asks.
+///
+/// # Arguments
+///
+/// * `node_type` - The node type's spelling.
+/// * `named`     - The terminal the link names, if it names one.
+/// * `sink`      - Whether this end is where data arrives.
+///
+/// # Returns
+///
+/// The terminal's name, or `None` for a type this build does not know or
+/// one with no terminal that fits.
 pub fn terminal_for(
     node_type: &str,
     named: Option<&str>,
@@ -732,6 +872,17 @@ pub fn terminal_for(
 ///
 /// `at` is where the node is. `None` for a type this build does not know, or a
 /// name that is not one of the four.
+///
+/// # Arguments
+///
+/// * `node_type` - The node type's spelling.
+/// * `at`        - Where the node's upper left corner is, in pixels.
+/// * `terminal`  - The terminal's name.
+///
+/// # Returns
+///
+/// The point the line joins, in pixels, and whether the line points
+/// right there.
 pub fn attachment(
     node_type: &str,
     at: (i32, i32),
@@ -761,7 +912,7 @@ pub fn attachment(
 
 /// The box a terminal is drawn in, relative to the node.
 ///
-/// For the tests, which let a line go of over a terminal because that is where
+/// For the tests, which let go of a line over a terminal because that is where
 /// a person naturally aims. The gesture itself does not ask: a line is drawn
 /// from the terminal that was pressed, and where it lands is a question about
 /// the node under the pointer and not about these boxes -- see `landed` in
@@ -769,6 +920,16 @@ pub fn attachment(
 ///
 /// `None` for a type this build does not know or a name that is not one of the
 /// four.
+///
+/// # Arguments
+///
+/// * `node_type` - The node type's spelling.
+/// * `at`        - Where the node's upper left corner is, in pixels.
+/// * `terminal`  - The terminal's name.
+///
+/// # Returns
+///
+/// The box's left, top, width and height, in pixels.
 pub fn terminal_box(
     node_type: &str,
     at: (i32, i32),
@@ -880,6 +1041,10 @@ impl NodeType {
     /// The word the configuration file uses, which is the word the editor
     /// shows: an operator reading the file and an operator reading the canvas
     /// should not have to translate.
+    ///
+    /// # Returns
+    ///
+    /// The type's spelling, as in a configuration's `type:`.
     pub fn spelling(self) -> &'static str {
         match self {
             NodeType::I2c => "i2c",
@@ -926,6 +1091,10 @@ impl NodeType {
     /// Not exhaustive for `compute`, whose parameters depend on which function
     /// it runs: those are whatever the function wants, so the editor takes
     /// what it is given there and the validation belongs to the function.
+    ///
+    /// # Returns
+    ///
+    /// Each attribute's name and whether it must be stated.
     pub fn attributes(self) -> &'static [(&'static str, bool)] {
         match self {
             NodeType::I2c => &[
@@ -1174,6 +1343,10 @@ impl NodeType {
     /// of that kind -- see [`NodeType::must_name`] -- so the file keeps saying
     /// `{ from: temp_1, to: moc }`, which is what the schema reads it as
     /// anyway.
+    ///
+    /// # Returns
+    ///
+    /// The type's sinks and sources.
     pub fn terminals(self) -> Terminals {
         // What tcslibgs says, where it says anything.
         if let Some(terminals) =
@@ -1211,6 +1384,15 @@ impl NodeType {
     /// sinks drawn on it and the schema calls its sinks its own business, so a
     /// line dragged to the `moc-in` in its upper left was recorded as a link
     /// naming no terminal, and then drawn arriving at the other corner.
+    ///
+    /// # Arguments
+    ///
+    /// * `sink` - `true` for the end where data arrives, `false` for where it
+    ///            leaves.
+    ///
+    /// # Returns
+    ///
+    /// Whether the type has more than one terminal of that kind.
     pub fn must_name(self, sink: bool) -> bool {
         let terminals = self.terminals();
         let how_many = if sink {
@@ -1229,6 +1411,10 @@ impl NodeType {
     /// outside the system, the ground. The palette shows the types under these
     /// headings, which is how the grammar gets taught -- a flat list of twenty
     /// shapes hides the pattern that would make them learnable.
+    ///
+    /// # Returns
+    ///
+    /// The family's heading, as the palette shows it.
     pub fn family(self) -> &'static str {
         match self {
             NodeType::I2c
@@ -1289,6 +1475,10 @@ impl NodeType {
     ///
     /// Listed rather than derived from [`NodeType::family`] so that a new type
     /// has to say which side it is on. The test below checks the two agree.
+    ///
+    /// # Returns
+    ///
+    /// Whether the type belongs in the payload working pane.
     pub fn is_payload(self) -> bool {
         match self {
             NodeType::I2c
@@ -1331,6 +1521,10 @@ impl NodeType {
     /// something outside the system altogether, the ground. Within an outline
     /// the types differ by the edge, the weight and the way the label is set
     /// -- not the size, every node being one size: see `HEIGHT`.
+    ///
+    /// # Returns
+    ///
+    /// The type's outline, edge, weight, size and label.
     pub fn appearance(self) -> Appearance {
         use Edge::*;
         use Outline::*;
@@ -1770,6 +1964,22 @@ mod tests {
     /// Within half a pixel of it, as [`within`] is, and along it rather than
     /// merely in line with it: a dash is a piece of a side, so both ends of it
     /// have to be between the side's own ends.
+    ///
+    /// # Arguments
+    ///
+    /// * `points` - The polygon's corners, in order.
+    /// * `(x, y)` - The spot, in pixels.
+    /// * `closes` - Whether a side runs from the last corner back to the
+    ///              first.
+    ///
+    /// # Returns
+    ///
+    /// Whether the spot is within half a pixel of a side, and between its
+    /// ends.
+    ///
+    /// # Panics
+    ///
+    /// If `closes` is `true` and `points` is empty.
     fn on_edge(
         points: &[(f32, f32)],
         (x, y): (f32, f32),
@@ -1800,6 +2010,15 @@ mod tests {
     /// cross product of an edge and the spot has one sign for every edge of a
     /// shape that holds it. On an edge counts as inside -- a terminal flush
     /// with the side of a square node is not outside it.
+    ///
+    /// # Arguments
+    ///
+    /// * `points` - The path's corners, wound clockwise.
+    /// * `(x, y)` - The spot, in pixels.
+    ///
+    /// # Returns
+    ///
+    /// Whether the spot is inside every edge, allowing half a pixel.
     fn within(points: &[(f32, f32)], (x, y): (f32, f32)) -> bool {
         points.iter().zip(points.iter().cycle().skip(1)).all(
             |((ax, ay), (bx, by))| {
@@ -1820,6 +2039,18 @@ mod tests {
     ///
     /// Only the shapes above are read, which are moves and lines and nothing
     /// else, so this is two words at a time and not a parser.
+    ///
+    /// # Arguments
+    ///
+    /// * `shape` - The path data, made only of `M`, `L` and `Z` commands.
+    ///
+    /// # Returns
+    ///
+    /// Each point of an `M` or `L`, in order.
+    ///
+    /// # Panics
+    ///
+    /// If the path has any other command or a coordinate is not a number.
     fn points_of(shape: &str) -> Vec<(f32, f32)> {
         let words: Vec<&str> = shape.split_whitespace().collect();
         let mut points = Vec::new();

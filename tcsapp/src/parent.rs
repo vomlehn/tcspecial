@@ -170,7 +170,19 @@ pub enum Arrived {
 }
 
 impl End {
-    /// This end of an interface, read and written without waiting.
+    /// Makes this end of an interface, read and written without waiting.
+    ///
+    /// # Arguments
+    ///
+    /// * `socket` - This end's half of the interface's socket pair.
+    ///
+    /// # Returns
+    ///
+    /// The end, with nothing read or written yet.
+    ///
+    /// # Errors
+    ///
+    /// Whatever making the socket non-blocking fails with.
     fn of(socket: UnixStream) -> io::Result<End> {
         socket.set_nonblocking(true)?;
         Ok(End {
@@ -181,11 +193,21 @@ impl End {
         })
     }
 
-    /// Whatever has arrived: a whole packet, nothing yet, or the end.
+    /// Reads whatever has arrived: a whole packet, nothing yet, or the end.
     ///
     /// Reads at most one packet, so a program that has written three leaves
     /// two for the next two calls. Which is what the fabric wants: one datum
     /// per delivery, and the next one when it comes round again.
+    ///
+    /// # Returns
+    ///
+    /// The packet, handed over, or that nothing whole has arrived yet, or
+    /// that the interface has ended.
+    ///
+    /// # Errors
+    ///
+    /// `UnexpectedEof` if the interface ended part way through a packet, or
+    /// whatever reading the socket fails with.
     fn read_now(&mut self) -> io::Result<Arrived> {
         Ok(match self.fill()? {
             // Given away, which is what a caller wanting the packet as a
@@ -197,9 +219,24 @@ impl End {
         })
     }
 
-    /// The same, the packet copied to the front of `out` rather than handed
-    /// over, so that reading one allocates nothing once `got` has grown to
-    /// the longest packet the program writes.
+    /// Reads as [`End::read_now`] does, the packet copied to the front of
+    /// `out` rather than handed over, so that reading one allocates nothing
+    /// once `got` has grown to the longest packet the program writes.
+    ///
+    /// # Arguments
+    ///
+    /// * `out` - Where the packet is copied, from its start.
+    ///
+    /// # Returns
+    ///
+    /// The packet's length, or its length when it is longer than `out` (it
+    /// is then dropped), or that nothing whole has arrived yet, or that the
+    /// interface has ended.
+    ///
+    /// # Errors
+    ///
+    /// `UnexpectedEof` if the interface ended part way through a packet, or
+    /// whatever reading the socket fails with.
     fn read_now_into(&mut self, out: &mut [u8]) -> io::Result<ReadInto> {
         Ok(match self.fill()? {
             Filled::Packet => {
@@ -219,8 +256,18 @@ impl End {
         })
     }
 
-    /// Read until a whole packet is in `got`, or there is nothing more to
+    /// Reads until a whole packet is in `got`, or there is nothing more to
     /// read now, or the interface has ended.
+    ///
+    /// # Returns
+    ///
+    /// Which of the three it was. Part of a packet read is kept, with `want`,
+    /// for the next call.
+    ///
+    /// # Errors
+    ///
+    /// `UnexpectedEof` if the interface ended part way through a packet, or
+    /// whatever reading the socket fails with.
     fn fill(&mut self) -> io::Result<Filled> {
         loop {
             let wanted = match self.want {
@@ -284,10 +331,25 @@ impl End {
         }
     }
 
-    /// And the same, waiting up to `how_long` for one.
+    /// Reads as [`End::read_now`] does, waiting up to `how_long` for a
+    /// packet or the end.
     ///
     /// For a tool and for a test, which have nothing else to do until the
-    /// program answers. `None` waits as long as it takes.
+    /// program answers.
+    ///
+    /// # Arguments
+    ///
+    /// * `how_long` - How long to wait; `None` waits as long as it takes.
+    ///
+    /// # Returns
+    ///
+    /// The packet, or that the interface has ended; never
+    /// [`Arrived::Nothing`].
+    ///
+    /// # Errors
+    ///
+    /// `TimedOut` if nothing arrived in time, and whatever
+    /// [`End::read_now`] or waiting fails with.
     fn read_waiting(
         &mut self,
         how_long: Option<Duration>,
@@ -317,13 +379,21 @@ impl End {
         }
     }
 
-    /// Write a whole packet, waiting for room where there is none.
+    /// Writes a whole packet, waiting for room where there is none.
     ///
     /// A packet written in part would be a length with somebody else's bytes
     /// after it, so this does not answer until all of it has gone. The waiting
     /// is for a program that is not reading: its socket fills, and the only
     /// alternatives to waiting are to lose the datum or to hold it in a queue
     /// of our own, which is a queue with no bound.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The packet's bytes.
+    ///
+    /// # Errors
+    ///
+    /// Whatever [`End::write_framed`] fails with.
     fn write_all(&mut self, data: &[u8]) -> io::Result<()> {
         // Framed in the end's own buffer, taken out while it is written and
         // put back after: it grows to the longest packet written, once.
@@ -334,6 +404,18 @@ impl End {
         written
     }
 
+    /// Frames a packet into `whole` and writes all of it to the socket,
+    /// waiting for room where there is none.
+    ///
+    /// # Arguments
+    ///
+    /// * `whole` - The buffer the framed packet is built in, empty to start.
+    /// * `data`  - The packet's bytes.
+    ///
+    /// # Errors
+    ///
+    /// `InvalidInput` if `data` is too long for a packet, `WriteZero` if the
+    /// socket takes none of it, or whatever writing or waiting fails with.
     fn write_framed(
         &mut self,
         whole: &mut Vec<u8>,
@@ -361,11 +443,21 @@ impl End {
         Ok(())
     }
 
-    /// Wait until the socket can be read or written, or `how_long` is up.
+    /// Waits until the socket can be read or written, or `how_long` is up.
     ///
     /// `poll` on the one descriptor, because a non-blocking socket with
     /// nothing on it has to be waited for somehow and a sleeping loop would
     /// answer late by however long it slept.
+    ///
+    /// # Arguments
+    ///
+    /// * `for_what` - The `poll` events waited for, `POLLIN` or `POLLOUT`.
+    /// * `how_long` - How long to wait, rounded up to a millisecond; `None`
+    ///                waits as long as it takes.
+    ///
+    /// # Errors
+    ///
+    /// Whatever `poll` fails with, other than being interrupted.
     fn ready(
         &self,
         for_what: libc::c_short,
@@ -421,7 +513,7 @@ pub struct Running {
     waits: Option<Duration>,
 }
 
-/// Start `executable` as an app supporting `supports`, run with `arguments`.
+/// Starts `executable` as an app supporting `supports`, run with `arguments`.
 ///
 /// The environment it is given is the one this process has. The arguments are
 /// a short, fixed list and are the one thing an app is told other than over
@@ -439,6 +531,22 @@ pub struct Running {
 /// The data itself never comes this way. What arrives on an interface is what
 /// the node was given, and a command line that carried readings would be a
 /// node whose work was outside both the configuration and the program.
+///
+/// # Arguments
+///
+/// * `executable` - The program an app node is.
+/// * `arguments`  - Its command line, the node's name first.
+/// * `supports`   - Which data interfaces its kind has; descriptors for the
+///                  others are closed in it.
+///
+/// # Returns
+///
+/// The app, running, and this end of its interfaces.
+///
+/// # Errors
+///
+/// A sentence naming the program if a socket pair cannot be made, the
+/// program cannot be started, or an end cannot be made ready.
 pub fn start(
     executable: &Path,
     arguments: &[String],
@@ -528,11 +636,24 @@ pub fn start(
     })
 }
 
-/// The child's half of a pair, as what a command wants for a descriptor.
+/// Gives the child's half of a pair, as what a command wants for a
+/// descriptor.
 ///
 /// Cloned rather than moved out of the pair, so that `start` can hold the
 /// pair until it has every one of them: a half given away before the spawn
 /// could not be given back if the next pair failed to be made.
+///
+/// # Arguments
+///
+/// * `stream` - The child's half of the pair.
+///
+/// # Returns
+///
+/// A clone of it, for the child's descriptor.
+///
+/// # Panics
+///
+/// If the half cannot be cloned.
 fn childs_half(stream: &UnixStream) -> Stdio {
     let held = stream
         .try_clone()
@@ -634,12 +755,16 @@ impl Running {
         said.map(words).transpose()
     }
 
-    /// Say that nothing more will be written to the app.
+    /// Says that nothing more will be written to the app.
     ///
     /// Which is how an app is told to finish: its interfaces end, its reads
     /// answer with nothing left, and it stops of its own accord. A parent that
     /// killed it instead would be a parent that lost whatever it had not yet
     /// written.
+    ///
+    /// # Errors
+    ///
+    /// A sentence saying so if a data interface would not be shut down.
     pub fn no_more(&mut self) -> Result<(), String> {
         for end in [self.payload.as_ref(), self.moc.as_ref()]
             .into_iter()
@@ -675,12 +800,27 @@ impl Running {
         self.waited_for()
     }
 
-    /// The interface, or a sentence about an app that has not got one.
+    /// Gives this end of an interface, or a sentence about an app that has
+    /// not got one.
     ///
     /// Unreachable through the five node types, each of which offers only
     /// what its kind supports -- see `tcspecial::node` -- and here all the
     /// same, because this end of an interface is held in a structure and a
     /// structure cannot refuse at compile time what a type can.
+    ///
+    /// # Arguments
+    ///
+    /// * `end`       - This end of the interface, if the app has it.
+    /// * `interface` - Which interface it is, for the sentence.
+    ///
+    /// # Returns
+    ///
+    /// This end of the interface.
+    ///
+    /// # Errors
+    ///
+    /// A sentence saying the app does not support the interface if `end` is
+    /// `None`.
     fn held(
         end: &mut Option<End>,
         interface: Interface,
@@ -697,11 +837,24 @@ impl Running {
     }
 }
 
-/// A packet that was waited for, as the callers before `Arrived` wanted it.
+/// Turns a packet that was waited for into what the callers before `Arrived`
+/// wanted.
 ///
-/// `None` is the interface having ended. A wait that was up is an error, and
-/// says so: a caller that asked to be told within a time and was not has
-/// learned something about the program.
+/// A wait that was up is an error, and says so: a caller that asked to be
+/// told within a time and was not has learned something about the program.
+///
+/// # Arguments
+///
+/// * `answer`    - What the wait came to.
+/// * `interface` - The interface waited on, for the sentence.
+///
+/// # Returns
+///
+/// The packet, or `None` where the interface has ended.
+///
+/// # Errors
+///
+/// A sentence naming the interface if nothing arrived or the read failed.
 fn waited(
     answer: io::Result<Arrived>,
     interface: Interface,
@@ -717,7 +870,19 @@ fn waited(
     }
 }
 
-/// A complaint as the text it is meant to be.
+/// Turns a complaint into the text it is meant to be.
+///
+/// # Arguments
+///
+/// * `said` - The complaint's bytes.
+///
+/// # Returns
+///
+/// The complaint as text.
+///
+/// # Errors
+///
+/// A sentence saying so if the bytes are not UTF-8.
 fn words(said: Vec<u8>) -> Result<String, String> {
     String::from_utf8(said).map_err(|e| {
         format!(
@@ -794,6 +959,15 @@ mod tests {
         #[global_allocator]
         static ALLOCATOR: Counting = Counting;
 
+        /// Counts the allocations this thread makes while doing `work`.
+        ///
+        /// # Arguments
+        ///
+        /// * `work` - What is done while counting.
+        ///
+        /// # Returns
+        ///
+        /// How many allocations and reallocations it made.
         pub fn allocations_in(work: impl FnOnce()) -> usize {
             COUNT.with(|count| count.set(0));
             COUNTING.with(|on| on.set(true));

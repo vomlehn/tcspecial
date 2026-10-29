@@ -112,9 +112,17 @@ pub fn now() -> Result<Duration, String> {
     })
 }
 
-/// A time as a ping writes it, into `out`: the bytes it took, or `None`
-/// where it does not fit. The one way a ping's time is written, and the way
-/// the vehicle writes it, allocating nothing: see [`reply`].
+/// Writes a time as a ping writes it. The one way a ping's time is written,
+/// and the way the vehicle writes it, allocating nothing: see [`reply`].
+///
+/// # Arguments
+///
+/// * `since_epoch` - The time, since the UNIX epoch.
+/// * `out`         - Where it is written, from the start.
+///
+/// # Returns
+///
+/// How many bytes it took, or `None` where it does not fit.
 fn write_time(since_epoch: Duration, out: &mut [u8]) -> Option<usize> {
     use std::fmt::Write;
 
@@ -162,8 +170,18 @@ pub fn message(count: u64, sent: Duration) -> Result<String, String> {
     Ok(message)
 }
 
-/// [`message`], written onto the end of `out`: how a ground station that
+/// Writes [`message`] onto the end of `out`: how a ground station that
 /// keeps the room for one pings without allocating.
+///
+/// # Arguments
+///
+/// * `count` - The ping's number, from one.
+/// * `sent`  - When it is sent, since the UNIX epoch.
+/// * `out`   - Where the ping is appended.
+///
+/// # Errors
+///
+/// A message, with nothing written, when `count` is nought.
 pub fn write_message(
     count: u64,
     sent: Duration,
@@ -183,7 +201,20 @@ pub fn write_message(
     Ok(())
 }
 
-/// What a ping says, or why it is not one.
+/// Reads what a ping says.
+///
+/// # Arguments
+///
+/// * `bytes` - The ping as it arrived.
+///
+/// # Returns
+///
+/// Its count and the time it was sent.
+///
+/// # Errors
+///
+/// A message quoting it when it is too long, is not ASCII text, lacks the
+/// prefix or the space, or has a count or time that does not read.
 pub fn read_message(bytes: &[u8]) -> Result<Ping, String> {
     if bytes.len() > MESSAGE_BYTES {
         return Err(format!(
@@ -214,12 +245,24 @@ pub fn read_message(bytes: &[u8]) -> Result<Ping, String> {
     })
 }
 
-/// The answer to this ping, had at `answered`: the ping, one space, and the
-/// time.
+/// Answers a ping: the ping, one space, and the time.
 ///
 /// The ping is read before it is answered, so what goes back is always a ping
 /// and its time: a message that is not one is refused here, and the reason
 /// names what was wrong with it.
+///
+/// # Arguments
+///
+/// * `message`  - The ping as it arrived.
+/// * `answered` - When it is answered, since the UNIX epoch.
+///
+/// # Returns
+///
+/// The answer, in a fixed array.
+///
+/// # Errors
+///
+/// What [`read_message`] refuses, and a time that does not fit the answer.
 pub fn reply(message: &[u8], answered: Duration) -> Result<Reply, String> {
     read_message(message)?;
 
@@ -237,7 +280,20 @@ pub fn reply(message: &[u8], answered: Duration) -> Result<Reply, String> {
     Ok(reply)
 }
 
-/// What an answer says, or why it is not one.
+/// Reads what an answer to a ping says.
+///
+/// # Arguments
+///
+/// * `bytes` - The answer as it arrived.
+///
+/// # Returns
+///
+/// The ping it answers and when the vehicle answered it.
+///
+/// # Errors
+///
+/// A message quoting it when it is too long, has no space, holds a ping
+/// [`read_message`] refuses, or has a time that does not read.
 pub fn read_reply(bytes: &[u8]) -> Result<Pong, String> {
     if bytes.len() > REPLY_BYTES {
         return Err(format!(
@@ -270,7 +326,20 @@ pub fn read_reply(bytes: &[u8]) -> Result<Pong, String> {
     Ok(Pong { ping, answered })
 }
 
-/// A count: decimal digits, from one, with no leading nought.
+/// Reads a count: decimal digits, from one, with no leading nought.
+///
+/// # Arguments
+///
+/// * `text` - The count as the ping wrote it.
+///
+/// # Returns
+///
+/// The count.
+///
+/// # Errors
+///
+/// A message when it is not digits, starts with a nought or does not fit in
+/// 64 bits.
 fn read_count(text: &str) -> Result<u64, String> {
     if text.is_empty() || !text.bytes().all(|b| b.is_ascii_digit()) {
         return Err(format!("the count \"{text}\" is not a whole number"));
@@ -286,12 +355,26 @@ fn read_count(text: &str) -> Result<u64, String> {
     })
 }
 
-/// A time: whole seconds, a point, and exactly nine digits of nanoseconds.
+/// Reads a time: whole seconds, a point, and exactly nine digits of
+/// nanoseconds.
 ///
 /// Exactly nine, not up to nine: a time written to the millisecond would read
 /// as the same number, and the format promises nanoseconds. The whole seconds
 /// are held to the one spelling as well, no leading nought but in nought
 /// itself, so that a time has one way to be written.
+///
+/// # Arguments
+///
+/// * `text` - The time as the ping wrote it.
+///
+/// # Returns
+///
+/// The time, since the UNIX epoch.
+///
+/// # Errors
+///
+/// A message when it is not in that one spelling, or has more seconds than
+/// 64 bits hold.
 fn read_time(text: &str) -> Result<Duration, String> {
     let wrong = || {
         format!(
@@ -317,8 +400,16 @@ fn read_time(text: &str) -> Result<Duration, String> {
     Ok(Duration::new(seconds, nanoseconds))
 }
 
-/// A message, for a complaint: as text where it is text, and cut short where
-/// it is long, so that one bad datagram cannot fill a log.
+/// Shows a message for a complaint: as text where it is text, and cut short
+/// where it is long, so that one bad datagram cannot fill a log.
+///
+/// # Arguments
+///
+/// * `bytes` - The message.
+///
+/// # Returns
+///
+/// It quoted and escaped, with "..." where it was cut.
 fn said(bytes: &[u8]) -> String {
     let shown = &bytes[..bytes.len().min(REPLY_BYTES)];
     let more = if bytes.len() > shown.len() { "..." } else { "" };

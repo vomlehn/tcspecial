@@ -36,7 +36,16 @@ pub struct Where {
 pub const THE_FILE_ITSELF: usize = 1;
 
 impl Where {
-    /// Scan `text` for the entries of a file written in `format`.
+    /// Scans `text` for the entries of a file written in `format`.
+    ///
+    /// # Arguments
+    ///
+    /// * `text`   - The file's text.
+    /// * `format` - What it is written in.
+    ///
+    /// # Returns
+    ///
+    /// Where each entry and section is.
     pub fn of(text: &str, format: ConfigFormat) -> Where {
         match format {
             ConfigFormat::Yaml => yaml(text),
@@ -44,11 +53,20 @@ impl Where {
         }
     }
 
-    /// The line to report a problem about `about` on.
+    /// Finds the line to report a problem about `about` on.
     ///
-    /// The first line an entry's name is written on. A name written twice --
-    /// which is itself a problem -- is reported from the first of them, that
-    /// being the definition the others are duplicates of.
+    /// A name written twice -- which is itself a problem -- is reported from
+    /// the first of them, that being the definition the others are
+    /// duplicates of.
+    ///
+    /// # Arguments
+    ///
+    /// * `about` - What the problem is about.
+    ///
+    /// # Returns
+    ///
+    /// The first line the entry's name is written on, or else its section's
+    /// line, or else [`THE_FILE_ITSELF`].
     pub fn line_of(&self, about: &About) -> usize {
         // Which sections an entry of this kind may be written in, and the name
         // to look for. Three for a node: the sections are the editor's three
@@ -88,6 +106,14 @@ impl Where {
             .unwrap_or(THE_FILE_ITSELF)
     }
 
+    /// Records where an entry is, unless one of that name in that section
+    /// was found first. An empty section or name is not recorded.
+    ///
+    /// # Arguments
+    ///
+    /// * `section` - The section the entry is in.
+    /// * `name`    - Its name.
+    /// * `line`    - The line it is written on, from 1.
     fn note(&mut self, section: &str, name: &str, line: usize) {
         if section.is_empty() || name.is_empty() {
             return;
@@ -102,11 +128,20 @@ impl Where {
     }
 }
 
-/// The `name` of a flow mapping, given what is inside its braces.
+/// Finds the `name` of a flow mapping, given what is inside its braces.
 ///
 /// A scan and not a parse, as everything here is: the file has already
 /// parsed, so the question is only where a name was written. Commas separate
 /// the entries and the first `name:` wins, which is the one a reader sees.
+///
+/// # Arguments
+///
+/// * `inside` - What follows the opening brace, the closing one included or
+///              not.
+///
+/// # Returns
+///
+/// The name, unquoted, or `None` if there is no `name:`.
 fn flow_name(inside: &str) -> Option<&str> {
     inside
         .trim_end_matches('}')
@@ -116,12 +151,20 @@ fn flow_name(inside: &str) -> Option<&str> {
         .map(unquoted)
 }
 
-/// What a YAML file says where.
+/// Finds what a YAML file says where.
 ///
 /// A section is a key at the left margin; an entry is a `name:` under one.
 /// That is the whole of the shape these files have -- every section is a list
 /// of named things, or the `tcspecial` mapping -- so nothing here has to know
 /// what any of them mean.
+///
+/// # Arguments
+///
+/// * `text` - The file's text.
+///
+/// # Returns
+///
+/// Where each entry and section is.
 fn yaml(text: &str) -> Where {
     let mut found = Where::default();
     let mut section = String::new();
@@ -167,12 +210,20 @@ fn yaml(text: &str) -> Where {
     found
 }
 
-/// What an XML file says where.
+/// Finds what an XML file says where.
 ///
 /// The sections are the elements under the root and the entries are their
 /// `name` children, which is the convention a payload configuration in XML
 /// follows. A `name` attribute is read as well: it is how the format that is
 /// gone wrote one, and a file written that way is better pointed at than not.
+///
+/// # Arguments
+///
+/// * `text` - The file's text.
+///
+/// # Returns
+///
+/// Where each entry and section is.
 fn xml(text: &str) -> Where {
     let mut found = Where::default();
     let mut section = String::new();
@@ -247,7 +298,17 @@ fn xml(text: &str) -> Where {
     found
 }
 
-/// The value of one attribute of a start tag, if it has one.
+/// Finds the value of one attribute of a start tag, if it has one.
+///
+/// # Arguments
+///
+/// * `body`   - The tag, without its angle brackets.
+/// * `wanted` - The attribute's name.
+///
+/// # Returns
+///
+/// The value, without its quotes, or `None` where the attribute is not
+/// given in quotes.
 fn attribute<'a>(body: &'a str, wanted: &str) -> Option<&'a str> {
     let mut rest = body;
     while let Some(equals) = rest.find('=') {
@@ -268,7 +329,16 @@ fn attribute<'a>(body: &'a str, wanted: &str) -> Option<&'a str> {
     None
 }
 
-/// A YAML scalar as the name it is, without the quotes a file may put on it.
+/// Gives a YAML scalar as the name it is, without the quotes a file may put
+/// on it.
+///
+/// # Arguments
+///
+/// * `value` - The scalar as written.
+///
+/// # Returns
+///
+/// It trimmed, and without one matching pair of quotes around it.
 fn unquoted(value: &str) -> &str {
     let value = value.trim();
     for quote in ['"', '\''] {

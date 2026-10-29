@@ -1,3 +1,4 @@
+/// Compiles the simulator's window, `ui/main.slint`, with debug info.
 fn main() {
     // With debug info the compiled window keeps the names of its elements,
     // which is how the layout test finds them: it opens the window headlessly

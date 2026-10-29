@@ -3158,6 +3158,8 @@ mod tests {
         let said = peripheral(&[("max_speed", "1000000"), ("spi_mode", "4")])
             .expect_err("there are four of them");
         assert!(said.contains("not one of 0, 1, 2, or 3"), "{said}");
+        // Named as the file names it, so that the line to change is found.
+        assert!(said.contains("spi_mode: \"4\""), "{said}");
     }
 
     #[test]

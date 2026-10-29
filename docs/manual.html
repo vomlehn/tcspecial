@@ -3587,25 +3587,12 @@ beaconing:</p>
 <p>It is said again only when a datagram comes from a different address than
 the last one warned of, not for every datagram, so that something sending
 steadily does not bury everything else.</p>
-<p><tt class="docutils literal">Last msg</tt> reads <tt class="docutils literal">&lt;none&gt;</tt> until a beacon arrives. <tt class="docutils literal">v</tt> is the software
+<p class="last"><tt class="docutils literal">Last msg</tt> reads <tt class="docutils literal">&lt;none&gt;</tt> until a beacon arrives. <tt class="docutils literal">v</tt> is the software
 flying and <tt class="docutils literal">md5</tt> the digest of the configuration file tcspecial read, so
 the line says what is up there without anything having to connect first.
 The answer to a <tt class="docutils literal">CONNECT</tt> says the same two in the same words: see <a class="reference internal" href="#what-each-end-read">What each end read</a>. A datagram the MOC cannot read is shown as
 what arrived, cut short, rather than left off the line: something else
 sending to the group is worth seeing beside a green indicator.</p>
-<p class="last">Under the box, while there is one, is a red line saying the vehicle's data
-is <em>held</em>, why, and a <tt class="docutils literal">Path purged</tt> button. A datum the vehicle sends
-is the node's bytes and nothing else, so one that an earlier configuration
-sent -- still held by a relay or a recorder when the vehicle switched --
-cannot be told from one the new configuration sent, and may arrive at a
-port the new one gives to another node. So from the moment the beacons
-say the vehicle's configuration or interface has changed, or is not the
-one this window read, or that the vehicle was restarted by command before
-the window heard it, no data is put in any panel. Purge everything on the
-path that could hold what the earlier configuration sent, then press
-<tt class="docutils literal">Path purged</tt>. It is refused while the vehicle is serving a different
-configuration than this window read, and the line then says which two:
-open the one it is serving first.</p>
 </dd>
 <dt>the <tt class="docutils literal">Command</tt> menu</dt>
 <dd>The commands below.</dd>

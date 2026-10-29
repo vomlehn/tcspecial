@@ -457,7 +457,7 @@ ul.auto-toc {
 <li><a class="reference internal" href="#the-generation-number-and-the-state-file" id="toc-entry-68">The generation number and the state file</a></li>
 <li><a class="reference internal" href="#the-beacon-across-a-restart" id="toc-entry-69">The beacon across a restart</a></li>
 <li><a class="reference internal" href="#what-the-ground-may-send-meanwhile" id="toc-entry-70">What the ground may send meanwhile</a></li>
-<li><a class="reference internal" href="#what-is-held-at-the-moc" id="toc-entry-71">What is held at the MOC</a></li>
+<li><a class="reference internal" href="#downlinked-data-across-a-switch" id="toc-entry-71">Downlinked data across a switch</a></li>
 <li><a class="reference internal" href="#holes-in-this-and-what-closes-them" id="toc-entry-72">Holes in this, and what closes them</a></li>
 </ul>
 </li>
@@ -6026,10 +6026,10 @@ what both rest on are in <a class="reference internal" href="#kinds-of-restart">
 <h1><a class="toc-backref" href="#toc-entry-64">Fault Resiliency</a></h1>
 <p>What tcspecial and the ground do about faults, in one place: what is
 assumed, how each kind of start is handled, how commands survive a link that
-loses and repeats them, and what is done should one arrive out of order, what the beacon says across a restart, what
-the ground holds, and what is still open. The sections before say as much of
-this as they need to explain how something works, and point here for the
-rule.</p>
+loses and repeats them and what is done should one arrive out of order, what
+the beacon says across a restart, how downlinked data is read across a
+switch, and what is still open. The sections before say as much of this as
+they need to explain how something works, and point here for the rule.</p>
 <p>The order the qualities are ranked in decides what is here: a fault is
 answered with what is most reliable, and a design that would be easier to
 use or more flexible is not taken where it would be less sure.</p>
@@ -6336,54 +6336,22 @@ command says where the sender knows none, and an answer that carries
 nought is read as saying nothing of it.</dd>
 </dl>
 </div>
-<div class="section" id="what-is-held-at-the-moc">
-<h2><a class="toc-backref" href="#toc-entry-71">What is held at the MOC</a></h2>
+<div class="section" id="downlinked-data-across-a-switch">
+<h2><a class="toc-backref" href="#toc-entry-71">Downlinked data across a switch</a></h2>
 <p>What the vehicle downlinks from a node is the node's bytes and nothing else:
 no header, no generation, no time. Which node sent a datum is the port it
 arrives at, and how to read it is that node's configuration. A switch of
 configuration -- commanded, or a fallback to the golden build -- can give a
-port to another node, or a node another format, and a datum the old start
-sent can still be on its way after the switch: held by a relay or a
-store-and-forward node, or played back from a recorder. Nothing in it says
-so. A mark on every datum would close that for any path at a cost on every
-datum, for something that happens only at a switch, so the ground holds the
-data instead, at no cost on the link, and the operators purge the path.</p>
+port to another node, or a node another format.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd>Before a new configuration is tested, everything on the path from the
-vehicle that can hold what the previous configuration sent -- the MOC's
-own recorders and queues, and a relay's or a gateway's where the mission
-controls them -- is purged of it. This is a constraint on operations,
-outside tcspecial; what follows is how the ground holds to it, and how it
-is protected where it is not kept.</dd>
-<dt>Requirement</dt>
-<dd>A ground station built on <tt class="docutils literal">tcslib</tt> holds the vehicle's data, in a
-<tt class="docutils literal"><span class="pre">tcslib::moc::DataHold</span></tt> that every beacon is handed and every <tt class="docutils literal">Moc</tt>
-it opens shares, from the moment a beacon says the vehicle serves a
-configuration or interface other than the beacon before it, or other
-than the one the station reads with, or is the first beacon the station
-has heard and is of a commanded start, which may have changed what the
-station did not see change. The digests the beacon carries are what say
-so, so a fallback to the golden build, which nobody commanded, is held
-for as surely as a switch.</dd>
-<dt>Requirement</dt>
-<dd>A datum that arrives while data is held is returned marked held: its
-bytes and the port it arrived at, with nothing claimed about which node
-sent it or what format it is in. Nothing is thrown away, so that a
-recording can be read afterwards by whoever knows which configuration
-each datum was written under; nothing is buffered to be attributed
-later, because an old datum and a new one look the same. The hold is
-asked once for each datum, as it is taken, without a lock or an
-allocation.</dd>
-<dt>Requirement</dt>
-<dd>A hold ends only when the station says the path has been purged -- the
-<tt class="docutils literal">Path purged</tt> button in tcsmoc, <tt class="docutils literal"><span class="pre">DataHold::purged</span></tt> in Rust,
-<tt class="docutils literal">tcs_hold_purged</tt> in C and C++ -- and that is refused, saying both
-digests, while the vehicle serves another configuration or interface
-than the station reads with: purging the path does not make the station
-read the right configuration. One hold for a station, shared by every
-<tt class="docutils literal">Moc</tt> it opens, so that opening the new configuration's <tt class="docutils literal">moc</tt> nodes
-after a switch does not end it.</dd>
+<dd>The ground reads every datum with the definitions of the last beacon
+before it, and holds nothing back. A datum the old start sent arrives
+before the first beacon of the new one, because the radio delivers in
+order and everything either side of it uses reliable datagrams: see
+<a class="reference internal" href="#what-is-assumed">What is assumed</a>. Nothing on the path needs purging at a switch, and
+a mark on every datum would pay on every datum for what the order of
+arrival already says.</dd>
 </dl>
 </div>
 <div class="section" id="holes-in-this-and-what-closes-them">
@@ -6416,15 +6384,14 @@ again; without one the vehicle is gone, which is why one is required.</dd>
 the generation again from 1, and the ground judges a restart by any change
 of generation, so a reset count is still seen.</dd>
 <dt>Downlinked data from before a switch</dt>
-<dd>A datum carries nothing that says which configuration wrote it, and the
-path may hold one across a switch. The ground holds every datum from the
-beacon that shows the change until the station says the path is purged.
-What is left open is a stale datum that arrives after the purge has been
-declared, which is read with the new definitions. Where a mission's path
-cannot be purged -- a relay the mission does not control -- the remedy is
-a mark of a byte on every datum: a count of changes of format, seven bits,
-kept in the state file and carried in the beacon's spare bits, which the
-ground compares with each datum's.</dd>
+<dd>A datum carries nothing that says which configuration wrote it. It is
+told apart by when it arrives: before the new start's first beacon, in
+order, as <a class="reference internal" href="#downlinked-data-across-a-switch">Downlinked data across a switch</a> says. Should a path that
+reorders ever be flown -- a relay that stores and forwards, or a
+recorder played back -- the remedy is a mark of a byte on every datum:
+a count of changes of format, seven bits, kept in the state file and
+carried in the beacon's spare bits, which the ground compares with each
+datum's.</dd>
 <dt>A restart nobody commanded changing the format</dt>
 <dd>A crash or a power cycle is a restart the ground did not ask for. It
 runs with the definitions it had, so nothing the ground sends is read
@@ -6457,8 +6424,7 @@ upload replaces it.</dd>
 <dt>A beacon delayed past a later one</dt>
 <dd>A beacon numbered at or before the last of its generation, or of an
 earlier generation, is taken for late and counts for nothing, so the
-generation a station hands <tt class="docutils literal">TcsClient</tt> and the digests it hands its
-<tt class="docutils literal">DataHold</tt> are the latest start's. Generations only go up but for a
+generation a station hands <tt class="docutils literal">TcsClient</tt> is the latest start's. Generations only go up but for a
 damaged state file, which starts again from one: its #1 is a start, and
 so is a second beacon of it where its #1 was lost. What is left open
 is two beacons of a start that has gone arriving in order after the new

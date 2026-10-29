@@ -105,19 +105,12 @@ int main(int argc, char **argv)
 	    pinger == NULL) {
 		return fail("open");
 	}
-	/* The station's hold on the vehicle's data, which every beacon is
-	 * handed and every moc node asks. */
-	tcs_hold *hold = tcs_hold_new();
-	if (hold == NULL || tcs_moc_share_hold(moc, hold) != 0) {
-		return fail("hold");
-	}
 
 	/* The first beacon: what the vehicle is flying, before anything has
 	 * been asked of it. */
 	tcs_pass pass;
 	do {
-		if (tcs_beacons_pass(beacons, &pass) != 0 ||
-		    tcs_hold_beacon_heard(hold, beacons) < 0) {
+		if (tcs_beacons_pass(beacons, &pass) != 0) {
 			return fail("beacon");
 		}
 		for (size_t w = 0; w < tcs_beacons_warning_count(beacons);
@@ -130,8 +123,6 @@ int main(int argc, char **argv)
 	       pass.stage == TCS_STAGE_HEARD && pass.in_contact ?
 	       "" : " (not in contact)",
 	       tcs_beacons_said(beacons));
-	printf("data held: %s\n",
-	       tcs_hold_held(hold) == 0 ? "no" : tcs_hold_why(hold));
 
 	int agrees = 0;
 	if (tcs_client_connect(client, &agrees) != 0) {
@@ -227,9 +218,7 @@ int main(int argc, char **argv)
 		if (got < 0) {
 			return fail("data");
 		}
-		/* Held: which node sent it, and in what format, is not
-		 * known, so it is not taken for anything. */
-		if (got == 0 || datum.held) {
+		if (got == 0) {
 			continue;
 		}
 		if (strcmp(datum.source, tcs_pinger_node(pinger)) == 0
@@ -258,7 +247,6 @@ int main(int argc, char **argv)
 	tcs_pinger_close(pinger);
 	tcs_client_close(client);
 	tcs_moc_close(moc);
-	tcs_hold_free(hold);
 	tcs_beacons_close(beacons);
 	tcs_configuration_close(configuration);
 	return 0;

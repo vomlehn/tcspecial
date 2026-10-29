@@ -3477,20 +3477,6 @@ the beacon box
   what arrived, cut short, rather than left off the line: something else
   sending to the group is worth seeing beside a green indicator.
 
-  Under the box, while there is one, is a red line saying the vehicle's data
-  is *held*, why, and a ``Path purged`` button. A datum the vehicle sends
-  is the node's bytes and nothing else, so one that an earlier configuration
-  sent -- still held by a relay or a recorder when the vehicle switched --
-  cannot be told from one the new configuration sent, and may arrive at a
-  port the new one gives to another node. So from the moment the beacons
-  say the vehicle's configuration or interface has changed, or is not the
-  one this window read, or that the vehicle was restarted by command before
-  the window heard it, no data is put in any panel. Purge everything on the
-  path that could hold what the earlier configuration sent, then press
-  ``Path purged``. It is refused while the vehicle is serving a different
-  configuration than this window read, and the line then says which two:
-  open the one it is serving first.
-
 the ``Command`` menu
   The commands below.
 

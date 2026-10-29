@@ -26,12 +26,7 @@ linkage throughout, and nothing in it that C++ will not compile.
   news, and warnings, which are to be said whether or not anybody asked.
 - **The vehicle's data.** `tcs_moc_open` opens a `moc` node, and each
   `tcs_moc_receive` returns one datum and the name of the node that produced
-  it. A station's `tcs_hold`, shared with each `moc` node by
-  `tcs_moc_share_hold` and handed every pass's beacon by
-  `tcs_hold_beacon_heard`, marks a datum `held` from the moment the beacons
-  say the vehicle's configuration changed until `tcs_hold_purged` says the
-  path from the vehicle has been purged of what the old one sent: a held
-  datum's source and format are not known.
+  it.
 - **Commands.** `tcs_client_open` opens the two command links the
   configuration states. `tcs_client_connect` says whether the vehicle is
   flying this configuration; then ping; start, stop or query a node by its

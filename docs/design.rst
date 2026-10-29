@@ -5607,10 +5607,15 @@ there should have been in between.
 
 Requirement
     The count is the sender's, so it starts again at one when tcspecial does.
-    The generation is what says a start; within one generation a number
-    that starts again at one is a start that could not count itself, and
-    any other number that does not go forward is a beacon the link delayed
-    past a later one or delivered twice, which counts for nothing. The MOC
+    The generation is what says a start: a later one is a start, and so is
+    an earlier one numbered #1, which is how a start whose state file was
+    damaged begins. Within one generation a number that starts again at one
+    is a start that could not count itself. Any other beacon that does not
+    go forward -- numbered at or before the last of its generation, or of
+    an earlier generation -- is one the link delayed past a later one or
+    delivered twice, and counts for nothing; but a second beacon of an
+    earlier generation, numbered after the first one taken for late, is the
+    start it is, whose #1 was lost, and is counted from then on. The MOC
     says which it was: *n beacons did not arrive*, *the beacons start again
     at #1, so tcspecial has restarted*, or *beacon #n arrived late, after
     #m*. See `What is assumed`_.
@@ -5968,6 +5973,17 @@ Requirement
     itself, and says so in the log and in the answer to CONNECT. The fallback
     is the one start nobody commanded that may change the definitions, and
     the interface digest in its beacons says that it has.
+
+Requirement
+    A load set is given up after failing to be heard from, not only on trial.
+    The state file counts the starts of the chosen load set in a row that
+    ended -- crashed, lost power, or failed their check -- before a valid
+    packet from the MOC arrived, and the count goes back to nought with each
+    one that is heard from. A load set whose count reaches ``load_trials``,
+    confirmed or not, is not started again, and the golden build falls back
+    as it does for one on trial. A load set confirmed once that later fails
+    at every start is then given up as surely as one that never worked, and
+    a crash that keeps its definitions cannot keep them for ever.
 
 Lost, late and repeated commands
 --------------------------------
@@ -6328,23 +6344,22 @@ The full interface breaking the way in
     upload replaces it.
 
 A beacon delayed past a later one
-    Within one generation a beacon numbered at or before the last is taken
-    for late, not for a restart, and the count goes on from the later one.
-    Still open: a late beacon of the generation before, arriving after the
-    new generation's, is taken for another restart, and a station that
-    hands it to ``TcsClient`` sends for that generation until the vehicle
-    refuses a command as ``WrongGeneration`` and the next beacon says
-    again. Generations only go up, but for a damaged state file starting
-    again from one, so the remedy is to take a generation before the last
-    for late unless its beacon is numbered #1.
+    A beacon numbered at or before the last of its generation, or of an
+    earlier generation, is taken for late and counts for nothing, so the
+    generation a station hands ``TcsClient`` and the digests it hands its
+    ``DataHold`` are the latest start's. Generations only go up but for a
+    damaged state file, which starts again from one: its #1 is a start, and
+    so is a second beacon of it where its #1 was lost. What is left open
+    is two beacons of a start that has gone arriving in order after the new
+    start's, which are taken for a start until the next beacon of the new
+    one says otherwise.
 
 A confirmed load set that later fails at every start
-    A load set is given up after ``load_trials`` starts that the MOC was not
-    heard in, and a crash keeps the definitions it had. Still open: a load
-    set confirmed once, that later fails at every start before the MOC is
-    heard, is started again and again. The remedy is to count every start,
-    not only those on trial, that ends before a valid packet from the MOC
-    arrives, and to fall back after ``load_trials`` of them in a row.
+    A crash keeps the definitions it had, so a load set that fails at every
+    start would be started for ever. Every start of a load set that ends
+    before the MOC is heard from is counted, in a row and whether the set
+    was confirmed or not, and ``load_trials`` of them give it up: see
+    `Kinds of restart`_.
 
 Still open
     The command link carries no authentication. Anyone who can reach it can

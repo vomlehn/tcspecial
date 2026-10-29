@@ -422,6 +422,10 @@ def counted(last, now):
     if last is None:
         return Counted.FIRST, 0
     if last[0] != now[0]:
+        # Earlier, and not #1: a beacon of a start that has gone, delayed
+        # past the new start's. The Rust's rule.
+        if now[0] < last[0] and now[1] != 1:
+            return Counted.LATE, 0
         return Counted.RESTARTED, 0
     last, now = last[1], now[1]
     # #1 is a start that kept no generation; any other number at or before
@@ -482,6 +486,10 @@ class Beacons:
         self._at = None
         self._said = NO_BEACON_MESSAGE
         self._count = None
+        # A beacon of an earlier generation taken for late, so that a second
+        # of that generation after it is taken for the start it is: see
+        # tcslib::beacon::Counter.
+        self._late = None
         self._differed = False
         # The last stranger warned of, so that one sending steadily is warned
         # of once and not on every datagram.
@@ -560,6 +568,12 @@ class Beacons:
             now = (heard.generation, heard.sequence)
             last = self._count
             kind, missed = counted(last, now)
+            if kind is Counted.LATE and last[0] != now[0]:
+                late = self._late
+                if late is not None and late[0] == now[0] and late[1] < now[1]:
+                    kind = Counted.RESTARTED
+                else:
+                    self._late = now
             if kind is Counted.MISSED:
                 remarks.append(
                     f"{missed} beacon{'' if missed == 1 else 's'} did not "
@@ -567,6 +581,11 @@ class Beacons:
                 )
             elif kind is Counted.RESTARTED:
                 remarks.append(restarted(last, now, heard.commanded_restart))
+            elif kind is Counted.LATE and last[0] != now[0]:
+                remarks.append(
+                    f"beacon #{now[1]} of generation {now[0]} arrived late, "
+                    f"after generation {last[0]} #{last[1]}"
+                )
             elif kind is Counted.LATE:
                 remarks.append(
                     f"beacon #{heard.sequence} arrived late, after #{last[1]}"
@@ -574,6 +593,7 @@ class Beacons:
             # A late beacon is the past: the count goes on from the later one.
             if kind is not Counted.LATE:
                 self._count = now
+                self._late = None
 
         return self.after(Arrived.BEACON, remarks, heard.message)
 

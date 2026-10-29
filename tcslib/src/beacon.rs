@@ -661,10 +661,12 @@ pub enum Counted {
     /// The numbering started again, or the generation changed, which is a
     /// spacecraft that restarted.
     Restarted,
-    /// A beacon of the same start as the last, numbered at or before it:
-    /// one delayed past a later one, or one delivered twice. The link keeps
-    /// no order, so this is the link's doing and not the spacecraft's, and
-    /// the count goes on from the later one.
+    /// A beacon the link delayed past a later one, or delivered twice: one
+    /// of the same start as the last numbered at or before it, or one of an
+    /// earlier generation. The link keeps no order, so this is the link's
+    /// doing and not the spacecraft's, and the count goes on from the later
+    /// one. See [`Counter`] for when an earlier generation is a start after
+    /// all.
     Late,
 }
 
@@ -678,10 +680,64 @@ pub enum Counted {
 pub fn counted(last: Option<Count>, now: Count) -> Counted {
     match last {
         None => Counted::First,
-        // A generation that changed, whichever way, is a start: see
-        // `tcslibgs::Beacon::generation`.
-        Some(last) if last.generation != now.generation => Counted::Restarted,
+        // A later generation is a start. So is an earlier one numbered #1,
+        // which is how a start whose state file was damaged, and which
+        // counted again from one, begins: see `tcslibgs::Beacon::generation`.
+        // Any other earlier one is a beacon of a start that has gone,
+        // delayed past the beacons of the one that replaced it.
+        Some(last) if last.generation != now.generation => {
+            if now.generation < last.generation && now.sequence != 1 {
+                Counted::Late
+            } else {
+                Counted::Restarted
+            }
+        }
         Some(last) => counted_within(last.sequence, now.sequence),
+    }
+}
+
+/// The count of the beacons heard: the last that counted, and whether the
+/// beacon before this one was of an earlier generation and taken for late.
+///
+/// Late beacons come singly, delayed one at a time on the way; a start
+/// whose state file was damaged, counting again from one, sends one after
+/// another. So a beacon of an earlier generation is taken for late, and a
+/// second of that same generation, numbered after the first, is taken for
+/// the start it is -- its #1 having been lost -- rather than every beacon of
+/// it being taken for late for ever.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Counter {
+    last: Option<Count>,
+    late: Option<Count>,
+}
+
+impl Counter {
+    /// The last beacon that counted.
+    pub fn last(&self) -> Option<Count> {
+        self.last
+    }
+
+    /// What a beacon numbered `now` says, which goes into the count unless
+    /// it was late.
+    pub fn heard(&mut self, now: Count) -> Counted {
+        let mut kind = counted(self.last, now);
+        let earlier = self.last.is_some_and(|l| l.generation != now.generation);
+        if kind == Counted::Late && earlier {
+            let again = self.late.is_some_and(|late| {
+                late.generation == now.generation
+                    && late.sequence < now.sequence
+            });
+            if again {
+                kind = Counted::Restarted;
+            } else {
+                self.late = Some(now);
+            }
+        }
+        if kind != Counted::Late {
+            self.last = Some(now);
+            self.late = None;
+        }
+        kind
     }
 }
 
@@ -795,7 +851,7 @@ pub struct Beacons {
     last: Pass,
     /// The generation and number of the last beacon, so the next can say
     /// what happened in between.
-    count: Option<Count>,
+    count: Counter,
     /// Whether the last beacon announced a different configuration, so that
     /// the change is remarked on and the state is not.
     differed: bool,
@@ -841,7 +897,7 @@ impl Beacons {
             expected,
             at: None,
             last,
-            count: None,
+            count: Counter::default(),
             differed: false,
             stranger: None,
         })
@@ -928,8 +984,9 @@ impl Beacons {
                         generation: beacon.generation,
                         sequence: beacon.sequence,
                     };
-                    let last = self.count;
-                    match counted(last, now) {
+                    let last = self.count.last();
+                    let kind = self.count.heard(now);
+                    match kind {
                         Counted::Missed(missed) => remarks.push(format!(
                             "{missed} beacon{} did not arrive: #{} came after \
                              #{}",
@@ -942,19 +999,14 @@ impl Beacons {
                             now,
                             beacon.commanded_restart,
                         )),
-                        Counted::Late => remarks.push(format!(
-                            "beacon #{} arrived late, after #{}",
-                            now.sequence,
-                            last.map_or(0, |last| last.sequence)
-                        )),
+                        Counted::Late => remarks.push(late(last, now)),
                         Counted::First | Counted::Next => {}
                     }
                     // A late beacon is the past: what is known is what the
                     // later one said.
-                    if counted(last, now) == Counted::Late {
+                    if kind == Counted::Late {
                         return self.after(Arrived::Beacon);
                     }
-                    self.count = Some(now);
                     self.last.generation = Some(beacon.generation);
                     self.last.commanded_restart = beacon.commanded_restart;
                     self.last.serving = Some((beacon.digest, beacon.interface));
@@ -1029,6 +1081,23 @@ fn restarted(last: Option<Count>, now: Count, commanded: bool) -> String {
         _ => format!(
             "the beacons start again at #{}, so tcspecial has restarted {how}",
             now.sequence
+        ),
+    }
+}
+
+/// What to say of a beacon that arrived late: the same words in every station
+/// and in the Python.
+fn late(last: Option<Count>, now: Count) -> String {
+    match last {
+        Some(last) if last.generation != now.generation => format!(
+            "beacon #{} of generation {} arrived late, after generation {} \
+             #{}",
+            now.sequence, now.generation, last.generation, last.sequence
+        ),
+        _ => format!(
+            "beacon #{} arrived late, after #{}",
+            now.sequence,
+            last.map_or(0, |last| last.sequence)
         ),
     }
 }
@@ -1496,7 +1565,10 @@ mod tests {
             counted(Some(count(3, 5)), count(4, 90)),
             Counted::Restarted
         );
-        assert_eq!(counted(Some(count(9, 5)), count(1, 6)), Counted::Restarted);
+        // Down, numbered #1: a start that counted again from one.
+        assert_eq!(counted(Some(count(9, 5)), count(1, 1)), Counted::Restarted);
+        // Down, numbered otherwise: a beacon of a start that has gone.
+        assert_eq!(counted(Some(count(9, 5)), count(8, 40)), Counted::Late);
         assert_eq!(counted(Some(count(4, 5)), count(4, 6)), Counted::Next);
         assert_eq!(
             restarted(Some(count(3, 5)), count(4, 90), true),
@@ -1507,6 +1579,33 @@ mod tests {
             restarted(Some(count(3, 5)), count(4, 90), false),
             "tcspecial has restarted without being commanded to, with the \
              definitions it had: generation 4 is flying, after 3"
+        );
+    }
+
+    /// A beacon of an earlier generation is late, and counts for nothing;
+    /// a second of that generation, numbered after it, is the start it is,
+    /// whose #1 was lost.
+    #[test]
+    fn a_beacon_of_an_earlier_generation_is_late_unless_another_follows() {
+        let count = |generation, sequence| Count {
+            generation,
+            sequence,
+        };
+        let mut counter = Counter::default();
+        assert_eq!(counter.heard(count(5, 1)), Counted::First);
+        assert_eq!(counter.heard(count(5, 2)), Counted::Next);
+        assert_eq!(counter.heard(count(4, 90)), Counted::Late);
+        assert_eq!(counter.last(), Some(count(5, 2)), "not counted");
+        assert_eq!(counter.heard(count(5, 3)), Counted::Next);
+
+        // A damaged state file: generation 1 again, its #1 lost.
+        assert_eq!(counter.heard(count(1, 2)), Counted::Late);
+        assert_eq!(counter.heard(count(1, 3)), Counted::Restarted);
+        assert_eq!(counter.last(), Some(count(1, 3)));
+        assert_eq!(counter.heard(count(1, 4)), Counted::Next);
+        assert_eq!(
+            late(Some(count(5, 3)), count(4, 90)),
+            "beacon #90 of generation 4 arrived late, after generation 5 #3"
         );
     }
 

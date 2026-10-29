@@ -165,6 +165,27 @@ pub(crate) fn rs485_of(
                     ),
                         ));
                     }
+                    // Linux holds the delays in whole milliseconds -- see
+                    // `struct serial_rs485` -- so a fraction of one would be
+                    // dropped on the way to the port, and a line asked for
+                    // 500 us would turn around at once. Refused, naming the
+                    // whole numbers either side of what was asked.
+                    if held.subsec_nanos() % 1_000_000 != 0 {
+                        let under = held.as_millis();
+                        let instead = if under == 0 {
+                            "leave it out for none, or say 1 ms".to_string()
+                        } else {
+                            format!("say {under} ms or {} ms", under + 1)
+                        };
+                        return Err(bad(
+                            name,
+                            &format!(
+                                "{field} is {}, but an RS-485 delay is a \
+                                 whole number of milliseconds: {instead}",
+                                s.as_str().trim()
+                            ),
+                        ));
+                    }
                     Ok(held)
                 }
                 None => Ok(Duration::ZERO),
@@ -289,6 +310,53 @@ mod tests {
             format!("{said}").contains("1000 ms"),
             "the error should say the limit: {said}"
         );
+    }
+
+    /// A delay that is not a whole number of milliseconds is refused.
+    ///
+    /// Linux holds the delays in whole milliseconds, so a fraction would be
+    /// dropped without a word: 500 us would be no delay at all.
+    #[test]
+    fn a_turnaround_is_whole_milliseconds() {
+        for (field, said, hint) in [
+            ("rs485_delay_before_send", "500 us", "or say 1 ms"),
+            ("rs485_delay_after_send", "1.5 ms", "say 1 ms or 2 ms"),
+            ("rs485_delay_before_send", "2500 us", "say 2 ms or 3 ms"),
+        ] {
+            let why = rs485_of(
+                "line",
+                &terms(&[
+                    ("rs485", "true"),
+                    ("rs485_rts_on_send", "true"),
+                    (field, said),
+                ]),
+                true,
+            )
+            .expect_err("a fraction of a millisecond");
+            let why = format!("{why}");
+            assert!(
+                why.contains(field)
+                    && why.contains("whole number of milliseconds")
+                    && why.contains(hint),
+                "{said}: {why}"
+            );
+        }
+
+        // Whole milliseconds, however they are written.
+        let good = rs485_of(
+            "line",
+            &terms(&[
+                ("rs485", "true"),
+                ("rs485_rts_on_send", "true"),
+                ("rs485_delay_before_send", "2000 us"),
+                ("rs485_delay_after_send", "0.001 s"),
+            ]),
+            true,
+        )
+        .expect("whole milliseconds written in other units");
+        let good = good.expect("an RS-485 line");
+        assert_eq!(good.delay_before_send, Duration::from_millis(2));
+        assert_eq!(good.delay_after_send, Duration::from_millis(1));
     }
 
     /// A turnaround without the mode is refused rather than kept for later.

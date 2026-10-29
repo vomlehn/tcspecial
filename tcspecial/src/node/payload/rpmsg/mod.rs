@@ -290,7 +290,8 @@ mod tests {
         }
 
         let name = {
-            let mut buffer = [0i8; 128];
+            // c_char, which is signed on some targets and unsigned on others.
+            let mut buffer = [0 as libc::c_char; 128];
             // SAFETY: a buffer of the length given, filled by the call.
             assert_eq!(
                 unsafe {

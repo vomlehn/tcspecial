@@ -355,7 +355,6 @@ vehicle:
         format!(
             "beacon: Heard, tcspecial v{version} md5 {digest} generation 1"
         ),
-        "data held: no".to_string(),
         "connect: agrees".to_string(),
         "ping: answered".to_string(),
         "query ping (node 1): Success, running".to_string(),

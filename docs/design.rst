@@ -5889,10 +5889,10 @@ Fault Resiliency
 
 What tcspecial and the ground do about faults, in one place: what is
 assumed, how each kind of start is handled, how commands survive a link that
-loses and repeats them, and what is done should one arrive out of order, what the beacon says across a restart, what
-the ground holds, and what is still open. The sections before say as much of
-this as they need to explain how something works, and point here for the
-rule.
+loses and repeats them and what is done should one arrive out of order, what
+the beacon says across a restart, how downlinked data is read across a
+switch, and what is still open. The sections before say as much of this as
+they need to explain how something works, and point here for the rule.
 
 The order the qualities are ranked in decides what is here: a fault is
 answered with what is most reliable, and a design that would be easier to
@@ -6224,58 +6224,23 @@ Requirement
     command says where the sender knows none, and an answer that carries
     nought is read as saying nothing of it.
 
-What is held at the MOC
------------------------
+Downlinked data across a switch
+-------------------------------
 
 What the vehicle downlinks from a node is the node's bytes and nothing else:
 no header, no generation, no time. Which node sent a datum is the port it
 arrives at, and how to read it is that node's configuration. A switch of
 configuration -- commanded, or a fallback to the golden build -- can give a
-port to another node, or a node another format, and a datum the old start
-sent can still be on its way after the switch: held by a relay or a
-store-and-forward node, or played back from a recorder. Nothing in it says
-so. A mark on every datum would close that for any path at a cost on every
-datum, for something that happens only at a switch, so the ground holds the
-data instead, at no cost on the link, and the operators purge the path.
+port to another node, or a node another format.
 
 Requirement
-    Before a new configuration is tested, everything on the path from the
-    vehicle that can hold what the previous configuration sent -- the MOC's
-    own recorders and queues, and a relay's or a gateway's where the mission
-    controls them -- is purged of it. This is a constraint on operations,
-    outside tcspecial; what follows is how the ground holds to it, and how it
-    is protected where it is not kept.
-
-Requirement
-    A ground station built on ``tcslib`` holds the vehicle's data, in a
-    ``tcslib::moc::DataHold`` that every beacon is handed and every ``Moc``
-    it opens shares, from the moment a beacon says the vehicle serves a
-    configuration or interface other than the beacon before it, or other
-    than the one the station reads with, or is the first beacon the station
-    has heard and is of a commanded start, which may have changed what the
-    station did not see change. The digests the beacon carries are what say
-    so, so a fallback to the golden build, which nobody commanded, is held
-    for as surely as a switch.
-
-Requirement
-    A datum that arrives while data is held is returned marked held: its
-    bytes and the port it arrived at, with nothing claimed about which node
-    sent it or what format it is in. Nothing is thrown away, so that a
-    recording can be read afterwards by whoever knows which configuration
-    each datum was written under; nothing is buffered to be attributed
-    later, because an old datum and a new one look the same. The hold is
-    asked once for each datum, as it is taken, without a lock or an
-    allocation.
-
-Requirement
-    A hold ends only when the station says the path has been purged -- the
-    ``Path purged`` button in tcsmoc, ``DataHold::purged`` in Rust,
-    ``tcs_hold_purged`` in C and C++ -- and that is refused, saying both
-    digests, while the vehicle serves another configuration or interface
-    than the station reads with: purging the path does not make the station
-    read the right configuration. One hold for a station, shared by every
-    ``Moc`` it opens, so that opening the new configuration's ``moc`` nodes
-    after a switch does not end it.
+    The ground reads every datum with the definitions of the last beacon
+    before it, and holds nothing back. A datum the old start sent arrives
+    before the first beacon of the new one, because the radio delivers in
+    order and everything either side of it uses reliable datagrams: see
+    `What is assumed`_. Nothing on the path needs purging at a switch, and
+    a mark on every datum would pay on every datum for what the order of
+    arrival already says.
 
 Holes in this, and what closes them
 -----------------------------------
@@ -6313,15 +6278,14 @@ A damaged or half-written state file
     of generation, so a reset count is still seen.
 
 Downlinked data from before a switch
-    A datum carries nothing that says which configuration wrote it, and the
-    path may hold one across a switch. The ground holds every datum from the
-    beacon that shows the change until the station says the path is purged.
-    What is left open is a stale datum that arrives after the purge has been
-    declared, which is read with the new definitions. Where a mission's path
-    cannot be purged -- a relay the mission does not control -- the remedy is
-    a mark of a byte on every datum: a count of changes of format, seven bits,
-    kept in the state file and carried in the beacon's spare bits, which the
-    ground compares with each datum's.
+    A datum carries nothing that says which configuration wrote it. It is
+    told apart by when it arrives: before the new start's first beacon, in
+    order, as `Downlinked data across a switch`_ says. Should a path that
+    reorders ever be flown -- a relay that stores and forwards, or a
+    recorder played back -- the remedy is a mark of a byte on every datum:
+    a count of changes of format, seven bits, kept in the state file and
+    carried in the beacon's spare bits, which the ground compares with each
+    datum's.
 
 A restart nobody commanded changing the format
     A crash or a power cycle is a restart the ground did not ask for. It
@@ -6362,8 +6326,7 @@ The full interface breaking the way in
 A beacon delayed past a later one
     A beacon numbered at or before the last of its generation, or of an
     earlier generation, is taken for late and counts for nothing, so the
-    generation a station hands ``TcsClient`` and the digests it hands its
-    ``DataHold`` are the latest start's. Generations only go up but for a
+    generation a station hands ``TcsClient`` is the latest start's. Generations only go up but for a
     damaged state file, which starts again from one: its #1 is a start, and
     so is a second beacon of it where its #1 was lost. What is left open
     is two beacons of a start that has gone arriving in order after the new

@@ -802,10 +802,6 @@ pub struct Pass {
     /// Whether the last beacon said the ground commanded the start that sent
     /// it. Kept as `at` is.
     pub commanded_restart: bool,
-    /// The digests of the configuration and the interface the last beacon
-    /// said the vehicle serves, if one has arrived: what a station hands its
-    /// [`crate::moc::DataHold`]. Kept as `at` is.
-    pub serving: Option<(ConfigDigest, tcslibgs::InterfaceDigest)>,
     /// Whether the spacecraft is being heard from, which is the same reading
     /// as the stage in the form a program acts on.
     pub contact: Contact,
@@ -885,7 +881,6 @@ impl Beacons {
             said,
             generation: None,
             commanded_restart: false,
-            serving: None,
             contact: Contact::Lost,
             remarks: Vec::with_capacity(REMARKS_AT_ONCE),
             warnings: Vec::with_capacity(REMARKS_AT_ONCE),
@@ -1009,7 +1004,6 @@ impl Beacons {
                     }
                     self.last.generation = Some(beacon.generation);
                     self.last.commanded_restart = beacon.commanded_restart;
-                    self.last.serving = Some((beacon.digest, beacon.interface));
                 }
 
                 Arrived::Beacon

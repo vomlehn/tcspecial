@@ -42,7 +42,6 @@ using Configuration = std::unique_ptr<
 using BeaconWatch =
 	std::unique_ptr<tcs_beacons, Closer<tcs_beacons, tcs_beacons_close>>;
 using MocNode = std::unique_ptr<tcs_moc, Closer<tcs_moc, tcs_moc_close>>;
-using Hold = std::unique_ptr<tcs_hold, Closer<tcs_hold, tcs_hold_free>>;
 using Client =
 	std::unique_ptr<tcs_client, Closer<tcs_client, tcs_client_close>>;
 using PingerHandle =
@@ -118,19 +117,12 @@ int main(int argc, char **argv)
 	if (!beacons || !moc || !client || !pinger) {
 		return fail("open");
 	}
-	// The station's hold on the vehicle's data, which every beacon is
-	// handed and every moc node asks.
-	Hold hold(tcs_hold_new());
-	if (!hold || tcs_moc_share_hold(moc.get(), hold.get()) != 0) {
-		return fail("hold");
-	}
 
 	// The first beacon: what the vehicle is flying, before anything has
 	// been asked of it.
 	tcs_pass pass{};
 	do {
-		if (tcs_beacons_pass(beacons.get(), &pass) != 0 ||
-		    tcs_hold_beacon_heard(hold.get(), beacons.get()) < 0) {
+		if (tcs_beacons_pass(beacons.get(), &pass) != 0) {
 			return fail("beacon");
 		}
 		for (std::size_t w = 0;
@@ -143,8 +135,6 @@ int main(int argc, char **argv)
 		    pass.stage == TCS_STAGE_HEARD && pass.in_contact ?
 		    "" : " (not in contact)",
 		    tcs_beacons_said(beacons.get()));
-	std::printf("data held: %s\n", tcs_hold_held(hold.get()) == 0 ?
-		    "no" : tcs_hold_why(hold.get()));
 
 	int agrees = 0;
 	if (tcs_client_connect(client.get(), &agrees) != 0) {
@@ -247,9 +237,7 @@ int main(int argc, char **argv)
 		if (got < 0) {
 			return fail("data");
 		}
-		// Held: which node sent it, and in what format, is not known,
-		// so it is not taken for anything.
-		if (got == 0 || datum.held) {
+		if (got == 0) {
 			continue;
 		}
 		const std::string said(

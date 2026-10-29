@@ -3795,16 +3795,24 @@ where it cannot do that -- one with neither <tt class="docutils literal">/proc/s
 output and exits, so run tcspecial under a supervisor that starts it again
 when it exits.</p>
 <p>The beacons are how the ground learns the restart happened. From the
-moment the restart is taken, every beacon carries a <em>restarting</em> flag --
-the panel's line ends <tt class="docutils literal">, RESTARTING</tt> -- and one goes at once, the rest
-every <tt class="docutils literal">beacon.reset_interval</tt>. The tcspecial that comes back counts
-itself a new <em>generation</em>, one more than the last, which it keeps in the
-file the <tt class="docutils literal">tcspecial</tt> section's <tt class="docutils literal">state_file</tt> names; its beacons start
-again at #1, say the new generation and have the flag clear. They go
-every <tt class="docutils literal">beacon.reset_interval</tt> until the first command from the MOC
-arrives, and every <tt class="docutils literal">beacon.default_interval</tt> after that.</p>
+moment the restart is taken one beacon goes at once, and the rest every
+<tt class="docutils literal">beacon.reset_interval</tt>. The tcspecial that comes back counts itself a
+new <em>generation</em>, one more than the last, which it keeps in the file the
+<tt class="docutils literal">tcspecial</tt> section's <tt class="docutils literal">state_file</tt> names; its beacons start again at
+#1, say the new generation, and carry a <em>commanded restart</em> flag -- the
+panel's line ends <tt class="docutils literal">, COMMANDED RESTART</tt> -- saying it is the start the
+restart asked for. They go every <tt class="docutils literal">beacon.reset_interval</tt> until the
+first command from the MOC arrives, and every <tt class="docutils literal">beacon.default_interval</tt>
+after that.</p>
+<p>A tcspecial that starts again for any other reason -- it crashed and its
+supervisor started it, or the vehicle lost power -- also counts a new
+generation, but its beacons do not carry the flag, and it runs with the
+configuration it had. A station waiting on a restart that sees a new
+generation without the flag says so: the restart it sent did not happen,
+and the vehicle restarted for a reason of its own, which is worth finding
+out before the restart is sent again.</p>
 <p>Once a station has sent a restart it sends nothing more to the vehicle
-until a beacon of the new generation, not restarting, arrives: the
+until a beacon of a new generation arrives: the
 vehicle that comes back may read packets differently from the one that
 went, and the beacon -- not the answer to the restart, which may never
 arrive -- is what says it is back. A command tried in between is refused

@@ -107,7 +107,8 @@ typedef struct tcs_pass {
 	uint32_t at_nanos;  /* and nanoseconds; both 0 where none has */
 	uint32_t generation; /* how many times tcspecial has started, as the
 	                        last beacon said; 0 where none has arrived */
-	int restarting;      /* whether it said a restart has been initiated */
+	int commanded_restart; /* whether it said the ground commanded the
+	                          start that sent it */
 } tcs_pass;
 
 /* The ground's end of the beacon link: a socket where the configuration says
@@ -123,7 +124,8 @@ tcs_beacons *tcs_beacons_listen(const tcs_configuration *configuration);
 int tcs_beacons_pass(tcs_beacons *beacons, tcs_pass *pass);
 
 /* What the last beacon said: "tcspecial v0.1.0 md5 ... generation 1", with
- * ", RESTARTING" after it while a restart is under way, or "<none>". */
+ * ", COMMANDED RESTART" after it where the ground commanded the start that
+ * sent it, or "<none>". */
 const char *tcs_beacons_said(const tcs_beacons *beacons);
 
 /* What the last pass had to say on a console, which is news: beacons missed,
@@ -224,12 +226,13 @@ int tcs_client_restart_arm(tcs_client *client, uint64_t key,
 			   tcs_status *status);
 
 /* Restart the vehicle, which the last RESTART_ARM must have armed with the
- * same key: the process restarts, its generation goes up by one, and the
- * beacons start again at #1.
+ * same key: the process restarts, its generation goes up by one, its beacons
+ * start again at #1 and say the start was commanded.
  *
- * From the moment it is sent, every command on this client is refused,
- * unsent, until a beacon of another generation, not restarting, says
- * tcspecial has started again: the beacon is the acknowledgement, and the
+ * Never send it again for want of an answer: the beacons say whether it was
+ * taken. From the moment it is sent, every command on this client is
+ * refused, unsent, until a beacon of another generation says tcspecial has
+ * started again: the beacon is the acknowledgement, and the
  * answer to the RESTART may never arrive. Hand the client each pass's beacon
  * with tcs_client_beacon_heard. A RESTART answered as refused ends the wait
  * at once. */
@@ -237,7 +240,10 @@ int tcs_client_restart(tcs_client *client, uint64_t key,
 		       tcs_status *status);
 
 /* Hand the client what the last pass of beacons heard: 1 when that ended a
- * wait begun by a RESTART, 0 when it did not, -1 on an error. */
+ * wait begun by a RESTART with the start the RESTART commanded; 2 when it
+ * ended it with a start nobody commanded -- the vehicle restarted for some
+ * other reason before the RESTART was taken, and runs with the definitions
+ * it had; 0 when it did not end one; -1 on an error. */
 int tcs_client_beacon_heard(tcs_client *client, const tcs_beacons *beacons);
 
 /* Whether the client is waiting for a beacon to say a RESTART is done: 1 or

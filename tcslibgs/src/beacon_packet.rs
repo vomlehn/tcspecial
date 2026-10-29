@@ -54,8 +54,8 @@ pub struct Beacon {
     pub sequence: u32,
     /// `/TcsBeacon/Generation` (/TcsBeacon/U32Type)
     pub generation: u32,
-    /// `/TcsBeacon/Restarting` (/TcsBeacon/FlagType)
-    pub restarting: bool,
+    /// `/TcsBeacon/CommandedRestart` (/TcsBeacon/FlagType)
+    pub commanded_restart: bool,
     /// `/TcsBeacon/Interface` (/TcsBeacon/DigestType)
     pub interface: pk::FixedBytes<16>,
 }
@@ -125,7 +125,7 @@ impl Packet for Beacon {
         let v6 = r.fixed_bytes::<16>(16, "Digest")?;
         let v7 = r.uint_order(32, false, "Sequence")? as u32;
         let v8 = r.uint_order(32, false, "Generation")? as u32;
-        let v9 = r.uint_order(1, false, "Restarting")? != 0;
+        let v9 = r.uint_order(1, false, "CommandedRestart")? != 0;
         let v10 = r.uint_order(7, false, "Spare")? as u8;
         let v11 = r.fixed_bytes::<16>(16, "Interface")?;
         if !(v1 == "tcspecial ") {
@@ -154,7 +154,7 @@ impl Packet for Beacon {
                 digest: v6,
                 sequence: v7,
                 generation: v8,
-                restarting: v9,
+                commanded_restart: v9,
                 interface: v11,
             },
             r.used(),
@@ -212,7 +212,7 @@ impl Packet for Beacon {
             false,
             pk::from_unsigned(self.generation as u64, 32, "Generation")?,
         );
-        w.uint_order(1, false, self.restarting as u64);
+        w.uint_order(1, false, self.commanded_restart as u64);
         w.uint_order(7, false, pk::from_unsigned(0 as u64, 7, "Spare")?);
         pk::write_binary(w, &self.interface, 16, "Interface")?;
         Ok(())
@@ -234,8 +234,8 @@ impl fmt::Display for Beacon {
         write!(f, "{}", self.sequence)?;
         f.write_str(", generation=")?;
         write!(f, "{}", self.generation)?;
-        f.write_str(", restarting=")?;
-        write!(f, "{}", self.restarting)?;
+        f.write_str(", commanded_restart=")?;
+        write!(f, "{}", self.commanded_restart)?;
         f.write_str(", interface=")?;
         pk::describe_bytes(&self.interface, f)?;
         f.write_char('}')
@@ -284,7 +284,7 @@ impl Packet for BeaconLayoutKind {
         let v6 = r.fixed_bytes::<16>(16, "Digest")?;
         let v7 = r.uint_order(32, false, "Sequence")? as u32;
         let v8 = r.uint_order(32, false, "Generation")? as u32;
-        let v9 = r.uint_order(1, false, "Restarting")? != 0;
+        let v9 = r.uint_order(1, false, "CommandedRestart")? != 0;
         let v10 = r.uint_order(7, false, "Spare")? as u8;
         let v11 = r.fixed_bytes::<16>(16, "Interface")?;
         if (v1 == "tcspecial ") && (v5 == " ") && ((v10 as i128) == 0) {
@@ -296,7 +296,7 @@ impl Packet for BeaconLayoutKind {
                     digest: v6,
                     sequence: v7,
                     generation: v8,
-                    restarting: v9,
+                    commanded_restart: v9,
                     interface: v11,
                 }),
                 r.used(),

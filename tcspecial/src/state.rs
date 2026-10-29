@@ -2,7 +2,8 @@
 //!
 //! For now that is the generation number, which every start of tcspecial adds
 //! one to before it sends its first beacon, so that the ground can tell from a
-//! beacon alone that the vehicle has started again. It is kept in the file the
+//! beacon alone that the vehicle has started again, and whether the next start
+//! is one the ground commanded, which its beacons then say. It is kept in the file the
 //! `tcspecial` section's `state_file` names, on storage that survives a power
 //! cycle, because a count kept in memory would start again at every crash and
 //! every power cycle -- which are the restarts the ground most needs to know
@@ -14,8 +15,12 @@
 //! ```text
 //! # tcspecial's state, which it writes on every start: do not edit.
 //! generation 7
+//! next_start commanded
 //! crc16 0x1a2b
 //! ```
+//!
+//! The `next_start` line is there only between a RESTART's being taken and
+//! the next start, which reads it and writes the file again without it.
 //!
 //! It is written whole to a file beside it, flushed, and renamed over it, and
 //! the directory is flushed after: a power failure part way through leaves
@@ -33,6 +38,10 @@ use tcslibgs::crc::crc16;
 pub struct Started {
     /// This start's generation, already written to the file.
     pub generation: u32,
+    /// Whether the ground commanded this start: the start before took an
+    /// armed RESTART and said so in the file before it went. Every beacon
+    /// of this start says it. See [`commanded_restart`].
+    pub commanded: bool,
     /// What was wrong with the file that was there, where something was: the
     /// generation then started again from one, and this says why, for the
     /// log.
@@ -53,14 +62,28 @@ pub struct Started {
 /// does not start: one that beaconed a generation it had not kept would
 /// beacon the same one after its next start, and the ground would not see
 /// that start at all.
+///
+/// The file is written without the `next_start` line, whatever it held, so
+/// that a later start nobody commanded -- a crash of this one -- is not taken
+/// for a commanded one. A damaged file says nothing of the next start, and
+/// the start is then taken for one nobody commanded: a vehicle that claimed a
+/// commanded start it could not vouch for would be telling the ground its
+/// definitions had changed when they might not have.
 pub fn start(path: &Path) -> Result<Started, String> {
-    let (before, damaged) = match std::fs::read(path) {
-        Ok(text) => match generation_in(&text) {
-            Ok(generation) => (generation, None),
-            Err(why) => (0, Some(format!("{}: {why}", path.display()))),
+    let ((before, commanded), damaged) = match std::fs::read(path) {
+        Ok(text) => match state_in(&text) {
+            Ok(state) => (state, None),
+            Err(why) => {
+                ((0, false), Some(format!("{}: {why}", path.display())))
+            }
         },
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => (0, None),
-        Err(e) => (0, Some(format!("{} cannot be read: {e}", path.display()))),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            ((0, false), None)
+        }
+        Err(e) => (
+            (0, false),
+            Some(format!("{} cannot be read: {e}", path.display())),
+        ),
     };
     // Nought is never a generation, so that a beacon of generation 0 is one
     // from a build that kept none, and never a count that wrapped.
@@ -68,18 +91,41 @@ pub fn start(path: &Path) -> Result<Started, String> {
         0 => 1,
         next => next,
     };
-    write(path, generation)?;
+    write(path, generation, false)?;
     Ok(Started {
         generation,
+        commanded,
         damaged,
     })
 }
 
-/// The file's text for `generation`, its CRC last.
-fn text_of(generation: u32) -> Vec<u8> {
+/// Say in the state file at `path` that the next start is one the ground
+/// commanded: an armed RESTART has been taken by `generation`, the start
+/// running now.
+///
+/// Written before the RESTART is answered and before anything stops, so that
+/// a RESTART the file cannot say is refused and nothing restarts: a vehicle
+/// that came back saying it had not been commanded would tell the ground the
+/// RESTART had not taken, when it had.
+///
+/// Allocates, in the command loop: the file's text is made, and the path is
+/// formatted into a refusal. Once, for a RESTART, after which the process
+/// ends, and there is no way to write a file without the bytes it holds.
+pub fn commanded_restart(path: &Path, generation: u32) -> Result<(), String> {
+    write(path, generation, true)
+}
+
+/// The file's text for `generation`, saying whether the next start is
+/// commanded, its CRC last.
+fn text_of(generation: u32, commanded: bool) -> Vec<u8> {
+    let next = if commanded {
+        "next_start commanded\n"
+    } else {
+        ""
+    };
     let mut text = format!(
         "# tcspecial's state, which it writes on every start: do not edit.\n\
-         generation {generation}\n"
+         generation {generation}\n{next}"
     )
     .into_bytes();
     let crc = crc16(&text);
@@ -87,8 +133,9 @@ fn text_of(generation: u32) -> Vec<u8> {
     text
 }
 
-/// The generation a state file's text holds, or why it holds none.
-fn generation_in(text: &[u8]) -> Result<u32, String> {
+/// The generation a state file's text holds and whether the next start is
+/// commanded, or why it holds no state.
+fn state_in(text: &[u8]) -> Result<(u32, bool), String> {
     const CRC: &[u8] = b"crc16 ";
     // The CRC's line is the last, and covers every byte before it.
     let body_end = text
@@ -117,6 +164,7 @@ fn generation_in(text: &[u8]) -> Result<u32, String> {
     }
     let body = std::str::from_utf8(body).map_err(|_| "it is not text")?;
     let mut generation = None;
+    let mut commanded = false;
     for line in body.lines() {
         let line = line.trim();
         if line.is_empty() || line.starts_with('#') {
@@ -129,14 +177,18 @@ fn generation_in(text: &[u8]) -> Result<u32, String> {
                         format!("its generation is {number:?}, not a count")
                     })?);
             }
+            Some(("next_start", "commanded")) => commanded = true,
             _ => return Err(format!("it says {line:?}, which is not state")),
         }
     }
-    generation.ok_or_else(|| "it holds no generation".to_string())
+    let generation =
+        generation.ok_or_else(|| "it holds no generation".to_string())?;
+    Ok((generation, commanded))
 }
 
-/// Write `generation` to the state file at `path`, whole or not at all.
-fn write(path: &Path, generation: u32) -> Result<(), String> {
+/// Write `generation` to the state file at `path`, and whether the next start
+/// is commanded, whole or not at all.
+fn write(path: &Path, generation: u32, commanded: bool) -> Result<(), String> {
     let cannot = |what: &str, e: std::io::Error| {
         format!(
             "the state file {} cannot be {what} ({e}): state_file in the \
@@ -153,7 +205,7 @@ fn write(path: &Path, generation: u32) -> Result<(), String> {
         .truncate(true)
         .open(&beside)
         .map_err(|e| cannot("written", e))?;
-    file.write_all(&text_of(generation))
+    file.write_all(&text_of(generation, commanded))
         .and_then(|()| file.sync_all())
         .map_err(|e| cannot("written", e))?;
     drop(file);
@@ -239,8 +291,30 @@ mod tests {
     fn the_count_wraps_past_nought() {
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("tcspecial.state");
-        std::fs::write(&path, text_of(u32::MAX)).expect("written");
+        std::fs::write(&path, text_of(u32::MAX, false)).expect("written");
         assert_eq!(start(&path).expect("it starts").generation, 1);
+    }
+
+    /// A start is commanded when the start before said so, and only that
+    /// one: the next start nobody commanded is not, though nothing was
+    /// written in between.
+    #[test]
+    fn only_the_start_after_a_commanded_restart_is_commanded() {
+        let dir = tempfile::tempdir().expect("a directory");
+        let path = dir.path().join("tcspecial.state");
+        let first = start(&path).expect("it starts");
+        assert!(!first.commanded, "nobody commanded a first start");
+
+        commanded_restart(&path, first.generation).expect("it is said");
+        let text = std::fs::read_to_string(&path).expect("it is text");
+        assert!(text.contains("\nnext_start commanded\n"), "{text}");
+
+        let second = start(&path).expect("it starts");
+        assert_eq!(second.generation, first.generation + 1);
+        assert!(second.commanded, "the start the RESTART asked for");
+
+        let third = start(&path).expect("it starts");
+        assert!(!third.commanded, "a crash after it is not commanded");
     }
 
     /// A file that cannot be written stops the start, naming the attribute

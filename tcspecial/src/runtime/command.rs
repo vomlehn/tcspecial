@@ -200,6 +200,7 @@ impl Commands {
             restart,
             restarting: false,
             newest: None,
+            state_file: std::path::PathBuf::from(&ci.state_file),
         };
         let thread = std::thread::spawn(move || serving.run(spacecraft, nodes));
 
@@ -282,6 +283,11 @@ struct Serving {
     /// What an armed RESTART calls, once it has been answered: asks the
     /// vehicle to stop and run itself again. See [`crate::runtime::restart`].
     restart: fn(),
+    /// The configuration's `state_file`, in which an armed RESTART says the
+    /// next start is commanded before it is answered: see
+    /// [`crate::state::commanded_restart`]. Empty where the configuration
+    /// gave none, as a test's does, and then nothing is written.
+    state_file: std::path::PathBuf,
     /// Whether the command just answered was an armed RESTART, so that the
     /// restart is asked for once its answer has gone.
     restarting: bool,
@@ -620,6 +626,14 @@ impl Serving {
                     if key == cmd.arm_key
                         && taken.elapsed() < self.arm_valid =>
                 {
+                    // The next start is said to be commanded before
+                    // anything else, so that it says so in its beacons; a
+                    // vehicle that cannot say it does not restart, and the
+                    // arm stands for a RESTART that can.
+                    if let Err(why) = self.say_next_start_commanded() {
+                        error!("a RESTART was refused: {why}");
+                        return answer_to(command, CommandStatus::Failure);
+                    }
                     self.armed = None;
                     self.restarting = true;
                     answer_to(command, CommandStatus::Success)
@@ -642,6 +656,19 @@ impl Serving {
                 }
             },
         }
+    }
+
+    /// Say in the state file that the next start is one the ground
+    /// commanded. See [`crate::state::commanded_restart`], which says why it
+    /// allocates, here in the loop.
+    fn say_next_start_commanded(&self) -> Result<(), String> {
+        if self.state_file.as_os_str().is_empty() {
+            return Ok(());
+        }
+        crate::state::commanded_restart(
+            &self.state_file,
+            self.flying.generation,
+        )
     }
 
     /// Say that the ground named a node this configuration has not got.
@@ -1630,6 +1657,7 @@ mod tests {
                 restart: || {},
                 restarting: false,
                 newest: None,
+                state_file: std::path::PathBuf::new(),
             }
         };
         let restart = |serving: &mut Serving, ago: Duration| {
@@ -1664,6 +1692,28 @@ mod tests {
             CommandStatus::Success
         );
         assert!(long.restarting, "an arm within its time restarts");
+
+        // A RESTART taken says in the state file that the next start is
+        // commanded; one that cannot say it is refused, restarts nothing,
+        // and leaves the arm for a RESTART that can.
+        let dir = tempfile::tempdir().expect("a directory");
+        let mut said = serving(Duration::from_secs(60));
+        said.state_file = dir.path().join("tcspecial.state");
+        assert_eq!(
+            restart(&mut said, Duration::from_secs(2)),
+            CommandStatus::Success
+        );
+        let kept = std::fs::read_to_string(&said.state_file).expect("written");
+        assert!(kept.contains("\nnext_start commanded\n"), "{kept}");
+
+        let mut unsaid = serving(Duration::from_secs(60));
+        unsaid.state_file = "/nonexistent/directory/tcspecial.state".into();
+        assert_eq!(
+            restart(&mut unsaid, Duration::from_secs(2)),
+            CommandStatus::Failure
+        );
+        assert!(!unsaid.restarting, "nothing restarts");
+        assert!(unsaid.armed.is_some(), "and the arm stands");
 
         // A RESTART_ARM sent again with the same key, as the ground sends a
         // command whose answer was lost, leaves the arm's time where it was;

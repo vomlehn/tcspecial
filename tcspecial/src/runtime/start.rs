@@ -351,9 +351,17 @@ fn beacons(
              generation starts again from 1"
         );
     }
+    // Which kind of start this is goes in the summary, because it is the
+    // first thing somebody reading a log after an unexpected restart asks.
     summary(format!(
-        "generation {}: {}",
-        started.generation, ci.state_file
+        "generation {}, {}: {}",
+        started.generation,
+        if started.commanded {
+            "a commanded restart"
+        } else {
+            "not commanded"
+        },
+        ci.state_file
     ));
     let sending = BeaconSend::new(
         crate::beacon_send::BeaconTiming {
@@ -365,7 +373,7 @@ fn beacons(
         telemetry_log,
         ConfigVersion::of_this_build(),
         digest,
-        started.generation,
+        &started,
     )
     .map_err(|e| e.to_string())?;
     if sending.is_some() {

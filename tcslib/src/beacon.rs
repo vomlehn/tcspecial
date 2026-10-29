@@ -509,8 +509,8 @@ pub struct Heard {
     /// How many times tcspecial has started, if it was a beacon this build
     /// can read.
     pub generation: Option<u32>,
-    /// Whether it said a restart has been initiated.
-    pub restarting: bool,
+    /// Whether it said the ground commanded the start that sent it.
+    pub commanded_restart: bool,
     /// What is wrong with the configuration it announces, if anything: see
     /// [`differs`].
     pub differs: Option<String>,
@@ -525,7 +525,9 @@ pub fn hear(datagram: &[u8], expected: Option<ConfigDigest>) -> Heard {
         message,
         sequence: reading.sequence,
         generation: reading.beacon.map(|beacon| beacon.generation),
-        restarting: reading.beacon.is_some_and(|beacon| beacon.restarting),
+        commanded_restart: reading
+            .beacon
+            .is_some_and(|beacon| beacon.commanded_restart),
         differs: reading
             .digests
             .and_then(|(theirs, ours)| differs(theirs, ours)),
@@ -626,8 +628,8 @@ fn write_message(
         Ok(beacon) => {
             write_what_it_read(beacon.version, beacon.digest, out);
             let _ = write!(out, " generation {}", beacon.generation);
-            if beacon.restarting {
-                out.push_str(", RESTARTING");
+            if beacon.commanded_restart {
+                out.push_str(", COMMANDED RESTART");
             }
         }
         Err(_) => {
@@ -732,8 +734,9 @@ pub struct Pass {
     /// The generation the last beacon carried, if one has arrived: which
     /// start of tcspecial is flying. Kept as `at` is.
     pub generation: Option<u32>,
-    /// Whether the last beacon said a restart has been initiated.
-    pub restarting: bool,
+    /// Whether the last beacon said the ground commanded the start that sent
+    /// it. Kept as `at` is.
+    pub commanded_restart: bool,
     /// Whether the spacecraft is being heard from, which is the same reading
     /// as the stage in the form a program acts on.
     pub contact: Contact,
@@ -812,7 +815,7 @@ impl Beacons {
             at: None,
             said,
             generation: None,
-            restarting: false,
+            commanded_restart: false,
             contact: Contact::Lost,
             remarks: Vec::with_capacity(REMARKS_AT_ONCE),
             warnings: Vec::with_capacity(REMARKS_AT_ONCE),
@@ -920,23 +923,16 @@ impl Beacons {
                             now.sequence,
                             last.map_or(0, |last| last.sequence)
                         )),
-                        Counted::Restarted => {
-                            remarks.push(restarted(last, now))
-                        }
+                        Counted::Restarted => remarks.push(restarted(
+                            last,
+                            now,
+                            beacon.commanded_restart,
+                        )),
                         Counted::First | Counted::Next => {}
-                    }
-                    // Said once, on the beacon that first says it: the ones
-                    // after it until the process ends say it too.
-                    if beacon.restarting && !self.last.restarting {
-                        remarks.push(format!(
-                            "tcspecial has initiated a restart: generation {} \
-                             is ending",
-                            beacon.generation
-                        ));
                     }
                     self.count = Some(now);
                     self.last.generation = Some(beacon.generation);
-                    self.last.restarting = beacon.restarting;
+                    self.last.commanded_restart = beacon.commanded_restart;
                 }
 
                 Arrived::Beacon
@@ -989,14 +985,24 @@ impl Beacons {
 
 /// What to say of a restart seen between `last` and `now`: by the
 /// generation, where it changed, and by the numbering where it did not.
-fn restarted(last: Option<Count>, now: Count) -> String {
+///
+/// And which kind of restart it was. A commanded one is the ground's own
+/// doing, and may have brought other definitions; one nobody commanded is a
+/// crash or a power cycle, which the ground has to look into, and which runs
+/// with the definitions it had.
+fn restarted(last: Option<Count>, now: Count, commanded: bool) -> String {
+    let how = if commanded {
+        "as commanded"
+    } else {
+        "without being commanded to, with the definitions it had"
+    };
     match last {
         Some(last) if last.generation != now.generation => format!(
-            "tcspecial has restarted: generation {} is flying, after {}",
+            "tcspecial has restarted {how}: generation {} is flying, after {}",
             now.generation, last.generation
         ),
         _ => format!(
-            "the beacons start again at #{}, so tcspecial has restarted",
+            "the beacons start again at #{}, so tcspecial has restarted {how}",
             now.sequence
         ),
     }
@@ -1367,17 +1373,18 @@ mod tests {
         // two lines cannot come to disagree about how to say it.
         assert_eq!(what_it_read(version, digest), read);
 
-        // A beacon from a process that has initiated a restart says so.
-        let restarting = Beacon::new(4, version, digest, 12)
-            .restarting(true)
+        // A beacon from a start the ground commanded says so.
+        let commanded = Beacon::new(4, version, digest, 12)
+            .commanded_restart(true)
             .to_bytes();
         assert_eq!(
-            message_of(&restarting),
-            format!("{read} generation 12, RESTARTING")
+            message_of(&commanded),
+            format!("{read} generation 12, COMMANDED RESTART")
         );
-        let heard = hear(&restarting, None);
+        let heard = hear(&commanded, None);
         assert_eq!(heard.generation, Some(12));
-        assert!(heard.restarting);
+        assert!(heard.commanded_restart);
+        assert!(!hear(&datagram, None).commanded_restart);
 
         // The beacon's own number comes back beside the message, which is
         // what tells a beacon that was missed from one that was never sent.
@@ -1466,8 +1473,14 @@ mod tests {
         assert_eq!(counted(Some(count(9, 5)), count(1, 6)), Counted::Restarted);
         assert_eq!(counted(Some(count(4, 5)), count(4, 6)), Counted::Next);
         assert_eq!(
-            restarted(Some(count(3, 5)), count(4, 90)),
-            "tcspecial has restarted: generation 4 is flying, after 3"
+            restarted(Some(count(3, 5)), count(4, 90), true),
+            "tcspecial has restarted as commanded: generation 4 is flying, \
+             after 3"
+        );
+        assert_eq!(
+            restarted(Some(count(3, 5)), count(4, 90), false),
+            "tcspecial has restarted without being commanded to, with the \
+             definitions it had: generation 4 is flying, after 3"
         );
     }
 

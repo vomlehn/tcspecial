@@ -3054,6 +3054,14 @@ Requirement
     again.
 
 Requirement
+    A RESTART is taken only once the state file says the next start is a
+    commanded one -- see `The generation number and the state file`_ -- so
+    that the start it asks for says so in every beacon. Where that cannot
+    be written the RESTART is answered ``Failure``, nothing restarts, and
+    the arm stands: a vehicle that came back saying it had not been
+    commanded would be telling the ground its RESTART had not taken.
+
+Requirement
     A RESTART that is taken is answered before anything stops, so the ground
     hears that it was taken before the links close under it. The vehicle then
     stops as it does on a signal -- the pass finished, the command links
@@ -5535,9 +5543,10 @@ it is published.
 |                |            |           | started, from the state file, most |
 |                |            |           | significant byte first             |
 |                +------------+-----------+------------------------------------+
-|                | restarting | 1 bit     | Set once a restart is initiated:   |
-|                |            |           | the most significant bit of its    |
-|                |            |           | byte                               |
+|                | commanded  | 1 bit     | Set where the ground commanded     |
+|                |            |           | this start, ``commanded_restart``  |
+|                |            |           | in code: the most significant bit  |
+|                |            |           | of its byte                        |
 |                +------------+-----------+------------------------------------+
 |                | spare      | 7 bits    | Nought                             |
 |                +------------+-----------+------------------------------------+
@@ -5587,7 +5596,8 @@ Requirement
     The MOC shows what the last beacon said as one line, each part
     labelled: ``tcspecial v0.1.0 md5`` and the digest's sixteen bytes in
     hex with nothing between them, then ``generation`` and the generation
-    number, then ``, RESTARTING`` while the restarting bit is set. The answer
+    number, then ``, COMMANDED RESTART`` where the commanded-restart bit is
+    set. The answer
     to a ``CONNECT`` is written the same way, up to the generation; see
     `What Each End Read`_.
 
@@ -5640,7 +5650,7 @@ another section says the same thing, this one is the one it follows.
 
 .. note::
    **What runs today.** The beacon carries the generation number, the
-   restarting bit and the interface digest, and is read without
+   commanded-restart bit and the interface digest, and is read without
    allocating. ``state_file``, ``beacon.default_interval`` and
    ``beacon.reset_interval`` are read; every start counts itself in the
    state file before its first beacon; the beacon goes fast from start, and
@@ -5924,8 +5934,18 @@ The generation number and the state file
 Requirement
     The ``tcspecial`` section's ``state_file``, required, is the path of the
     file in which tcspecial keeps what must survive a restart: the
-    generation number, and, once there are load sets, which one is chosen,
-    which is confirmed and how many times each has started.
+    generation number, whether the next start is one the ground commanded,
+    and, once there are load sets, which one is chosen, which is confirmed
+    and how many times each has started.
+
+Requirement
+    An armed RESTART or SWITCH that is taken writes to the state file that
+    the next start is commanded, before it is answered. The start that
+    reads it says in its beacons that it was commanded, and writes the file
+    again without it as it counts itself, so that a later start of its own
+    -- a crash -- is not taken for a commanded one. A state file that is
+    damaged says nothing of the next start, which is then taken for one
+    nobody commanded.
 
 Requirement
     Every start of tcspecial -- a commanded restart, a crash the supervisor
@@ -5957,9 +5977,19 @@ The beacon across a restart
 ---------------------------
 
 Requirement
-    The beacon carries the generation number, four bytes, and a *restarting*
-    bit, which is set from the moment a restart has been initiated -- an
-    armed RESTART or SWITCH taken -- until the process ends.
+    The beacon carries the generation number, four bytes, and a
+    *commanded-restart* bit, which is set in every beacon of a start the
+    ground commanded -- the start before took an armed RESTART or SWITCH --
+    and clear in every beacon of any other: a first start, a crash the
+    supervisor restarted, a power cycle.
+
+Requirement
+    Only a commanded start may change the definitions the vehicle runs with.
+    A start nobody commanded runs with the definitions the start before it
+    had, so that the format of what crosses the link never changes under a
+    ground station that did not ask for it to. The one exception is the
+    fallback to the golden build, which a load set that will not start
+    forces: see `Restarting onto a load set`_.
 
 Requirement
     The beacon has two intervals, both required and both lengths of time:
@@ -5971,14 +6001,17 @@ Requirement
     told so by name.
 
 Requirement
-    When a restart is initiated, a beacon with the restarting bit set is sent
-    at once, and from then on beacons are sent every ``reset_interval``.
+    When a restart is initiated, a beacon is sent at once, and from then on
+    beacons are sent every ``reset_interval``. They say nothing new -- it is
+    the next start that is commanded, and says so in a generation of its own
+    -- but they come fast, because the ground is waiting for that start's
+    first beacon.
 
 Requirement
     Every start of tcspecial beacons every ``reset_interval``, and its
-    first beacon follows the generation number's being incremented and the
-    restarting bit's being cleared: the first beacon of a start already
-    says the new generation, with the bit clear.
+    first beacon follows the generation number's being incremented: the
+    first beacon of a start already says the new generation, and whether it
+    was commanded.
 
 Requirement
     The interval goes back to ``default_interval`` when the first valid
@@ -5999,20 +6032,28 @@ What the ground may send meanwhile
 The beacon is the acknowledgement of a RESTART or a SWITCH, not the answer to
 it. The answer is a packet like any other on a link that loses them, and the
 vehicle may be gone before it is sent again, so the ground may never hear one;
-the beacons keep coming whatever happens to the answer. A beacon with the
-restarting bit set says the restart was taken, and a beacon of a new
-generation with the bit clear says it is done. Until the second, the ground
-cannot know which definitions a packet it sends would be read with, so it
-sends none.
+the beacons keep coming whatever happens to the answer. A beacon of a new
+generation says the old start has gone, and its commanded-restart bit says
+whether the start that replaced it is the one the RESTART asked for. Until
+that beacon, the ground cannot know which definitions a packet it sends would
+be read with, so it sends none.
 
 Requirement
     Once the MOC has sent a SWITCH -- or a RESTART -- it sends no command at
-    all until it has a beacon whose generation differs from the generation of
-    the last beacon before the SWITCH was sent, with the restarting bit
-    clear: a beacon saying that tcspecial has started again, and is using
-    the definitions it has started with. ``tcslib``'s ``TcsClient`` holds to
-    this itself, refusing any command in between with an error that says
-    which generation it is waiting to see change.
+    all until it has a beacon whose generation differs from the generation
+    flying when the SWITCH was sent: a beacon saying that tcspecial has
+    started again, and is using the definitions it has started with.
+    ``tcslib``'s ``TcsClient`` holds to this itself, refusing any command in
+    between with an error that says which generation it is waiting to see
+    change.
+
+Requirement
+    The wait says how it ended. A new generation with the commanded-restart
+    bit set is the start the SWITCH or RESTART asked for. One with the bit
+    clear is a start nobody commanded -- the vehicle crashed or lost power
+    before the command was taken -- running with the definitions it had: the
+    command did not happen, and the station says so rather than going on as
+    though it had.
 
 Requirement
     The wait does not depend on the answer: one that never arrives leaves it
@@ -6112,10 +6153,12 @@ A damaged or half-written state file
     the generation again from 1, and the ground judges a restart by any change
     of generation, so a reset count is still seen.
 
-A beacon with the restarting bit lost
-    The bit is a courtesy: the ground does not need to see it, because the
-    change of generation in the first beacon after the restart says the same
-    thing, and beacons are fast throughout.
+A restart nobody commanded changing the format
+    A crash or a power cycle is a restart the ground did not ask for. It
+    runs with the definitions it had, so nothing the ground sends is read
+    differently, and its beacons' commanded-restart bit is clear, so the
+    ground knows not to take up new ones. The fallback to the golden build
+    is the exception, and the interface digest in its beacons says so.
 
 Commands in flight across the switch
     A command sent before the SWITCH and arriving after the restart would be
@@ -6125,8 +6168,8 @@ Commands in flight across the switch
 A wait that never ends
     If the SWITCH was refused, or never arrived, no new generation comes.
     A refusal ends the wait; a SWITCH that never arrived shows as beacons of
-    the old generation with the restarting bit clear, and the operator may
-    end the wait by hand.
+    the old generation at their own interval, not every ``reset_interval``,
+    and the operator may end the wait by hand.
 
 A stray packet resetting the beacon interval
     Only a valid packet from the address the configuration says the MOC

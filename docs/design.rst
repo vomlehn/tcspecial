@@ -5889,7 +5889,7 @@ Fault Resiliency
 
 What tcspecial and the ground do about faults, in one place: what is
 assumed, how each kind of start is handled, how commands survive a link that
-loses, reorders and repeats them, what the beacon says across a restart, what
+loses and repeats them, and what is done should one arrive out of order, what the beacon says across a restart, what
 the ground holds, and what is still open. The sections before say as much of
 this as they need to explain how something works, and point here for the
 rule.
@@ -5928,13 +5928,20 @@ Requirement
     outlast the starts they are about.
 
 Requirement
-    The link between the MOC and the vehicle is never relied on to deliver in
-    order, to deliver at all, or to deliver once. A packet may be lost,
-    delayed past later ones, or arrive twice, and nothing in tcspecial or the
-    ground depends on otherwise. Order is kept by whoever receives: a command
-    older than one already taken is not acted on -- see `What the ground may
-    send meanwhile`_ -- and a beacon of the same start numbered at or before
-    one already heard is late, and counts for nothing: see `Asynchronous
+    **The radio link delivers in order.** A packet between the vehicle and
+    the ground may be lost, or arrive twice, but those that arrive arrive in
+    the order they were sent, and tcspecial and the ground rely on that.
+    Nothing is designed to put packets back in order. The link is never
+    relied on to deliver at all, or to deliver once.
+
+Requirement
+    The receiver still drops what arrives out of order, as a guard and not as
+    the way order is kept. The UDP hops at either end of the radio, and the
+    sockets a restart closes and opens again, are outside what the radio
+    promises, and the check costs a comparison. A command older than one
+    already taken is not acted on -- see `What the ground may send
+    meanwhile`_ -- and a beacon of the same start numbered at or before one
+    already heard is late, and counts for nothing: see `Asynchronous
     Telemetry`_.
 
 No packet on the link carries a check of its own: the transport beneath it
@@ -6174,9 +6181,9 @@ Requirement
 Requirement
     A command older than one this start of tcspecial has already taken, on
     either link, is answered ``Stale`` and nothing in it is acted on. The
-    link does not keep order -- it is never relied on to -- so a command can
-    arrive after one sent later, and the later one is what the ground meant
-    last. Older is by serial-number arithmetic on the four-byte sequence
+    radio delivers in order, but what lies either side of it may not -- see
+    `What is assumed`_ -- and should a command arrive after one sent later,
+    the later one is what the ground meant last. Older is by serial-number arithmetic on the four-byte sequence
     (RFC 1982), ``tcslibgs::sequence_is_before``, so that a count that wraps
     still goes forward. A command of the same sequence as the newest taken
     is a repeat, not an older command, and is taken. PING and CONNECT are

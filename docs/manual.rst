@@ -290,6 +290,23 @@ command binding
    the rule this project has always followed applies: the description stands,
    and a note records what is so today.
 
+Assumptions
+===========
+
+Order of delivery
+   A packet sent between the vehicle and the ground may be dropped, but
+   the radio link delivers those that arrive in the order they were sent,
+   and TCSpecial relies on it to. Nothing puts packets back in order. As a
+   guard against what lies outside the radio -- the UDP hops at either
+   end, and a restart that opens its sockets again -- the receiving end
+   still drops anything older than what it has already taken: a command
+   older than one tcspecial has already taken is answered ``Stale`` and not
+   acted on, and a beacon older than one the ground has already heard
+   counts for nothing.
+   `What is assumed
+   <https://vomlehn.github.io/tcspecial/docs/design.html#what-is-assumed>`__,
+   in the design, says what else tcspecial and the ground rest on.
+
 Limitations
 ===========
 
@@ -3426,7 +3443,8 @@ the beacon box
 
   A beacon says only that the spacecraft is alive, so without the number a
   beacon that was lost on the way reads exactly like one that was never sent.
-  The network may deliver beacons out of order or twice, and a beacon
+  The radio delivers in order, but a beacon may still arrive twice, or out
+  of order from beyond the radio, and a beacon
   numbered before the last one heard is said to be late rather than taken for
   a restart.
 

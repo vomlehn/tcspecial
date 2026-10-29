@@ -290,6 +290,50 @@ command binding
    the rule this project has always followed applies: the description stands,
    and a note records what is so today.
 
+Limitations
+===========
+
+Platform
+   TCSpecial runs only on Linux. Seven of its interface types use Linux's
+   own kernel interfaces, and much of the rest needs POSIX processes,
+   ``poll`` and Unix file descriptors. `Platforms and Porting
+   <https://vomlehn.github.io/tcspecial/docs/design.html#platforms-and-porting>`__,
+   in the design, says which parts are Linux-only and how they might be
+   carried to a real-time operating system.
+
+Number of nodes
+   A node's id is its position among all the configuration's nodes -- the
+   moc, vehicle and payload sections, the top file first and then the files
+   it includes -- counting from nought, and it is 32 bits. A node's
+   telemetry port is a base plus its id, so a base of *B* leaves room for
+   ids up to 65535 - *B*, counting every node, not only payloads. A
+   configuration whose ports would pass 65535, or that puts two sources on
+   the same address and port, is refused when the file is read.
+
+Times
+   Times are 64-bit counts of microseconds since the UNIX epoch, which run
+   to the year 586524; all ones means the clock failed. The beacon interval,
+   ``beacon.default_interval``, and the interval across a restart,
+   ``beacon.reset_interval``, are at most 2\ :sup:`64` - 1 microseconds,
+   about 585,000 years, which is what the eight bytes of microseconds a
+   ``CONFIG`` carries state; the reset interval is no longer than the
+   beacon interval.
+
+Command sequence numbers
+   A ground client numbers its commands from 1 in 32 bits. After
+   4294967295 commands the number wraps to 0 and starts again, so a client
+   that sends more than that reuses numbers.
+
+Counters
+   The beacon's sequence number is 32 bits and wraps, and the ground takes
+   a sequence that goes backwards as a restart: at one beacon every 5
+   seconds, that happens after about 680 years. The generation, which
+   counts restarts, is 32 bits and wraps, skipping 0.
+
+Data sizes
+   Aboard, one read delivers at most 4096 bytes, so ``max_length`` is at
+   most 4096.
+
 Configuration File Formats
 ==========================
 A configuration file may be written in YAML or XML. Both describe the same

@@ -8302,6 +8302,226 @@ Requirement
     binding gives it. A refused ``SET_NODE``'s hint reaches the ground in
     the answer's reason, and the vehicle's log.
 
+Platforms and Porting
+=====================
+
+TCSpecial runs on Linux, and only on Linux. This section says which parts
+of it depend on Linux, which on POSIX, and which only on Rust's standard
+library, and sets down some thoughts on how each might be carried to a
+real-time operating system: OpenRTOS (the commercially licensed FreeRTOS),
+VxWorks, RTEMS, and others such as QNX, Zephyr and INTEGRITY. Nothing here
+has been tried. It is a map for whoever does the work, not a plan, and
+what an operating system offers should be checked against its own
+documentation for the release and board in question. `Which Node Types Are
+Built`_ gives the rule that already stops a build that asks for a Linux
+interface on another operating system.
+
+What the flight software assumes
+--------------------------------
+
+The flight software is ordinary hosted Rust. It uses the standard library
+throughout -- ``std::thread``, ``std::net``, ``std::fs``, ``std::process``
+and ``std::os::unix`` -- and nothing is ``no_std``. Its model of waiting is
+blocking: one thread per node, each sleeping in
+``poll(2)`` on the Unix file descriptors of its endpoints, with a pipe to
+wake it. There is no async runtime, by design. Device interfaces are
+written directly against the kernel's interfaces through ``libc``, with
+the ``ioctl`` numbers as constants, rather than through crates for each
+device.
+
+So there are three layers to carry, in increasing order of difficulty:
+what needs only Rust's standard library, what needs POSIX, and what needs
+Linux itself.
+
+Linux-only
+----------
+
+Each of these uses an interface only Linux has: a kernel ABI through a
+character device and ``ioctl``, a socket family, or a Linux file system.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 40 40
+
+   * - What
+     - What TCSpecial uses
+     - Used for
+   * - SocketCAN
+     - ``socket(PF_CAN, SOCK_RAW, CAN_RAW)``, ``CAN_RAW_FILTER``,
+       ``CAN_RAW_FD_FRAMES``, ``if_nametoindex``
+     - The ``can`` node
+   * - GPIO character device
+     - ``/dev/gpiochipN`` and the version 2 line ``ioctl``\ s: requesting
+       lines, edges, bias and debounce, getting and setting values
+     - The ``gpio`` node
+   * - ``i2c-dev``
+     - ``/dev/i2c-N`` with ``I2C_SLAVE``, ``I2C_TENBIT``, ``I2C_PEC``,
+       ``I2C_FUNCS`` and ``I2C_SMBUS``
+     - The ``i2c`` node
+   * - ``spidev``
+     - ``/dev/spidevB.C`` with the ``SPI_IOC_WR_*`` mode, bit order, word
+       size and speed ``ioctl``\ s
+     - The ``spi`` node
+   * - IIO buffers
+     - ``/dev/iio:deviceN``, configured through sysfs
+     - The ``iio`` node
+   * - rpmsg
+     - ``/dev/rpmsgN``, and ``/sys/class/rpmsg`` for the service name
+     - The ``rpmsg`` node
+   * - Generic HDLC
+     - ``SIOCWANDEV`` with ``IF_PROTO_HDLC`` and the clock settings, and an
+       ``AF_PACKET`` socket for frames
+     - The ``hdlc`` node
+   * - RS-485 and serial extras
+     - ``TIOCSRS485`` and ``TIOCGRS485``, ``CMSPAR`` for mark and space
+       parity, and the baud rates above 921600
+     - The ``serial`` node's RS-485 and parity settings
+   * - ``/proc``
+     - ``/proc/self/exe`` and ``/proc/self/fd`` (or ``/dev/fd``)
+     - Restarting by re-executing itself with its descriptors
+   * - ``pipe2``
+     - A non-blocking pipe made in one call
+     - Waking a node's thread
+   * - Address families
+     - The table of Linux families a network node may name
+     - Checking a configuration
+
+The first seven are the node types gated by ``compile_error!``; the others
+are not gated, and are smaller.
+
+POSIX
+-----
+
+These need a POSIX layer, which VxWorks (in real-time processes), QNX,
+RTEMS, LynxOS and INTEGRITY's POSIX subsystem have in some measure, and
+FreeRTOS and Zephyr have only in part.
+
+* ``poll(2)`` on file descriptors is how every endpoint waits: the
+  command interpreter, ports, node state, the process node and every
+  payload. It is the one facility everything else rests on.
+* termios for the ``serial`` node: ``tcgetattr``, ``tcsetattr``,
+  ``cfsetispeed``, ``cfmakeraw`` and ``O_NOCTTY``. The ``device-file`` node
+  needs only ``open`` and ``poll``.
+* Unix-domain sockets for the network node's ``unix_stream`` and
+  ``unix_dgram``, which are in every build.
+* Processes: the ``process`` compute node runs a program with its standard
+  input and output on pipes; the app nodes start a program with socket
+  pairs and close descriptors in the child, which is the ``fork`` and
+  ``exec`` model; segment handoff runs its command with ``posix_spawn``
+  and ``waitpid``; and a restart re-executes the program with ``execv``.
+* Signals: ``SIGINT`` and ``SIGTERM`` stop TCSpecial.
+* Unix file descriptors themselves: ``RawFd``, ``AsRawFd`` and
+  ``BorrowedFd`` run through every endpoint.
+
+Rust's standard library
+-----------------------
+
+These need only an operating system that Rust's standard library has been
+ported to.
+
+* Threads, one per node and one each for the beacon, the command
+  interpreter and segment handoff, with ``Mutex``, ``Condvar``,
+  ``RwLock`` and channels between them.
+* UDP for the ground link and the beacon, and TCP for network nodes.
+* Clocks: ``Instant``, which must be monotonic, for scheduling and
+  deadlines, and ``SystemTime`` for timestamps.
+* Files: the state file is written, synchronized, renamed into place and
+  its directory synchronized, so it needs a file system whose rename is
+  atomic; the telemetry log is Tcslog, which needs a directory, exclusive
+  create and rename.
+
+The ground programs -- tcsmoc, tcssim and the GUIs -- use Slint and are
+not a porting concern: they run on the ground, on Linux or another desktop
+system.
+
+Thoughts on real-time operating systems
+---------------------------------------
+
+The first question for any of them is whether Rust's standard library is
+there, because that decides whether the work is a port or a rewrite.
+
+Where it is, most of TCSpecial would build as it is, and the work is in
+the device interfaces and in ``poll``. Where it is not, the endpoint,
+fabric, command, beacon and state layers would have to be written again
+for ``no_std`` with an allocator, against the operating system's own
+tasks, queues and sockets, which is most of the flight software.
+
+There is a third way that avoids both: keep TCSpecial on Linux, on a
+companion processor or on one core of a heterogeneous part, and let the
+real-time operating system run beside it on another core. TCSpecial
+already has an ``rpmsg`` node, which is the usual channel between Linux
+and a real-time core, so the real-time side would need only a small
+program that speaks rpmsg, and no part of TCSpecial would need porting.
+Where the mission's hardware allows it, this is the cheapest path.
+
+For a real port, these are the pieces and what each operating system
+might offer in their place:
+
+Waiting
+    ``EndpointWaitable`` is already the trait each endpoint implements to
+    say what to wait on. It is the place to put an operating system's own
+    way of waiting: ``select`` or ``poll`` where they exist on the
+    descriptors in question, and otherwise a task blocked on a queue, an
+    event group or a task notification that the device's driver or
+    interrupt handler posts to. The wake-up pipe becomes whatever the
+    chosen wait can be woken by.
+
+Device interfaces
+    Each interface is one node module, gated by its feature, so a port
+    adds a module per operating system beside the Linux one, chosen by
+    ``cfg(target_os)``, as the ``compile_error!`` gates already are. RTEMS
+    is the easiest case: its I2C and SPI frameworks follow the Linux
+    ``i2c-dev`` and ``spidev`` user interfaces, so those nodes might need
+    little change, and it has termios. Zephyr offers SocketCAN through its
+    socket layer. VxWorks and QNX reach I2C, SPI, CAN and GPIO through
+    their own driver frameworks (VxBus, and QNX's resource managers),
+    whose interfaces differ from Linux's. On FreeRTOS and OpenRTOS the
+    drivers are the board vendor's HAL, and each node would be written
+    against it.
+
+Processes
+    The ``process`` and app nodes, segment handoff and restart by
+    re-execution assume processes. VxWorks has them as real-time
+    processes (``rtpSpawn``), QNX and INTEGRITY have them natively, and
+    RTEMS, FreeRTOS, OpenRTOS and Zephyr do not: they have one address
+    space and tasks. On those, a ``process`` node would become a task
+    running code linked into the image, app nodes would not be built,
+    segment handoff would call a function rather than a program, and a
+    restart would be a reset of the processor -- by a watchdog, or the
+    operating system's own restart -- with the generation kept in the
+    state file as it is now. Re-execution also needs the program's path
+    and its open descriptors, which Linux finds in ``/proc``; elsewhere
+    they would be passed in or kept.
+
+Stopping
+    ``SIGINT`` and ``SIGTERM`` would become the operating system's own way
+    of asking a task to stop, or a command from the ground.
+
+Files
+    The state file needs a file system whose rename is atomic, and
+    Tcslog needs a directory, exclusive create and rename. VxWorks
+    (HRFS), QNX, RTEMS and INTEGRITY have such file systems;
+    FreeRTOS-Plus-FAT and other FAT file systems do not promise an atomic
+    rename, which the state file's write would have to make up for.
+
+Network
+    The ground link is UDP. VxWorks, QNX, RTEMS (with libbsd or lwIP) and
+    Zephyr have Berkeley sockets; FreeRTOS and OpenRTOS have them through
+    FreeRTOS-Plus-TCP or lwIP, in a form close to but not the same as
+    POSIX's.
+
+Rust
+    VxWorks and QNX have targets of Rust's standard library, at tier 3,
+    and RTEMS has one for some architectures. FreeRTOS, OpenRTOS and
+    Zephyr have no standard library target, so TCSpecial would be
+    ``no_std`` there, or kept on Linux as above.
+
+Of these, VxWorks and QNX are the closest to Linux in what TCSpecial
+needs: a standard library, processes, POSIX and files, with only the
+device interfaces and the wait to replace. RTEMS is close too, without
+processes. FreeRTOS, OpenRTOS and Zephyr are furthest, and for them the
+Linux companion is likely the better answer.
+
 Simulator Configuration Files
 =============================
 The tcspecial configuration describes payloads. Simulating one takes more than
@@ -10720,9 +10940,10 @@ Tcspecial manual/auto fail over
 
     Requires sharing the state in a consistent way.
 
-Support for non-Linux ReadyWait
+Support for operating systems other than Linux
 
-    The ReadyWait trait could be extended to other operating systems.
+    The EndpointWaitable trait, and each device interface, could be
+    extended to other operating systems: see `Platforms and Porting`_.
 
 
 Development Approach

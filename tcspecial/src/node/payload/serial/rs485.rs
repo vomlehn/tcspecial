@@ -290,6 +290,9 @@ mod tests {
             "the error should name the device and the mode: {said}"
         );
 
+        // SAFETY: close needs descriptors that nothing else owns or will use
+        // again. Both came from openpty above as bare numbers, were never
+        // given to an owner, and are not used after this.
         unsafe {
             libc::close(master);
             libc::close(slave);

@@ -291,13 +291,17 @@ mod tests {
 
         let name = {
             let mut buffer = [0i8; 128];
-            // SAFETY: a buffer of the length given, filled by the call.
             assert_eq!(
+                // SAFETY: a buffer of the length given, filled by the call.
                 unsafe {
                     libc::ttyname_r(slave, buffer.as_mut_ptr(), buffer.len())
                 },
                 0
             );
+            // SAFETY: from_ptr needs a NUL-terminated string that outlives
+            // the borrow. ttyname_r returned 0, so it wrote a terminated name
+            // (it fails with ERANGE rather than truncate), and `buffer`
+            // outlives the CStr, which is copied out at once.
             unsafe { std::ffi::CStr::from_ptr(buffer.as_ptr()) }
                 .to_string_lossy()
                 .into_owned()
@@ -354,6 +358,10 @@ mod tests {
             "the error should say why it cannot be split: {said}"
         );
 
+        // SAFETY: close needs descriptors that nothing else owns or will use
+        // again. Both came from openpty above as bare numbers; the endpoint
+        // opened the slave by name, so holds a descriptor of its own, and
+        // neither number is used after this.
         unsafe {
             libc::close(master);
             libc::close(slave);

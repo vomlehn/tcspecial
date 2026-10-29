@@ -1448,6 +1448,9 @@ mod tests {
         for stage in
             [Stage::Unheard, Stage::Heard, Stage::Aging, Stage::Waiting]
         {
+            // SAFETY: from_ptr needs a NUL-terminated string that outlives
+            // the borrow. tcs_stage_label returns a C string literal, which
+            // is terminated and 'static, for every number.
             let said =
                 unsafe { CStr::from_ptr(tcs_stage_label(stage_number(stage))) };
             assert_eq!(said.to_str(), Ok(stage.label()));
@@ -1462,6 +1465,7 @@ mod tests {
             CommandStatus::AlreadyExists,
             CommandStatus::Timeout,
         ] {
+            // SAFETY: as above: tcs_status_name returns a C string literal.
             let said = unsafe {
                 CStr::from_ptr(tcs_status_name(status_number(status)))
             };
@@ -1473,14 +1477,23 @@ mod tests {
     /// a crash.
     #[test]
     fn what_cannot_be_done_is_said() {
+        // SAFETY: tcs_configuration_open needs NULL or a NUL-terminated
+        // string, and this is NULL.
         let none = unsafe { tcs_configuration_open(std::ptr::null()) };
         assert!(none.is_null());
+        // SAFETY: from_ptr needs a NUL-terminated string that outlives the
+        // borrow. tcs_last_error points into this thread's error buffer,
+        // which lives as long as the thread and which `Text` keeps
+        // terminated; nothing writes it again while `why` is in use.
         let why = unsafe { CStr::from_ptr(tcs_last_error()) };
         assert!(why.to_str().unwrap().contains("NULL"), "{why:?}");
 
         let missing = CString::new("/nonexistent/tcs.yaml").unwrap();
+        // SAFETY: a CString is NUL-terminated, and `missing` outlives the
+        // call.
         let none = unsafe { tcs_configuration_open(missing.as_ptr()) };
         assert!(none.is_null());
+        // SAFETY: as for the first `why`.
         let why = unsafe { CStr::from_ptr(tcs_last_error()) };
         assert!(
             why.to_str().unwrap().contains("/nonexistent/tcs.yaml"),
@@ -1488,6 +1501,9 @@ mod tests {
         );
 
         // Closing nothing is nothing.
+        //
+        // SAFETY: each `_close` takes NULL or a handle of its own kind not
+        // yet closed, and each is given NULL.
         unsafe {
             tcs_configuration_close(std::ptr::null_mut());
             tcs_beacons_close(std::ptr::null_mut());

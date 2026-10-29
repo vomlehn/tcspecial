@@ -1903,6 +1903,12 @@ vehicle:
             }
         }
 
+        // SAFETY: GlobalAlloc asks that an allocator not unwind and that it
+        // give and take back memory as its layouts say. Every method here
+        // hands its arguments unchanged to System, which keeps that contract,
+        // and before it only counts: `note` touches two const-initialized
+        // thread locals through `try_with`, which neither allocates nor
+        // panics, even while the thread is being torn down.
         unsafe impl GlobalAlloc for Counting {
             unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
                 note();

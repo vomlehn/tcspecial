@@ -81,6 +81,10 @@ impl BusMember {
             ));
         }
         // Owned from here, so every path below closes it.
+        //
+        // SAFETY: from_raw_fd needs sole ownership of an open descriptor.
+        // socket has just made this one and it is checked above; nothing
+        // else has been given it.
         let socket = unsafe { OwnedFd::from_raw_fd(fd) };
 
         let can_id = config.can_id;
@@ -159,6 +163,7 @@ impl BusMember {
         // SAFETY: both calls take the descriptor by value.
         let flags = unsafe { libc::fcntl(socket.as_raw_fd(), libc::F_GETFL) };
         if flags < 0
+            // SAFETY: as for F_GETFL: `socket` is owned here and open.
             || unsafe {
                 libc::fcntl(
                     socket.as_raw_fd(),

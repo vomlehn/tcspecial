@@ -154,7 +154,13 @@ pub(crate) fn wait_for_fds(
     io_events: PollFlags,
     timeout_ms: i32,
 ) -> TcsResult<WaitResult> {
+    // SAFETY: borrow_raw needs each descriptor to stay open for as long as
+    // the borrow lasts, which is this call. Every caller passes its own
+    // endpoint's descriptor and its command pipe's, both owned by the
+    // handler that is calling and so open until it returns; nothing here
+    // closes either, and the borrows end when poll does.
     let io_borrowed = unsafe { BorrowedFd::borrow_raw(io_fd) };
+    // SAFETY: as for `io_fd` above.
     let cmd_borrowed = unsafe { BorrowedFd::borrow_raw(cmd_fd) };
 
     let mut poll_fds = [

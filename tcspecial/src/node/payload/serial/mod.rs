@@ -129,7 +129,13 @@ fn apply_line_terms(
 
     // Read what the port is set to now, so that what is not named here is
     // left as it was rather than zeroed.
+    //
+    // SAFETY: termios is a C struct of integers and arrays of integers, for
+    // which all zeroes is a valid value; tcgetattr overwrites it anyway.
     let mut terms: libc::termios = unsafe { std::mem::zeroed() };
+    // SAFETY: tcgetattr needs an open descriptor and a termios it can write.
+    // `fd` is `file`'s, and `file` is borrowed for the whole of this call;
+    // `terms` is a local termios, alive and mutably borrowed for the call.
     if unsafe { libc::tcgetattr(fd, &mut terms) } != 0 {
         return Err(not_a_line(
             what,
@@ -138,6 +144,8 @@ fn apply_line_terms(
         ));
     }
 
+    // SAFETY: cfmakeraw needs a termios it can write, which `terms` is,
+    // filled in by tcgetattr above.
     unsafe { libc::cfmakeraw(&mut terms) };
 
     terms.c_cflag &= !(libc::CSIZE
@@ -163,7 +171,11 @@ fn apply_line_terms(
     // CLOCAL waits on carrier a device link does not have.
     terms.c_cflag |= libc::CREAD | libc::CLOCAL;
 
+    // SAFETY: cfsetispeed and cfsetospeed need a termios they can write,
+    // which `terms` is; they only change the struct, and a speed they do not
+    // know is refused by their return, which is checked.
     if unsafe { libc::cfsetispeed(&mut terms, speed) } != 0
+        // SAFETY: as for cfsetispeed.
         || unsafe { libc::cfsetospeed(&mut terms, speed) } != 0
     {
         return Err(not_a_line(
@@ -173,6 +185,8 @@ fn apply_line_terms(
         ));
     }
 
+    // SAFETY: tcsetattr needs an open descriptor and a termios it can read:
+    // `fd` is still `file`'s, borrowed for this call, and `terms` is local.
     if unsafe { libc::tcsetattr(fd, libc::TCSANOW, &terms) } != 0 {
         // What was asked for, because which of the terms the port would not
         // take is the whole of what the reader needs. A pty, which is what a
@@ -204,7 +218,10 @@ fn apply_line_terms(
     // makes no sense, where a missing parity bit shows up as nothing at all
     // until a corrupted byte is believed.
     let wanted = config.parity;
+    // SAFETY: all zeroes is a valid termios, as above.
     let mut got: libc::termios = unsafe { std::mem::zeroed() };
+    // SAFETY: as for the first tcgetattr: `fd` is open while `file` is
+    // borrowed, and `got` is a local termios it can write.
     if unsafe { libc::tcgetattr(fd, &mut got) } != 0 {
         return Err(not_a_line(
             what,
@@ -394,6 +411,8 @@ mod tests {
     fn a_line_is_set_to_the_parity_it_was_given() {
         use std::os::unix::io::FromRawFd;
 
+        // SAFETY: posix_openpt takes only flags and has no preconditions;
+        // its result is checked before it is used.
         let master_fd =
             unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY) };
         assert!(
@@ -401,17 +420,31 @@ mod tests {
             "no pty: {}",
             std::io::Error::last_os_error()
         );
+        // SAFETY: from_raw_fd needs sole ownership of an open descriptor.
+        // `master_fd` was just opened, is checked above, and nothing else
+        // takes ownership of it; the uses below only borrow it while the File
+        // is alive.
         let _master = unsafe { File::from_raw_fd(master_fd) };
+        // SAFETY: grantpt needs an open pty master, which `master_fd` is,
+        // owned by the File above for the rest of the test.
         assert_eq!(unsafe { libc::grantpt(master_fd) }, 0);
+        // SAFETY: as for grantpt.
         assert_eq!(unsafe { libc::unlockpt(master_fd) }, 0);
 
         let mut name = [0 as libc::c_char; 128];
         assert_eq!(
+            // SAFETY: ptsname_r needs an open pty master and a buffer it can
+            // write of the length it is given: `name` is a local array, and
+            // its own length is what is passed.
             unsafe {
                 libc::ptsname_r(master_fd, name.as_mut_ptr(), name.len())
             },
             0
         );
+        // SAFETY: from_ptr needs a NUL-terminated string that outlives the
+        // borrow. ptsname_r returned 0, so it wrote a terminated name into
+        // `name` (it fails with ERANGE rather than truncate), and `name`
+        // outlives the CStr, which is copied out at once.
         let slave = unsafe { std::ffi::CStr::from_ptr(name.as_ptr()) }
             .to_string_lossy()
             .into_owned();
@@ -431,8 +464,13 @@ mod tests {
         // pty will take: the port comes back with the bit disabled.
         let endpoint = SerialEndpoint::new("telemetry", &line(Parity::None))
             .expect("a pty takes none");
+        // SAFETY: termios is a C struct of integers, for which all zeroes is
+        // a valid value.
         let mut terms: libc::termios = unsafe { std::mem::zeroed() };
         assert_eq!(
+            // SAFETY: tcgetattr needs an open descriptor and a termios it can
+            // write: the descriptor is `endpoint`'s, open until the drop
+            // below, and `terms` is local.
             unsafe { libc::tcgetattr(endpoint.file.as_raw_fd(), &mut terms) },
             0
         );
@@ -501,6 +539,8 @@ mod tests {
         use std::os::unix::io::FromRawFd;
 
         // A pty, as tcssim makes one.
+        // SAFETY: posix_openpt takes only flags and has no preconditions;
+        // its result is checked before it is used.
         let master_fd =
             unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY) };
         assert!(
@@ -508,17 +548,31 @@ mod tests {
             "no pty: {}",
             std::io::Error::last_os_error()
         );
+        // SAFETY: from_raw_fd needs sole ownership of an open descriptor.
+        // `master_fd` was just opened, is checked above, and nothing else
+        // takes ownership of it; the uses below only borrow it while the File
+        // is alive.
         let mut master = unsafe { File::from_raw_fd(master_fd) };
+        // SAFETY: grantpt needs an open pty master, which `master_fd` is,
+        // owned by the File above for the rest of the test.
         assert_eq!(unsafe { libc::grantpt(master_fd) }, 0);
+        // SAFETY: as for grantpt.
         assert_eq!(unsafe { libc::unlockpt(master_fd) }, 0);
 
         let mut name = [0 as libc::c_char; 128];
         assert_eq!(
+            // SAFETY: ptsname_r needs an open pty master and a buffer it can
+            // write of the length it is given: `name` is a local array, and
+            // its own length is what is passed.
             unsafe {
                 libc::ptsname_r(master_fd, name.as_mut_ptr(), name.len())
             },
             0
         );
+        // SAFETY: from_ptr needs a NUL-terminated string that outlives the
+        // borrow. ptsname_r returned 0, so it wrote a terminated name into
+        // `name` (it fails with ERANGE rather than truncate), and `name`
+        // outlives the CStr, which is copied out at once.
         let slave = unsafe { std::ffi::CStr::from_ptr(name.as_ptr()) }
             .to_string_lossy()
             .into_owned();

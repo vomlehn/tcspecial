@@ -411,6 +411,8 @@ fn ask_for_lines(
     // SAFETY: both calls take the descriptor by value and return a status.
     let flags = unsafe { libc::fcntl(request.fd, libc::F_GETFL) };
     if flags < 0
+        // SAFETY: as for F_GETFL: `request.fd` is the open descriptor the
+        // kernel has just given, checked above, and owned by nothing else yet.
         || unsafe {
             libc::fcntl(request.fd, libc::F_SETFL, flags | libc::O_NONBLOCK)
         } < 0
@@ -824,6 +826,8 @@ mod tests {
     #[test]
     fn a_set_of_input_lines_refuses_a_write() {
         let mut fds = [0 as RawFd; 2];
+        // SAFETY: pipe needs room for two descriptors to write, which `fds`
+        // is: a local array of two.
         assert_eq!(unsafe { libc::pipe(fds.as_mut_ptr()) }, 0, "a pipe");
 
         let mut endpoint = GpioEndpoint {
@@ -831,6 +835,7 @@ mod tests {
             // SAFETY: both descriptors are the pipe's, just made, and owned
             // by the endpoint from here.
             _chip: unsafe { File::from_raw_fd(fds[1]) },
+            // SAFETY: as for `_chip`.
             lines: unsafe { File::from_raw_fd(fds[0]) },
             direction: Direction::Input,
             count: 1,
@@ -859,6 +864,8 @@ mod tests {
     #[test]
     fn every_event_waiting_becomes_a_record() {
         let mut fds = [0 as RawFd; 2];
+        // SAFETY: pipe needs room for two descriptors to write, which `fds`
+        // is: a local array of two.
         assert_eq!(unsafe { libc::pipe(fds.as_mut_ptr()) }, 0, "a pipe");
 
         // Non-blocking, as the kernel's own descriptor is made in
@@ -872,8 +879,13 @@ mod tests {
 
         let mut endpoint = GpioEndpoint {
             what: "discretes".to_string(),
-            // SAFETY: as above.
+            // SAFETY: from_raw_fd needs sole ownership of an open
+            // descriptor. The dup is this File's alone -- the test keeps
+            // `fds[1]` itself, to write with -- but dup's result is not
+            // checked, so that it is open (not -1) is assumed, not shown.
             _chip: unsafe { File::from_raw_fd(libc::dup(fds[1])) },
+            // SAFETY: the pipe's read end, just made, owned by the endpoint
+            // from here and not used through `fds[0]` again.
             lines: unsafe { File::from_raw_fd(fds[0]) },
             direction: Direction::Input,
             count: 1,
@@ -919,6 +931,9 @@ mod tests {
             0
         );
 
+        // SAFETY: close needs a descriptor nothing else owns or will use.
+        // `fds[1]` is the pipe's write end, which only this test holds -- the
+        // endpoint owns a dup of it -- and is not used after this.
         unsafe {
             libc::close(fds[1]);
         }
@@ -1005,6 +1020,8 @@ mod tests {
     #[test]
     fn a_set_of_driven_lines_refuses_a_read() {
         let mut fds = [0 as RawFd; 2];
+        // SAFETY: pipe needs room for two descriptors to write, which `fds`
+        // is: a local array of two.
         assert_eq!(unsafe { libc::pipe(fds.as_mut_ptr()) }, 0, "a pipe");
 
         let mut endpoint = GpioEndpoint {
@@ -1012,6 +1029,7 @@ mod tests {
             // SAFETY: both descriptors are the pipe's, just made, and owned
             // by the endpoint from here.
             _chip: unsafe { File::from_raw_fd(fds[1]) },
+            // SAFETY: as for `_chip`.
             lines: unsafe { File::from_raw_fd(fds[0]) },
             direction: Direction::Output,
             count: 3,
@@ -1040,12 +1058,15 @@ mod tests {
     #[test]
     fn a_write_to_driven_lines_is_attempted() {
         let mut fds = [0 as RawFd; 2];
+        // SAFETY: pipe needs room for two descriptors to write, which `fds`
+        // is: a local array of two.
         assert_eq!(unsafe { libc::pipe(fds.as_mut_ptr()) }, 0, "a pipe");
 
         let mut endpoint = GpioEndpoint {
             what: "heaters".to_string(),
             // SAFETY: as above.
             _chip: unsafe { File::from_raw_fd(fds[1]) },
+            // SAFETY: as above.
             lines: unsafe { File::from_raw_fd(fds[0]) },
             direction: Direction::Output,
             count: 3,

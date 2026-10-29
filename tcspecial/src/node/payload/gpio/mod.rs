@@ -870,10 +870,13 @@ mod tests {
             libc::fcntl(fds[0], libc::F_SETFL, flags | libc::O_NONBLOCK);
         }
 
+        // SAFETY: dup takes the descriptor by value; the pipe is open.
+        let chip = unsafe { libc::dup(fds[1]) };
+        assert!(chip >= 0, "a copy of the pipe's end");
         let mut endpoint = GpioEndpoint {
             what: "discretes".to_string(),
-            // SAFETY: as above.
-            _chip: unsafe { File::from_raw_fd(libc::dup(fds[1])) },
+            // SAFETY: the copy was just made and nothing else owns it.
+            _chip: unsafe { File::from_raw_fd(chip) },
             lines: unsafe { File::from_raw_fd(fds[0]) },
             direction: Direction::Input,
             count: 1,

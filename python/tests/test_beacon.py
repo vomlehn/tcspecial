@@ -277,8 +277,10 @@ class HearingTest(unittest.TestCase):
     def test_a_generation_that_changes_is_a_restart(self):
         self.assertEqual(beacon.counted((3, 5), (4, 90)),
                          (Counted.RESTARTED, 0))
-        self.assertEqual(beacon.counted((9, 5), (1, 6)),
+        self.assertEqual(beacon.counted((9, 5), (1, 1)),
                          (Counted.RESTARTED, 0))
+        self.assertEqual(beacon.counted((9, 5), (8, 40)),
+                         (Counted.LATE, 0))
 
     def test_a_beacon_is_shown_by_when_it_arrived(self):
         self.assertEqual(beacon.received_at(None), "--:--:--")
@@ -345,6 +347,17 @@ class LoopTest(unittest.TestCase):
         self.assertIn("tcspecial has restarted without being commanded to, "
                       "with the definitions it had: generation 3 is flying, "
                       "after 2", crashed.remarks)
+        # A beacon of generation 2, delayed past generation 3's: late.
+        straggler = self.beacons.heard(
+            a_beacon(sequence=5, generation=2), sender)
+        self.assertIn("beacon #5 of generation 2 arrived late, after "
+                      "generation 3 #1", straggler.remarks)
+        # A start counting again from one, its #1 lost: late once, then the
+        # start it is.
+        self.beacons.heard(a_beacon(sequence=2, generation=1), sender)
+        reset = self.beacons.heard(a_beacon(sequence=3, generation=1), sender)
+        self.assertTrue(any("tcspecial has restarted" in r
+                            for r in reset.remarks), reset.remarks)
 
     def test_a_datagram_from_the_wrong_place_is_not_a_beacon(self):
         wrong = self.beacons.heard(a_beacon(), ("127.0.0.1", 9999))

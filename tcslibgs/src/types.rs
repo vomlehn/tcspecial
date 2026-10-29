@@ -94,6 +94,14 @@ impl Timestamp {
     /// is a fault in its own right, and saying so is better both than a
     /// panic in a program watching a spacecraft and than the epoch, which is
     /// a time the ground would take for a real one.
+    ///
+    /// # Arguments
+    ///
+    /// * `time` - The clock reading.
+    ///
+    /// # Returns
+    ///
+    /// The reading as a timestamp, or [`Timestamp::CLOCK_FAULT`].
     pub fn at(time: SystemTime) -> Self {
         let Ok(since) = time.duration_since(UNIX_EPOCH) else {
             return Self::CLOCK_FAULT;
@@ -126,6 +134,15 @@ impl Timestamp {
     /// nothing behind it, and a time from the future is a clock that moved.
     /// Both are "cannot say", which is what every caller here does with the
     /// absence.
+    ///
+    /// # Arguments
+    ///
+    /// * `earlier` - The time to measure from.
+    ///
+    /// # Returns
+    ///
+    /// The time between them, or `None` for a clock fault at either end or an
+    /// `earlier` that is later.
     pub fn since(&self, earlier: Timestamp) -> Option<Duration> {
         if self.clock_failed() || earlier.clock_failed() {
             return None;
@@ -145,6 +162,10 @@ impl Timestamp {
     ///
     /// Here rather than at each place that sends a time, so that the format
     /// is written down once and the test below is the whole of what holds it.
+    ///
+    /// # Returns
+    ///
+    /// The microseconds since the epoch, most significant byte first.
     pub fn to_be_bytes(&self) -> [u8; 8] {
         self.micros.to_be_bytes()
     }
@@ -174,6 +195,11 @@ impl Timestamp {
     /// The fractions of a second are deliberately unused. A panel refreshed
     /// twice a second cannot show them, and a time that changed in its last
     /// digits between two looks would read as traffic that had not happened.
+    ///
+    /// # Returns
+    ///
+    /// The time as `hh:mm:ss` in UTC, or [`NO_TRANSFER_TIME`] for a clock
+    /// fault.
     pub fn time_of_day(&self) -> String {
         if self.clock_failed() {
             return NO_TRANSFER_TIME.to_string();
@@ -243,6 +269,15 @@ pub enum DHType {
 /// two handlers doing so: a simulator configuration stating `localhost` for a
 /// payload the tcspecial configuration put at `127.0.0.1` has not disagreed
 /// with it.
+///
+/// # Arguments
+///
+/// * `address` - A host, as a file writes it.
+///
+/// # Returns
+///
+/// `localhost` for any name of this host, and `address` as written for any
+/// other.
 pub fn one_host(address: &str) -> String {
     match address {
         "localhost" | "127.0.0.1" | "::1" => "localhost".to_string(),
@@ -268,6 +303,15 @@ pub fn one_host(address: &str) -> String {
 /// Asked of every datagram on those links, so it allocates nothing: the
 /// address a datagram came from is written into a buffer on the stack and
 /// compared as text, by the same rule [`one_host`] states.
+///
+/// # Arguments
+///
+/// * `stated` - The socket the configuration says the datagram comes from.
+/// * `from`   - Where the datagram came from.
+///
+/// # Returns
+///
+/// Whether `from` is the socket `stated` names.
 pub fn came_from(stated: &HostPort, from: &SocketAddr) -> bool {
     if from.port() != stated.port {
         return false;
@@ -294,6 +338,15 @@ pub fn came_from(stated: &HostPort, from: &SocketAddr) -> bool {
 
 /// `value` written into `out`, as `Display` writes it: the bytes it took, or
 /// `None` where it does not fit.
+///
+/// # Arguments
+///
+/// * `value` - What to write.
+/// * `out`   - The buffer it is written into, from the start.
+///
+/// # Returns
+///
+/// How many bytes of `out` it took, or `None` if it does not fit.
 fn written(value: &impl std::fmt::Display, out: &mut [u8]) -> Option<usize> {
     use std::fmt::Write;
 
@@ -322,6 +375,14 @@ fn written(value: &impl std::fmt::Display, out: &mut [u8]) -> Option<usize> {
 /// A wildcard claims a port on every address at once, which is why it has to
 /// be told from a host: a handler at `localhost:4000` and a command link at
 /// `0.0.0.0:4000` do collide, without naming one host between them.
+///
+/// # Arguments
+///
+/// * `address` - A host, as a file writes it.
+///
+/// # Returns
+///
+/// Whether it is empty, `0.0.0.0`, `::` or `*`.
 fn binds_every_interface(address: &str) -> bool {
     address.is_empty()
         || address == "0.0.0.0"
@@ -352,6 +413,10 @@ impl DHType {
     /// tcspecial configuration and the simulator file cannot disagree about
     /// what a kind is called. The spellings are also what an error says, which
     /// is how a file is told what it could have written instead.
+    ///
+    /// # Returns
+    ///
+    /// The kind's word: `network`, `device-file`, `i2c` and so on.
     pub fn spelling(&self) -> &'static str {
         match self {
             DHType::Network => "network",
@@ -382,6 +447,10 @@ impl DHType {
     ///
     /// `i2c` is the reason this exists: "a i2c payload" is not a thing anyone
     /// writes, and these words appear in errors people read.
+    ///
+    /// # Returns
+    ///
+    /// "an" for `i2c` and `iio`, "a" for every other kind.
     pub fn article(&self) -> &'static str {
         match self {
             DHType::I2c | DHType::Iio => "an",
@@ -402,6 +471,14 @@ impl DHType {
     /// `trigger_interval_ms` is told about `packet_interval_ms`: the author of
     /// such a file wrote something that was right once, and the useful answer
     /// is the new word and not a list of nine.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The word a file wrote for a kind.
+    ///
+    /// # Returns
+    ///
+    /// The kind's word now, if `text` is an older one; `None` if it is not.
     pub fn renamed(text: &str) -> Option<&'static str> {
         match text {
             "device" => Some("device-file"),
@@ -415,6 +492,11 @@ pub const RAW: &str = "raw";
 
 impl NetworkProtocol {
     /// The word a configuration file uses for this transport.
+    ///
+    /// # Returns
+    ///
+    /// The transport's word: `tcp`, `udp`, `unix_stream`, `unix_dgram` or
+    /// `raw`.
     pub fn spelling(&self) -> &'static str {
         match self {
             NetworkProtocol::Tcp => "tcp",
@@ -429,6 +511,14 @@ impl NetworkProtocol {
     ///
     /// Not `raw`, which names a transport only with the `ip_protocol` beside
     /// it: see [`crate::graph::reach`], which reads the two together.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The word a file wrote for a transport.
+    ///
+    /// # Returns
+    ///
+    /// The transport it names, or `None` if it names none, or is `raw`.
     pub fn from_spelling(text: &str) -> Option<NetworkProtocol> {
         [
             NetworkProtocol::Tcp,
@@ -524,6 +614,10 @@ impl NodeId {
     ///
     /// The order a [`Timestamp`] and a [`BeaconInterval`] go in, for the
     /// reason given on the first of them.
+    ///
+    /// # Returns
+    ///
+    /// The id, most significant byte first.
     pub fn to_be_bytes(&self) -> [u8; 4] {
         self.0.to_be_bytes()
     }
@@ -600,6 +694,10 @@ impl BeaconInterval {
     /// first.
     ///
     /// The order a [`Timestamp`] goes in, for the reason given there.
+    ///
+    /// # Returns
+    ///
+    /// The interval's microseconds, most significant byte first.
     pub fn to_be_bytes(&self) -> [u8; 8] {
         self.0.to_be_bytes()
     }
@@ -703,6 +801,16 @@ pub const NO_TRANSFER_TIME: &str = "--:--:--";
 
 /// Bytes as a panel shows them: hex pairs, and an ellipsis if there were
 /// more than `max_len` of them.
+///
+/// # Arguments
+///
+/// * `bytes`   - The bytes to show.
+/// * `max_len` - The most of them to show.
+///
+/// # Returns
+///
+/// Up to `max_len` of the bytes as upper-case hex pairs separated by spaces,
+/// with `...` after them if there were more.
 pub fn bytes_to_hex(bytes: &[u8], max_len: usize) -> String {
     let shown = &bytes[..bytes.len().min(max_len)];
     let hex: Vec<String> = shown.iter().map(|b| format!("{:02X}", b)).collect();
@@ -759,6 +867,10 @@ impl DHSample {
     ///
     /// Longer data is truncated to what fits; the panel shows a head and says
     /// so, and the rest is of no use to it.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - What the transfer carried, of which the head is kept.
     pub fn record(&mut self, data: &[u8]) {
         let len = data.len().min(DH_SAMPLE_BYTES);
         // Cleared rather than overwritten in place, or a short transfer after
@@ -814,6 +926,15 @@ impl DHSample {
     /// and sent something else has something wrong with it, and the bytes are
     /// what says so; a temperature made out of the wrong four bytes would
     /// hide it.
+    ///
+    /// # Arguments
+    ///
+    /// * `as_value` - Whether the node that sent the data sends values.
+    ///
+    /// # Returns
+    ///
+    /// The time of day of the transfer, and its data as a temperature in kelvin
+    /// or as hex; [`NO_TRANSFER_TIME`] and nothing for a sample with no time.
     pub fn panel_lines_of(&self, as_value: bool) -> (String, String) {
         let Some(time) = self.time else {
             return (NO_TRANSFER_TIME.to_string(), String::new());
@@ -927,6 +1048,14 @@ impl BeaconLink {
     /// What a configuration with no payload set's `tcspecial` section to
     /// prefer comes to; see `tcspecial::config::beacon` for the pair of
     /// files.
+    ///
+    /// # Arguments
+    ///
+    /// * `ci` - The command interpreter's configuration.
+    ///
+    /// # Returns
+    ///
+    /// Its `beacon_send` and `beacon_recv`, as the two ends of the link.
     pub fn of(ci: &CIConfig) -> BeaconLink {
         BeaconLink {
             send: ci.beacon_send.clone(),
@@ -1175,6 +1304,10 @@ impl EndpointConfig {
     /// for a handler and the spacecraft checking what was asked for cannot
     /// read the same configuration differently. START_DH carries the kind,
     /// and tcspecial refuses one that is not this.
+    ///
+    /// # Returns
+    ///
+    /// The kind, one for each variant of the endpoint.
     pub fn kind(&self) -> DHType {
         match self {
             EndpointConfig::Network(_) => DHType::Network,
@@ -1236,6 +1369,11 @@ impl Default for DHMode {
 
 impl DHMode {
     /// What to send and how often, for a handler that has to ask.
+    ///
+    /// # Returns
+    ///
+    /// The trigger and the interval it is sent at, or `None` for a periodic
+    /// handler.
     pub fn polling(&self) -> Option<(&[u8], Duration)> {
         match self {
             DHMode::Periodic => None,
@@ -1334,6 +1472,21 @@ pub struct DHConfig {
 /// A node states them as its attributes, and [`crate::graph::reach`] gathers
 /// them and asks here: the rules themselves are asked in one place, so that
 /// no reader of a configuration can come to read them differently.
+///
+/// # Arguments
+///
+/// * `name` - The node's name, for the message.
+/// * `kind` - The node's interface type.
+/// * `wire` - The terms the node states.
+///
+/// # Returns
+///
+/// What the rules for `kind` settle.
+///
+/// # Errors
+///
+/// The rules' refusal, or a message if `kind` is a network or device file,
+/// which has no link terms.
 pub(crate) fn kind_of_terms(
     name: &str,
     kind: DHType,
@@ -1360,9 +1513,8 @@ pub(crate) fn kind_of_terms(
     .map_err(|e| format!("{e}"))
 }
 
-/// Payload bytes per telemetry log segment file, when the configuration
+/// Payload bytes per telemetry log segment file, for a configuration that
 /// does not say. The segment file header is added on top of this.
-/// Payload bytes per segment file, for a configuration that does not say.
 ///
 /// A size rather than a required value because it is a tuning choice with a
 /// defensible answer, where the beacon attributes beside it are mission facts
@@ -1414,6 +1566,18 @@ impl HostPort {
     /// a configuration of three hundred payloads based at 65400 describes
     /// something no socket can be, and the useful moment to say so is while
     /// somebody is reading the file.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The payload's id: its position in the configuration.
+    ///
+    /// # Returns
+    ///
+    /// A UDP endpoint at this base's host, at its port plus `id`.
+    ///
+    /// # Errors
+    ///
+    /// A message if the sum is more than 65535.
     pub fn at(&self, id: usize) -> Result<NetworkConfig, String> {
         let port = (self.port as usize).checked_add(id).ok_or_else(|| {
             format!("{}:{} plus {id} is not a port", self.address, self.port)
@@ -1448,6 +1612,20 @@ impl std::fmt::Display for HostPort {
 ///
 /// Split at the last colon, so that whatever a host is called the port is the
 /// part after it.
+///
+/// # Arguments
+///
+/// * `attribute` - The attribute's name, for the message.
+/// * `stated`    - Its value, as written.
+///
+/// # Returns
+///
+/// The host and the port.
+///
+/// # Errors
+///
+/// A message if there is no colon, no address before it, or a port after it
+/// that is not a whole number from 1 to 65535.
 pub fn host_port_of(attribute: &str, stated: &str) -> Result<HostPort, String> {
     let said = stated.trim();
     let (address, port) = said.rsplit_once(':').ok_or_else(|| {
@@ -1701,6 +1879,18 @@ pub struct CIConfigJson {
 /// Nought is refused: an arm that lapsed as it was taken would be a vehicle
 /// that could never be restarted, which is a configuration nobody means and
 /// would find out about only when they needed it.
+///
+/// # Arguments
+///
+/// * `said` - `restart_arm_valid`, as written.
+///
+/// # Returns
+///
+/// How long an arm lasts.
+///
+/// # Errors
+///
+/// A message if it is not a length of time, or is nought.
 pub fn restart_arm_valid_of(said: &str) -> Result<Duration, String> {
     let valid = crate::graph::parse_interval(said)
         .map_err(|why| format!("restart_arm_valid: {why}"))?;
@@ -1762,6 +1952,19 @@ pub struct CIConfig {
 }
 
 impl CIConfigJson {
+    /// Settles the command interpreter's configuration from what the file says.
+    ///
+    /// # Returns
+    ///
+    /// The configuration, its addresses parsed and its lengths of time read.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the attribute, if an address is not an
+    /// `address:port`, a beacon interval is written with a retired name, is
+    /// not a length of time or is out of range, `restart_arm_valid` is not a
+    /// length of time or is nought, `state_file` is empty, or `tcs_cmd.recv`
+    /// and `payload_command.dest_base` are one socket.
     pub fn to_ci_config(&self) -> Result<CIConfig, String> {
         let command = host_port_of("tcs_cmd.recv", &self.tcs_cmd.recv)?;
         let (address, port) = (command.address, command.port);
@@ -1875,6 +2078,18 @@ impl CIConfigJson {
 
 /// Refuses a length of time longer than a [`BeaconInterval`] states:
 /// 2^64 - 1 microseconds, about 585,000 years.
+///
+/// # Arguments
+///
+/// * `interval` - The length of time.
+///
+/// # Returns
+///
+/// `Ok(())` if it fits in a [`BeaconInterval`].
+///
+/// # Errors
+///
+/// A message saying it is too long for the protocol.
 fn beyond_a_beacon_interval(interval: Duration) -> Result<(), String> {
     if u64::try_from(interval.as_micros()).is_err() {
         return Err("longer than the protocol can carry, which counts \
@@ -1893,6 +2108,20 @@ fn beyond_a_beacon_interval(interval: Duration) -> Result<(), String> {
 /// it. Longer than the interval is refused too, because the point of it is
 /// that a restart is heard about sooner than a beacon would otherwise come,
 /// and one that made the ground wait longer is a configuration nobody means.
+///
+/// # Arguments
+///
+/// * `said`            - `beacon.reset_interval`, as written.
+/// * `beacon_interval` - `beacon.default_interval`, read already.
+///
+/// # Returns
+///
+/// How often beacons go across a restart.
+///
+/// # Errors
+///
+/// A message if it is not a length of time, is too long for the protocol,
+/// is nought, or is longer than `beacon_interval`.
 pub fn reset_interval_of(
     said: &str,
     beacon_interval: Duration,

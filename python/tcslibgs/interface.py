@@ -36,8 +36,16 @@ def of_this_tree():
 
 
 def differs(theirs, ours):
-    """Why ``theirs``, the interface the vehicle speaks, is not ``ours``, or
-    ``None`` when it is: the same words as the Rust's."""
+    """Why ``theirs`` is not ``ours``: the same words as the Rust's.
+
+    Args:
+        theirs: The interface the vehicle speaks, as its sixteen-byte digest.
+        ours:   The interface this station read, as its sixteen-byte digest.
+
+    Returns:
+        ``None`` when they are the same, else a sentence saying how they
+        differ and what to do.
+    """
     if theirs == ours:
         return None
     return (

@@ -20,7 +20,14 @@ use crate::payload::{
     PayloadConfig, PayloadStats, Produce,
 };
 
-/// Run a simulated device reached over TCP.
+/// Runs a simulated device reached over TCP, which listens where the
+/// handler connects.
+///
+/// # Arguments
+///
+/// * `config`  - The payload's configuration.
+/// * `running` - Cleared to stop it; the function returns soon after.
+/// * `stats`   - Where it counts what it sends and receives.
 pub fn run_tcp_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
@@ -130,6 +137,19 @@ mod tests {
     use std::time::Duration;
     use tcslibgs::Faults;
 
+    /// Makes a working simulated TCP device on 127.0.0.1, sending twelve-byte
+    /// packets.
+    ///
+    /// # Arguments
+    ///
+    /// * `port`        - The port it listens on.
+    /// * `triggered`   - Whether it answers requests rather than sending on its
+    ///                   own.
+    /// * `interval_ms` - Its packet and segment intervals, in ms.
+    ///
+    /// # Returns
+    ///
+    /// The device, not yet started.
     fn device_at(
         port: u16,
         triggered: bool,
@@ -138,6 +158,20 @@ mod tests {
         faulty_device_at(port, triggered, interval_ms, Faults::default())
     }
 
+    /// Makes a simulated TCP device with faults, on 127.0.0.1, sending
+    /// twelve-byte packets.
+    ///
+    /// # Arguments
+    ///
+    /// * `port`        - The port it listens on.
+    /// * `triggered`   - Whether it answers requests rather than sending on its
+    ///                   own.
+    /// * `interval_ms` - Its packet and segment intervals, in ms.
+    /// * `faults`      - The faults it is to inject.
+    ///
+    /// # Returns
+    ///
+    /// The device, not yet started.
     fn faulty_device_at(
         port: u16,
         triggered: bool,
@@ -168,6 +202,15 @@ mod tests {
         })
     }
 
+    /// Finds a loopback TCP port that is free.
+    ///
+    /// # Returns
+    ///
+    /// A port that was free a moment ago.
+    ///
+    /// # Panics
+    ///
+    /// If no port can be bound.
     fn a_free_port() -> u16 {
         let socket =
             std::net::TcpListener::bind("127.0.0.1:0").expect("a port");
@@ -244,7 +287,20 @@ mod tests {
         assert!(stats.packets_recv >= 1, "the request was not counted");
     }
 
-    /// Connect to the device, as a handler does, waiting for it to listen.
+    /// Connects to the device, as a handler does, waiting up to five
+    /// seconds for it to listen.
+    ///
+    /// # Arguments
+    ///
+    /// * `port` - The loopback port it listens on.
+    ///
+    /// # Returns
+    ///
+    /// The connected stream.
+    ///
+    /// # Panics
+    ///
+    /// If it never listens.
     fn connect_to(port: u16) -> TcpStream {
         let deadline = Instant::now() + Duration::from_secs(5);
         loop {

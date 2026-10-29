@@ -40,9 +40,13 @@ pub struct Through {
 const WAITING_AT_ONCE: usize = 4;
 
 impl Through {
-    /// A pass-through with nothing in it, and buffers made for a few data of
-    /// the largest size a datum has: made with the node, so that passing
-    /// data through allocates nothing.
+    /// Makes a pass-through with nothing in it, and buffers made for a few
+    /// data of the largest size a datum has: made with the node, so that
+    /// passing data through allocates nothing.
+    ///
+    /// # Returns
+    ///
+    /// The empty pass-through.
     pub fn new() -> Through {
         Through {
             waiting: VecDeque::with_capacity(WAITING_AT_ONCE),
@@ -52,11 +56,15 @@ impl Through {
         }
     }
 
-    /// Hold what arrived.
+    /// Holds what arrived.
     ///
     /// Copied into a spare buffer. Only where more are waiting than there
     /// were buffers made is one made, and it is kept after, so that happens
     /// once if it happens at all.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - What arrived.
     pub fn give(&mut self, data: &[u8]) {
         let mut buffer = self.spare.pop().unwrap_or_default();
         buffer.clear();
@@ -69,12 +77,25 @@ impl Through {
         !self.waiting.is_empty()
     }
 
-    /// Hand on the oldest datum, or nothing where there is none.
+    /// Hands on the oldest datum, or nothing where there is none.
     ///
-    /// `what` names the node, for the one complaint this makes. A datum that
-    /// will not fit is reported and kept rather than cut down: part of a value
-    /// is not a smaller value, and the queue holds it so that a caller with a
-    /// larger buffer can still have it.
+    /// A datum that will not fit is reported and kept rather than cut down:
+    /// part of a value is not a smaller value, and the queue holds it so
+    /// that a caller with a larger buffer can still have it.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`   - The node's name, for the one complaint this makes.
+    /// * `buffer` - Where the datum is copied.
+    ///
+    /// # Returns
+    ///
+    /// The datum's length in bytes, or 0 if none was waiting.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the node if the datum is longer than `buffer`; the
+    /// datum is kept.
     pub fn take(
         &mut self,
         what: &str,

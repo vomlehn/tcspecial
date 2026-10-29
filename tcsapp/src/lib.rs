@@ -129,7 +129,11 @@ pub enum Interface {
 }
 
 impl Interface {
-    /// The descriptor this interface is, on a UNIX-like system.
+    /// Gives the descriptor this interface is, on a UNIX-like system.
+    ///
+    /// # Returns
+    ///
+    /// 0 for the payload interface, 1 for the MOC one, 2 for the errors.
     pub fn fd(self) -> RawFd {
         match self {
             Interface::Payload => 0,
@@ -138,7 +142,11 @@ impl Interface {
         }
     }
 
-    /// What it is called, for a sentence about it.
+    /// Gives what it is called, for a sentence about it.
+    ///
+    /// # Returns
+    ///
+    /// Its name, such as "the payload interface".
     pub fn name(self) -> &'static str {
         match self {
             Interface::Payload => "the payload interface",
@@ -147,7 +155,11 @@ impl Interface {
         }
     }
 
-    /// What an app does with it, for a sentence about one that cannot.
+    /// Gives what an app does with it, for a sentence about one that cannot.
+    ///
+    /// # Returns
+    ///
+    /// A clause such as "payload data is read and MOC data written".
     pub fn carries(self) -> &'static str {
         match self {
             Interface::Payload => "payload data is read and MOC data written",
@@ -164,7 +176,8 @@ pub fn is_open(fd: RawFd) -> bool {
     unsafe { libc::fcntl(fd, libc::F_GETFD) != -1 }
 }
 
-/// Whether what is at this descriptor is an interface that was handed over.
+/// Tells whether what is at this descriptor is an interface that was handed
+/// over.
 ///
 /// A socket, which is what [`parent`] makes each of the two data interfaces
 /// out of and what each of them has to be: an interface that is read *and*
@@ -177,6 +190,14 @@ pub fn is_open(fd: RawFd) -> bool {
 /// socket where its kind has none; and an app run by hand or by something that
 /// attached pipes, which finds no socket where it needs one. Both are said at
 /// once rather than discovered as a read that never answers.
+///
+/// # Arguments
+///
+/// * `fd` - The descriptor to ask about.
+///
+/// # Returns
+///
+/// `true` if it is open and a socket, `false` otherwise.
 pub fn is_handed_over(fd: RawFd) -> bool {
     let mut about = std::mem::MaybeUninit::<libc::stat>::uninit();
     unsafe {

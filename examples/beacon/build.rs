@@ -1,3 +1,8 @@
+/// Compiles the window's markup, `ui/watch.slint`, with debug info.
+///
+/// # Panics
+///
+/// The markup does not compile.
 fn main() {
     // The window is one panel, and the panel is tcsui's: the markup imports
     // it by path, which is what Slint resolves relative to the importing

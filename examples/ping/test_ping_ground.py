@@ -186,7 +186,17 @@ class WindowTest(unittest.TestCase):
                 yield from labels(child)
 
         def mainloop(window, n=0):
+            """Stands in for ``Tk.mainloop``: presses the button, plays the
+            vehicle's answer, reads the window, and runs the real loop until
+            it is closed.
+
+            Args:
+                window: The window being run.
+                n:      What the real ``mainloop`` is passed.
+            """
             def press():
+                """Press the button, and answer the ping it sends as the
+                vehicle would."""
                 button = next(
                     w for w in labels(window) if isinstance(w, ttk.Button)
                 )
@@ -198,6 +208,7 @@ class WindowTest(unittest.TestCase):
                 window.after(600, read)
 
             def read():
+                """Keep every label's text, and close the window."""
                 texts = [
                     w.cget("text")
                     for w in labels(window)

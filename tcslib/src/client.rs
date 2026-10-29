@@ -52,11 +52,24 @@ pub struct CommandLinks {
     pub nodes_to: tcslibgs::HostPort,
 }
 
-/// The command links of a configuration, or `None` for one with no
-/// `tcspecial` section, which states no ports and so nowhere to command.
+/// Reads the command links of a configuration.
 ///
 /// One reading of them, here, for every ground station: tcsmoc and the C/C++
 /// library alike.
+///
+/// # Arguments
+///
+/// * `graph` - The configuration's graph.
+///
+/// # Returns
+///
+/// The links, or `None` for a configuration with no `tcspecial` section,
+/// which states no ports and so nowhere to command.
+///
+/// # Errors
+///
+/// A message saying what is wrong with the `tcspecial` section's command
+/// interpreter settings.
 pub fn command_links_of(
     graph: &tcslibgs::graph::Graph,
 ) -> Result<Option<CommandLinks>, String> {
@@ -159,7 +172,11 @@ impl RestartWait {
         generation != self.before
     }
 
-    /// Why a command is refused while this lasts.
+    /// Says why a command is refused while this lasts.
+    ///
+    /// # Returns
+    ///
+    /// A `TcsError::AwaitingRestart` naming the generation waited on.
     fn refusal(&self) -> TcsError {
         TcsError::AwaitingRestart(format!(
             "not sent: a RESTART went out, and nothing may follow it until a \
@@ -183,6 +200,16 @@ impl TcsClient {
     /// 1 bound one socket for each payload, that being how a command said
     /// which payload it was about, so a client without a payload's link
     /// could not send anything about that payload.
+    ///
+    /// # Arguments
+    ///
+    /// * `connection` - The spacecraft's own link.
+    /// * `nodes`      - The one link every node is commanded on.
+    ///
+    /// # Returns
+    ///
+    /// The client, with the default timeout, counting from sequence 1 and
+    /// knowing no generation yet.
     pub fn of_a_graph(
         connection: Box<dyn Connection>,
         nodes: Box<dyn Connection>,
@@ -201,7 +228,21 @@ impl TcsClient {
         }
     }
 
-    /// A client on a configuration's two command links, over UDP.
+    /// Opens a client on a configuration's two command links, over UDP.
+    ///
+    /// # Arguments
+    ///
+    /// * `links` - Where each link is sent from and goes to, as
+    ///             [`command_links_of`] reads them.
+    ///
+    /// # Returns
+    ///
+    /// The client.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Io` if a link's address cannot be bound, and
+    /// `TcsError::Config` if where one goes is not a socket address.
     pub fn open(links: &CommandLinks) -> TcsResult<Self> {
         let connection =
             crate::UdpConnection::new(&links.from, &links.interpreter)?;
@@ -217,6 +258,15 @@ impl TcsClient {
     /// For a program that commands the vehicle itself and no node of it: a
     /// PING, a CONNECT, a CONFIGURE. A node command is refused rather than
     /// sent -- see `link_for` -- because there is nowhere for it to go.
+    ///
+    /// # Arguments
+    ///
+    /// * `connection` - The spacecraft's own link.
+    ///
+    /// # Returns
+    ///
+    /// The client, with the default timeout, counting from sequence 1 and
+    /// knowing no generation yet.
     pub fn spacecraft_only(connection: Box<dyn Connection>) -> Self {
         Self {
             connection,
@@ -232,13 +282,23 @@ impl TcsClient {
         }
     }
 
-    /// A beacon has arrived, of `generation` and saying whether the ground
-    /// commanded the start that sent it: what [`crate::beacon::Pass`] says of
-    /// the last one.
+    /// Takes note that a beacon has arrived: what [`crate::beacon::Pass`]
+    /// says of the last one. Its generation is the one commands are sent
+    /// for from now on.
     ///
     /// A station that sends RESTART passes on every beacon it hears, because
-    /// a beacon is what ends the wait a RESTART begins. Returns how the wait
-    /// ended, if this ended one, for the station to say so.
+    /// a beacon is what ends the wait a RESTART begins.
+    ///
+    /// # Arguments
+    ///
+    /// * `generation` - The generation the beacon carries.
+    /// * `commanded`  - Whether it says the ground commanded the start that
+    ///                  sent it.
+    ///
+    /// # Returns
+    ///
+    /// How the wait for a restart ended, if this ended one, for the station
+    /// to say so; otherwise `None`.
     pub fn beacon_heard(
         &mut self,
         generation: u32,
@@ -301,6 +361,19 @@ impl TcsClient {
     /// the spacecraft would refuse it on. A CONNECT goes on the spacecraft
     /// link here, that being the one every caller has; [`Self::connect`] asks
     /// the other one as well.
+    ///
+    /// # Arguments
+    ///
+    /// * `command` - The command to be sent.
+    ///
+    /// # Returns
+    ///
+    /// The link it goes on.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Config` for a node command where the client has no node
+    /// link.
     fn link_for(
         &mut self,
         command: &Command,
@@ -325,11 +398,24 @@ impl TcsClient {
         self.generation
     }
 
-    /// `command`, sent for the generation flying, or why it is not sent.
+    /// Marks a command as sent for the generation flying.
     ///
     /// A PING or a CONNECT goes whether or not this station knows which
     /// generation that is, because that is how it finds out. Nought, which no
     /// start is, is what such a command says where it does not.
+    ///
+    /// # Arguments
+    ///
+    /// * `command` - The command to be sent.
+    ///
+    /// # Returns
+    ///
+    /// The command, carrying the generation it is sent for.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::GenerationUnknown` where no generation is known and the
+    /// command is not one that is always taken.
     fn for_generation(&self, command: Command) -> TcsResult<Command> {
         match self.generation {
             Some(generation) => Ok(command.for_generation(generation)),
@@ -338,7 +424,24 @@ impl TcsClient {
         }
     }
 
-    /// Send a command and wait for the response
+    /// Sends a command on its link, for the generation flying, and waits for
+    /// the answer, timing both.
+    ///
+    /// # Arguments
+    ///
+    /// * `command` - The command, with its sequence number.
+    ///
+    /// # Returns
+    ///
+    /// The answer, whatever kind of telemetry it is.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::AwaitingRestart` while a RESTART is awaited,
+    /// `TcsError::Config` if the client has no link for it,
+    /// `TcsError::GenerationUnknown` if no generation is known to send it
+    /// for, and `TcsError::Io` if it cannot be sent or no answer comes in
+    /// time.
     fn send_command(&mut self, command: Command) -> TcsResult<Telemetry> {
         if let Some(wait) = &self.restart_wait {
             return Err(wait.refusal());
@@ -376,6 +479,10 @@ impl TcsClient {
     /// not be the ones this station is reading. Learning the generation from
     /// the answer instead would carry on as though nothing had happened. An
     /// answer of generation nought, which no start is, says nothing of it.
+    ///
+    /// # Arguments
+    ///
+    /// * `answer` - The answer to a command this client sent.
     fn heard_generation_of(&mut self, answer: &Telemetry) {
         let other = answer.generation() != 0
             && Some(answer.generation()) != self.generation;
@@ -391,6 +498,11 @@ impl TcsClient {
     /// station -- would otherwise have every command it sends answered
     /// `Stale`. Forward only, so that a CONNECT answered late cannot take
     /// the count back to where it was.
+    ///
+    /// # Arguments
+    ///
+    /// * `newest` - The sequence number of the newest command the vehicle
+    ///              has taken.
     fn count_past(&self, newest: u32) {
         let next = self.sequence.load(Ordering::SeqCst);
         if !sequence_is_before(newest, next) {
@@ -401,7 +513,18 @@ impl TcsClient {
 
     // -- global control and status ----------------------------------------
 
-    /// Send a PING command
+    /// Sends a PING and waits for its answer.
+    ///
+    /// # Returns
+    ///
+    /// The PING's answer.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::AwaitingRestart` while a RESTART is awaited,
+    /// `TcsError::GenerationUnknown` if no generation is known to send it
+    /// for, `TcsError::Io` if it cannot be sent or no answer comes in time,
+    /// and `TcsError::Protocol` if the answer is not this command's.
     pub fn ping(&mut self) -> TcsResult<tcslibgs::PingTelemetry> {
         let seq = self.next_sequence();
         let cmd = Command::Ping(PingCommand::new(seq));
@@ -415,7 +538,22 @@ impl TcsClient {
         }
     }
 
-    /// Send a RESTART_ARM command
+    /// Sends a RESTART_ARM and waits for its answer.
+    ///
+    /// # Arguments
+    ///
+    /// * `arm_key` - The key the RESTART that follows must carry.
+    ///
+    /// # Returns
+    ///
+    /// The status the vehicle answered with.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::AwaitingRestart` while a RESTART is awaited,
+    /// `TcsError::GenerationUnknown` if no generation is known to send it
+    /// for, `TcsError::Io` if it cannot be sent or no answer comes in time,
+    /// and `TcsError::Protocol` if the answer is not this command's.
     pub fn restart_arm(&mut self, arm_key: ArmKey) -> TcsResult<CommandStatus> {
         let seq = self.next_sequence();
         let cmd = Command::RestartArm(RestartArmCommand::new(seq, arm_key));
@@ -436,6 +574,26 @@ impl TcsClient {
     /// caller to hold against the two it sent: this returns both rather than
     /// a verdict, because the caller is the end that knows which file it read
     /// and can say so.
+    ///
+    /// Where the answer is a success its generation is the one commands are
+    /// sent for from then on, and the sequence count goes on from past the
+    /// newest command the vehicle has taken.
+    ///
+    /// # Arguments
+    ///
+    /// * `version` - The version of the configuration this end read.
+    /// * `digest`  - The digest of that configuration.
+    ///
+    /// # Returns
+    ///
+    /// The spacecraft's version and digest.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::AwaitingRestart` while a RESTART is awaited,
+    /// `TcsError::GenerationUnknown` if no generation is known to send it
+    /// for, `TcsError::Io` if it cannot be sent or no answer comes in time,
+    /// and `TcsError::Protocol` if the answer is not this command's.
     pub fn connect(
         &mut self,
         version: ConfigVersion,
@@ -485,6 +643,21 @@ impl TcsClient {
     /// again: see [`RestartWait`]. A RESTART the vehicle answers as refused
     /// ends the wait, because nothing was initiated; one whose answer does
     /// not come does not, because it may have been taken.
+    ///
+    /// # Arguments
+    ///
+    /// * `arm_key` - The key the RESTART_ARM before it gave.
+    ///
+    /// # Returns
+    ///
+    /// The status the vehicle answered with.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::AwaitingRestart` while a RESTART is awaited,
+    /// `TcsError::GenerationUnknown` if no generation is known to send it
+    /// for, `TcsError::Io` if it cannot be sent or no answer comes in time,
+    /// and `TcsError::Protocol` if the answer is not this command's.
     pub fn restart(&mut self, arm_key: ArmKey) -> TcsResult<CommandStatus> {
         let seq = self.next_sequence();
         let cmd = Command::Restart(RestartCommand::new(seq, arm_key));
@@ -528,6 +701,22 @@ impl TcsClient {
     ///
     /// The answer carries the id that was sent, so an answer can be placed
     /// without the name even if two overtake one another.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The node's id.
+    ///
+    /// # Returns
+    ///
+    /// The status the vehicle answered with, and the id it answered for.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Config` if the client has no node link,
+    /// `TcsError::AwaitingRestart` while a RESTART is awaited,
+    /// `TcsError::GenerationUnknown` if no generation is known to send it
+    /// for, `TcsError::Io` if it cannot be sent or no answer comes in time,
+    /// and `TcsError::Protocol` if the answer is not this command's.
     pub fn start_node(
         &mut self,
         node: NodeId,
@@ -546,6 +735,22 @@ impl TcsClient {
     ///
     /// Answered when the node has stopped *and* given up what it held, so a
     /// success means its device, bus address or socket is free.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The node's id.
+    ///
+    /// # Returns
+    ///
+    /// The status the vehicle answered with, and the id it answered for.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Config` if the client has no node link,
+    /// `TcsError::AwaitingRestart` while a RESTART is awaited,
+    /// `TcsError::GenerationUnknown` if no generation is known to send it
+    /// for, `TcsError::Io` if it cannot be sent or no answer comes in time,
+    /// and `TcsError::Protocol` if the answer is not this command's.
     pub fn stop_node(
         &mut self,
         node: NodeId,
@@ -572,14 +777,30 @@ impl TcsClient {
     /// business: a setpoint is a temperature and a band is a width, and the
     /// node is what reads them.
     ///
+    /// # Arguments
+    ///
+    /// * `node`      - The node's id.
+    /// * `attribute` - The attribute's name, as the configuration binds it.
+    /// * `value`     - The value, as the node reads it.
+    ///
+    /// # Returns
+    ///
+    /// The status the vehicle answered with, the id it answered for, and
+    /// the reason. The reason says why where the vehicle refused it --
+    /// which attribute no binding names, with its spelling where that was
+    /// what was wrong; what the node would not take -- and is empty where
+    /// it did not: see [`tcslibgs::SetNodeTelemetry::reason`].
+    ///
+    /// # Errors
+    ///
     /// An attribute longer than `ATTRIBUTE_BYTES` or a value longer than
     /// `VALUE_BYTES` is a `TcsError::Command` and is not sent: the vehicle
-    /// would refuse it unanswered.
-    ///
-    /// The answer says why where the vehicle refused it -- which attribute no
-    /// binding names, with its spelling where that was what was wrong; what
-    /// the node would not take -- and is empty where it did not: see
-    /// [`tcslibgs::SetNodeTelemetry::reason`].
+    /// would refuse it unanswered. Otherwise
+    /// `TcsError::Config` if the client has no node link,
+    /// `TcsError::AwaitingRestart` while a RESTART is awaited,
+    /// `TcsError::GenerationUnknown` if no generation is known to send it
+    /// for, `TcsError::Io` if it cannot be sent or no answer comes in time,
+    /// and `TcsError::Protocol` if the answer is not this command's.
     pub fn set_node(
         &mut self,
         node: NodeId,
@@ -608,6 +829,23 @@ impl TcsClient {
     /// that is running. A disabled node answers with its counters all the
     /// same -- they say what it has done since the vehicle started, not since
     /// it was last enabled.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The node's id.
+    ///
+    /// # Returns
+    ///
+    /// The status the vehicle answered with, whether the node is enabled,
+    /// and its counts.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Config` if the client has no node link,
+    /// `TcsError::AwaitingRestart` while a RESTART is awaited,
+    /// `TcsError::GenerationUnknown` if no generation is known to send it
+    /// for, `TcsError::Io` if it cannot be sent or no answer comes in time,
+    /// and `TcsError::Protocol` if the answer is not this command's.
     pub fn query_node(
         &mut self,
         node: NodeId,
@@ -630,6 +868,23 @@ impl TcsClient {
     /// them. For an operator who wants to see the bytes rather than a count
     /// of them; the counts are [`TcsClient::query_node`]'s, and asking for
     /// both every poll would spend downlink on data nobody reads.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The node's id.
+    ///
+    /// # Returns
+    ///
+    /// The status the vehicle answered with, the datum taken and the datum
+    /// given.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Config` if the client has no node link,
+    /// `TcsError::AwaitingRestart` while a RESTART is awaited,
+    /// `TcsError::GenerationUnknown` if no generation is known to send it
+    /// for, `TcsError::Io` if it cannot be sent or no answer comes in time,
+    /// and `TcsError::Protocol` if the answer is not this command's.
     pub fn query_node_sample(
         &mut self,
         node: NodeId,
@@ -649,7 +904,22 @@ impl TcsClient {
 
     // -- configuring the spacecraft ----------------------------------------
 
-    /// Send a CONFIG command
+    /// Sends a CONFIG and waits for its answer.
+    ///
+    /// # Arguments
+    ///
+    /// * `beacon_interval` - How often the vehicle is to send its beacon.
+    ///
+    /// # Returns
+    ///
+    /// The status the vehicle answered with.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::AwaitingRestart` while a RESTART is awaited,
+    /// `TcsError::GenerationUnknown` if no generation is known to send it
+    /// for, `TcsError::Io` if it cannot be sent or no answer comes in time,
+    /// and `TcsError::Protocol` if the answer is not this command's.
     pub fn configure(
         &mut self,
         beacon_interval: BeaconInterval,
@@ -691,6 +961,14 @@ impl TcsClient {
     /// All of them are closed even if one complains, because a client whose
     /// links are half closed is worse than one whose close was reported: the
     /// error comes back, the sockets go.
+    ///
+    /// # Returns
+    ///
+    /// Nothing, once every link is closed.
+    ///
+    /// # Errors
+    ///
+    /// The first error any link gave in closing.
     pub fn close(&mut self) -> TcsResult<()> {
         let mut outcome = self.connection.close();
         if let Some(nodes) = self.nodes.as_mut() {
@@ -780,6 +1058,15 @@ mod tests {
     }
 
     impl Canned {
+        /// Makes a link that answers every command with one answer.
+        ///
+        /// # Arguments
+        ///
+        /// * `answer` - What it answers with.
+        ///
+        /// # Returns
+        ///
+        /// The link, boxed to be given to a client.
         fn answering(answer: Telemetry) -> Box<Canned> {
             Box::new(Canned {
                 answer,
@@ -787,7 +1074,16 @@ mod tests {
             })
         }
 
-        /// The same, and what it is asked kept where a test can read it.
+        /// Makes a link as [`Canned::answering`] does, and keeps what it is
+        /// asked where a test can read it.
+        ///
+        /// # Arguments
+        ///
+        /// * `answer` - What it answers with.
+        ///
+        /// # Returns
+        ///
+        /// The link, and the record of the commands it is sent.
         fn recording(
             answer: Telemetry,
         ) -> (Box<Canned>, std::sync::Arc<std::sync::Mutex<Vec<Command>>>)
@@ -824,6 +1120,16 @@ mod tests {
         }
     }
 
+    /// Makes a CONNECT's answer from generation 7, which has taken up to
+    /// command 40.
+    ///
+    /// # Arguments
+    ///
+    /// * `version` - The configuration version it answers with.
+    ///
+    /// # Returns
+    ///
+    /// The answer.
     fn an_answer(version: ConfigVersion) -> Telemetry {
         // Generation 7, which has taken up to command 40.
         Telemetry::Connect(tcslibgs::ConnectTelemetry::new(
@@ -835,6 +1141,15 @@ mod tests {
         .for_generation(7)
     }
 
+    /// Makes a configuration version of `major`.0.0.
+    ///
+    /// # Arguments
+    ///
+    /// * `major` - Its major number.
+    ///
+    /// # Returns
+    ///
+    /// The version.
     fn a_version(major: u8) -> ConfigVersion {
         ConfigVersion {
             major,

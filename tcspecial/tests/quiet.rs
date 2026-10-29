@@ -7,7 +7,19 @@
 
 use std::process::Command;
 
-/// What tcspecial says on stderr, given these arguments.
+/// Runs tcspecial, which must fail, and collects what it says.
+///
+/// # Arguments
+///
+/// * `args` - Its command-line arguments.
+///
+/// # Returns
+///
+/// What tcspecial wrote on stderr.
+///
+/// # Panics
+///
+/// If tcspecial cannot be run or exits successfully.
 fn said(args: &[&str]) -> String {
     let ran = Command::new(env!("CARGO_BIN_EXE_tcspecial"))
         .args(args)

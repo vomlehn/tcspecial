@@ -16,7 +16,15 @@ use crate::payload::{
     Pacing, PayloadConfig, PayloadStats, Produce,
 };
 
-/// Run device payload simulation (simulates /dev/urandom-like behavior)
+/// Runs a simulated device file: packets of random bytes, paced and faulted
+/// as the simulator file says, like a `/dev/urandom` that tcspecial opens
+/// itself.
+///
+/// # Arguments
+///
+/// * `config`  - The payload's configuration.
+/// * `running` - Cleared to stop it; the function returns soon after.
+/// * `stats`   - Where it counts what it sends and receives.
 pub fn run_device_file_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,

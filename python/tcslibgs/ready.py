@@ -44,8 +44,15 @@ class SetUpFor:
     mode: str
 
     def differences(self, theirs):
-        """Each way this differs from ``theirs``, the simulator's, named with
-        what each side has: empty where the two agree."""
+        """Each way this differs from ``theirs``.
+
+        Args:
+            theirs: The simulator's :class:`SetUpFor`.
+
+        Returns:
+            A list of the differences, each named with what each side has:
+            empty where the two agree.
+        """
         differ = []
         if self.configuration != theirs.configuration:
             differ.append(
@@ -74,7 +81,16 @@ class Answer:
 
 
 def encode_answer(answer):
-    """An answer, as tcssim writes it: for a test playing the simulator."""
+    """An answer, as tcssim writes it: for a test playing the simulator.
+
+    A reason too long for the answer is cut short, at a whole character.
+
+    Args:
+        answer: The :class:`Answer`.
+
+    Returns:
+        The datagram, ``ANSWER_BYTES`` long.
+    """
     reason = answer.reason.encode()[:REASON_BYTES]
     while True:
         try:
@@ -94,7 +110,14 @@ def encode_answer(answer):
 
 
 def decode_answer(data):
-    """An answer, or ``None`` for a datagram that is not one."""
+    """An answer from tcssim.
+
+    Args:
+        data: The datagram, as bytes.
+
+    Returns:
+        The :class:`Answer`, or ``None`` for a datagram that is not one.
+    """
     if len(data) != ANSWER_BYTES or data[:4] != ANSWER_MAGIC:
         return None
     sequence, state, mode = struct.unpack(">IBB", data[4:10])

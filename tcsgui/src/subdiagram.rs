@@ -48,7 +48,7 @@ pub struct Qualified {
 }
 
 impl Qualified {
-    /// Read a name as a link wrote it.
+    /// Reads a name as a link wrote it.
     ///
     /// One separator and no more: `cabin/temp_1` reaches into `cabin`, and
     /// a name with two separators in it is a name this cannot mean anything
@@ -56,6 +56,16 @@ impl Qualified {
     /// keeps the function total -- a name is always readable as something --
     /// and leaves saying so to the validation, which has somewhere to report
     /// it.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name as a link wrote it, such as `cabin/temp_1` or
+    ///            `temp_1`.
+    ///
+    /// # Returns
+    ///
+    /// The subdiagram the name reaches into, if it says one, and the node's
+    /// name.
     pub fn parse(name: &str) -> Qualified {
         match name.split_once('/') {
             Some((home, node)) if !home.is_empty() && !node.is_empty() => {
@@ -77,6 +87,15 @@ impl Qualified {
     /// This is the half that keeps a subdiagram's own links readable: inside
     /// `cabin.yaml` a link says `temp_1`, and only a link reaching out of
     /// it says `cabin/temp_1`.
+    ///
+    /// # Arguments
+    ///
+    /// * `from` - The subdiagram the link lives in, or `None` for the top
+    ///            diagram.
+    ///
+    /// # Returns
+    ///
+    /// The name as the link should write it.
     pub fn written_from(&self, from: &Home) -> String {
         match (&self.in_, from) {
             (a, b) if a == b => self.node.clone(),
@@ -89,6 +108,11 @@ impl Qualified {
     ///
     /// What the editor holds a node under, so that two subdiagrams may both
     /// have a `temp_1` without either of them having to be renamed.
+    ///
+    /// # Returns
+    ///
+    /// `home/node` for a node in a subdiagram, or the plain name for one in the
+    /// top diagram.
     pub fn absolute(&self) -> String {
         match &self.in_ {
             Some(home) => format!("{home}/{}", self.node),
@@ -97,6 +121,15 @@ impl Qualified {
     }
 
     /// A name in a particular home.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The node's name within its file.
+    /// * `home` - The subdiagram it is in, or `None` for the top diagram.
+    ///
+    /// # Returns
+    ///
+    /// The qualified name.
     pub fn of(node: &str, home: &Home) -> Qualified {
         Qualified {
             in_: home.clone(),
@@ -112,6 +145,16 @@ impl Qualified {
 /// written in XML keeps its subdiagrams in XML, because a set of files half in
 /// one language and half in the other is a thing nobody meant and everybody
 /// would have to remember.
+///
+/// # Arguments
+///
+/// * `name` - The subdiagram's name, which is the file's stem.
+/// * `like` - The path of the including file, whose directory and extension the
+///            subdiagram's file takes; YAML if it has no extension.
+///
+/// # Returns
+///
+/// The path of the subdiagram's file.
 pub fn file_for(name: &str, like: &std::path::Path) -> std::path::PathBuf {
     let extension = like
         .extension()

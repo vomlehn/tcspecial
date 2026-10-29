@@ -64,7 +64,21 @@ pub fn message_bytes(max_message_bytes: Option<u32>) -> u32 {
     max_message_bytes.unwrap_or(USUAL_MESSAGE_BYTES)
 }
 
-/// What an rpmsg payload says about its channel, and what it must say.
+/// Reads what an rpmsg payload says about its channel, and what it must say.
+///
+/// # Arguments
+///
+/// * `name` - The node's name, for the messages.
+/// * `g`    - The node's terms as the file states them.
+///
+/// # Returns
+///
+/// The channel's service name and largest message.
+///
+/// # Errors
+///
+/// A term that does not belong to rpmsg, a `stream`, a missing or empty
+/// `service`, and a `max_message_bytes` that is not a number or is zero.
 pub(crate) fn group_kind_of(
     name: &str,
     g: LinkTerms,
@@ -111,8 +125,16 @@ pub(crate) fn group_kind_of(
     }))
 }
 
-/// Whether the device at `path` is a stand-in: a pseudo-terminal, which is
+/// Judges whether an rpmsg device is a stand-in: a pseudo-terminal, which is
 /// what tcssim makes for a rpmsg payload. See [`crate::simulate`].
+///
+/// # Arguments
+///
+/// * `path` - The device's path, from the node's `path`.
+///
+/// # Returns
+///
+/// The judgement, with what to change if it is not a stand-in.
 pub fn judged(path: &str) -> crate::simulate::Judged {
     crate::simulate::pseudo_terminal(
         path,
@@ -126,6 +148,19 @@ mod tests {
     use super::*;
     use crate::endpoint_config::Scalar;
 
+    /// Makes terms as a file states them, with everything else absent.
+    ///
+    /// # Arguments
+    ///
+    /// * `stated` - Each term stated, with its value as written.
+    ///
+    /// # Returns
+    ///
+    /// The terms.
+    ///
+    /// # Panics
+    ///
+    /// If a term is not `service`, `max_message_bytes` or `datarate`.
     fn terms(stated: &[(&str, &str)]) -> LinkTerms {
         let mut g = LinkTerms::default();
         for (field, value) in stated {
@@ -140,6 +175,19 @@ mod tests {
         g
     }
 
+    /// Reads the channel a node named `remote` states.
+    ///
+    /// # Arguments
+    ///
+    /// * `stated` - Each term stated, with its value as written.
+    ///
+    /// # Returns
+    ///
+    /// The channel's parameters.
+    ///
+    /// # Panics
+    ///
+    /// If the terms are refused, or are not an rpmsg channel.
     fn params(stated: &[(&str, &str)]) -> RpmsgParams {
         match group_kind_of("remote", terms(stated)).expect("a channel") {
             GroupKind::Rpmsg(rpmsg) => rpmsg,

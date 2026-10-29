@@ -7,8 +7,17 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-/// A configuration with this many errors in it, one per payload: each sends
-/// to a node that is not there.
+/// Writes a configuration with this many errors in it, one per payload: each
+/// sends to a node that is not there.
+///
+/// # Arguments
+///
+/// * `dir`   - The directory it is written in, as `set.yaml`.
+/// * `count` - How many errors.
+///
+/// # Returns
+///
+/// The file's path.
 fn with_errors(dir: &Path, count: usize) -> PathBuf {
     let mut text = "\
 description: many
@@ -47,7 +56,20 @@ payloads:
     path
 }
 
-/// The lines printed and the exit status, for these arguments.
+/// Runs tcsverify with these arguments.
+///
+/// # Arguments
+///
+/// * `args` - Its command line, after the program's name.
+///
+/// # Returns
+///
+/// The lines it printed on stdout and its exit status.
+///
+/// # Panics
+///
+/// If it cannot be run, prints something that is not text, or is killed by
+/// a signal.
 fn run(args: &[&str]) -> (Vec<String>, i32) {
     let out = Command::new(env!("CARGO_BIN_EXE_tcsverify"))
         .args(args)
@@ -214,8 +236,17 @@ fn a_bad_option_is_a_command_line_of_none_of_the_shapes() {
     }
 }
 
-/// A configuration whose one vehicle node is written as `node`, beside a
-/// ground link it is joined to both ways.
+/// Writes a configuration whose one vehicle node is written as `node`,
+/// beside a ground link it is joined to both ways.
+///
+/// # Arguments
+///
+/// * `dir`  - The directory it is written in, as `one.yaml`.
+/// * `node` - The node's attributes after its name, as indented YAML lines.
+///
+/// # Returns
+///
+/// The file's path.
 fn with_vehicle_node(dir: &Path, node: &str) -> PathBuf {
     let text = format!(
         "\

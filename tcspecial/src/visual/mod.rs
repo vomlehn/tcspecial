@@ -67,11 +67,15 @@ struct Sent {
 /// was asked for. Absent, [`sent`] does nothing.
 static SENT: OnceLock<Sent> = OnceLock::new();
 
-/// Data has been sent over this line of the drawing.
+/// Records that data has been sent over this line of the drawing.
 ///
 /// Called by the fabric for every delivery, in the main loop, so it is one
 /// clock read and one atomic store: no allocation, no lock, nothing that
 /// waits. A line the table has no slot for -- there is none -- is left alone.
+///
+/// # Arguments
+///
+/// * `line` - The line, as [`tcspecial::runtime::route`] numbers it.
 pub fn sent(line: usize) {
     if let Some(sent) = SENT.get() {
         if let Some(slot) = sent.at.get(line) {
@@ -84,8 +88,18 @@ pub fn sent(line: usize) {
     }
 }
 
-/// Whether this line is lit at `now`: whether data crossed it less than
-/// [`LINE_BLINK`] before.
+/// Says whether this line is lit at `now`: whether data crossed it less
+/// than [`LINE_BLINK`] before.
+///
+/// # Arguments
+///
+/// * `line` - The line, as [`tcspecial::runtime::route`] numbers it.
+/// * `now`  - The time to judge at.
+///
+/// # Returns
+///
+/// `true` if data crossed the line within [`LINE_BLINK`] before `now`;
+/// `false` if not, if nothing has crossed it, or if there is no table.
 fn is_lit(line: usize, now: Instant) -> bool {
     let Some(sent) = SENT.get() else {
         return false;
@@ -101,7 +115,11 @@ fn is_lit(line: usize, now: Instant) -> bool {
     now.saturating_duration_since(when) < LINE_BLINK
 }
 
-/// Make the table, with a slot for each of `lines`.
+/// Makes the table that [`sent`] records in, once per process.
+///
+/// # Arguments
+///
+/// * `lines` - How many lines the drawing has, one slot each.
 fn watch(lines: usize) {
     let at: Box<[AtomicU64]> = (0..lines).map(|_| AtomicU64::new(0)).collect();
     // Made once: a second window in one process is not something this does.
@@ -121,9 +139,17 @@ struct Line {
     comment: Option<String>,
 }
 
-/// Every line of the configuration, one per destination, in the file's order:
-/// the order the route table numbers them in. See
+/// Lists every line of the configuration, one per destination, in the
+/// file's order: the order the route table numbers them in. See
 /// `crate::runtime::route::Delivery::line`.
+///
+/// # Arguments
+///
+/// * `graph` - The configuration.
+///
+/// # Returns
+///
+/// The lines, owned.
 fn lines_of(graph: &Graph) -> Vec<Line> {
     let mut lines = Vec::new();
     for link in &graph.links {
@@ -142,12 +168,21 @@ fn lines_of(graph: &Graph) -> Vec<Line> {
     lines
 }
 
-/// Run the vehicle in `path` under `mode` with the window open, and say what
-/// to exit with.
+/// Runs a vehicle with the window open, and says what to exit with.
 ///
 /// The vehicle on a thread of its own and the window on this one. Each ends
 /// the other: a window closed stops the vehicle, as an interrupt would, and a
 /// vehicle that stops -- or never starts -- closes the window.
+///
+/// # Arguments
+///
+/// * `path` - The vehicle's configuration file.
+/// * `mode` - The `--simulate` mode to run it under.
+///
+/// # Returns
+///
+/// The exit status: the vehicle's, or 1 if the window or the vehicle's
+/// thread cannot be started.
 pub fn run(path: &str, mode: tcslibgs::simulate::Mode) -> i32 {
     // Read again rather than handed over: the vehicle reads its own copy,
     // and checked it before this was called.
@@ -236,13 +271,24 @@ struct Shown {
     rows: Vec<usize>,
 }
 
-/// Put the graph in the window, as tcsgui would draw its top page.
+/// Puts the graph in the window, as tcsgui would draw its top page.
 ///
 /// Where the panes are divided is the person's own tcsgui setting, read and
 /// never written, and every node is settled into its pane as the editor
 /// settles a file it opens -- so a node is drawn where the editor would draw
 /// it. A node in an included file is on that file's page, not this one; a
 /// line to it is drawn to a stub, as the editor draws it.
+///
+/// # Arguments
+///
+/// * `window` - The window to draw in.
+/// * `path`   - The configuration file, which the window names.
+/// * `graph`  - The configuration read from it.
+/// * `lines`  - Its lines, from [`lines_of`].
+///
+/// # Returns
+///
+/// The links drawn, and which line of the configuration each row is.
 fn draw(
     window: &ui::VisualWindow,
     path: &str,
@@ -342,11 +388,19 @@ fn colour(hex: &str) -> slint::Color {
     slint::Color::from_rgb_u8(red, green, blue)
 }
 
-/// A node's look, as this window's markup takes it.
+/// Turns a node's look into what this window's markup takes.
 ///
 /// The same mapping tcsgui makes of the same look, into its own build's
 /// struct: a Slint struct of one program is not a type of the other, so each
 /// says it once. Never selected: nothing here can be.
+///
+/// # Arguments
+///
+/// * `look` - How tcsdiagram draws the node.
+///
+/// # Returns
+///
+/// The node as the window draws it.
 fn node_view(look: NodeLook) -> ui::NodeView {
     let terminal = |look: view::TerminalLook| ui::TerminalView {
         shown: look.shown,
@@ -385,8 +439,16 @@ fn node_view(look: NodeLook) -> ui::NodeView {
     }
 }
 
-/// A line's look, as this window's markup takes it, put out until data
-/// crosses it.
+/// Turns a line's look into what this window's markup takes, put out
+/// until data crosses it.
+///
+/// # Arguments
+///
+/// * `look` - How tcsdiagram draws the line.
+///
+/// # Returns
+///
+/// The line as the window draws it, not lit.
 fn link_view(look: LinkLook) -> ui::LinkView {
     ui::LinkView {
         glow: colour(&look::lighter(&look.ink)),

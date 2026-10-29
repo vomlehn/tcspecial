@@ -42,7 +42,11 @@ pub enum Stream {
 }
 
 impl Stream {
-    /// What this stream is called in a complaint.
+    /// Names this stream as a complaint calls it.
+    ///
+    /// # Returns
+    ///
+    /// `groundward` or `vehicleward`.
     pub fn label(self) -> &'static str {
         match self {
             Stream::Groundward => "groundward",
@@ -64,10 +68,17 @@ const KNOWN: &[(&str, bool, Stream)] = &[
     ("moc-in", true, Stream::Vehicleward),
 ];
 
-/// Which stream a terminal carries, and whether it is a sink.
+/// Finds which stream a terminal carries, and whether it is a sink.
 ///
-/// `None` for a name that is not one of the four -- a computation's `in0`, for
-/// instance, which is a sink its own rules know about.
+/// # Arguments
+///
+/// * `terminal` - The terminal's name.
+///
+/// # Returns
+///
+/// Whether it is a sink, and its stream. `None` for a name that is not one of
+/// the four -- a computation's `in0`, for instance, which is a sink its own
+/// rules know about.
 pub fn stream_of(terminal: &str) -> Option<(bool, Stream)> {
     KNOWN
         .iter()
@@ -75,7 +86,7 @@ pub fn stream_of(terminal: &str) -> Option<(bool, Stream)> {
         .map(|(_, sink, stream)| (*sink, *stream))
 }
 
-/// The terminal at the other end of this one's stream.
+/// Finds the terminal at the other end of this one's stream.
 ///
 /// The pairing, as four sentences: a `payload-out` may only be linked to a
 /// `payload-in`, a `payload-in` only to a `payload-out`, a `moc-out` only to
@@ -84,8 +95,15 @@ pub fn stream_of(terminal: &str) -> Option<(bool, Stream)> {
 /// other -- and that is why it is derived from `KNOWN` rather than written
 /// out again: the two halves of the table cannot drift apart.
 ///
-/// `None` for a name that is not one of the four, which is a computation's own
-/// input: what may be linked to one of those is the computation's business.
+/// # Arguments
+///
+/// * `terminal` - The terminal's name.
+///
+/// # Returns
+///
+/// The other end's name. `None` for a name that is not one of the four,
+/// which is a computation's own input: what may be linked to one of those is
+/// the computation's business.
 pub fn answers(terminal: &str) -> Option<&'static str> {
     let (sink, stream) = stream_of(terminal)?;
     KNOWN
@@ -135,11 +153,19 @@ pub struct Terminals {
 }
 
 impl Terminals {
-    /// The one terminal of this kind, where there is exactly one.
+    /// Finds the one terminal of this kind, where there is exactly one.
     ///
     /// What a link end that names no terminal means. A node with one sink and
     /// one source needs no names in the file -- `{ from: temp_1, to: moc }`
     /// is unambiguous -- and one with two of either has to be told which.
+    ///
+    /// # Arguments
+    ///
+    /// * `of` - The type's sinks, or its sources.
+    ///
+    /// # Returns
+    ///
+    /// The terminal, or `None` where there are none or several.
     fn only(of: &'static [&'static str]) -> Option<&'static str> {
         match of {
             [one] => Some(one),
@@ -148,10 +174,17 @@ impl Terminals {
     }
 }
 
-/// The sinks and sources of this type, where they are fixed.
+/// Gives the sinks and sources of a node type, where they are fixed.
 ///
-/// `None` where they are not: a computation's sinks are the inputs it declares
-/// and a log's are whatever is written to it, so there is no table to give.
+/// # Arguments
+///
+/// * `node_type` - The node's `type`.
+///
+/// # Returns
+///
+/// The type's terminals. `None` where they are not fixed: a computation's
+/// sinks are the inputs it declares and a log's are whatever is written to
+/// it, so there is no table to give.
 pub fn terminals_of(node_type: &str) -> Option<Terminals> {
     const PAYLOAD: Terminals = Terminals {
         // A payload receives what asks it for a reading -- a trigger, a
@@ -276,17 +309,32 @@ pub fn merges(node_type: &str) -> bool {
     terminals_of(node_type).is_some_and(|terminals| terminals.merges)
 }
 
-/// Which terminal a link end means, and what is wrong with it if anything.
+/// Finds which terminal a link end means, and what is wrong with it if
+/// anything.
 ///
-/// `named` is what the file wrote after the dot, where it wrote one. A node
-/// whose terminals are fixed is held to them: a name it does not have is
+/// A node whose terminals are fixed is held to them: a name it does not have is
 /// refused, a sink named where a source belongs is refused, and an end that
 /// names nothing is refused where the type has more than one terminal to
 /// choose between. A type whose terminals are its own business answers
 /// whatever was written, for its own rules to judge.
 ///
-/// `sink` says which end of the link this is: `true` for where the data
-/// arrives, `false` for where it leaves.
+/// # Arguments
+///
+/// * `node_type` - The `type` of the node at this end.
+/// * `named`     - What the file wrote after the dot, where it wrote one.
+/// * `sink`      - Which end of the link this is: `true` for where the data
+///                 arrives, `false` for where it leaves.
+///
+/// # Returns
+///
+/// The terminal's name, or for a type whose terminals are its own business,
+/// whatever was written.
+///
+/// # Errors
+///
+/// A message for a name the type does not have, a terminal of the other
+/// end's kind, and an end naming nothing where the type has no terminal or
+/// several.
 pub fn terminal_at(
     node_type: &str,
     named: Option<&str>,
@@ -340,7 +388,15 @@ pub fn terminal_at(
     }
 }
 
-/// A list of names, for a complaint.
+/// Lists names, for a complaint.
+///
+/// # Arguments
+///
+/// * `names` - The names.
+///
+/// # Returns
+///
+/// Each quoted, joined with commas, or "none at all".
 fn said(names: &[&str]) -> String {
     match names {
         [] => "none at all".to_string(),

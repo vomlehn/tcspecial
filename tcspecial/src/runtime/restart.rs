@@ -42,7 +42,7 @@ static STARTED: OnceLock<Started> = OnceLock::new();
 /// Whether an armed RESTART has asked for one.
 static ASKED: AtomicBool = AtomicBool::new(false);
 
-/// Note what a restart will need: the program, its arguments and the
+/// Notes what a restart will need: the program, its arguments and the
 /// descriptors it was started with.
 ///
 /// The first thing `main` does, before anything is opened: a descriptor
@@ -57,7 +57,7 @@ pub fn note_how_started() {
     });
 }
 
-/// Ask for a restart once the vehicle has stopped.
+/// Asks for a restart once the vehicle has stopped.
 ///
 /// For the command interpreter, having answered an armed RESTART. The vehicle
 /// stops as it does when it is told to -- the pass finished, the links closed,
@@ -66,12 +66,16 @@ pub fn ask() {
     ASKED.store(true, Ordering::SeqCst);
 }
 
-/// Whether a restart has been asked for.
+/// Says whether a restart has been asked for.
+///
+/// # Returns
+///
+/// True once [`ask`] has been called.
 pub fn asked() -> bool {
     ASKED.load(Ordering::SeqCst)
 }
 
-/// Run tcspecial again, if a restart was asked for, and otherwise return.
+/// Runs tcspecial again, if a restart was asked for, and otherwise returns.
 ///
 /// Does not return when one was: the process becomes the new tcspecial, or
 /// says why it could not and exits.
@@ -97,8 +101,20 @@ pub fn if_asked() {
     std::process::exit(1);
 }
 
-/// Close everything this process opened, keep `inherited`, and become
-/// `started.program` again. Returns only to say why it could not.
+/// Closes everything this process opened, keeps `inherited`, and becomes
+/// `started.program` again.
+///
+/// # Arguments
+///
+/// * `started`   - The program and arguments noted as the process started.
+/// * `inherited` - The descriptors the process was started with, kept open
+///                 across the `exec`.
+///
+/// # Returns
+///
+/// Only if the process could not be run again: why not (a nul in the
+/// program's name or an argument, the open descriptors unreadable, or the
+/// `exec` failing).
 fn run_again(started: &Started, inherited: &[libc::c_int]) -> String {
     let program = match CString::new(started.program.as_os_str().as_bytes()) {
         Ok(program) => program,
@@ -166,6 +182,14 @@ fn run_again(started: &Started, inherited: &[libc::c_int]) -> String {
 /// Reading the directory opens one descriptor of its own, which is in the
 /// listing and closed by the time it is returned, so each one listed is asked
 /// about again once the directory is closed.
+///
+/// # Returns
+///
+/// The open descriptors, sorted.
+///
+/// # Errors
+///
+/// A message saying so if neither `/proc/self/fd` nor `/dev/fd` can be read.
 fn open_descriptors() -> Result<Vec<libc::c_int>, String> {
     let listed: Vec<libc::c_int> = ["/proc/self/fd", "/dev/fd"]
         .iter()

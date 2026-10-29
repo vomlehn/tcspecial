@@ -106,6 +106,14 @@ pub struct Reach {
 /// Every other type has a stand-in the kernel or tcssim puts at the
 /// endpoint tcspecial opens, which is the better test: the code that runs is
 /// the code that flies.
+///
+/// # Arguments
+///
+/// * `kind` - The node's interface type.
+///
+/// # Returns
+///
+/// Whether a node of that type may give a `stand_in`.
 pub fn stands_in_over_udp(kind: DHType) -> bool {
     matches!(
         kind,
@@ -123,6 +131,15 @@ impl Reach {
     /// and the device is what is opened; under `some` and `all` a node with
     /// one is reached there, and tcssim answers. See "Saying Which Payloads Are
     /// Simulated" in docs/design.rst.
+    ///
+    /// # Arguments
+    ///
+    /// * `mode` - What the run simulates: `none`, `some` or `all`.
+    ///
+    /// # Returns
+    ///
+    /// The endpoint to open: a UDP socket to `stand_in` where `mode` is not the
+    /// flight setting and the node gives one, and its own endpoint otherwise.
     pub fn opened(&self, mode: crate::simulate::Mode) -> EndpointConfig {
         match self.stand_in {
             Some(at) if !mode.is_flight() => {
@@ -141,6 +158,20 @@ impl Reach {
 ///
 /// The name is in every complaint: a configuration is read by somebody who
 /// needs to know which of forty nodes is the one being refused.
+///
+/// # Arguments
+///
+/// * `node` - The node, as the configuration states it.
+///
+/// # Returns
+///
+/// Everything its attributes say about reaching it.
+///
+/// # Errors
+///
+/// A message naming the node, if it is of a type that is not opened, states
+/// an attribute nothing reads or one its type does not take, leaves out one
+/// its type needs, or states a value its type's rules refuse.
 pub fn reach_of(node: &Node) -> Result<Reach, String> {
     let what = node.name.as_str();
     let kind = kind_of(node)?;
@@ -417,6 +448,23 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
 ///
 /// Whether the payload is one that speaks first, the only kind this is for,
 /// is a question of its links, and `Graph::check` asks it.
+///
+/// # Arguments
+///
+/// * `what`     - The node's name, for the message.
+/// * `written`  - Its `sends_from`, as written.
+/// * `endpoint` - Its endpoint, which says the protocol and its own address.
+///
+/// # Returns
+///
+/// Where its payload sends from: a socket address over UDP, a path over a
+/// Unix datagram socket.
+///
+/// # Errors
+///
+/// A message if the node is not a UDP or Unix datagram network node, or if
+/// `written` is not an address and a non-zero port (UDP) or is empty (Unix),
+/// or is the node's own address.
 fn sends_from_of(
     what: &str,
     written: &str,
@@ -526,6 +574,24 @@ impl Default for Said {
 /// Apart from [`reach_of`] so that a refusal can ask whether the word with
 /// its hyphens and underscores swapped is one this reads -- by asking this,
 /// rather than a second list of the words that would drift from the first.
+///
+/// # Arguments
+///
+/// * `said`      - What the node's attributes have said so far, to which
+///                 this one is added.
+/// * `node`      - The node the attribute is on.
+/// * `kind`      - The node's interface type.
+/// * `attribute` - The attribute's name.
+/// * `value`     - Its value.
+///
+/// # Returns
+///
+/// `true` if the attribute is one this reads, `false` if nothing reads it.
+///
+/// # Errors
+///
+/// A message if the attribute is one this reads but not on this type of node,
+/// is a retired spelling, or has a value that does not parse.
 fn take(
     said: &mut Said,
     node: &Node,
@@ -726,6 +792,15 @@ fn take(
 /// configured with -- its channels, its sample rate, its trigger in the
 /// kernel's sense -- is in `sysfs` and is written by whoever brought the
 /// sensor up, not by a datum on this link.
+///
+/// # Arguments
+///
+/// * `endpoint` - The interface the node opens.
+///
+/// # Returns
+///
+/// Why it cannot be asked, for a set of lines or a sensor's sample buffer;
+/// `None` for every other interface.
 fn cannot_be_asked(endpoint: &EndpointConfig) -> Option<&'static str> {
     match endpoint {
         EndpointConfig::Gpio(_) => Some(
@@ -748,6 +823,15 @@ fn cannot_be_asked(endpoint: &EndpointConfig) -> Option<&'static str> {
 /// of discrete lines that is driven is the very thing an init is for -- a
 /// heater that starts off -- where one that is watched is read and not
 /// written, and a sensor's sample buffer is never written at all.
+///
+/// # Arguments
+///
+/// * `endpoint` - The interface the node opens.
+///
+/// # Returns
+///
+/// Why it cannot be written, for lines that are watched or a sensor's sample
+/// buffer; `None` for every other interface.
 fn cannot_be_written(endpoint: &EndpointConfig) -> Option<&'static str> {
     match endpoint {
         EndpointConfig::Gpio(gpio) if !gpio.direction.is_output() => Some(
@@ -783,6 +867,21 @@ fn cannot_be_written(endpoint: &EndpointConfig) -> Option<&'static str> {
 ///
 /// Every other interface is a stream or a register and has nothing to say
 /// here: where one read ends is the `stream` rule's business.
+///
+/// # Arguments
+///
+/// * `what`     - The node's name, for the message.
+/// * `size`     - Its `read_size`, in bytes.
+/// * `endpoint` - The interface the node opens.
+///
+/// # Returns
+///
+/// `Ok(())` if one read of `size` can come back whole.
+///
+/// # Errors
+///
+/// A message if `size` is more than a CAN frame or an rpmsg message carries,
+/// or is not a whole number of a set of lines' event records.
 fn fits_one_read(
     what: &str,
     size: u32,
@@ -856,6 +955,21 @@ pub fn binds(node: &Node) -> bool {
 /// `fprime_id_base` is required here too, and read as a whole number, though
 /// nothing aboard uses it: a bridge model made from a configuration that did
 /// not say where its IDs begin would be one nobody could check.
+///
+/// # Arguments
+///
+/// * `what` - The node's name, for the message.
+/// * `node` - The node.
+///
+/// # Returns
+///
+/// Where its data goes, for a gateway node; `None` for any other node.
+///
+/// # Errors
+///
+/// A message if a gateway node leaves out its base attribute or states one
+/// that is not an `address:port`, or if an F´ gateway leaves out
+/// `fprime_id_base` or states one that is not a whole number.
 fn ground_of(what: &str, node: &Node) -> Result<Option<HostPort>, String> {
     let Some(kind) = GatewayKind::of_node_type(&node.node_type) else {
         return Ok(None);
@@ -903,6 +1017,14 @@ const LOCATORS: &[&str] = &[
 ];
 
 /// What locates a node of this type.
+///
+/// # Arguments
+///
+/// * `kind` - The node's interface type.
+///
+/// # Returns
+///
+/// The attributes, out of [`LOCATORS`], that locate a node of that type.
 fn locators(kind: DHType) -> &'static [&'static str] {
     match kind {
         // A host and a port, and which protocol is spoken to it -- or, on a
@@ -929,6 +1051,19 @@ fn locators(kind: DHType) -> &'static [&'static str] {
 /// a bus at once. And `moc` is a network link named for what is at the far end
 /// of it rather than for how it is reached, because that is the thing a reader
 /// of the configuration cares about.
+///
+/// # Arguments
+///
+/// * `node` - The node, whose `node_type` is read.
+///
+/// # Returns
+///
+/// The interface type its node type is reached as.
+///
+/// # Errors
+///
+/// A message if its type is one that is not opened -- a compute, log or app
+/// node -- or is no node type at all.
 fn kind_of(node: &Node) -> Result<DHType, String> {
     match node.node_type.as_str() {
         "i2c" => Ok(DHType::I2c),
@@ -974,6 +1109,21 @@ fn kind_of(node: &Node) -> Result<DHType, String> {
 }
 
 /// Where this node is, by the rules for its type.
+///
+/// # Arguments
+///
+/// * `what` - The node's name, for the message.
+/// * `node` - The node.
+/// * `kind` - Its interface type.
+///
+/// # Returns
+///
+/// Where it is: an interface and a CAN identifier, an interface alone for
+/// hdlc, a bus and an address for I2C, and a path for everything else.
+///
+/// # Errors
+///
+/// A message if an attribute that locates it is missing or does not parse.
 fn location_of(
     what: &str,
     node: &Node,
@@ -1081,6 +1231,20 @@ fn number(what: &str, attribute: &str, value: &Scalar) -> Result<u32, String> {
 /// The IP protocol a raw network node's datagrams are, from its
 /// `ip_protocol`: a number from 1 to 254, IANA's list being where the numbers
 /// are given out.
+///
+/// # Arguments
+///
+/// * `what` - The node's name, for the message.
+/// * `node` - The node, whose `ip_protocol` is read.
+///
+/// # Returns
+///
+/// The IP protocol its datagrams are.
+///
+/// # Errors
+///
+/// A message if `ip_protocol` is missing, not a whole number, or not 1 to
+/// 254.
 fn ip_protocol_of(
     what: &str,
     node: &Node,
@@ -1108,6 +1272,20 @@ fn ip_protocol_of(
 
 /// An attribute a node of this protocol does not take, said in its terms:
 /// `ip_protocol` names a raw socket's datagrams and nothing else's.
+///
+/// # Arguments
+///
+/// * `what`     - The node's name, for the message.
+/// * `node`     - The node.
+/// * `protocol` - The protocol it is reached over.
+///
+/// # Returns
+///
+/// `Ok(())` if the node does not state `ip_protocol` where it should not.
+///
+/// # Errors
+///
+/// A message if the node states `ip_protocol` and `protocol` is not raw.
 fn ip_protocol_misplaced(
     what: &str,
     node: &Node,
@@ -1132,6 +1310,23 @@ fn port_of(what: &str, node: &Node) -> Result<u16, String> {
 }
 
 /// A port, under whichever attribute states it.
+///
+/// # Arguments
+///
+/// * `what`      - The node's name, for the message.
+/// * `node`      - The node.
+/// * `attribute` - The attribute the port is under.
+/// * `is`        - What the node is, for the message: "a network node".
+/// * `wants`     - What the attribute gives, for the message.
+///
+/// # Returns
+///
+/// The port.
+///
+/// # Errors
+///
+/// A message if the attribute is missing, not a whole number, or not 1 to
+/// 65535.
 fn port_named(
     what: &str,
     node: &Node,
@@ -1157,14 +1352,6 @@ fn port_named(
     Ok(port as u16)
 }
 
-/// Put one attribute in the term it names, saying whether it was one.
-///
-/// Every term of every type, in one place: a term is handed to the rules for
-/// the node's own type whichever type it belongs to, and those rules refuse
-/// the ones that are not theirs. The alternative -- a list per type here --
-/// would be a second copy of what each type accepts, and the two would
-/// disagree the first time a type gained a term.
-///
 /// A term a configuration used to write, and what to write instead.
 ///
 /// The spellings three terms had before each became a length of time.
@@ -1173,6 +1360,15 @@ fn port_named(
 /// with a misspelling on it, it is a node written for the spelling before
 /// this one. The files here were renamed with these, so the old spelling is
 /// nobody's now.
+///
+/// # Arguments
+///
+/// * `attribute` - The attribute's name.
+///
+/// # Returns
+///
+/// What to write instead, if `attribute` is a retired spelling; `None` if it
+/// is not.
 pub fn retired_term(attribute: &str) -> Option<&'static str> {
     match attribute {
         "debounce_us" => Some(
@@ -1190,6 +1386,23 @@ pub fn retired_term(attribute: &str) -> Option<&'static str> {
     }
 }
 
+/// Put one attribute in the term it names, saying whether it was one.
+///
+/// Every term of every type, in one place: a term is handed to the rules for
+/// the node's own type whichever type it belongs to, and those rules refuse
+/// the ones that are not theirs. The alternative -- a list per type here --
+/// would be a second copy of what each type accepts, and the two would
+/// disagree the first time a type gained a term.
+///
+/// # Arguments
+///
+/// * `terms`     - The terms, of which the one named is set.
+/// * `attribute` - The attribute's name.
+/// * `value`     - Its value.
+///
+/// # Returns
+///
+/// Whether `attribute` is a term of some type.
 fn put_term(terms: &mut LinkTerms, attribute: &str, value: &Scalar) -> bool {
     let value = Some(value.clone());
     match attribute {
@@ -1257,6 +1470,16 @@ mod tests {
     }
 
     /// A node built here rather than read, so a test can make one wrong.
+    ///
+    /// # Arguments
+    ///
+    /// * `name`       - The node's name.
+    /// * `node_type`  - Its type, as a configuration spells it.
+    /// * `attributes` - Its attributes, as names and values.
+    ///
+    /// # Returns
+    ///
+    /// The node, in no group.
     fn node(name: &str, node_type: &str, attributes: &[(&str, &str)]) -> Node {
         Node {
             name: name.to_string(),
@@ -2102,6 +2325,19 @@ mod tests {
     /// configuration gets. Then the terms are gathered as `reach_of` gathers
     /// them -- `put_term`, and the three attributes of where a read ends --
     /// and handed to the same `kind_of_terms` it hands them to.
+    ///
+    /// # Arguments
+    ///
+    /// * `node_type`  - The node's type, as a configuration spells it.
+    /// * `attributes` - Its attributes, as names and values.
+    ///
+    /// # Returns
+    ///
+    /// What the rules for its type settle.
+    ///
+    /// # Errors
+    ///
+    /// The refusal `reach_of` or `kind_of_terms` gives.
     fn settled(
         node_type: &str,
         attributes: &[(&str, &str)],
@@ -2852,6 +3088,18 @@ mod tests {
 
     /// What the rules settle for a line with these terms, beside a path, a
     /// rate, a byte length and a fixed-length read.
+    ///
+    /// # Arguments
+    ///
+    /// * `extra` - The terms beside the line's own, as names and values.
+    ///
+    /// # Returns
+    ///
+    /// What the rules settle for the line.
+    ///
+    /// # Errors
+    ///
+    /// The refusal the rules give.
     fn line_terms(
         extra: &[(&str, &str)],
     ) -> Result<crate::endpoint_config::GroupKind, String> {
@@ -2955,6 +3203,22 @@ mod tests {
     // -- a bus and what sits on it --------------------------------------------
 
     /// One device on a bus, with these terms beside its bus and address.
+    ///
+    /// # Arguments
+    ///
+    /// * `extra` - The terms beside the bus's path, as names and values.
+    ///
+    /// # Returns
+    ///
+    /// What the rules settle for the device.
+    ///
+    /// # Errors
+    ///
+    /// The refusal the rules give.
+    ///
+    /// # Panics
+    ///
+    /// If the rules settle something other than an I2C device.
     fn bus(
         extra: &[(&str, &str)],
     ) -> Result<crate::node::payload::i2c::I2cParams, String> {
@@ -3112,6 +3376,22 @@ mod tests {
     // -- a peripheral ---------------------------------------------------------
 
     /// One peripheral with these terms beside its device file.
+    ///
+    /// # Arguments
+    ///
+    /// * `extra` - The terms beside the device file, as names and values.
+    ///
+    /// # Returns
+    ///
+    /// What the rules settle for the peripheral.
+    ///
+    /// # Errors
+    ///
+    /// The refusal the rules give.
+    ///
+    /// # Panics
+    ///
+    /// If the rules settle something other than a SPI peripheral.
     fn peripheral(
         extra: &[(&str, &str)],
     ) -> Result<crate::node::payload::spi::SpiParams, String> {

@@ -90,14 +90,20 @@ fn sample_lines(sample: &DHSample) -> (SharedString, SharedString) {
     (SharedString::from(time), SharedString::from(data))
 }
 
-/// Take an edited setting to the payload it belongs to, and say whether the
-/// two sizes still describe something that can be sent.
+/// Takes an edited setting to the payload it belongs to, and says whether
+/// the two sizes still describe something that can be sent.
 ///
 /// A panel holds no state of its own: what a spin box shows is what the model
 /// says, so an edit has to come through here to be kept. The answer about the
 /// sizes is decided here too, so there is one rule -- the window disables the
 /// button while this says something and shows what it says, rather than
 /// comparing the two numbers itself.
+///
+/// # Arguments
+///
+/// * `ui`       - The main window, whose edits are handled.
+/// * `payloads` - The simulated payloads, in the panels' order.
+/// * `model`    - The panels' rows, where the answer about the sizes goes.
 fn handle_config_edits(
     ui: &MainWindow,
     payloads: Arc<Mutex<Vec<SimulatedPayload>>>,
@@ -126,8 +132,8 @@ fn handle_config_edits(
     );
 }
 
-/// What is wrong with a packet size and a segment size together, and nothing
-/// when they agree.
+/// Says what is wrong with a packet size and a segment size together, and
+/// nothing when they agree.
 ///
 /// A segment is a piece of a packet, so a segment larger than the packet
 /// describes a piece larger than the whole it is a piece of. Equal is the
@@ -135,9 +141,16 @@ fn handle_config_edits(
 /// file that states no segment size asks for, so only a segment strictly
 /// larger than the packet is wrong.
 ///
-/// Returns the sentence the window shows, which says both numbers and either
-/// way out of it: the two spin boxes are side by side and either can be the
-/// one that was meant to change.
+/// # Arguments
+///
+/// * `packet_size`  - The packet size, in bytes.
+/// * `segment_size` - The segment size, in bytes.
+///
+/// # Returns
+///
+/// The sentence the window shows, which says both numbers and either way
+/// out of it: the two spin boxes are side by side and either can be the
+/// one that was meant to change. Empty when the sizes agree.
 fn sizes_problem(packet_size: i32, segment_size: i32) -> String {
     if segment_size <= packet_size {
         return String::new();
@@ -166,13 +179,21 @@ enum Transfer {
     Silent,
 }
 
-/// Which way a press of a panel's one button goes.
+/// Decides which way a press of a panel's one button goes.
 ///
 /// Decided by what the button offered, read back from the status its label
 /// comes from -- not by what the payload turns out to be doing. Anything that
 /// is not the running status offers to send: a payload that failed to
 /// start shows the stopped status, and the useful thing to offer then is the
 /// start that failed rather than a stop of something that never began.
+///
+/// # Arguments
+///
+/// * `status` - The panel's status, which its button's label comes from.
+///
+/// # Returns
+///
+/// `Silent` for a running payload, `Send` for anything else.
 fn transfer_wanted(status: &str) -> Transfer {
     if status == RUNNING_STATUS {
         Transfer::Silent
@@ -181,7 +202,7 @@ fn transfer_wanted(status: &str) -> Transfer {
     }
 }
 
-/// Put a payload's traffic into its panel.
+/// Puts a payload's traffic into its panel.
 ///
 /// The times are what the panel is for: a count tells how much has moved
 /// since the payload started, and the time tells whether any of it is moving
@@ -189,6 +210,12 @@ fn transfer_wanted(status: &str) -> Transfer {
 /// the same count a moment after they are looked at. The bytes beside each
 /// time are the head of that packet, which is what says the traffic is the
 /// traffic that was expected rather than merely traffic.
+///
+/// # Arguments
+///
+/// * `info`  - The panel's row, whose counts and last packets are set.
+/// * `stats` - The payload's statistics; a count too large for the panel
+///             shows as `i32::MAX`.
 fn show_traffic(info: &mut PayloadInfo, stats: &PayloadStats) {
     info.packets_sent = i32::try_from(stats.packets_sent).unwrap_or(i32::MAX);
     info.packets_recv = i32::try_from(stats.packets_recv).unwrap_or(i32::MAX);
@@ -196,8 +223,19 @@ fn show_traffic(info: &mut PayloadInfo, stats: &PayloadStats) {
     (info.last_recv_time, info.last_recv_data) = sample_lines(&stats.last_recv);
 }
 
-/// Turn a data handler and its settled simulator settings into the panel the
-/// window shows for it.
+/// Turns a data handler and its settled simulator settings into the panel
+/// the window shows for it.
+///
+/// # Arguments
+///
+/// * `dev_id` - The handler's place in the payload configuration, counted
+///              from 0.
+/// * `dh`     - The data handler.
+/// * `sim`    - Its simulator settings.
+///
+/// # Returns
+///
+/// The panel, stopped and with nothing moved yet.
 fn payload_info_from(
     dev_id: usize,
     dh: &DHConfig,
@@ -225,13 +263,13 @@ fn payload_info_from(
         // panels can show the whole of what a payload set says about a
         // payload.
         parameters: SharedString::from(payload_parameters(dh, Some(sim))),
+        // Whether anything is ever sent to this payload, which decides
+        // whether its panel has a received line at all.
+        triggered: sim.triggered,
         // Checked from the start, not only after an edit: a simulator file may
         // state a segment larger than the tcspecial configuration's packet, and
         // a panel that said nothing about it until a spin box was touched would
-        // have the payload refuse to start for no stated reason. Whether
-        // anything is ever sent to this payload, which decides whether its
-        // panel has a received line at all.
-        triggered: sim.triggered,
+        // have the payload refuse to start for no stated reason.
         sizes_problem: SharedString::from(sizes_problem(
             i32::try_from(dh.packet_size).unwrap_or(i32::MAX),
             sim.segment_size as i32,
@@ -239,10 +277,16 @@ fn payload_info_from(
     }
 }
 
-/// Change one panel's contents, leaving the rest of it alone.
+/// Changes one panel's contents, leaving the rest of it alone.
 ///
 /// A Slint model row is a value rather than a place, so a field is changed by
 /// reading the row, changing it, and putting it back.
+///
+/// # Arguments
+///
+/// * `model` - The panels' rows.
+/// * `row`   - Which panel; one that does not exist is left alone.
+/// * `f`     - What to change in it.
 fn update_row(
     model: &Rc<VecModel<PayloadInfo>>,
     row: usize,
@@ -254,7 +298,8 @@ fn update_row(
     }
 }
 
-/// What each simulated payload is to a thermal mass, by payload name.
+/// Works out what each simulated payload is to a thermal mass, by payload
+/// name.
 ///
 /// One `ThermalMass` per declared mass, shared by every payload attached to
 /// it: the sensors read the state the heaters warm, which is what makes a
@@ -264,6 +309,24 @@ fn update_row(
 /// `tcslibgs::graph::simulated::reading_of` -- so the bytes it sends are the
 /// bytes the vehicle reads back as the mass's temperature, and neither file
 /// states the scale twice.
+///
+/// # Arguments
+///
+/// * `sim_file`   - The simulator file, which declares the masses.
+/// * `graph`      - The tcspecial configuration's graph, whose conversions
+///                  give the sensors' encodings, if it was read.
+/// * `sims`       - Each handler's simulator settings, beside `dh_configs`.
+/// * `dh_configs` - The data handlers stood in for.
+///
+/// # Returns
+///
+/// What each attached payload is to its mass, by payload name; empty if
+/// the file declares no mass.
+///
+/// # Errors
+///
+/// A message if the masses are wrongly declared, a mass is declared but no
+/// graph was read, or a sensor's conversion cannot be found in the graph.
 fn thermal_masses(
     sim_file: &SimConfigFile,
     graph: Option<&tcslibgs::graph::Graph>,
@@ -344,8 +407,8 @@ type Loaded = (
     Vec<PayloadConfig>,
 );
 
-/// Read the pair, once tcsverify has found nothing wrong with it, and say in
-/// `startup` whatever stops it being simulated.
+/// Reads the pair, once tcsverify has found nothing wrong with it, and says
+/// in `startup` whatever stops it being simulated.
 ///
 /// Every one of these is a refusal tcsverify has already made, bar the ones
 /// that are the simulator's alone -- a payload it cannot stand in for, and a
@@ -353,6 +416,18 @@ type Loaded = (
 /// asked again rather than assumed: the files can change between the two
 /// reads, and a simulator running on a half-read pair would be worse than one
 /// that says so.
+///
+/// # Arguments
+///
+/// * `payload_path` - The tcspecial configuration file.
+/// * `sim_path`     - The simulator file.
+/// * `mode`         - The `--simulate` setting.
+/// * `startup`      - Where each problem found is said.
+///
+/// # Returns
+///
+/// The handlers, the simulator file, their settings and the payloads'
+/// configurations, or `None` if anything stops the pair being simulated.
 fn load(
     payload_path: &str,
     sim_path: &str,
@@ -477,8 +552,8 @@ fn load(
     Some((dh_configs, sim_file, sims, configs))
 }
 
-/// Every way the payloads of `graph` disagree with what the simulator file
-/// says of them, or are not what `mode` allows.
+/// Finds every way the payloads of a graph disagree with what the
+/// simulator file says of them, or are not what the mode allows.
 ///
 /// Each payload is compared with what is at its endpoint: see
 /// `tcslibgs::simulate::disagreement`. One the file says is simulated is held
@@ -486,6 +561,18 @@ fn load(
 /// it does not name is refused where it is a stand-in all the same, so that
 /// every simulated device is one tcssim controls and shows. For the mode, a
 /// payload is a stand-in when its simulate is true.
+///
+/// # Arguments
+///
+/// * `graph`    - The tcspecial configuration's graph.
+/// * `sim_file` - The simulator file.
+/// * `sim_path` - Its path, for the messages.
+/// * `mode`     - The `--simulate` setting.
+///
+/// # Returns
+///
+/// A message for each disagreement, or, where there are none, for each
+/// refusal under the mode; empty when the pair can be simulated.
 fn stand_ins_refused(
     graph: &Graph,
     sim_file: &SimConfigFile,
@@ -539,8 +626,24 @@ fn stand_ins_refused(
         .collect()
 }
 
-/// Read where this simulator says whether it is ready, and bind it, with
-/// what it is set up for: or say what stops either.
+/// Reads where this simulator says whether it is ready, and binds it, with
+/// what it is set up for: or says what stops either.
+///
+/// # Arguments
+///
+/// * `payload_path` - The tcspecial configuration file.
+/// * `sim_path`     - The simulator file.
+/// * `sim_file`     - The simulator file as read, which gives the address.
+/// * `mode`         - The `--simulate` setting.
+///
+/// # Returns
+///
+/// The bound readiness socket, and what this simulator is set up for.
+///
+/// # Errors
+///
+/// A message naming the file if the address is wrong or cannot be bound,
+/// or either file cannot be digested.
 fn ready_socket(
     payload_path: &str,
     sim_path: &str,
@@ -554,8 +657,22 @@ fn ready_socket(
     Ok((socket, set_up_for))
 }
 
-/// What a simulator started on these files under `mode` is set up for, as
-/// its readiness answers say and a harness compares.
+/// Works out what a simulator started on these files under a mode is set
+/// up for, as its readiness answers say and a harness compares.
+///
+/// # Arguments
+///
+/// * `payload_path` - The tcspecial configuration file.
+/// * `sim_path`     - The simulator file.
+/// * `mode`         - The `--simulate` setting.
+///
+/// # Returns
+///
+/// The two files' digests and the mode.
+///
+/// # Errors
+///
+/// A message naming the file if either cannot be read for its digest.
 fn set_up_for(
     payload_path: &str,
     sim_path: &str,
@@ -573,8 +690,20 @@ fn set_up_for(
 /// How long `--wait` waits where it is not told.
 const WAIT_DEFAULT: std::time::Duration = std::time::Duration::from_secs(30);
 
-/// Take `--wait` or `--wait=<seconds>` out of the arguments: how long to
-/// wait, where it was given, and what is left.
+/// Takes `--wait` or `--wait=<seconds>` out of the arguments.
+///
+/// # Arguments
+///
+/// * `args` - The command line's arguments.
+///
+/// # Returns
+///
+/// How long to wait, where it was given, and the arguments left.
+///
+/// # Errors
+///
+/// A message if the seconds are not a positive number, or `--wait` is
+/// given twice.
 fn take_wait(
     args: Vec<String>,
 ) -> Result<(Option<std::time::Duration>, Vec<String>), String> {
@@ -606,9 +735,21 @@ fn take_wait(
     Ok((waiting, rest))
 }
 
-/// `--wait`: wait for a simulator started on these files under `mode` to be
-/// ready, and say what to exit with. Nothing is stood in for and no window
-/// opens: this is the harness for a run started by hand.
+/// Does `--wait`: waits for a simulator started on these files under a mode
+/// to be ready, and says what to exit with. Nothing is stood in for and no
+/// window opens: this is the harness for a run started by hand.
+///
+/// # Arguments
+///
+/// * `payload_path` - The tcspecial configuration file.
+/// * `sim_path`     - The simulator file, which says where to ask.
+/// * `mode`         - The `--simulate` setting the simulator must have.
+/// * `patience`     - How long to wait.
+///
+/// # Returns
+///
+/// The exit status: 0 once it is ready; 1 if it is not ready in time, is
+/// set up for something else, or the files cannot be read.
 fn wait_for_another(
     payload_path: &str,
     sim_path: &str,
@@ -637,13 +778,17 @@ fn wait_for_another(
     }
 }
 
-/// Say what was found as tcssim started, in a window of its own, and wait for
-/// it to be closed.
+/// Says what was found as tcssim started, in a window of its own, and waits
+/// for it to be closed.
 ///
 /// Before the main window is shown, so that nobody is looking at panels for a
 /// pair with something wrong with it without having been told -- and on
 /// stderr as well, for a run from a terminal and for one with no display to
 /// open a window on.
+///
+/// # Arguments
+///
+/// * `startup` - What was found.
 fn present(startup: &Startup) {
     startup.eprint("tcssim");
 
@@ -689,6 +834,17 @@ fn present(startup: &Startup) {
     }
 }
 
+/// Runs tcssim: reads and checks the tcspecial configuration and its
+/// simulator file, makes a stand-in for each simulated payload, and shows
+/// a panel for each until the window is closed. With `--wait` it instead
+/// waits for another simulator to be ready.
+///
+/// Exits with status 1 if the arguments, the mode or the files are wrong,
+/// or the readiness socket cannot be bound.
+///
+/// # Panics
+///
+/// If the window cannot be made or run.
 fn main() {
     //    env_logger::init();
 
@@ -930,7 +1086,7 @@ fn main() {
     ui.run().unwrap();
 }
 
-/// Ask for this window to be put against one edge of the display.
+/// Asks for this window to be put against one edge of the display.
 ///
 /// Asked once the event loop is running, because that is when the window has
 /// a size: before it is shown, what it reports is what was requested rather
@@ -938,6 +1094,11 @@ fn main() {
 /// height less the window's.
 ///
 /// A request, and not a thing to report on: see `tcslibgs::display`.
+///
+/// # Arguments
+///
+/// * `ui`   - The main window.
+/// * `edge` - The edge to put it against.
 fn ask_for_the_edge(ui: &MainWindow, edge: Edge) {
     let ui_weak = ui.as_weak();
     let timer = slint::Timer::default();
@@ -1076,10 +1237,18 @@ mod tests {
         );
     }
 
-    /// A sample of a transfer, as the stats hold it.
+    /// Makes a sample of a transfer, as the stats hold it.
     ///
-    /// Taking the time in seconds, which is what these tests mean; a time is
-    /// carried in microseconds since the epoch.
+    /// # Arguments
+    ///
+    /// * `seconds` - When it moved, in seconds since the epoch, which is
+    ///               what these tests mean; a time is carried in
+    ///               microseconds.
+    /// * `data`    - The packet.
+    ///
+    /// # Returns
+    ///
+    /// The sample.
     fn sample_of(seconds: u64, data: &[u8]) -> DHSample {
         let mut sample = DHSample::new();
         sample.record(data);
@@ -1279,7 +1448,11 @@ mod tests {
     const ENABLE_LABEL: &str = "Enable";
 
     impl Transfer {
-        /// The label a button offering this carries.
+        /// Gives the label a button offering this carries.
+        ///
+        /// # Returns
+        ///
+        /// `Enable` for `Send`, `Disable` for `Silent`.
         fn label(&self) -> &'static str {
             match self {
                 Transfer::Send => ENABLE_LABEL,
@@ -1788,12 +1961,25 @@ mod tests {
         sizes_that_cannot_be_sent_stop_the_button_and_say_so();
     }
 
-    /// The payloads of a configuration that its simulator file names, as
-    /// `load` makes them.
+    /// Makes the payloads of a configuration that its simulator file names,
+    /// as `load` makes them.
     ///
     /// Through `tcslibgs::graph::simulated`, which is what turns a payload
     /// node into what the simulator stands in for: where it is reached, how
     /// big a packet is, and whether it answers a trigger.
+    ///
+    /// # Arguments
+    ///
+    /// * `configuration` - The tcspecial configuration file.
+    /// * `sim_file`      - Its simulator file, as read.
+    ///
+    /// # Returns
+    ///
+    /// A data handler for each payload the simulator stands in for.
+    ///
+    /// # Panics
+    ///
+    /// If the configuration cannot be read or simulated.
     fn simulated_payloads_of(
         configuration: &std::path::Path,
         sim_file: &SimConfigFile,
@@ -1807,11 +1993,6 @@ mod tests {
         )
     }
 
-    /// Every shipped configuration and the simulator file beside it.
-    ///
-    /// The examples, found rather than listed, so an example added to the
-    /// repository is covered by these tests without anyone remembering to
-    /// name it here.
     /// Every shipped set's simulator file names every payload that is a
     /// stand-in, so that tcssim controls and shows each of them. Only that is
     /// asked here: whether a device path is real hardware depends on the host
@@ -1839,6 +2020,20 @@ mod tests {
         }
     }
 
+    /// Finds every shipped configuration and the simulator file beside it.
+    ///
+    /// The examples, found rather than listed, so an example added to the
+    /// repository is covered by these tests without anyone remembering to
+    /// name it here.
+    ///
+    /// # Returns
+    ///
+    /// Each example's `<name>.yaml` and `<name>-sim.yaml`, sorted.
+    ///
+    /// # Panics
+    ///
+    /// If the examples cannot be read, one has no simulator file, or there
+    /// are none.
     fn shipped_sets() -> Vec<(std::path::PathBuf, std::path::PathBuf)> {
         let root = repo_file("examples");
         let mut sets = Vec::new();
@@ -1877,7 +2072,15 @@ mod tests {
         sets
     }
 
-    /// A data handler, for the tests that only need one to exist.
+    /// Makes a data handler, for the tests that only need one to exist.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - Its name.
+    ///
+    /// # Returns
+    ///
+    /// A UDP handler to localhost:5000 with twelve-byte packets.
     fn handler(name: &str) -> DHConfig {
         DHConfig {
             name: DHName::new(name),
@@ -1897,6 +2100,17 @@ mod tests {
         }
     }
 
+    /// Makes simulator settings attached to nothing, with no faults.
+    ///
+    /// # Arguments
+    ///
+    /// * `packet_interval_ms`  - The time between packets, in ms.
+    /// * `segment_interval_ms` - The time between segments, in ms.
+    /// * `segment_size`        - The bytes in a segment.
+    ///
+    /// # Returns
+    ///
+    /// The settings.
     fn sim(
         packet_interval_ms: u32,
         segment_interval_ms: u32,
@@ -2086,7 +2300,17 @@ mod tests {
     fn the_panel_shows_the_time_and_bytes_it_was_given() {
         use i_slint_backend_testing::ElementHandle;
 
-        /// Every line of a panel that begins with `start`, as laid out.
+        /// Finds every line of a panel that begins with some text, as laid
+        /// out.
+        ///
+        /// # Arguments
+        ///
+        /// * `ui`    - The window, shown.
+        /// * `start` - What the lines begin with.
+        ///
+        /// # Returns
+        ///
+        /// The lines' text, in the order they were found.
         fn lines_from(ui: &MainWindow, start: &str) -> Vec<String> {
             ElementHandle::find_by_element_type_name(ui, "Text")
                 .filter_map(|e| e.accessible_label())

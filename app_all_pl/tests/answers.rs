@@ -14,6 +14,10 @@ fn app() -> PathBuf {
 
 /// The arguments an `app_all_pl` is run with: its name, then the payload
 /// argument, then the MOC one, this kind handling both streams.
+///
+/// # Returns
+///
+/// The three arguments, in order.
 fn arguments() -> Vec<String> {
     vec![
         "bay".to_string(),

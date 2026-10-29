@@ -8,9 +8,9 @@ holds the two to one another with the same examples the Rust tests use.
 
 A beacon says that tcspecial is running, which build it is, which version of
 a configuration it is serving and the digest of the files it read. It arrives
-on its own, every ``beacon.default_interval``, over a socket of its own, and it keeps
-arriving whether or not a ground station has connected -- so it is the one
-thing a ground station can know about a spacecraft without having asked it
+on its own, every ``beacon.default_interval``, over a socket of its own, and it
+keeps arriving whether or not a ground station has connected -- so it is the
+one thing a ground station can know about a spacecraft without having asked it
 anything.
 
 Staleness
@@ -105,8 +105,12 @@ class Stage(enum.Enum):
         return self is Stage.HEARD
 
     def label(self):
-        """What this stage is called where a person reads it: ``Stage::label``
-        in ``tcslib::beacon``, word for word."""
+        """What this stage is called where a person reads it.
+
+        Returns:
+            The stage's name: ``Stage::label`` in ``tcslib::beacon``, word for
+            word.
+        """
         return {
             Stage.UNHEARD: "Unheard",
             Stage.HEARD: "Heard",
@@ -123,7 +127,14 @@ class Contact(enum.Enum):
 
     @staticmethod
     def at(stage):
-        """The contact a stage amounts to."""
+        """The contact a stage amounts to.
+
+        Args:
+            stage: The :class:`Stage`.
+
+        Returns:
+            ``Contact.MADE`` for a stage in contact, else ``Contact.LOST``.
+        """
         return Contact.MADE if stage.in_contact() else Contact.LOST
 
 
@@ -191,6 +202,13 @@ class Schedule:
         nought gets the standard schedule. The last step never ends, and
         blinks, because an indicator that has stopped changing is one an
         operator stops reading.
+
+        Args:
+            interval: How often the vehicle beacons, in nanoseconds; nought
+                      for the standard interval.
+
+        Returns:
+            The schedule, a :class:`Schedule` of four steps.
         """
         if not interval:
             interval = STANDARD_INTERVAL
@@ -219,8 +237,12 @@ class Schedule:
         return list(self._steps)
 
     def while_in_contact(self):
-        """How long contact is held after a beacon: the leading run of steps
-        whose stage counts as contact."""
+        """How long contact is held after a beacon.
+
+        Returns:
+            The total time, in nanoseconds, of the leading run of steps whose
+            stage counts as contact, or ``FOREVER`` if one of them never ends.
+        """
         held = 0
         for step in self._steps:
             if not step.stage.in_contact():
@@ -231,7 +253,16 @@ class Schedule:
         return held
 
     def at(self, elapsed):
-        """What to show for a beacon received ``elapsed`` nanoseconds ago."""
+        """What to show for a beacon received ``elapsed`` nanoseconds ago.
+
+        Args:
+            elapsed: How long ago the beacon arrived, in nanoseconds; not
+                     negative.
+
+        Returns:
+            The :class:`Showing`: the step's stage, whether a blinking
+            indicator is lit, and how long until either changes.
+        """
         start = 0
         for step in self._steps:
             ends = FOREVER if step.holds is FOREVER else start + step.holds
@@ -260,30 +291,63 @@ class Schedule:
         return UNHEARD
 
     def after(self, last, now):
-        """What to show, given when the last beacon arrived and the time now,
-        both in nanoseconds since the epoch. Nothing heard is UNHEARD, and so
-        is a last beacon in the future."""
+        """What to show, given when the last beacon arrived and the time now.
+
+        Args:
+            last: When the last beacon arrived, in nanoseconds since the
+                  epoch, or ``None`` if none has.
+            now:  The time now, in nanoseconds since the epoch.
+
+        Returns:
+            The :class:`Showing` for the beacon's age. Nothing heard is
+            ``UNHEARD``, and so is a last beacon in the future.
+        """
         if last is None or now < last:
             return UNHEARD
         return self.at(now - last)
 
     def contact(self, elapsed):
-        """Whether the spacecraft is being heard from, for a beacon this old."""
+        """Whether the spacecraft is being heard from, for a beacon this old.
+
+        Args:
+            elapsed: How long ago the last beacon arrived, in nanoseconds.
+
+        Returns:
+            ``Contact.MADE`` while the schedule still holds contact,
+            ``Contact.LOST`` after.
+        """
         held = self.while_in_contact()
         if held is FOREVER or elapsed < held:
             return Contact.MADE
         return Contact.LOST
 
     def contact_at(self, last, now):
-        """Whether the spacecraft is being heard from, ``now``."""
+        """Whether the spacecraft is being heard from, ``now``.
+
+        Args:
+            last: When the last beacon arrived, in nanoseconds since the
+                  epoch, or ``None`` if none has.
+            now:  The time now, in nanoseconds since the epoch.
+
+        Returns:
+            The :class:`Contact`; ``LOST`` if nothing was heard or the last
+            beacon is in the future.
+        """
         if last is None or now < last:
             return Contact.LOST
         return self.contact(now - last)
 
 
 def time_of_day(since_epoch):
-    """A time as every panel shows it: hours, minutes and seconds of the day,
-    UTC, and no fractions -- ``Timestamp::time_of_day``."""
+    """A time as every panel shows it: ``Timestamp::time_of_day``.
+
+    Args:
+        since_epoch: The time, in nanoseconds since the epoch.
+
+    Returns:
+        Hours, minutes and seconds of the day, UTC, as ``HH:MM:SS``, with no
+        fractions.
+    """
     within_a_day = (since_epoch // SECOND) % 86_400
     return (
         f"{within_a_day // 3600:02d}:{(within_a_day % 3600) // 60:02d}:"
@@ -331,7 +395,16 @@ class Heard:
 
 
 def _beacon_of(datagram):
-    """The beacon in a datagram, as tcspecial packs it, or ``None``."""
+    """The beacon in a datagram, as tcspecial packs it.
+
+    Args:
+        datagram: The bytes that arrived on the beacon link.
+
+    Returns:
+        A dict of the beacon's ``sequence``, ``version`` and ``digest`` (as
+        text), ``generation`` and ``commanded_restart``, or ``None`` if the
+        datagram is not a beacon this can read.
+    """
     try:
         beacon = Beacon.read(datagram)
     except BeaconError:
@@ -346,8 +419,18 @@ def _beacon_of(datagram):
 
 
 def hear(datagram, expected):
-    """Read a datagram from the beacon link, comparing the digest it carries
-    with ``expected``, this station's own, as thirty-two hex digits."""
+    """Read a datagram from the beacon link.
+
+    Args:
+        datagram: The bytes that arrived on the beacon link.
+        expected: This station's own configuration digest, as thirty-two hex
+                  digits, which the beacon's is compared with; ``None`` to
+                  compare nothing.
+
+    Returns:
+        A :class:`Heard`: what to show, the beacon's numbers if it could be
+        read, and what differs about its configuration, if anything.
+    """
     beacon = _beacon_of(datagram)
     why = None
     if beacon is not None and expected is not None:
@@ -364,9 +447,17 @@ def hear(datagram, expected):
 
 
 def restarted(last, now, commanded):
-    """What to say of a restart, from the count before it and the count
-    now, each a (generation, sequence) pair, and whether the start that came
-    back was commanded: the same words as the Rust's."""
+    """What to say of a restart: the same words as the Rust's.
+
+    Args:
+        last:      The count before the restart, a (generation, sequence)
+                   pair, or ``None`` if there was none.
+        now:       The count now, a (generation, sequence) pair.
+        commanded: Whether the start that came back was commanded.
+
+    Returns:
+        The sentence to say.
+    """
     how = ("as commanded" if commanded
            else "without being commanded to, with the definitions it had")
     if last is not None and last[0] != now[0]:
@@ -378,7 +469,15 @@ def restarted(last, now, commanded):
 
 def differs(theirs, ours):
     """Whether the configuration tcspecial announces is the one this station
-    read: ``None`` when the digests agree."""
+    read.
+
+    Args:
+        theirs: The digest the beacon carries, as hex.
+        ours:   The digest of the configuration this station read, as hex.
+
+    Returns:
+        ``None`` when the digests agree, else a sentence saying they differ.
+    """
     if theirs == ours:
         return None
     return (
@@ -388,8 +487,16 @@ def differs(theirs, ours):
 
 
 def message_of(datagram):
-    """What a beacon said, as a window shows it. A datagram this cannot read
-    is shown as what arrived, cut short."""
+    """What a beacon said, as a window shows it.
+
+    Args:
+        datagram: The bytes that arrived on the beacon link.
+
+    Returns:
+        The beacon's version, digest, generation and whether it was a
+        commanded restart, as one line. A datagram this cannot read is shown
+        as what arrived, cut short to forty characters.
+    """
     beacon = _beacon_of(datagram)
     if beacon is not None:
         said = (what_it_read(beacon["version"], beacon["digest"])
@@ -416,9 +523,20 @@ class Counted(enum.Enum):
 
 
 def counted(last, now):
-    """What ``now`` says about the beacons between it and ``last``: the kind,
-    and how many were missed. Each is a beacon's generation and number, as a
-    pair: a generation that changed, either way, is a restart."""
+    """What ``now`` says about the beacons between it and ``last``.
+
+    A generation that changed, either way, is a restart, except an earlier
+    one that is not #1, which is a beacon delayed past the new start's.
+
+    Args:
+        last: The last beacon counted, a (generation, number) pair, or
+              ``None`` if there was none.
+        now:  The beacon just arrived, a (generation, number) pair.
+
+    Returns:
+        A pair: the :class:`Counted` kind, and how many beacons were missed
+        between the two (nought unless the kind is ``MISSED``).
+    """
     if last is None:
         return Counted.FIRST, 0
     if last[0] != now[0]:
@@ -475,6 +593,13 @@ class Beacons:
     The loop is the caller's: a window runs it on a thread of its own and a
     program with no window runs it where it stands. One pass waits no longer
     than the next change of what is shown.
+
+    Args:
+        link:     The beacon link from the configuration.
+        schedule: The :class:`Schedule` the last beacon ages through.
+        expected: This station's configuration digest, as hex; ``None`` to
+                  compare nothing.
+        clock:    What gives the time now, in nanoseconds since the epoch.
     """
 
     def __init__(self, link, schedule, expected, clock=time.time_ns):
@@ -497,7 +622,21 @@ class Beacons:
 
     @staticmethod
     def listening(link, schedule, expected):
-        """Bind where the configuration says beacons are received."""
+        """Bind where the configuration says beacons are received.
+
+        Args:
+            link:     The beacon link from the configuration: where beacons
+                      are received and where they come from.
+            schedule: The :class:`Schedule` the last beacon ages through.
+            expected: This station's configuration digest, as hex, to compare
+                      each beacon's with; ``None`` to compare nothing.
+
+        Returns:
+            The :class:`Beacons`, with its socket bound.
+
+        Raises:
+            OSError: The socket could not be made or bound.
+        """
         beacons = Beacons(link, schedule, expected)
         beacons._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         beacons._socket.bind((link.recv.address, link.recv.port))
@@ -516,6 +655,9 @@ class Beacons:
 
         One pass of the loop: Rust's ``Beacons::pass``, which Python cannot
         call ``pass``.
+
+        Returns:
+            The :class:`Pass`: what arrived, if anything, and what to show.
         """
         waiting = self._schedule.after(self._at, self._clock())
         try:
@@ -535,8 +677,21 @@ class Beacons:
         return self.heard(datagram, sender, remarks)
 
     def heard(self, datagram, sender, remarks=None):
-        """Fold in one datagram from ``sender``: apart from the socket so that
-        it can be exercised without one."""
+        """Fold in one datagram from ``sender``.
+
+        Apart from the socket so that it can be exercised without one. A
+        datagram from anywhere but where the configuration says beacons come
+        from is ignored, with a warning the first time.
+
+        Args:
+            datagram: The bytes that arrived.
+            sender:   The (address, port) they came from.
+            remarks:  Remarks already made on this pass, which this appends
+                      to; ``None`` for none.
+
+        Returns:
+            The :class:`Pass` this datagram makes.
+        """
         remarks = [] if remarks is None else remarks
         # Only from where the configuration says beacons come from.
         if not came_from(self._link.send, sender):
@@ -598,9 +753,21 @@ class Beacons:
         return self.after(Arrived.BEACON, remarks, heard.message)
 
     def after(self, arrived, remarks, message=None, warnings=None):
-        """Fold what a pass found into what is known, and say what to show. A
-        pass that found nothing still has the beacon before it to show, and so
-        does a pass whose socket broke."""
+        """Fold what a pass found into what is known, and say what to show.
+
+        A pass that found nothing still has the beacon before it to show, and
+        so does a pass whose socket broke.
+
+        Args:
+            arrived:  What the pass found.
+            remarks:  What is worth saying about the pass, in order.
+            message:  What the beacon said, for a pass that found one.
+            warnings: What is wrong, to be said whether or not asked; ``None``
+                      for nothing.
+
+        Returns:
+            The :class:`Pass`.
+        """
         now = self._clock()
         if arrived is Arrived.BEACON:
             self._at = now

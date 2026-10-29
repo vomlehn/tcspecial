@@ -168,7 +168,20 @@ pub struct AppPayloadVeh {
 }
 
 impl AppPayloadVeh {
-    /// Take the interfaces and the arguments this program was run with.
+    /// Takes the interfaces and the arguments this program was run with.
+    ///
+    /// Called once, at the start of the program: the descriptors are owned
+    /// from here on.
+    ///
+    /// # Returns
+    ///
+    /// The app, holding its interfaces and arguments.
+    ///
+    /// # Errors
+    ///
+    /// A sentence saying what is wrong unless the program was run with
+    /// the payload interface and the errors handed over, and the node's name
+    /// and its app-payload-arg, and nothing else.
     pub fn inherited() -> Result<AppPayloadVeh, String> {
         taking(&[Interface::Payload, Interface::Errors])?;
         let [name, payload_arg] = told(["the node's name", "app-payload-arg"])?;
@@ -196,7 +209,20 @@ pub struct AppMocVeh {
 }
 
 impl AppMocVeh {
-    /// Take the interfaces and the arguments this program was run with.
+    /// Takes the interfaces and the arguments this program was run with.
+    ///
+    /// Called once, at the start of the program: the descriptors are owned
+    /// from here on.
+    ///
+    /// # Returns
+    ///
+    /// The app, holding its interfaces and arguments.
+    ///
+    /// # Errors
+    ///
+    /// A sentence saying what is wrong unless the program was run with
+    /// the MOC interface and the errors handed over, and the node's name
+    /// and its app-moc-arg, and nothing else.
     pub fn inherited() -> Result<AppMocVeh, String> {
         taking(&[Interface::Moc, Interface::Errors])?;
         let [name, moc_arg] = told(["the node's name", "app-moc-arg"])?;
@@ -229,7 +255,20 @@ pub struct AppAllVeh {
 }
 
 impl AppAllVeh {
-    /// Take the interfaces and the arguments this program was run with.
+    /// Takes the interfaces and the arguments this program was run with.
+    ///
+    /// Called once, at the start of the program: the descriptors are owned
+    /// from here on.
+    ///
+    /// # Returns
+    ///
+    /// The app, holding its interfaces and arguments.
+    ///
+    /// # Errors
+    ///
+    /// A sentence saying what is wrong unless the program was run with
+    /// both data interfaces and the errors handed over, and the node's
+    /// name, its app-payload-arg and its app-moc-arg, and nothing else.
     pub fn inherited() -> Result<AppAllVeh, String> {
         taking(&[Interface::Payload, Interface::Moc, Interface::Errors])?;
         let [name, payload_arg, moc_arg] =
@@ -268,7 +307,20 @@ pub struct AppPl {
 }
 
 impl AppPl {
-    /// Take the interfaces and the arguments this program was run with.
+    /// Takes the interfaces and the arguments this program was run with.
+    ///
+    /// Called once, at the start of the program: the descriptors are owned
+    /// from here on.
+    ///
+    /// # Returns
+    ///
+    /// The app, holding its interfaces and arguments.
+    ///
+    /// # Errors
+    ///
+    /// A sentence saying what is wrong unless the program was run with
+    /// descriptor 1 and the errors handed over, and the node's name and
+    /// its app-payload-arg, and nothing else.
     pub fn inherited() -> Result<AppPl, String> {
         taking(&[Interface::Moc, Interface::Errors])?;
         let [name, payload_arg] = told(["the node's name", "app-payload-arg"])?;
@@ -303,7 +355,20 @@ pub struct AppAllPl {
 }
 
 impl AppAllPl {
-    /// Take the interfaces and the arguments this program was run with.
+    /// Takes the interfaces and the arguments this program was run with.
+    ///
+    /// Called once, at the start of the program: the descriptors are owned
+    /// from here on.
+    ///
+    /// # Returns
+    ///
+    /// The app, holding its interfaces and arguments.
+    ///
+    /// # Errors
+    ///
+    /// A sentence saying what is wrong unless the program was run with
+    /// descriptor 1 and the errors handed over, and the node's name, its
+    /// app-payload-arg and its app-moc-arg, and nothing else.
     pub fn inherited() -> Result<AppAllPl, String> {
         taking(&[Interface::Moc, Interface::Errors])?;
         let [name, payload_arg, moc_arg] =
@@ -318,18 +383,29 @@ impl AppAllPl {
     }
 }
 
-/// What this program's command line said, for a kind that expects these
+/// Reads this program's command line, for a kind that expects these
 /// arguments.
-///
-/// `expects` is the configuration's own word for each of them, in order, which
-/// is what a wrong count is refused with: a program told "it is run with the
-/// node's name and app-payload-arg" can be looked up in the file that started
-/// it.
 ///
 /// Refused and not made good: a program run with the wrong number of arguments
 /// has been started by something that has misunderstood which kind of app it
 /// is, which is the mistake `taking` catches for the interfaces. Reading on
 /// would mean taking one stream's argument for the other's.
+///
+/// # Arguments
+///
+/// * `expects` - The configuration's own word for each argument, in order,
+///               which is what a wrong count is refused with: a program
+///               told "it is run with the node's name and app-payload-arg"
+///               can be looked up in the file that started it.
+///
+/// # Returns
+///
+/// The arguments, the program's own name left out.
+///
+/// # Errors
+///
+/// A sentence saying so if an argument is not text or there are not exactly
+/// `N` of them.
 fn told<const N: usize>(expects: [&str; N]) -> Result<[String; N], String> {
     let mut said: Vec<String> = Vec::with_capacity(N);
     for (at, argument) in std::env::args_os().enumerate().skip(1) {
@@ -352,7 +428,7 @@ fn told<const N: usize>(expects: [&str; N]) -> Result<[String; N], String> {
     Ok(said.try_into().expect("a list of the length just counted"))
 }
 
-/// Say what went wrong when there is no app to say it with.
+/// Says what went wrong when there is no app to say it with.
 ///
 /// For the one moment an app has nothing to complain on: before `inherited`
 /// has answered, and because it has refused. A program that cannot take its
@@ -364,6 +440,10 @@ fn told<const N: usize>(expects: [&str; N]) -> Result<[String; N], String> {
 /// went wrong. Unframed text would be worse than silence: the first four bytes
 /// of it would be read as a packet's length, and the parent would wait for
 /// bytes that are not coming.
+///
+/// # Arguments
+///
+/// * `message` - What went wrong, written as one packet.
 pub fn complain(message: &str) {
     if !is_open(Interface::Errors.fd()) {
         return;
@@ -375,7 +455,7 @@ pub fn complain(message: &str) {
     let _ = packet::write(&mut *errors, message.as_bytes());
 }
 
-/// Whether this program was run the way this kind of app is run.
+/// Checks that this program was run the way this kind of app is run.
 ///
 /// Every data interface it supports handed over, and every data interface it
 /// does not support not. Both halves, because each catches a different
@@ -393,6 +473,16 @@ pub fn complain(message: &str) {
 /// pipe, the terminal of somebody running the program to look at it -- and
 /// refusing to start for want of somewhere to complain would be the one
 /// refusal that could not be reported.
+///
+/// # Arguments
+///
+/// * `supported` - The data interfaces this kind supports.
+///
+/// # Errors
+///
+/// A sentence naming the interface and the descriptor if a supported data
+/// interface was not handed over, an unsupported one was, or the error
+/// interface is not open.
 fn taking(supported: &[Interface]) -> Result<(), String> {
     for interface in [Interface::Payload, Interface::Moc] {
         let wanted = supported.contains(&interface);

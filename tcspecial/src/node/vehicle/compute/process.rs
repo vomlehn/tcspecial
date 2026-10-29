@@ -111,12 +111,23 @@ pub struct Process {
 const LINE_BYTES: usize = 256;
 
 impl Process {
-    /// The program these settled parameters name, not yet started.
+    /// Makes the node for the program these settled parameters name, not
+    /// yet started.
     ///
     /// Nothing to refuse: what a file may say -- the program, the deadline it
     /// cannot do without, and whether it may be restarted -- is
     /// `tcslibgs::node::vehicle::compute`'s, where the ground tool checks it.
     /// What is found here is the machine's answer: see [`Process::start`].
+    ///
+    /// # Arguments
+    ///
+    /// * `params` - The program, how long it has to answer, and whether it
+    ///              is started again when it stops.
+    ///
+    /// # Returns
+    ///
+    /// The node, its program not started and with nothing to abandon a
+    /// wait for.
     pub fn of(params: ProcessParams) -> Process {
         Process {
             quoted: format!("\"{}\"", params.executable),
@@ -157,7 +168,17 @@ impl Process {
         self.running.is_some()
     }
 
-    /// Start the program, whatever happened to the last one.
+    /// Starts the program, whatever happened to the last one.
+    ///
+    /// # Returns
+    ///
+    /// The running program, with its standard input and output piped to
+    /// this process and its standard error shared.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the program if it cannot be run, or comes without
+    /// the pipes.
     fn spawn(&self) -> Result<Running, String> {
         let mut child = Command::new(&self.executable)
             .stdin(Stdio::piped())
@@ -187,16 +208,26 @@ impl Process {
         })
     }
 
-    /// Hand one line over and wait for the answer, or say what went wrong.
+    /// Hands one line over and waits for the answer, or says what went
+    /// wrong.
     ///
     /// The deadline is measured from here and not from the write: a program
     /// that takes its `timeout` to answer has used all of it, whatever the
     /// writing cost.
     ///
-    /// The line is `self.line`, and the answer is left in `self.answer`:
-    /// `Ok(true)` is an answer there, and `Ok(false)` is none -- an empty line,
-    /// which is the program saying "nothing to send yet", or the node being
-    /// disabled while it waited.
+    /// The line is `self.line`, and the answer is left in `self.answer`.
+    ///
+    /// # Returns
+    ///
+    /// `true` if there is an answer in `self.answer`, and `false` if there
+    /// is none -- an empty line, which is the program saying "nothing to
+    /// send yet", or the node being disabled while it waited.
+    ///
+    /// # Errors
+    ///
+    /// A message saying what went wrong if the program is not running, will
+    /// not take the line, does not answer by the deadline, cannot be
+    /// waited on or read, or has closed its output (with how it exited).
     fn ask(&mut self) -> Result<bool, String> {
         let deadline = Instant::now() + self.timeout;
         let Some(running) = self.running.as_mut() else {
@@ -303,12 +334,16 @@ impl Process {
         self.restart
     }
 
-    /// Whether it is started again when it stops.
+    /// Says whether it is started again when it stops.
     ///
     /// The answer the configuration gave, and the same answer every time: a
     /// program told to come back comes back however often it stops. What the
     /// count below is for is the telemetry -- how many times this one has --
     /// and not a bound on it.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the configuration says to restart it when it stops.
     pub fn may_restart(&self) -> bool {
         match self.restart {
             Restart::Never => false,
@@ -316,7 +351,16 @@ impl Process {
         }
     }
 
-    /// Record that it stopped, and say whether it will be started again.
+    /// Records that it stopped, and says whether it will be started again.
+    ///
+    /// # Arguments
+    ///
+    /// * `why` - Why it stopped, kept for [`Process::why_stopped`] if it
+    ///           will not be started again.
+    ///
+    /// # Returns
+    ///
+    /// `true` if it will be started again, which counts a restart.
     pub fn stopped(&mut self, why: &str) -> bool {
         if self.may_restart() {
             self.restarts += 1;
@@ -362,14 +406,22 @@ impl Process {
 // run looks like a program that started -- which is the one failure this
 // node exists to make visible.
 
-/// The first whole line in what has arrived, if there is one: how many bytes
-/// it takes up, its newline included, and the line without it.
+/// Finds the first whole line in what has arrived, if there is one.
 ///
-/// An empty line is the program saying "nothing to send yet". `None` is "no
-/// whole line yet", which is what makes the caller wait rather than guess. A
-/// trailing carriage return is dropped, so a program written on a machine
-/// that writes them is not refused for the one byte. Borrowed from the
-/// buffer, so that finding it allocates nothing.
+/// An empty line is the program saying "nothing to send yet". A trailing
+/// carriage return is dropped, so a program written on a machine that
+/// writes them is not refused for the one byte. Borrowed from the buffer,
+/// so that finding it allocates nothing.
+///
+/// # Arguments
+///
+/// * `buffer` - What the program has written and nobody has taken yet.
+///
+/// # Returns
+///
+/// How many bytes the line takes up, its newline included, and the line
+/// without it; or `None`, "no whole line yet", which is what makes the
+/// caller wait rather than guess.
 fn next_line(buffer: &[u8]) -> Option<(usize, &[u8])> {
     let end = buffer.iter().position(|b| *b == b'\n')?;
     let line = &buffer[..end];
@@ -377,11 +429,20 @@ fn next_line(buffer: &[u8]) -> Option<(usize, &[u8])> {
     Some((end + 1, line))
 }
 
-/// What a program that has gone exited with, said in a sentence.
+/// Says what a program that has gone exited with, in a sentence.
 ///
 /// Asked after its pipe closed, which is how this finds out: a program is not
 /// waited for while it is working, so its end is noticed when it stops talking
 /// and the status is read afterwards.
+///
+/// # Arguments
+///
+/// * `child` - The program, which is waited for.
+///
+/// # Returns
+///
+/// The sentence: a clean exit, a status, a signal, or why it could not be
+/// waited for.
 fn exit_of(child: &mut Child) -> String {
     match child.wait() {
         Ok(status) => match status.code() {
@@ -524,12 +585,22 @@ mod tests {
         as_value(number).expect("a temperature a value carries")
     }
 
-    /// A program of these parameters, not started.
+    /// Makes a node for a program of these parameters, not started.
     ///
     /// What a file may say about one -- that the program and the deadline are
     /// required, that a restart allowance is a number or "never" -- is
     /// `tcslibgs::node::vehicle::compute`'s rule, where the ground tool applies
     /// it. These tests are about what the supervision does.
+    ///
+    /// # Arguments
+    ///
+    /// * `executable` - The program's path.
+    /// * `timeout`    - How long it has to answer.
+    /// * `restart`    - Whether it is started again when it stops.
+    ///
+    /// # Returns
+    ///
+    /// The node.
     fn process(
         executable: &str,
         timeout: Duration,
@@ -601,11 +672,24 @@ mod tests {
         assert_eq!(p.why_stopped(), Some("it could not be executed"));
     }
 
-    /// A program written for this test, in whatever shell there is.
+    /// Writes a program for this test, in whatever shell there is.
     ///
     /// A shell script rather than a Rust helper binary: what is being tested
     /// is the arrangement a configuration can actually name, which is a
     /// program on this machine reading lines and writing them.
+    ///
+    /// # Arguments
+    ///
+    /// * `script` - The shell script, without its `#!` line.
+    ///
+    /// # Returns
+    ///
+    /// The directory it is in, which removes it when dropped, and its
+    /// path.
+    ///
+    /// # Panics
+    ///
+    /// If it cannot be written or made executable.
     fn program(script: &str) -> (tempfile::TempDir, String) {
         use std::io::Write as _;
         use std::os::unix::fs::PermissionsExt;
@@ -624,6 +708,21 @@ mod tests {
         (where_, name)
     }
 
+    /// Writes a program and starts a node that never restarts it.
+    ///
+    /// # Arguments
+    ///
+    /// * `script`  - The program, as a shell script without its `#!` line.
+    /// * `timeout` - How long it has to answer.
+    ///
+    /// # Returns
+    ///
+    /// The directory the program is in, to be kept as long as it runs, and
+    /// the node, its program running.
+    ///
+    /// # Panics
+    ///
+    /// If the program cannot be written or started.
     fn running(
         script: &str,
         timeout: Duration,
@@ -635,7 +734,7 @@ mod tests {
         (where_, p)
     }
 
-    /// Start it, past a race these tests have and a vehicle does not.
+    /// Starts it, past a race these tests have and a vehicle does not.
     ///
     /// A program just written by this process cannot be executed while any
     /// process holds it open for writing, and in a multi-threaded program
@@ -644,6 +743,14 @@ mod tests {
     /// can see `ETXTBSY` from the kernel. Nothing in flight writes the program
     /// it runs, which is why the retry is here and not in `Process::start`:
     /// there, a text file busy is news.
+    ///
+    /// # Arguments
+    ///
+    /// * `p` - The node whose program to start.
+    ///
+    /// # Panics
+    ///
+    /// If it fails for any other reason, or is still busy after 50 tries.
     fn start_despite_the_race(p: &mut Process) {
         for attempt in 1..=50 {
             match p.start() {

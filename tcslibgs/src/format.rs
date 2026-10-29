@@ -33,9 +33,15 @@ pub enum ConfigFormat {
 }
 
 impl ConfigFormat {
-    /// The format a path's extension names, or nothing for one this does not
-    /// recognise.
+    /// Finds the format a path's extension names.
     ///
+    /// # Arguments
+    ///
+    /// * `path` - The file's path.
+    ///
+    /// # Returns
+    ///
+    /// The format, or nothing for an extension this does not recognise.
     /// Nothing rather than a default: a file whose extension is not one of
     /// these is more likely a mistake about which file is being read than a
     /// file meaning to be read some other way, and the one default there ever
@@ -55,7 +61,20 @@ impl ConfigFormat {
         }
     }
 
-    /// The format of the file at `path`, or what is wrong with asking.
+    /// Finds the format of a file from its extension.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The file's path.
+    ///
+    /// # Returns
+    ///
+    /// The format.
+    ///
+    /// # Errors
+    ///
+    /// [`TcsError::Config`] if the path is not named `.yaml`, `.yml` or
+    /// `.xml`.
     pub fn of_file<P: AsRef<Path>>(path: P) -> TcsResult<Self> {
         let path = path.as_ref();
         Self::from_path(path).ok_or_else(|| {
@@ -67,7 +86,20 @@ impl ConfigFormat {
         })
     }
 
-    /// Parse `text` in this format into `T`.
+    /// Parses text in this format.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The file's text.
+    ///
+    /// # Returns
+    ///
+    /// What the text says, as `T`.
+    ///
+    /// # Errors
+    ///
+    /// The YAML parser's error, or [`TcsError::Xml`] with the line and column
+    /// where the XML went wrong.
     pub fn parse<T: DeserializeOwned>(self, text: &str) -> TcsResult<T> {
         match self {
             ConfigFormat::Yaml => {
@@ -89,13 +121,24 @@ impl ConfigFormat {
     }
 }
 
-/// The line and column, counted from one, an XML error is to be reported at.
+/// Finds the line and column, counted from one, an XML error is to be
+/// reported at.
 ///
 /// Markup that does not parse is where its `<` is, which the reader keeps for
 /// just that. Anything else -- an element the type has no field for, a value
 /// that is not one -- is found by the deserializer after it has read the
 /// event, so it is where the reader stopped: just past the tag or the text in
 /// question, and on its line unless the element runs over several.
+///
+/// # Arguments
+///
+/// * `text`   - The text being parsed.
+/// * `error`  - What went wrong.
+/// * `reader` - The reader that was parsing it, which knows where it stopped.
+///
+/// # Returns
+///
+/// The line and the column, counted in characters.
 fn xml_position(
     text: &str,
     error: &quick_xml::DeError,
@@ -132,10 +175,21 @@ fn xml_position(
 pub struct Spelling(Option<ConfigFormat>);
 
 impl Spelling {
-    /// Take `arg` if it is `--yaml` or `--xml`: `Ok(true)` if it was one,
-    /// `Ok(false)` if it is something else for the caller to read, and what
-    /// is wrong where it contradicts one already taken. The same flag twice
+    /// Takes an argument if it is `--yaml` or `--xml`. The same flag twice
     /// says one thing twice and is taken.
+    ///
+    /// # Arguments
+    ///
+    /// * `arg` - One command-line argument.
+    ///
+    /// # Returns
+    ///
+    /// `true` if it was one of the flags, `false` if it is something else for
+    /// the caller to read.
+    ///
+    /// # Errors
+    ///
+    /// A message when it contradicts a flag already taken.
     pub fn take(&mut self, arg: &str) -> Result<bool, String> {
         let said = match arg {
             "--yaml" => ConfigFormat::Yaml,
@@ -155,13 +209,27 @@ impl Spelling {
         }
     }
 
-    /// The configuration to read.
+    /// Chooses the configuration to read.
     ///
     /// The one `named`, where one was; a flag beside it has to agree with its
     /// extension, because a file named `.xml` read as asked for in YAML is a
-    /// command line that cannot both be right. Otherwise `stem` -- the
-    /// example's path without an extension -- in the spelling asked for, or
-    /// in `default` where neither was.
+    /// command line that cannot both be right. Otherwise `stem` in the
+    /// spelling asked for, or in `default` where neither was.
+    ///
+    /// # Arguments
+    ///
+    /// * `named`   - The configuration the command line named, if it did.
+    /// * `stem`    - The example's path without an extension.
+    /// * `default` - The spelling to read where no flag asks for one.
+    ///
+    /// # Returns
+    ///
+    /// The path of the configuration to read.
+    ///
+    /// # Errors
+    ///
+    /// A message when a flag asks for a format the named file's extension is
+    /// not.
     pub fn configuration(
         &self,
         named: Option<String>,
@@ -187,7 +255,11 @@ impl Spelling {
 }
 
 impl ConfigFormat {
-    /// The extension a file in this format is written with.
+    /// Gives the extension a file in this format is written with.
+    ///
+    /// # Returns
+    ///
+    /// `yaml` or `xml`.
     pub fn extension(self) -> &'static str {
         match self {
             ConfigFormat::Yaml => "yaml",
@@ -195,7 +267,11 @@ impl ConfigFormat {
         }
     }
 
-    /// This format's name, as a person says it.
+    /// Gives this format's name, as a person says it.
+    ///
+    /// # Returns
+    ///
+    /// `YAML` or `XML`.
     pub fn name(self) -> &'static str {
         match self {
             ConfigFormat::Yaml => "YAML",
@@ -203,7 +279,11 @@ impl ConfigFormat {
         }
     }
 
-    /// The command-line flag that asks for this format.
+    /// Gives the command-line flag that asks for this format.
+    ///
+    /// # Returns
+    ///
+    /// `--yaml` or `--xml`.
     pub fn flag(self) -> &'static str {
         match self {
             ConfigFormat::Yaml => "--yaml",
@@ -212,9 +292,23 @@ impl ConfigFormat {
     }
 }
 
-/// Read and parse a configuration file, choosing the parser from its extension.
+/// Reads and parses a configuration file, choosing the parser from its
+/// extension.
 ///
 /// This is the single entry point every configuration loader should use.
+///
+/// # Arguments
+///
+/// * `path` - The file's path.
+///
+/// # Returns
+///
+/// What the file says, as `T`.
+///
+/// # Errors
+///
+/// An extension that names no format, a file that cannot be read, and what
+/// [`ConfigFormat::parse`] refuses.
 pub fn load_config_file<T: DeserializeOwned, P: AsRef<Path>>(
     path: P,
 ) -> TcsResult<T> {

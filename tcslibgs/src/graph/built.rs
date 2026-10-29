@@ -38,11 +38,19 @@ pub const OPTIONAL_TYPES: [&str; 10] = [
     RAW,
 ];
 
-/// The optional type a node needs a build to contain, if it needs one.
+/// Finds the optional type a node needs a build to contain, if it needs one.
 ///
 /// A node of a payload type needs that type, and a network node needs `raw`
 /// where its protocol is raw and nothing otherwise. Every other node -- a
 /// gateway, a computation, a log, an app -- needs nothing.
+///
+/// # Arguments
+///
+/// * `node` - The node.
+///
+/// # Returns
+///
+/// The type's spelling, or `None` when the node needs none.
 pub fn needs(node: &Node) -> Option<&'static str> {
     match DHType::from_spelling(&node.node_type)? {
         DHType::Network => node
@@ -54,10 +62,17 @@ pub fn needs(node: &Node) -> Option<&'static str> {
     }
 }
 
-/// Every node of `nodes` -- a graph's -- whose type `built` does not
-/// contain, as problems.
+/// Finds every node whose type a build does not contain.
 ///
-/// `built` is the optional types a build contains: see [`OPTIONAL_TYPES`].
+/// # Arguments
+///
+/// * `nodes` - A graph's nodes.
+/// * `built` - The optional types the build contains: see
+///             [`OPTIONAL_TYPES`].
+///
+/// # Returns
+///
+/// A [`Problem::NotBuilt`] for each node whose type is not built.
 pub fn not_built(nodes: &[Node], built: &[&str]) -> Vec<Problem> {
     nodes
         .iter()
@@ -71,11 +86,20 @@ pub fn not_built(nodes: &[Node], built: &[&str]) -> Vec<Problem> {
         .collect()
 }
 
-/// What is said of a node whose type a build does not contain.
+/// Says what is said of a node whose type a build does not contain.
 ///
 /// The one sentence for it, which tcspecial says as it refuses a configuration
 /// at load, tcsverify says of a configuration checked with `--types`, and the
 /// open says if a node ever reaches it unchecked.
+///
+/// # Arguments
+///
+/// * `node`      - The node's name.
+/// * `node_type` - Its type, which the build lacks.
+///
+/// # Returns
+///
+/// The message, saying how to build for it.
 pub fn not_built_message(node: &str, node_type: &str) -> String {
     let article = match node_type {
         "i2c" | "iio" => "an",
@@ -88,13 +112,25 @@ pub fn not_built_message(node: &str, node_type: &str) -> String {
     )
 }
 
-/// The optional types a list names, as `--types` gives them: words separated
-/// by commas, as `tcspecial --types` prints them.
+/// Reads the optional types a list names, as `--types` gives them: words
+/// separated by commas, as `tcspecial --types` prints them.
 ///
 /// An empty list is a build with none of them, which is a build that can fly
-/// a configuration of network nodes and nothing else. A word that names no
-/// optional type is refused, listing those that do: a misspelling taken as a
-/// type the build lacks would report every node of the type that was meant.
+/// a configuration of network nodes and nothing else.
+///
+/// # Arguments
+///
+/// * `list` - The list as given.
+///
+/// # Returns
+///
+/// The types it names, each once, in the order first named.
+///
+/// # Errors
+///
+/// A word that names no optional type is refused, listing those that do: a
+/// misspelling taken as a type the build lacks would report every node of
+/// the type that was meant.
 pub fn types_from(list: &str) -> Result<Vec<&'static str>, String> {
     let mut types = Vec::new();
     for word in list
@@ -124,7 +160,17 @@ pub fn types_from(list: &str) -> Result<Vec<&'static str>, String> {
 mod tests {
     use super::*;
 
-    /// A node of a type, with a protocol where one is given.
+    /// Makes a node of a type, with a protocol where one is given.
+    ///
+    /// # Arguments
+    ///
+    /// * `name`      - The node's name.
+    /// * `node_type` - Its type.
+    /// * `protocol`  - Its `protocol` attribute, if it has one.
+    ///
+    /// # Returns
+    ///
+    /// The node, with no group.
     fn node(name: &str, node_type: &str, protocol: Option<&str>) -> Node {
         Node {
             name: name.into(),

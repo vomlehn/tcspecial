@@ -47,7 +47,20 @@ impl Sizes {
     ///
     /// Read before the window is sized, which is why the markup reports what a
     /// panel *wants* rather than what it got: a preferred size is a layout
-    /// question and is answered without laying anything out.
+    /// question and is answered without laying anything out. The window is
+    /// told the panel size back, so that it lays the grid out by it.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui` - The main window, not yet sized.
+    ///
+    /// # Returns
+    ///
+    /// A panel's preferred size and the window's chrome around the grid.
+    ///
+    /// # Panics
+    ///
+    /// If the window that measures a panel cannot be made.
     pub fn of(ui: &crate::MainWindow) -> Self {
         // A panel's size comes from a window of its own -- see PanelProbe in
         // ui/main.slint -- and the chrome from the real one, which knows its
@@ -77,6 +90,10 @@ impl Sizes {
     /// test of that rule needs numbers rather than the numbers.
     /// `the_markup_reports_the_sizes_the_tests_assume` is what keeps these
     /// from drifting away from the markup they were read off.
+    ///
+    /// # Returns
+    ///
+    /// The sizes, as numbers read off the markup.
     #[cfg(test)]
     pub fn for_tests() -> Self {
         Self {
@@ -118,7 +135,17 @@ pub fn height_for_rows(sizes: &Sizes, rows: usize) -> f32 {
     rows.max(1) as f32 * sizes.panel_height + sizes.chrome_height
 }
 
-/// The size the window opens at for a grid of `shape` holding `panels`.
+/// Works out the size the window opens at for a grid.
+///
+/// # Arguments
+///
+/// * `sizes`  - What the window says about a panel and its chrome.
+/// * `shape`  - The grid's shape, from [`grid_shape`].
+/// * `panels` - How many panels the grid holds.
+///
+/// # Returns
+///
+/// The grid's width, and the height of [`rows_of_room`] rows.
 pub fn window_size(
     sizes: &Sizes,
     shape: &GridShape,
@@ -167,7 +194,16 @@ pub fn columns_for(panels: usize) -> usize {
     panels.clamp(1, MAX_COLUMNS)
 }
 
-/// Choose the grid shape for `panels` simulated payloads.
+/// Chooses the grid shape for the simulated payloads.
+///
+/// # Arguments
+///
+/// * `sizes`  - What the window says about a panel and its chrome.
+/// * `panels` - How many simulated payloads; none is laid out as one.
+///
+/// # Returns
+///
+/// The columns and rows, and the window size they ask for.
 pub fn grid_shape(sizes: &Sizes, panels: usize) -> GridShape {
     // An empty configuration still has to produce a window.
     let panels = panels.max(1);
@@ -186,12 +222,6 @@ pub fn grid_shape(sizes: &Sizes, panels: usize) -> GridShape {
 mod tests {
     use super::*;
 
-    /// The room the window opens with, which is a rule rather than a floor.
-    ///
-    /// Three rows are looked ahead for, so a file that grows a row can be
-    /// watched without resizing the window; but a file with fewer panels than
-    /// that opens only as tall as the panels it has, rather than with room
-    /// below that nothing could fill. A grid taller than three rows is given
     /// The sizes the shipped window reports, so that the shape rule is
     /// exercised on the numbers it actually runs on.
     ///
@@ -203,6 +233,12 @@ mod tests {
         Sizes::for_tests()
     }
 
+    /// The room the window opens with, which is a rule rather than a floor.
+    ///
+    /// Three rows are looked ahead for, so a file that grows a row can be
+    /// watched without resizing the window; but a file with fewer panels than
+    /// that opens only as tall as the panels it has, rather than with room
+    /// below that nothing could fill. A grid taller than three rows is given
     /// all of them.
     #[test]
     fn the_window_keeps_room_for_the_rows_there_are_to_fill() {

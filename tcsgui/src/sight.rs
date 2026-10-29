@@ -45,6 +45,14 @@ impl Sight {
 }
 
 /// One channel of an sRGB colour as linear light.
+///
+/// # Arguments
+///
+/// * `channel` - The channel's 8-bit sRGB value.
+///
+/// # Returns
+///
+/// The channel's linear light, from 0 to 1.
 fn linear(channel: u8) -> f64 {
     let c = channel as f64 / 255.0;
     if c <= 0.04045 {
@@ -57,6 +65,14 @@ fn linear(channel: u8) -> f64 {
 /// And back, clamped: a simulation can land a little outside the gamut, and a
 /// colour outside it is shown as the nearest one that is in it -- which is
 /// what a screen does too.
+///
+/// # Arguments
+///
+/// * `light` - A channel's linear light, nominally from 0 to 1.
+///
+/// # Returns
+///
+/// The channel's sRGB value, from 0 to 1.
 fn encoded(light: f64) -> f64 {
     let c = light.clamp(0.0, 1.0);
     if c <= 0.003_130_8 {
@@ -66,6 +82,17 @@ fn encoded(light: f64) -> f64 {
     }
 }
 
+/// Applies a colour-vision matrix to an sRGB colour in linear light.
+///
+/// # Arguments
+///
+/// * `matrix` - The matrix, by row, that maps linear red, green and blue to
+///              what is seen.
+/// * `rgb`    - The colour as red, green and blue bytes.
+///
+/// # Returns
+///
+/// The colour seen, as sRGB bytes, clamped to the gamut.
 fn through(matrix: [[f64; 3]; 3], rgb: (u8, u8, u8)) -> (u8, u8, u8) {
     let v = [linear(rgb.0), linear(rgb.1), linear(rgb.2)];
     let out: Vec<f64> = (0..3)
@@ -79,6 +106,15 @@ fn through(matrix: [[f64; 3]; 3], rgb: (u8, u8, u8)) -> (u8, u8, u8) {
 }
 
 /// `rgb` as this way of seeing shows it.
+///
+/// # Arguments
+///
+/// * `rgb`   - The colour as red, green and blue bytes.
+/// * `sight` - The way of seeing to simulate.
+///
+/// # Returns
+///
+/// The colour as that way of seeing shows it, as sRGB bytes.
 pub fn seen(rgb: (u8, u8, u8), sight: Sight) -> (u8, u8, u8) {
     match sight {
         Sight::Normal => rgb,
@@ -110,6 +146,14 @@ pub fn seen(rgb: (u8, u8, u8), sight: Sight) -> (u8, u8, u8) {
 }
 
 /// `rgb` in CIE L\*a\*b\*, under a D65 white.
+///
+/// # Arguments
+///
+/// * `rgb` - The colour as red, green and blue bytes.
+///
+/// # Returns
+///
+/// Its lightness L\*, from 0 to 100, and its a\* and b\*.
 pub fn lab(rgb: (u8, u8, u8)) -> (f64, f64, f64) {
     let (r, g, b) = (linear(rgb.0), linear(rgb.1), linear(rgb.2));
     let x = 0.412_456_4 * r + 0.357_576_1 * g + 0.180_437_5 * b;
@@ -133,6 +177,15 @@ pub fn lab(rgb: (u8, u8, u8)) -> (f64, f64, f64) {
 /// printings". The plain 1976 distance rather than one of its successors: the
 /// successors are corrections for pairs that are already close, and what is
 /// wanted here is a floor well above that.
+///
+/// # Arguments
+///
+/// * `a` - One colour, as red, green and blue bytes.
+/// * `b` - The other.
+///
+/// # Returns
+///
+/// The CIE 1976 distance between them in L\*a\*b\*.
 pub fn difference(a: (u8, u8, u8), b: (u8, u8, u8)) -> f64 {
     let (one, two) = (lab(a), lab(b));
     ((one.0 - two.0).powi(2)
@@ -148,6 +201,15 @@ pub fn difference(a: (u8, u8, u8), b: (u8, u8, u8)) -> f64 {
 /// line, a shape. What a node is drawn against is its own working pane, which
 /// is a tinted ground rather than the white it used to be -- so the question
 /// is asked of the pair and not of the colour alone.
+///
+/// # Arguments
+///
+/// * `a` - One colour, as red, green and blue bytes.
+/// * `b` - The other; which is the lighter does not matter.
+///
+/// # Returns
+///
+/// The ratio, from 1 (no contrast) to 21 (black on white).
 pub fn contrast(a: (u8, u8, u8), b: (u8, u8, u8)) -> f64 {
     let light = |rgb: (u8, u8, u8)| {
         0.2126 * linear(rgb.0) + 0.7152 * linear(rgb.1) + 0.0722 * linear(rgb.2)

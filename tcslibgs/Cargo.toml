@@ -22,3 +22,6 @@ tcs-xtce = { path = "../vendor/tcs-xtce/rust" }
 
 [dev-dependencies]
 tempfile = "3"
+
+[lints]
+workspace = true

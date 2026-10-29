@@ -15,7 +15,16 @@ use tcslibgs::{
     ArmKey, Beacon, CommandStatus, RestartArmCommand, RestartCommand, Telemetry,
 };
 
-/// A socket on a port nothing else holds, kept so that it stays that way.
+/// Binds a socket on a loopback port nothing else holds, kept so that it
+/// stays that way.
+///
+/// # Returns
+///
+/// The socket, with a read timeout of five seconds.
+///
+/// # Panics
+///
+/// If no port can be bound or the timeout cannot be set.
 fn socket() -> UdpSocket {
     let socket = UdpSocket::bind("127.0.0.1:0").expect("a socket");
     socket
@@ -40,7 +49,19 @@ impl Drop for Running {
     }
 }
 
-/// The descriptors process `pid` has open.
+/// Lists the descriptors a process has open, from `/proc`.
+///
+/// # Arguments
+///
+/// * `pid` - The process's ID.
+///
+/// # Returns
+///
+/// Its open descriptors, in ascending order.
+///
+/// # Panics
+///
+/// If the process's descriptors cannot be read.
 fn descriptors(pid: u32) -> Vec<i32> {
     let mut open: Vec<i32> = std::fs::read_dir(format!("/proc/{pid}/fd"))
         .expect("the process's descriptors")
@@ -50,7 +71,19 @@ fn descriptors(pid: u32) -> Vec<i32> {
     open
 }
 
-/// The next beacon.
+/// Waits for the next beacon.
+///
+/// # Arguments
+///
+/// * `ground` - The socket the beacons arrive at.
+///
+/// # Returns
+///
+/// The beacon.
+///
+/// # Panics
+///
+/// If the read fails or times out, or what arrives is not a beacon.
 fn beacon(ground: &UdpSocket) -> Beacon {
     let mut buffer = [0u8; 65535];
     loop {
@@ -67,7 +100,21 @@ fn beacon(ground: &UdpSocket) -> Beacon {
     }
 }
 
-/// Send `command` from `ground` to `at` and read its answer's status.
+/// Sends a command and reads its answer's status.
+///
+/// # Arguments
+///
+/// * `ground`  - The socket to send from, where the answer arrives.
+/// * `at`      - The loopback port tcspecial takes commands on.
+/// * `command` - The command to send.
+///
+/// # Returns
+///
+/// The status in tcspecial's answer.
+///
+/// # Panics
+///
+/// If the send or the read fails, or the answer is not telemetry.
 fn ask(
     ground: &UdpSocket,
     at: u16,

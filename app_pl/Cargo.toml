@@ -7,3 +7,6 @@ description = "A test app for the tcspecial node type app_pl"
 
 [dependencies]
 tcsapp = { path = "../tcsapp" }
+
+[lints]
+workspace = true

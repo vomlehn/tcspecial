@@ -124,8 +124,14 @@ pub struct PayloadConfig {
     pub driven: bool,
 }
 
-/// The thread of a payload of `config`'s kind, which makes its stand-in and
-/// then runs it until `running` is cleared.
+/// Runs the thread of a payload of its configuration's kind, which makes
+/// its stand-in and then runs it until `running` is cleared.
+///
+/// # Arguments
+///
+/// * `config`  - The payload's configuration, which says its kind.
+/// * `running` - Cleared to stop it.
+/// * `stats`   - Where it counts what it sends and receives.
 fn run_kind(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
@@ -275,7 +281,15 @@ pub struct SimulatedPayload {
 }
 
 impl SimulatedPayload {
-    /// Create a new simulated payload
+    /// Creates a simulated payload, not yet started.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - Its configuration.
+    ///
+    /// # Returns
+    ///
+    /// The payload, with no traffic counted.
     pub fn new(config: PayloadConfig) -> Self {
         Self {
             config,
@@ -285,7 +299,13 @@ impl SimulatedPayload {
         }
     }
 
-    /// Start the payload simulation
+    /// Starts the payload's thread, which makes its stand-in and runs it.
+    /// A thread that ends while still meant to be running marks the
+    /// payload's standing failed.
+    ///
+    /// # Errors
+    ///
+    /// `"Already running"` if it has been started and not stopped.
     pub fn start(&mut self) -> Result<(), String> {
         if self.running.load(Ordering::SeqCst) {
             return Err("Already running".to_string());
@@ -350,7 +370,15 @@ impl SimulatedPayload {
         &self.config.name
     }
 
-    /// Get the current statistics
+    /// Copies out the current statistics.
+    ///
+    /// # Returns
+    ///
+    /// The counts and the last packet each way, as they are now.
+    ///
+    /// # Panics
+    ///
+    /// If the payload's thread panicked holding the statistics.
     pub fn stats(&self) -> PayloadStats {
         let guard = self.stats.lock().unwrap();
         PayloadStats {
@@ -394,13 +422,27 @@ impl Drop for SimulatedPayload {
     }
 }
 
-/// Make `path` a link to `leads_to`, refusing to displace anything else.
+/// Makes a path a link to another, refusing to displace anything else.
 ///
 /// A link the simulator itself left behind -- from a run that was killed
 /// rather than stopped -- is replaced, since it points at a pty that no longer
 /// exists. Anything else at that path is somebody else's: a real port, a file,
 /// a directory. The refusal says which, because "permission denied" on
 /// `/dev/ttyS0` and "there is a real device there" call for different answers.
+///
+/// # Arguments
+///
+/// * `path`     - The configured path a handler opens.
+/// * `leads_to` - What it is to lead to, such as a pty's slave.
+///
+/// # Returns
+///
+/// Nothing, once the link is made.
+///
+/// # Errors
+///
+/// A message if a character device or anything but a link is at `path`,
+/// if an old link cannot be removed, or if the link cannot be made.
 pub(crate) fn make_the_path_lead_to(
     path: &Path,
     leads_to: &str,
@@ -452,10 +494,17 @@ pub(crate) fn make_the_path_lead_to(
 /// in slices and the flag is read between them.
 const WAIT_SLICE: Duration = Duration::from_millis(50);
 
-/// Wait `how_long`, giving up early if the payload has been stopped.
+/// Waits, giving up early if the payload has been stopped.
 ///
-/// Returns whether it is still running, so a caller can abandon the rest of
-/// what it was doing.
+/// # Arguments
+///
+/// * `how_long` - How long to wait; taken in slices of `WAIT_SLICE`.
+/// * `running`  - The payload's flag, read between slices.
+///
+/// # Returns
+///
+/// Whether it is still running, so a caller can abandon the rest of what
+/// it was doing.
 pub(crate) fn wait_while_running(
     how_long: Duration,
     running: &AtomicBool,
@@ -476,7 +525,7 @@ pub(crate) fn wait_while_running(
     }
 }
 
-/// Send one packet, a segment at a time.
+/// Sends one packet, a segment at a time.
 ///
 /// What a simulator file means by a segment: a packet of `packet` bytes
 /// reaches the handler in pieces of `segment_size`, `segment_interval` apart,
@@ -491,9 +540,22 @@ pub(crate) fn wait_while_running(
 ///
 /// The wait falls between segments, never before the first or after the last:
 /// what follows the last segment is the rest of the packet interval, which
-/// the caller waits out. Returns the bytes that went and whether the whole
-/// packet did -- a packet cut short by a stop or a failed write is not
-/// counted as sent, though the bytes that did go are.
+/// the caller waits out.
+///
+/// # Arguments
+///
+/// * `packet`           - The whole packet; an empty one sends nothing.
+/// * `segment_size`     - The bytes in a segment; zero sends it whole.
+/// * `segment_interval` - The wait between segments.
+/// * `running`          - The payload's flag; cleared, it stops between
+///                        segments.
+/// * `send`             - Writes one segment, returning the bytes that went.
+///
+/// # Returns
+///
+/// The bytes that went and whether the whole packet did -- a packet cut
+/// short by a stop or a failed write is not counted as sent, though the
+/// bytes that did go are.
 pub(crate) fn send_in_segments(
     packet: &[u8],
     segment_size: usize,
@@ -539,17 +601,28 @@ pub(crate) enum Produce {
     Nothing,
 }
 
-/// Make the packet this pass should send, and do to it whatever the faults
-/// ask.
-///
-/// `sent` is how many packets have gone so far, which the faults that are
-/// counted rather than random need: a payload that goes quiet after a hundred
-/// packets has to know it has sent a hundred.
+/// Makes the packet this pass should send, and does to it whatever the
+/// faults ask.
 ///
 /// The order is the order a real fault would happen in. A dropped packet is
 /// never generated, there being nothing yet to corrupt. A truncated packet is
 /// cut before it is corrupted, so that the corruption lands in what is
 /// actually sent rather than in the part that was cut off.
+///
+/// # Arguments
+///
+/// * `config` - The payload's configuration, which gives its faults and
+///              any thermal mass it reads or heats.
+/// * `pacing` - What the window has the payload's packet size at.
+/// * `sent`   - How many packets have gone so far, which the faults that
+///              are counted rather than random need: a payload that goes
+///              quiet after a hundred packets has to know it has sent a
+///              hundred.
+/// * `rng`    - Where the random bytes and random faults come from.
+///
+/// # Returns
+///
+/// The bytes to send, or nothing.
 pub(crate) fn a_packet(
     config: &PayloadConfig,
     pacing: &Pacing,
@@ -627,7 +700,17 @@ fn corrupt(byte: u8, rng: &mut impl Rng) -> u8 {
     byte.wrapping_add(rng.gen_range(1..=255u8))
 }
 
-/// Whether something that happens `percent` times in a hundred happens now.
+/// Decides whether something that happens `percent` times in a hundred
+/// happens now.
+///
+/// # Arguments
+///
+/// * `percent` - How often, 0 to 100; 0 is never and 100 always.
+/// * `rng`     - Where the chance comes from.
+///
+/// # Returns
+///
+/// Whether it happens.
 fn happens(percent: u32, rng: &mut impl Rng) -> bool {
     match percent {
         0 => false,
@@ -636,7 +719,7 @@ fn happens(percent: u32, rng: &mut impl Rng) -> bool {
     }
 }
 
-/// How much later than it should this packet is.
+/// Picks how much later than it should this packet is.
 ///
 /// Waited before the packet goes rather than added to the interval, which is
 /// what makes it jitter and not a slower rate: the pass still ends when the
@@ -644,6 +727,16 @@ fn happens(percent: u32, rng: &mut impl Rng) -> bool {
 /// second, with the packet itself a little late inside that. Late and never
 /// early, because early would be the simulator sending before the interval
 /// its own configuration asked for.
+///
+/// # Arguments
+///
+/// * `config` - The payload's configuration, whose `jitter` fault is the
+///              most a packet may be late.
+/// * `rng`    - Where the chance comes from.
+///
+/// # Returns
+///
+/// A delay from zero to the jitter, evenly spread; zero if there is none.
 pub(crate) fn lateness(config: &PayloadConfig, rng: &mut impl Rng) -> Duration {
     let jitter = config.faults.jitter;
     if jitter.is_zero() {
@@ -679,6 +772,15 @@ pub(crate) struct Pacing {
 }
 
 impl Pacing {
+    /// Reads the pacing out of the shared configuration as it is now.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - The payload's configuration, which the window changes.
+    ///
+    /// # Returns
+    ///
+    /// Whether it is sending, its sizes in bytes and its intervals.
     pub(crate) fn read(config: &PayloadConfig) -> Self {
         Self {
             sending: config.sending.load(Ordering::SeqCst),
@@ -703,12 +805,21 @@ impl Pacing {
     ///
     /// For a payload that sends on its own, every pass of its loop: the
     /// interval is waited out at the end of the pass rather than tested here.
-    /// For one that answers requests, exactly when a request has arrived --
-    /// `asked` being the bytes just read -- so that a trigger is answered once
-    /// and silence is answered not at all.
+    /// For one that answers requests, exactly when a request has arrived, so
+    /// that a trigger is answered once and silence is answered not at all.
     ///
     /// Never for a payload whose panel has it silent: its stand-in is there,
     /// and nothing goes over it.
+    ///
+    /// # Arguments
+    ///
+    /// * `triggered` - Whether the payload answers requests rather than
+    ///                 sending on its own.
+    /// * `asked`     - The bytes of request just read, for one that answers.
+    ///
+    /// # Returns
+    ///
+    /// Whether to make and send a packet this pass.
     pub(crate) fn a_packet_is_due(
         &self,
         triggered: bool,
@@ -724,7 +835,7 @@ impl Pacing {
     }
 }
 
-/// Wait out what is left of the packet interval after a packet has gone.
+/// Waits out what is left of the packet interval after a packet has gone.
 ///
 /// The segments of a packet are sent inside the interval rather than on top
 /// of it, so the packet rate is what the file says for as long as the
@@ -732,6 +843,12 @@ impl Pacing {
 /// makes packets late instead of overlapping the next one, which is the
 /// lesser of two wrong answers: the alternative is a payload that quietly
 /// sends more than it was asked to.
+///
+/// # Arguments
+///
+/// * `pacing`  - The pacing, which gives the packet interval.
+/// * `since`   - When this pass began.
+/// * `running` - The payload's flag; cleared, the wait ends early.
 pub(crate) fn wait_out_packet(
     pacing: &Pacing,
     since: Instant,
@@ -756,9 +873,17 @@ mod tests {
     use super::*;
     use std::sync::atomic::AtomicU32;
 
-    /// What a packet is divided into, and what the pieces add up to.
-    /// A payload with faults, for the tests below. Everything else is what a
-    /// payload that works has.
+    /// Makes a payload with faults, for the tests below. Everything else is
+    /// what a payload that works has.
+    ///
+    /// # Arguments
+    ///
+    /// * `faults` - The faults it is to inject.
+    ///
+    /// # Returns
+    ///
+    /// Its configuration: UDP to 127.0.0.1:5000, twelve-byte packets every
+    /// 100 ms, sending.
     fn with(faults: Faults) -> PayloadConfig {
         PayloadConfig {
             thermal: None,
@@ -1011,6 +1136,7 @@ mod tests {
         assert!(hangs_up(&hangs, 5));
     }
 
+    /// What a packet is divided into, and what the pieces add up to.
     #[test]
     fn a_packet_is_cut_into_segments_of_the_size_asked_for() {
         let packet: Vec<u8> = (0..12).collect();

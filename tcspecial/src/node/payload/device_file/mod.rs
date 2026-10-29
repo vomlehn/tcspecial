@@ -36,6 +36,21 @@ pub struct DeviceEndpoint {
 }
 
 impl DeviceEndpoint {
+    /// Opens the device file a node names, for reading and writing.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`   - The node's name, for the complaint.
+    /// * `config` - The node's settings, which give the device file's path.
+    ///
+    /// # Returns
+    ///
+    /// The endpoint, the file open.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Endpoint`, naming the node and the path, if the file
+    /// cannot be opened.
     pub fn new(what: &str, config: &DeviceConfig) -> TcsResult<Self> {
         let file = OpenOptions::new()
             .read(true)
@@ -63,11 +78,19 @@ impl DeviceEndpoint {
         })
     }
 
-    /// A second endpoint on the same open file.
+    /// Makes a second endpoint on the same open file.
     ///
     /// A device could be opened twice where a socket could not, but one
     /// description is shared so that both ends of a conduit pair see one file
     /// position and one set of open flags.
+    ///
+    /// # Returns
+    ///
+    /// The second endpoint.
+    ///
+    /// # Errors
+    ///
+    /// The I/O error if the descriptor cannot be duplicated.
     pub fn try_clone(&self) -> TcsResult<Self> {
         Ok(Self {
             file: self.file.try_clone()?,

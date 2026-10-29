@@ -28,12 +28,8 @@ use crate::types::{DHConfig, DHMode, DHName};
 /// a reading's worth of bytes.
 pub const DEFAULT_PACKET_BYTES: usize = 16;
 
-/// What the simulator takes for each payload node the simulator file names, in
-/// the order the configuration declares them.
-///
-/// A name in the simulator file that is not a payload node, or a payload node
-/// the simulator cannot stand in for, is refused, saying which.
-/// How a reading of this payload is encoded, from the conversion it feeds.
+/// Finds how a reading of this payload is encoded, from the conversion it
+/// feeds.
 ///
 /// A simulated sensor attached to a thermal mass has to send bytes the vehicle
 /// will read back as the mass's temperature, and what those bytes are is not
@@ -50,6 +46,20 @@ pub const DEFAULT_PACKET_BYTES: usize = 16;
 /// Refused where there is not exactly one conversion to take it from: a
 /// sensor feeding none has no encoding to borrow, and one feeding two that
 /// disagree has no single answer.
+///
+/// # Arguments
+///
+/// * `graph`   - The configuration.
+/// * `payload` - The name of the payload node whose readings are encoded.
+///
+/// # Returns
+///
+/// The `to_kelvin` parameters of the one conversion its readings go to.
+///
+/// # Errors
+///
+/// A message saying so when its readings go to no `to_kelvin` node, or to
+/// more than one.
 pub fn reading_of(
     graph: &Graph,
     payload: &str,
@@ -100,6 +110,24 @@ pub fn reading_of(
     }
 }
 
+/// Makes what the simulator takes for each payload node the simulator file
+/// names, in the order the configuration declares them.
+///
+/// # Arguments
+///
+/// * `graph`    - The configuration.
+/// * `sim_file` - The simulator file, which says which payloads are
+///                simulated.
+///
+/// # Returns
+///
+/// A handler for each payload whose `simulate` is true.
+///
+/// # Errors
+///
+/// A name in the simulator file that is not a payload node, or a payload node
+/// the simulator cannot stand in for (an app node, or one whose endpoint
+/// cannot be reached), is refused, saying which.
 pub fn handlers(
     graph: &Graph,
     sim_file: &SimConfigFile,
@@ -199,6 +227,20 @@ mod tests {
     use super::*;
     use std::path::Path;
 
+    /// Loads one of the examples and its simulator file.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The example's directory under `examples/`, which is also
+    ///            its files' stem.
+    ///
+    /// # Returns
+    ///
+    /// The configuration and the simulator file.
+    ///
+    /// # Panics
+    ///
+    /// If either does not read.
     fn example(name: &str) -> (Graph, SimConfigFile) {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let graph =

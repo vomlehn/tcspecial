@@ -16,12 +16,19 @@ use std::fmt::Write;
 use crate::sim_config::ResolvedSim;
 use crate::{DHConfig, DHMode, EndpointConfig, NetworkProtocol};
 
-/// The parameters of one payload, a line each.
+/// Describes the parameters of one payload, a line each.
 ///
-/// `sim` is what the simulator configuration settled for this payload, where
-/// the program has it. Tcssim always does; tcsmoc reads the file if it is
-/// there, and says plainly when it is not rather than leaving the simulation
-/// half of the set unexplained.
+/// # Arguments
+///
+/// * `dh`  - The payload, as the configuration settled it.
+/// * `sim` - What the simulator configuration settled for this payload, where
+///           the program has it. Tcssim always does; tcsmoc reads the file if
+///           it is there, and says plainly when it is not rather than leaving
+///           the simulation half of the set unexplained.
+///
+/// # Returns
+///
+/// The text, one parameter a line.
 pub fn payload_parameters(dh: &DHConfig, sim: Option<&ResolvedSim>) -> String {
     let mut out = String::new();
 
@@ -116,7 +123,13 @@ pub fn payload_parameters(dh: &DHConfig, sim: Option<&ResolvedSim>) -> String {
     out
 }
 
-/// The attributes that belong to this kind of endpoint and to no other.
+/// Writes the attributes that belong to this kind of endpoint and to no
+/// other.
+///
+/// # Arguments
+///
+/// * `out`      - Where the lines are written.
+/// * `endpoint` - The endpoint described.
 fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
     match endpoint {
         EndpointConfig::Network(net) => {
@@ -358,7 +371,13 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
     }
 }
 
-/// What the simulator configuration settled for this payload.
+/// Writes what the simulator configuration settled for this payload.
+///
+/// # Arguments
+///
+/// * `out` - Where the lines are written.
+/// * `dh`  - The payload, whose packet size a segment is weighed against.
+/// * `sim` - What the simulator configuration settled for it.
 fn simulator_parameters(out: &mut String, dh: &DHConfig, sim: &ResolvedSim) {
     let _ = writeln!(out, "From the simulator configuration");
 
@@ -480,6 +499,15 @@ mod tests {
     };
     use std::time::Duration;
 
+    /// Makes a periodic UDP payload of 12-byte packets.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The payload's name.
+    ///
+    /// # Returns
+    ///
+    /// The payload.
     fn udp(name: &str) -> DHConfig {
         DHConfig {
             name: DHName::new(name),
@@ -503,6 +531,20 @@ mod tests {
         }
     }
 
+    /// Settles a simulator file for one payload.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - The simulator file, in YAML.
+    /// * `dh`   - The payload it simulates.
+    ///
+    /// # Returns
+    ///
+    /// What the file settled for the payload.
+    ///
+    /// # Panics
+    ///
+    /// If the file does not parse or does not fit the payload.
     fn settled(text: &str, dh: &DHConfig) -> ResolvedSim {
         let file: SimConfigFile =
             ConfigFormat::Yaml.parse(text).expect("parses");

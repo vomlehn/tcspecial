@@ -36,14 +36,22 @@ pub const SIM_PAYLOAD_CONFIG_PATH_VAR: &str = "SIM_PAYLOAD_CONFIG_PATH";
 /// argument, and that is what a real run names.
 pub const DEFAULT_PAYLOAD_CONFIG_PATH: &str = "tests/manual/thermostat.yaml";
 
-/// The simulator file beside a configuration and named for it, where there is
-/// one.
+/// Finds the simulator file beside a configuration and named for it.
 ///
 /// Two spellings are looked for: `<stem>-sim.yaml`, which the examples use,
 /// and the older `<stem>sim.yaml`. The stem is the configuration's name
 /// without `.yaml`, `.yml` or `.xml`, so either spelling of a configuration
 /// finds the same simulator file. One function for every program that looks,
 /// so that tcsmoc and the tcssim it starts cannot pick different files.
+///
+/// # Arguments
+///
+/// * `payload_path` - The configuration's path.
+///
+/// # Returns
+///
+/// The simulator file's path, or `None` when the configuration's name has
+/// none of the three extensions or there is no such file.
 pub fn sim_path_beside(payload_path: &str) -> Option<String> {
     let stem = [".yaml", ".yml", ".xml"]
         .iter()
@@ -53,7 +61,7 @@ pub fn sim_path_beside(payload_path: &str) -> Option<String> {
         .find(|candidate| Path::new(candidate).is_file())
 }
 
-/// The tcspecial configuration file a program was told to read.
+/// Finds the tcspecial configuration file a program was told to read.
 ///
 /// Every program that serves, controls or simulates a payload set needs to be
 /// pointed at one, and they are all pointed the same way: a command line
@@ -63,12 +71,25 @@ pub fn sim_path_beside(payload_path: &str) -> Option<String> {
 /// they inherit its environment, so a variable can reach further than it was
 /// meant to, where an argument cannot.
 ///
-/// `var` is the program's variable, or `None` for a program that has none:
-/// tcsmoc deliberately has no variable of its own, for the reason above.
-///
 /// One argument is expected. A second is refused rather than ignored, because
 /// a second path is more likely a mistake about which file is being read than
 /// something meant to have no effect.
+///
+/// # Arguments
+///
+/// * `args` - The program's arguments, its own name first.
+/// * `var`  - The program's environment variable, or `None` for a program
+///            that has none: tcsmoc deliberately has no variable of its own,
+///            for the reason above.
+///
+/// # Returns
+///
+/// The configuration file's path.
+///
+/// # Errors
+///
+/// A usage message when there is more than one argument after the
+/// program's name.
 pub fn payload_path_from_args<I: Iterator<Item = String>>(
     mut args: I,
     var: Option<&str>,
@@ -145,6 +166,16 @@ pub fn names_what_is_gone(
     what_is_gone(&format.parse(text).ok()?)
 }
 
+/// Says what became of a section a file names in an older spelling.
+///
+/// # Arguments
+///
+/// * `sections` - The sections the file names.
+///
+/// # Returns
+///
+/// [`TcsError::Config`] naming the old section, or `None` when the file
+/// names none.
 fn what_is_gone(sections: &Sections) -> Option<TcsError> {
     if !sections.data_handlers.is_empty()
         || !sections.data_handler_groups.is_empty()

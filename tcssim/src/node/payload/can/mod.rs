@@ -53,11 +53,26 @@ struct BusMember {
 }
 
 impl BusMember {
-    /// Join the bus the handler is on, filtered to this device's identifier.
+    /// Joins the bus the handler is on, filtered to this device's identifier.
     ///
     /// Filtered for the same reason the handler filters: a bus carries
     /// everybody's frames, and a device that read the lot would answer
     /// triggers meant for another device on the same interface.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - The device's configuration: the interface, the identifier
+    ///              and whether frames are CAN FD.
+    ///
+    /// # Returns
+    ///
+    /// The member, its socket bound and non-blocking.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the device if the interface does not exist (with the
+    /// commands that make one), or the socket cannot be opened, filtered, set
+    /// for CAN FD, bound or made non-blocking.
     fn join(config: &PayloadConfig) -> Result<Self, String> {
         let interface = config.address.clone();
         let index = index_of(&interface).ok_or_else(|| {
@@ -181,7 +196,11 @@ impl BusMember {
         })
     }
 
-    /// How many bytes one frame carries.
+    /// Says how many bytes one frame carries.
+    ///
+    /// # Returns
+    ///
+    /// 64 for CAN FD, 8 otherwise.
     fn frame_bytes(&self) -> usize {
         if self.fd {
             64
@@ -190,7 +209,20 @@ impl BusMember {
         }
     }
 
-    /// Put one segment on the bus as one frame.
+    /// Puts one segment on the bus as one frame.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The segment, no longer than a frame carries.
+    ///
+    /// # Returns
+    ///
+    /// The segment's length: the device's bytes, not the frame's.
+    ///
+    /// # Errors
+    ///
+    /// `InvalidInput` if the segment will not fit in a frame, or the
+    /// system's error if the write fails.
     fn send(&self, data: &[u8]) -> io::Result<usize> {
         if data.len() > self.frame_bytes() {
             return Err(io::Error::new(
@@ -239,7 +271,15 @@ impl BusMember {
         Ok(data.len())
     }
 
-    /// One frame's data, or nothing where no frame is waiting.
+    /// Reads one frame's data, or nothing where no frame is waiting.
+    ///
+    /// # Arguments
+    ///
+    /// * `into` - Where the data goes; a longer frame is cut to fit.
+    ///
+    /// # Returns
+    ///
+    /// The bytes put in `into`; 0 if no whole frame was waiting.
     fn receive(&self, into: &mut [u8]) -> usize {
         let mut frame = [0u8; mem::size_of::<libc::canfd_frame>()];
         let room = if self.fd {
@@ -268,7 +308,16 @@ impl BusMember {
     }
 }
 
-/// The kernel's index for an interface name, if it has one.
+/// Looks up the kernel's index for an interface name.
+///
+/// # Arguments
+///
+/// * `interface` - The interface's name, such as `vcan0`.
+///
+/// # Returns
+///
+/// The index, or `None` if there is no such interface or the name holds a
+/// NUL.
 fn index_of(interface: &str) -> Option<libc::c_uint> {
     let name = std::ffi::CString::new(interface).ok()?;
     // SAFETY: a valid C string for the length of the call.
@@ -280,12 +329,18 @@ fn index_of(interface: &str) -> Option<libc::c_uint> {
     }
 }
 
-/// Run a simulated device on a CAN bus.
+/// Runs a simulated device on a CAN bus.
 ///
 /// The same loop every other kind has: read whatever the handler sent, send a
 /// packet if one is due, wait out the rest of the interval. What differs is
 /// only that each segment is a frame, so a packet in four segments arrives at
 /// the handler as four frames.
+///
+/// # Arguments
+///
+/// * `config`  - The payload's configuration.
+/// * `running` - Cleared to stop it; the function returns soon after.
+/// * `stats`   - Where it counts what it sends and receives.
 pub fn run_can_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
@@ -361,7 +416,8 @@ mod tests {
     use std::time::Duration;
     use tcslibgs::Faults;
 
-    /// Whether an interface is up, from the flags the kernel keeps for it.
+    /// Says whether an interface is up, from the flags the kernel keeps for
+    /// it.
     ///
     /// An interface that exists is not one a frame can go out on: `ip link
     /// add` makes a virtual bus and leaves it down, and a socket bound to a
@@ -369,6 +425,14 @@ mod tests {
     /// `ENETDOWN`. The operational state says nothing either -- a virtual bus
     /// has no carrier and reports "unknown" whether it is up or not -- so
     /// this reads `IFF_UP` itself.
+    ///
+    /// # Arguments
+    ///
+    /// * `interface` - The interface's name.
+    ///
+    /// # Returns
+    ///
+    /// Whether `IFF_UP` is set; false if its flags cannot be read.
     fn is_up(interface: &str) -> bool {
         let Ok(flags) = std::fs::read_to_string(format!(
             "/sys/class/net/{interface}/flags"
@@ -390,8 +454,8 @@ mod tests {
             .find(|name| index_of(name).is_some() && is_up(name))
     }
 
-    /// A device on the given bus, under the given identifier, sending a
-    /// packet every 50 ms.
+    /// Configures a device on the given bus, under the given identifier,
+    /// sending an eight-byte packet every 50 ms.
     ///
     /// The identifier is a parameter rather than a constant because the tests
     /// here run as threads of one process and share the one bus the host has.
@@ -402,6 +466,17 @@ mod tests {
     /// intermittently, nowhere near the cause. So each test that touches the
     /// bus takes an identifier of its own, and the device and the handler
     /// within one test share it, which is how they talk at all.
+    ///
+    /// # Arguments
+    ///
+    /// * `interface` - The bus.
+    /// * `can_id`    - The identifier its frames carry.
+    /// * `triggered` - Whether it answers requests rather than sending on its
+    ///                 own.
+    ///
+    /// # Returns
+    ///
+    /// Its configuration.
     fn device_on(
         interface: &str,
         can_id: u32,
@@ -490,12 +565,24 @@ mod tests {
         assert_eq!(&buf[..got], &[9, 8, 7]);
     }
 
-    /// A member of the bus whose socket is not a bus at all.
+    /// Makes a member of the bus whose socket is not a bus at all.
     ///
     /// For the checks that happen before anything is sent, which need a
     /// member and not a bus. They were written beside the test above and
     /// gated with it, and so ran on no machine that had not been set up by
     /// hand.
+    ///
+    /// # Arguments
+    ///
+    /// * `fd` - Whether it sends CAN FD frames.
+    ///
+    /// # Returns
+    ///
+    /// The member, writing to `/dev/null` under identifier 1.
+    ///
+    /// # Panics
+    ///
+    /// If `/dev/null` cannot be opened.
     fn not_on_a_bus(fd: bool) -> BusMember {
         BusMember {
             // Writable, because the lengths that are not refused go on to be

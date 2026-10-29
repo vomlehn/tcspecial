@@ -67,17 +67,25 @@ impl SimulatedLine {
 /// decision a vehicle makes about a heater, and slow enough to cost nothing.
 const WATCH_EVERY: std::time::Duration = std::time::Duration::from_millis(20);
 
-/// Find the simulated lines of `chip`, where the kernel has any.
+/// Finds the simulated lines of a chip, where the kernel has any.
 ///
-/// `devices` is where to look, given so that a test can hand over a tree of
-/// its own: the scan is the part of this that can be checked without the
-/// module loaded.
+/// What matches the chip is a simulated bank whose `chip_name` file holds
+/// its node's name. The number is not an identity: a simulated chip's node
+/// is numbered as chips appear, exactly as an `i2c-stub` adapter's bus is.
 ///
-/// `chip` is the character device a handler was told to open --
-/// `/dev/gpiochip3` -- and what matches it is a simulated bank whose
-/// `chip_name` file holds that node's name. The number is not an identity: a
-/// simulated chip's node is numbered as chips appear, exactly as an
-/// `i2c-stub` adapter's bus is.
+/// # Arguments
+///
+/// * `devices` - Where to look, given so that a test can hand over a tree
+///               of its own: the scan is the part of this that can be checked
+///               without the module loaded.
+/// * `chip`    - The character device a handler was told to open, such as
+///               `/dev/gpiochip3`.
+/// * `lines`   - The offsets of the lines wanted on it.
+///
+/// # Returns
+///
+/// The wanted lines of the matching bank, or `None` if no bank matches or
+/// `devices` cannot be read.
 pub(crate) fn lines_of(
     devices: &Path,
     chip: &str,
@@ -142,7 +150,14 @@ pub(crate) fn how_to_make_one(chip: &str) -> String {
     )
 }
 
-/// Run a simulated device that moves discrete lines.
+/// Runs a simulated device that moves discrete lines, or watches them
+/// where the vehicle drives them.
+///
+/// # Arguments
+///
+/// * `config`  - The payload's configuration.
+/// * `running` - Cleared to stop it; the function returns soon after.
+/// * `stats`   - Where it counts what it sends and receives.
 pub fn run_gpio_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
@@ -208,7 +223,7 @@ pub fn run_gpio_node(
     }
 }
 
-/// Watch the lines of a chip the vehicle drives -- a heater, a valve -- and
+/// Watches the lines of a chip the vehicle drives -- a heater, a valve -- and
 /// count each time it moves them, as a datum received.
 ///
 /// The vehicle drives them as outputs, and gpio-sim keeps what each line is
@@ -219,6 +234,13 @@ pub fn run_gpio_node(
 ///
 /// Silent -- its panel's button off -- the device is switched off: a move is
 /// counted, as every stand-in counts what arrives, and heats nothing.
+///
+/// # Arguments
+///
+/// * `config`  - The payload's configuration.
+/// * `running` - Cleared to stop it.
+/// * `stats`   - Where each move is counted.
+/// * `lines`   - The chip's lines, from [`lines_of`].
 fn watch_driven_lines(
     config: &PayloadConfig,
     running: &AtomicBool,

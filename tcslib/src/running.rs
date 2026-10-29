@@ -66,7 +66,15 @@ mod counting {
     static ALLOCATOR: Counting = Counting;
 }
 
-/// How many allocations `work` made on this thread.
+/// Counts the allocations `work` makes on this thread.
+///
+/// # Arguments
+///
+/// * `work` - What to run while counting.
+///
+/// # Returns
+///
+/// How many allocations and reallocations it made.
 fn allocations_in(work: impl FnOnce()) -> usize {
     counting::COUNT.with(|count| count.set(0));
     counting::COUNTING.with(|on| on.set(true));
@@ -75,7 +83,15 @@ fn allocations_in(work: impl FnOnce()) -> usize {
     counting::COUNT.with(Cell::get)
 }
 
-/// A port nothing holds.
+/// Finds a UDP port on the loopback address that nothing holds.
+///
+/// # Returns
+///
+/// The port, free when it was looked at.
+///
+/// # Panics
+///
+/// If no port can be bound.
 fn a_free_port() -> u16 {
     UdpSocket::bind("127.0.0.1:0")
         .expect("a port")

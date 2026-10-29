@@ -87,7 +87,11 @@ pub enum Kind {
 }
 
 impl Kind {
-    /// The configuration's own word for this kind.
+    /// Gives the configuration's own word for this kind.
+    ///
+    /// # Returns
+    ///
+    /// The node type, such as `app_payload_veh`.
     pub fn node_type(self) -> &'static str {
         match self {
             Kind::PayloadVeh => "app_payload_veh",
@@ -98,12 +102,19 @@ impl Kind {
         }
     }
 
-    /// Which kind of app this node type is, or `None` for a type that is not
-    /// an app at all.
+    /// Finds which kind of app a node type is.
     ///
     /// The one statement of which types are apps, read by the checking, by the
     /// flight software and by anything else that has to tell one: three
     /// separate lists of five words would be three places to add a sixth.
+    ///
+    /// # Arguments
+    ///
+    /// * `node_type` - The node's `type`.
+    ///
+    /// # Returns
+    ///
+    /// The kind, or `None` for a type that is not an app at all.
     pub fn of(node_type: &str) -> Option<Kind> {
         match node_type {
             "app_payload_veh" => Some(Kind::PayloadVeh),
@@ -131,6 +142,10 @@ impl Kind {
     /// editor it is placed on, and which of `tcspecial::node`'s two families
     /// opens it. `crate::graph::Node::is_payload_type` reads this rather than
     /// listing the app types again.
+    ///
+    /// # Returns
+    ///
+    /// `true` for the two payload-side kinds.
     pub fn is_payload(self) -> bool {
         match self {
             Kind::Pl | Kind::AllPl => true,
@@ -169,6 +184,10 @@ impl Kind {
     ///
     /// What it is for is `app-payload-arg`: see [`Kind::attributes`] and
     /// [`AppParams::arguments`].
+    ///
+    /// # Returns
+    ///
+    /// `true` for every kind but `app_moc_veh`.
     pub fn handles_payload_data(self) -> bool {
         matches!(
             self,
@@ -192,6 +211,10 @@ impl Kind {
     /// Required ones first, which is the order a window asks in: the
     /// executable, then the argument for each stream the kind handles, then
     /// what to do when it stops.
+    ///
+    /// # Returns
+    ///
+    /// Each attribute's name, with whether it is required.
     pub fn attributes(self) -> &'static [(&'static str, bool)] {
         match self {
             Kind::PayloadVeh | Kind::Pl => &[
@@ -255,7 +278,7 @@ pub struct AppParams {
 }
 
 impl AppParams {
-    /// Where the application is, with `~` and `$HOME` expanded.
+    /// Finds where the application is, with `~` and `$HOME` expanded.
     ///
     /// What tcspecial executes. Called when it goes to start the program and
     /// not when the configuration is read, because what `$HOME` stands for is
@@ -263,6 +286,14 @@ impl AppParams {
     ///
     /// The expansion is [`expanded`]'s, which is a shell's for the two forms
     /// it covers and nothing else's.
+    ///
+    /// # Returns
+    ///
+    /// The path tcspecial executes.
+    ///
+    /// # Errors
+    ///
+    /// What [`expanded`] refuses, naming the node.
     pub fn executable_path(&self) -> Result<PathBuf, String> {
         let home = std::env::var("HOME").ok();
         expanded(&self.executable, home.as_deref())
@@ -270,7 +301,7 @@ impl AppParams {
             .map_err(|why| format!("\"{}\": executable: {why}", self.name))
     }
 
-    /// The arguments the program is run with, in order.
+    /// Lists the arguments the program is run with, in order.
     ///
     /// The node's name first, for every kind: a program that is three nodes of
     /// one configuration is three processes which otherwise could not say
@@ -283,6 +314,10 @@ impl AppParams {
     /// whose meaning depends on which attributes somebody wrote is a list a
     /// program has to count before it can read, and it would count wrongly on
     /// the day it mattered.
+    ///
+    /// # Returns
+    ///
+    /// The node's name, then each stream's argument the kind takes.
     pub fn arguments(&self) -> Vec<String> {
         let mut said = vec![self.name.clone()];
         said.extend(self.payload_arg.clone());
@@ -291,13 +326,11 @@ impl AppParams {
     }
 }
 
-/// `executable` as a path, with `~` and `$HOME` expanded as a shell would.
+/// Expands `~` and `$HOME` in an executable's path as a shell would.
 ///
-/// `home` is what both stand for, which is `HOME` in the environment of
-/// whatever is about to run the program. `None` is an environment that has
-/// none, and a value needing one is then refused rather than guessed at: a
-/// relative path made from an empty home is a path to somewhere else, and an
-/// app node started from it would be a program nobody chose.
+/// A value needing a home where there is none is refused rather than guessed
+/// at: a relative path made from an empty home is a path to somewhere else,
+/// and an app node started from it would be a program nobody chose.
 ///
 /// Two forms, which is what a configuration needs and is where this stops:
 ///
@@ -310,6 +343,22 @@ impl AppParams {
 /// `~somebody`, there being no way to tell which was meant; and no other
 /// variable is looked up, a configuration that wanted one being a
 /// configuration that would behave differently on two vehicles.
+///
+/// # Arguments
+///
+/// * `executable` - The `executable` attribute as the file wrote it.
+/// * `home`       - What both forms stand for, which is `HOME` in the
+///                  environment of whatever is about to run the program;
+///                  `None` for an environment that has none.
+///
+/// # Returns
+///
+/// The path, expanded.
+///
+/// # Errors
+///
+/// A message for `~` followed by a name, and for a value needing a home
+/// when `home` is `None` or empty.
 pub fn expanded(
     executable: &str,
     home: Option<&str>,
@@ -361,7 +410,7 @@ pub fn attributes_of(
     Kind::of(node_type).map(Kind::attributes)
 }
 
-/// What this app node says, or what is wrong with what it says.
+/// Reads what this app node says, or what is wrong with what it says.
 ///
 /// Every attribute is checked, including the ones that are not this kind's:
 /// one that nothing reads is refused rather than ignored, because an app node
@@ -370,6 +419,22 @@ pub fn attributes_of(
 /// two words is the only way anybody would find it. An `app-moc-arg` on a kind
 /// that handles no MOC data is the same mistake with a different word: an
 /// argument written for a program that will not be given it.
+///
+/// # Arguments
+///
+/// * `what`       - The node's name, for the messages and the arguments.
+/// * `node_type`  - The node's `type`.
+/// * `attributes` - The node's attributes as the file states them.
+///
+/// # Returns
+///
+/// The node's program, its arguments and whether it is restarted.
+///
+/// # Errors
+///
+/// A message naming the node for a type that is not an app's, an attribute
+/// the kind does not take, a missing or empty `executable`, a missing
+/// argument the kind requires, and a `restart` [`Restart::of`] refuses.
 pub fn params_of(
     what: &str,
     node_type: &str,
@@ -479,7 +544,15 @@ pub fn params_of(
 mod tests {
     use super::*;
 
-    /// What a node says, as a graph holds it.
+    /// Makes what a node says, as a graph holds it.
+    ///
+    /// # Arguments
+    ///
+    /// * `attributes` - Each attribute, with its value as written.
+    ///
+    /// # Returns
+    ///
+    /// The attributes, by name.
     fn said(attributes: &[(&str, &str)]) -> BTreeMap<String, Scalar> {
         attributes
             .iter()

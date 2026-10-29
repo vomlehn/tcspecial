@@ -7,6 +7,19 @@
 
 use std::process::Command;
 
+/// Runs tcspecial.
+///
+/// # Arguments
+///
+/// * `args` - Its command-line arguments.
+///
+/// # Returns
+///
+/// Whether it exited successfully, and what it wrote on stderr.
+///
+/// # Panics
+///
+/// If tcspecial cannot be run.
 fn tcspecial(args: &[&str]) -> (bool, String) {
     let ran = Command::new(env!("CARGO_BIN_EXE_tcspecial"))
         .args(args)

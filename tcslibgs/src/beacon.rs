@@ -73,8 +73,19 @@ pub struct Beacon {
 }
 
 impl Beacon {
-    /// A beacon from a start nobody commanded, speaking the interface this
-    /// build was generated from.
+    /// Makes a beacon from a start nobody commanded, speaking the interface
+    /// this build was generated from.
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence`   - Which beacon this is, counted from one.
+    /// * `version`    - The version of the build that sends it.
+    /// * `digest`     - The digest of the configuration the sender read.
+    /// * `generation` - How many times tcspecial has started on this vehicle.
+    ///
+    /// # Returns
+    ///
+    /// The beacon, with `commanded_restart` clear.
     pub fn new(
         sequence: u32,
         version: ConfigVersion,
@@ -91,7 +102,16 @@ impl Beacon {
         }
     }
 
-    /// This beacon, saying whether the ground commanded this start.
+    /// Says whether the ground commanded this start.
+    ///
+    /// # Arguments
+    ///
+    /// * `commanded_restart` - Whether an armed RESTART was taken by the
+    ///                         start before this one.
+    ///
+    /// # Returns
+    ///
+    /// This beacon, with `commanded_restart` set to the value given.
     pub fn commanded_restart(self, commanded_restart: bool) -> Self {
         Self {
             commanded_restart,
@@ -99,11 +119,24 @@ impl Beacon {
         }
     }
 
-    /// The beacon a datagram holds, or why it holds none.
+    /// Reads the beacon a datagram holds.
     ///
     /// A datagram must be a beacon and nothing else: one of any other length
     /// is refused rather than read as far as a beacon goes, so that something
     /// else sending to the beacon port is seen for what it is.
+    ///
+    /// # Arguments
+    ///
+    /// * `datagram` - The datagram received on the beacon port.
+    ///
+    /// # Returns
+    ///
+    /// The beacon it holds.
+    ///
+    /// # Errors
+    ///
+    /// [`BeaconError::Length`] if the datagram is not [`BEACON_BYTES`] long,
+    /// and [`BeaconError::Packet`] if it does not unpack as a beacon.
     pub fn read(datagram: &[u8]) -> Result<Beacon, BeaconError> {
         if datagram.len() != BEACON_BYTES {
             return Err(BeaconError::Length(datagram.len()));
@@ -151,6 +184,11 @@ pub struct BeaconPacker {
 }
 
 impl BeaconPacker {
+    /// Makes a packer, with its buffer and packet, ready to pack beacons.
+    ///
+    /// # Returns
+    ///
+    /// The packer.
     pub fn new() -> Self {
         Self {
             codec: Codec::for_packet::<beacon_packet::Beacon>(),
@@ -158,7 +196,20 @@ impl BeaconPacker {
         }
     }
 
-    /// `beacon`, packed: [`BEACON_BYTES`] bytes in the packer's own buffer.
+    /// Packs a beacon into the packer's own buffer.
+    ///
+    /// # Arguments
+    ///
+    /// * `beacon` - The beacon to pack.
+    ///
+    /// # Returns
+    ///
+    /// The packed beacon: [`BEACON_BYTES`] bytes in the packer's buffer,
+    /// good until the next call.
+    ///
+    /// # Panics
+    ///
+    /// Never in practice: every field is a fixed size and every value fits.
     pub fn pack(&mut self, beacon: &Beacon) -> &[u8] {
         self.packet.sequence = beacon.sequence;
         self.packet.major = beacon.version.major;
@@ -222,6 +273,11 @@ mod tests {
         ConfigVersion::of_text("1.2.3").expect("1.2.3 is a version")
     }
 
+    /// Gives the digest the tests' beacons carry.
+    ///
+    /// # Returns
+    ///
+    /// A fixed, recognizable digest.
     fn digest() -> ConfigDigest {
         ConfigDigest([
             0xd4, 0x1d, 0x8c, 0xd9, 0x8f, 0x00, 0xb2, 0x04, 0xe9, 0x80, 0x09,

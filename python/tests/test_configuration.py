@@ -21,7 +21,15 @@ PING = ROOT / "examples" / "ping" / "ping.xml"
 
 
 def written(text):
-    """A configuration in a file of its own."""
+    """A configuration in a file of its own.
+
+    Args:
+        text: The XML inside the ``configuration`` element.
+
+    Returns:
+        A pair: the temporary directory holding the file, which removes it
+        when cleaned up, and the file's path.
+    """
     directory = tempfile.TemporaryDirectory()
     path = Path(directory.name) / "vehicle.xml"
     path.write_text(f"<configuration>{text}</configuration>")

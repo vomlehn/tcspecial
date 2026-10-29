@@ -127,13 +127,27 @@ impl From<EndpointConfigError> for TcsError {
 // Domain types -- what a caller gets back
 // ---------------------------------------------------------------------------
 
-/// What tcspecial opens to reach a payload, from where it is and what kind of
-/// link it is on.
+/// Works out what tcspecial opens to reach a payload, from where it is and
+/// what kind of link it is on.
 ///
 /// The same two facts whichever language described the payload: a payload
 /// configuration states them as attributes of one payload, and an endpoint
-/// configuration splits them between an endpoint and its group. `what` is the
-/// payload's name, for the complaints.
+/// configuration splits them between an endpoint and its group.
+///
+/// # Arguments
+///
+/// * `what`     - The payload's name, for the complaints.
+/// * `location` - Where the payload is.
+/// * `kind`     - The kind of link it is on, with that kind's terms.
+///
+/// # Returns
+///
+/// The endpoint tcspecial opens.
+///
+/// # Errors
+///
+/// A message naming the payload when the location is not one the kind of
+/// link puts a payload at, such as a device file for a CAN payload.
 pub(crate) fn endpoint_of(
     what: &str,
     location: &EndpointLocation,
@@ -278,7 +292,11 @@ pub enum GroupKind {
 }
 
 impl GroupKind {
-    /// The name this type goes by in a configuration file.
+    /// Names this type as a configuration file does.
+    ///
+    /// # Returns
+    ///
+    /// The type's name, such as `serial` or `i2c`.
     pub fn type_name(&self) -> &'static str {
         match self {
             GroupKind::Serial(_) => "serial",
@@ -292,11 +310,13 @@ impl GroupKind {
         }
     }
 
-    /// The stream payload protocol attributes, if this group has them.
+    /// Gives the stream payload protocol attributes, if this group has them.
     ///
-    /// `None` for the bus types: a master clocks exactly as many bytes as it
-    /// asks for, so a transfer is already bounded and needs no rule for where
-    /// a read ends.
+    /// # Returns
+    ///
+    /// The attributes, or `None` for the bus types: a master clocks exactly
+    /// as many bytes as it asks for, so a transfer is already bounded and
+    /// needs no rule for where a read ends.
     pub fn stream(&self) -> Option<&StreamParams> {
         match self {
             GroupKind::Serial(s) => Some(&s.stream),
@@ -367,7 +387,11 @@ impl LengthPrefix {
     pub const ALL: [LengthPrefix; 3] =
         [LengthPrefix::U8, LengthPrefix::U16Be, LengthPrefix::U16Le];
 
-    /// How this prefix is spelled in a configuration file.
+    /// Spells this prefix as a configuration file does.
+    ///
+    /// # Returns
+    ///
+    /// `u8`, `u16be` or `u16le`.
     pub fn as_str(self) -> &'static str {
         match self {
             LengthPrefix::U8 => "u8",
@@ -376,7 +400,11 @@ impl LengthPrefix {
         }
     }
 
-    /// How many bytes the prefix is.
+    /// Says how many bytes the prefix is.
+    ///
+    /// # Returns
+    ///
+    /// The prefix's width in bytes.
     pub fn width(self) -> usize {
         match self {
             LengthPrefix::U8 => 1,
@@ -384,8 +412,20 @@ impl LengthPrefix {
         }
     }
 
-    /// The length a prefix gives, read from the first [`LengthPrefix::width`]
-    /// bytes of `bytes`, which must hold at least that many.
+    /// Reads the length a prefix gives.
+    ///
+    /// # Arguments
+    ///
+    /// * `bytes` - The frame so far, holding at least
+    ///             [`LengthPrefix::width`] bytes.
+    ///
+    /// # Returns
+    ///
+    /// The length the prefix gives.
+    ///
+    /// # Panics
+    ///
+    /// If `bytes` is shorter than the prefix.
     pub fn length(self, bytes: &[u8]) -> usize {
         match self {
             LengthPrefix::U8 => bytes[0] as usize,
@@ -683,7 +723,23 @@ impl<'de> Deserialize<'de> for Scalar {
 // Validation -- wire types to domain types
 // ---------------------------------------------------------------------------
 
-/// Apply the rules governing a stream section.
+/// Applies the rules governing a stream section.
+///
+/// # Arguments
+///
+/// * `group` - The group's name, for the messages.
+/// * `s`     - The stream terms as the file states them.
+///
+/// # Returns
+///
+/// The stream's settings.
+///
+/// # Errors
+///
+/// A missing or zero `max_length`; a timeout or terminator that does not
+/// read, or a terminator longer than `max_length`; a length prefix that
+/// does not read, comes with terminators or without a timeout, or does not
+/// fit in `max_length`; and a stream with no condition to end a read.
 pub(crate) fn validate_stream(
     group: &str,
     s: StreamTerms,
@@ -799,7 +855,20 @@ pub(crate) fn validate_stream(
     })
 }
 
-/// Which length prefix a file's word names.
+/// Reads which length prefix a file's word names.
+///
+/// # Arguments
+///
+/// * `group` - The group's name, for the message.
+/// * `s`     - The `length_prefix` attribute as the file wrote it.
+///
+/// # Returns
+///
+/// The prefix.
+///
+/// # Errors
+///
+/// [`EndpointConfigError::BadGroupValue`] for a word that names none.
 fn parse_length_prefix(
     group: &str,
     s: &Scalar,
@@ -825,6 +894,16 @@ fn parse_length_prefix(
 // Scalar parsers
 // ---------------------------------------------------------------------------
 
+/// Makes the error for a value a group may not have.
+///
+/// # Arguments
+///
+/// * `group`   - The group's name.
+/// * `message` - What is wrong with the value.
+///
+/// # Returns
+///
+/// [`EndpointConfigError::BadGroupValue`].
 pub(crate) fn bad(group: &str, message: &str) -> EndpointConfigError {
     EndpointConfigError::BadGroupValue {
         group: group.to_string(),
@@ -832,6 +911,22 @@ pub(crate) fn bad(group: &str, message: &str) -> EndpointConfigError {
     }
 }
 
+/// Requires a group attribute its kind cannot do without.
+///
+/// # Arguments
+///
+/// * `group` - The group's name.
+/// * `kind`  - The group's kind, as a file names it.
+/// * `field` - The attribute's name.
+/// * `value` - The attribute, if the file gave it.
+///
+/// # Returns
+///
+/// The attribute.
+///
+/// # Errors
+///
+/// [`EndpointConfigError::MissingGroupField`] if the file did not give it.
 pub(crate) fn require<'a, T>(
     group: &str,
     kind: &'static str,
@@ -845,6 +940,22 @@ pub(crate) fn require<'a, T>(
     })
 }
 
+/// Refuses a group attribute its kind does not use.
+///
+/// # Arguments
+///
+/// * `group`   - The group's name.
+/// * `kind`    - The group's kind, as a file names it.
+/// * `field`   - The attribute's name.
+/// * `present` - Whether the file gave it.
+///
+/// # Returns
+///
+/// `Ok(())` when it was not given.
+///
+/// # Errors
+///
+/// [`EndpointConfigError::UnusedGroupField`] when it was.
 fn reject_unused(
     group: &str,
     kind: &'static str,
@@ -862,10 +973,19 @@ fn reject_unused(
     }
 }
 
-/// Every type-specific group attribute, paired with whether the file gave it.
+/// Lists every type-specific group attribute, paired with whether the file
+/// gave it.
 ///
 /// Listed in one place so that adding an attribute to one type cannot quietly
 /// make it accepted by the others.
+///
+/// # Arguments
+///
+/// * `g` - The terms as the file states them.
+///
+/// # Returns
+///
+/// Each attribute's name and whether it was given.
 fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 32] {
     [
         // Serial.
@@ -914,7 +1034,7 @@ fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 32] {
     ]
 }
 
-/// A term of a link in these, apart from the ones `own` names.
+/// Finds a term of a link in these, apart from the ones `own` names.
 ///
 /// For the two kinds that are not on a link -- a network address and a plain
 /// device file -- which have no rules of their own to refuse what belongs to
@@ -922,6 +1042,15 @@ fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 32] {
 /// [`reject_foreign_fields`], and these two were left ignoring them: a device
 /// payload could state a data rate, or a sensor's channels, and be read as a
 /// device payload that said nothing of the sort.
+///
+/// # Arguments
+///
+/// * `g`   - The terms as the file states them.
+/// * `own` - The terms the node's kind takes.
+///
+/// # Returns
+///
+/// The name of the first term given that is not the kind's own, or `None`.
 pub(crate) fn a_link_term(g: &LinkTerms, own: &[&str]) -> Option<&'static str> {
     type_specific_fields(g)
         .into_iter()
@@ -929,10 +1058,25 @@ pub(crate) fn a_link_term(g: &LinkTerms, own: &[&str]) -> Option<&'static str> {
         .map(|(field, _)| field)
 }
 
-/// Reject any attribute that belongs to some other type of group.
+/// Rejects any attribute that belongs to some other type of group.
 ///
 /// An attribute that does not apply is an error rather than being ignored, so
 /// that a misspelled or misplaced attribute is reported where it was written.
+///
+/// # Arguments
+///
+/// * `group` - The group's name.
+/// * `kind`  - The group's kind, as a file names it.
+/// * `g`     - The terms as the file states them.
+/// * `own`   - The terms the kind takes.
+///
+/// # Returns
+///
+/// `Ok(())` when every term given is the kind's own.
+///
+/// # Errors
+///
+/// [`EndpointConfigError::UnusedGroupField`] for the first that is not.
 pub(crate) fn reject_foreign_fields(
     group: &str,
     kind: &'static str,
@@ -971,11 +1115,26 @@ pub(crate) fn parse_u32(
         .map_err(|why| bad(group, &format!("{field}: {why}")))
 }
 
-/// Parse a flag written `true` or `false`.
+/// Parses a flag written `true` or `false`, in either case.
 ///
 /// A YAML 1.1 reader folds `yes`, `no`, `on`, and `off` to a boolean before
 /// this sees them, and [`Scalar`] puts the result back as `true` or `false`,
 /// so those spellings work too without being named here.
+///
+/// # Arguments
+///
+/// * `group` - The group's name, for the message.
+/// * `field` - The attribute's name, for the message.
+/// * `s`     - The attribute, if the file gave it.
+///
+/// # Returns
+///
+/// The flag, or `None` when it was not given.
+///
+/// # Errors
+///
+/// [`EndpointConfigError::BadGroupValue`] for anything but `true` or
+/// `false`.
 pub(crate) fn parse_flag(
     group: &str,
     field: &str,
@@ -992,7 +1151,7 @@ pub(crate) fn parse_flag(
     }
 }
 
-/// Parse a timeout: a length of time, or the word `none`.
+/// Parses a timeout: a length of time, or the word `none`.
 ///
 /// Every value [`crate::graph::parse_interval`] takes, in every unit it takes
 /// -- that being the one grammar for a length of time in a configuration, so
@@ -1009,6 +1168,20 @@ pub(crate) fn parse_flag(
 ///
 /// Nought is refused, as it is of any interval: a read that times out at once
 /// reads nothing, and `none` is the way to ask for a read that is waited out.
+///
+/// # Arguments
+///
+/// * `group` - The group's name, for the message.
+/// * `s`     - The timeout as the file wrote it.
+///
+/// # Returns
+///
+/// The timeout, or `None` for the word `none`.
+///
+/// # Errors
+///
+/// [`EndpointConfigError::BadGroupValue`] for anything that is neither an
+/// interval [`crate::graph::parse_interval`] takes nor `none`.
 pub(crate) fn parse_timeout(
     group: &str,
     s: &Scalar,

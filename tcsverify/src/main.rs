@@ -96,6 +96,14 @@ const TYPES_FLAG: &str = "--types=";
 /// configuration and nothing to choose about it.
 const DIGEST_FLAG: &str = "--digest";
 
+/// Reads the command line, checks the files it names and prints what it
+/// found, and each configuration's digest where `--digest` asks for it.
+///
+/// # Returns
+///
+/// The exit status `USAGE` describes: 0 when no error was printed, 1 when
+/// one was or a digest could not be taken, 2 when the command line is not
+/// one of its shapes or the output cannot be written.
 fn main() -> ExitCode {
     let mut files: Vec<PathBuf> = Vec::new();
     let mut limits = tcsverify::Limits::EVERYTHING;
@@ -223,7 +231,8 @@ fn main() -> ExitCode {
     ExitCode::from(u8::try_from(report.status()).unwrap_or(1))
 }
 
-/// The configurations among the pathnames: every one but the simulator file.
+/// Picks the configurations among the pathnames: every one but the simulator
+/// file.
 ///
 /// One pathname is a configuration. Two are a configuration and its simulator
 /// file, and three are one configuration written twice and their simulator
@@ -234,6 +243,14 @@ fn main() -> ExitCode {
 /// nothing to digest it over, and it does not fly: the digest exists so that
 /// the vehicle and the ground can prove they read the same configuration, and
 /// nothing aboard reads a simulator file.
+///
+/// # Arguments
+///
+/// * `files` - The pathnames on the command line.
+///
+/// # Returns
+///
+/// The first of one, or all but the last of two or more.
 fn configurations(files: &[PathBuf]) -> &[PathBuf] {
     match files.len() {
         0 => &[],
@@ -242,7 +259,19 @@ fn configurations(files: &[PathBuf]) -> &[PathBuf] {
     }
 }
 
-/// What `--error-limit=` was given, as how many to list: `None` for every one.
+/// Reads what `--error-limit=` was given, as how many to list.
+///
+/// # Arguments
+///
+/// * `value` - What follows the `=`.
+///
+/// # Returns
+///
+/// The limit, or `None` for "unlimited", which is every one.
+///
+/// # Errors
+///
+/// A sentence saying what the limit may be, if it is anything else.
 fn error_limit(value: &str) -> Result<Option<usize>, String> {
     if value == "unlimited" {
         return Ok(None);
@@ -255,7 +284,19 @@ fn error_limit(value: &str) -> Result<Option<usize>, String> {
     })
 }
 
-/// What `--warnings=` was given.
+/// Reads what `--warnings=` was given.
+///
+/// # Arguments
+///
+/// * `value` - What follows the `=`: "on", "off" or "errors".
+///
+/// # Returns
+///
+/// What is done with warnings.
+///
+/// # Errors
+///
+/// A sentence saying what it may be, if it is anything else.
 fn warnings(value: &str) -> Result<tcsverify::Warnings, String> {
     use tcsverify::Warnings;
 
@@ -269,8 +310,19 @@ fn warnings(value: &str) -> Result<tcsverify::Warnings, String> {
     }
 }
 
-/// Whether two configurations are one XML file and one YAML file, in either
-/// order, which is what comparing two spellings of one configuration is.
+/// Checks that two configurations are one XML file and one YAML file, in
+/// either order, which is what comparing two spellings of one configuration
+/// is.
+///
+/// # Arguments
+///
+/// * `first`  - One configuration.
+/// * `second` - The other.
+///
+/// # Errors
+///
+/// A sentence naming them if they are not one of each, or naming a file
+/// whose name says neither format.
 fn one_of_each(
     first: &std::path::Path,
     second: &std::path::Path,

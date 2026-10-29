@@ -65,9 +65,20 @@ class Beacon:
 
     @staticmethod
     def read(datagram):
-        """The beacon a datagram holds, or ``BeaconError`` saying why it holds
-        none. A datagram of any length but a beacon's is refused rather than
-        read as far as a beacon goes."""
+        """The beacon a datagram holds.
+
+        A datagram of any length but a beacon's is refused rather than read as
+        far as a beacon goes.
+
+        Args:
+            datagram: The bytes that arrived on the beacon link.
+
+        Returns:
+            The :class:`Beacon`.
+
+        Raises:
+            BeaconError: The datagram holds no beacon; the message says why.
+        """
         if len(datagram) != BEACON_BYTES:
             raise BeaconError(
                 f"{len(datagram)} bytes, where a beacon is {BEACON_BYTES}: "
@@ -91,7 +102,11 @@ class Beacon:
         )
 
     def to_bytes(self):
-        """This beacon as it goes on the link."""
+        """This beacon as it goes on the link.
+
+        Returns:
+            The beacon packed as tcspecial packs it, ``BEACON_BYTES`` long.
+        """
         major, minor, patch = self.version
         return bytes(
             _packet.Beacon(

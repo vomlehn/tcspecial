@@ -5,8 +5,16 @@
 //! which `crate::graph::reach` reads with the rules of
 //! `crate::endpoint_config`; there is nothing of its own to check.
 
-/// Whether the file at `path` is a stand-in: a pseudo-terminal, which is
+/// Judges whether a device file is a stand-in: a pseudo-terminal, which is
 /// what tcssim makes for a device-file payload. See [`crate::simulate`].
+///
+/// # Arguments
+///
+/// * `path` - The device file's path, from the node's `path`.
+///
+/// # Returns
+///
+/// The judgement, with what to change if it is not a stand-in.
 pub fn judged(path: &str) -> crate::simulate::Judged {
     crate::simulate::pseudo_terminal(
         path,

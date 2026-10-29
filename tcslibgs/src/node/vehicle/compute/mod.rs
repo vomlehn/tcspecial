@@ -39,10 +39,14 @@ pub const VALUE_BYTES: usize = 4;
 /// nothing at all.
 pub const MICRO_KELVIN: f64 = 1_000_000.0;
 
-/// The coldest and the hottest a value can say, in kelvin.
+/// Gives the coldest and the hottest a value can say, in kelvin.
 ///
 /// Said out loud so that a message can name it and a tool can ask: these are
 /// the ends of [`micro_kelvin`], which is the one place the range is decided.
+///
+/// # Returns
+///
+/// The coldest, then the hottest.
 pub fn kelvin_range() -> (f64, f64) {
     (
         f64::from(i32::MIN) / MICRO_KELVIN,
@@ -50,8 +54,7 @@ pub fn kelvin_range() -> (f64, f64) {
     )
 }
 
-/// A temperature as the count of micro-kelvin a value carries, or why it
-/// cannot be one.
+/// Turns a temperature into the count of micro-kelvin a value carries.
 ///
 /// The one place the range of a value is decided, and everything that turns a
 /// number into a temperature comes here: a reading on its way onto a link, a
@@ -72,6 +75,19 @@ pub fn kelvin_range() -> (f64, f64) {
 /// makes it matter: a vote sorts its readings, and NaN compares as neither
 /// less nor greater, so a sort that met one would order the readings by where
 /// they happened to lie and the middle one would be the middle of nothing.
+///
+/// # Arguments
+///
+/// * `number` - The temperature in kelvin.
+///
+/// # Returns
+///
+/// The count of micro-kelvin, rounded to the nearest.
+///
+/// # Errors
+///
+/// A message naming the number for a NaN or an infinity, or a temperature
+/// outside [`kelvin_range`].
 pub fn micro_kelvin(number: f64) -> Result<i32, String> {
     if !number.is_finite() {
         return Err(format!(
@@ -128,13 +144,26 @@ pub fn as_value(number: f64) -> Result<Vec<u8>, String> {
     Ok(value_bytes(number)?.to_vec())
 }
 
-/// The same, as the four bytes themselves, allocating nothing: what a
-/// computation aboard makes a value with, once the vehicle is running.
+/// Makes a value as [`as_value`] does, as the four bytes themselves,
+/// allocating nothing: what a computation aboard makes a value with, once the
+/// vehicle is running.
+///
+/// # Arguments
+///
+/// * `number` - The temperature in kelvin.
+///
+/// # Returns
+///
+/// The value's bytes, most significant first.
+///
+/// # Errors
+///
+/// What [`micro_kelvin`] refuses.
 pub fn value_bytes(number: f64) -> Result<[u8; VALUE_BYTES], String> {
     Ok(micro_kelvin(number)?.to_be_bytes())
 }
 
-/// A value that arrived, as a number of kelvin.
+/// Reads a value that arrived as a number of kelvin.
 ///
 /// Exactly four bytes, and every four bytes are a value: a count of
 /// micro-kelvin is a number whatever the bits say, so the width is the whole
@@ -146,6 +175,19 @@ pub fn value_bytes(number: f64) -> Result<[u8; VALUE_BYTES], String> {
 /// -- a sensor's raw bytes delivered where a conversion's output was meant, or
 /// a node whose output is a decision -- and taking four of them would be a
 /// temperature made of whatever was there.
+///
+/// # Arguments
+///
+/// * `data` - The value's bytes as they arrived.
+/// * `what` - What the value is, for the message.
+///
+/// # Returns
+///
+/// The temperature in kelvin.
+///
+/// # Errors
+///
+/// A message when `data` is not [`VALUE_BYTES`] long.
 pub fn from_value(data: &[u8], what: &str) -> Result<f64, String> {
     let bytes: [u8; VALUE_BYTES] = data.try_into().map_err(|_| {
         format!(
@@ -158,7 +200,7 @@ pub fn from_value(data: &[u8], what: &str) -> Result<f64, String> {
     Ok(f64::from(i32::from_be_bytes(bytes)) / MICRO_KELVIN)
 }
 
-/// Whether what this computation produces is a value.
+/// Tells whether what this computation produces is a value.
 ///
 /// Three of the four are: a conversion makes one out of a part's counts, a
 /// vote makes one out of several, and a program's answer is read as one. A
@@ -170,6 +212,15 @@ pub fn from_value(data: &[u8], what: &str) -> Result<f64, String> {
 /// them apart is the configuration. Not the width -- every four bytes are a
 /// value, so a decision of four characters would read as a temperature, which
 /// is the one guess this exists to avoid.
+///
+/// # Arguments
+///
+/// * `function` - The computation's `function`.
+///
+/// # Returns
+///
+/// `true` for `to_kelvin`, `vote` and `process`; `false` for `hysteresis`
+/// and for a name that is not a computation.
 pub fn result_is_a_value(function: &str) -> bool {
     match function {
         "to_kelvin" | "vote" | "process" => true,
@@ -181,12 +232,21 @@ pub fn result_is_a_value(function: &str) -> bool {
     }
 }
 
-/// Whether what this node sends is a value.
+/// Tells whether what this node sends is a value.
 ///
 /// Only a computation makes one, and only three of the four: see
 /// [`result_is_a_value`]. Everything else sends what it was given or what its
 /// part produced -- a sensor's own bytes, a log record, whatever a program
 /// wrote -- and none of that is a number in this form.
+///
+/// # Arguments
+///
+/// * `node_type`  - The node's type.
+/// * `attributes` - The node's attributes, which name its function.
+///
+/// # Returns
+///
+/// `true` for a compute node whose function makes a value.
 pub fn node_sends_a_value(
     node_type: &str,
     attributes: &BTreeMap<String, Scalar>,
@@ -208,13 +268,27 @@ pub fn as_text(number: f64) -> String {
     format!("{number}")
 }
 
-/// And a number a program wrote, as a number of kelvin.
+/// Reads a number a program wrote as a number of kelvin.
 ///
 /// Held to the same range as a reading, by [`micro_kelvin`], because what is
 /// read here becomes one: a program's answer goes straight onto a link, and
 /// an operator's setpoint or band is compared against readings that cannot
 /// leave that range. A number outside it is told so when it is sent rather
 /// than carried as far as the arithmetic and lost there.
+///
+/// # Arguments
+///
+/// * `text` - The number as written.
+/// * `what` - What the number is, for the messages.
+///
+/// # Returns
+///
+/// The temperature in kelvin.
+///
+/// # Errors
+///
+/// A message for text that is not a number, and for what
+/// [`micro_kelvin`] refuses.
 pub fn from_text(text: &str, what: &str) -> Result<f64, String> {
     let said = text.trim();
     let number: f64 = said
@@ -242,7 +316,19 @@ pub enum Format {
 }
 
 impl Format {
-    /// The format this name asks for.
+    /// Reads the format a `format` attribute names.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The attribute as the file wrote it.
+    ///
+    /// # Returns
+    ///
+    /// The format.
+    ///
+    /// # Errors
+    ///
+    /// A message listing the formats, for a name that is none of them.
     pub fn of(name: &str) -> Result<Format, String> {
         match name {
             "i16_be" => Ok(Format::I16Be),
@@ -256,7 +342,11 @@ impl Format {
         }
     }
 
-    /// How many bytes a reading takes.
+    /// Says how many bytes a reading takes.
+    ///
+    /// # Returns
+    ///
+    /// The reading's width in bytes.
     pub fn width(self) -> usize {
         match self {
             Format::U24Be => 3,
@@ -319,7 +409,11 @@ pub enum Algorithm {
 }
 
 impl Algorithm {
-    /// The word a file uses for it.
+    /// Names the algorithm as a file does.
+    ///
+    /// # Returns
+    ///
+    /// `median` or `closest_mean`.
     pub fn spelling(&self) -> &'static str {
         match self {
             Algorithm::Median => "median",
@@ -327,7 +421,19 @@ impl Algorithm {
         }
     }
 
-    /// What a file said, or what is wrong with it.
+    /// Reads the algorithm a file's `algorithm` names.
+    ///
+    /// # Arguments
+    ///
+    /// * `said` - The attribute as the file wrote it.
+    ///
+    /// # Returns
+    ///
+    /// The algorithm.
+    ///
+    /// # Errors
+    ///
+    /// A message describing the two algorithms, for a word that is neither.
     pub fn of(said: &str) -> Result<Algorithm, String> {
         match said.trim() {
             "median" => Ok(Algorithm::Median),
@@ -375,7 +481,11 @@ pub enum Computation {
 }
 
 impl Computation {
-    /// What this computation is called in a configuration file.
+    /// Names this computation as a configuration file does.
+    ///
+    /// # Returns
+    ///
+    /// Its `function`, such as `to_kelvin`.
     pub fn function(&self) -> &'static str {
         match self {
             Computation::ToKelvin(_) => "to_kelvin",
@@ -391,7 +501,7 @@ pub fn functions() -> &'static str {
     "to_kelvin, vote, hysteresis, or process"
 }
 
-/// What a computation is told, by name.
+/// Lists what a computation is told, by name.
 ///
 /// The list every computation is held to: `params_of` refuses an attribute
 /// that is not on it, and this is the same list said out loud so that a tool
@@ -401,7 +511,15 @@ pub fn functions() -> &'static str {
 /// be a panel filling in a field the checking then refuses.
 ///
 /// `function` is on every list, it being how a node says which computation it
-/// is. `None` for a name that is not a computation.
+/// is.
+///
+/// # Arguments
+///
+/// * `function` - The computation's `function`.
+///
+/// # Returns
+///
+/// The attributes it takes, or `None` for a name that is not a computation.
 pub fn attributes_of(function: &str) -> Option<&'static [&'static str]> {
     match function {
         "to_kelvin" => Some(&["function", "format", "scale", "offset"]),
@@ -412,7 +530,24 @@ pub fn attributes_of(function: &str) -> Option<&'static [&'static str]> {
     }
 }
 
-/// What this compute node computes, or what is wrong with what it says.
+/// Reads what this compute node computes, or what is wrong with what it says.
+///
+/// # Arguments
+///
+/// * `what`       - The node's name, for the messages.
+/// * `attributes` - The node's attributes as the file states them.
+///
+/// # Returns
+///
+/// The computation and its parameters.
+///
+/// # Errors
+///
+/// A message naming the node for a missing or unknown `function`, an
+/// attribute the computation does not take, and a parameter that is missing
+/// or wrong for it: a format or algorithm it does not know, a scale of
+/// nought, a vote over fewer than three inputs or over one twice, a
+/// half-band that is not positive, or a timeout that is not an interval.
 pub fn params_of(
     what: &str,
     attributes: &BTreeMap<String, Scalar>,
@@ -616,12 +751,25 @@ pub fn params_of(
     }
 }
 
-/// A number an attribute says, or what is wrong with it.
+/// Reads a number an attribute says.
 ///
 /// Required, because every parameter these computations take is one the
 /// arithmetic cannot be done without. A scale of nought or an absent setpoint
 /// is not a default worth inventing -- it is a configuration that has not said
 /// what it wants, and saying so is better than averaging against zero.
+///
+/// # Arguments
+///
+/// * `attributes` - The node's attributes.
+/// * `name`       - The attribute's name.
+///
+/// # Returns
+///
+/// The number.
+///
+/// # Errors
+///
+/// A message when the attribute is not set or is not a number.
 fn number(
     attributes: &BTreeMap<String, Scalar>,
     name: &str,
@@ -837,6 +985,15 @@ mod tests {
         );
     }
 
+    /// Makes a node's attributes as a file states them.
+    ///
+    /// # Arguments
+    ///
+    /// * `pairs` - Each attribute, with its value as written.
+    ///
+    /// # Returns
+    ///
+    /// The attributes, by name.
     fn attributes(pairs: &[(&str, &str)]) -> BTreeMap<String, Scalar> {
         pairs
             .iter()

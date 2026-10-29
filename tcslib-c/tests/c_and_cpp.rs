@@ -33,7 +33,15 @@ fn here() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf()
 }
 
-/// Where cargo puts `libtcs.a`: the directory above this test's own.
+/// Finds where cargo puts `libtcs.a`: the directory above this test's own.
+///
+/// # Returns
+///
+/// The library's path, whether or not it has been built.
+///
+/// # Panics
+///
+/// If this test's own path cannot be found.
 fn library() -> PathBuf {
     let test = std::env::current_exe().expect("where this test is");
     let target = test
@@ -43,13 +51,22 @@ fn library() -> PathBuf {
     target.join("libtcs.a")
 }
 
-/// Build `libtcs.a` from the source as it is now, and say where it is.
+/// Builds `libtcs.a` from the source as it is now, and says where it is.
 ///
 /// `cargo test` builds this crate for its tests as an rlib and leaves the
 /// static library as the last `cargo build` left it, so a test that linked
 /// whatever was there could pass against a library older than the change
 /// it was meant to test. Built here, with the cargo and the profile running
 /// this test, it is this source's.
+///
+/// # Returns
+///
+/// The library's path.
+///
+/// # Panics
+///
+/// If cargo cannot be run, the library does not build, or it is not where
+/// [`library`] says.
 fn fresh_library() -> PathBuf {
     let library = library();
     let profile = library
@@ -90,8 +107,23 @@ fn free() -> u16 {
     port(&bound())
 }
 
-/// Compile `source` with `compiler` against `library`, or `None` where there
-/// is no compiler.
+/// Compiles a ground station against `tcs.h` and the library.
+///
+/// # Arguments
+///
+/// * `compiler` - The compiler to run: "gcc" or "g++".
+/// * `standard` - The language standard's flag, such as "-std=c11".
+/// * `source`   - The program's file, in `examples/`.
+/// * `library`  - The `libtcs.a` to link with.
+/// * `out`      - Where the program is written.
+///
+/// # Returns
+///
+/// The program's path, or `None` where there is no such compiler.
+///
+/// # Panics
+///
+/// If the compiler cannot be run for another reason, or fails.
 fn compiled(
     compiler: &str,
     standard: &str,
@@ -124,7 +156,22 @@ fn compiled(
     Some(out.to_path_buf())
 }
 
-/// Run `program` against a stand-in vehicle, and say what it printed.
+/// Runs a ground station against a stand-in vehicle, and checks what it
+/// printed.
+///
+/// # Arguments
+///
+/// * `program` - The compiled ground station.
+///
+/// # Returns
+///
+/// What the program printed on standard output, with the configuration's
+/// digest replaced by `<digest>`, which differs from run to run.
+///
+/// # Panics
+///
+/// If the program or the vehicle fails, the vehicle is not sent the
+/// commands expected, or the program does not print the lines expected.
 fn against_a_vehicle(program: &Path) -> String {
     // The vehicle's sockets: where beacons come from, where commands are
     // taken, where node commands are taken, where the moc node takes a ping,

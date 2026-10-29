@@ -36,6 +36,16 @@ use crate::style::{self, NodeType};
 /// Grey for a line whose stream cannot be told, which is a line this build
 /// does not understand: it is drawn, because a connection missing from a
 /// drawing is worse than one drawn in the wrong colour.
+///
+/// # Arguments
+///
+/// * `leaves_by` - The terminal the line leaves its source by:
+///                 `payload-out`, `moc-out`, or anything else or nothing
+///                 for a stream that cannot be told.
+///
+/// # Returns
+///
+/// The line's colour, `#rrggbb`.
 pub fn line_ink(leaves_by: Option<&str>) -> String {
     match leaves_by {
         Some("payload-out") => PAYLOAD_LINE,
@@ -126,6 +136,16 @@ pub const MOC_LINE: &str = "#0292e4";
 /// Searched offline and written down, as the palette before it was: the
 /// maths lives in `sight.rs`, which is test-only, and
 /// `tests::every_panel_is_a_ramp_from_its_own_line` holds these to the rule.
+///
+/// # Arguments
+///
+/// * `node_type` - The node type's spelling, as in a configuration's
+///                 `type:`.
+///
+/// # Returns
+///
+/// The body's colour, `#rrggbb`; the first rung of the vehicle's ramp for
+/// a type this build does not know.
 pub fn tint_of(node_type: &str) -> String {
     let pane = pane_of(node_type);
     let rungs = match pane {
@@ -170,6 +190,14 @@ pub const PAYLOAD_RUNGS: &[&str] = &[
 /// payload rungs and moved every device a rung or two down, so that a can
 /// node was no longer the colour a can node had been. Wrapping is allowed --
 /// see `tint_of` -- and moving a colour that is already in use is not.
+///
+/// # Arguments
+///
+/// * `pane` - The panel whose types are wanted.
+///
+/// # Returns
+///
+/// The spellings of the panel's node types, in ramp order.
 pub fn ramp_order(pane: Pane) -> Vec<&'static str> {
     let mut types: Vec<NodeType> = NodeType::ALL
         .iter()
@@ -184,6 +212,15 @@ pub fn ramp_order(pane: Pane) -> Vec<&'static str> {
 /// then the five apps, then the types that came after them. `null-moc` took
 /// the place and the colour of the `null` node it replaced, and the other
 /// three that replaced it come last, so that no colour already in use moved.
+///
+/// # Arguments
+///
+/// * `node_type` - The node type.
+///
+/// # Returns
+///
+/// 0 for a type the rungs were chosen for, 1 for an app, 2 for a type
+/// that came after the apps.
 pub fn came_later(node_type: NodeType) -> u8 {
     match node_type {
         NodeType::AppPayloadVeh
@@ -197,6 +234,14 @@ pub fn came_later(node_type: NodeType) -> u8 {
 }
 
 /// What a working pane is painted, at the head of its column.
+///
+/// # Arguments
+///
+/// * `ground` - The working pane.
+///
+/// # Returns
+///
+/// The pane's colour, `#rrggbb`.
 pub fn ground_of(ground: style::Ground) -> String {
     match ground {
         style::Ground::Moc => "#dee2fc",
@@ -211,6 +256,15 @@ pub fn ground_of(ground: style::Ground) -> String {
 /// A dark grey for a string that is not one, which is what the editor drew
 /// before this was shared: a colour that could not be read is drawn, as a
 /// line of the wrong colour is, rather than left out.
+///
+/// # Arguments
+///
+/// * `hex` - The colour, `#rrggbb`; the `#` may be left out.
+///
+/// # Returns
+///
+/// Its red, green and blue parts, or those of `#333333` if `hex` is not a
+/// hex number.
 pub fn rgb(hex: &str) -> (u8, u8, u8) {
     let value = u32::from_str_radix(hex.trim_start_matches('#'), 16)
         .unwrap_or(0x33_33_33);
@@ -231,6 +285,14 @@ pub fn rgb(hex: &str) -> (u8, u8, u8) {
 pub const LIGHTER_BY: f64 = 0.5;
 
 /// A shade lighter than `hex`: [`LIGHTER_BY`] of the way from it to white.
+///
+/// # Arguments
+///
+/// * `hex` - The colour to lighten, `#rrggbb`.
+///
+/// # Returns
+///
+/// The lighter shade, `#rrggbb`.
 pub fn lighter(hex: &str) -> String {
     let (r, g, b) = rgb(hex);
     let towards = |part: u8| -> u8 {
